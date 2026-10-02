@@ -23,6 +23,7 @@ final class Tests38 {
       gpuParity();
       forcing();
       cells();
+      dome();
       persistence();
       rules();
       lightning();
@@ -51,7 +52,7 @@ final class Tests38 {
          int overcast = 0;
          int rain = 0;
          int storm = 0;
-         float[] o = new float[3];
+         float[] o = new float[4];
          for (int i = 0; i < 80; i++) {
             for (int j = 0; j < 80; j++) {
                s.at(i * 190.0, j * 190.0, o);
@@ -171,8 +172,8 @@ final class Tests38 {
                double ddz = z - s.cells[k + 1];
                float dl = (float)(Math.sqrt(ddx * ddx + ddz * ddz) / s.cells[k + 2]);
                if (s.cells[k + 3] > 0 && dl < 1.0F) {
-                  float t = Math.max(0.0F, Math.min(1.0F, (1.0F - dl) * 2.0F));
-                  g += Math.max(0.0F, Weather.T1 + 0.06F - g) * (t * t * (3.0F - 2.0F * t)) * s.cells[k + 3];
+                  float t = Math.max(0.0F, Math.min(1.0F, 1.0F - dl));
+                  g += Math.max(0.0F, Weather.cellPeak() - g) * (t * t * (3.0F - 2.0F * t)) * s.cells[k + 3];
                }
             }
             g += (Math.max(s.lo, Math.min(s.hi, g)) - g) * s.amt;
@@ -209,7 +210,7 @@ final class Tests38 {
    static void forcing() {
       test("/weather forcing: clear, rain and thunder take over everywhere, fade in and out, then the natural weather returns", () -> {
          Weather w = fresh(11);
-         float[] o = new float[3];
+         float[] o = new float[4];
          w.force(2, 30);
          check(w.tickSnap.amt == 0.0F, "forcing starts at 0");
          for (int i = 0; i < 205; i++) {
@@ -292,6 +293,77 @@ final class Tests38 {
       });
    }
 
+   static void dome() {
+      test("storm cell: a dome (the thunderhead grows towards the middle), thunder under most of the cloud, distant storms are found by the sky scan", () -> {
+         Weather w = fresh(40);
+         w.enabled = true;
+         w.calm = true;
+         Weather.Cell c = w.placeStorm(1800, 0, 600);
+         Weather.Snap s = w.snap(w.ticks / 20.0);
+         float[] o = new float[4];
+         double cx = s.cells[0];
+         double cz = s.cells[1];
+         float prevCore = 2.0F;
+         float coreMid = 0;
+         float stormEdge = 0;
+         for (int k = 0; k <= 20; k++) {
+            double d = k / 20.0;
+            s.at(cx + d * 600, cz, o);
+            check(o[3] <= prevCore + 1e-5F, "the core never grows towards the rim");
+            prevCore = o[3];
+            if (k == 10) {
+               coreMid = o[3];
+            }
+            if (d < 0.35) {
+               check(o[2] > 0.95F, "full thunderstorm out to a third of the radius (at " + d + ")");
+            }
+            if (d > 0.7) {
+               check(o[2] < 0.05F, "no thunder near the rim (at " + d + ")");
+            }
+            check(o[1] <= o[0] + 1e-4F && o[2] <= o[1] + 1e-4F, "cover >= rain >= thunder");
+         }
+         s.at(cx, cz, o);
+         check(o[3] > 0.97F, "the very centre is the tallest point: " + o[3]);
+         check(coreMid < o[3] - 0.5F, "halfway out the tower is much lower, a dome: " + coreMid + " vs " + o[3]);
+         // the thunderhead stays inside the slab the shader marches
+         check(Weather.baseAlt(1.0F) + 46.0F + 28.0F + 150.0F <= Shaders.CLOUD_Y1 - 8.0F, "tallest tower fits the slab");
+         // the sky scan
+         w.tick();
+         w.scanSky(0, 0);
+         check(w.maxStorm > 0.95F && w.maxCore > 0.5F, "scan sees the storm 1800 blocks away: " + w.maxStorm + " / " + w.maxCore);
+         w.natural();
+         w.calm = true;
+         w.tick();
+         w.scanSky(0, 0);
+         check(w.maxStorm == 0.0F && w.maxCore == 0.0F, "a calm sky has nothing to scan for");
+         // the height of the mesh: centre column higher than a column halfway out
+         Game g = weatherGame(0);
+         g.world.weather.calm = true;
+         g.world.weather.placeStorm(900, 0, 600);
+         Weather.Snap sg = g.world.weather.snap(g.world.weather.ticks / 20.0);
+         WeatherFx.Result r = WeatherFx.build(sg, g.world, 8, 8);
+         float topC = columnTop(r, sg, sg.cells[0], sg.cells[1]);
+         float topM = columnTop(r, sg, sg.cells[0] + 330, sg.cells[1]);
+         check(topC > topM + 20.0F && topC > 300.0F, "centre column " + topC + " is taller than the one halfway out " + topM);
+      });
+   }
+
+   /** Highest y of the cloud vertices within 40 blocks (horizontally) of a world point. */
+   static float columnTop(WeatherFx.Result r, Weather.Snap s, double wx, double wz) {
+      float best = -1e9F;
+      for (int lv = 0; lv < 2; lv++) {
+         for (int i = 0; i < r.cloud[lv].n; i++) {
+            double x = r.cloud[lv].b.getFloat(i * 16) + (double)r.ui0[lv] * WeatherFx.CELLS[lv] + s.oax;
+            double z = r.cloud[lv].b.getFloat(i * 16 + 8) + (double)r.uj0[lv] * WeatherFx.CELLS[lv] + s.oaz;
+            if (Math.abs(x - wx) < 40 && Math.abs(z - wz) < 40) {
+               best = Math.max(best, r.cloud[lv].b.getFloat(i * 16 + 4));
+            }
+         }
+      }
+
+      return best;
+   }
+
    static void persistence() {
       test("weather is saved with the world; old worlds start under a fair sky", () -> {
          Weather w = fresh(3);
@@ -317,7 +389,7 @@ final class Tests38 {
          Weather old = fresh(3);
          old.load(new Properties());
          check(old.calmUntil > old.ticks, "a world from before 3.8 starts calm");
-         float[] o3 = new float[3];
+         float[] o3 = new float[4];
          for (int i = 0; i < 80; i++) {
             old.snap(old.ticks / 20.0).at(i * 211.0, i * 97.0, o3);
             check(o3[1] == 0.0F && o3[2] == 0.0F, "calm start: no rain, no storm");

@@ -877,7 +877,7 @@ public final class Shaders {
          GL20.glUniform3f(this.loc(this.pCloud, "ambCol"), var20, var21, var22);
          GL20.glUniform3f(this.loc(this.pCloud, "fogCol"), var11[0], var11[1], var11[2]);
          GL20.glUniform2f(this.loc(this.pCloud, "zNF"), var23, var24);
-         GL20.glUniform2f(this.loc(this.pCloud, "cloudY"), CLOUD_Y0, CLOUD_Y1);
+         GL20.glUniform2f(this.loc(this.pCloud, "cloudY"), fx.slabLo, fx.slabHi);
          GL13.glActiveTexture(33986);
          GL11.glBindTexture(3553, this.wnoiseTex);
          GL13.glActiveTexture(33985);

@@ -53,13 +53,16 @@ final class WeatherFx {
    float sunVis = 1.0F;
    /** 0..1: how grey/dark the sky is overall */
    float overcast;
+   /** the slab the cloud shader marches: thin in fair weather (like before 3.8), tall only while a thunderhead is within reach */
+   float slabLo = 140.0F;
+   float slabHi = 252.0F;
    /** the strongest bolt for the cloud glow: world position of its top and the strength 0..1 */
    float flashX;
    float flashY;
    float flashZ;
    float flashAmt;
    Weather.Snap snap;
-   final float[] tmp = new float[3];
+   final float[] tmp = new float[4];
 
    // ---------------------------------------------------------------- GL objects
    int texWhite;
@@ -116,6 +119,8 @@ final class WeatherFx {
       int kind = wx.precipKind((int)Math.floor(x), (int)Math.floor(z));
       float target = kind == 2 ? 1.0F : 0.0F;
       this.snowy += (target - this.snowy) * 0.05F;
+      this.slabLo = 164.0F - 27.0F * wx.maxStorm;
+      this.slabHi = 250.0F + 134.0F * wx.maxCore;
       this.flash = wx.suppressed ? 0.0F : wx.flashAt(x, z, partial);
       this.flashAmt = 0.0F;
       if (!wx.suppressed) {
@@ -352,6 +357,12 @@ final class WeatherFx {
       return Math.max(0.0F, Math.min(1.0F, (n - edge) * 2.6F)) * prof;
    }
 
+   /** Vertical size of the cloud above its base: thin sheets in fair weather, towers where the thunderhead (core) is, with lumpy tops. */
+   static float thickness(float cover, float core, double u, double v) {
+      float lump = Weather.samp(NOISE_R, u * (1.0 / 600.0), v * (1.0 / 600.0));
+      return 46.0F + 28.0F * cover + 150.0F * core * (0.65F + 0.35F * lump);
+   }
+
    static float groundAt(World w, int x, int z) {
       if (w == null) {
          return 64.0F;
@@ -398,7 +409,7 @@ final class WeatherFx {
       float[] cov = new float[n * n];
       float[] stm = new float[n * n];
       float[] thk = new float[n * n];
-      float[] o3 = new float[3];
+      float[] o3 = new float[4];
       for (int j = 0; j < n; j++) {
          for (int i = 0; i < n; i++) {
             int idx = j * n + i;
@@ -423,7 +434,7 @@ final class WeatherFx {
             }
 
             float base = Weather.baseAlt(storm);
-            float thick = 46.0F + 28.0F * cover + storm * 150.0F;
+            float thick = thickness(cover, o3[3], u, v);
             int first = -1;
             int last = -1;
             int steps = 14;
@@ -482,14 +493,16 @@ final class WeatherFx {
                continue;
             }
 
-            // lumpy shading: the tops of storm towers and the bellies of the clouds are not one flat grey
+            // lumpy shading: the tops of storm towers and the bellies of the clouds are not one flat grey. Sun-lit tops stay
+            // fairly bright, the flanks and above all the bases of a thunderhead are dark.
             float lump = Weather.samp(NOISE_G, cu * (1.0 / 90.0) + 0.37, cv * (1.0 / 90.0) + 0.11);
-            float dark = 1.0F - 0.50F * storm - 0.14F * cover * (1.0F - storm);
             float a = 0.90F * fade;
-            float tc = dark * (1.0F - 0.26F * storm) * (0.90F + 0.20F * lump);
+            float tc = (1.0F - 0.10F * cover) * (1.0F - 0.30F * storm) * (0.90F + 0.20F * lump);
             int ct = rgba(tc, tc, tc * 1.02F, a);
-            float bc = 0.62F * dark * (1.0F - 0.38F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
-            int cbm = rgba(bc, bc, bc * 1.04F, Math.min(1.0F, a * 1.05F));
+            float bc = (0.66F - 0.50F * storm) * (1.0F - 0.30F * cover * (1.0F - storm)) * (1.0F - 0.30F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
+            int cbm = rgba(bc, bc, bc * 1.06F, Math.min(1.0F, a * 1.05F));
+            float sideK = (0.84F - 0.50F * storm) * (1.0F - 0.12F * cover * (1.0F - storm)) * (0.92F + 0.16F * lump);
+            float grad = 0.30F + 0.40F * storm;
             // top and bottom
             cb.v(x0, t, z0, ct);
             cb.v(x0, t, z1, ct);
@@ -511,14 +524,14 @@ final class WeatherFx {
                }
 
                if (Float.isNaN(nb)) {
-                  side(cb, s, x0, x1, z0, z1, b, t, b, t, dark * (0.92F + 0.16F * lump), a);
+                  side(cb, s, x0, x1, z0, z1, b, t, b, t, sideK, grad, a);
                } else {
                   if (nb > b) {
-                     side(cb, s, x0, x1, z0, z1, b, Math.min(t, nb), b, t, dark * (0.92F + 0.16F * lump), a);
+                     side(cb, s, x0, x1, z0, z1, b, Math.min(t, nb), b, t, sideK, grad, a);
                   }
 
                   if (nt < t) {
-                     side(cb, s, x0, x1, z0, z1, Math.max(b, nt), t, b, t, dark * (0.92F + 0.16F * lump), a);
+                     side(cb, s, x0, x1, z0, z1, Math.max(b, nt), t, b, t, sideK, grad, a);
                   }
                }
             }
@@ -529,12 +542,11 @@ final class WeatherFx {
    }
 
    /** One vertical face of a cloud column between heights ya and yb; the colour darkens towards the cloud's own base. */
-   static void side(VB cb, int s, float x0, float x1, float z0, float z1, float ya, float yb, float colBot, float colTop, float dark, float a) {
+   static void side(VB cb, int s, float x0, float x1, float z0, float z1, float ya, float yb, float colBot, float colTop, float k, float grad, float a) {
       float ha = (ya - colBot) / Math.max(1.0F, colTop - colBot);
       float hb = (yb - colBot) / Math.max(1.0F, colTop - colBot);
-      float sa = 0.70F + 0.30F * ha;
-      float sb = 0.70F + 0.30F * hb;
-      float k = 0.80F * dark;
+      float sa = 1.0F - grad + grad * ha;
+      float sb = 1.0F - grad + grad * hb;
       int ca = rgba(k * sa, k * sa, k * sa * 1.03F, a);
       int cbc = rgba(k * sb, k * sb, k * sb * 1.03F, a);
       switch (s) {
@@ -570,7 +582,7 @@ final class WeatherFx {
     */
    static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res) {
       VB vb = new VB();
-      float[] o3 = new float[3];
+      float[] o3 = new float[4];
       Weather wx = world == null ? null : world.weather;
       for (int level = 0; level < 2; level++) {
          final int G = level == 0 ? 64 : 192;

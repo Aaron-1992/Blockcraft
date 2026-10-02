@@ -44,7 +44,7 @@ public final class Weather {
 
    /** cloud cover starts / is complete, rain starts / is full, thunderstorm starts / is full (quantiles of the field). */
    public static final float C0, C1, R0, R1, T0, T1;
-   /** The cap of the field in fair weather (/weather clear, /weather off, a new world): scattered cumulus, about a quarter of the sky. */
+   /** The cap of the field in fair weather (/weather clear, /weather off, a new world): cover 0.4, the look of the sky before 3.8. */
    public static final float FAIR;
    /** Standard deviation of the field; the climate cycle swings by this much. */
    public static final float SIGMA;
@@ -76,7 +76,7 @@ public final class Weather {
       R1 = v[(int)(v.length * 0.905)];
       T0 = v[(int)(v.length * 0.925)];
       T1 = v[(int)(v.length * 0.975)];
-      FAIR = C0 + 0.36F * (C1 - C0);
+      FAIR = C0 + 0.43F * (C1 - C0);
    }
 
    static byte[] bytes(float[] f) {
@@ -109,10 +109,23 @@ public final class Weather {
       return (top + (bot - top) * ty) / 255.0F;
    }
 
-   /** A storm cell's profile over its radius: a full thunderstorm out to half the radius, then rain, then overcast, gone at the rim. */
+   /**
+    * A storm cell's profile over its radius d (0 = centre, 1 = rim): a smooth bell. The field is pulled towards cellPeak() by this
+    * much, so there is a tall dome in the middle, thunder out to about half the radius, rain a bit further and overcast to the rim.
+    */
    static float cellShape(float d) {
-      float t = Math.max(0.0F, Math.min(1.0F, (1.0F - d) * 2.0F));
+      float t = Math.max(0.0F, Math.min(1.0F, 1.0F - d));
       return t * t * (3.0F - 2.0F * t);
+   }
+
+   /** How high a storm cell pulls the field at its centre: far above "full thunderstorm", so the tower grows towards the middle (a dome). */
+   static float cellPeak() {
+      return T1 + 0.20F;
+   }
+
+   /** Height of the thunderhead (0..1): keeps growing after the storm itself is "full", so cores are domes, not plateaus. */
+   static float coreOf(float s) {
+      return smooth(T0, T1 + 0.20F, s);
    }
 
    static float smooth(float e0, float e1, float x) {
@@ -277,7 +290,7 @@ public final class Weather {
             double dz = z - this.cells[i + 1];
             double r = this.cells[i + 2];
             if (dx * dx + dz * dz < r * r && this.cells[i + 3] > 0.0F) {
-               s += Math.max(0.0F, T1 + 0.06F - s) * cellShape((float)(Math.sqrt(dx * dx + dz * dz) / r)) * this.cells[i + 3];
+               s += Math.max(0.0F, cellPeak() - s) * cellShape((float)(Math.sqrt(dx * dx + dz * dz) / r)) * this.cells[i + 3];
             }
          }
 
@@ -300,12 +313,13 @@ public final class Weather {
          return this.on ? smooth(T0, T1, this.s(x, z)) : 0.0F;
       }
 
-      /** cover, rain, storm in one go (out has 3 floats). */
+      /** cover, rain, storm, core (thunderhead height) in one go (out has 4 floats). */
       public void at(double x, double z, float[] out) {
          float s = this.s(x, z);
          out[0] = smooth(C0, C1, s);
          out[1] = this.on ? smooth(R0, R1, s) : 0.0F;
          out[2] = this.on ? smooth(T0, T1, s) : 0.0F;
+         out[3] = this.on ? coreOf(s) : 0.0F;
       }
    }
 
@@ -349,7 +363,7 @@ public final class Weather {
 
    /** Summons a thunderstorm {@code dist} blocks upwind of (px, pz) that drifts over that spot. Returns the cell. */
    public Cell summonStorm(double px, double pz, double dist) {
-      Snap s = this.tickSnap;
+      Snap s = this.snap(this.ticks / 20.0);
       double wl = Math.max(0.001, Math.sqrt(s.windX * s.windX + s.windZ * s.windZ));
       double ux = s.windX / wl;
       double uz = s.windZ / wl;
@@ -359,7 +373,7 @@ public final class Weather {
       c.z = pz - uz * dist + ux * lateral;
       c.oax = s.oax;
       c.oaz = s.oaz;
-      c.radius = 420.0F + this.rnd.nextInt(120);
+      c.radius = 560.0F + this.rnd.nextInt(200);
       c.born = this.ticks;
       c.life = 16000L;
       if (this.cells.size() >= 4) {
@@ -427,6 +441,32 @@ public final class Weather {
       }
 
       return 1;
+   }
+
+   /** Highest storm and thunderhead within about 5.4 km of (px, pz): the cloud shader only has to march the tall slab when there is one. */
+   public float maxStorm;
+   public float maxCore;
+
+   public void scanSky(double px, double pz) {
+      float ms = 0.0F;
+      float mc = 0.0F;
+      float[] o = new float[4];
+      if (this.enabled && !this.suppressed) {
+         Snap s = this.tickSnap;
+         for (int ring = 0; ring <= 18; ring++) {
+            double r = ring * 300.0;
+            int n = ring == 0 ? 1 : Math.max(16, (int)(Math.PI * 2.0 * r / 240.0));
+            for (int k = 0; k < n; k++) {
+               double a = k * Math.PI * 2.0 / n;
+               s.at(px + Math.cos(a) * r, pz + Math.sin(a) * r, o);
+               ms = Math.max(ms, o[2]);
+               mc = Math.max(mc, o[3]);
+            }
+         }
+      }
+
+      this.maxStorm = ms;
+      this.maxCore = mc;
    }
 
    /** Is it raining at this block (and nothing above it)? Used for putting fires out, farmland and zombies. */
@@ -539,8 +579,13 @@ public final class Weather {
          this.wet = wetting ? Math.min(1.0F, this.wet + 1.0F / 300.0F) : Math.max(0.0F, this.wet - 1.0F / 1500.0F);
          this.tickLightning(g, px, pz);
          this.tickRainFx(g, px, pz);
+         if (this.ticks % 10 == 0) {
+            this.scanSky(px, pz);
+         }
       } else {
          this.wet = Math.max(0.0F, this.wet - 1.0F / 1500.0F);
+         this.maxStorm = 0.0F;
+         this.maxCore = 0.0F;
       }
 
       for (int i = this.bolts.size() - 1; i >= 0; i--) {
