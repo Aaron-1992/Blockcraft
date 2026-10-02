@@ -14,7 +14,8 @@ Textures, models, terrain generation and physics are all generated in code; the 
 | `package/` | `README.txt` and `Blockcraft-debug.bat` that ship next to the exe. |
 | `Blockcraft-1.12-UPDATE3.5-windows.zip` | The last build produced before the source moved here. Used as the *base kit*: it holds the bundled Windows JRE (Temurin 21) that `--full` builds re-use. |
 | `tools/` | `bootstrap.py` (get a compiler), `build.py`, `test.py`. |
-| `test/bc/` | Headless tests (package `bc`, so they can see package-private members). |
+| `test/bc/` | Headless tests in package `bc` (so they can see package-private members): `GameTests` (game logic), `Equivalence` (fingerprints vs the 3.5 jar), `TexSheet` (renders the procedural textures to a PNG for review). `test/equivalence-allowed.txt` lists the fingerprints that are *allowed* to differ from 3.5. |
+| `.github/workflows/` | `ci.yml` (javac build + all tests on every push to `arena/**`), `visual.yml` (real game under Xvfb + Mesa software OpenGL, screenshots; trigger by editing `ci/visual-trigger.txt`, its first line selects scenes). |
 | `releases/` | Output of `build.py --patch/--full` (the files the owner downloads). |
 
 ## Build
@@ -38,15 +39,41 @@ python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-wind
 ## Tests
 
 ```
-python3 tools/runtests.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation vs the ORIGINAL 3.5 jar
-python3 tools/runtests.py unit          # game-logic tests (test/bc/GameTests.java)
+python3 tools/runtests.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation/meshing vs the ORIGINAL 3.5 jar
+python3 tools/runtests.py unit          # test/bc/GameTests.java: ~3,200 checks of the game logic, no GPU needed
+python3 tools/runtests.py               # both (this is what CI runs)
 ```
 
-`Equivalence` was how the recovered source was proven faithful: 224 fingerprint lines (4 seeds of terrain,
-the threaded world+lighting pipeline, spawn search, 6000 collision trials, crafting lookups, a 600-tick
-fluid/sand/TNT simulation, every static table) are identical between the original jar and the rebuilt classes.
-Features that change behaviour on purpose will (correctly) change some fingerprints; refresh the expectation
-consciously, don't just ignore a diff.
+`GameTests` builds a real `Game` + flat `World` + `Player` without OpenGL (`Game.rend` is null; `Game.meshNow()` is the
+null-safe seam) and drives the same methods the mouse and keyboard reach: `useSpecial`, `useBlock`, `placeBlock`,
+`breakBlock`, `interact`, `useOnMob`, `World.tick`, `Player.tick`, `Mobs.tickMob`, `Mobs.blast`, save/load ...
+Remember that every `newGame()` re-seeds its RNGs identically - reuse one game when a test needs many different rolls.
+
+`Equivalence` proves that the code you did *not* touch still behaves exactly like the shipped 3.5 build: it prints
+"label = value" fingerprints (4 seeds of terrain, the threaded world+lighting pipeline, spawn search, 6000 collision
+trials, crafting lookups, a 600-tick fluid/sand/TNT simulation, chunk meshing of terrain and of every block id,
+every procedural texture, every static table) for the old jar and for the freshly built classes and compares them
+key by key. A value that changed on purpose must be listed in `test/equivalence-allowed.txt`; brand-new
+fingerprints are always accepted; anything else is a regression.
+
+**What is NOT covered headless:** everything that calls OpenGL (`Renderer`, `Shaders`, `Gui` drawing, `MobRender`
+drawing, `Lod` upload). That is what the *Visual* workflow is for.
+
+### Visual workflow (headless OpenGL on GitHub)
+
+Edit `ci/visual-trigger.txt` (first line = comma separated scene names from `tools/shots.py`, or `all`) and push:
+GitHub runs the real game under Xvfb with Mesa llvmpipe, the scenes use the game's own `-Dbc.*` hooks (below), and
+side-by-side JPEGs + `report.md` (with timings) are committed to `ci-results/shots/` on the same branch.
+Scenes marked *only new* run with the new jar only; the others also run the original 3.5 jar (`ref`) for an A/B picture.
+Logs cannot be downloaded in the assistant sandbox, so workflows copy what matters into *annotations*
+(`tools/ci_annotate.py`) which are readable through `gh api repos/<o>/<r>/check-runs/<job id>/annotations`.
+
+### Built-in test hooks (`Game.autoTest`, system properties)
+
+`-Dbc.auto=1` starts a world and exits after one screenshot (`~/.blockcraft112/screenshots`). Useful companions:
+`bc.seed`, `bc.mode`, `bc.rd` (render distance), `bc.lod`, `bc.shaders=false`, `bc.cam=x,y,z,yaw,pitch`, `bc.time`,
+`bc.shot=<frame>`, `bc.set=x,y,z,id;...` (place blocks at frame 70), `bc.summon=pig,baby:cow,sheared:sheep,...`,
+`bc.inv=creative|craft|player|furnace|chest` with `bc.page`, `bc.tnt=x,y,z`, `bc.kit`, `bc.hold=<id>`, `bc.title=<screen>`.
 
 ## How the source was recovered (2026-10-02)
 
@@ -60,6 +87,28 @@ The 3.5 source did not survive the move away from the first chat, so it was deco
   If you ever decompile again, check for this first.
 * **Local variable names are lost** (`var12`, ...): the jar had no debug info. Fields, methods and classes kept their names.
   Rename locals when you touch a method; builds now include `-g` so future decompiles keep names.
+
+## How to add content (what the code expects)
+
+**A block** (ids 159..255 are free; keep `Blocks.COUNT` = last id + 1, a block is ONE BYTE and has no metadata, so
+rotations/stages use consecutive ids):
+1. `Blocks`: constant + `def(id, name, hardness, opaque, tile)` in the static initialiser; then `kind[id]`
+   (0 cube, 1 cross, 2 box, 3 fluid, 4 stair, 5 wall torch, 6 fence, 7 crop), `box`/`coll`, `drop`, `mineClass`/`needTool`,
+   `faces(id, top, bottom, side)` for different tiles. Add it to `Blocks.creativeList()` if players should get it.
+2. Art: a function returning `int[256]` (ARGB, 16x16) in `TexExtra` and `Tex.blit(tile, pixels)` in `TexExtra.blocks()`.
+   The atlas is 16x16 tiles; tiles 0..218 are taken (3.6 uses 203 wet farmland, 204-207 carrots, 208-211 potatoes,
+   212-213 hay, 214-218 item icons 336-340). **Next free tile: 219.** Preview art with `bc.TexSheet`.
+3. Behaviour: `World.blockUpdate` (reacts to neighbour changes), `World.tickCrops` (random ticks within 32 blocks of the
+   player), `Game.useBlock` (right-click), `Game.placeBlock`, `Game.breakBlock` / `Game.blockDrops`.
+
+**An item** (ids 341..399 free; the arrays in `Items` are sized 400): `Items.def(id, name, tileOffset)` (the atlas tile is
+`65 + tileOffset`), `maxStack[]`, `maxDmg[]`, `food(id, hunger, saturation)`; icon in `TexExtra.newSprite` (range hook in
+`TexExtra.sprite`) - the registration loop in `TexExtra.blocks()` covers ids 256..399; recipes in `Recipes`
+(`shaped`, `shapeless`, `smelt`); right-click behaviour in `Game.useSpecial` (runs *before* eating and placing).
+
+**A mob** type: parallel arrays in `Mobs` (`NAME`, `HP`, `W`, `H`, `SPD`), AI in `Mobs.tickMob`, model in
+`MobRender.build`/`drawMob`, drops in `Mobs.kill`, persistence in `mobs.dat` (space separated; append fields at the end
+so old lines still load).
 
 ## Conventions / gotchas
 

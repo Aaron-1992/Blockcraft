@@ -46,7 +46,11 @@ jobs:
         continue-on-error: true
         run: |
           set -o pipefail
-          timeout 33m python3 tools/shots.py --scenes "${{ github.event.inputs.scenes || 'all' }}" 2>&1 | tee build/shots.log
+          SCENES="${{ github.event.inputs.scenes }}"
+          if [ -z "$SCENES" ]; then SCENES="$(head -n1 ci/visual-trigger.txt | tr -d '[:space:]')"; fi
+          case "$SCENES" in ''|*[!a-z0-9,-]*|[0-9]*) SCENES=all;; esac
+          echo "scenes: $SCENES"
+          timeout 33m python3 tools/shots.py --scenes "$SCENES" 2>&1 | tee build/shots.log
 
       - name: Output (readable through the check-run API)
         if: always()
@@ -56,6 +60,7 @@ jobs:
           python3 tools/ci_annotate.py build/shots-ls.txt "shots files" notice
 
       - name: Commit results to the branch
+        if: always()
         run: |
           git config user.name "blockcraft-ci"
           git config user.email "blockcraft-ci@users.noreply.github.com"

@@ -24,25 +24,55 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "ci-results", "shots")
+TIMES = []
 
-# Spawn of seed 12345 is around x=133,z=71 (see Equivalence output) with terrain ~y=70.
-COMMON = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=48"]
+# Seed 12345: spawn is around x=133,z=71; there is a flat grass strip (surface y=66) around x=138..150, z=73..76.
+COMMON = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32"]
 CAM = "-Dbc.cam=133,92,71,45,22"
+PLAIN = ["-Dbc.shaders=false"]
+
+
+def sets(blocks):
+    """bc.set hook: 'x,y,z,id;...' - blocks are placed at frame 70 of the run."""
+    return "-Dbc.set=" + ";".join("%d,%d,%d,%d" % b for b in blocks)
+
+
+def farm_blocks():
+    """3 rows of crops in all 8 growth stages on wet farmland, a dry plot, an irrigation ditch and hay bales."""
+    out = []
+    gy = 66  # ground (grass) level of the strip
+    for z in range(72, 80):
+        out.append((137, gy, z, 50))          # water column west of the field: x=137
+        for x in range(138, 150):
+            out.append((x, gy + 1, z, 0))     # clear anything above
+            out.append((x, gy + 2, z, 0))
+    for i in range(8):
+        x = 138 + i
+        for z, base in ((73, 124), (74, 142), (75, 150)):
+            out.append((x, gy, z, 141))       # wet farmland
+            out.append((x, gy + 1, z, base + i))
+        out.append((x, gy, 76, 123))          # dry, empty farmland row
+        out.append((x, gy, 77, 123))
+        out.append((x, gy + 1, 77, 124))      # dry farmland with a young wheat plant
+    for x, z in ((147, 73), (148, 73), (147, 74), (148, 74)):
+        out.append((x, gy + 1, z, 158))
+    out.append((147, gy + 2, 73, 158))
+    return out
+
 
 # name -> (props, only_new)
-# Software OpenGL is slow: the shader pack (raymarched clouds, shadows, bloom) can take seconds per frame at
-# 720p, so almost every scene uses the plain renderer; only one scene exercises shaders, with very few frames.
-PLAIN = ["-Dbc.shaders=false"]
+# Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
     "title":          (["-Dbc.title=TITLE"], False),
-    "day-plain":      (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=120"], False),
-    "night":          (COMMON + ["-Dbc.cam=133,80,71,45,15", "-Dbc.time=18000"] + PLAIN + ["-Dbc.shot=120"], False),
-    "mobs":           (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=pig,cow,sheep,chicken,zombie,skeleton,creeper,spider", "-Dbc.shot=150"], False),
-    "inv-creative-1": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=0", "-Dbc.shot=130"], False),
-    "inv-creative-2": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=1", "-Dbc.shot=130"], False),
-    "inv-craft":      (COMMON + [CAM] + PLAIN + ["-Dbc.inv=craft", "-Dbc.shot=130"], False),
-    "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32", CAM, "-Dbc.time=6000", "-Dbc.shot=30"], False),
+    "day-plain":      (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=100"], False),
+    "mobs":           (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=pig,cow,sheep,chicken,zombie,skeleton,creeper,spider", "-Dbc.shot=110"], False),
+    "farm":           (COMMON + ["-Dbc.cam=143.5,71,68.5,0,30", "-Dbc.time=6000"] + PLAIN + [sets(farm_blocks()), "-Dbc.shot=170"], True),
+    "farm-close":     (COMMON + ["-Dbc.cam=141.5,69.3,70.8,0,38", "-Dbc.time=6000"] + PLAIN + [sets(farm_blocks()), "-Dbc.shot=170"], True),
+    "mobs36":         (COMMON + ["-Dbc.cam=133,70,60,0,20", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=baby:pig,pig,baby:cow,cow,sheared:sheep,sheep,baby:sheep,baby:chicken", "-Dbc.shot=120"], True),
+    "inv-creative-2": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=1", "-Dbc.shot=110"], True),
+    "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }
+DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "mobs36", "inv-creative-2"]
 
 
 def run_scene(java, label, jar, name, props, timeout):
@@ -59,6 +89,7 @@ def run_scene(java, label, jar, name, props, timeout):
         status = "TIMEOUT"
         err = ""
     dt = time.time() - t0
+    TIMES.append("%s/%s: %s in %.0fs" % (name, label, status, dt))
     shots = sorted(glob.glob(os.path.join(home, ".blockcraft112", "screenshots", "*.png")))
     log = os.path.join(home, ".blockcraft112", "latest.log")
     os.makedirs(os.path.join(OUT, "logs"), exist_ok=True)
@@ -106,13 +137,14 @@ def write_report(rows):
         f.write("# Visual run %s\n\n| scene | rendered by | differing pixels (ref vs new) |\n|---|---|---|\n" % time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()))
         for r in rows:
             f.write("| %s | %s | %s |\n" % (r["scene"], ", ".join(r["have"]) or "NOTHING", "n/a" if r["diff"] is None else "%.2f%%" % r["diff"]))
+        f.write("\n## timings\n\n" + "\n".join("- " + t for t in TIMES) + "\n")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenes", default="all")
     ap.add_argument("--jar", action="append", help="label=path (repeatable)")
-    ap.add_argument("--timeout", type=int, default=180)
+    ap.add_argument("--timeout", type=int, default=240)
     a = ap.parse_args()
     jars = {}
     if a.jar:
@@ -124,7 +156,7 @@ def main():
         import runtests as T  # reuses reference_jar()
         jars = {"ref": T.reference_jar(), "new": os.path.join(ROOT, "build", "blockcraft.jar")}
     java = shutil.which("java") or "java"
-    names = list(SCENES) if a.scenes == "all" else [s.strip() for s in a.scenes.split(",")]
+    names = DEFAULT_SCENES if a.scenes == "all" else [x.strip() for x in a.scenes.split(",") if x.strip()]
     shutil.rmtree(OUT, ignore_errors=True)
     os.makedirs(OUT, exist_ok=True)
     rows = []
