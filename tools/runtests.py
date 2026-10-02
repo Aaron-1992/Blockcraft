@@ -57,8 +57,9 @@ def equivalence(classes):
     new = run_java([TEST_CLASSES, classes, LWJGL], "bc.Equivalence")
     for tag, r in (("reference 3.5 jar", old), ("rebuilt classes", new)):
         if r.returncode != 0:
-            print(r.stderr[-2000:])
-            sys.exit("equivalence run failed for " + tag)
+            print("--- stdout (tail) ---\n" + r.stdout[-2500:])
+            print("--- stderr (tail) ---\n" + r.stderr[-2500:])
+            sys.exit("equivalence run failed for %s (exit code %s)" % (tag, r.returncode))
     a, b = old.stdout.splitlines(), new.stdout.splitlines()
     diffs = [(i, x, y) for i, (x, y) in enumerate(zip(a, b)) if x != y]
     if len(a) != len(b):
