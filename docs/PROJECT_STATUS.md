@@ -2,6 +2,22 @@
 
 _Last updated: 2026-10-02 (Update 3.7)._
 
+## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
+
+| # | Item | State |
+|---|---|---|
+| 1 | Weather system with volumetric clouds, storms and rain visible in the distance, working without shaders | **Update 3.8 - in progress** (weather field, clouds in both render paths, rain / snow / lightning; see below) |
+| 2 | Fix LODs and adapt them for the weather system | next |
+| 3 | Skins (easy import of Minecraft skins) | planned |
+| 4 | Smooth animations | planned |
+| 5 | Natural disasters | planned (builds on the weather system: lightning fires, storms) |
+| 6 | Trees fall over when chopped; the fallen trunk can be harvested further | planned |
+| 7 | Slabs, stairs etc. on the top half of a block / upside down | planned |
+| 8 | Make creepers ignitable | planned |
+| 9 | Fire drawn like in Minecraft when attached to a block | planned |
+| 10 | Hide interior surfaces (performance) | planned |
+| 11 | Fix mobs not being able to jump up a block | planned |
+
 ## What it is
 
 Blockcraft is an original Minecraft-Java-1.12-style block sandbox for Windows ("an original clone": no Mojang code or
