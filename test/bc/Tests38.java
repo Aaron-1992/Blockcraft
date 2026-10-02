@@ -166,13 +166,14 @@ final class Tests38 {
             float a = Weather.samp(Weather.MAP_A, (px - mod(s.oax, 9000)) / 9000.0, (pz - mod(s.oaz, 9000)) / 9000.0);
             float b = Weather.samp(Weather.MAP_B, (px - mod(s.obx, 9000)) / 4500.0, (pz - mod(s.obz, 9000)) / 4500.0);
             float g = 0.62F * a + 0.38F * b + s.bias;
+            g += (Math.max(Weather.FAIR_LO, Math.min(g, Weather.FAIR)) - g) * s.calmAmt; // (the calm clamp comes before the cells)
             for (int k = 0; k < s.cells.length; k += 4) {
                // cell positions arrive relative to the camera (here: the sample point plays the camera)
                double ddx = x - s.cells[k];
                double ddz = z - s.cells[k + 1];
                float dl = (float)(Math.sqrt(ddx * ddx + ddz * ddz) / s.cells[k + 2]);
                if (s.cells[k + 3] > 0 && dl < 1.0F) {
-                  float t = Math.max(0.0F, Math.min(1.0F, 1.0F - dl));
+                  float t = Math.max(0.0F, Math.min(1.0F, (1.0F - dl) * 1.6F));
                   g += Math.max(0.0F, Weather.cellPeak() - g) * (t * t * (3.0F - 2.0F * t)) * s.cells[k + 3];
                }
             }
@@ -311,20 +312,20 @@ final class Tests38 {
             s.at(cx + d * 600, cz, o);
             check(o[3] <= prevCore + 1e-5F, "the core never grows towards the rim");
             prevCore = o[3];
-            if (k == 10) {
-               coreMid = o[3];
+            if (k == 13) {
+               coreMid = o[3]; // 0.65 of the radius
             }
-            if (d < 0.35) {
-               check(o[2] > 0.95F, "full thunderstorm out to a third of the radius (at " + d + ")");
+            if (d < 0.5) {
+               check(o[2] > 0.95F, "full thunderstorm out to half the radius (at " + d + ")");
             }
-            if (d > 0.7) {
+            if (d > 0.85) {
                check(o[2] < 0.05F, "no thunder near the rim (at " + d + ")");
             }
             check(o[1] <= o[0] + 1e-4F && o[2] <= o[1] + 1e-4F, "cover >= rain >= thunder");
          }
          s.at(cx, cz, o);
          check(o[3] > 0.97F, "the very centre is the tallest point: " + o[3]);
-         check(coreMid < o[3] - 0.5F, "halfway out the tower is much lower, a dome: " + coreMid + " vs " + o[3]);
+         check(coreMid < o[3] - 0.5F, "two thirds out the tower is much lower, a dome: " + coreMid + " vs " + o[3]);
          // the thunderhead stays inside the slab the shader marches
          check(Weather.baseAlt(1.0F) + 46.0F + 28.0F + 150.0F <= Shaders.CLOUD_Y1 - 8.0F, "tallest tower fits the slab");
          // the sky scan
@@ -343,8 +344,8 @@ final class Tests38 {
          Weather.Snap sg = g.world.weather.snap(g.world.weather.ticks / 20.0);
          WeatherFx.Result r = WeatherFx.build(sg, g.world, 8, 8);
          float topC = columnTop(r, sg, sg.cells[0], sg.cells[1]);
-         float topM = columnTop(r, sg, sg.cells[0] + 330, sg.cells[1]);
-         check(topC > topM + 20.0F && topC > 300.0F, "centre column " + topC + " is taller than the one halfway out " + topM);
+         float topM = columnTop(r, sg, sg.cells[0] + 480, sg.cells[1]);
+         check(topC > topM + 40.0F && topC > 300.0F, "centre column " + topC + " is taller than the one 0.8 of the radius out " + topM);
       });
    }
 

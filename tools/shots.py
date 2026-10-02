@@ -132,7 +132,7 @@ SCENES = {
     "wx-fair":        (WXC + ["-Dbc.cam=133,95,71,-90,0", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
     "wx-storm":       (WXC + ["-Dbc.cam=133,95,71,-90,0", "-Dbc.weather=cell:1150,-60,620", "-Dbc.lightning=off", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
     "wx-storm-far":   (WXC + ["-Dbc.cam=133,95,71,-90,0", "-Dbc.weather=cell:2400,-100,720", "-Dbc.lightning=off", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
-    "wx-storm-bolt":  (WXC + ["-Dbc.cam=133,95,71,-90,0", "-Dbc.weather=cell:1000,-60,620", "-Dbc.lightning=off", "-Dbc.bolt=650,-40", "-Dbc.time=12800"] + PLAIN + ["-Dbc.shot=190"], True),
+    "wx-storm-bolt":  (WXC + ["-Dbc.cam=133,95,71,-90,0", "-Dbc.weather=cell:1000,-60,620", "-Dbc.lightning=off", "-Dbc.bolt=650,-40", "-Dbc.time=12300"] + PLAIN + ["-Dbc.shot=190"], True),
     "wx-rain":        (WXC + ["-Dbc.cam=133,69,71,-70,2", "-Dbc.weather=rain", "-Dbc.lightning=off", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
     "wx-overcast":    (WXC + ["-Dbc.cam=133,69,71,-90,-28", "-Dbc.weather=thunder", "-Dbc.lightning=off", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
     "wx-snow":        (WXC + ["-Dbc.cam=133,69,71,-70,2", "-Dbc.weather=rain", "-Dbc.biome=5", "-Dbc.lightning=off", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),

@@ -46,6 +46,8 @@ public final class Weather {
    public static final float C0, C1, R0, R1, T0, T1;
    /** The cap of the field in fair weather (/weather clear, /weather off, a new world): cover 0.4, the look of the sky before 3.8. */
    public static final float FAIR;
+   /** ... and its floor: in fair weather the sky is never completely empty (cover 0.15), like the old constant-coverage sky. */
+   public static final float FAIR_LO;
    /** Standard deviation of the field; the climate cycle swings by this much. */
    public static final float SIGMA;
 
@@ -70,13 +72,14 @@ public final class Weather {
 
       SIGMA = (float)Math.sqrt(var / v.length);
       Arrays.sort(v);
-      C0 = v[(int)(v.length * 0.42)];
+      C0 = v[(int)(v.length * 0.30)];
       C1 = v[(int)(v.length * 0.74)];
       R0 = v[(int)(v.length * 0.83)];
       R1 = v[(int)(v.length * 0.905)];
       T0 = v[(int)(v.length * 0.925)];
       T1 = v[(int)(v.length * 0.975)];
       FAIR = C0 + 0.43F * (C1 - C0);
+      FAIR_LO = C0 + 0.22F * (C1 - C0);
    }
 
    static byte[] bytes(float[] f) {
@@ -110,11 +113,12 @@ public final class Weather {
    }
 
    /**
-    * A storm cell's profile over its radius d (0 = centre, 1 = rim): a smooth bell. The field is pulled towards cellPeak() by this
-    * much, so there is a tall dome in the middle, thunder out to about half the radius, rain a bit further and overcast to the rim.
+    * A storm cell's profile over its radius d (0 = centre, 1 = rim): a smooth bump with a small flat top. The field is pulled
+    * towards cellPeak() by this much: the thunderhead is at full height out to ~0.4 of the radius, thunder reaches ~0.7, rain
+    * a bit further and the overcast sheet the rim.
     */
    static float cellShape(float d) {
-      float t = Math.max(0.0F, Math.min(1.0F, 1.0F - d));
+      float t = Math.max(0.0F, Math.min(1.0F, (1.0F - d) * 1.6F));
       return t * t * (3.0F - 2.0F * t);
    }
 
@@ -282,7 +286,7 @@ public final class Weather {
          float b = samp(MAP_B, (x - this.obx) * SB, (z - this.obz) * SB);
          float s = 0.62F * a + 0.38F * b + this.bias;
          if (this.calmAmt > 0.0F) {
-            s += (Math.min(s, FAIR) - s) * this.calmAmt;
+            s += (Math.max(FAIR_LO, Math.min(s, FAIR)) - s) * this.calmAmt;
          }
 
          for (int i = 0; i < this.cells.length; i += 4) {
@@ -298,7 +302,7 @@ public final class Weather {
             s += (Math.max(this.lo, Math.min(this.hi, s)) - s) * this.amt;
          }
 
-         return this.on ? s : Math.min(s, FAIR);
+         return this.on ? s : Math.max(FAIR_LO, Math.min(s, FAIR));
       }
 
       public float cover(double x, double z) {

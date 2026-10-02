@@ -871,7 +871,7 @@ public final class Shaders {
 
          GL20.glUniform4fv(this.loc(this.pCloud, "wCells[0]"), cells);
          GL20.glUniform4f(this.loc(this.pCloud, "wFlash"), fx.flashX - (float)var3, fx.flashY - (float)var5, fx.flashZ - (float)var7, fx.flashAmt);
-         GL20.glUniform3f(this.loc(this.pCloud, "wOnCap"), sn.on ? 1.0F : 0.0F, Weather.FAIR, sn.calmAmt);
+         GL20.glUniform4f(this.loc(this.pCloud, "wOnCap"), sn.on ? 1.0F : 0.0F, Weather.FAIR, sn.calmAmt, Weather.FAIR_LO);
          GL20.glUniform3f(this.loc(this.pCloud, "sunDir"), this.sunX, this.sunY, this.sunZ);
          GL20.glUniform3f(this.loc(this.pCloud, "sunCol"), var16 * var14, var17 * var14, var18 * var14);
          GL20.glUniform3f(this.loc(this.pCloud, "ambCol"), var20, var21, var22);
