@@ -176,24 +176,37 @@ def build_patch_zip(ver, exe_path, jar_path):
     return out
 
 
-def build_full_zip(ver, exe_path, jar_path):
-    out = os.path.join(ROOT, "releases", "Blockcraft-1.12-UPDATE%s-windows.zip" % ver)
+def compose_full_zip(out, replacements):
+    """Complete game zip = the 3.5 base kit (bundled JRE etc.) with some files replaced.
+
+    replacements: archive name inside the zip (e.g. 'Blockcraft/Blockcraft.exe') -> (bytes, unix mode)
+    Everything else is copied byte-for-byte from the base zip (deterministic timestamps).
+    """
     os.makedirs(os.path.dirname(out), exist_ok=True)
-    replaced = {"Blockcraft/Blockcraft.exe", "Blockcraft/blockcraft.jar"} | {"Blockcraft/" + n for n in package_files()}
     with zipfile.ZipFile(BASE_ZIP) as base, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
         for i in base.infolist():
-            if i.filename in replaced:
+            if i.filename in replacements:
                 continue
             zi = zipfile.ZipInfo(i.filename, FIXED_TIME)
-            zi.compress_type = zipfile.ZIP_STORED if i.filename.endswith("/lib/modules") and False else zipfile.ZIP_DEFLATED
+            zi.compress_type = zipfile.ZIP_DEFLATED
             zi.external_attr = i.external_attr
             z.writestr(zi, base.read(i))
-        add(z, "Blockcraft/Blockcraft.exe", open(exe_path, "rb").read(), 0o755)
-        add(z, "Blockcraft/blockcraft.jar", open(jar_path, "rb").read())
-        for n, data in package_files().items():
-            add(z, "Blockcraft/" + n, data)
+        for name in sorted(replacements):
+            data, mode = replacements[name]
+            add(z, name, data, mode)
     print("[build] %s  (%.2f MB)" % (os.path.relpath(out, ROOT), os.path.getsize(out) / 1e6))
     return out
+
+
+def build_full_zip(ver, exe_path, jar_path):
+    out = os.path.join(ROOT, "releases", "Blockcraft-1.12-UPDATE%s-windows.zip" % ver)
+    rep = {
+        "Blockcraft/Blockcraft.exe": (open(exe_path, "rb").read(), 0o755),
+        "Blockcraft/blockcraft.jar": (open(jar_path, "rb").read(), 0o644),
+    }
+    for n, data in package_files().items():
+        rep["Blockcraft/" + n] = (data, 0o644)
+    return compose_full_zip(out, rep)
 
 
 def main():
