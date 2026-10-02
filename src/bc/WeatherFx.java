@@ -27,12 +27,14 @@ import org.lwjgl.opengl.GL30;
  */
 final class WeatherFx {
    // ---------------------------------------------------------------- cloud mesh parameters
-   static final int CELL = 16;
-   static final int LAYER = 6;
-   static final int RAD = 80;
-   static final int N = RAD * 2;
-   static final float FAR_FOG0 = 1100.0F;
-   static final float FAR_FOG1 = 3600.0F;
+   /** two levels of cloud blocks: fine ones near the camera, coarse ones out to 3.6 km so storms are visible from far away */
+   static final int[] CELLS = {16, 48};
+   static final int[] LAYERS = {6, 16};
+   static final int[] RADS = {70, 75};
+   /** the fine level covers this many blocks around the camera (square), the coarse level starts there */
+   static final float NEAR_R = 1120.0F;
+   static final float FAR_FOG0 = 500.0F;
+   static final float FAR_FOG1 = 4300.0F;
    /** the cloud shader's noise (R = coarse 1800-block structure, G = fine 300-block structure), same maps on the CPU */
    static final byte[] NOISE_R = Weather.bytes(Shaders.fbm(256, new int[]{4, 8, 16, 32}, new float[]{0.5F, 0.28F, 0.15F, 0.07F}, 1337L));
    static final byte[] NOISE_G = Weather.bytes(Shaders.fbm(256, new int[]{16, 32, 64}, new float[]{0.5F, 0.3F, 0.2F}, 4242L));
@@ -64,12 +66,12 @@ final class WeatherFx {
    int texRain;
    int texSnow;
    int texShaft;
-   int vboCloud;
+   final int[] vboCloud = new int[2];
    int vboShaft;
-   int nCloud;
+   final int[] nCloud = new int[2];
    int nShaft;
-   int ui0;
-   int uj0;
+   final int[] ui0 = new int[2];
+   final int[] uj0 = new int[2];
    double builtTs = -1.0E9;
    double builtCamX;
    double builtCamZ;
@@ -175,7 +177,7 @@ final class WeatherFx {
       }
 
       this.texWhite = Tex.upload(1, 1, new int[]{-1}, false, true);
-      this.texRain = mip(Tex.upload(64, 128, streaks(64, 128, 11, 14, 46, 0.55F, 6001L), true, true));
+      this.texRain = mip(Tex.upload(64, 128, streaks(64, 128, 12, 12, 40, 0.50F, 6001L), true, true));
       this.texShaft = mip(Tex.upload(64, 256, streaks(64, 256, 26, 24, 90, 0.9F, 6002L), true, true));
       this.texSnow = mip(Tex.upload(32, 32, flakes(32, 3, 6003L), true, true));
    }
@@ -281,10 +283,11 @@ final class WeatherFx {
    }
 
    static final class Result {
-      VB cloud;
+      /** cloud blocks per level (0 = fine, 1 = coarse) */
+      final VB[] cloud = new VB[2];
       VB shaft;
-      int ui0;
-      int uj0;
+      final int[] ui0 = new int[2];
+      final int[] uj0 = new int[2];
       double ts;
       double camX;
       double camZ;
@@ -332,28 +335,51 @@ final class WeatherFx {
       res.camZ = camZ;
       res.offX = sn.oax;
       res.offZ = sn.oaz;
-      // window in u-space (the drifting frame of layer A), centred on the camera
-      int ci = (int)Math.floor((camX - sn.oax) / CELL);
-      int cj = (int)Math.floor((camZ - sn.oaz) / CELL);
-      res.ui0 = ci - RAD;
-      res.uj0 = cj - RAD;
-      float[] top = new float[N * N];
-      float[] bot = new float[N * N];
-      float[] cov = new float[N * N];
-      float[] stm = new float[N * N];
-      float[] thk = new float[N * N];
+      for (int lv = 0; lv < 2; lv++) {
+         res.cloud[lv] = cloudLevel(sn, camX, camZ, lv, res);
+      }
+
+      res.shaft = shafts(sn, world, camX, camZ, res);
+      return res;
+   }
+
+   /** One level of blocky clouds: a column per cell with a bottom and a top, faces only where a neighbour does not cover them. */
+   static VB cloudLevel(Weather.Snap sn, double camX, double camZ, int lv, Result res) {
+      final int cell = CELLS[lv];
+      final float layer = LAYERS[lv];
+      final int rad = RADS[lv];
+      final int n = rad * 2;
+      int ci = (int)Math.floor((camX - sn.oax) / cell);
+      int cj = (int)Math.floor((camZ - sn.oaz) / cell);
+      int ui0 = ci - rad;
+      int uj0 = cj - rad;
+      res.ui0[lv] = ui0;
+      res.uj0[lv] = uj0;
+      float[] top = new float[n * n];
+      float[] bot = new float[n * n];
+      float[] cov = new float[n * n];
+      float[] stm = new float[n * n];
+      float[] thk = new float[n * n];
       float[] o3 = new float[3];
-      for (int j = 0; j < N; j++) {
-         for (int i = 0; i < N; i++) {
-            int idx = j * N + i;
-            double u = (res.ui0 + i + 0.5) * CELL;
-            double v = (res.uj0 + j + 0.5) * CELL;
+      for (int j = 0; j < n; j++) {
+         for (int i = 0; i < n; i++) {
+            int idx = j * n + i;
+            double u = (ui0 + i + 0.5) * cell;
+            double v = (uj0 + j + 0.5) * cell;
+            top[idx] = bot[idx] = Float.NaN;
+            if (lv == 1 && Math.abs(u + sn.oax - camX) < NEAR_R - 24.0F && Math.abs(v + sn.oaz - camZ) < NEAR_R - 24.0F) {
+               continue; // the fine level covers this
+            }
+
+            if (lv == 0 && (Math.abs(u + sn.oax - camX) > NEAR_R || Math.abs(v + sn.oaz - camZ) > NEAR_R)) {
+               continue;
+            }
+
             sn.at(u + sn.oax, v + sn.oaz, o3);
             float cover = o3[0];
             float storm = o3[2];
             cov[idx] = cover;
             stm[idx] = storm;
-            top[idx] = bot[idx] = Float.NaN;
             if (cover < 0.03F) {
                continue;
             }
@@ -382,45 +408,49 @@ final class WeatherFx {
             float y0 = base + (first - 0.5F) / steps * thick;
             float y1 = base + (last + 0.5F) / steps * thick;
             // a ragged, lowered base under storm clouds
-            y0 -= storm * (Weather.samp(NOISE_G, u * (1.0 / 140.0), v * (1.0 / 140.0)) * 20.0F);
-            int kb = Math.round(y0 / LAYER);
-            int kt = Math.max(kb + 1, Math.round(y1 / LAYER));
-            bot[idx] = kb * LAYER;
-            top[idx] = kt * LAYER;
+            y0 -= storm * (Weather.samp(NOISE_G, u * (1.0 / 140.0), v * (1.0 / 140.0)) * 22.0F);
+            int kb = Math.round(y0 / layer);
+            int kt = Math.max(kb + 1, Math.round(y1 / layer));
+            bot[idx] = kb * layer;
+            top[idx] = kt * layer;
             thk[idx] = top[idx] - bot[idx];
          }
       }
 
       VB cb = new VB();
-      float edgeR = RAD * CELL;
-      for (int j = 0; j < N; j++) {
-         for (int i = 0; i < N; i++) {
-            int idx = j * N + i;
+      final float edgeR = RADS[1] * (float)CELLS[1];
+      for (int j = 0; j < n; j++) {
+         for (int i = 0; i < n; i++) {
+            int idx = j * n + i;
             if (Float.isNaN(top[idx])) {
                continue;
             }
 
             float b = bot[idx];
             float t = top[idx];
-            float x0 = i * CELL;
-            float x1 = x0 + CELL;
-            float z0 = j * CELL;
-            float z1 = z0 + CELL;
+            float x0 = i * cell;
+            float x1 = x0 + cell;
+            float z0 = j * cell;
+            float z1 = z0 + cell;
             float storm = stm[idx];
             float cover = cov[idx];
-            float dark = 1.0F - 0.52F * storm - 0.14F * cover * (1.0F - storm);
-            float dx = (float)((res.ui0 + i + 0.5) * CELL + sn.oax - camX);
-            float dz = (float)((res.uj0 + j + 0.5) * CELL + sn.oaz - camZ);
+            double cu = (ui0 + i + 0.5) * cell;
+            double cv = (uj0 + j + 0.5) * cell;
+            float dx = (float)(cu + sn.oax - camX);
+            float dz = (float)(cv + sn.oaz - camZ);
             float dd = (float)Math.sqrt(dx * dx + dz * dz);
-            float fade = 1.0F - Weather.smooth(edgeR * 0.78F, edgeR * 0.98F, dd);
+            float fade = lv == 1 ? 1.0F - Weather.smooth(edgeR * 0.80F, edgeR * 0.97F, dd) : 1.0F;
             if (fade <= 0.01F) {
                continue;
             }
 
+            // lumpy shading: the tops of storm towers and the bellies of the clouds are not one flat grey
+            float lump = Weather.samp(NOISE_G, cu * (1.0 / 90.0) + 0.37, cv * (1.0 / 90.0) + 0.11);
+            float dark = 1.0F - 0.50F * storm - 0.14F * cover * (1.0F - storm);
             float a = 0.90F * fade;
-            float tc = dark * (1.0F - 0.30F * storm);
+            float tc = dark * (1.0F - 0.26F * storm) * (0.90F + 0.20F * lump);
             int ct = rgba(tc, tc, tc * 1.02F, a);
-            float bc = 0.60F * dark * (1.0F - 0.38F * Math.min(1.0F, thk[idx] / 80.0F));
+            float bc = 0.62F * dark * (1.0F - 0.38F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
             int cbm = rgba(bc, bc, bc * 1.04F, Math.min(1.0F, a * 1.05F));
             // top and bottom
             cb.v(x0, t, z0, ct);
@@ -437,29 +467,27 @@ final class WeatherFx {
                int nj = j + (s == 2 ? 1 : (s == 3 ? -1 : 0));
                float nb = Float.NaN;
                float nt = Float.NaN;
-               if (ni >= 0 && nj >= 0 && ni < N && nj < N) {
-                  nb = bot[nj * N + ni];
-                  nt = top[nj * N + ni];
+               if (ni >= 0 && nj >= 0 && ni < n && nj < n) {
+                  nb = bot[nj * n + ni];
+                  nt = top[nj * n + ni];
                }
 
                if (Float.isNaN(nb)) {
-                  side(cb, s, x0, x1, z0, z1, b, t, b, t, dark, a);
+                  side(cb, s, x0, x1, z0, z1, b, t, b, t, dark * (0.92F + 0.16F * lump), a);
                } else {
                   if (nb > b) {
-                     side(cb, s, x0, x1, z0, z1, b, Math.min(t, nb), b, t, dark, a);
+                     side(cb, s, x0, x1, z0, z1, b, Math.min(t, nb), b, t, dark * (0.92F + 0.16F * lump), a);
                   }
 
                   if (nt < t) {
-                     side(cb, s, x0, x1, z0, z1, Math.max(b, nt), t, b, t, dark, a);
+                     side(cb, s, x0, x1, z0, z1, Math.max(b, nt), t, b, t, dark * (0.92F + 0.16F * lump), a);
                   }
                }
             }
          }
       }
 
-      res.cloud = cb;
-      res.shaft = shafts(sn, world, camX, camZ, res);
-      return res;
+      return cb;
    }
 
    /** One vertical face of a cloud column between heights ya and yb; the colour darkens towards the cloud's own base. */
@@ -498,84 +526,91 @@ final class WeatherFx {
       }
    }
 
-   /** The rain / snow curtains: three crossing vertical planes per 64-block grid point where it rains, soft at the edges. */
+   /**
+    * The rain / snow curtains: three crossing vertical planes per grid point where it rains, soft at the edges. A fine grid
+    * (64 blocks) near the camera and a coarse one (192 blocks) out to 3.6 km, so a storm on the horizon has its rain too.
+    */
    static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res) {
       VB vb = new VB();
-      final int G = 64;
-      final int RG = 24;
-      int gx0 = (int)Math.floor(camX / G);
-      int gz0 = (int)Math.floor(camZ / G);
       float[] o3 = new float[3];
       Weather wx = world == null ? null : world.weather;
-      for (int dj = -RG; dj <= RG; dj++) {
-         for (int di = -RG; di <= RG; di++) {
-            double wx0 = (gx0 + di + 0.5) * G;
-            double wz0 = (gz0 + dj + 0.5) * G;
-            double dxc = wx0 - camX;
-            double dzc = wz0 - camZ;
-            double dist = Math.sqrt(dxc * dxc + dzc * dzc);
-            if (dist > RG * G || dist < 14.0) {
-               continue;
-            }
+      for (int level = 0; level < 2; level++) {
+         final int G = level == 0 ? 64 : 192;
+         final int RG = level == 0 ? 20 : 19;
+         final float inner = level == 0 ? 14.0F : 1180.0F;
+         final float outer = level == 0 ? 1280.0F : 3600.0F;
+         final float hw = G * 0.97F;
+         int gx0 = (int)Math.floor(camX / G);
+         int gz0 = (int)Math.floor(camZ / G);
+         for (int dj = -RG; dj <= RG; dj++) {
+            for (int di = -RG; di <= RG; di++) {
+               double wx0 = (gx0 + di + 0.5) * G;
+               double wz0 = (gz0 + dj + 0.5) * G;
+               double dxc = wx0 - camX;
+               double dzc = wz0 - camZ;
+               float dist = (float)Math.sqrt(dxc * dxc + dzc * dzc);
+               if (dist > outer || dist < inner) {
+                  continue;
+               }
 
-            sn.at(wx0, wz0, o3);
-            float rain = o3[1];
-            if (rain < 0.10F) {
-               continue;
-            }
+               sn.at(wx0, wz0, o3);
+               float rain = o3[1];
+               if (rain < 0.10F) {
+                  continue;
+               }
 
-            int kind = wx == null ? 1 : wx.precipKind((int)Math.floor(wx0), (int)Math.floor(wz0));
-            if (kind < 0) {
-               continue;
-            }
+               int kind = wx == null ? 1 : wx.precipKind((int)Math.floor(wx0), (int)Math.floor(wz0));
+               if (kind < 0) {
+                  continue;
+               }
 
-            float ground = groundAt(world, (int)Math.floor(wx0), (int)Math.floor(wz0));
-            float topY = Weather.baseAlt(o3[2]) + 6.0F;
-            if (topY - ground < 20.0F) {
-               continue;
-            }
+               float ground = groundAt(world, (int)Math.floor(wx0), (int)Math.floor(wz0));
+               float topY = Weather.baseAlt(o3[2]) + 6.0F;
+               if (topY - ground < 20.0F) {
+                  continue;
+               }
 
-            float edgeFade = 1.0F - Weather.smooth(RG * G * 0.7F, RG * G, (float)dist);
-            float nearFade = Weather.smooth(25.0F, 150.0F, (float)dist);
-            float strength = Math.min(1.0F, rain * 1.25F) * edgeFade * nearFade;
-            if (strength < 0.02F) {
-               continue;
-            }
+               float edgeFade = 1.0F - Weather.smooth(outer * 0.78F, outer, dist);
+               float nearFade = level == 0 ? Weather.smooth(25.0F, 150.0F, dist) : 1.0F;
+               float strength = Math.min(1.0F, rain * 1.25F) * edgeFade * nearFade;
+               if (strength < 0.02F) {
+                  continue;
+               }
 
-            float cr = kind == 2 ? 0.95F : 0.70F;
-            float cg = kind == 2 ? 0.97F : 0.78F;
-            float cb2 = 1.0F;
-            float hw = 62.0F;
-            float height = topY - ground;
-            float vTop = height / 90.0F;
-            float ux = (float)(wx0 - res.offX - (double)res.ui0 * CELL);
-            float uz = (float)(wz0 - res.offZ - (double)res.uj0 * CELL);
-            for (int pl = 0; pl < 3; pl++) {
-               double ang = pl * Math.PI / 3.0 + ((gx0 + di) * 7 + (gz0 + dj) * 13) % 5 * 0.2;
-               float ax = (float)Math.cos(ang) * hw;
-               float az = (float)Math.sin(ang) * hw;
-               float ur = hw * 2.0F / 40.0F;
-               float uOff = ((gx0 + di) * 31 + (gz0 + dj) * 17 + pl * 5) % 13 * 0.31F;
-               // rows: top (invisible), cloud base (full), mid, ground (slightly weaker); columns: edge, centre, edge
-               float[] ys = new float[]{topY + 8.0F, topY - 22.0F, ground + height * 0.35F, ground};
-               float[] al = new float[]{0.0F, 0.95F, 0.85F, 0.55F};
-               float[] vs = new float[]{vTop + 0.1F, vTop - 0.25F, vTop * 0.35F, 0.0F};
-               for (int row = 0; row < 3; row++) {
-                  for (int half = 0; half < 2; half++) {
-                     float xa = half == 0 ? -1.0F : 0.0F;
-                     float xb = half == 0 ? 0.0F : 1.0F;
-                     float fa = half == 0 ? 0.0F : 1.0F;
-                     float fb = half == 0 ? 1.0F : 0.0F;
-                     float ua = uOff + (xa + 1.0F) * 0.5F * ur;
-                     float ub = uOff + (xb + 1.0F) * 0.5F * ur;
-                     int c00 = rgba(cr, cg, cb2, al[row] * fa * strength);
-                     int c01 = rgba(cr, cg, cb2, al[row] * fb * strength);
-                     int c10 = rgba(cr, cg, cb2, al[row + 1] * fa * strength);
-                     int c11 = rgba(cr, cg, cb2, al[row + 1] * fb * strength);
-                     vb.vt(ux + ax * xa, ys[row], uz + az * xa, ua, vs[row], c00);
-                     vb.vt(ux + ax * xb, ys[row], uz + az * xb, ub, vs[row], c01);
-                     vb.vt(ux + ax * xb, ys[row + 1], uz + az * xb, ub, vs[row + 1], c11);
-                     vb.vt(ux + ax * xa, ys[row + 1], uz + az * xa, ua, vs[row + 1], c10);
+               float cr = kind == 2 ? 0.95F : 0.72F;
+               float cg = kind == 2 ? 0.97F : 0.80F;
+               float cb2 = 1.0F;
+               float height = topY - ground;
+               float vTop = height / 90.0F;
+               float ux = (float)(wx0 - res.offX - (double)res.ui0[0] * CELLS[0]);
+               float uz = (float)(wz0 - res.offZ - (double)res.uj0[0] * CELLS[0]);
+               for (int pl = 0; pl < 3; pl++) {
+                  double ang = pl * Math.PI / 3.0 + ((gx0 + di) * 7 + (gz0 + dj) * 13) % 5 * 0.2;
+                  float ax = (float)Math.cos(ang) * hw;
+                  float az = (float)Math.sin(ang) * hw;
+                  float ur = hw * 2.0F / 40.0F;
+                  float uOff = ((gx0 + di) * 31 + (gz0 + dj) * 17 + pl * 5) % 13 * 0.31F;
+                  // rows: above the cloud base (invisible), cloud base (full), mid, ground (slightly weaker); columns: edge, centre, edge
+                  float[] ys = new float[]{topY + 8.0F, topY - 22.0F, ground + height * 0.35F, ground};
+                  float[] al = new float[]{0.0F, 0.95F, 0.85F, 0.55F};
+                  float[] vs = new float[]{vTop + 0.1F, vTop - 0.25F, vTop * 0.35F, 0.0F};
+                  for (int row = 0; row < 3; row++) {
+                     for (int half = 0; half < 2; half++) {
+                        float xa = half == 0 ? -1.0F : 0.0F;
+                        float xb = half == 0 ? 0.0F : 1.0F;
+                        float fa = half == 0 ? 0.0F : 1.0F;
+                        float fb = half == 0 ? 1.0F : 0.0F;
+                        float ua = uOff + (xa + 1.0F) * 0.5F * ur;
+                        float ub = uOff + (xb + 1.0F) * 0.5F * ur;
+                        int c00 = rgba(cr, cg, cb2, al[row] * fa * strength);
+                        int c01 = rgba(cr, cg, cb2, al[row] * fb * strength);
+                        int c10 = rgba(cr, cg, cb2, al[row + 1] * fa * strength);
+                        int c11 = rgba(cr, cg, cb2, al[row + 1] * fb * strength);
+                        vb.vt(ux + ax * xa, ys[row], uz + az * xa, ua, vs[row], c00);
+                        vb.vt(ux + ax * xb, ys[row], uz + az * xb, ub, vs[row], c01);
+                        vb.vt(ux + ax * xb, ys[row + 1], uz + az * xb, ub, vs[row + 1], c11);
+                        vb.vt(ux + ax * xa, ys[row + 1], uz + az * xa, ua, vs[row + 1], c10);
+                     }
                   }
                }
             }
@@ -587,22 +622,26 @@ final class WeatherFx {
 
    // ================================================================ drawing: clouds (no-shader path)
    void upload(Result res) {
-      if (this.vboCloud == 0) {
-         this.vboCloud = GL15.glGenBuffers();
+      if (this.vboCloud[0] == 0) {
+         this.vboCloud[0] = GL15.glGenBuffers();
+         this.vboCloud[1] = GL15.glGenBuffers();
          this.vboShaft = GL15.glGenBuffers();
       }
 
-      res.cloud.b.flip();
-      GL15.glBindBuffer(34962, this.vboCloud);
-      GL15.glBufferData(34962, res.cloud.b, 35044);
-      this.nCloud = res.cloud.n;
+      for (int lv = 0; lv < 2; lv++) {
+         res.cloud[lv].b.flip();
+         GL15.glBindBuffer(34962, this.vboCloud[lv]);
+         GL15.glBufferData(34962, res.cloud[lv].b, 35044);
+         this.nCloud[lv] = res.cloud[lv].n;
+         this.ui0[lv] = res.ui0[lv];
+         this.uj0[lv] = res.uj0[lv];
+      }
+
       res.shaft.b.flip();
       GL15.glBindBuffer(34962, this.vboShaft);
       GL15.glBufferData(34962, res.shaft.b, 35044);
       this.nShaft = res.shaft.n;
       GL15.glBindBuffer(34962, 0);
-      this.ui0 = res.ui0;
-      this.uj0 = res.uj0;
       this.builtTs = res.ts;
       this.builtCamX = res.camX;
       this.builtCamZ = res.camZ;
@@ -622,14 +661,11 @@ final class WeatherFx {
          return;
       }
 
-      double cu = camX - sn.oax - (this.ui0 + RAD) * (double)CELL;
-      double cv = camZ - sn.oaz - (this.uj0 + RAD) * (double)CELL;
       boolean stale = !this.built
          || this.wantRebuild
          || sn.ts - this.builtTs > 2.5
          || Math.abs(camX - this.builtCamX) > 40.0
-         || Math.abs(camZ - this.builtCamZ) > 40.0
-         || cu * cu + cv * cv > 640.0 * 640.0;
+         || Math.abs(camZ - this.builtCamZ) > 40.0;
       if (!stale) {
          return;
       }
@@ -677,14 +713,12 @@ final class WeatherFx {
 
       this.ensureTextures();
       this.maintain(this.snap, this.r.camX, this.r.camZ);
-      if (!this.built || this.nCloud == 0) {
+      if (!this.built || this.nCloud[0] + this.nCloud[1] == 0) {
          return;
       }
 
       Weather.Snap sn = this.snap;
       float[] tint = this.cloudTint(this.r.daylight, this.r.sunAngle);
-      GL11.glPushMatrix();
-      GL11.glTranslated(this.ui0 * (double)CELL + sn.oax - this.r.camX, -this.r.camY, this.uj0 * (double)CELL + sn.oaz - this.r.camZ);
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, this.texWhite);
       GL11.glTexEnvi(8960, 8704, 34160);
@@ -705,25 +739,38 @@ final class WeatherFx {
       GL11.glFogfv(2918, new float[]{fogR, fogG, fogB, 1.0F});
       GL11.glEnableClientState(32884);
       GL11.glEnableClientState(32886);
-      GL15.glBindBuffer(34962, this.vboCloud);
-      GL11.glVertexPointer(3, 5126, 16, 0L);
-      GL11.glColorPointer(4, 5121, 16, 12L);
-      // pass 1: depth only, so every pixel is blended with the cloud surface nearest to the camera only
-      GL11.glColorMask(false, false, false, false);
-      GL11.glDepthMask(true);
-      GL11.glDrawArrays(7, 0, this.nCloud);
-      // pass 2: colour where the depth matches
-      GL11.glColorMask(true, true, true, true);
-      GL11.glDepthMask(false);
-      GL11.glDepthFunc(515);
-      GL11.glDrawArrays(7, 0, this.nCloud);
+      // pass 1: depth only, so every pixel is blended with the cloud surface nearest to the camera only; pass 2: colour
+      for (int pass = 0; pass < 2; pass++) {
+         if (pass == 0) {
+            GL11.glColorMask(false, false, false, false);
+            GL11.glDepthMask(true);
+         } else {
+            GL11.glColorMask(true, true, true, true);
+            GL11.glDepthMask(false);
+            GL11.glDepthFunc(515);
+         }
+
+         for (int lv = 0; lv < 2; lv++) {
+            if (this.nCloud[lv] == 0) {
+               continue;
+            }
+
+            GL11.glPushMatrix();
+            GL11.glTranslated(this.ui0[lv] * (double)CELLS[lv] + sn.oax - this.r.camX, -this.r.camY, this.uj0[lv] * (double)CELLS[lv] + sn.oaz - this.r.camZ);
+            GL15.glBindBuffer(34962, this.vboCloud[lv]);
+            GL11.glVertexPointer(3, 5126, 16, 0L);
+            GL11.glColorPointer(4, 5121, 16, 12L);
+            GL11.glDrawArrays(7, 0, this.nCloud[lv]);
+            GL11.glPopMatrix();
+         }
+      }
+
       GL11.glDepthMask(true);
       GL15.glBindBuffer(34962, 0);
       GL11.glDisableClientState(32884);
       GL11.glDisableClientState(32886);
       GL11.glTexEnvi(8960, 8704, 8448);
       GL11.glDisable(3042);
-      GL11.glPopMatrix();
       // back to the terrain's fog for the translucent blocks that follow
       GL11.glFogf(2915, fogStart);
       GL11.glFogf(2916, fogEnd);
@@ -825,11 +872,11 @@ final class WeatherFx {
    }
 
    double builtOffXNow(Weather.Snap sn) {
-      return this.ui0 * (double)CELL + sn.oax;
+      return this.ui0[0] * (double)CELLS[0] + sn.oax;
    }
 
    double builtOffZNow(Weather.Snap sn) {
-      return this.uj0 * (double)CELL + sn.oaz;
+      return this.uj0[0] * (double)CELLS[0] + sn.oaz;
    }
 
    /** Rain / snow streaks in a disc around the camera, stopped by whatever is overhead (the chunk heightmap). */
@@ -888,10 +935,11 @@ final class WeatherFx {
 
                int hash = x * 73856093 ^ z * 19349663;
                float f = (float)Math.sqrt(d2) / rad;
-               float alpha = (1.0F - f * f) * (pass == 0 ? 0.62F : 0.85F) * Math.min(1.0F, amount * 1.4F);
                double ddx = x + 0.5 - cx;
                double ddz = z + 0.5 - cz;
                double dl = Math.sqrt(ddx * ddx + ddz * ddz);
+               // thin out the streaks that pass right in front of the lens: they would be fat bright bands on screen
+               float alpha = (1.0F - f * f) * (pass == 0 ? 0.42F : 0.80F) * Math.min(1.0F, amount * 1.4F) * Weather.smooth(1.4F, 6.5F, (float)dl);
                float px = (float)(-ddz / dl * 0.5);
                float pz = (float)(ddx / dl * 0.5);
                float uoff = (hash & 31) / 32.0F;

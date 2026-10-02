@@ -127,15 +127,18 @@ SCENES = {
     "kitchen37":      (COMMON + ["-Dbc.cam=143.5,72.5,69.0,0,40", "-Dbc.time=6000"] + PLAIN + [sets(kitchen_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "night37":        (COMMON + ["-Dbc.cam=145.5,70.0,71.0,0,34", "-Dbc.time=18000"] + PLAIN + [sets(kitchen_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     # ---- Update 3.8: weather. -Dbc.weather=calm|clear|rain|thunder|cell:dx,dz,radius (storm cell relative to the player),
-    # -Dbc.bolt=dx,dz (a fresh lightning bolt every frame), -Dbc.biome=5 (snow), -Dbc.wtime=<weather ticks>. Camera yaw -90 looks east.
-    "wx-fair":        (WXC + ["-Dbc.cam=133,69,71,-90,9", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
-    "wx-storm":       (WXC + ["-Dbc.cam=133,69,71,-90,7", "-Dbc.weather=cell:1250,-120,430", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
-    "wx-storm-bolt":  (WXC + ["-Dbc.cam=133,69,71,-90,7", "-Dbc.weather=cell:1000,-100,430", "-Dbc.bolt=700,-60", "-Dbc.time=15500"] + PLAIN + ["-Dbc.shot=190"], True),
-    "wx-rain":        (WXC + ["-Dbc.cam=133,69,71,-60,14", "-Dbc.weather=rain", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
+    # -Dbc.bolt=dx,dz (a fresh lightning bolt every frame), -Dbc.biome=5 (snow), -Dbc.wtime=<weather ticks>. Camera yaw -90 looks east
+    # (positive pitch looks down). The camera floats at y=125 so the terrain does not hide the horizon.
+    "wx-fair":        (WXC + ["-Dbc.cam=133,125,71,-90,-3", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
+    "wx-storm":       (WXC + ["-Dbc.cam=133,125,71,-90,-2", "-Dbc.weather=cell:800,-60,380", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
+    "wx-storm-far":   (WXC + ["-Dbc.cam=133,125,71,-90,-1", "-Dbc.weather=cell:2200,-100,480", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
+    "wx-storm-bolt":  (WXC + ["-Dbc.cam=133,125,71,-90,-2", "-Dbc.weather=cell:700,-60,380", "-Dbc.bolt=420,-30", "-Dbc.time=12800"] + PLAIN + ["-Dbc.shot=190"], True),
+    "wx-rain":        (WXC + ["-Dbc.cam=133,69,71,-70,2", "-Dbc.weather=rain", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
     "wx-overcast":    (WXC + ["-Dbc.cam=133,69,71,-90,-28", "-Dbc.weather=thunder", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
-    "wx-snow":        (WXC + ["-Dbc.cam=133,69,71,-60,14", "-Dbc.weather=rain", "-Dbc.biome=5", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
-    "wx-storm-sh":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,69,71,-90,7", "-Dbc.weather=cell:1250,-120,430", "-Dbc.time=6000", "-Dbc.shot=26"], True),
-    "wx-rain-sh":     (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,69,71,-60,14", "-Dbc.weather=rain", "-Dbc.time=6000", "-Dbc.shot=26"], True),
+    "wx-snow":        (WXC + ["-Dbc.cam=133,69,71,-70,2", "-Dbc.weather=rain", "-Dbc.biome=5", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=190"], True),
+    "wx-storm-sh":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,125,71,-90,-2", "-Dbc.weather=cell:800,-60,380", "-Dbc.time=6000", "-Dbc.shot=26"], True),
+    "wx-storm-far-sh": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,125,71,-90,-1", "-Dbc.weather=cell:2200,-100,480", "-Dbc.time=6000", "-Dbc.shot=26"], True),
+    "wx-rain-sh":     (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,69,71,-70,2", "-Dbc.weather=rain", "-Dbc.time=6000", "-Dbc.shot=26"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]

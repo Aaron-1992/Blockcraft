@@ -585,6 +585,25 @@ final class Tests38 {
    }
 
    // ------------------------------------------------------------------ meshes (CPU part of the renderers)
+   static int nv(WeatherFx.Result r) {
+      return r.cloud[0].n + r.cloud[1].n;
+   }
+
+   /** lowest and highest y of all cloud vertices (parses the vertex buffer: x, y, z floats + colour). */
+   static float[] heights(WeatherFx.Result r) {
+      float lo = 1e9F;
+      float hi = -1e9F;
+      for (int lv = 0; lv < 2; lv++) {
+         for (int i = 0; i < r.cloud[lv].n; i++) {
+            float y = r.cloud[lv].b.getFloat(i * 16 + 4);
+            lo = Math.min(lo, y);
+            hi = Math.max(hi, y);
+         }
+      }
+
+      return new float[]{lo, hi};
+   }
+
    static void meshes() {
       test("cloud mesh: nothing in a clear sky, a big dark lowered mass in a storm, rain curtains only where it rains", () -> {
          Game g = weatherGame(0);
@@ -593,24 +612,31 @@ final class Tests38 {
          wx.force(1, 99999);
          wx.instant();
          WeatherFx.Result clear = WeatherFx.build(wx.snap(10), w, 8, 8);
-         check(clear.cloud.n >= 0, "fair-weather clouds when forced clear (" + clear.cloud.n + " vertices)");
+         check(nv(clear) > 0, "fair-weather clouds when forced clear (" + nv(clear) + " vertices)");
          eq(0, clear.shaft.n, "no rain curtains");
          wx.force(2, 99999);
          wx.instant();
          WeatherFx.Result rain = WeatherFx.build(wx.snap(10), w, 8, 8);
-         check(rain.cloud.n > 4000, "overcast: a lot of cloud (" + rain.cloud.n + " vertices)");
-         check(clear.cloud.n < rain.cloud.n / 2, "far less cloud than in the rain (" + clear.cloud.n + " vs " + rain.cloud.n + ")");
+         check(nv(rain) > 4000, "overcast: a lot of cloud (" + nv(rain) + " vertices)");
+         check(nv(clear) < nv(rain) / 2, "far less cloud than in the rain (" + nv(clear) + " vs " + nv(rain) + ")");
          check(rain.shaft.n > 400, "rain curtains hang under it (" + rain.shaft.n + " vertices)");
-         eq(0, rain.cloud.n % 4, "quads");
+         eq(0, rain.cloud[0].n % 4, "quads");
+         eq(0, rain.cloud[1].n % 4, "quads");
          eq(0, rain.shaft.n % 4, "quads");
+         check(rain.cloud[0].n > 0 && rain.cloud[1].n > 0, "both the fine near level and the coarse far level have clouds");
          wx.force(3, 99999);
          wx.instant();
          WeatherFx.Result storm = WeatherFx.build(wx.snap(10), w, 8, 8);
-         check(storm.cloud.n > rain.cloud.n, "a storm is taller than plain rain (" + storm.cloud.n + " > " + rain.cloud.n + ")");
+         float[] hs = heights(storm);
+         float[] hc = heights(clear);
+         check(hs[1] > 300.0F && hs[1] > hc[1] + 70.0F, "storm clouds tower: top " + hs[1] + " vs " + hc[1] + " in fair weather");
+         check(hs[0] < 150.0F && hs[0] < hc[0], "and hang lower: base " + hs[0] + " vs " + hc[0]);
+         check(hc[0] >= 160.0F && hc[1] < 260.0F, "fair-weather cumulus stay in a thin layer: " + hc[0] + " .. " + hc[1]);
+         check(hs[0] >= 110.0F && hs[1] <= Shaders.CLOUD_Y1 + 4.0F, "storms stay inside the slab the shader marches (" + Shaders.CLOUD_Y0 + ".." + Shaders.CLOUD_Y1 + ")");
          // natural weather: a mix
          wx.natural();
          WeatherFx.Result nat = WeatherFx.build(wx.snap(500), w, 3000, -2000);
-         check(nat.cloud.n >= 0 && nat.cloud.n < 3_000_000, "natural weather builds, sane size " + nat.cloud.n);
+         check(nv(nat) >= 0 && nv(nat) < 4_000_000, "natural weather builds, sane size " + nv(nat));
          // desert: no curtains (dry)
          Game d = weatherGame(0);
          for (Chunk c : d.world.chunks.values()) {
@@ -631,7 +657,9 @@ final class Tests38 {
          s.world.weather.placeStorm(900, 0, 350);
          s.world.weather.enabled = true;
          WeatherFx.Result cell = WeatherFx.build(s.world.weather.snap(s.world.weather.ticks / 20.0), s.world, 8, 8);
-         check(cell.cloud.n > 0, "the cell has clouds");
+         check(nv(cell) > 0, "the cell has clouds");
+         // the storm 900 blocks east is seen by the coarse level and has its rain curtains, nothing of it is west of the player
+         check(cell.shaft.n > 0, "and rain curtains");
       });
       test("cloud density: more cover, more cloud; storms are thicker; nothing when it is clear", () -> {
          int nClear = 0;

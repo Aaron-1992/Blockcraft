@@ -124,9 +124,9 @@ public final class Shaders {
    final float[] viewM = new float[16];
    final float[] invViewM = new float[16];
    boolean sceneActive;
-   /** The slab the cloud shader marches through: lowest storm base .. highest storm top (Update 3.8). */
-   public static final float CLOUD_Y0 = 140.0F;
-   public static final float CLOUD_Y1 = 330.0F;
+   /** The slab the cloud shader marches through: lowest storm base .. highest storm top, 146 + 46 + 28 + 150 = 370 (Update 3.8). */
+   public static final float CLOUD_Y0 = 136.0F;
+   public static final float CLOUD_Y1 = 380.0F;
    /** Update 3.8: how much of the sun's direct light gets through the clouds (set by the renderer every frame). */
    public float sunAtten = 1.0F;
    int wnoiseTex;

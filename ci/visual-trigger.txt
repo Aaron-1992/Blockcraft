@@ -1,2 +1,2 @@
-wx-fair,wx-storm,wx-rain,wx-overcast,wx-storm-sh
+wx-fair,wx-storm,wx-storm-far,wx-storm-bolt,wx-rain,wx-overcast,wx-storm-sh,wx-storm-far-sh
 jar=build
