@@ -320,8 +320,73 @@ public final class Gen {
 
       this.plantTrees(var3);
       this.structs.apply(var3);
+      this.plantShoreAndPatches(var3, var6, var7);
       var3.computeHeightmap();
       return var3;
+   }
+
+   /**
+    * Update 3.7: sugar cane along the shore (sand / grass / dirt at sea level with water next to it) and the odd
+    * pumpkin patch on grassland. Uses its own random stream, so everything generated before is untouched.
+    */
+   /** Test hook: false (-Dbc.noextras=true) = generate exactly like Update 3.6 (no sugar cane, no pumpkin patches). */
+   static boolean extras = !Boolean.getBoolean("bc.noextras");
+
+   void plantShoreAndPatches(Chunk c, int[] heights, int[] biomes) {
+      if (!extras) {
+         return;
+      }
+
+      Random r = new Random(this.seed * -7046029254386353131L ^ (c.cx * 73856093L + c.cz * 19349663L) * 1000003L + 37L);
+      int[][] around = new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+      for (int z = 0; z < 16; z++) {
+         for (int x = 0; x < 16; x++) {
+            if (heights[z * 16 + x] != 62) {
+               continue;
+            }
+
+            int ground = c.get(x, 62, z);
+            if ((ground != 7 && ground != 3 && ground != 2) || c.get(x, 63, z) != 0) {
+               continue;
+            }
+
+            boolean water = false;
+            for (int[] d : around) {
+               int nx = x + d[0];
+               int nz = z + d[1];
+               if (nx >= 0 && nx <= 15 && nz >= 0 && nz <= 15 && Blocks.isWater(c.get(nx, 62, nz))) {
+                  water = true;
+               }
+            }
+
+            if (water && r.nextInt(100) < 30) {
+               int n = 1 + r.nextInt(3);
+               for (int i = 0; i < n; i++) {
+                  c.set(x, 63 + i, z, Blocks.SUGAR_CANE);
+               }
+            }
+         }
+      }
+
+      if (r.nextInt(9) == 0) {
+         int px = 3 + r.nextInt(10);
+         int pz = 3 + r.nextInt(10);
+         int placed = 0;
+         for (int i = 0; i < 24 && placed < 8; i++) {
+            int x = Math.max(0, Math.min(15, px + r.nextInt(7) - 3));
+            int z = Math.max(0, Math.min(15, pz + r.nextInt(7) - 3));
+            int h = heights[z * 16 + x];
+            int biome = biomes[z * 16 + x];
+            if ((biome == 2 || biome == 3) && h >= 64 && h <= 235 && c.get(x, h, z) == 2) {
+               int above = c.get(x, h + 1, z);
+               if (above == 0 || above == 29) {
+                  c.set(x, h + 1, z, Blocks.PUMPKIN);
+                  placed++;
+               }
+            }
+         }
+      }
    }
 
    void vein(Chunk var1, Random var2, int var3, int var4, int var5, int var6, int var7) {

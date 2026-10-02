@@ -42,7 +42,17 @@ public final class Items {
    public static final int BAKED_POTATO = 338;
    public static final int BONE_MEAL = 339;
    public static final int SHEARS = 340;
-   public static final int END = 341;
+   public static final int PUMPKIN_SEEDS = 341;
+   public static final int MELON_SEEDS = 342;
+   public static final int MELON_SLICE = 343;
+   public static final int PUMPKIN_PIE = 344;
+   public static final int SUGAR = 345;
+   public static final int PAPER = 346;
+   public static final int BOOK = 347;
+   public static final int MILK_BUCKET = 348;
+   public static final int EGG = 349;
+   public static final int CAKE = 350;
+   public static final int END = 351;
    public static final int ITEM_TILE_BASE = 65;
    public static final int C_NONE = 0;
    public static final int C_PICK = 1;
@@ -94,9 +104,9 @@ public final class Items {
       return var0 >= 290 && var0 < 295;
    }
 
-   /** Items that are planted on farmland: wheat seeds, carrots, potatoes. Returns the block id of growth stage 0, or 0. */
+   /** Items that are planted on farmland: wheat/pumpkin/melon seeds, carrots, potatoes. Returns the block id of growth stage 0, or 0. */
    public static int plantBlock(int var0) {
-      return var0 == 285 ? 124 : (var0 == 336 ? 142 : (var0 == 337 ? 150 : 0));
+      return var0 == 285 ? 124 : (var0 == 336 ? 142 : (var0 == 337 ? 150 : (var0 == 341 ? 171 : (var0 == 342 ? 179 : 0))));
    }
 
    public static boolean isItem(int var0) {
@@ -303,6 +313,21 @@ public final class Items {
       maxStack[340] = 1;
       maxDmg[340] = 238;
 
+      // ---- Update 3.7 (atlas tiles 236-245, see TexArt37) ----
+      def(341, "Pumpkin Seeds", 241 - 65);
+      def(342, "Melon Seeds", 242 - 65);
+      def(343, "Melon Slice", 243 - 65);
+      def(344, "Pumpkin Pie", 244 - 65);
+      def(345, "Sugar", 236 - 65);
+      def(346, "Paper", 237 - 65);
+      def(347, "Book", 238 - 65);
+      def(348, "Milk Bucket", 239 - 65);
+      def(349, "Egg", 240 - 65);
+      def(350, "Cake", 245 - 65);
+      maxStack[348] = 1;
+      maxStack[349] = 16;
+      maxStack[350] = 1;
+
       for (int var1 = 0; var1 < 5; var1++) {
          int var2 = 290 + var1;
          name[var2] = TIER_NAMES[var1] + " Hoe";
@@ -325,6 +350,8 @@ public final class Items {
       food(336, 3, 3.6F);
       food(337, 1, 0.6F);
       food(338, 5, 6.0F);
+      food(343, 2, 1.2F);
+      food(344, 8, 4.8F);
 
       for (int var30 = 0; var30 < 5; var30++) {
          for (int var32 = 0; var32 < 4; var32++) {

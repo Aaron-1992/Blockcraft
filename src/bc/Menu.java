@@ -312,9 +312,13 @@ final class Menu {
 
             for (int var9 = 0; var9 < this.grid.length; var9++) {
                if (this.grid[var9] != null) {
+                  int left = Recipes.leftover(this.grid[var9].id);
                   this.grid[var9].n--;
                   if (this.grid[var9].n <= 0) {
-                     this.grid[var9] = null;
+                     // a used-up milk bucket leaves its empty bucket in the slot (Update 3.7)
+                     this.grid[var9] = left != 0 ? new Stack(left, 1) : null;
+                  } else if (left != 0 && !this.g.addItem(new Stack(left, 1))) {
+                     this.g.dropFromPlayer(left, 1);
                   }
                }
             }

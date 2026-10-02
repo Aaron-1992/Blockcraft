@@ -55,6 +55,11 @@ public final class Recipes {
       list.add(var3);
    }
 
+   /** What stays behind in a crafting-grid slot when one of this item is used up as an ingredient (milk bucket -> bucket). 0 = nothing. */
+   public static int leftover(int id) {
+      return id == Items.MILK_BUCKET ? Items.BUCKET : 0;
+   }
+
    public static int fuelTime(Stack var0) {
       if (var0 == null) {
          return 0;
@@ -219,6 +224,17 @@ public final class Recipes {
       shaped(340, 1, new String[]{"I ", " I"}, 'I', 258);
       shaped(158, 1, new String[]{"WWW", "WWW", "WWW"}, 'W', 286);
       shapeless(286, 9, 158);
+      // ---- Update 3.7 ----
+      shapeless(Items.SUGAR, 1, Blocks.SUGAR_CANE);
+      shaped(Items.PAPER, 3, new String[]{"CCC"}, 'C', Blocks.SUGAR_CANE);
+      shapeless(Items.BOOK, 1, Items.PAPER, Items.PAPER, Items.PAPER, Items.LEATHER);
+      shaped(Blocks.BOOKSHELF, 1, new String[]{"PPP", "BBB", "PPP"}, 'P', Integer.valueOf(var0), 'B', Items.BOOK);
+      shapeless(Items.PUMPKIN_SEEDS, 4, Blocks.PUMPKIN);
+      shapeless(Items.MELON_SEEDS, 1, Items.MELON_SLICE);
+      shaped(Blocks.MELON, 1, new String[]{"MMM", "MMM", "MMM"}, 'M', Items.MELON_SLICE);
+      shapeless(Items.PUMPKIN_PIE, 1, Blocks.PUMPKIN, Items.SUGAR, Items.EGG);
+      shaped(Blocks.JACK_O_LANTERN + 1, 1, new String[]{"P", "T"}, 'P', Blocks.CARVED_PUMPKIN + 1, 'T', Blocks.TORCH);
+      shaped(Items.CAKE, 1, new String[]{"MMM", "SES", "WWW"}, 'M', Items.MILK_BUCKET, 'S', Items.SUGAR, 'E', Items.EGG, 'W', Items.WHEAT);
       smelt.put(337, new Stack(338, 1));
       smelt.put(20, new Stack(258, 1));
       smelt.put(21, new Stack(259, 1));

@@ -208,6 +208,31 @@ public final class Mobs {
          this.hurtMob(var1, 4, var1.x, var1.z, 0.0, false);
       }
 
+      if (var7) {
+         var1.burn = Math.max(var1.burn, 160);
+      }
+
+      // Update 3.7: standing in a fire sets a creature alight
+      if (Blocks.isFire(var2.getBlock(var5, (int)Math.floor(var1.y + 0.1), var6)) || Blocks.isFire(var2.getBlock(var5, (int)Math.floor(var1.y + 0.9), var6))) {
+         var1.burn = Math.max(var1.burn, 160);
+         if (var1.age % 10 == 0) {
+            this.hurtMob(var1, 1, var1.x, var1.z, 0.0, false);
+         }
+      }
+
+      if (var1.burn > 0 && var1.age % 3 == 0 && !var1.dead) {
+         this.g.flameParticle(var1.x + (this.rnd.nextDouble() - 0.5) * W[var1.type], var1.y + this.rnd.nextDouble() * H[var1.type], var1.z + (this.rnd.nextDouble() - 0.5) * W[var1.type], this.rnd.nextInt(3) == 0);
+      }
+
+      // chickens lay an egg every 5-10 minutes
+      if (var1.type == 3 && var1.babyAge == 0 && !var1.dead) {
+         if (var1.eggTimer <= 0) {
+            var1.eggTimer = 6000 + this.rnd.nextInt(6000);
+         } else if (--var1.eggTimer == 0) {
+            this.drop(var2, var1, Items.EGG, 1);
+         }
+      }
+
       if (!var1.dead) {
          if ((var1.type == 4 || var1.type == 5) && var4 > 0.7 && !var1.inWater && var2.getSky(var5, (int)Math.floor(var1.y + 1.5), var6) >= 15) {
             var1.burn = 40;
@@ -391,6 +416,13 @@ public final class Mobs {
                   if (var50 < 1.7 && Math.abs(mate.y - var1.y) < 1.5 && mate.love > 0) {
                      this.breed(var1, mate);
                   }
+               } else if (var1.love <= 0 && this.tempted(var1, var3)) {
+                  // Update 3.7: animals follow a player who holds their favourite food
+                  var1.dirYaw = angleTo(var16, var18);
+                  var26 = var1.dirYaw;
+                  var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22))) * 0.5F;
+                  var12 = var22 > 2.2;
+                  var13 *= 1.15;
                } else {
                   this.wanderAI(var1);
                   var12 = var1.moving;
@@ -489,6 +521,11 @@ public final class Mobs {
          var1.walkAmp = var1.walkAmp + (Math.min(1.0F, (float)(var38 * 8.0)) - var1.walkAmp) * 0.4F;
          var1.walk += (float)var38 * 4.0F;
       }
+   }
+
+   /** The player holds the food this animal likes and is within 9 blocks: it walks over to have a look. */
+   boolean tempted(Mobs.Mob m, Player p) {
+      return !p.dead && !p.spectator && isBreedFood(m.type, this.g.heldId()) && this.nearPlayer(m, p, 9.0);
    }
 
    boolean nearPlayer(Mobs.Mob var1, Player var2, double var3) {
@@ -1218,6 +1255,8 @@ public final class Mobs {
       public boolean sheared;
       /** Ticks until a sheared sheep has regrown its wool. */
       public int woolTimer;
+      /** Ticks until a (grown-up) chicken lays its next egg; 0 = not started yet. */
+      public int eggTimer;
 
       public boolean isBaby() {
          return this.babyAge > 0;

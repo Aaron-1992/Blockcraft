@@ -39,6 +39,8 @@ public final class World {
    public final HashMap<Long, TileEntity> tiles = new HashMap();
    public final ArrayList<World.Item> items = new ArrayList();
    public final ArrayList<World.Falling> fallers = new ArrayList();
+   /** Fire (Update 3.7): ages, spreading, burning out. */
+   public final Fire fire = new Fire(this);
    private final Random rnd = new Random();
    private final ExecutorService pool;
    private final ConcurrentLinkedQueue<Chunk> ready = new ConcurrentLinkedQueue();
@@ -213,6 +215,7 @@ public final class World {
          this.requested.remove(key(var22.cx, var22.cz));
          if (Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
             this.chunks.put(key(var22.cx, var22.cz), var22);
+            this.fire.scanChunk(var22);
             this.lightChunk(var22);
 
             for (int var24 = -1; var24 <= 1; var24++) {
@@ -297,19 +300,19 @@ public final class World {
       this.pool.shutdownNow();
    }
 
-   private static long pack(int var0, int var1, int var2) {
+   static long pack(int var0, int var1, int var2) {
       return (long)(var0 + 33554432) << 34 | (long)(var2 + 33554432) << 8 | var1;
    }
 
-   private static int ux(long var0) {
+   static int ux(long var0) {
       return (int)(var0 >>> 34 & 67108863L) - 33554432;
    }
 
-   private static int uz(long var0) {
+   static int uz(long var0) {
       return (int)(var0 >>> 8 & 67108863L) - 33554432;
    }
 
-   private static int uy(long var0) {
+   static int uy(long var0) {
       return (int)(var0 & 255L);
    }
 
@@ -581,6 +584,12 @@ public final class World {
 
          var5.set(var6, var2, var7, var4);
          var5.modified = true;
+         if (var4 == Blocks.FIRE) {
+            this.fire.added(var1, var2, var3);
+         } else if (var8 == Blocks.FIRE) {
+            this.fire.removed(var1, var2, var3);
+         }
+
          this.resetBounds();
          this.touch(var1, var2, var3);
 
@@ -672,6 +681,7 @@ public final class World {
                || var8 == 32
                || var8 == 28
                || Blocks.isDoor(var8)
+               || Blocks.isCake(var8)
                || Blocks.isWallTorch(var8)) {
                this.scheduleBlock(var5, var6, var7);
             }
@@ -711,6 +721,7 @@ public final class World {
 
       this.fallers.removeIf(var0 -> var0.dead);
       this.tickCrops();
+      this.fire.tick();
 
       for (World.Item var13 : this.items) {
          this.tickItem(var13);
@@ -790,13 +801,24 @@ public final class World {
 
             int y = c.hm[(z & 15) * 16 + (x & 15)];
             int b = this.getBlock(x, y, z);
+            if (this.getBlock(x, y + 1, z) == Blocks.SUGAR_CANE) {
+               if (!this.canCaneStay(x, y + 1, z)) {
+                  this.scheduleBlock(x, y + 1, z); // e.g. the water next to it was removed diagonally: it pops off
+               } else if (this.rnd.nextInt(16) == 0) {
+                  this.growCane(x, y + 1, z);
+               }
+
+               continue;
+            }
+
             if (!Blocks.isFarmland(b)) {
                continue;
             }
 
             boolean wet = this.hydrated(x, y, z);
             int above = this.getBlock(x, y + 1, z);
-            boolean crop = Blocks.isCrop(above);
+            boolean stem = Blocks.isStem(above);
+            boolean crop = Blocks.isCrop(above) || stem;
             if (wet && b == Blocks.FARMLAND) {
                this.setBlock(x, y, z, Blocks.FARMLAND_WET);
             } else if (!wet && b == Blocks.FARMLAND_WET) {
@@ -806,10 +828,73 @@ public final class World {
                continue;
             }
 
-            if (crop && !Blocks.isRipe(above) && this.rnd.nextInt(wet ? 5 : 12) == 0) {
+            if (stem) {
+               if (Blocks.stemStage(above) < 7) {
+                  if (this.rnd.nextInt(wet ? 5 : 12) == 0) {
+                     this.setBlock(x, y + 1, z, above + 1);
+                  }
+               } else if (this.rnd.nextInt(wet ? 12 : 24) == 0) {
+                  this.tryFruit(x, y + 1, z, above);
+               }
+            } else if (crop && !Blocks.isRipe(above) && this.rnd.nextInt(wet ? 5 : 12) == 0) {
                this.setBlock(x, y + 1, z, above + 1);
             }
          }
+      }
+   }
+
+   /**
+    * Sugar cane can stand on another cane, or on grass / dirt / sand that has water right next to it (on the same level
+    * as that ground block) - exactly like Minecraft.
+    */
+   public boolean canCaneStay(int x, int y, int z) {
+      int below = this.getBlock(x, y - 1, z);
+      if (below == Blocks.SUGAR_CANE) {
+         return true;
+      } else if (below != 2 && below != 3 && below != 7) {
+         return false;
+      } else {
+         return Blocks.isWater(this.getBlock(x + 1, y - 1, z))
+            || Blocks.isWater(this.getBlock(x - 1, y - 1, z))
+            || Blocks.isWater(this.getBlock(x, y - 1, z + 1))
+            || Blocks.isWater(this.getBlock(x, y - 1, z - 1));
+      }
+   }
+
+   /** One random growth step of the sugar cane stack whose lowest block is at (x, y, z): +1 block on top, max 3 high. */
+   void growCane(int x, int y, int z) {
+      int top = y;
+      while (this.getBlock(x, top + 1, z) == Blocks.SUGAR_CANE) {
+         top++;
+      }
+
+      if (top - y < 2 && this.getBlock(x, top + 1, z) == 0) {
+         this.setBlock(x, top + 1, z, Blocks.SUGAR_CANE);
+      }
+   }
+
+   /**
+    * A fully grown pumpkin / melon stem tries to put a fruit on a random side - only when it has no fruit next to it
+    * yet and the spot is free air above farmland, dirt or grass (Minecraft 1.12 rules).
+    */
+   boolean tryFruit(int x, int y, int z, int stem) {
+      int fruit = Blocks.stemFruit(stem);
+      for (int i = 0; i < 6; i++) {
+         if (DY[i] == 0 && this.getBlock(x + DX[i], y, z + DZ[i]) == fruit) {
+            return false;
+         }
+      }
+
+      int d = this.rnd.nextInt(4);
+      int[] hx = new int[]{1, -1, 0, 0};
+      int[] hz = new int[]{0, 0, 1, -1};
+      int fx = x + hx[d];
+      int fz = z + hz[d];
+      int soil = this.getBlock(fx, y - 1, fz);
+      if (this.getBlock(fx, y, fz) == 0 && (Blocks.isFarmland(soil) || soil == 2 || soil == 3)) {
+         return this.setBlock(fx, y, fz, fruit);
+      } else {
+         return false;
       }
    }
 
@@ -873,6 +958,22 @@ public final class World {
             this.setBlock(var1, var2, var3, 0);
             this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.cropSeedItem(var4), 1);
          }
+      } else if (var4 == Blocks.SUGAR_CANE) {
+         if (!this.canCaneStay(var1, var2, var3)) {
+            this.setBlock(var1, var2, var3, 0);
+            this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.SUGAR_CANE, 1);
+         }
+      } else if (Blocks.isStem(var4)) {
+         if (!Blocks.isFarmland(this.getBlock(var1, var2 - 1, var3))) {
+            this.setBlock(var1, var2, var3, 0);
+            this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.stemSeedItem(var4), 1);
+         }
+      } else if (Blocks.isCake(var4)) {
+         if (!Blocks.solid[this.getBlock(var1, var2 - 1, var3)]) {
+            this.setBlock(var1, var2, var3, 0);
+         }
+      } else if (Blocks.isFire(var4)) {
+         this.fire.check(var1, var2, var3);
       } else {
          if (var4 != 7 && var4 != 8) {
             if (Blocks.kind[var4] == 1 || var4 == 32) {
@@ -1494,6 +1595,8 @@ public final class World {
          {Items.armorId(1, 3), 1, 1, 2},
          {Items.armorId(2, 1), 1, 1, 1},
          {268, 1, 1, 2},
+         {341, 2, 4, 6},
+         {342, 2, 4, 6},
          {4, 6, 14, 5}
       };
       FULL = new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};

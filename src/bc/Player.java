@@ -20,6 +20,8 @@ public final class Player {
    public boolean sneaking;
    public boolean inWater;
    public boolean inLava;
+   /** ticks left on fire (Update 3.7): 1 damage per second, put out by water */
+   public int burn;
    public boolean eyeInWater;
    public boolean collidedH;
    public boolean creative = true;
@@ -210,6 +212,28 @@ public final class Player {
                this.hurt(4);
             }
 
+            if (this.inLava) {
+               this.burn = 300;
+            }
+
+            int fireX = fl(this.x);
+            int fireZ = fl(this.z);
+            if (Blocks.isFire(var1.getBlock(fireX, fl(this.y + 0.1), fireZ)) || Blocks.isFire(var1.getBlock(fireX, fl(this.y + 0.9), fireZ))) {
+               this.burn = Math.max(this.burn, 160);
+               if (this.invuln == 0) {
+                  this.hurt(1);
+               }
+            }
+
+            if (this.burn > 0) {
+               this.burn--;
+               if (this.inWater) {
+                  this.burn = 0;
+               } else if (this.burn % 20 == 0) {
+                  this.hurt(1);
+               }
+            }
+
             if (this.eyeInWater) {
                this.air--;
                if (this.air <= -20) {
@@ -260,6 +284,7 @@ public final class Player {
             }
          } else {
             this.air = 300;
+            this.burn = 0;
             if (this.creative) {
                this.food = 20;
                this.exh = 0.0F;

@@ -69,6 +69,7 @@ final class TexExtra {
 
       Tex.blit(212, haySide());
       Tex.blit(213, hayTop());
+      TexArt37.blocks();
 
       for (int var2 = 256; var2 < 400; var2++) {
          if (Items.name[var2] != null) {
@@ -662,6 +663,10 @@ final class TexExtra {
    static int[] sprite(int var0) {
       if (var0 >= 336 && var0 <= 340) {
          return newSprite(var0);
+      }
+
+      if (var0 >= 341 && var0 <= 350) {
+         return TexArt37.sprite(var0);
       }
 
       TexExtra.Cv var1 = new TexExtra.Cv();

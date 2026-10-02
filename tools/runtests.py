@@ -46,8 +46,8 @@ def reference_jar():
     return out
 
 
-def run_java(cp, main, *args, timeout=900):
-    cmd = [B.java_exe(), "-Xmx2g", "-Djava.awt.headless=true", "-cp", os.pathsep.join(cp), main, *args]
+def run_java(cp, main, *args, timeout=900, props=()):
+    cmd = [B.java_exe(), "-Xmx2g", "-Djava.awt.headless=true", *props, "-cp", os.pathsep.join(cp), main, *args]
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
@@ -109,7 +109,20 @@ def equivalence(classes):
         with open(os.path.join(BUILD, "equivalence-diff.txt"), "w") as f:
             f.write(report + "\n--- stderr (3.5) ---\n" + old.stderr[-3000:] + "\n--- stderr (now) ---\n" + new.stderr[-3000:])
         return False
+    # strict pass: with the Update 3.7 worldgen extras (sugar cane, pumpkin patches) switched off, terrain generation, the
+    # loaded world and the simulation must be IDENTICAL to Update 3.5 - proof that the extras are purely additive.
+    strict = run_java([TEST_CLASSES, classes, LWJGL], "bc.Equivalence", props=["-Dbc.noextras=true"])
+    if strict.returncode != 0:
+        print("--- stderr (tail) ---\n" + strict.stderr[-2500:])
+        sys.exit("strict equivalence run failed (exit code %s)" % strict.returncode)
+    c = parse_fingerprint(strict.stdout)
+    strict_bad = ["  %s\n    3.5 : %s\n    now : %s" % (k, a[k], c.get(k, "(absent)"))
+                  for k in sorted(a) if k.startswith(("gen ", "world ", "tick", "mesh terrain")) and a[k] != c.get(k)]
+    if strict_bad:
+        print("equivalence (worldgen extras off): %d differences vs the 3.5 jar:\n%s" % (len(strict_bad), "\n".join(strict_bad[:40])))
+        return False
     same = sum(1 for k in a if k in b and a[k] == b[k])
+    print("equivalence: terrain / world / tick fingerprints are identical to 3.5 once the 3.7 worldgen extras are off")
     print("equivalence: OK - %d fingerprints identical to the 3.5 jar, %d changed on purpose (test/equivalence-allowed.txt), %d new" % (same, tolerated, added))
     return True
 

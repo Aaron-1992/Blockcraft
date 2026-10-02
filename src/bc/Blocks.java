@@ -62,7 +62,17 @@ public final class Blocks {
    public static final int CARROT0 = 142;
    public static final int POTATO0 = 150;
    public static final int HAY_BALE = 158;
-   public static final int COUNT = 159;
+   public static final int SUGAR_CANE = 159;
+   public static final int BOOKSHELF = 160;
+   public static final int PUMPKIN = 161;
+   public static final int CARVED_PUMPKIN = 162;
+   public static final int JACK_O_LANTERN = 166;
+   public static final int MELON = 170;
+   public static final int PUMPKIN_STEM = 171;
+   public static final int MELON_STEM = 179;
+   public static final int CAKE = 187;
+   public static final int FIRE = 194;
+   public static final int COUNT = 195;
    public static final int[] STAIR_MAT = new int[]{5, 4, 27, 16, 17};
    public static final String[] STAIR_NAME = new String[]{"Oak Wood", "Cobblestone", "Stone Brick", "Brick", "Sandstone"};
    public static final int K_CUBE = 0;
@@ -213,6 +223,57 @@ public final class Blocks {
       return var0 >= 137 && var0 < 141;
    }
 
+   /** Pumpkin stems 171-178 and melon stems 179-186 (8 growth stages each, stage 7 = fully grown). */
+   public static boolean isStem(int var0) {
+      return var0 >= 171 && var0 < 187;
+   }
+
+   public static int stemStage(int var0) {
+      return var0 - 171 & 7;
+   }
+
+   /** The fruit block a fully grown stem grows next to itself: pumpkin (161) or melon (170). */
+   public static int stemFruit(int var0) {
+      return var0 < 179 ? 161 : 170;
+   }
+
+   /** The seed item that is planted to get this stem. */
+   public static int stemSeedItem(int var0) {
+      return var0 < 179 ? 341 : 342;
+   }
+
+   public static boolean isCarvedPumpkin(int var0) {
+      return var0 >= 162 && var0 < 166;
+   }
+
+   public static boolean isJackOLantern(int var0) {
+      return var0 >= 166 && var0 < 170;
+   }
+
+   /** Cake with 0..6 slices eaten (187..193). */
+   public static boolean isCake(int var0) {
+      return var0 >= 187 && var0 < 194;
+   }
+
+   public static boolean isFire(int var0) {
+      return var0 == 194;
+   }
+
+   /** The item you get for a block that is placed in a facing/age variant: what pick-block and drops use. 0 = nothing. */
+   public static int pickItem(int var0) {
+      if (isCarvedPumpkin(var0)) {
+         return 163;
+      } else if (isJackOLantern(var0)) {
+         return 167;
+      } else if (isStem(var0)) {
+         return stemSeedItem(var0);
+      } else if (isCake(var0)) {
+         return 350;
+      } else {
+         return isFire(var0) ? 0 : var0;
+      }
+   }
+
    public static boolean isLeaves(int var0) {
       return var0 >= 12 && var0 <= 14;
    }
@@ -253,8 +314,14 @@ public final class Blocks {
       var1.add(119);
       var1.add(132);
       var1.add(158);
+      var1.add(159);
+      var1.add(160);
+      var1.add(161);
+      var1.add(163);
+      var1.add(167);
+      var1.add(170);
 
-      for (int var23 : new int[]{281, 289, 282, 283, 284, 288, 285, 286, 287, 336, 337, 338, 339, 340}) {
+      for (int var23 : new int[]{281, 289, 282, 283, 284, 288, 285, 286, 287, 336, 337, 338, 339, 340, 341, 342, 343, 344, 345, 346, 347, 348, 349, 350}) {
          var1.add(var23);
       }
 
@@ -619,5 +686,80 @@ public final class Blocks {
          opacity[var55] = 2;
          emit[var55] = 15;
       }
+
+      // ---- Update 3.7: sugar cane, bookshelf, pumpkins, melons, cake, fire ----
+      def(159, "Sugar Cane", 0.0F, false, 219);
+      kind[159] = 1;
+      solid[159] = false;
+      coll[159] = null;
+      cutout[159] = true;
+      box[159] = new double[]{0.1, 0.0, 0.1, 0.9, 1.0, 0.9};
+
+      def(160, "Bookshelf", 1.5F, true, 220);
+      tiles[160][0] = tiles[160][1] = 10;
+      drop[160] = 347;
+      mineClass[160] = 2;
+
+      def(161, "Pumpkin", 1.0F, true, 222);
+      faces(161, 221, 221, 222);
+      mineClass[161] = 2;
+
+      for (int var70 = 0; var70 < 4; var70++) {
+         int var71 = 162 + var70;
+         def(var71, "Carved Pumpkin", 1.0F, true, 222);
+         faces(var71, 221, 221, 222);
+         tiles[var71][2 + var70] = 223;
+         drop[var71] = 163;
+         mineClass[var71] = 2;
+         int var72 = 166 + var70;
+         def(var72, "Jack o'Lantern", 1.0F, true, 222);
+         faces(var72, 221, 221, 222);
+         tiles[var72][2 + var70] = 224;
+         emit[var72] = 15;
+         drop[var72] = 167;
+         mineClass[var72] = 2;
+      }
+
+      def(170, "Melon", 1.0F, true, 226);
+      faces(170, 225, 225, 226);
+      drop[170] = 343;
+      mineClass[170] = 2;
+
+      for (int var73 = 0; var73 < 16; var73++) {
+         int var74 = 171 + var73;
+         int var75 = var73 & 7;
+         def(var74, var73 < 8 ? "Pumpkin Stem" : "Melon Stem", 0.0F, false, 227 + var75 / 2);
+         kind[var74] = 1;
+         solid[var74] = false;
+         coll[var74] = null;
+         cutout[var74] = true;
+         drop[var74] = 0;
+         box[var74] = new double[]{0.3, 0.0, 0.3, 0.7, 0.2 + 0.1 * var75, 0.7};
+      }
+
+      for (int var76 = 0; var76 < 7; var76++) {
+         int var77 = 187 + var76;
+         def(var77, "Cake", 0.5F, false, 232);
+         tiles[var77][0] = 231;
+         tiles[var77][1] = 233;
+         if (var76 > 0) {
+            tiles[var77][5] = 234;
+         }
+
+         kind[var77] = 2;
+         box[var77] = new double[]{(1 + 2 * var76) / 16.0, 0.0, 0.0625, 0.9375, 0.5, 0.9375};
+         coll[var77] = box[var77];
+         drop[var77] = 0;
+      }
+
+      def(194, "Fire", 0.0F, false, 235);
+      kind[194] = 1;
+      solid[194] = false;
+      coll[194] = null;
+      cutout[194] = true;
+      replaceable[194] = true;
+      emit[194] = 15;
+      drop[194] = 0;
+      box[194] = new double[]{0.1, 0.0, 0.1, 0.9, 0.9, 0.9};
    }
 }

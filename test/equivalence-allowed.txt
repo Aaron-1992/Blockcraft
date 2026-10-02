@@ -11,3 +11,10 @@ tex sprites
 tex iconBoxes
 mesh showcase
 recipes
+# Update 3.7 (kitchen & fire update): sugar cane on shores and pumpkin patches in newly generated terrain
+# (Gen.plantShoreAndPatches - runtests.py also proves that with -Dbc.noextras=true gen / world / tick are IDENTICAL
+# to 3.5), the dungeon loot table (pumpkin / melon seeds) and everything that depends on them.
+gen seed=
+world seed=
+tick
+statics World.LOOT

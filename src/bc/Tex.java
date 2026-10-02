@@ -817,6 +817,9 @@ public final class Tex {
          ByteBuffer var3 = toBuffer(lavaFrames[var1 * 1 % 16]);
          GL11.glTexSubImage2D(3553, 0, 128, 16, 16, 16, 6408, 5121, var3);
          MemoryUtil.memFree(var3);
+         ByteBuffer fire = toBuffer(TexArt37.fireFrames[var1]);
+         GL11.glTexSubImage2D(3553, 0, 235 % 16 * 16, 235 / 16 * 16, 16, 16, 6408, 5121, fire);
+         MemoryUtil.memFree(fire);
          if ((var1 & 3) == 0) {
             GL30.glGenerateMipmap(3553);
          }

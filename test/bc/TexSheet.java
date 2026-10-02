@@ -32,6 +32,32 @@ public final class TexSheet {
       for (int id : new int[]{285, 286, 287, 264, 258, 336, 337, 338, 339, 340}) {
          add(tiles, names, "item " + id, TexExtra.sprite(id));
       }
+      if (args.length > 1 && args[1].equals("37")) {
+         tiles.clear(); // only the Update 3.7 art:  bc.TexSheet out.png 37
+         names.clear();
+      }
+      // ---- Update 3.7
+      add(tiles, names, "sugar cane", TexArt37.cane());
+      add(tiles, names, "bookshelf", TexArt37.bookshelfSide());
+      add(tiles, names, "pumpkin top", TexArt37.pumpkinTop());
+      add(tiles, names, "pumpkin side", TexArt37.pumpkinSide());
+      add(tiles, names, "carved", TexArt37.pumpkinFace(false));
+      add(tiles, names, "jack o'lantern", TexArt37.pumpkinFace(true));
+      add(tiles, names, "melon top", TexArt37.melonTop());
+      add(tiles, names, "melon side", TexArt37.melonSide());
+      for (int i = 0; i < 4; i++) {
+         add(tiles, names, "stem g" + i, TexArt37.stem(i));
+      }
+      add(tiles, names, "cake top", TexArt37.cakeTop());
+      add(tiles, names, "cake side", TexArt37.cakeSide(false));
+      add(tiles, names, "cake bottom", TexArt37.cakeBottom());
+      add(tiles, names, "cake cut", TexArt37.cakeSide(true));
+      for (int f = 0; f < 16; f += 3) {
+         add(tiles, names, "fire f" + f, TexArt37.fireFrame(f));
+      }
+      for (int id = 341; id <= 350; id++) {
+         add(tiles, names, "item " + id, TexExtra.sprite(id));
+      }
       int cols = 8;
       int rows = (tiles.size() + cols - 1) / cols;
       int cell = 16 * S + 6;

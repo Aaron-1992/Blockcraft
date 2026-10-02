@@ -761,6 +761,7 @@ public final class Game {
       }
 
       this.player.dead = false;
+      this.player.burn = 0;
       this.player.health = 20;
       this.player.food = 20;
       this.player.sat = 5.0F;
@@ -1228,8 +1229,15 @@ public final class Game {
 
                   this.player.flying = !this.player.flying;
                   break;
+               case "firespread":
+                  if (var2.length > 1 && (var2[1].equalsIgnoreCase("on") || var2[1].equalsIgnoreCase("off"))) {
+                     this.world.fire.spread = var2[1].equalsIgnoreCase("on");
+                  }
+
+                  this.say("Fire spread is " + (this.world.fire.spread ? "on" : "off") + "  (/firespread on|off)");
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon");
+                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
@@ -1354,7 +1362,8 @@ public final class Game {
                var1 = 67;
             }
 
-            if (!Blocks.isFluid(var1)) {
+            var1 = Blocks.pickItem(var1);
+            if (var1 != 0 && !Blocks.isFluid(var1)) {
                for (int var2 = 0; var2 < 9; var2++) {
                   if (this.inv[var2] != null && this.inv[var2].id == var1) {
                      this.sel = var2;
@@ -1552,6 +1561,7 @@ public final class Game {
    void tick() {
       this.tickCount++;
       this.world.tick();
+      this.world.fire.particles(this);
       this.Tex_tick();
       if (this.screen != Game.S.PAUSE) {
          this.mobs.tick();
@@ -1644,7 +1654,7 @@ public final class Game {
          if (var8.life <= 0) {
             var13.remove();
          } else {
-            var8.vy -= 0.04F;
+            var8.vy -= var8.grav;
             float var9 = var8.x + var8.vx;
             float var10 = var8.y + var8.vy;
             float var11 = var8.z + var8.vz;
@@ -1876,6 +1886,14 @@ public final class Game {
          return true;
       }
 
+      if (Blocks.isCake(var1)) {
+         return this.eatCake();
+      }
+
+      if (var1 == Blocks.PUMPKIN && this.heldId() == Items.SHEARS && !this.player.adventure) {
+         return this.carvePumpkin();
+      }
+
       switch (var1) {
          case 66:
             this.openMenu(1, null);
@@ -1907,7 +1925,15 @@ public final class Game {
       if (Items.canHarvest(var5, var4)) {
          int var6 = Blocks.drop[var4];
          int var7 = 1;
-         if (Blocks.isCrop(var4)) {
+         if (Blocks.isStem(var4)) {
+            int stage = Blocks.stemStage(var4);
+
+            for (int seed = 0; seed < 3; seed++) {
+               if (this.rnd.nextInt(15) <= stage) {
+                  this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.stemSeedItem(var4), 1);
+               }
+            }
+         } else if (Blocks.isCrop(var4)) {
             if (Blocks.isRipe(var4)) {
                if (Blocks.cropBase(var4) == 124) {
                   this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 286, 1);
@@ -1936,6 +1962,12 @@ public final class Game {
                   break;
                case 29:
                   var6 = var5 == 340 ? 29 : (this.rnd.nextInt(8) == 0 ? 285 : 0);
+                  break;
+               case 160:
+                  var7 = 3;
+                  break;
+               case 170:
+                  var7 = 3 + this.rnd.nextInt(5);
                   break;
                default:
                   if (Blocks.isLeaves(var4)) {
@@ -2014,6 +2046,38 @@ public final class Game {
 
          this.player.addExhaustion(0.1F);
       }
+   }
+
+   /** One spark (or a puff of smoke) of a fire or a burning creature. */
+   void flameParticle(double x, double y, double z, boolean smoke) {
+      Game.Particle p = new Game.Particle();
+      p.x = (float)x;
+      p.y = (float)y;
+      p.z = (float)z;
+      p.vx = (this.rnd.nextFloat() - 0.5F) * 0.02F;
+      p.vz = (this.rnd.nextFloat() - 0.5F) * 0.02F;
+      p.u = 1.0F / 256.0F;
+      p.v = 65.0F / 256.0F;
+      p.shade = 1.0F;
+      p.grav = -0.002F;
+      if (smoke) {
+         p.vy = 0.03F + this.rnd.nextFloat() * 0.02F;
+         p.size = 0.16F + this.rnd.nextFloat() * 0.1F;
+         p.life = 22 + this.rnd.nextInt(14);
+         float g = 0.18F + this.rnd.nextFloat() * 0.15F;
+         p.r = g;
+         p.g = g;
+         p.b = g;
+      } else {
+         p.vy = 0.04F + this.rnd.nextFloat() * 0.03F;
+         p.size = 0.07F + this.rnd.nextFloat() * 0.05F;
+         p.life = 10 + this.rnd.nextInt(8);
+         p.r = 1.0F;
+         p.g = 0.45F + this.rnd.nextFloat() * 0.4F;
+         p.b = 0.08F;
+      }
+
+      this.particles.add(p);
    }
 
    void explosionParticles(double var1, double var3, double var5) {
@@ -2146,12 +2210,16 @@ public final class Game {
       int var3 = this.target.y;
       int var4 = this.target.z;
       int var5 = this.world.getBlock(var2, var3, var4);
-      if (Blocks.isFarmland(var5) && Blocks.isCrop(this.world.getBlock(var2, var3 + 1, var4))) {
+      if (Blocks.isFarmland(var5) && (Blocks.isCrop(this.world.getBlock(var2, var3 + 1, var4)) || Blocks.isStem(this.world.getBlock(var2, var3 + 1, var4)))) {
          var3++;
          var5 = this.world.getBlock(var2, var3, var4);
       }
 
-      if (Blocks.isCrop(var5) && !Blocks.isRipe(var5)) {
+      if (Blocks.isStem(var5) && Blocks.stemStage(var5) < 7) {
+         int stage = Math.min(7, Blocks.stemStage(var5) + 2 + this.rnd.nextInt(4));
+         this.world.setBlock(var2, var3, var4, var5 - Blocks.stemStage(var5) + stage);
+         this.meshNow(var2, var3, var4);
+      } else if (Blocks.isCrop(var5) && !Blocks.isRipe(var5)) {
          int var6 = Math.min(7, Blocks.cropStage(var5) + 2 + this.rnd.nextInt(4));
          this.world.setBlock(var2, var3, var4, Blocks.cropBase(var5) + var6);
          this.meshNow(var2, var3, var4);
@@ -2195,6 +2263,17 @@ public final class Game {
          return true;
       }
 
+      if (var2.id == Items.BUCKET && var1.type == Mobs.COW && var1.babyAge == 0 && !this.player.creative) {
+         var2.n--;
+         if (var2.n <= 0) {
+            this.inv[this.sel] = new Stack(Items.MILK_BUCKET, 1);
+         } else if (!this.addItem(new Stack(Items.MILK_BUCKET, 1))) {
+            this.dropFromPlayer(Items.MILK_BUCKET, 1);
+         }
+
+         return true;
+      }
+
       if (this.mobs.feed(var1, var2.id)) {
          if (!this.player.creative) {
             var2.n--;
@@ -2230,6 +2309,93 @@ public final class Game {
          var3.b = 0.4F;
          this.particles.add(var3);
       }
+   }
+
+   /**
+    * Which side a carved pumpkin / jack o'lantern shows its face on when it looks at the player:
+    * 0 = north (-z), 1 = south (+z), 2 = east (+x), 3 = west (-x).
+    */
+   int carveFacing() {
+      double yaw = Math.toRadians(this.player.yaw);
+      double dx = -Math.sin(yaw);
+      double dz = Math.cos(yaw);
+      if (Math.abs(dz) >= Math.abs(dx)) {
+         return dz > 0.0 ? 0 : 1;
+      } else {
+         return dx > 0.0 ? 3 : 2;
+      }
+   }
+
+   /** Puts a cake on top of a solid block (or into the free cell next to the clicked face). */
+   boolean placeCake(Stack var1) {
+      int x = this.target.x;
+      int y = this.target.y;
+      int z = this.target.z;
+      if (!Blocks.replaceable[this.world.getBlock(x, y, z)]) {
+         x += this.target.nx;
+         y += this.target.ny;
+         z += this.target.nz;
+      }
+
+      if (y >= 1 && y <= 254 && Blocks.replaceable[this.world.getBlock(x, y, z)] && Blocks.solid[this.world.getBlock(x, y - 1, z)]) {
+         double[] bb = this.player.bb;
+         double[] c = Blocks.coll[Blocks.CAKE];
+         if (bb[3] > x + c[0] && bb[0] < x + c[3] && bb[4] > y + c[1] && bb[1] < y + c[4] && bb[5] > z + c[2] && bb[2] < z + c[5]) {
+            return false;
+         }
+
+         if (!this.world.setBlock(x, y, z, Blocks.CAKE)) {
+            return false;
+         }
+
+         this.meshNow(x, y, z);
+         if (!this.player.creative) {
+            var1.n--;
+            if (var1.n <= 0) {
+               this.inv[this.sel] = null;
+            }
+         }
+
+         return true;
+      } else {
+         return false;
+      }
+   }
+
+   /** Right-click on a cake: eat one slice (+2 hunger) if you are hungry; the last slice makes the cake disappear. */
+   boolean eatCake() {
+      int x = this.target.x;
+      int y = this.target.y;
+      int z = this.target.z;
+      int id = this.world.getBlock(x, y, z);
+      if (!Blocks.isCake(id) || this.player.food >= 20 || this.player.adventure) {
+         return false;
+      }
+
+      this.player.food = Math.min(20, this.player.food + 2);
+      this.player.sat = Math.min(this.player.food, this.player.sat + 0.4F);
+      this.world.setBlock(x, y, z, id >= Blocks.CAKE + 6 ? 0 : id + 1);
+      this.meshNow(x, y, z);
+      return true;
+   }
+
+   /** Shears on a pumpkin: carve a face into the clicked side (or towards you if you clicked top / bottom), 4 seeds drop. */
+   boolean carvePumpkin() {
+      int x = this.target.x;
+      int y = this.target.y;
+      int z = this.target.z;
+      int f;
+      if (this.target.ny != 0) {
+         f = this.carveFacing();
+      } else {
+         f = this.target.nz == -1 ? 0 : (this.target.nz == 1 ? 1 : (this.target.nx == 1 ? 2 : 3));
+      }
+
+      this.world.setBlock(x, y, z, Blocks.CARVED_PUMPKIN + f);
+      this.meshNow(x, y, z);
+      this.world.dropItem(x + 0.5 + this.target.nx * 0.65, y + 0.5 + this.target.ny * 0.65, z + 0.5 + this.target.nz * 0.65, Items.PUMPKIN_SEEDS, 4);
+      this.damageHeld(1);
+      return true;
    }
 
    boolean placeBed(Stack var1) {
@@ -2349,7 +2515,17 @@ public final class Game {
 
             if (this.target != null && !this.player.adventure) {
                if (this.world.getBlock(this.target.x, this.target.y, this.target.z) != 132) {
-                  return false;
+                  // Update 3.7: light a fire in the free cell next to the clicked face
+                  int fx = this.target.x + this.target.nx;
+                  int fy = this.target.y + this.target.ny;
+                  int fz = this.target.z + this.target.nz;
+                  if (!this.world.fire.ignite(fx, fy, fz)) {
+                     return false;
+                  }
+
+                  this.meshNow(fx, fy, fz);
+                  this.damageHeld(1);
+                  return true;
                }
 
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 0);
@@ -2485,6 +2661,10 @@ public final class Game {
          return this.placeBed(var1);
       }
 
+      if (var1 != null && var1.id == Items.CAKE) {
+         return this.placeCake(var1);
+      }
+
       if (var1 != null && Items.plantBlock(var1.id) != 0) {
          return this.placeSeeds(var1);
       }
@@ -2567,7 +2747,7 @@ public final class Game {
                   }
 
                   var2 = 119 + (var10 == 1 ? 0 : (var10 == -1 ? 1 : (var8 == 1 ? 3 : 2)));
-               } else if (Blocks.kind[var2] == 1 && !Blocks.solid[var18]) {
+               } else if (Blocks.kind[var2] == 1 && !Blocks.solid[var18] && !(var2 == Blocks.SUGAR_CANE && var18 == Blocks.SUGAR_CANE)) {
                   return false;
                }
 
@@ -2576,6 +2756,14 @@ public final class Game {
                   double var15 = Math.cos(Math.toRadians(this.player.yaw));
                   int var17 = Math.abs(var15) >= Math.abs(var21) ? (var15 > 0.0 ? 1 : 0) : (var21 > 0.0 ? 2 : 3);
                   var2 = var2 - (var2 - 93 & 3) + var17;
+               }
+
+               if (Blocks.isCarvedPumpkin(var2) || Blocks.isJackOLantern(var2)) {
+                  var2 = (Blocks.isCarvedPumpkin(var2) ? 162 : 166) + this.carveFacing();
+               }
+
+               if (var2 == Blocks.SUGAR_CANE && !this.world.canCaneStay(var3, var4, var5)) {
+                  return false;
                }
 
                if (var2 == 28 && var18 != 7 && var18 != 28) {
@@ -3130,6 +3318,15 @@ public final class Game {
          this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, 1612726464);
       }
 
+      if (this.player.burn > 0 && !this.player.creative) {
+         // flames licking up the bottom of the screen
+         float band = this.gui.h * 0.28F;
+         int flick = this.tickCount / 2 % 3;
+         this.gui.rect(0.0F, this.gui.h - band * 0.55F, this.gui.w, band * 0.55F, (96 + flick * 8) << 24 | 0xFF7A10);
+         this.gui.rect(0.0F, this.gui.h - band, this.gui.w, band * 0.45F, (54 + flick * 6) << 24 | 0xFFA020);
+         this.gui.rect(0.0F, this.gui.h - band * 0.25F, this.gui.w, band * 0.25F, 150 << 24 | 0xFFD040);
+      }
+
       int var1 = this.world.getBlock((int)Math.floor(this.player.x), (int)Math.floor(this.player.y + this.player.eye), (int)Math.floor(this.player.z));
       if (Blocks.isLava(var1)) {
          this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, -1328525312);
@@ -3466,6 +3663,8 @@ public final class Game {
       public float g = 1.0F;
       public float b = 1.0F;
       public float shade = 1.0F;
+      /** downward acceleration per tick (smoke and sparks use a tiny or negative value so they rise) */
+      public float grav = 0.04F;
       int life;
    }
 
