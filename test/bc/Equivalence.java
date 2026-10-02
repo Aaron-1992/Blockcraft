@@ -463,19 +463,7 @@ public final class Equivalence {
          }
       }
       p("tex iconBoxes 0..519 = " + hex(acc));
-      try {
-         MobRender.build();
-         long mr = 0;
-         for (Field f : MobRender.class.getDeclaredFields()) {
-            if (Modifier.isStatic(f.getModifiers()) && !f.isSynthetic()) {
-               f.setAccessible(true);
-               mr = mix(mr, mix(f.getName().hashCode(), h(f.get(null))));
-            }
-         }
-         p("tex MobRender.build statics = " + hex(mr));
-      } catch (Throwable t) {
-         p("tex MobRender.build threw " + t.getClass().getSimpleName());
-      }
+      // NOTE: MobRender.build() is deliberately NOT called - it uploads textures (needs a GL context and aborts the JVM without one).
    }
 
    // ---------- 8. chunk meshing (vertex data) ----------
