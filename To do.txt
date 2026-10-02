@@ -1,0 +1,21 @@
+Weather system with volumetric clouds so you can see bad weather, storms, rain, etc., in the distance (needs to look cool and work without shaders)
+
+Fix LODs and adapt them for the weather system
+
+Skins (make it easy to import Minecraft skins)
+
+Smooth animations
+
+Natural disasters
+
+Trees fall over when chopped down; allow for further harvesting after they fall
+
+Allow slabs, stairs, etc., to be placed on the top half of a block, upside down, etc.
+
+Make Creepers ignitable
+
+Display fire like in Minecraft when it is attached to a block
+
+Hide interior surfaces to improve performance
+
+Fix Mobs not beeing able to jump up a block
