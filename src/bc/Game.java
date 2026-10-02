@@ -2360,7 +2360,7 @@ public final class Game {
             }
          } else if (this.target != null && !this.player.adventure) {
             int var18 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
-            if ((var18 == 2 || var18 == 3) && this.target.ny == 1) {
+            if ((var18 == 2 || var18 == 3) && this.target.ny >= 0) {
                int var20 = this.world.getBlock(this.target.x, this.target.y + 1, this.target.z);
                if (var20 != 0 && !Blocks.replaceable[var20]) {
                   return false;

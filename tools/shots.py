@@ -63,12 +63,13 @@ def farm_blocks():
 # name -> (props, only_new)
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
-    "title":          (["-Dbc.title=TITLE"], False),
+    "title":          (["-Dbc.auto=1", "-Dbc.title=TITLE"], False),
     "day-plain":      (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=100"], False),
-    "mobs":           (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=pig,cow,sheep,chicken,zombie,skeleton,creeper,spider", "-Dbc.shot=110"], False),
+    "mobs":           (COMMON + ["-Dbc.cam=140,69,62,0,18", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=pig,cow,sheep,chicken,creeper", "-Dbc.shot=110"], False),
     "farm":           (COMMON + ["-Dbc.cam=143.5,71,68.5,0,30", "-Dbc.time=6000"] + PLAIN + [sets(farm_blocks()), "-Dbc.shot=170"], True),
     "farm-close":     (COMMON + ["-Dbc.cam=141.5,69.3,70.8,0,38", "-Dbc.time=6000"] + PLAIN + [sets(farm_blocks()), "-Dbc.shot=170"], True),
-    "mobs36":         (COMMON + ["-Dbc.cam=133,70,60,0,20", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=baby:pig,pig,baby:cow,cow,sheared:sheep,sheep,baby:sheep,baby:chicken", "-Dbc.shot=120"], True),
+    "mobs36":         (COMMON + ["-Dbc.cam=140,69,62,0,18", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=baby:pig,pig,baby:cow,cow,sheared:sheep,baby:sheep", "-Dbc.shot=110"], True),
+    "mobs36b":        (COMMON + ["-Dbc.cam=140,69,62,0,18", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=sheep,sheared:sheep,baby:chicken,chicken", "-Dbc.shot=110"], True),
     "inv-creative-2": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=1", "-Dbc.shot=110"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }

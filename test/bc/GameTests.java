@@ -245,7 +245,7 @@ public final class GameTests {
          eq(1, g.inv[g.sel].dmg, "hoe durability used");
       });
 
-      test("hoe: dirt works, stone/sand do not, side faces do not", () -> {
+      test("hoe: dirt works, stone/sand do not, side faces work, the bottom face does not", () -> {
          Game g = newGame(0);
          hold(g, 290, 1);
          g.world.setBlock(11, GROUND, 10, Blocks.DIRT);
@@ -258,8 +258,14 @@ public final class GameTests {
          g.world.setBlock(13, GROUND, 10, Blocks.SAND);
          g.target = top(13, 10);
          check(!g.useSpecial(g.inv[g.sel]), "sand is not hoeable");
+         g.world.setBlock(14, GROUND, 10, Blocks.GRASS);
          g.target = hit(14, GROUND, 10, 1, 0, 0);
-         check(!g.useSpecial(g.inv[g.sel]), "side face is not hoeable (current behaviour)");
+         check(g.useSpecial(g.inv[g.sel]), "the side of a grass block can be hoed too (like Minecraft)");
+         eq(Blocks.FARMLAND, g.world.getBlock(14, GROUND, 10), "side-hoed grass became farmland");
+         g.world.setBlock(16, GROUND, 10, Blocks.GRASS);
+         g.target = hit(16, GROUND, 10, 0, -1, 0);
+         check(!g.useSpecial(g.inv[g.sel]), "but not the bottom face");
+         eq(Blocks.GRASS, g.world.getBlock(16, GROUND, 10), "bottom-clicked grass unchanged");
       });
 
       test("hoe: block above prevents tilling, tall grass above is cleared", () -> {
@@ -1356,6 +1362,42 @@ public final class GameTests {
          eq(285, Blocks.cropSeedItem(127), "wheat -> seeds");
          eq(Items.CARROT, Blocks.cropSeedItem(145), "carrot block -> carrot");
          eq(Items.POTATO, Blocks.cropSeedItem(150), "potato block -> potato");
+      });
+
+      test("atlas: every tile >= 160 used by a block or item is actually painted (TexExtra.blocks)", () -> {
+         TexExtra.blocks(); // pure CPU: fills Tex.atlasPixels for the tiles TexExtra owns
+         java.util.function.IntPredicate painted = tile -> {
+            int ox = tile % 16 * 16;
+            int oy = tile / 16 * 16;
+            for (int y = 0; y < 16; y++) {
+               for (int x = 0; x < 16; x++) {
+                  if (Tex.atlasPixels[(oy + y) * 256 + ox + x] >>> 24 != 0) {
+                     return true;
+                  }
+               }
+            }
+            return false;
+         };
+         int checked = 0;
+         for (int id = 1; id < Blocks.COUNT; id++) {
+            if (Blocks.name[id] == null) {
+               continue;
+            }
+            for (int f = 0; f < 6; f++) {
+               int t = Blocks.tiles[id][f];
+               if (t >= 160) {
+                  checked++;
+                  check(painted.test(t), "block " + id + " (" + Blocks.name[id] + ") face " + f + " tile " + t + " is painted");
+               }
+            }
+         }
+         for (int id = 256; id < 400; id++) {
+            if (Items.name[id] != null && Items.tile[id] >= 160) {
+               checked++;
+               check(painted.test(Items.tile[id]), "item " + id + " (" + Items.name[id] + ") tile " + Items.tile[id] + " is painted");
+            }
+         }
+         check(checked > 60, "checked " + checked + " tile references");
       });
 
       test("shears: recipe (both diagonals), durability 238, leaves and tall grass drop themselves", () -> {

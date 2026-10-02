@@ -28,6 +28,7 @@ WHAT'S NEW IN UPDATE 3.6  (the farm update)
     a baby. Pigs like carrots or potatoes, cows and sheep like wheat, chickens like seeds. Love lasts 30 seconds, the
     parents then need 5 minutes of rest. Babies are half size, take 20 minutes to grow up (every feeding makes it
     2 minutes faster), cannot be sheared and drop nothing. A baby sheep gets one of its parents' colours.
+  * HOES now also work on the side of a grass or dirt block (not only the top), like in Minecraft.
   * New items and the hay bale are in the creative inventory (page 2).
   * Honest note: every rule above is covered by automated tests (3,200+ checks), and the old terrain / lighting /
     physics / crafting code was verified to be unchanged against the 3.5 build, but the game itself has still not
