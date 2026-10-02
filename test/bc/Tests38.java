@@ -169,9 +169,10 @@ final class Tests38 {
                // cell positions arrive relative to the camera (here: the sample point plays the camera)
                double ddx = x - s.cells[k];
                double ddz = z - s.cells[k + 1];
-               float kk = (float)(1.0 - (ddx * ddx + ddz * ddz) / ((double)s.cells[k + 2] * s.cells[k + 2]));
-               if (s.cells[k + 3] > 0 && kk > 0) {
-                  g += Math.max(0.0F, Weather.T1 + 0.06F - g) * kk * kk * s.cells[k + 3];
+               float dl = (float)(Math.sqrt(ddx * ddx + ddz * ddz) / s.cells[k + 2]);
+               if (s.cells[k + 3] > 0 && dl < 1.0F) {
+                  float t = Math.max(0.0F, Math.min(1.0F, (1.0F - dl) * 2.0F));
+                  g += Math.max(0.0F, Weather.T1 + 0.06F - g) * (t * t * (3.0F - 2.0F * t)) * s.cells[k + 3];
                }
             }
             g += (Math.max(s.lo, Math.min(s.hi, g)) - g) * s.amt;

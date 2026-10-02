@@ -109,6 +109,12 @@ public final class Weather {
       return (top + (bot - top) * ty) / 255.0F;
    }
 
+   /** A storm cell's profile over its radius: a full thunderstorm out to half the radius, then rain, then overcast, gone at the rim. */
+   static float cellShape(float d) {
+      float t = Math.max(0.0F, Math.min(1.0F, (1.0F - d) * 2.0F));
+      return t * t * (3.0F - 2.0F * t);
+   }
+
    static float smooth(float e0, float e1, float x) {
       float t = Math.max(0.0F, Math.min(1.0F, (x - e0) / (e1 - e0)));
       return t * t * (3.0F - 2.0F * t);
@@ -123,6 +129,8 @@ public final class Weather {
    public boolean suppressed;
    /** Test / screenshot hook (-Dbc.weather=cell:...): the natural sky is capped at fair-weather clouds, only cells and forcing add weather. */
    public boolean calm;
+   /** Test / screenshot hook (-Dbc.lightning=off): no random lightning (bolts can still be made with {@link #strike}). */
+   public boolean noLightning;
    /** A new world starts calm (fair-weather clouds, no rain) until this clock value; the calm fades out over the last minute. */
    public long calmUntil;
    /** Weather clock in ticks (saved with the world; independent of /time set). */
@@ -268,10 +276,8 @@ public final class Weather {
             double dx = x - this.cells[i];
             double dz = z - this.cells[i + 1];
             double r = this.cells[i + 2];
-            double d2 = (dx * dx + dz * dz) / (r * r);
-            if (d2 < 1.0 && this.cells[i + 3] > 0.0F) {
-               float k = (float)(1.0 - d2);
-               s += Math.max(0.0F, T1 + 0.06F - s) * k * k * this.cells[i + 3];
+            if (dx * dx + dz * dz < r * r && this.cells[i + 3] > 0.0F) {
+               s += Math.max(0.0F, T1 + 0.06F - s) * cellShape((float)(Math.sqrt(dx * dx + dz * dz) / r)) * this.cells[i + 3];
             }
          }
 
@@ -747,7 +753,7 @@ public final class Weather {
 
    void tickLightning(Game g, double px, double pz) {
       Snap s = this.tickSnap;
-      if (g.screen == Game.S.PAUSE) {
+      if (g.screen == Game.S.PAUSE || this.noLightning) {
          return;
       }
 

@@ -274,6 +274,7 @@ public final class Game {
          }
       }
 
+      w.noLightning = "off".equals(System.getProperty("bc.lightning"));
       String biome = System.getProperty("bc.biome");
       if (biome != null) {
          for (Chunk c : this.world.chunks.values()) {

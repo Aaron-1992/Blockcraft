@@ -163,8 +163,18 @@ final class WeatherFx {
          sc *= 2600.0 / hd;
       }
 
-      this.snap.at(this.r.camX + dx * sc, this.r.camZ + dz * sc, this.tmp);
-      float g = this.tmp[0] * 0.45F + this.tmp[2] * 0.55F;
+      // near the horizon the line of sight crosses the whole cloud layer over a long stretch: look at three places along it
+      float g = 0.0F;
+      for (int i = 0; i < 3; i++) {
+         double f = i == 0 ? 1.0 : (i == 1 ? 0.55 : 0.3);
+         if (i > 0 && sc < 500.0) {
+            break;
+         }
+
+         this.snap.at(this.r.camX + dx * sc * f, this.r.camZ + dz * sc * f, this.tmp);
+         g = Math.max(g, this.tmp[0] * 0.45F + this.tmp[2] * 0.55F);
+      }
+
       // strongest overhead, weaker at the horizon (the haze there is the fog colour)
       float elev = (float)Math.max(0.0, Math.min(1.0, dy * 4.0));
       return Math.min(1.0F, g * (0.45F + 0.55F * elev));
@@ -178,7 +188,7 @@ final class WeatherFx {
 
       this.texWhite = Tex.upload(1, 1, new int[]{-1}, false, true);
       this.texRain = mip(Tex.upload(64, 128, streaks(64, 128, 12, 12, 40, 0.50F, 6001L), true, true));
-      this.texShaft = mip(Tex.upload(64, 256, streaks(64, 256, 26, 24, 90, 0.9F, 6002L), true, true));
+      this.texShaft = mip(Tex.upload(64, 256, veil(64, 256, 30, 24, 90, 6002L), true, true));
       this.texSnow = mip(Tex.upload(32, 32, flakes(32, 3, 6003L), true, true));
    }
 
@@ -218,6 +228,33 @@ final class WeatherFx {
       for (int i = 0; i < px.length; i++) {
          int al = Math.min(255, (int)(a[i] * 255.0F));
          px[i] = al << 24 | 0xDCE6FF;
+      }
+
+      return px;
+   }
+
+   /** A rain curtain: a soft translucent veil (so it still shows at a distance, where thin streaks average out) with streaks in it. */
+   static int[] veil(int w, int h, int count, int minLen, int maxLen, long seed) {
+      int[] st = streaks(w, h, count, minLen, maxLen, 0.55F, seed);
+      Random rnd = new Random(seed + 77);
+      float[] low = new float[w * 8];
+      for (int i = 0; i < low.length; i++) {
+         low[i] = rnd.nextFloat();
+      }
+
+      int[] px = new int[w * h];
+      for (int y = 0; y < h; y++) {
+         for (int x = 0; x < w; x++) {
+            // slow variation in density: vertical bands that are denser and thinner (tileable)
+            float a0 = low[(y * 8 / h) * w + x];
+            float a1 = low[((y * 8 / h + 1) % 8) * w + x];
+            float f = y * 8.0F / h - (float)Math.floor(y * 8.0F / h);
+            float band = a0 + (a1 - a0) * f;
+            float base = 0.15F + 0.07F * band;
+            float streak = (st[y * w + x] >>> 24) / 255.0F;
+            int al = Math.min(255, (int)((base + streak * 0.62F) * 255.0F));
+            px[y * w + x] = al << 24 | 0xDCE6FF;
+         }
       }
 
       return px;
@@ -307,10 +344,11 @@ final class WeatherFx {
    static float density(double u, double v, float h, float cover, float storm) {
       float n1 = Weather.samp(NOISE_R, u * (1.0 / 1800.0), v * (1.0 / 1800.0));
       float n2 = Weather.samp(NOISE_G, u * (1.0 / 300.0) + h * 0.012, v * (1.0 / 300.0) + h * 0.008);
-      float n = n1 * 0.66F + n2 * 0.34F;
+      float wt = 0.66F - 0.26F * storm; // thunderheads get more fine detail: cauliflower tops
+      float n = n1 * wt + n2 * (1.0F - wt);
       float top = 0.40F + 0.35F * storm;
       float prof = Weather.smooth(0.0F, 0.16F, h) * (1.0F - Weather.smooth(top, 1.0F, h));
-      float edge = 0.80F + (0.20F - 0.80F) * cover + (h - 0.35F) * 0.10F;
+      float edge = 0.80F + (0.20F - 0.80F) * cover + (h - 0.35F) * 0.10F * (1.0F - 1.5F * storm); // storms widen with height: an anvil
       return Math.max(0.0F, Math.min(1.0F, (n - edge) * 2.6F)) * prof;
    }
 
@@ -577,9 +615,10 @@ final class WeatherFx {
                   continue;
                }
 
-               float cr = kind == 2 ? 0.95F : 0.72F;
-               float cg = kind == 2 ? 0.97F : 0.80F;
-               float cb2 = 1.0F;
+               float dk = 1.0F - 0.50F * o3[2];
+               float cr = (kind == 2 ? 0.95F : 0.72F) * dk;
+               float cg = (kind == 2 ? 0.97F : 0.80F) * dk;
+               float cb2 = 1.0F * (1.0F - 0.30F * o3[2]);
                float height = topY - ground;
                float vTop = height / 90.0F;
                float ux = (float)(wx0 - res.offX - (double)res.ui0[0] * CELLS[0]);
@@ -995,14 +1034,14 @@ final class WeatherFx {
             double mdx = b.x - cx;
             double mdz = b.z - cz;
             double dist = Math.sqrt(mdx * mdx + mdz * mdz) + 20.0;
-            float wscale = (float)Math.max(0.45, dist * 0.0028);
+            float wscale = (float)Math.max(0.7, dist * 0.0042);
             if (pass == 0) {
-               GL11.glColor4f(0.45F, 0.55F, 1.0F, 0.20F * e);
+               GL11.glColor4f(0.45F, 0.58F, 1.0F, 0.30F * e);
             } else {
                GL11.glColor4f(0.92F, 0.95F, 1.0F, Math.min(1.0F, 0.35F + e));
             }
 
-            float widen = pass == 0 ? 5.0F : 1.0F;
+            float widen = pass == 0 ? 6.5F : 1.0F;
             for (int i = 0; i < b.seg.length; i += 7) {
                double x0 = b.seg[i] - cx;
                double y0 = b.seg[i + 1] - cy;
