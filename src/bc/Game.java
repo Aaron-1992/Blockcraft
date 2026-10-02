@@ -1840,6 +1840,13 @@ public final class Game {
       }
    }
 
+   /** Re-meshes the chunk sections around a changed block. No-op without a renderer (headless tests). */
+   void meshNow(int x, int y, int z) {
+      if (this.rend != null) {
+         this.rend.meshNow(this.world, x, y, z);
+      }
+   }
+
    boolean useBlock() {
       int var1 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
       if (Blocks.isDoor(var1)) {
@@ -2040,7 +2047,7 @@ public final class Game {
             int var11 = var7 ? var1 - var9 : var1 + var9;
             int var12 = var7 ? var3 - var10 : var3 + var10;
             this.world.setBlock(var11, var2, var12, 0);
-            this.rend.meshNow(this.world, var11, var2, var12);
+            this.meshNow(var11, var2, var12);
             if (var7 && !this.player.creative) {
                this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 289, 1);
             }
@@ -2051,7 +2058,7 @@ public final class Game {
             int var13 = Blocks.isDoorLo(var4) ? var2 + 1 : var2 - 1;
             if (Blocks.isDoor(this.world.getBlock(var1, var13, var3))) {
                this.world.setBlock(var1, var13, var3, 0);
-               this.rend.meshNow(this.world, var1, var13, var3);
+               this.meshNow(var1, var13, var3);
             }
 
             if (Blocks.isDoorHi(var4)) {
@@ -2067,7 +2074,7 @@ public final class Game {
             }
          }
 
-         this.rend.meshNow(this.world, var1, var2, var3);
+         this.meshNow(var1, var2, var3);
       }
    }
 
@@ -2087,7 +2094,7 @@ public final class Game {
          }
 
          this.world.setBlock(this.target.x, var2, this.target.z, 124);
-         this.rend.meshNow(this.world, this.target.x, var2, this.target.z);
+         this.meshNow(this.target.x, var2, this.target.z);
          if (!this.player.creative) {
             var1.n--;
             if (var1.n <= 0) {
@@ -2125,8 +2132,8 @@ public final class Game {
          if (Blocks.solid[this.world.getBlock(var2, var3 - 1, var4)] && Blocks.solid[this.world.getBlock(var10, var3 - 1, var11)]) {
             this.world.setBlock(var2, var3, var4, 133 + var7);
             this.world.setBlock(var10, var3, var11, 137 + var7);
-            this.rend.meshNow(this.world, var2, var3, var4);
-            this.rend.meshNow(this.world, var10, var3, var11);
+            this.meshNow(var2, var3, var4);
+            this.meshNow(var10, var3, var11);
             if (!this.player.creative) {
                var1.n--;
                if (var1.n <= 0) {
@@ -2190,7 +2197,7 @@ public final class Game {
          if (Blocks.isFluid(var21) && Blocks.fluidLevel(var21) == 0) {
             int var22 = Blocks.isWater(var21) ? 283 : 284;
             this.world.setBlock(var19.x, var19.y, var19.z, 0);
-            this.rend.meshNow(this.world, var19.x, var19.y, var19.z);
+            this.meshNow(var19.x, var19.y, var19.z);
             var1.n--;
             if (var1.n <= 0) {
                this.inv[this.sel] = new Stack(var22, 1);
@@ -2214,7 +2221,7 @@ public final class Game {
                }
 
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 0);
-               this.rend.meshNow(this.world, this.target.x, this.target.y, this.target.z);
+               this.meshNow(this.target.x, this.target.y, this.target.z);
                this.world.primeTnt(this.target.x, this.target.y, this.target.z, 80);
                this.damageHeld(1);
                return true;
@@ -2234,8 +2241,8 @@ public final class Game {
                }
 
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 123);
-               this.rend.meshNow(this.world, this.target.x, this.target.y, this.target.z);
-               this.rend.meshNow(this.world, this.target.x, this.target.y + 1, this.target.z);
+               this.meshNow(this.target.x, this.target.y, this.target.z);
+               this.meshNow(this.target.x, this.target.y + 1, this.target.z);
                this.damageHeld(1);
                return true;
             } else {
@@ -2256,7 +2263,7 @@ public final class Game {
 
          if (var16 >= 0 && var16 <= 255 && Blocks.replaceable[this.world.getBlock(var15, var16, var17)]) {
             this.world.setBlock(var15, var16, var17, var2 == 283 ? 50 : 58);
-            this.rend.meshNow(this.world, var15, var16, var17);
+            this.meshNow(var15, var16, var17);
             if (!this.player.creative) {
                this.inv[this.sel] = new Stack(282, 1);
             }
@@ -2301,8 +2308,8 @@ public final class Game {
 
                this.world.setBlock(var2, var3, var4, 73 + var7);
                this.world.setBlock(var2, var3 + 1, var4, 81 + var7);
-               this.rend.meshNow(this.world, var2, var3, var4);
-               this.rend.meshNow(this.world, var2, var3 + 1, var4);
+               this.meshNow(var2, var3, var4);
+               this.meshNow(var2, var3 + 1, var4);
                if (!this.player.creative) {
                   var1.n--;
                   if (var1.n <= 0) {
@@ -2331,8 +2338,8 @@ public final class Game {
          int var8 = Blocks.doorOpen(var6) ? -4 : 4;
          this.world.setBlock(var1, var5, var3, var6 + var8);
          this.world.setBlock(var1, var5 + 1, var3, var7 + var8);
-         this.rend.meshNow(this.world, var1, var5, var3);
-         this.rend.meshNow(this.world, var1, var5 + 1, var3);
+         this.meshNow(var1, var5, var3);
+         this.meshNow(var1, var5 + 1, var3);
       }
    }
 
@@ -2358,7 +2365,7 @@ public final class Game {
          int var6 = this.world.getBlock(var3, var4, var5);
          if (Blocks.isSlab(var2) && var6 == var2 && this.target.ny == 1) {
             this.world.setBlock(var3, var4, var5, Blocks.STAIR_MAT[var2 - 113]);
-            this.rend.meshNow(this.world, var3, var4, var5);
+            this.meshNow(var3, var4, var5);
             if (!this.player.creative) {
                var1.n--;
                if (var1.n <= 0) {
@@ -2447,7 +2454,7 @@ public final class Game {
                   return false;
                }
 
-               this.rend.meshNow(this.world, var3, var4, var5);
+               this.meshNow(var3, var4, var5);
                if (!this.player.creative) {
                   var1.n--;
                   if (var1.n <= 0) {
