@@ -68,11 +68,19 @@ Scenes marked *only new* run with the new jar only; the others also run the orig
 Logs cannot be downloaded in the assistant sandbox, so workflows copy what matters into *annotations*
 (`tools/ci_annotate.py`) which are readable through `gh api repos/<o>/<r>/check-runs/<job id>/annotations`.
 
+### Windows smoke workflow
+
+`windows-smoke.yml` (trigger: edit `ci/windows-trigger.txt`) takes the committed `releases/*-patch.zip`, installs it over the 3.5 base
+zip like a player, adds Mesa's `opengl32.dll`/`libgallium_wgl.dll` next to the bundled `javaw.exe` (GitHub's Windows machines have no GPU)
+and runs the real `Blockcraft.exe`; screenshots and logs land in `ci-results/windows/`. Gotcha: the Launch4j stub probes `java -version`
+and **hangs on a huge `JAVA_TOOL_OPTIONS`** (> ~1 KB), so scenes with long `-Dbc.*` values are started with `jre\bin\java.exe -jar Blockcraft.exe`
+instead (the exe is a jar with a stub in front). Both visual workflows test the *committed* release zip, not a fresh build.
+
 ### Built-in test hooks (`Game.autoTest`, system properties)
 
 `-Dbc.auto=1` starts a world and exits after one screenshot (`~/.blockcraft112/screenshots`). Useful companions:
 `bc.seed`, `bc.mode`, `bc.rd` (render distance), `bc.lod`, `bc.shaders=false`, `bc.cam=x,y,z,yaw,pitch`, `bc.time`,
-`bc.shot=<frame>`, `bc.set=x,y,z,id;...` (place blocks at frame 70), `bc.summon=pig,baby:cow,sheared:sheep,...`,
+`bc.shot=<frame>`, `bc.set=x,y,z,id;...` (place blocks at frame 70), `bc.summon=pig,baby:cow,sheared:sheep,...` (with `bc.summonDist`, `bc.summonDy` for close-ups),
 `bc.inv=creative|craft|player|furnace|chest` with `bc.page`, `bc.tnt=x,y,z`, `bc.kit`, `bc.hold=<id>`, `bc.title=<screen>`.
 
 ## How the source was recovered (2026-10-02)

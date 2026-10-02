@@ -319,6 +319,8 @@ public final class Game {
             // names: pig,cow,sheep,... ; prefix "baby:" for a baby, "sheared:" for a sheared sheep (test hooks)
             String[] var14 = System.getProperty("bc.summon").split(",");
             double var17 = Math.toRadians(this.player.yaw);
+            double summonDist = Double.parseDouble(System.getProperty("bc.summonDist", "3.5"));
+            double summonDy = Double.parseDouble(System.getProperty("bc.summonDy", "-3.0"));
 
             for (int var20 = 0; var20 < var14.length; var20++) {
                String mobName = var14[var20];
@@ -335,9 +337,9 @@ public final class Game {
                for (int var21 = 0; var21 < 8; var21++) {
                   if (Mobs.NAME[var21].equals(mobName)) {
                      double var8 = (var20 - (var14.length - 1) / 2.0) * 1.6;
-                     double mx = this.player.x - Math.sin(var17) * 3.5 + Math.cos(var17) * var8;
-                     double my = this.player.y - 3.0;
-                     double mz = this.player.z + Math.cos(var17) * 3.5 + Math.sin(var17) * var8;
+                     double mx = this.player.x - Math.sin(var17) * summonDist + Math.cos(var17) * var8;
+                     double my = this.player.y + summonDy;
+                     double mz = this.player.z + Math.cos(var17) * summonDist + Math.sin(var17) * var8;
                      Mob spawned = babyMob ? this.mobs.spawnBaby(var21, mx, my, mz) : this.mobs.spawn(var21, mx, my, mz);
                      spawned.sheared = shearedMob;
                      spawned.yaw = this.player.yaw + 180.0F - 30.0F;

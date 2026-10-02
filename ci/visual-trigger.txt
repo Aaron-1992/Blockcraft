@@ -1,1 +1,1 @@
-title,day-plain,mobs,farm,farm-close,mobs36,mobs36b,inv-creative-2
+title,day-plain,mobs,farm,sheep36,pigs36,inv-creative-2
