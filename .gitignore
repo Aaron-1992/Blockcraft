@@ -1,0 +1,11 @@
+# build output (regenerate with: python3 tools/build.py)
+build/
+.toolchain/
+*.class
+# editor / OS noise
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+__pycache__/

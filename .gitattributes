@@ -1,0 +1,9 @@
+# Keep release files byte-for-byte (Windows .bat/.txt need CRLF; binaries must never be touched).
+package/*   -text
+*.bat       -text
+*.bin       binary
+*.jar       binary
+*.zip       binary
+*.dll       binary
+*.so        binary
+*.png       binary

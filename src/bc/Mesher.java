@@ -1,0 +1,772 @@
+package bc;
+
+import java.nio.FloatBuffer;
+import java.util.Arrays;
+import org.lwjgl.system.MemoryUtil;
+
+public final class Mesher {
+   public static final int FLOATS = 11;
+   static final ThreadLocal<Mesher.Scratch> TL = ThreadLocal.withInitial(Mesher.Scratch::new);
+   static final int[][] FN = new int[][]{{0, 1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {1, 0, 0}, {-1, 0, 0}};
+   static final int[][][] FC = new int[][][]{
+      {{0, 1, 0}, {0, 1, 1}, {1, 1, 1}, {1, 1, 0}},
+      {{0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1}},
+      {{1, 0, 0}, {0, 0, 0}, {0, 1, 0}, {1, 1, 0}},
+      {{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}},
+      {{1, 0, 1}, {1, 0, 0}, {1, 1, 0}, {1, 1, 1}},
+      {{0, 0, 0}, {0, 0, 1}, {0, 1, 1}, {0, 1, 0}}
+   };
+   static final int[][] PLANE = new int[][]{{0, 2}, {0, 2}, {0, 1}, {0, 1}, {1, 2}, {1, 2}};
+   static final float[] SHADE = new float[]{1.0F, 0.5F, 0.8F, 0.8F, 0.6F, 0.6F};
+   static final float[] AOF = new float[]{1.0F, 0.8F, 0.62F, 0.46F};
+   static final float E = 2.0E-4F;
+   static final ThreadLocal<float[]> UVT = ThreadLocal.withInitial(() -> new float[2]);
+
+   static int ci(int var0, int var1, int var2) {
+      return (var1 * 18 + var2) * 18 + var0;
+   }
+
+   public static Mesher.Result build(World var0, Chunk var1, int var2, boolean var3) {
+      Mesher.Scratch var4 = (Mesher.Scratch)TL.get();
+      var4.o.clear();
+      var4.t.clear();
+      int var5 = var1.cx * 16;
+      int var6 = var2 * 16;
+      int var7 = var1.cz * 16;
+      Chunk[] var8 = new Chunk[9];
+
+      for (int var9 = -1; var9 <= 1; var9++) {
+         for (int var10 = -1; var10 <= 1; var10++) {
+            var8[(var9 + 1) * 3 + var10 + 1] = var0.chunk(var1.cx + var10, var1.cz + var9);
+         }
+      }
+
+      byte[] var22 = var4.B;
+      byte[] var23 = var4.L;
+
+      for (int var11 = 0; var11 < 18; var11++) {
+         int var12 = var6 - 1 + var11;
+
+         for (int var13 = 0; var13 < 18; var13++) {
+            int var14 = var7 - 1 + var13;
+            int var15 = (var14 >> 4) - var1.cz + 1;
+            int var16 = var14 & 15;
+
+            for (int var17 = 0; var17 < 18; var17++) {
+               int var18 = var5 - 1 + var17;
+               int var19 = ci(var17, var11, var13);
+               if (var12 < 0) {
+                  var22[var19] = 6;
+                  var23[var19] = 0;
+               } else if (var12 > 255) {
+                  var22[var19] = 0;
+                  var23[var19] = -16;
+               } else {
+                  Chunk var20 = var8[var15 * 3 + (var18 >> 4) - var1.cx + 1];
+                  if (var20 == null) {
+                     var22[var19] = 6;
+                     var23[var19] = 0;
+                  } else {
+                     int var21 = Chunk.idx(var18 & 15, var12, var16);
+                     var22[var19] = var20.blocks[var21];
+                     var23[var19] = var20.light[var21];
+                  }
+               }
+            }
+         }
+      }
+
+      boolean var24 = false;
+
+      for (int var26 = 0; var26 < 16; var26++) {
+         for (int var28 = 0; var28 < 16; var28++) {
+            for (int var29 = 0; var29 < 16; var29++) {
+               int var30 = var22[ci(var29 + 1, var26 + 1, var28 + 1)] & 255;
+               if (var30 != 0) {
+                  var24 = true;
+                  switch (Blocks.kind[var30]) {
+                     case 0:
+                        cube(var4, var1, var29, var26, var28, var30, var3);
+                        break;
+                     case 1:
+                        cross(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 2:
+                        box(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 3:
+                        fluid(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 4:
+                        stair(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 5:
+                        wallTorch(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 6:
+                        fence(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 7:
+                        crop(var4, var1, var29, var26, var28, var30);
+                  }
+               }
+            }
+         }
+      }
+
+      Mesher.Result var27 = new Mesher.Result();
+      var27.nO = var4.o.n / 11;
+      var27.nT = var4.t.n / 11;
+      if (var27.nO > 0) {
+         var27.opaque = MemoryUtil.memAllocFloat(var4.o.n);
+         var27.opaque.put(var4.o.a, 0, var4.o.n).flip();
+      }
+
+      if (var27.nT > 0) {
+         var27.trans = MemoryUtil.memAllocFloat(var4.t.n);
+         var27.trans.put(var4.t.a, 0, var4.t.n).flip();
+      }
+
+      return var27;
+   }
+
+   static float lu(float var0) {
+      return (var0 + 0.5F) / 16.0F;
+   }
+
+   static int tintColor(Chunk var0, int var1, int var2, int var3) {
+      switch (Blocks.tint[var1]) {
+         case 1:
+            return var0.grassColor[var3 * 16 + var2];
+         case 2:
+            if (var1 == 14) {
+               return 6396257;
+            } else {
+               if (var1 == 13) {
+                  return 8431445;
+               }
+
+               return var0.foliageColor[var3 * 16 + var2];
+            }
+         default:
+            return 16777215;
+      }
+   }
+
+   static void emit(Mesher.Scratch var0, Mesher.FB var1, int var2, boolean var3) {
+      float var4 = var2 % 16 / 16.0F;
+      float var5 = var2 / 16 / 16.0F;
+      float var6 = var4 + 2.0E-4F;
+      float var7 = var4 + 0.0625F - 2.0E-4F;
+      float var8 = var5 + 2.0E-4F;
+      float var9 = var5 + 0.0625F - 2.0E-4F;
+
+      for (int var10 = 0; var10 < 4; var10++) {
+         int var11 = var3 ? var10 + 1 & 3 : var10;
+         var1.v(
+            var0.qx[var11],
+            var0.qy[var11],
+            var0.qz[var11],
+            var6 + (var7 - var6) * var0.qu[var11],
+            var8 + (var9 - var8) * var0.qv[var11],
+            var0.qr[var11],
+            var0.qg[var11],
+            var0.qb[var11],
+            var0.qa[var11],
+            var0.qm[var11],
+            var0.ql[var11]
+         );
+      }
+   }
+
+   static void uvFor(int var0, float var1, float var2, float var3, float[] var4) {
+      switch (var0) {
+         case 0:
+         case 1:
+            var4[0] = var1;
+            var4[1] = var3;
+            break;
+         case 2:
+            var4[0] = 1.0F - var1;
+            var4[1] = 1.0F - var2;
+            break;
+         case 3:
+            var4[0] = var1;
+            var4[1] = 1.0F - var2;
+            break;
+         case 4:
+            var4[0] = 1.0F - var3;
+            var4[1] = 1.0F - var2;
+            break;
+         default:
+            var4[0] = var3;
+            var4[1] = 1.0F - var2;
+      }
+   }
+
+   static void cube(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5, boolean var6) {
+      byte[] var7 = var0.B;
+      byte[] var8 = var0.L;
+      int var9 = var2 + 1;
+      int var10 = var3 + 1;
+      int var11 = var4 + 1;
+      int var12 = ci(var9, var10, var11);
+      int var13 = tintColor(var1, var5, var2, var4);
+      float[] var14 = (float[])UVT.get();
+
+      for (int var15 = 0; var15 < 6; var15++) {
+         int[] var16 = FN[var15];
+         int var17 = ci(var9 + var16[0], var10 + var16[1], var11 + var16[2]);
+         int var18 = var7[var17] & 255;
+         if (!Blocks.opaque[var18] && (var5 != 15 || var18 != 15)) {
+            boolean var19 = Blocks.tint[var5] == 1;
+            float var20 = 1.0F;
+            float var21 = 1.0F;
+            float var22 = 1.0F;
+            int var23 = Blocks.tiles[var5][var15];
+            if (Blocks.tint[var5] == 2 || var19 && var15 == 0) {
+               var20 = (var13 >> 16 & 0xFF) / 255.0F;
+               var21 = (var13 >> 8 & 0xFF) / 255.0F;
+               var22 = (var13 & 0xFF) / 255.0F;
+            }
+
+            quad(var0, var15, var2, var3, var4, var17, var12, var23, var20, var21, var22, 1.0F, var6, 0.0F, var14);
+            emit(var0, var0.o, var23, flipFor(var0));
+            if (var19 && var15 >= 2) {
+               float var24 = (var13 >> 16 & 0xFF) / 255.0F;
+               float var25 = (var13 >> 8 & 0xFF) / 255.0F;
+               float var26 = (var13 & 0xFF) / 255.0F;
+               quad(var0, var15, var2, var3, var4, var17, var12, 2, var24, var25, var26, 1.0F, var6, 0.002F, var14);
+               emit(var0, var0.o, 2, flipFor(var0));
+            }
+         }
+      }
+   }
+
+   static boolean flipFor(Mesher.Scratch var0) {
+      return var0.ao[0] + var0.ao[2] < var0.ao[1] + var0.ao[3];
+   }
+
+   static void quad(
+      Mesher.Scratch var0,
+      int var1,
+      int var2,
+      int var3,
+      int var4,
+      int var5,
+      int var6,
+      int var7,
+      float var8,
+      float var9,
+      float var10,
+      float var11,
+      boolean var12,
+      float var13,
+      float[] var14
+   ) {
+      byte[] var15 = var0.B;
+      byte[] var16 = var0.L;
+      int[] var17 = FN[var1];
+      int var18 = var2 + 1 + var17[0];
+      int var19 = var3 + 1 + var17[1];
+      int var20 = var4 + 1 + var17[2];
+      int var21 = var16[var5] & 255;
+      if (Blocks.opaque[var15[var5] & 0xFF]) {
+         var21 = var16[var6] & 255;
+      }
+
+      int var22 = PLANE[var1][0];
+      int var23 = PLANE[var1][1];
+
+      for (int var24 = 0; var24 < 4; var24++) {
+         int[] var25 = FC[var1][var24];
+         float var26 = 1.0F;
+         float var27;
+         float var28;
+         if (var12) {
+            int var29 = var25[var22] * 2 - 1;
+            int var30 = var25[var23] * 2 - 1;
+            int[] var31 = new int[]{var18, var19, var20};
+            int[] var32 = new int[]{var18, var19, var20};
+            int[] var33 = new int[]{var18, var19, var20};
+            var31[var22] += var29;
+            var32[var23] += var30;
+            var33[var22] += var29;
+            var33[var23] += var30;
+            int var34 = ci(var31[0], var31[1], var31[2]);
+            int var35 = ci(var32[0], var32[1], var32[2]);
+            int var36 = ci(var33[0], var33[1], var33[2]);
+            boolean var37 = Blocks.opaque[var15[var34] & 0xFF];
+            boolean var38 = Blocks.opaque[var15[var35] & 0xFF];
+            boolean var39 = Blocks.opaque[var15[var36] & 0xFF];
+            int var40 = var37 && var38 ? 3 : (var37 ? 1 : 0) + (var38 ? 1 : 0) + (var39 ? 1 : 0);
+            var26 = AOF[var40];
+            int var41 = var37 ? var21 : var16[var34] & 0xFF;
+            int var42 = var38 ? var21 : var16[var35] & 0xFF;
+            int var43 = var37 && var38 ? var21 : (var39 ? var21 : var16[var36] & 0xFF);
+            var27 = ((var21 >> 4 & 15) + (var41 >> 4 & 15) + (var42 >> 4 & 15) + (var43 >> 4 & 15)) * 0.25F;
+            var28 = ((var21 & 15) + (var41 & 15) + (var42 & 15) + (var43 & 15)) * 0.25F;
+         } else {
+            var27 = var21 >> 4 & 15;
+            var28 = var21 & 15;
+         }
+
+         var0.ao[var24] = var26;
+         float var44 = SHADE[var1] * var26;
+         float var45 = var25[0];
+         float var46 = var25[1];
+         float var47 = var25[2];
+         uvFor(var1, var45, var46, var47, var14);
+         var0.qx[var24] = var2 + var45 + var17[0] * var13;
+         var0.qy[var24] = var3 + var46 + var17[1] * var13;
+         var0.qz[var24] = var4 + var47 + var17[2] * var13;
+         var0.qu[var24] = var14[0];
+         var0.qv[var24] = var14[1];
+         var0.qr[var24] = var44 * var8;
+         var0.qg[var24] = var44 * var9;
+         var0.qb[var24] = var44 * var10;
+         var0.qa[var24] = var11;
+         var0.qm[var24] = lu(var27);
+         var0.ql[var24] = lu(var28);
+      }
+   }
+
+   static void cross(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      int var6 = ci(var2 + 1, var3 + 1, var4 + 1);
+      int var7 = var0.L[var6] & 255;
+      float var8 = var7 >> 4 & 15;
+      float var9 = var7 & 15;
+      int var10 = tintColor(var1, var5, var2, var4);
+      float var11 = (var10 >> 16 & 0xFF) / 255.0F;
+      float var12 = (var10 >> 8 & 0xFF) / 255.0F;
+      float var13 = (var10 & 0xFF) / 255.0F;
+      int var14 = var1.cx * 16 + var2;
+      int var15 = var1.cz * 16 + var4;
+      int var16 = var14 * 3129871 ^ var15 * 116129781;
+      var16 = var16 * var16 * 42317861 + var16 * 11;
+      float var17 = ((var16 >> 16 & 15) / 15.0F - 0.5F) * 0.3F;
+      float var18 = ((var16 >> 20 & 15) / 15.0F - 0.5F) * 0.3F;
+      float var19 = 0.146F;
+      float var20 = 0.854F;
+      float[][][] var21 = new float[][][]{
+         {{var19, 0.0F, var19}, {var20, 0.0F, var20}, {var20, 1.0F, var20}, {var19, 1.0F, var19}},
+         {{var19, 0.0F, var20}, {var20, 0.0F, var19}, {var20, 1.0F, var19}, {var19, 1.0F, var20}}
+      };
+      float[] var22 = new float[]{0.0F, 1.0F, 1.0F, 0.0F};
+      float[] var23 = new float[]{1.0F, 1.0F, 0.0F, 0.0F};
+
+      for (float[][] var27 : var21) {
+         for (int var28 = 0; var28 < 4; var28++) {
+            var0.qx[var28] = var2 + var27[var28][0] + var17;
+            var0.qy[var28] = var3 + var27[var28][1];
+            var0.qz[var28] = var4 + var27[var28][2] + var18;
+            var0.qu[var28] = var22[var28];
+            var0.qv[var28] = var23[var28];
+            var0.qr[var28] = 0.95F * var11;
+            var0.qg[var28] = 0.95F * var12;
+            var0.qb[var28] = 0.95F * var13;
+            var0.qa[var28] = 1.0F;
+            var0.qm[var28] = lu(var8);
+            var0.ql[var28] = lu(var9);
+         }
+
+         var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+         emit(var0, var0.o, Blocks.tiles[var5][0], false);
+      }
+   }
+
+   static void crop(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      int var6 = ci(var2 + 1, var3 + 1, var4 + 1);
+      int var7 = var0.L[var6] & 255;
+      float var8 = var7 >> 4 & 15;
+      float var9 = var7 & 15;
+      float var10 = 0.25F;
+      float var11 = 0.75F;
+      float[][][] var12 = new float[][][]{
+         {{0.0F, 0.0F, var10}, {1.0F, 0.0F, var10}, {1.0F, 1.0F, var10}, {0.0F, 1.0F, var10}},
+         {{0.0F, 0.0F, var11}, {1.0F, 0.0F, var11}, {1.0F, 1.0F, var11}, {0.0F, 1.0F, var11}},
+         {{var10, 0.0F, 0.0F}, {var10, 0.0F, 1.0F}, {var10, 1.0F, 1.0F}, {var10, 1.0F, 0.0F}},
+         {{var11, 0.0F, 0.0F}, {var11, 0.0F, 1.0F}, {var11, 1.0F, 1.0F}, {var11, 1.0F, 0.0F}}
+      };
+      float[] var13 = new float[]{0.0F, 1.0F, 1.0F, 0.0F};
+      float[] var14 = new float[]{1.0F, 1.0F, 0.0F, 0.0F};
+
+      for (float[][] var18 : var12) {
+         for (int var19 = 0; var19 < 4; var19++) {
+            var0.qx[var19] = var2 + var18[var19][0];
+            var0.qy[var19] = var3 + var18[var19][1] - 0.0625F;
+            var0.qz[var19] = var4 + var18[var19][2];
+            var0.qu[var19] = var13[var19];
+            var0.qv[var19] = var14[var19];
+            var0.qr[var19] = var0.qg[var19] = var0.qb[var19] = 0.95F;
+            var0.qa[var19] = 1.0F;
+            var0.qm[var19] = lu(var8);
+            var0.ql[var19] = lu(var9);
+         }
+
+         var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+         emit(var0, var0.o, Blocks.tiles[var5][0], false);
+      }
+   }
+
+   static void box(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      boxBB(var0, var1, var2, var3, var4, var5, Blocks.box[var5], null);
+   }
+
+   static void stair(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      int var6 = var5 - 93 & 3;
+      double[][] var7 = new double[][]{{0.0, 0.0, 0.0, 1.0, 0.5, 0.5}, {0.0, 0.5, 0.0, 1.0, 1.0, 0.5}, {0.0, 0.0, 0.5, 1.0, 0.5, 1.0}};
+      int[][][] var8 = new int[][][]{{{0, 0, 1}, {0, 1, 0}}, {{0, -1, 0}}, {{0, 0, -1}}};
+
+      for (int var9 = 0; var9 < 3; var9++) {
+         double[] var10 = var7[var9];
+         double[] var11 = new double[6];
+         double[][] var12 = new double[][]{{var10[0], var10[2]}, {var10[3], var10[5]}};
+         double[] var13 = new double[2];
+         double[] var14 = new double[2];
+
+         for (int var15 = 0; var15 < 2; var15++) {
+            double var16 = var12[var15][0];
+            double var18 = var12[var15][1];
+            switch (var6) {
+               case 0:
+                  var13[var15] = var16;
+                  var14[var15] = var18;
+                  break;
+               case 1:
+                  var13[var15] = 1.0 - var16;
+                  var14[var15] = 1.0 - var18;
+                  break;
+               case 2:
+                  var13[var15] = 1.0 - var18;
+                  var14[var15] = var16;
+                  break;
+               default:
+                  var13[var15] = var18;
+                  var14[var15] = 1.0 - var16;
+            }
+         }
+
+         var11[0] = Math.min(var13[0], var13[1]);
+         var11[3] = Math.max(var13[0], var13[1]);
+         var11[2] = Math.min(var14[0], var14[1]);
+         var11[5] = Math.max(var14[0], var14[1]);
+         var11[1] = var10[1];
+         var11[4] = var10[4];
+         int[][] var20 = new int[var8[var9].length][];
+
+         for (int var21 = 0; var21 < var20.length; var21++) {
+            int var17 = var8[var9][var21][0];
+            int var22 = var8[var9][var21][1];
+            int var19 = var8[var9][var21][2];
+            switch (var6) {
+               case 0:
+                  var20[var21] = new int[]{var17, var22, var19};
+                  break;
+               case 1:
+                  var20[var21] = new int[]{-var17, var22, -var19};
+                  break;
+               case 2:
+                  var20[var21] = new int[]{-var19, var22, var17};
+                  break;
+               default:
+                  var20[var21] = new int[]{var19, var22, -var17};
+            }
+         }
+
+         boxBB(var0, var1, var2, var3, var4, var5, var11, var20);
+      }
+   }
+
+   static boolean fenceLink(Mesher.Scratch var0, int var1, int var2, int var3) {
+      int var4 = var0.B[ci(var1, var2, var3)] & 255;
+      return var4 == 118 || Blocks.opaque[var4];
+   }
+
+   static void fence(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      boxBB(var0, var1, var2, var3, var4, var5, new double[]{0.375, 0.0, 0.375, 0.625, 1.0, 0.625}, null);
+      int var6 = var2 + 1;
+      int var7 = var3 + 1;
+      int var8 = var4 + 1;
+      boolean[] var9 = new boolean[]{
+         fenceLink(var0, var6, var7, var8 - 1),
+         fenceLink(var0, var6, var7, var8 + 1),
+         fenceLink(var0, var6 + 1, var7, var8),
+         fenceLink(var0, var6 - 1, var7, var8)
+      };
+      double[][] var10 = new double[][]{
+         {0.4375, 0.0, 0.0, 0.5625, 0.0, 0.375},
+         {0.4375, 0.0, 0.625, 0.5625, 0.0, 1.0},
+         {0.625, 0.0, 0.4375, 1.0, 0.0, 0.5625},
+         {0.0, 0.0, 0.4375, 0.375, 0.0, 0.5625}
+      };
+      double[][] var11 = new double[][]{{0.375, 0.5625}, {0.75, 0.9375}};
+
+      for (int var12 = 0; var12 < 4; var12++) {
+         if (var9[var12]) {
+            for (double[] var16 : var11) {
+               double[] var17 = (double[])var10[var12].clone();
+               var17[1] = var16[0];
+               var17[4] = var16[1];
+               boxBB(var0, var1, var2, var3, var4, var5, var17, null);
+            }
+         }
+      }
+   }
+
+   static void wallTorch(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      int var6 = var5 - 89;
+      float var7 = var6 == 2 ? -1.0F : (var6 == 3 ? 1.0F : 0.0F);
+      float var8 = var6 == 0 ? 1.0F : (var6 == 1 ? -1.0F : 0.0F);
+      int var9 = ci(var2 + 1, var3 + 1, var4 + 1);
+      int var10 = var0.L[var9] & 255;
+      float var11 = var10 >> 4 & 15;
+      float var12 = var10 & 15;
+      double[] var13 = new double[]{0.4375, 0.0, 0.4375, 0.5625, 0.625, 0.5625};
+      float[] var14 = (float[])UVT.get();
+      int[] var15 = new int[]{0, 2, 3, 4, 5};
+
+      for (int var19 : var15) {
+         for (int var20 = 0; var20 < 4; var20++) {
+            int[] var21 = FC[var19][var20];
+            float var22 = (float)(var21[0] == 0 ? var13[0] : var13[3]);
+            float var23 = (float)(var21[1] == 0 ? var13[1] : var13[4]);
+            float var24 = (float)(var21[2] == 0 ? var13[2] : var13[5]);
+            uvFor(var19, var22, var23, var24, var14);
+            float var25 = var23 * 0.55F;
+            var0.qx[var20] = var2 + 0.5F + (var22 - 0.5F) - var7 * 0.34F + var7 * var25;
+            var0.qy[var20] = var3 + 0.2F + var23;
+            var0.qz[var20] = var4 + 0.5F + (var24 - 0.5F) - var8 * 0.34F + var8 * var25;
+            var0.qu[var20] = var14[0];
+            var0.qv[var20] = var14[1];
+            var0.qr[var20] = var0.qg[var20] = var0.qb[var20] = 1.0F;
+            var0.qa[var20] = 1.0F;
+            var0.qm[var20] = lu(var11);
+            var0.ql[var20] = lu(var12);
+         }
+
+         var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+         emit(var0, var0.o, Blocks.tiles[var5][var19], false);
+      }
+   }
+
+   static void boxBB(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5, double[] var6, int[][] var7) {
+      int var8 = var2 + 1;
+      int var9 = var3 + 1;
+      int var10 = var4 + 1;
+      int var11 = ci(var8, var9, var10);
+      int var12 = var0.L[var11] & 255;
+      float[] var13 = (float[])UVT.get();
+
+      for (int var14 = 0; var14 < 6; var14++) {
+         int[] var15 = FN[var14];
+         if (var7 != null) {
+            boolean var16 = false;
+
+            for (int[] var20 : var7) {
+               if (var20[0] == var15[0] && var20[1] == var15[1] && var20[2] == var15[2]) {
+                  var16 = true;
+               }
+            }
+
+            if (var16) {
+               continue;
+            }
+         }
+
+         int var31 = var14 / 2 == 0 ? 1 : (var14 / 2 == 1 ? 2 : 0);
+         double var33 = var14 % 2 == 0 ? var6[3 + var31] : var6[var31];
+         boolean var32 = var14 % 2 == 0 ? var33 >= 1.0 : var33 <= 0.0;
+         if (var32) {
+            int var34 = var0.B[ci(var8 + var15[0], var9 + var15[1], var10 + var15[2])] & 255;
+            if (Blocks.opaque[var34]) {
+               continue;
+            }
+         }
+
+         int var35 = var12;
+         int var21 = ci(var8 + var15[0], var9 + var15[1], var10 + var15[2]);
+         if (!Blocks.opaque[var0.B[var21] & 0xFF]) {
+            var35 = var0.L[var21] & 255;
+         }
+
+         if (var5 == 32) {
+            var35 = var12;
+         }
+
+         float var22 = var35 >> 4 & 15;
+         float var23 = var35 & 15;
+         boolean var24 = false;
+         if (Blocks.isDoor(var5)) {
+            int var25 = var6[3] - var6[0] < var6[5] - var6[2] ? 4 : 2;
+            var24 = var14 / 2 * 2 != var25;
+         }
+
+         for (int var36 = 0; var36 < 4; var36++) {
+            int[] var26 = FC[var14][var36];
+            float var27 = (float)(var26[0] == 0 ? var6[0] : var6[3]);
+            float var28 = (float)(var26[1] == 0 ? var6[1] : var6[4]);
+            float var29 = (float)(var26[2] == 0 ? var6[2] : var6[5]);
+            uvFor(var14, var27, var28, var29, var13);
+            if (var24) {
+               var13[0] = 0.3F + 0.4F * (var13[0] * 7.0F % 1.0F);
+               var13[1] = 0.3F + 0.4F * (var13[1] * 7.0F % 1.0F);
+            }
+
+            var0.qx[var36] = var2 + var27;
+            var0.qy[var36] = var3 + var28;
+            var0.qz[var36] = var4 + var29;
+            var0.qu[var36] = var13[0];
+            var0.qv[var36] = var13[1];
+            float var30 = var5 == 32 ? 1.0F : SHADE[var14];
+            var0.qr[var36] = var30;
+            var0.qg[var36] = var30;
+            var0.qb[var36] = var30;
+            var0.qa[var36] = 1.0F;
+            var0.qm[var36] = lu(var22);
+            var0.ql[var36] = lu(var23);
+         }
+
+         var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+         emit(var0, var0.o, var24 ? 10 : Blocks.tiles[var5][var14], false);
+      }
+   }
+
+   static float cornerHeight(Mesher.Scratch var0, int var1, int var2, int var3, int var4, int var5, int var6) {
+      float var7 = 0.0F;
+      int var8 = 0;
+
+      for (int var9 = var5 - 1; var9 <= var5; var9++) {
+         for (int var10 = var4 - 1; var10 <= var4; var10++) {
+            int var11 = var0.B[ci(var1 + var10, var2 + 1, var3 + var9)] & 255;
+            if (Blocks.sameFluid(var11, var6)) {
+               return 1.0F;
+            }
+
+            int var12 = var0.B[ci(var1 + var10, var2, var3 + var9)] & 255;
+            if (Blocks.sameFluid(var12, var6)) {
+               float var13 = (8 - Blocks.fluidLevel(var12)) / 9.0F;
+               var7 += var13;
+               var8++;
+            } else if (!Blocks.solid[var12]) {
+               var8++;
+            }
+         }
+      }
+
+      return var8 == 0 ? 0.0F : var7 / var8;
+   }
+
+   static void fluid(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      int var6 = var2 + 1;
+      int var7 = var3 + 1;
+      int var8 = var4 + 1;
+      boolean var9 = Blocks.isWater(var5);
+      Mesher.FB var10 = var9 ? var0.t : var0.o;
+      int var11 = ci(var6, var7, var8);
+      float[] var12 = (float[])UVT.get();
+      float[][] var13 = new float[2][2];
+
+      for (int var14 = 0; var14 < 2; var14++) {
+         for (int var15 = 0; var15 < 2; var15++) {
+            var13[var14][var15] = cornerHeight(var0, var6, var7, var8, var15, var14, var5);
+         }
+      }
+
+      int var26 = var9 ? 23 : 24;
+
+      for (int var27 = 0; var27 < 6; var27++) {
+         int[] var16 = FN[var27];
+         int var17 = ci(var6 + var16[0], var7 + var16[1], var8 + var16[2]);
+         int var18 = var0.B[var17] & 255;
+         if (!Blocks.opaque[var18] && !Blocks.sameFluid(var18, var5)) {
+            int var19 = var0.L[var17] & 255;
+            if (!var9) {
+               var19 = var0.L[var11] & 255;
+            }
+
+            float var20 = var19 >> 4 & 15;
+            float var21 = var19 & 15;
+
+            for (int var22 = 0; var22 < 4; var22++) {
+               int[] var23 = FC[var27][var22];
+               float var24 = var23[1] == 1 ? var13[var23[2]][var23[0]] : 0.0F;
+               uvFor(var27, var23[0], var24, var23[2], var12);
+               if (var27 < 2) {
+                  var12[0] = var23[0];
+                  var12[1] = var23[2];
+               }
+
+               var0.qx[var22] = var2 + var23[0];
+               var0.qy[var22] = var3 + var24;
+               var0.qz[var22] = var4 + var23[2];
+               var0.qu[var22] = var12[0];
+               var0.qv[var22] = var12[1];
+               float var25 = var9 ? SHADE[var27] : 0.8F + 0.2F * SHADE[var27];
+               var0.qr[var22] = var25;
+               var0.qg[var22] = var25;
+               var0.qb[var22] = var25;
+               var0.qa[var22] = var9 ? 0.72F : 1.0F;
+               var0.qm[var22] = lu(var20);
+               var0.ql[var22] = lu(var21);
+            }
+
+            var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+            emit(var0, var10, var26, false);
+         }
+      }
+   }
+
+   static final class FB {
+      float[] a = new float[32768];
+      int n;
+
+      void clear() {
+         this.n = 0;
+      }
+
+      void v(float var1, float var2, float var3, float var4, float var5, float var6, float var7, float var8, float var9, float var10, float var11) {
+         if (this.n + 11 > this.a.length) {
+            this.a = Arrays.copyOf(this.a, this.a.length * 2);
+         }
+
+         this.a[this.n++] = var1;
+         this.a[this.n++] = var2;
+         this.a[this.n++] = var3;
+         this.a[this.n++] = var4;
+         this.a[this.n++] = var5;
+         this.a[this.n++] = var6;
+         this.a[this.n++] = var7;
+         this.a[this.n++] = var8;
+         this.a[this.n++] = var9;
+         this.a[this.n++] = var10;
+         this.a[this.n++] = var11;
+      }
+   }
+
+   public static final class Result {
+      public FloatBuffer opaque;
+      public FloatBuffer trans;
+      public int nO;
+      public int nT;
+   }
+
+   static final class Scratch {
+      final byte[] B = new byte[5832];
+      final byte[] L = new byte[5832];
+      final Mesher.FB o = new Mesher.FB();
+      final Mesher.FB t = new Mesher.FB();
+      final float[] qx = new float[4];
+      final float[] qy = new float[4];
+      final float[] qz = new float[4];
+      final float[] qu = new float[4];
+      final float[] qv = new float[4];
+      final float[] qr = new float[4];
+      final float[] qg = new float[4];
+      final float[] qb = new float[4];
+      final float[] qa = new float[4];
+      final float[] ql = new float[4];
+      final float[] qm = new float[4];
+      final float[] ao = new float[4];
+   }
+}

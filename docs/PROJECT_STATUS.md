@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Handoff notes, 2026-10-02. The project was started in an earlier chat and moved to this repo. Everything below is copied from that chat's "Update 3.5" release message. It has **not** been checked against code, because the source has not been uploaded to this repo yet._
+_Handoff notes, 2026-10-02. The project was started in an earlier chat and moved to this repo. The feature list below is copied from that chat's "Update 3.5" release message and matches the `README.txt` inside the 3.5 zip. The original source did not survive, so it was **recovered from the shipped jar** (see [`DEVELOPMENT.md`](DEVELOPMENT.md)) and now lives in `src/`; the recovered code was verified to behave identically to the 3.5 jar for all non-graphics logic._
 
 ## What it is
 
@@ -53,10 +53,12 @@ The crafting recipes were not checked in-game either.
 Built and tested on Linux with software rendering. **Not** tested on real Windows hardware.
 
 ## Open items
-- [ ] Upload the project source and/or the 3.5 zip to this repo. Until then there is nothing to build on.
-- [ ] Work out the tech stack from the uploaded files.
-- [ ] Decide how Windows builds are produced and delivered to the owner.
-- [ ] Play-test the three untested features above and the crafting recipes.
+- [x] Upload the 3.5 zip to this repo (done by the owner).
+- [x] Identify the tech stack: Java 21 + LWJGL 3; `Blockcraft.exe` is a Launch4j wrapper around the jar.
+- [x] Recover the source from `blockcraft.jar` and make it build again (`src/`, `tools/build.py`).
+- [x] Prove the recovered logic code equals the 3.5 jar (`python3 tools/test.py equivalence`).
+- [ ] Decide how Windows builds are delivered to the owner (update packs in `releases/`; see README).
+- [ ] Play-test the three untested features above and the crafting recipes (headless unit tests cover the logic).
 
 ## Moving files around (limits observed 2026-10-02)
 - GitHub website upload: max 25 MiB per file, 100 files at a time. Git / GitHub Desktop: max 100 MiB per file (warning above 50 MiB). Anything larger needs Git LFS.

@@ -1,0 +1,1091 @@
+package bc;
+
+import bc.World.Hit;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Random;
+
+public final class Mobs {
+   public static final int PIG = 0;
+   public static final int COW = 1;
+   public static final int SHEEP = 2;
+   public static final int CHICKEN = 3;
+   public static final int ZOMBIE = 4;
+   public static final int SKELETON = 5;
+   public static final int CREEPER = 6;
+   public static final int SPIDER = 7;
+   public static final int N = 8;
+   public static final String[] NAME = new String[]{"pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider"};
+   static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16};
+   static final float[] W = new float[]{0.9F, 0.9F, 0.9F, 0.4F, 0.6F, 0.6F, 0.6F, 1.4F};
+   static final float[] H = new float[]{0.9F, 1.4F, 1.3F, 0.7F, 1.95F, 1.99F, 1.7F, 0.9F};
+   static final float[] SPD = new float[]{0.1F, 0.1F, 0.1F, 0.1F, 0.13F, 0.125F, 0.125F, 0.17F};
+   static final int[] SHEEP_COLORS = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 7, 15, 12, 6};
+   final Game g;
+   public final ArrayList<Mobs.Mob> list = new ArrayList();
+   public final ArrayList<Mobs.Arrow> arrows = new ArrayList();
+   final Random rnd = new Random();
+   int timer;
+   final double[] res = new double[3];
+   final HashMap<Long, Integer> spawnerCd = new HashMap();
+
+   public static boolean hostile(int var0) {
+      return var0 >= 4;
+   }
+
+   public Mobs(Game var1) {
+      this.g = var1;
+   }
+
+   public void clear() {
+      this.list.clear();
+      this.arrows.clear();
+   }
+
+   public int count(boolean var1) {
+      int var2 = 0;
+
+      for (Mobs.Mob var4 : this.list) {
+         if (!var4.dead && hostile(var4.type) == var1) {
+            var2++;
+         }
+      }
+
+      return var2;
+   }
+
+   static float daylightAt(long var0) {
+      double var2 = var0 % 24000L;
+      double var4 = Math.cos((Math.PI * 2) * (var2 - 6000.0) / 24000.0);
+      return (float)Math.max(0.0, Math.min(1.0, 0.5 + var4 * 1.3));
+   }
+
+   public Mobs.Mob spawn(int var1, double var2, double var4, double var6) {
+      Mobs.Mob var8 = new Mobs.Mob();
+      var8.type = var1;
+      var8.health = HP[var1];
+      var8.setPos(var2, var4, var6);
+      var8.yaw = var8.pyaw = this.rnd.nextFloat() * 360.0F;
+      var8.dirYaw = var8.yaw;
+      var8.headYaw = var8.pheadYaw = var8.yaw;
+      var8.px = var2;
+      var8.py = var4;
+      var8.pz = var6;
+      var8.wander = this.rnd.nextInt(60);
+      var8.cd = 40;
+      if (var1 == 2) {
+         var8.color = SHEEP_COLORS[this.rnd.nextInt(SHEEP_COLORS.length)];
+      }
+
+      this.list.add(var8);
+      return var8;
+   }
+
+   public void tick() {
+      World var1 = this.g.world;
+      Player var2 = this.g.player;
+      if (var1 != null && var2 != null) {
+         float var3 = daylightAt(var1.dayTime);
+
+         for (int var4 = this.list.size() - 1; var4 >= 0; var4--) {
+            Mobs.Mob var5 = (Mobs.Mob)this.list.get(var4);
+            if (var5.dead) {
+               var5.deathTime++;
+               if (var5.deathTime >= 20) {
+                  this.list.remove(var4);
+               }
+            } else {
+               double var6 = var5.x - var2.x;
+               double var8 = var5.z - var2.z;
+               double var10 = var6 * var6 + var8 * var8;
+               if (!(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
+                  if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
+                     this.tickMob(var5, var1, var2, var3);
+                     if (var5.y < -20.0) {
+                        this.list.remove(var4);
+                     }
+                  }
+               } else {
+                  this.list.remove(var4);
+               }
+            }
+         }
+
+         for (int var12 = this.arrows.size() - 1; var12 >= 0; var12--) {
+            if (this.tickArrow((Mobs.Arrow)this.arrows.get(var12), var1, var2)) {
+               this.arrows.remove(var12);
+            }
+         }
+
+         this.timer++;
+         if (this.timer % 20 == 3) {
+            this.tickSpawners(var1, var2);
+         }
+
+         if (this.timer % 20 == 0) {
+            this.spawnHostile(var1, var2, var3);
+         }
+
+         if (this.timer % 40 == 7) {
+            this.spawnPassive(var1, var2);
+         }
+      }
+   }
+
+   boolean targetable(Player var1) {
+      return !var1.dead && (var1.gameMode == 0 || var1.gameMode == 2);
+   }
+
+   static float angleTo(double var0, double var2) {
+      return (float)Math.toDegrees(Math.atan2(-var0, var2));
+   }
+
+   static float wrap(float var0) {
+      while (var0 > 180.0F) {
+         var0 -= 360.0F;
+      }
+
+      while (var0 < -180.0F) {
+         var0 += 360.0F;
+      }
+
+      return var0;
+   }
+
+   void tickMob(Mobs.Mob var1, World var2, Player var3, float var4) {
+      var1.px = var1.x;
+      var1.py = var1.y;
+      var1.pz = var1.z;
+      var1.pyaw = var1.yaw;
+      var1.pheadYaw = var1.headYaw;
+      var1.pheadPitch = var1.headPitch;
+      var1.pwalk = var1.walk;
+      var1.pwalkAmp = var1.walkAmp;
+      var1.pswell = var1.swell;
+      var1.age++;
+      if (var1.hurtTime > 0) {
+         var1.hurtTime--;
+      }
+
+      if (var1.invuln > 0) {
+         var1.invuln--;
+      }
+
+      if (var1.attackAnim > 0) {
+         var1.attackAnim--;
+      }
+
+      if (var1.angry > 0) {
+         var1.angry--;
+      }
+
+      int var5 = (int)Math.floor(var1.x);
+      int var6 = (int)Math.floor(var1.z);
+      var1.inWater = Blocks.isWater(var2.getBlock(var5, (int)Math.floor(var1.y + 0.3), var6));
+      boolean var7 = Blocks.isLava(var2.getBlock(var5, (int)Math.floor(var1.y + 0.1), var6));
+      if (var7 && var1.age % 10 == 0) {
+         this.hurtMob(var1, 4, var1.x, var1.z, 0.0, false);
+      }
+
+      if (!var1.dead) {
+         if ((var1.type == 4 || var1.type == 5) && var4 > 0.7 && !var1.inWater && var2.getSky(var5, (int)Math.floor(var1.y + 1.5), var6) >= 15) {
+            var1.burn = 40;
+         }
+
+         if (var1.burn > 0) {
+            var1.burn--;
+            if (var1.inWater) {
+               var1.burn = 0;
+            }
+
+            if (var1.burn % 20 == 0 && var1.burn > 0 || var1.burn == 39) {
+               this.hurtMob(var1, 1, var1.x, var1.z, 0.0, false);
+            }
+
+            if (var1.dead) {
+               return;
+            }
+         }
+
+         double var8 = 0.0;
+         double var10 = 0.0;
+         boolean var12 = false;
+         var1.hasTarget = false;
+         double var13 = SPD[var1.type];
+         boolean var15 = hostile(var1.type) && this.targetable(var3);
+         double var16 = var3.x - var1.x;
+         double var18 = var3.z - var1.z;
+         double var20 = var3.y + 0.9 - (var1.y + H[var1.type] * 0.5);
+         double var22 = Math.sqrt(var16 * var16 + var18 * var18);
+         double var24 = Math.sqrt(var22 * var22 + var20 * var20);
+         float var26 = var1.yaw;
+         float var27 = 0.0F;
+         switch (var1.type) {
+            case 4:
+               if (var15 && var24 < 24.0) {
+                  var1.hasTarget = true;
+                  var1.dirYaw = angleTo(var16, var18);
+                  var26 = var1.dirYaw;
+                  var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22)));
+                  if (var22 > 0.8) {
+                     var12 = true;
+                  }
+
+                  if (var22 < 1.3 && Math.abs(var20) < 1.8 && var1.cd <= 0) {
+                     var1.cd = 20;
+                     var1.attackAnim = 8;
+                     this.g.damagePlayer(3, var1.x, var1.z);
+                  }
+               } else {
+                  this.wanderAI(var1);
+               }
+
+               if (var1.cd > 0) {
+                  var1.cd--;
+               }
+
+               if (!var1.hasTarget) {
+                  var12 = var1.moving;
+               }
+
+               if (!var1.hasTarget) {
+                  var13 *= 0.6;
+               }
+               break;
+            case 5:
+               if (var15 && var24 < 20.0) {
+                  var1.hasTarget = true;
+                  var1.dirYaw = angleTo(var16, var18);
+                  var26 = var1.dirYaw;
+                  var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22)));
+                  boolean var40 = this.hasLOS(var2, var1.x, var1.y + 1.5, var1.z, var3.x, var3.y + 1.0, var3.z);
+                  if (var1.age % 60 == 0) {
+                     var1.strafeDir = -var1.strafeDir;
+                  }
+
+                  if (!var40 || var22 > 9.0) {
+                     var12 = true;
+                  } else if (var22 < 4.0) {
+                     var12 = true;
+                     var1.dirYaw += 180.0F;
+                  } else {
+                     var12 = true;
+                     var1.dirYaw = var1.dirYaw + 90 * var1.strafeDir;
+                     var13 *= 0.6;
+                  }
+
+                  if (var40 && var24 < 16.0 && var1.cd <= 0) {
+                     var1.cd = 40;
+                     this.shoot(var1, var3);
+                  }
+               } else {
+                  this.wanderAI(var1);
+                  var12 = var1.moving;
+                  var13 *= 0.6;
+               }
+
+               if (var1.cd > 0) {
+                  var1.cd--;
+               }
+               break;
+            case 6:
+               if (var15 && var24 < 18.0) {
+                  var1.hasTarget = true;
+                  var1.dirYaw = angleTo(var16, var18);
+                  var26 = var1.dirYaw;
+                  var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22)));
+                  if (!(var24 < 3.0) && (var1.fuse <= 0 || !(var24 < 7.0))) {
+                     if (var1.fuse > 0) {
+                        var1.fuse--;
+                     }
+
+                     var12 = true;
+                  } else {
+                     var1.fuse++;
+                     var12 = false;
+                  }
+               } else {
+                  if (var1.fuse > 0) {
+                     var1.fuse--;
+                  }
+
+                  this.wanderAI(var1);
+                  var12 = var1.moving;
+                  var13 *= 0.6;
+               }
+
+               var1.swell = var1.fuse;
+               if (var1.fuse >= 30) {
+                  this.explode(var1);
+                  return;
+               }
+               break;
+            case 7:
+               boolean var28 = (var4 < 0.5 || var1.angry > 0) && var15;
+               if (var28 && var24 < 20.0) {
+                  var1.hasTarget = true;
+                  var1.dirYaw = angleTo(var16, var18);
+                  var26 = var1.dirYaw;
+                  var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22)));
+                  if (var22 > 1.2) {
+                     var12 = true;
+                  }
+
+                  if (var1.onGround && var22 > 2.0 && var22 < 5.5 && this.rnd.nextInt(10) == 0 && Math.abs(var20) < 2.0) {
+                     var1.vy = 0.4;
+                     var1.vx = Math.cos(Math.toRadians(var1.dirYaw + 90.0F)) * 0.35;
+                     var1.vz = Math.sin(Math.toRadians(var1.dirYaw + 90.0F)) * 0.35;
+                  }
+
+                  if (var22 < 1.7 && Math.abs(var20) < 1.5 && var1.cd <= 0) {
+                     var1.cd = 20;
+                     var1.attackAnim = 8;
+                     this.g.damagePlayer(2, var1.x, var1.z);
+                  }
+               } else {
+                  this.wanderAI(var1);
+                  var12 = var1.moving;
+                  var13 *= 0.6;
+               }
+
+               if (var1.cd > 0) {
+                  var1.cd--;
+               }
+               break;
+            default:
+               if (var1.flee > 0) {
+                  var1.flee--;
+                  var1.dirYaw = angleTo(var1.x - var1.fleeX, var1.z - var1.fleeZ);
+                  var12 = true;
+                  var13 *= 1.9;
+               } else {
+                  this.wanderAI(var1);
+                  var12 = var1.moving;
+                  if (!var12 && this.nearPlayer(var1, var3, 6.0) && this.rnd.nextInt(4) != 0) {
+                     var26 = angleTo(var16, var18);
+                     var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22))) * 0.5F;
+                  }
+               }
+         }
+
+         if (var12) {
+            double var41 = Math.toRadians(var1.dirYaw);
+            var8 = -Math.sin(var41) * var13;
+            var10 = Math.cos(var41) * var13;
+            float var30 = wrap(var1.dirYaw - var1.yaw);
+            var1.yaw = var1.yaw + Math.max(-25.0F, Math.min(25.0F, var30));
+         }
+
+         if (var1.hasTarget && !var12) {
+            var1.yaw = var1.yaw + Math.max(-10.0F, Math.min(10.0F, wrap(var1.dirYaw - var1.yaw)));
+         }
+
+         float var42 = wrap(var26 - var1.yaw);
+         var42 = Math.max(-50.0F, Math.min(50.0F, var42));
+         var1.headYaw = var1.headYaw + (var1.yaw + var42 - var1.headYaw) * 0.4F;
+         var1.headPitch = var1.headPitch + (var27 - var1.headPitch) * 0.4F;
+         if (var12 && !var1.hasTarget && var1.flee <= 0) {
+            double var29 = var1.x + var8 * 8.0;
+            double var31 = var1.z + var10 * 8.0;
+            int var33 = (int)Math.floor(var1.y);
+            boolean var34 = false;
+
+            for (int var35 = 0; var35 < 4; var35++) {
+               int var36 = var2.getBlock((int)Math.floor(var29), var33 - var35, (int)Math.floor(var31));
+               if (Blocks.isLava(var36)) {
+                  break;
+               }
+
+               if (Blocks.coll[var36] != null && var36 != 0 || Blocks.isWater(var36)) {
+                  var34 = true;
+                  break;
+               }
+            }
+
+            if (!var34) {
+               var10 = 0.0;
+               var8 = 0.0;
+               var12 = false;
+               var1.moving = false;
+               var1.wander = 0;
+            }
+         }
+
+         double var44 = var1.onGround ? 0.4 : 0.06;
+         var1.vx = var1.vx + (var8 - var1.vx) * var44;
+         var1.vz = var1.vz + (var10 - var1.vz) * var44;
+         var1.vy -= 0.08;
+         var1.vy *= 0.98;
+         if (var1.inWater) {
+            var1.vy *= 0.8;
+            var1.vy += 0.045;
+            var1.vx *= 0.8;
+            var1.vz *= 0.8;
+         }
+
+         if (var1.type == 3 && var1.vy < -0.1) {
+            var1.vy = -0.1;
+         }
+
+         double var45 = var1.vx;
+         double var46 = var1.vz;
+         double var47 = var1.vy;
+         Phys.move(var2, var1.bb, var1.vx, var1.vy, var1.vz, this.res);
+         var1.onGround = var47 < 0.0 && this.res[1] > var47 + 1.0E-9;
+         boolean var37 = Math.abs(this.res[0] - var45) > 1.0E-6 || Math.abs(this.res[2] - var46) > 1.0E-6;
+         if (var1.onGround || this.res[1] != var47) {
+            var1.vy = 0.0;
+         }
+
+         if (Math.abs(this.res[0] - var45) > 1.0E-6) {
+            var1.vx = 0.0;
+         }
+
+         if (Math.abs(this.res[2] - var46) > 1.0E-6) {
+            var1.vz = 0.0;
+         }
+
+         var1.x = (var1.bb[0] + var1.bb[3]) / 2.0;
+         var1.y = var1.bb[1];
+         var1.z = (var1.bb[2] + var1.bb[5]) / 2.0;
+         if (var37 && var12 && var1.onGround) {
+            var1.vy = 0.42;
+         }
+
+         double var38 = Math.hypot(var1.x - var1.px, var1.z - var1.pz);
+         var1.walkAmp = var1.walkAmp + (Math.min(1.0F, (float)(var38 * 8.0)) - var1.walkAmp) * 0.4F;
+         var1.walk += (float)var38 * 4.0F;
+      }
+   }
+
+   boolean nearPlayer(Mobs.Mob var1, Player var2, double var3) {
+      double var5 = var1.x - var2.x;
+      double var7 = var1.z - var2.z;
+      return var5 * var5 + var7 * var7 < var3 * var3;
+   }
+
+   void wanderAI(Mobs.Mob var1) {
+      if (--var1.wander <= 0) {
+         if (this.rnd.nextInt(3) == 0) {
+            var1.moving = false;
+            var1.wander = 40 + this.rnd.nextInt(80);
+         } else {
+            var1.moving = true;
+            var1.dirYaw = this.rnd.nextFloat() * 360.0F;
+            var1.wander = 30 + this.rnd.nextInt(60);
+         }
+      }
+   }
+
+   boolean hasLOS(World var1, double var2, double var4, double var6, double var8, double var10, double var12) {
+      double var14 = var8 - var2;
+      double var16 = var10 - var4;
+      double var18 = var12 - var6;
+      double var20 = Math.sqrt(var14 * var14 + var16 * var16 + var18 * var18);
+      if (var20 < 0.001) {
+         return true;
+      }
+
+      Hit var22 = var1.raycast(var2, var4, var6, var14 / var20, var16 / var20, var18 / var20, var20);
+      return var22 == null;
+   }
+
+   void shoot(Mobs.Mob var1, Player var2) {
+      Mobs.Arrow var3 = new Mobs.Arrow();
+      var3.x = var1.x;
+      var3.y = var1.y + 1.5;
+      var3.z = var1.z;
+      double var4 = var2.x - var3.x;
+      double var6 = var2.y + 1.2 - var3.y;
+      double var8 = var2.z - var3.z;
+      double var10 = Math.sqrt(var4 * var4 + var8 * var8);
+      var6 += var10 * 0.12;
+      double var12 = Math.sqrt(var4 * var4 + var6 * var6 + var8 * var8);
+      double var14 = 1.6;
+      var3.vx = var4 / var12 * var14 + this.rnd.nextGaussian() * 0.04;
+      var3.vy = var6 / var12 * var14 + this.rnd.nextGaussian() * 0.04;
+      var3.vz = var8 / var12 * var14 + this.rnd.nextGaussian() * 0.04;
+      var3.damage = 3 + this.rnd.nextInt(2);
+      var3.px = var3.x;
+      var3.py = var3.y;
+      var3.pz = var3.z;
+      this.arrows.add(var3);
+      var1.attackAnim = 6;
+   }
+
+   public void shootFromPlayer(double var1, double var3, double var5, double var7, double var9, double var11, float var13) {
+      Mobs.Arrow var14 = new Mobs.Arrow();
+      var14.x = var1;
+      var14.y = var3;
+      var14.z = var5;
+      var14.px = var1;
+      var14.py = var3;
+      var14.pz = var5;
+      var14.vx = var7 * var13;
+      var14.vy = var9 * var13;
+      var14.vz = var11 * var13;
+      var14.fromPlayer = true;
+      var14.damage = Math.max(1, Math.round(var13 * 2.0F));
+      this.arrows.add(var14);
+   }
+
+   boolean tickArrow(Mobs.Arrow var1, World var2, Player var3) {
+      var1.px = var1.x;
+      var1.py = var1.y;
+      var1.pz = var1.z;
+      var1.life++;
+      if (var1.stuck) {
+         return var1.life > 1200;
+      }
+
+      if (var1.life > 1200) {
+         return true;
+      }
+
+      for (int var4 = 0; var4 < 4; var4++) {
+         var1.x = var1.x + var1.vx / 4.0;
+         var1.y = var1.y + var1.vy / 4.0;
+         var1.z = var1.z + var1.vz / 4.0;
+         int var5 = var2.getBlock((int)Math.floor(var1.x), (int)Math.floor(var1.y), (int)Math.floor(var1.z));
+         if (var5 != 0 && Blocks.coll[var5] != null) {
+            var1.stuck = true;
+            var1.life = 1140;
+            var1.vx = var1.vy = var1.vz = 0.0;
+            return false;
+         }
+
+         if (var1.fromPlayer) {
+            for (Mobs.Mob var7 : this.list) {
+               if (!var7.dead
+                  && var1.x > var7.bb[0] - 0.1
+                  && var1.x < var7.bb[3] + 0.1
+                  && var1.y > var7.bb[1] - 0.1
+                  && var1.y < var7.bb[4] + 0.1
+                  && var1.z > var7.bb[2] - 0.1
+                  && var1.z < var7.bb[5] + 0.1) {
+                  this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.4, true);
+                  return true;
+               }
+            }
+         } else if (this.targetable(var3)
+            && var1.x > var3.bb[0]
+            && var1.x < var3.bb[3]
+            && var1.y > var3.bb[1]
+            && var1.y < var3.bb[4]
+            && var1.z > var3.bb[2]
+            && var1.z < var3.bb[5]) {
+            this.g.damagePlayer((int)var1.damage, var1.x - var1.vx, var1.z - var1.vz);
+            return true;
+         }
+      }
+
+      var1.vy -= 0.05;
+      var1.vx *= 0.99;
+      var1.vy *= 0.99;
+      var1.vz *= 0.99;
+      return false;
+   }
+
+   public boolean hurtMob(Mobs.Mob var1, int var2, double var3, double var5, double var7, boolean var9) {
+      if (!var1.dead && var1.invuln <= 0) {
+         var1.health -= var2;
+         var1.hurtTime = 10;
+         var1.invuln = 10;
+         double var10 = var1.x - var3;
+         double var12 = var1.z - var5;
+         double var14 = Math.sqrt(var10 * var10 + var12 * var12);
+         if (var7 > 0.0 && var14 > 1.0E-4) {
+            var1.vx = var10 / var14 * var7;
+            var1.vz = var12 / var14 * var7;
+            if (var1.onGround) {
+               var1.vy = 0.36;
+            }
+         }
+
+         if (!hostile(var1.type)) {
+            var1.flee = 60;
+            var1.fleeX = var3;
+            var1.fleeZ = var5;
+         } else if (var9) {
+            var1.angry = 400;
+         }
+
+         if (var1.health <= 0) {
+            this.kill(var1);
+         }
+
+         return true;
+      } else {
+         return false;
+      }
+   }
+
+   void kill(Mobs.Mob var1) {
+      var1.dead = true;
+      var1.deathTime = 0;
+      World var2 = this.g.world;
+      boolean var3 = var1.burn > 0;
+      switch (var1.type) {
+         case 0:
+            this.drop(var2, var1, var3 ? 273 : 272, 1 + this.rnd.nextInt(3));
+            break;
+         case 1:
+            this.drop(var2, var1, 261, this.rnd.nextInt(3));
+            this.drop(var2, var1, var3 ? 275 : 274, 1 + this.rnd.nextInt(3));
+            break;
+         case 2:
+            this.drop(var2, var1, 34 + var1.color, 1);
+            this.drop(var2, var1, var3 ? 279 : 278, 1 + this.rnd.nextInt(2));
+            break;
+         case 3:
+            this.drop(var2, var1, 262, this.rnd.nextInt(3));
+            this.drop(var2, var1, var3 ? 277 : 276, 1);
+            break;
+         case 4:
+            this.drop(var2, var1, 280, this.rnd.nextInt(3));
+            break;
+         case 5:
+            this.drop(var2, var1, 264, this.rnd.nextInt(3));
+            this.drop(var2, var1, 267, this.rnd.nextInt(3));
+            break;
+         case 6:
+            this.drop(var2, var1, 265, this.rnd.nextInt(3));
+            break;
+         case 7:
+            this.drop(var2, var1, 263, this.rnd.nextInt(3));
+      }
+   }
+
+   void drop(World var1, Mobs.Mob var2, int var3, int var4) {
+      if (var4 > 0) {
+         var1.dropItem(var2.x, var2.y + 0.4, var2.z, var3, var4);
+      }
+   }
+
+   void explode(Mobs.Mob var1) {
+      this.blast(var1.x, var1.y + 0.8, var1.z, 3, var1);
+      var1.dead = true;
+      var1.deathTime = 20;
+   }
+
+   void blast(double var1, double var3, double var5, int var7, Mobs.Mob var8) {
+      World var9 = this.g.world;
+      Player var10 = this.g.player;
+      int var11 = (int)Math.floor(var1);
+      int var12 = (int)Math.floor(var3);
+      int var13 = (int)Math.floor(var5);
+
+      for (int var14 = -var7; var14 <= var7; var14++) {
+         for (int var15 = -var7; var15 <= var7; var15++) {
+            for (int var16 = -var7; var16 <= var7; var16++) {
+               double var17 = Math.sqrt(var14 * var14 + var15 * var15 + var16 * var16);
+               if (!(var17 > var7 + 0.3) && (!(var17 > var7 - 1) || !(this.rnd.nextFloat() < 0.35 + (var17 - (var7 - 1)) * 0.3))) {
+                  int var19 = var9.getBlock(var11 + var14, var12 + var15, var13 + var16);
+                  if (var19 != 0 && Blocks.breakable(var19) && var19 != 26 && !Blocks.isFluid(var19)) {
+                     if (var19 == 132) {
+                        var9.setBlock(var11 + var14, var12 + var15, var13 + var16, 0);
+                        var9.primeTnt(var11 + var14, var12 + var15, var13 + var16, 8 + this.rnd.nextInt(20));
+                     } else {
+                        if (var19 == 69 || var19 == 70 || var19 == 67 || var19 == 68) {
+                           var9.removeTile(var11 + var14, var12 + var15, var13 + var16, true);
+                        } else if (this.rnd.nextInt(4) == 0 && Blocks.drop[var19] != 0) {
+                           var9.dropItem(var11 + var14 + 0.5, var12 + var15 + 0.5, var13 + var16 + 0.5, Blocks.drop[var19], 1);
+                        }
+
+                        var9.setBlock(var11 + var14, var12 + var15, var13 + var16, 0);
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      this.g.explosionParticles(var1, var3, var5);
+      double var25 = 2 * var7 + 1;
+      if (this.targetable(var10)) {
+         double var26 = var10.x - var1;
+         double var18 = var10.y + 0.9 - var3;
+         double var20 = var10.z - var5;
+         double var22 = Math.sqrt(var26 * var26 + var18 * var18 + var20 * var20);
+         if (var22 < var25) {
+            int var24 = (int)(1.0 + 18.0 * Math.pow(1.0 - var22 / var25, 1.2));
+            var10.invuln = 0;
+            this.g.damagePlayer(var24, var1, var5);
+         }
+      }
+
+      for (Mobs.Mob var28 : this.list) {
+         if (var28 != var8 && !var28.dead) {
+            double var29 = Math.sqrt((var28.x - var1) * (var28.x - var1) + (var28.z - var5) * (var28.z - var5));
+            if (var29 < var25 - 1.0) {
+               this.hurtMob(var28, (int)(1.0 + 14.0 * (1.0 - var29 / (var25 - 1.0))), var1, var5, 0.8, false);
+            }
+         }
+      }
+   }
+
+   public Mobs.Mob pick(double var1, double var3, double var5, double var7, double var9, double var11, double var13, double[] var15) {
+      Mobs.Mob var16 = null;
+      double var17 = var13;
+
+      for (Mobs.Mob var20 : this.list) {
+         if (!var20.dead) {
+            double[] var21 = var20.bb;
+            double var22 = 0.0;
+            double var24 = var17;
+            double[] var26 = new double[]{var1, var3, var5};
+            double[] var27 = new double[]{var7, var9, var11};
+            double[] var28 = new double[]{var21[0] - 0.1, var21[1] - 0.05, var21[2] - 0.1};
+            double[] var29 = new double[]{var21[3] + 0.1, var21[4] + 0.05, var21[5] + 0.1};
+            boolean var30 = true;
+
+            for (int var31 = 0; var31 < 3 && var30; var31++) {
+               if (Math.abs(var27[var31]) < 1.0E-9) {
+                  if (var26[var31] < var28[var31] || var26[var31] > var29[var31]) {
+                     var30 = false;
+                  }
+               } else {
+                  double var32 = (var28[var31] - var26[var31]) / var27[var31];
+                  double var34 = (var29[var31] - var26[var31]) / var27[var31];
+                  if (var32 > var34) {
+                     double var36 = var32;
+                     var32 = var34;
+                     var34 = var36;
+                  }
+
+                  var22 = Math.max(var22, var32);
+                  var24 = Math.min(var24, var34);
+                  if (var22 > var24) {
+                     var30 = false;
+                  }
+               }
+            }
+
+            if (var30 && var22 < var17) {
+               var17 = var22;
+               var16 = var20;
+            }
+         }
+      }
+
+      if (var16 != null) {
+         var15[0] = var17;
+      }
+
+      return var16;
+   }
+
+   void tickSpawners(World var1, Player var2) {
+      int var3 = (int)Math.floor(var2.x);
+      int var4 = (int)Math.floor(var2.y);
+      int var5 = (int)Math.floor(var2.z);
+
+      for (int var6 = var3 - 13; var6 <= var3 + 13; var6++) {
+         for (int var7 = var5 - 13; var7 <= var5 + 13; var7++) {
+            if (var1.isLoaded(var6, var7)) {
+               for (int var8 = Math.max(1, var4 - 8); var8 <= var4 + 8; var8++) {
+                  if (var1.getBlock(var6, var8, var7) == 71) {
+                     long var9 = var6 * 73856093L ^ var8 * 19349663L ^ var7 * 83492791L;
+                     int var11 = (Integer)this.spawnerCd.getOrDefault(var9, 40);
+                     if (var11 > 0) {
+                        this.spawnerCd.put(var9, var11 - 20);
+                     } else {
+                        this.spawnerCd.put(var9, 200 + this.rnd.nextInt(400));
+                        int var12 = 0;
+
+                        for (Mobs.Mob var14 : this.list) {
+                           if (!var14.dead
+                              && hostile(var14.type)
+                              && Math.abs(var14.x - var6) < 8.0
+                              && Math.abs(var14.z - var7) < 8.0
+                              && Math.abs(var14.y - var8) < 4.0) {
+                              var12++;
+                           }
+                        }
+
+                        if (var12 < 6) {
+                           int var22 = (int)(Math.abs(var9) % 3L);
+                           var22 = var22 == 0 ? 4 : (var22 == 1 ? 5 : 7);
+                           int var24 = 1 + this.rnd.nextInt(3);
+
+                           for (int var15 = 0; var15 < var24; var15++) {
+                              double var16 = var6 + 0.5 + this.rnd.nextInt(7) - 3.0;
+                              double var18 = var7 + 0.5 + this.rnd.nextInt(7) - 3.0;
+                              int var20 = var8;
+                              if (var1.getBlock((int)Math.floor(var16), var20, (int)Math.floor(var18)) == 0
+                                 && var1.getBlock((int)Math.floor(var16), var20 + 1, (int)Math.floor(var18)) == 0) {
+                                 Mobs.Mob var21 = this.spawn(var22, var16, var20, var18);
+                                 if (Phys.collides(var1, var21.bb)) {
+                                    this.list.remove(var21);
+                                 }
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   void spawnHostile(World var1, Player var2, float var3) {
+      if (!var2.dead) {
+         if (var2.gameMode == 3) {
+         }
+
+         if (this.count(true) < 40) {
+            for (int var4 = 0; var4 < 8; var4++) {
+               double var5 = this.rnd.nextDouble() * Math.PI * 2.0;
+               double var7 = 24.0 + this.rnd.nextDouble() * 22.0;
+               int var9 = (int)Math.floor(var2.x + Math.cos(var5) * var7);
+               int var10 = (int)Math.floor(var2.z + Math.sin(var5) * var7);
+               if (var1.isLoaded(var9, var10)) {
+                  int var11 = (int)var2.y + this.rnd.nextInt(34) - 22;
+                  var11 = Math.max(2, Math.min(200, var11));
+                  int var12 = -1;
+
+                  for (int var13 = 0; var13 < 20; var13++) {
+                     int var14 = var11 - var13;
+                     if (var14 < 1) {
+                        break;
+                     }
+
+                     int var15 = var1.getBlock(var9, var14 - 1, var10);
+                     if (Blocks.coll[var15] != null
+                        && var15 != 0
+                        && !Blocks.isFluid(var15)
+                        && var1.getBlock(var9, var14, var10) == 0
+                        && var1.getBlock(var9, var14 + 1, var10) == 0) {
+                        var12 = var14;
+                        break;
+                     }
+                  }
+
+                  if (var12 >= 0) {
+                     int var26 = var1.getBlock(var9, var12 - 1, var10);
+                     if (Blocks.solid[var26] && !Blocks.isLeaves(var26) && var26 != 28) {
+                        int var27 = var1.getSky(var9, var12, var10) - (int)((1.0F - var3) * 11.0F);
+                        int var28 = var1.getBlk(var9, var12, var10);
+                        if (Math.max(var27, var28) <= 7) {
+                           int var16 = this.rnd.nextInt(100);
+                           int var17 = var16 < 38 ? 4 : (var16 < 66 ? 5 : (var16 < 92 ? 6 : 7));
+                           int var18 = var17 != 4 && var17 != 5 ? 1 : 1 + this.rnd.nextInt(2);
+
+                           for (int var19 = 0; var19 < var18; var19++) {
+                              double var20 = var9 + 0.5 + (var19 > 0 ? this.rnd.nextInt(3) - 1 : 0) * 0.8;
+                              double var22 = var10 + 0.5 + (var19 > 0 ? this.rnd.nextInt(3) - 1 : 0) * 0.8;
+                              Mobs.Mob var24 = this.spawn(var17, var20, var12, var22);
+                              if (Phys.collides(var1, var24.bb)) {
+                                 this.list.remove(var24);
+                              }
+                           }
+
+                           return;
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   void spawnPassive(World var1, Player var2) {
+      if (this.count(false) < 28) {
+         for (int var3 = 0; var3 < 6; var3++) {
+            double var4 = this.rnd.nextDouble() * Math.PI * 2.0;
+            double var6 = 14.0 + this.rnd.nextDouble() * 40.0;
+            int var8 = (int)Math.floor(var2.x + Math.cos(var4) * var6);
+            int var9 = (int)Math.floor(var2.z + Math.sin(var4) * var6);
+            if (var1.isLoaded(var8, var9)) {
+               int var10 = -1;
+
+               for (int var11 = 200; var11 > 40; var11--) {
+                  int var12 = var1.getBlock(var8, var11, var9);
+                  if (var12 != 0 && (!Blocks.replaceable[var12] || Blocks.isFluid(var12))) {
+                     if (var12 == 2 && var1.getBlock(var8, var11 + 1, var9) == 0 || var12 == 2 && var1.getBlock(var8, var11 + 1, var9) == 29) {
+                        var10 = var11 + 1;
+                     }
+                     break;
+                  }
+               }
+
+               if (var10 >= 0 && var1.getSky(var8, var10, var9) >= 12) {
+                  int var19 = this.rnd.nextInt(100);
+                  int var20 = var19 < 25 ? 0 : (var19 < 50 ? 1 : (var19 < 80 ? 2 : 3));
+                  int var13 = 2 + this.rnd.nextInt(3);
+
+                  for (int var14 = 0; var14 < var13; var14++) {
+                     int var15 = var8 + this.rnd.nextInt(5) - 2;
+                     int var16 = var9 + this.rnd.nextInt(5) - 2;
+                     if (var1.isLoaded(var15, var16)) {
+                        int var17 = -1;
+
+                        for (int var18 = var10 + 3; var18 > var10 - 4; var18--) {
+                           if (var1.getBlock(var15, var18, var16) == 0 && var1.getBlock(var15, var18 - 1, var16) == 2) {
+                              var17 = var18;
+                              break;
+                           }
+                        }
+
+                        if (var17 >= 0) {
+                           Mobs.Mob var21 = this.spawn(var20, var15 + 0.5, var17, var16 + 0.5);
+                           if (Phys.collides(var1, var21.bb)) {
+                              this.list.remove(var21);
+                           }
+                        }
+                     }
+                  }
+
+                  return;
+               }
+            }
+         }
+      }
+   }
+
+   public void save(File var1) {
+      try {
+         PrintWriter var2 = new PrintWriter(new FileWriter(new File(var1, "mobs.dat")));
+
+         try {
+            for (Mobs.Mob var4 : this.list) {
+               if (!var4.dead && !hostile(var4.type) && Math.abs(var4.x - this.g.player.x) < 120.0 && Math.abs(var4.z - this.g.player.z) < 120.0) {
+                  var2.println(var4.type + " " + var4.x + " " + var4.y + " " + var4.z + " " + var4.health + " " + var4.color);
+               }
+            }
+         } catch (Throwable var6) {
+            try {
+               var2.close();
+            } catch (Throwable var5) {
+               var6.addSuppressed(var5);
+            }
+
+            throw var6;
+         }
+
+         var2.close();
+      } catch (IOException var7) {
+         var7.printStackTrace();
+      }
+   }
+
+   public void load(File var1) {
+      File var2 = new File(var1, "mobs.dat");
+      if (var2.exists()) {
+         try {
+            BufferedReader var3 = new BufferedReader(new FileReader(var2));
+
+            String var4;
+            try {
+               while ((var4 = var3.readLine()) != null) {
+                  String[] var5 = var4.trim().split(" ");
+                  if (var5.length >= 6) {
+                     Mobs.Mob var6 = this.spawn(
+                        Integer.parseInt(var5[0]), Double.parseDouble(var5[1]), Double.parseDouble(var5[2]), Double.parseDouble(var5[3])
+                     );
+                     var6.health = Integer.parseInt(var5[4]);
+                     var6.color = Integer.parseInt(var5[5]);
+                  }
+               }
+            } catch (Throwable var8) {
+               try {
+                  var3.close();
+               } catch (Throwable var7) {
+                  var8.addSuppressed(var7);
+               }
+
+               throw var8;
+            }
+
+            var3.close();
+         } catch (Exception var9) {
+            var9.printStackTrace();
+         }
+      }
+   }
+
+   public static final class Arrow {
+      public double x;
+      public double y;
+      public double z;
+      public double vx;
+      public double vy;
+      public double vz;
+      public double px;
+      public double py;
+      public double pz;
+      public boolean fromPlayer;
+      public boolean stuck;
+      public int life;
+      public float damage;
+   }
+
+   public static final class Mob {
+      public int type;
+      public int health;
+      public int hurtTime;
+      public int invuln;
+      public int deathTime;
+      public int age;
+      public int wander;
+      public int fuse;
+      public int cd;
+      public int flee;
+      public int burn;
+      public int color;
+      public int angry;
+      public int attackAnim;
+      public int strafeDir = 1;
+      public double x;
+      public double y;
+      public double z;
+      public double vx;
+      public double vy;
+      public double vz;
+      public double px;
+      public double py;
+      public double pz;
+      public float yaw;
+      public float pyaw;
+      public float headYaw;
+      public float pheadYaw;
+      public float headPitch;
+      public float pheadPitch;
+      public float walk;
+      public float pwalk;
+      public float walkAmp;
+      public float pwalkAmp;
+      public float dirYaw;
+      public boolean onGround;
+      public boolean inWater;
+      public boolean dead;
+      public boolean moving;
+      public boolean hasTarget;
+      public double fleeX;
+      public double fleeZ;
+      public final double[] bb = new double[6];
+      public int swell;
+      public int pswell;
+
+      void setPos(double var1, double var3, double var5) {
+         this.x = var1;
+         this.y = var3;
+         this.z = var5;
+         float var7 = Mobs.W[this.type] / 2.0F;
+         this.bb[0] = this.x - var7;
+         this.bb[1] = this.y;
+         this.bb[2] = this.z - var7;
+         this.bb[3] = this.x + var7;
+         this.bb[4] = this.y + Mobs.H[this.type];
+         this.bb[5] = this.z + var7;
+      }
+   }
+}
