@@ -28,6 +28,10 @@ jobs:
       - name: Headless tests (equivalence vs the 3.5 jar + unit tests)
         run: python3 tools/runtests.py
 
+      - name: Report test diff (readable through the check-run API)
+        if: failure()
+        run: python3 tools/ci_annotate.py build/equivalence-diff.txt "equivalence diff" error
+
       - name: Keep the update pack
         uses: actions/upload-artifact@v4
         with:

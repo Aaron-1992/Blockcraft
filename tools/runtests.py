@@ -64,9 +64,14 @@ def equivalence(classes):
     if len(a) != len(b):
         print("line count differs: %d vs %d" % (len(a), len(b)))
     if diffs or len(a) != len(b):
-        for i, x, y in diffs[:40]:
-            print("DIFF line %d\n  3.5 : %s\n  now : %s" % (i + 1, x, y))
-        print("equivalence: %d differing lines of %d" % (len(diffs), len(a)))
+        lines = []
+        for i, x, y in diffs[:60]:
+            lines.append("DIFF line %d\n  3.5 : %s\n  now : %s" % (i + 1, x, y))
+        lines.append("equivalence: %d differing lines of %d" % (len(diffs), len(a)))
+        report = "\n".join(lines)
+        print(report)
+        with open(os.path.join(BUILD, "equivalence-diff.txt"), "w") as f:
+            f.write(report + "\n--- stderr (3.5) ---\n" + old.stderr[-3000:] + "\n--- stderr (now) ---\n" + new.stderr[-3000:])
         return False
     print("equivalence: IDENTICAL (%d fingerprint lines)" % len(a))
     return True
