@@ -153,7 +153,7 @@ public final class Equivalence {
       for (long seed : seeds) {
          Gen g = new Gen(seed);
          int[] sp = g.findSpawn();
-         p("gen seed=" + seed + " spawn=" + sp[0] + "," + sp[1]);
+         p("gen seed=" + seed + " spawn = " + sp[0] + "," + sp[1]);
          long all = 0;
          for (int cz = -3; cz <= 3; cz++) {
             for (int cx = -3; cx <= 3; cx++) {
@@ -165,7 +165,7 @@ public final class Equivalence {
                }
             }
          }
-         p("gen seed=" + seed + " all=" + hex(all));
+         p("gen seed=" + seed + " all = " + hex(all));
       }
    }
 
@@ -216,7 +216,7 @@ public final class Equivalence {
                lit++;
             }
          }
-         p("world seed=" + seed + " chunks=" + keys.size() + " lit=" + lit + " blocks=" + hex(blocks) + " light=" + hex(light));
+         p("world seed=" + seed + " = chunks=" + keys.size() + " lit=" + lit + " blocks=" + hex(blocks) + " light=" + hex(light));
       }
    }
 
@@ -263,7 +263,7 @@ public final class Equivalence {
       Phys.move(w, big, 0.0, -1.0, 0.0, out);
       Phys.move(w, big, 0.7, 0.0, 0.0, out);
       acc = mix(acc, h(big));
-      p("phys collided=" + collided + " acc=" + hex(acc) + " big=" + Arrays.toString(big));
+      p("phys = collided=" + collided + " acc=" + hex(acc) + " big=" + Arrays.toString(big));
    }
 
    // ---------- 5. crafting lookup ----------
@@ -324,7 +324,7 @@ public final class Equivalence {
             acc = mix(acc, 2);
          }
       }
-      p("recipes random-hits=" + hits + " real-recipes=" + total + " acc=" + hex(acc));
+      p("recipes = random-hits=" + hits + " real-recipes=" + total + " acc=" + hex(acc));
    }
 
    // ---------- 6. simulation: fluids, falling blocks, TNT fuse, furnace-less ticking ----------
@@ -372,7 +372,7 @@ public final class Equivalence {
             }
          }
       }
-      p("tick region=" + hex(acc) + " items=" + w.items.size() + " fallers=" + w.fallers.size() + " tick=" + w.tickCount);
+      p("tick = region=" + hex(acc) + " items=" + w.items.size() + " fallers=" + w.fallers.size() + " tick=" + w.tickCount);
    }
 
 
@@ -504,7 +504,7 @@ public final class Equivalence {
             }
          }
       }
-      p("mesh terrain verts=" + verts + " acc=" + hex(acc));
+      p("mesh terrain = verts=" + verts + " acc=" + hex(acc));
       // (b) showcase: every block id once, on a stone floor, in 4 chunks
       World s = newWorld(1);
       for (int cz = -1; cz <= 2; cz++) {
@@ -563,7 +563,7 @@ public final class Equivalence {
             }
          }
       }
-      p("mesh showcase verts=" + verts + " acc=" + hex(acc));
+      p("mesh showcase = verts=" + verts + " acc=" + hex(acc));
    }
 
    public static void main(String[] args) throws Exception {

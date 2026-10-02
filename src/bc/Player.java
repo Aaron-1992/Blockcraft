@@ -533,8 +533,20 @@ public final class Player {
       }
 
       if (this.onGround) {
+         int landX = fl(this.x);
+         int landY = fl(this.y - 0.001);
+         int landZ = fl(this.z);
+         int below = var1.getBlock(landX, landY, landZ);
+         if (this.fallDistance > 0.5F && !this.flying) {
+            var1.trample(landX, landY, landZ, this.fallDistance);
+         }
+
          if (this.fallDistance > 3.0F && !this.creative && !this.flying) {
             int var29 = (int)Math.ceil(this.fallDistance - 3.0F);
+            if (below == Blocks.HAY_BALE) {
+               var29 = (int)Math.ceil(var29 * 0.2F);
+            }
+
             if (var29 > 0) {
                this.invuln = 0;
                this.hurt(var29);

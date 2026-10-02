@@ -51,7 +51,37 @@ def run_java(cp, main, *args, timeout=900):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
+def parse_fingerprint(text):
+    """'label = value' -> {label: value};  'label threw X' -> {label: 'threw X'}."""
+    d = {}
+    for line in text.splitlines():
+        if " = " in line:
+            k, v = line.split(" = ", 1)
+        elif " threw " in line:
+            k, v = line.split(" threw ", 1)
+            v = "threw " + v
+        else:
+            k, v = line, ""
+        d[k] = v
+    return d
+
+
+def allowed_prefixes():
+    path = os.path.join(ROOT, "test", "equivalence-allowed.txt")
+    out = []
+    if os.path.exists(path):
+        for ln in open(path, encoding="utf-8"):
+            ln = ln.rstrip("\n")
+            if ln.strip() and not ln.lstrip().startswith("#"):
+                out.append(ln.strip())
+    return out
+
+
 def equivalence(classes):
+    """
+    Fingerprints of the pure-logic subsystems must match the ORIGINAL 3.5 jar, except for the areas listed in
+    test/equivalence-allowed.txt (changed on purpose since 3.5). Anything else that differs is a regression.
+    """
     ref = reference_jar()
     old = run_java([TEST_CLASSES, ref], "bc.Equivalence")
     new = run_java([TEST_CLASSES, classes, LWJGL], "bc.Equivalence")
@@ -60,21 +90,27 @@ def equivalence(classes):
             print("--- stdout (tail) ---\n" + r.stdout[-2500:])
             print("--- stderr (tail) ---\n" + r.stderr[-2500:])
             sys.exit("equivalence run failed for %s (exit code %s)" % (tag, r.returncode))
-    a, b = old.stdout.splitlines(), new.stdout.splitlines()
-    diffs = [(i, x, y) for i, (x, y) in enumerate(zip(a, b)) if x != y]
-    if len(a) != len(b):
-        print("line count differs: %d vs %d" % (len(a), len(b)))
-    if diffs or len(a) != len(b):
-        lines = []
-        for i, x, y in diffs[:60]:
-            lines.append("DIFF line %d\n  3.5 : %s\n  now : %s" % (i + 1, x, y))
-        lines.append("equivalence: %d differing lines of %d" % (len(diffs), len(a)))
-        report = "\n".join(lines)
+    a, b = parse_fingerprint(old.stdout), parse_fingerprint(new.stdout)
+    allowed = allowed_prefixes()
+    bad, tolerated, added = [], 0, 0
+    for k in sorted(set(a) | set(b)):
+        if a.get(k) == b.get(k):
+            continue
+        if k not in a:
+            added += 1  # a brand-new fingerprint (new feature): always fine
+            continue
+        if any(k.startswith(p) for p in allowed):
+            tolerated += 1
+            continue
+        bad.append("  %s\n    3.5 : %s\n    now : %s" % (k, a.get(k, "(absent)"), b.get(k, "(absent)")))
+    if bad:
+        report = "equivalence: %d UNEXPECTED differences vs the 3.5 jar:\n%s" % (len(bad), "\n".join(bad[:60]))
         print(report)
         with open(os.path.join(BUILD, "equivalence-diff.txt"), "w") as f:
             f.write(report + "\n--- stderr (3.5) ---\n" + old.stderr[-3000:] + "\n--- stderr (now) ---\n" + new.stderr[-3000:])
         return False
-    print("equivalence: IDENTICAL (%d fingerprint lines)" % len(a))
+    same = sum(1 for k in a if k in b and a[k] == b[k])
+    print("equivalence: OK - %d fingerprints identical to the 3.5 jar, %d changed on purpose (test/equivalence-allowed.txt), %d new" % (same, tolerated, added))
     return True
 
 

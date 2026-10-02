@@ -58,7 +58,11 @@ public final class Blocks {
    public static final int TNT = 132;
    public static final int BED_FOOT = 133;
    public static final int BED_HEAD = 137;
-   public static final int COUNT = 141;
+   public static final int FARMLAND_WET = 141;
+   public static final int CARROT0 = 142;
+   public static final int POTATO0 = 150;
+   public static final int HAY_BALE = 158;
+   public static final int COUNT = 159;
    public static final int[] STAIR_MAT = new int[]{5, 4, 27, 16, 17};
    public static final String[] STAIR_NAME = new String[]{"Oak Wood", "Cobblestone", "Stone Brick", "Brick", "Sandstone"};
    public static final int K_CUBE = 0;
@@ -172,8 +176,33 @@ public final class Blocks {
       return var0 >= 119 && var0 < 123;
    }
 
+   /** Any growing crop block: wheat 124-131, carrots 142-149, potatoes 150-157 (8 growth stages each). */
    public static boolean isCrop(int var0) {
-      return var0 >= 124 && var0 < 132;
+      return var0 >= 124 && var0 < 132 || var0 >= 142 && var0 < 158;
+   }
+
+   /** Dry (123) or hydrated (141) farmland. */
+   public static boolean isFarmland(int var0) {
+      return var0 == 123 || var0 == 141;
+   }
+
+   /** First block id (growth stage 0) of the crop family this crop block belongs to. */
+   public static int cropBase(int var0) {
+      return var0 < 132 ? 124 : (var0 < 150 ? 142 : 150);
+   }
+
+   public static int cropStage(int var0) {
+      return var0 - cropBase(var0);
+   }
+
+   public static boolean isRipe(int var0) {
+      return isCrop(var0) && cropStage(var0) == 7;
+   }
+
+   /** The item that is dropped when an unripe crop is broken / pops off: it is also the thing you plant. */
+   public static int cropSeedItem(int var0) {
+      int var1 = cropBase(var0);
+      return var1 == 124 ? 285 : (var1 == 142 ? 336 : 337);
    }
 
    public static boolean isBed(int var0) {
@@ -223,8 +252,9 @@ public final class Blocks {
       var1.add(118);
       var1.add(119);
       var1.add(132);
+      var1.add(158);
 
-      for (int var23 : new int[]{281, 289, 282, 283, 284, 288, 285, 286, 287}) {
+      for (int var23 : new int[]{281, 289, 282, 283, 284, 288, 285, 286, 287, 336, 337, 338, 339, 340}) {
          var1.add(var23);
       }
 
@@ -504,6 +534,32 @@ public final class Blocks {
          coll[var30] = box[var30];
          drop[var30] = var43 ? 0 : 289;
       }
+
+      // ---- Update 3.6: hydrated farmland, carrots, potatoes, hay bale ----
+      def(141, "Farmland", 0.6F, false, 1);
+      tiles[141][0] = 203;
+      kind[141] = 2;
+      opacity[141] = 15;
+      box[141] = new double[]{0.0, 0.0, 0.0, 1.0, 0.9375, 1.0};
+      coll[141] = box[141];
+      drop[141] = 3;
+      mineClass[141] = 3;
+
+      for (int var62 = 0; var62 < 16; var62++) {
+         int var63 = 142 + var62;
+         int var64 = var62 & 7;
+         int var65 = var62 < 8 ? 204 + var64 / 2 : 208 + var64 / 2;
+         def(var63, var62 < 8 ? "Carrots" : "Potatoes", 0.0F, false, var65);
+         kind[var63] = 7;
+         solid[var63] = false;
+         coll[var63] = null;
+         cutout[var63] = true;
+         drop[var63] = 0;
+         box[var63] = new double[]{0.1, 0.0, 0.1, 0.9, 0.25 + 0.09 * var64, 0.9};
+      }
+
+      def(158, "Hay Bale", 0.5F, true, 212);
+      faces(158, 213, 213, 212);
 
       for (int var52 : new int[]{1, 4, 16, 17, 27, 67, 68, 72, 71, 19, 20, 21, 22, 23, 24, 26, 25}) {
          mineClass[var52] = 1;

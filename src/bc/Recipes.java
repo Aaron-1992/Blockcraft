@@ -213,6 +213,13 @@ public final class Recipes {
          shaped(Items.armorId(var12, 3), 1, new String[]{"M M", "M M"}, 'M', var6);
       }
 
+      // ---- Update 3.6 ----
+      shapeless(339, 3, 264);
+      shaped(340, 1, new String[]{" I", "I "}, 'I', 258);
+      shaped(340, 1, new String[]{"I ", " I"}, 'I', 258);
+      shaped(158, 1, new String[]{"WWW", "WWW", "WWW"}, 'W', 286);
+      shapeless(286, 9, 158);
+      smelt.put(337, new Stack(338, 1));
       smelt.put(20, new Stack(258, 1));
       smelt.put(21, new Stack(259, 1));
       smelt.put(7, new Stack(15, 1));

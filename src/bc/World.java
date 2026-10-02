@@ -667,7 +667,7 @@ public final class World {
                || Blocks.kind[var8] == 1
                || Blocks.isLadder(var8)
                || Blocks.isBed(var8)
-               || var8 == 123
+               || Blocks.isFarmland(var8)
                || Blocks.isCrop(var8)
                || var8 == 32
                || var8 == 28
@@ -770,23 +770,72 @@ public final class World {
       }
    }
 
+   /**
+    * Random "farm ticks" around the player (like Minecraft's random block ticks, but only within 32 blocks of you):
+    * farmland gets wet/dry depending on nearby water, dry empty farmland slowly turns back into dirt, and crops
+    * grow - about 1.7x faster on wet farmland than before, and slower on dry farmland.
+    */
    private void tickCrops() {
       if (this.game != null && this.game.player != null) {
-         int var1 = (int)Math.floor(this.game.player.x);
-         int var2 = (int)Math.floor(this.game.player.z);
+         int px = (int)Math.floor(this.game.player.x);
+         int pz = (int)Math.floor(this.game.player.z);
 
-         for (int var3 = 0; var3 < 40; var3++) {
-            int var4 = var1 + this.rnd.nextInt(65) - 32;
-            int var5 = var2 + this.rnd.nextInt(65) - 32;
-            Chunk var6 = this.chunkAt(var4, var5);
-            if (var6 != null) {
-               int var7 = var6.hm[(var5 & 15) * 16 + (var4 & 15)];
-               int var8 = this.getBlock(var4, var7 + 1, var5);
-               if (Blocks.isCrop(var8) && var8 < 131 && this.getBlock(var4, var7, var5) == 123 && this.rnd.nextInt(7) == 0) {
-                  this.setBlock(var4, var7 + 1, var5, var8 + 1);
+         for (int i = 0; i < 40; i++) {
+            int x = px + this.rnd.nextInt(65) - 32;
+            int z = pz + this.rnd.nextInt(65) - 32;
+            Chunk c = this.chunkAt(x, z);
+            if (c == null) {
+               continue;
+            }
+
+            int y = c.hm[(z & 15) * 16 + (x & 15)];
+            int b = this.getBlock(x, y, z);
+            if (!Blocks.isFarmland(b)) {
+               continue;
+            }
+
+            boolean wet = this.hydrated(x, y, z);
+            int above = this.getBlock(x, y + 1, z);
+            boolean crop = Blocks.isCrop(above);
+            if (wet && b == Blocks.FARMLAND) {
+               this.setBlock(x, y, z, Blocks.FARMLAND_WET);
+            } else if (!wet && b == Blocks.FARMLAND_WET) {
+               this.setBlock(x, y, z, Blocks.FARMLAND);
+            } else if (!wet && !crop && this.rnd.nextInt(40) == 0) {
+               this.setBlock(x, y, z, Blocks.DIRT);
+               continue;
+            }
+
+            if (crop && !Blocks.isRipe(above) && this.rnd.nextInt(wet ? 5 : 12) == 0) {
+               this.setBlock(x, y + 1, z, above + 1);
+            }
+         }
+      }
+   }
+
+   /** True when water is within 4 blocks (horizontally) of the farmland block at (x, y, z), on its level or one above. */
+   public boolean hydrated(int x, int y, int z) {
+      for (int dy = 0; dy <= 1; dy++) {
+         for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+               if (Blocks.isWater(this.getBlock(x + dx, y + dy, z + dz))) {
+                  return true;
                }
             }
          }
+      }
+
+      return false;
+   }
+
+   /**
+    * Something landed on block (x, y, z) after falling `fall` blocks. Farmland is trampled into dirt with a
+    * probability of (fall - 0.5), exactly like Minecraft: a small hop is usually harmless, a real jump rarely is.
+    * (Crops on it pop off through the normal block update.)
+    */
+   public void trample(int x, int y, int z, float fall) {
+      if (Blocks.isFarmland(this.getBlock(x, y, z)) && this.rnd.nextFloat() < fall - 0.5F) {
+         this.setBlock(x, y, z, Blocks.DIRT);
       }
    }
 
@@ -814,15 +863,15 @@ public final class World {
                this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 289, 1);
             }
          }
-      } else if (var4 == 123) {
+      } else if (Blocks.isFarmland(var4)) {
          int var16 = this.getBlock(var1, var2 + 1, var3);
          if (Blocks.opaque[var16] || Blocks.isStair(var16) || Blocks.isSlab(var16)) {
             this.setBlock(var1, var2, var3, 3);
          }
       } else if (Blocks.isCrop(var4)) {
-         if (this.getBlock(var1, var2 - 1, var3) != 123) {
+         if (!Blocks.isFarmland(this.getBlock(var1, var2 - 1, var3))) {
             this.setBlock(var1, var2, var3, 0);
-            this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 285, 1);
+            this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.cropSeedItem(var4), 1);
          }
       } else {
          if (var4 != 7 && var4 != 8) {

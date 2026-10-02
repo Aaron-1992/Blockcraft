@@ -60,8 +60,17 @@ final class TexExtra {
       Tex.blit(183, bedTop(true));
       Tex.blit(184, bedTop(false));
       Tex.blit(185, bedSide());
+      Tex.blit(203, farmWetTop());
 
-      for (int var2 = 256; var2 < 336; var2++) {
+      for (int var3 = 0; var3 < 4; var3++) {
+         Tex.blit(204 + var3, rootCropTile(false, var3));
+         Tex.blit(208 + var3, rootCropTile(true, var3));
+      }
+
+      Tex.blit(212, haySide());
+      Tex.blit(213, hayTop());
+
+      for (int var2 = 256; var2 < 400; var2++) {
          if (Items.name[var2] != null) {
             int[] var1 = sprite(var2);
             if (var1 != null) {
@@ -115,6 +124,201 @@ final class TexExtra {
       }
 
       return var2.p;
+   }
+
+   // ------------------------------------------------------------------ Update 3.6 art
+   /** Hydrated farmland: the dry furrows, but dark and damp. */
+   static int[] farmWetTop() {
+      int[] var0 = farmTop();
+      TexExtra.Cv var1 = new TexExtra.Cv();
+
+      for (int var2 = 0; var2 < 256; var2++) {
+         int var3 = var0[var2] & 16777215;
+         var1.p[var2] = 0xFF000000 | rgb((int)((var3 >> 16 & 0xFF) * 0.70F), (int)((var3 >> 8 & 0xFF) * 0.72F), (int)((var3 & 0xFF) * 0.80F));
+      }
+
+      return var1.p;
+   }
+
+   /**
+    * Carrot or potato plant for growth group 0..3 (stage / 2). Like wheatTile the plant stands in the lower part
+    * of a transparent tile; the ripe group shows the root poking out of the soil.
+    */
+   static int[] rootCropTile(boolean potato, int group) {
+      Random rnd = new Random((potato ? 720 : 610) + group);
+      TexExtra.Cv cv = new TexExtra.Cv();
+      int dark = potato ? rgb(56, 108, 40) : rgb(48, 120, 34);
+      int light = potato ? rgb(92, 150, 58) : rgb(92, 172, 56);
+      int[] xs = new int[]{2, 6, 10, 13};
+      int h = new int[]{3, 6, 9, 12}[group];
+
+      for (int i = 0; i < xs.length; i++) {
+         int x = xs[i];
+         int hh = Math.max(2, h - i % 2 * 2 + rnd.nextInt(2));
+
+         for (int y = 0; y < hh; y++) {
+            cv.set(x, 15 - y, (y + i) % 3 == 0 ? light : dark);
+         }
+
+         if (group >= 1) {
+            for (int y = 2; y < hh; y += 2) {
+               cv.set(x - 1, 15 - y, dark);
+               cv.set(x + 1, 14 - y, light);
+               if (potato && group >= 2) {
+                  cv.set(x - 2, 15 - y, light);
+                  cv.set(x + 2, 14 - y, dark);
+               }
+            }
+
+            cv.set(x - 1, 15 - hh, light);
+            cv.set(x + 1, 15 - hh, light);
+            cv.set(x, 14 - hh, light);
+            if (!potato && group >= 2) {
+               cv.set(x - 1, 14 - hh, dark);
+               cv.set(x + 1, 14 - hh, dark);
+            }
+         }
+
+         if (group == 3) {
+            if (potato) {
+               cv.set(x, 15, rgb(208, 174, 106));
+               cv.set(x + 1, 15, rgb(190, 152, 88));
+            } else {
+               cv.set(x, 15, rgb(240, 134, 28));
+               cv.set(x, 14, rgb(224, 118, 22));
+            }
+         }
+      }
+
+      return cv.p;
+   }
+
+   static int[] hayTop() {
+      Random rnd = new Random(88L);
+      TexExtra.Cv cv = new TexExtra.Cv();
+
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            int ring = (int)Math.max(Math.abs(x - 7.5), Math.abs(y - 7.5));
+            int base = ring % 2 == 0 ? rgb(208, 174, 60) : rgb(186, 150, 44);
+            if (ring >= 7) {
+               base = rgb(150, 118, 34);
+            }
+
+            int n = rnd.nextInt(17) - 8;
+            cv.set(x, y, rgb((base >> 16 & 0xFF) + n, (base >> 8 & 0xFF) + n, (base & 0xFF) + n / 2));
+         }
+      }
+
+      return cv.p;
+   }
+
+   static int[] haySide() {
+      Random rnd = new Random(89L);
+      TexExtra.Cv cv = new TexExtra.Cv();
+      int[] streak = new int[]{rgb(214, 178, 62), rgb(192, 156, 46), rgb(204, 168, 54)};
+
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            int base = streak[(x + y / 6) % 3];
+            if (y == 0 || y == 15) {
+               base = rgb(150, 118, 34);
+            }
+
+            if (y == 3 || y == 12) {
+               base = rgb(112, 80, 32);
+            } else if (y == 4 || y == 11) {
+               base = rgb(160, 126, 40);
+            }
+
+            int n = rnd.nextInt(15) - 7;
+            cv.set(x, y, rgb((base >> 16 & 0xFF) + n, (base >> 8 & 0xFF) + n, (base & 0xFF) + n / 2));
+         }
+      }
+
+      return cv.p;
+   }
+
+   /** Item icons of Update 3.6: carrot, potato, baked potato, bone meal, shears. */
+   static int[] newSprite(int var0) {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      switch (var0) {
+         case 336:
+            int o1 = rgb(238, 134, 30);
+            int o2 = rgb(206, 102, 18);
+            int o3 = rgb(252, 172, 72);
+            int g1 = rgb(60, 150, 46);
+            int g2 = rgb(108, 190, 70);
+
+            for (int i = 0; i < 9; i++) {
+               int x = 5 + i;
+               int y = 5 + i;
+               cv.set(x, y, o1);
+               if (i < 6) {
+                  cv.set(x + 1, y, o2);
+                  cv.set(x, y + 1, o3);
+               }
+
+               if (i < 3) {
+                  cv.set(x + 1, y + 1, o1);
+               }
+            }
+
+            cv.set(7, 8, o2);
+            cv.set(9, 10, o2);
+            cv.set(8, 6, o3);
+            cv.line(5, 5, 2, 1, g1);
+            cv.line(5, 4, 4, 0, g2);
+            cv.line(4, 5, 0, 3, g1);
+            cv.line(6, 4, 7, 0, g2);
+            cv.line(4, 4, 1, 2, g2);
+            break;
+         case 337:
+            cv.ell(8.0, 8.8, 5.6, 4.4, rgb(196, 160, 98));
+            cv.ell(7.4, 7.9, 3.6, 2.5, rgb(214, 180, 118));
+            cv.set(5, 9, rgb(150, 116, 66));
+            cv.set(9, 11, rgb(150, 116, 66));
+            cv.set(11, 8, rgb(150, 116, 66));
+            cv.set(8, 6, rgb(150, 116, 66));
+            cv.shade();
+            break;
+         case 338:
+            cv.ell(8.0, 8.8, 5.6, 4.4, rgb(190, 118, 46));
+            cv.ell(7.4, 7.9, 3.6, 2.5, rgb(214, 148, 70));
+            cv.line(5, 7, 10, 7, rgb(246, 226, 150));
+            cv.line(6, 8, 10, 8, rgb(255, 240, 176));
+            cv.set(5, 10, rgb(110, 66, 28));
+            cv.set(10, 11, rgb(110, 66, 28));
+            cv.set(12, 9, rgb(110, 66, 28));
+            cv.shade();
+            break;
+         case 339:
+            cv.ell(8.0, 11.0, 5.4, 3.2, rgb(236, 236, 228));
+            cv.ell(8.0, 9.4, 3.6, 2.4, rgb(250, 250, 244));
+            cv.set(5, 11, rgb(206, 206, 198));
+            cv.set(10, 12, rgb(206, 206, 198));
+            cv.set(7, 8, rgb(255, 255, 255));
+            cv.line(9, 3, 12, 6, rgb(232, 230, 214));
+            cv.rect(8, 2, 2, 2, rgb(244, 242, 228));
+            cv.rect(12, 5, 2, 2, rgb(244, 242, 228));
+            cv.shade();
+            break;
+         default:
+            int steel = rgb(196, 198, 202);
+            int steel2 = rgb(150, 152, 158);
+            int red = rgb(176, 36, 34);
+            cv.line(3, 2, 10, 10, steel);
+            cv.line(4, 2, 10, 9, steel2);
+            cv.line(12, 2, 5, 10, steel);
+            cv.line(11, 2, 5, 9, steel2);
+            cv.ell(5.0, 12.5, 2.6, 2.6, red);
+            cv.ell(11.0, 12.5, 2.6, 2.6, red);
+            cv.clr(4, 12, 2, 2);
+            cv.clr(10, 12, 2, 2);
+            cv.set(8, 8, rgb(90, 90, 96));
+      }
+
+      return cv.p;
    }
 
    static int[] ladderTile() {
@@ -456,6 +660,10 @@ final class TexExtra {
    }
 
    static int[] sprite(int var0) {
+      if (var0 >= 336 && var0 <= 340) {
+         return newSprite(var0);
+      }
+
       TexExtra.Cv var1 = new TexExtra.Cv();
       switch (var0) {
          case 256:

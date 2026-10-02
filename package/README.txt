@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.5)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.6)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,31 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.6  (the farm update)
+  * FARMLAND NEEDS WATER: farmland with water within 4 blocks (on its level or one higher) turns dark and "wet".
+    Crops grow about 40% faster on wet farmland than they did in 3.5 and about 40% slower on dry farmland (wet is
+    roughly 2.4x as fast as dry). Dry farmland with nothing planted on it slowly turns back into dirt - after a few
+    minutes - wet farmland never does. Farmland and crops only update within 32 blocks of you, as before.
+  * TRAMPLING: jumping or falling onto farmland can turn it into dirt - the higher the fall the likelier (a short hop is
+    often fine, a 2 block drop always ruins it). Crops on it pop off. Walking is always safe. Only you trample (mobs don't).
+  * CARROTS and POTATOES: plant them on farmland with right-click (8 growth stages, ripe plants give 1-4 back, young
+    ones give 1). Zombies rarely drop them (about 1 in 40). Carrot = 3 hunger, raw potato = 1, and a potato bakes in
+    a furnace into a BAKED POTATO (5 hunger). On farmland right-click plants them; anywhere else it eats them.
+  * BONE MEAL: 1 bone -> 3 bone meal. Right-click a growing crop (or the soil under it) to grow it 2-5 stages at once;
+    right-click a grass block to sprinkle tall grass and a few flowers around it.
+  * HAY BALE: 9 wheat -> 1 hay bale, and 1 hay bale -> 9 wheat. Landing on a hay bale takes 80% less fall damage.
+  * SHEARS: 2 iron ingots placed diagonally. Right-click a sheep: 1-3 wool of its colour, the sheep turns pink and its
+    wool grows back after 4-8 minutes. Shears also make leaves and tall grass drop themselves when you break them.
+  * BREEDING: right-click two grown-up animals of the same kind with their food and they walk to each other and make
+    a baby. Pigs like carrots or potatoes, cows and sheep like wheat, chickens like seeds. Love lasts 30 seconds, the
+    parents then need 5 minutes of rest. Babies are half size, take 20 minutes to grow up (every feeding makes it
+    2 minutes faster), cannot be sheared and drop nothing. A baby sheep gets one of its parents' colours.
+  * New items and the hay bale are in the creative inventory (page 2).
+  * Honest note: every rule above is covered by automated tests (3,200+ checks), and the old terrain / lighting /
+    physics / crafting code was verified to be unchanged against the 3.5 build, but the game itself has still not
+    been played on real Windows hardware; the new textures were only checked as pictures.
+    Not in this update: milk, eggs, mobs trampling crops, hoes/shears on more blocks.
 
 WHAT'S NEW IN UPDATE 3.5  (more 1.12 features)
   * FARMING: craft a hoe (wood/stone/iron/gold/diamond: MM / _S / _S) and right-click grass or dirt to make farmland.
@@ -87,7 +112,7 @@ WHAT'S NEW IN UPDATE 2
 CONTROLS
   W A S D       move            Space       jump (double-tap = toggle flying in creative/spectator)
   Ctrl / W x2   sprint          Shift       sneak (won't fall off edges) / fly down
-  Mouse         look            Left click  break (hold) / attack     Right click  place / use / eat / bow
+  Mouse         look            Left click  break (hold) / attack     Right click  place / use / eat / bow / feed or shear animals
   Middle click  pick block (creative)       1-9 / wheel hotbar        E  inventory
   Q             drop item       T or /      chat / commands           Esc  pause
   F1 hide HUD   F2 screenshot   F3 debug    F11 fullscreen

@@ -497,6 +497,10 @@ public final class MobRender {
       GL11.glPushMatrix();
       GL11.glTranslated(var4 - var2.camX, var6 - var2.camY, var8 - var2.camZ);
       GL11.glRotatef(-var13, 0.0F, 1.0F, 0.0F);
+      if (var0.babyAge > 0) {
+         GL11.glScalef(0.5F, 0.5F, 0.5F);
+      }
+
       if (var0.dead) {
          float var21 = Math.min(1.0F, (var0.deathTime + var3) / 20.0F);
          GL11.glTranslatef(0.0F, 0.3F * var21, 0.0F);
@@ -570,7 +574,12 @@ public final class MobRender {
                GL11.glRotatef(var28.rz + (float)Math.max(0.0, Math.cos(var23)) * 15.0F * var17 * var24, 0.0F, 0.0F, 1.0F);
          }
 
-         if (var0.type == 2 && var28.color == 15132390 && !var20) {
+         if (var0.type == 2 && var0.sheared && var28.color == 15132390 && !var20) {
+            if (var28.kind == 2) {
+               float[] skin = new float[]{var12[0] * 244.0F / 230.0F, var12[1] * 190.0F / 230.0F, var12[2] * 175.0F / 230.0F};
+               drawBox(var10, var28, var11, skin);
+            }
+         } else if (var0.type == 2 && var28.color == 15132390 && !var20) {
             int var31 = SHEEP_RGB[var0.color];
             float[] var33 = new float[]{var12[0] * (var31 >> 16 & 0xFF) / 230.0F, var12[1] * (var31 >> 8 & 0xFF) / 230.0F, var12[2] * (var31 & 0xFF) / 230.0F};
             drawBox(var10, var28, var11, var33);

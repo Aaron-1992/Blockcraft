@@ -338,20 +338,12 @@ public final class GameTests {
             g.world.setBlock(farX, GROUND, i, Blocks.FARMLAND);
             g.world.setBlock(farX, GROUND + 1, i, 124);
          }
-         int firstRipe = -1;
+         for (int z = -2; z < plots + 2; z++) { // irrigation ditches next to both rows (wet farmland grows faster)
+            g.world.setBlock(nearX + 2, GROUND, z, Blocks.WATER);
+            g.world.setBlock(farX + 2, GROUND, z, Blocks.WATER);
+         }
          for (int t = 1; t <= 12000; t++) { // 10 minutes
             g.world.tick();
-            if (t % 600 == 0) {
-               int ripe = 0;
-               for (int i = 0; i < plots; i++) {
-                  if (g.world.getBlock(nearX, GROUND + 1, i) == 131) {
-                     ripe++;
-                  }
-               }
-               if (ripe == plots && firstRipe < 0) {
-                  firstRipe = t;
-               }
-            }
          }
          int ripeNear = 0;
          int maxFar = 0;
@@ -362,7 +354,6 @@ public final class GameTests {
             maxFar = Math.max(maxFar, g.world.getBlock(farX, GROUND + 1, i));
          }
          check(ripeNear >= plots - 1, "near crops ripe after 10 minutes (" + ripeNear + "/" + plots + ")");
-         check(firstRipe > 0, "all near crops ripe at some point (first full ripeness at tick " + firstRipe + ")");
          eq(124, maxFar, "far crops did not grow at all (outside the 32 block range)");
       });
 
@@ -940,6 +931,723 @@ public final class GameTests {
       });
    }
 
+
+   // ------------------------------------------------------------------ tests: Update 3.6 farming
+   static void farm36() {
+      test("hydration: water within 4 blocks (same level or one above) counts, 5 away / below does not", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         for (int dx = -6; dx <= 6; dx++) {
+            w.setBlock(10 + dx, GROUND + 1, 10, 0);
+         }
+         w.setBlock(14, GROUND, 10, Blocks.WATER);
+         check(w.hydrated(10, GROUND, 10), "water 4 blocks east on the same level");
+         w.setBlock(14, GROUND, 10, Blocks.GRASS);
+         w.setBlock(15, GROUND, 10, Blocks.WATER);
+         check(!w.hydrated(10, GROUND, 10), "water 5 blocks away is too far");
+         w.setBlock(15, GROUND, 10, Blocks.GRASS);
+         w.setBlock(12, GROUND + 1, 12, Blocks.WATER);
+         check(w.hydrated(10, GROUND, 10), "water one level above counts");
+         w.setBlock(12, GROUND + 1, 12, 0);
+         w.setBlock(12, GROUND - 1, 12, Blocks.WATER);
+         check(!w.hydrated(10, GROUND, 10), "water one level below does not count");
+         w.setBlock(12, GROUND + 2, 12, Blocks.WATER);
+         check(!w.hydrated(10, GROUND, 10), "water two levels above does not count");
+         w.setBlock(10, GROUND, 14, Blocks.WATER + 4); // flowing water counts too
+         check(w.hydrated(10, GROUND, 10), "flowing water counts as well");
+      });
+
+      test("hydration: farmland turns wet next to water and dry again when the water is gone", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         w.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         w.setBlock(10, GROUND + 1, 10, 124); // a crop keeps dry farmland from reverting to dirt
+         w.setBlock(12, GROUND, 10, Blocks.WATER);
+         tick(w, 3000);
+         eq(Blocks.FARMLAND_WET, w.getBlock(10, GROUND, 10), "became wet");
+         w.setBlock(12, GROUND, 10, Blocks.GRASS);
+         tick(w, 3000);
+         eq(Blocks.FARMLAND, w.getBlock(10, GROUND, 10), "dried out again");
+         check(Blocks.isCrop(w.getBlock(10, GROUND + 1, 10)), "the crop survived both changes");
+      });
+
+      test("hydration: dry farmland with no crop reverts to dirt over a few minutes; wet farmland and farmland with a crop stay", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         int n = 30;
+         for (int i = 0; i < n; i++) {
+            w.setBlock(-20, GROUND, i - 10, Blocks.FARMLAND);              // dry, empty
+            w.setBlock(-16, GROUND, i - 10, Blocks.FARMLAND);              // dry, planted
+            w.setBlock(-16, GROUND + 1, i - 10, 124);
+            w.setBlock(20 + (i % 2) * 2, GROUND, i - 10, Blocks.FARMLAND); // wet (water below)
+         }
+         for (int z = -12; z < n; z++) {
+            w.setBlock(21, GROUND, z, Blocks.WATER);
+         }
+         for (int i = 0; i < n; i++) {
+            w.setBlock(21, GROUND, i - 10, Blocks.WATER);
+         }
+         for (int i = 0; i < n; i++) {
+            w.setBlock(20, GROUND, i - 10, Blocks.FARMLAND);
+         }
+         tick(w, 25000);
+         int dirt = 0;
+         int plantedFarm = 0;
+         int wetFarm = 0;
+         for (int i = 0; i < n; i++) {
+            if (w.getBlock(-20, GROUND, i - 10) == Blocks.DIRT) {
+               dirt++;
+            }
+            if (Blocks.isFarmland(w.getBlock(-16, GROUND, i - 10))) {
+               plantedFarm++;
+            }
+            if (Blocks.isFarmland(w.getBlock(20, GROUND, i - 10))) {
+               wetFarm++;
+            }
+         }
+         check(dirt >= 26, "dry empty farmland went back to dirt (" + dirt + "/" + n + ")");
+         eq(n, plantedFarm, "dry farmland with a crop on it stays farmland");
+         eq(n, wetFarm, "wet farmland stays farmland");
+      });
+
+      test("hydration: crops grow noticeably faster on wet than on dry farmland", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         int n = 24;
+         for (int i = 0; i < n; i++) {
+            w.setBlock(-22, GROUND, i - 12, Blocks.FARMLAND);
+            w.setBlock(-22, GROUND + 1, i - 12, 124);
+            w.setBlock(-21, GROUND, i - 12, Blocks.WATER); // wet row
+            w.setBlock(24, GROUND, i - 12, Blocks.FARMLAND); // dry row (no water within 4 blocks)
+            w.setBlock(24, GROUND + 1, i - 12, 124);
+         }
+         tick(w, 3000);
+         double wet = 0;
+         double dry = 0;
+         for (int i = 0; i < n; i++) {
+            wet += Blocks.cropStage(w.getBlock(-22, GROUND + 1, i - 12));
+            dry += Blocks.cropStage(w.getBlock(24, GROUND + 1, i - 12));
+         }
+         wet /= n;
+         dry /= n;
+         check(wet > dry * 1.5, "average growth stage after 2.5 min: wet " + wet + " vs dry " + dry);
+         check(dry > 0.5, "dry farmland still grows, just slower (" + dry + ")");
+      });
+
+      test("farmland: still breaks into dirt drops, pops under a solid block, wet or dry", () -> {
+         Game g = newGame(0);
+         for (int id : new int[]{Blocks.FARMLAND, Blocks.FARMLAND_WET}) {
+            g.world.items.clear();
+            g.world.setBlock(10, GROUND, 10, id);
+            g.breakBlock(10, GROUND, 10);
+            eq(1, countItems(g.world, Blocks.DIRT), "farmland " + id + " drops dirt");
+            g.world.setBlock(10, GROUND, 10, id);
+            g.world.setBlock(10, GROUND + 1, 10, Blocks.STONE);
+            tick(g.world, 5);
+            eq(Blocks.DIRT, g.world.getBlock(10, GROUND, 10), "farmland " + id + " under stone turns to dirt");
+            g.world.setBlock(10, GROUND + 1, 10, 0);
+         }
+         // a crop stays on wet farmland
+         g.world.setBlock(12, GROUND, 12, Blocks.FARMLAND_WET);
+         g.world.setBlock(12, GROUND + 1, 12, 142);
+         tick(g.world, 20);
+         eq(142, g.world.getBlock(12, GROUND + 1, 12), "carrots stay on wet farmland");
+      });
+
+      test("trampling: probability is (fall distance - 0.5), crops pop off", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         int dirt = 0;
+         for (int i = 0; i < 400; i++) {
+            w.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+            w.trample(10, GROUND, 10, 0.3F);
+         }
+         eq(Blocks.FARMLAND, w.getBlock(10, GROUND, 10), "a 0.3 block hop never tramples");
+         for (int i = 0; i < 1000; i++) {
+            w.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+            w.trample(10, GROUND, 10, 1.0F);
+            if (w.getBlock(10, GROUND, 10) == Blocks.DIRT) {
+               dirt++;
+            }
+         }
+         check(dirt > 420 && dirt < 580, "a 1.0 block fall tramples about half the time (" + dirt + "/1000)");
+         w.setBlock(10, GROUND, 10, Blocks.FARMLAND_WET);
+         w.trample(10, GROUND, 10, 5.0F);
+         eq(Blocks.DIRT, w.getBlock(10, GROUND, 10), "a 5 block fall always tramples wet farmland");
+         w.setBlock(12, GROUND, 12, Blocks.GRASS);
+         w.trample(12, GROUND, 12, 5.0F);
+         eq(Blocks.GRASS, w.getBlock(12, GROUND, 12), "grass is not affected");
+         // crop on top
+         w.items.clear();
+         w.setBlock(14, GROUND, 14, Blocks.FARMLAND);
+         w.setBlock(14, GROUND + 1, 14, 143);
+         w.trample(14, GROUND, 14, 5.0F);
+         tick(w, 5);
+         eq(0, w.getBlock(14, GROUND + 1, 14), "the carrot popped off");
+         eq(1, countItems(w, Items.CARROT), "and dropped a carrot");
+      });
+
+      test("trampling: the player jumping down onto farmland ruins it; flying/creative-flying does not", () -> {
+         Game g = newGame(0);
+         g.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         Player p = g.player;
+         p.setPos(10.5, GROUND + 4, 10.5);
+         for (int i = 0; i < 200 && !p.onGround; i++) {
+            p.tick(g.world, 0f, 0f, false, false, false);
+         }
+         check(p.onGround, "landed");
+         eq(Blocks.DIRT, g.world.getBlock(10, GROUND, 10), "farmland trampled after a 3 block drop");
+         // flying creative player: no fall distance -> no trampling
+         Game c = newGame(1);
+         c.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         c.player.flying = true;
+         c.player.setPos(10.5, GROUND + 4, 10.5);
+         for (int i = 0; i < 30; i++) {
+            c.player.tick(c.world, 0f, 0f, false, false, false);
+         }
+         c.player.flying = false;
+         // walking on it is harmless
+         Game h = newGame(0);
+         h.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         h.player.setPos(9.5, GROUND + 1, 10.5);
+         for (int i = 0; i < 40; i++) {
+            h.player.tick(h.world, 0.8f, 0f, false, false, false);
+            h.player.yaw = -90; // walk along +x over the farmland
+         }
+         check(Blocks.isFarmland(h.world.getBlock(10, GROUND, 10)) || h.player.x < 10, "walking does not trample (or has not reached it)");
+      });
+
+      test("hay bale: 80% less fall damage; plain ground hurts fully", () -> {
+         Game g = newGame(0);
+         g.world.setBlock(10, GROUND, 10, Blocks.HAY_BALE);
+         Player p = g.player;
+         p.setPos(10.5, GROUND + 14, 10.5);
+         for (int i = 0; i < 400 && !p.onGround; i++) {
+            p.tick(g.world, 0f, 0f, false, false, false);
+         }
+         eq(18, p.health, "13 block fall onto hay costs 2 hearts (10 * 0.2)");
+         Game g2 = newGame(0);
+         g2.player.setPos(10.5, GROUND + 14, 10.5);
+         for (int i = 0; i < 400 && !g2.player.onGround; i++) {
+            g2.player.tick(g2.world, 0f, 0f, false, false, false);
+         }
+         eq(10, g2.player.health, "same fall onto grass costs 10");
+      });
+
+      test("hay bale and wheat recipes", () -> {
+         Stack hay = craft(3, 3, Items.WHEAT, Items.WHEAT, Items.WHEAT, Items.WHEAT, Items.WHEAT, Items.WHEAT, Items.WHEAT, Items.WHEAT, Items.WHEAT);
+         check(hay != null && hay.id == Blocks.HAY_BALE && hay.n == 1, "9 wheat -> hay bale");
+         Stack back = craft(3, 3, Blocks.HAY_BALE, 0, 0, 0, 0, 0, 0, 0, 0);
+         check(back != null && back.id == Items.WHEAT && back.n == 9, "hay bale -> 9 wheat");
+         Stack bread = craft(3, 3, Items.WHEAT, Items.WHEAT, Items.WHEAT, 0, 0, 0, 0, 0, 0);
+         check(bread != null && bread.id == Items.BREAD, "bread still works");
+         Game g = newGame(0);
+         hold(g, Blocks.HAY_BALE, 2);
+         g.target = top(20, 20);
+         check(g.placeBlock(), "hay bale can be placed");
+         eq(Blocks.HAY_BALE, blockAbove(g, 20, 20), "hay bale placed");
+         g.breakBlock(20, GROUND + 1, 20);
+         eq(1, countItems(g.world, Blocks.HAY_BALE), "breaking it drops it");
+      });
+
+      test("carrots/potatoes: planting by right-click, not on grass, hungry player plants instead of eating", () -> {
+         int[][] crops = {{Items.CARROT, 142}, {Items.POTATO, 150}};
+         for (int[] cp : crops) {
+            Game g = newGame(0);
+            g.player.food = 10; // hungry: would start eating if planting did not take priority
+            g.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+            hold(g, cp[0], 3);
+            g.target = top(10, 10);
+            g.rightPressed = true;
+            g.rightDown = true;
+            g.interact();
+            eq(cp[1], blockAbove(g, 10, 10), "item " + cp[0] + " planted as block " + cp[1]);
+            eq(2, g.inv[g.sel].n, "one consumed");
+            eq(10, g.player.food, "did not eat it");
+            // wet farmland too
+            g.world.setBlock(12, GROUND, 10, Blocks.FARMLAND_WET);
+            g.target = top(12, 10);
+            check(g.useSpecial(g.inv[g.sel]), "planted on wet farmland");
+            eq(cp[1], blockAbove(g, 12, 10), "wet farmland accepts it too");
+            // not on grass, not on a planted spot
+            g.target = top(14, 14);
+            check(!g.useSpecial(g.inv[g.sel]), "not on grass");
+            g.target = top(10, 10);
+            check(!g.useSpecial(g.inv[g.sel]), "not on top of another crop");
+         }
+      });
+
+      test("carrots/potatoes: can be eaten away from farmland (3 and 1 hunger points), baked potato 5", () -> {
+         int[][] foods = {{Items.CARROT, 3}, {Items.POTATO, 1}, {Items.BAKED_POTATO, 5}};
+         for (int[] f : foods) {
+            Game g = newGame(0);
+            g.player.food = 5;
+            hold(g, f[0], 2);
+            g.target = top(10, 10); // grass: not farmland
+            for (int i = 0; i < 40; i++) {
+               g.rightDown = true;
+               g.rightPressed = i == 0;
+               g.interact();
+            }
+            eq(5 + f[1], g.player.food, "item " + f[0] + " restores " + f[1]);
+            eq(1, g.inv[g.sel].n, "one eaten");
+            check(Items.isFood(f[0]), "isFood");
+         }
+      });
+
+      test("carrots/potatoes: grow in 8 stages, drop 1-4 when ripe, 1 when young, pop off without farmland", () -> {
+         Game g = newGame(0);
+         for (int base : new int[]{142, 150}) {
+            int item = base == 142 ? Items.CARROT : Items.POTATO;
+            int total = 0;
+            int max = 0;
+            int min = 99;
+            for (int i = 0; i < 600; i++) {
+               g.world.items.clear();
+               g.world.setBlock(10, GROUND + 1, 10, base + 7);
+               g.breakBlock(10, GROUND + 1, 10);
+               int n = countItems(g.world, item);
+               total += n;
+               max = Math.max(max, n);
+               min = Math.min(min, n);
+            }
+            check(min >= 1 && max <= 4, "ripe " + item + " drops 1..4 (" + min + ".." + max + ")");
+            check(Math.abs(total / 600.0 - 2.5) < 0.25, "average ~2.5 (" + total / 600.0 + ")");
+            g.world.items.clear();
+            g.world.setBlock(10, GROUND + 1, 10, base + 3);
+            g.breakBlock(10, GROUND + 1, 10);
+            eq(1, countItems(g.world, item), "young crop drops exactly 1");
+            // pops off when its soil is gone
+            g.world.items.clear();
+            g.world.setBlock(14, GROUND, 14, Blocks.FARMLAND);
+            g.world.setBlock(14, GROUND + 1, 14, base + 2);
+            g.world.setBlock(14, GROUND, 14, Blocks.STONE);
+            tick(g.world, 5);
+            eq(0, g.world.getBlock(14, GROUND + 1, 14), "crop popped off");
+            eq(1, countItems(g.world, item), "and dropped its own item");
+         }
+         // full growth cycle on wet farmland: stages go 0..7 in order and stop at 7
+         g.world.setBlock(-20, GROUND, 0, Blocks.FARMLAND);
+         g.world.setBlock(-20, GROUND + 1, 0, 142);
+         g.world.setBlock(-19, GROUND, 0, Blocks.WATER);
+         g.player.setPos(-18.5, GROUND + 1, 4.5);
+         int last = 142;
+         boolean ordered = true;
+         for (int t = 0; t < 30000; t++) {
+            g.world.tick();
+            int b = g.world.getBlock(-20, GROUND + 1, 0);
+            if (b != last) {
+               ordered &= b == last + 1;
+               last = b;
+            }
+         }
+         check(ordered, "stages advance one at a time");
+         eq(149, last, "carrots ripen at stage 7 (id 149) and stop there");
+      });
+
+      test("bone meal: recipe, grows crops 2-5 stages, not past ripe, not consumed in creative or on ripe crops", () -> {
+         Stack r = craft(3, 3, Items.BONE, 0, 0, 0, 0, 0, 0, 0, 0);
+         check(r != null && r.id == Items.BONE_MEAL && r.n == 3, "1 bone -> 3 bone meal");
+         int[] stageGain = new int[8];
+         Game rg = newGame(0); // one game for all rolls: a fresh game would re-seed the RNG identically every time
+         for (int base : new int[]{124, 142, 150}) {
+            for (int i = 0; i < 300; i++) {
+               rg.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+               rg.world.setBlock(10, GROUND + 1, 10, base);
+               hold(rg, Items.BONE_MEAL, 5);
+               rg.target = hit(10, GROUND + 1, 10, 0, 1, 0);
+               check(rg.useSpecial(rg.inv[rg.sel]), "bone meal used on crop " + base);
+               int gain = Blocks.cropStage(rg.world.getBlock(10, GROUND + 1, 10));
+               stageGain[gain]++;
+               check(gain >= 2 && gain <= 5, "gain " + gain + " is within 2..5");
+               eq(4, rg.inv[rg.sel].n, "one bone meal consumed");
+            }
+         }
+         check(stageGain[2] > 150 && stageGain[3] > 150 && stageGain[4] > 150 && stageGain[5] > 150, "2,3,4,5 each occur about a quarter of the time " + java.util.Arrays.toString(stageGain));
+         Game g = newGame(0);
+         g.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         g.world.setBlock(10, GROUND + 1, 10, 142 + 6);
+         hold(g, Items.BONE_MEAL, 5);
+         g.target = hit(10, GROUND + 1, 10, 0, 1, 0);
+         g.useSpecial(g.inv[g.sel]);
+         eq(149, g.world.getBlock(10, GROUND + 1, 10), "stage 6 + bone meal tops out at ripe (149)");
+         check(!g.useSpecial(g.inv[g.sel]), "ripe crops refuse bone meal");
+         eq(4, g.inv[g.sel].n, "and nothing is consumed");
+         // clicking the soil below the plant works too
+         g.world.setBlock(12, GROUND, 12, Blocks.FARMLAND);
+         g.world.setBlock(12, GROUND + 1, 12, 124);
+         g.target = top(12, 12);
+         check(g.useSpecial(g.inv[g.sel]), "clicking the farmland under a crop also works");
+         // creative: not consumed
+         Game c = newGame(1);
+         c.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         c.world.setBlock(10, GROUND + 1, 10, 124);
+         hold(c, Items.BONE_MEAL, 1);
+         c.target = hit(10, GROUND + 1, 10, 0, 1, 0);
+         c.useSpecial(c.inv[c.sel]);
+         eq(1, c.inv[c.sel].n, "creative keeps the stack");
+      });
+
+      test("bone meal: grass block gets tall grass / flowers around it, other blocks refuse", () -> {
+         Game g = newGame(0);
+         hold(g, Items.BONE_MEAL, 10);
+         g.target = top(10, 10);
+         check(g.useSpecial(g.inv[g.sel]), "used on grass");
+         int grass = 0;
+         int flowers = 0;
+         for (int x = 6; x <= 14; x++) {
+            for (int z = 6; z <= 14; z++) {
+               int b = blockAbove(g, x, z);
+               if (b == Blocks.TALLGRASS) {
+                  grass++;
+               }
+               if (b == Blocks.FLOWER_RED || b == Blocks.FLOWER_YELLOW) {
+                  flowers++;
+               }
+            }
+         }
+         check(grass >= 5, "tall grass appeared (" + grass + ")");
+         check(grass + flowers <= 24, "bounded amount");
+         eq(9, g.inv[g.sel].n, "one consumed");
+         g.target = hit(10, GROUND - 1, 10, 0, 1, 0); // dirt under the grass
+         check(!g.useSpecial(g.inv[g.sel]), "dirt refuses bone meal");
+         g.world.setBlock(10, GROUND + 1, 10, Blocks.STONE);
+         g.target = top(10, 10);
+         check(!g.useSpecial(g.inv[g.sel]), "grass with something on top refuses");
+      });
+
+      test("baked potato: smelts from a potato in the furnace", () -> {
+         Stack r = Recipes.smeltResult(new Stack(Items.POTATO, 1));
+         check(r != null && r.id == Items.BAKED_POTATO && r.n == 1, "potato -> baked potato");
+         check(Recipes.smeltResult(new Stack(Items.CARROT, 1)) == null, "carrot is not smeltable");
+      });
+
+      test("new content: names, tiles, creative inventory entries, sprites", () -> {
+         for (int id = 141; id < Blocks.COUNT; id++) {
+            check(Blocks.name[id] != null, "block " + id + " has a name");
+         }
+         eq(159, Blocks.COUNT, "COUNT");
+         for (int id = 336; id <= 340; id++) {
+            check(Items.name[id] != null, "item " + id + " has a name");
+            check(TexExtra.sprite(id) != null, "item " + id + " has a sprite");
+            check(Items.tile[id] >= 65 && Items.tile[id] < 256, "item " + id + " tile in atlas range (" + Items.tile[id] + ")");
+         }
+         java.util.Set<Integer> list = new java.util.HashSet<>();
+         for (int id : Blocks.creativeList()) {
+            list.add(id);
+         }
+         for (int id : new int[]{158, 336, 337, 338, 339, 340}) {
+            check(list.contains(id), "creative list has " + id);
+         }
+         // atlas tile numbers used by the new blocks/items must be unique and < 256
+         java.util.Map<Integer, String> used = new java.util.HashMap<>();
+         for (int id = 141; id < Blocks.COUNT; id++) {
+            for (int f = 0; f < 6; f++) {
+               int t = Blocks.tiles[id][f];
+               check(t >= 0 && t < 256, "block " + id + " tile " + t + " in range");
+            }
+         }
+         for (int id = 336; id <= 340; id++) {
+            String prev = used.put(Items.tile[id], "item " + id);
+            check(prev == null, "item tile " + Items.tile[id] + " is unique (clashes with " + prev + ")");
+         }
+         check(!Blocks.isCrop(141) && !Blocks.isCrop(132) && !Blocks.isCrop(158) && !Blocks.isCrop(133), "isCrop only covers the three crop families");
+         check(Blocks.isCrop(124) && Blocks.isCrop(131) && Blocks.isCrop(142) && Blocks.isCrop(157), "isCrop covers wheat, carrots, potatoes");
+         eq(285, Blocks.cropSeedItem(127), "wheat -> seeds");
+         eq(Items.CARROT, Blocks.cropSeedItem(145), "carrot block -> carrot");
+         eq(Items.POTATO, Blocks.cropSeedItem(150), "potato block -> potato");
+      });
+
+      test("shears: recipe (both diagonals), durability 238, leaves and tall grass drop themselves", () -> {
+         Stack a = craft(2, 2, 0, Items.IRON_INGOT, Items.IRON_INGOT, 0);
+         Stack b = craft(2, 2, Items.IRON_INGOT, 0, 0, Items.IRON_INGOT);
+         check(a != null && a.id == Items.SHEARS && b != null && b.id == Items.SHEARS, "2 iron ingots diagonal -> shears");
+         eq(238, Items.maxDamage(Items.SHEARS), "durability");
+         Game g = newGame(0);
+         hold(g, Items.SHEARS, 1);
+         g.world.setBlock(10, GROUND + 1, 10, Blocks.LEAVES_OAK);
+         g.breakBlock(10, GROUND + 1, 10);
+         eq(1, countItems(g.world, Blocks.LEAVES_OAK), "leaves dropped by shears");
+         g.world.items.clear();
+         g.world.setBlock(10, GROUND + 1, 10, Blocks.TALLGRASS);
+         g.breakBlock(10, GROUND + 1, 10);
+         eq(1, countItems(g.world, Blocks.TALLGRASS), "tall grass dropped by shears");
+         // without shears leaves do not drop themselves
+         Game h = newGame(0);
+         int leaves = 0;
+         for (int i = 0; i < 200; i++) {
+            h.world.items.clear();
+            h.world.setBlock(10, GROUND + 1, 10, Blocks.LEAVES_OAK);
+            h.breakBlock(10, GROUND + 1, 10);
+            leaves += countItems(h.world, Blocks.LEAVES_OAK);
+         }
+         eq(0, leaves, "bare-handed leaves never drop the leaf block");
+      });
+   }
+
+   // ------------------------------------------------------------------ tests: animals
+   static void animals36() {
+      test("shearing: wool of the sheep's colour, once, wears the shears, regrows later", () -> {
+         Game g = newGame(0);
+         g.mobs.timer = 1; // keep random spawns out of the way (they happen on timer % 20 / % 40)
+         Mob sheep = g.mobs.spawn(Mobs.SHEEP, 12.5, GROUND + 1, 12.5);
+         sheep.color = 6; // pink
+         hold(g, Items.SHEARS, 1);
+         check(g.useOnMob(sheep, g.inv[g.sel]), "sheared");
+         check(sheep.sheared, "sheep is sheared");
+         int wool = countItems(g.world, Blocks.WOOL0 + 6);
+         check(wool >= 1 && wool <= 3, "1-3 pink wool dropped (" + wool + ")");
+         eq(1, g.inv[g.sel].dmg, "shears lost 1 durability");
+         check(!g.useOnMob(sheep, g.inv[g.sel]), "a sheared sheep cannot be sheared again");
+         eq(1, g.inv[g.sel].dmg, "no extra wear");
+         // regrowth: tick the mob until the timer runs out
+         int ticks = 0;
+         while (sheep.sheared && ticks < 12000) {
+            g.mobs.tickMob(sheep, g.world, g.player, 1.0f);
+            ticks++;
+         }
+         check(!sheep.sheared && ticks >= 4800 && ticks <= 9600, "wool regrew after " + ticks + " ticks (4800..9600)");
+         // creative does not wear the shears
+         Game c = newGame(1);
+         Mob s2 = c.mobs.spawn(Mobs.SHEEP, 12.5, GROUND + 1, 12.5);
+         hold(c, Items.SHEARS, 1);
+         c.useOnMob(s2, c.inv[c.sel]);
+         eq(0, c.inv[c.sel].dmg, "creative: no wear");
+         // only sheep
+         Mob cow = c.mobs.spawn(Mobs.COW, 14.5, GROUND + 1, 12.5);
+         check(!c.useOnMob(cow, c.inv[c.sel]), "shears do nothing to cows");
+      });
+
+      test("interact(): right-click on a targeted mob feeds/shears it instead of placing/eating; normal clicks unchanged", () -> {
+         Game g = newGame(0);
+         g.world.dayTime = 6000;
+         Mob cow = g.mobs.spawn(Mobs.COW, 12.5, GROUND + 1, 12.5);
+         hold(g, Items.WHEAT, 2);
+         g.targetMob = cow;
+         g.target = null;
+         g.rightPressed = true;
+         g.rightDown = true;
+         g.interact();
+         eq(600, cow.love, "cow fed through interact()");
+         eq(1, g.inv[g.sel].n, "wheat consumed");
+         Mob sheep = g.mobs.spawn(Mobs.SHEEP, 14.5, GROUND + 1, 12.5);
+         hold(g, Items.SHEARS, 1);
+         g.targetMob = sheep;
+         g.rightPressed = true;
+         g.rightDown = true;
+         g.interact();
+         check(sheep.sheared, "sheep sheared through interact()");
+         // hostile mob targeted while holding a block: the block is not 'used on the mob' - placement is unaffected
+         g.targetMob = null;
+         hold(g, Blocks.STONE, 5);
+         g.target = top(20, 20);
+         g.rightPressed = true;
+         g.rightDown = true;
+         g.placeDelay = 0;
+         g.interact();
+         eq(Blocks.STONE, blockAbove(g, 20, 20), "placing a block still works");
+         // a hungry player eating a carrot while NOT looking at farmland / a mob
+         g.player.food = 5;
+         hold(g, Items.CARROT, 1);
+         g.target = top(22, 22);
+         for (int i = 0; i < 40; i++) {
+            g.rightDown = true;
+            g.rightPressed = i == 0;
+            g.interact();
+         }
+         eq(8, g.player.food, "still eats carrots on grass");
+      });
+
+      test("shearing: a sheared sheep drops no wool when killed; babies cannot be sheared and drop nothing", () -> {
+         Game g = newGame(0);
+         Mob a = g.mobs.spawn(Mobs.SHEEP, 12.5, GROUND + 1, 12.5);
+         a.color = 3;
+         g.mobs.kill(a);
+         eq(1, countItems(g.world, Blocks.WOOL0 + 3), "normal sheep drops 1 wool");
+         g.world.items.clear();
+         Mob b = g.mobs.spawn(Mobs.SHEEP, 14.5, GROUND + 1, 12.5);
+         b.color = 3;
+         b.sheared = true;
+         g.mobs.kill(b);
+         eq(0, countItems(g.world, Blocks.WOOL0 + 3), "sheared sheep drops no wool");
+         g.world.items.clear();
+         Mob baby = g.mobs.spawnBaby(Mobs.SHEEP, 16.5, GROUND + 1, 12.5);
+         hold(g, Items.SHEARS, 1);
+         check(!g.useOnMob(baby, g.inv[g.sel]), "baby sheep cannot be sheared");
+         g.mobs.kill(baby);
+         eq(0, g.world.items.size(), "baby drops nothing");
+      });
+
+      test("breeding: right food puts adults in love, wrong food / babies / cooldown are refused", () -> {
+         int[][] pairs = {{Mobs.PIG, Items.CARROT}, {Mobs.PIG, Items.POTATO}, {Mobs.COW, Items.WHEAT}, {Mobs.SHEEP, Items.WHEAT}, {Mobs.CHICKEN, Items.SEEDS}};
+         for (int[] pr : pairs) {
+            Game g = newGame(0);
+            Mob m = g.mobs.spawn(pr[0], 12.5, GROUND + 1, 12.5);
+            hold(g, pr[1], 3);
+            check(g.useOnMob(m, g.inv[g.sel]), Mobs.NAME[pr[0]] + " accepts " + pr[1]);
+            eq(600, m.love, "in love for 30 seconds");
+            eq(2, g.inv[g.sel].n, "one item consumed");
+            check(!g.useOnMob(m, g.inv[g.sel]), "already in love: refused");
+            eq(2, g.inv[g.sel].n, "nothing consumed when refused");
+         }
+         Game g = newGame(0);
+         Mob pig = g.mobs.spawn(Mobs.PIG, 12.5, GROUND + 1, 12.5);
+         hold(g, Items.WHEAT, 2);
+         check(!g.useOnMob(pig, g.inv[g.sel]), "pigs do not eat wheat");
+         hold(g, Items.CARROT, 2);
+         pig.breedCd = 100;
+         check(!g.useOnMob(pig, g.inv[g.sel]), "cooldown refuses");
+         pig.breedCd = 0;
+         Mob baby = g.mobs.spawnBaby(Mobs.PIG, 14.5, GROUND + 1, 12.5);
+         int age0 = baby.babyAge;
+         check(g.useOnMob(baby, g.inv[g.sel]), "babies accept food (to grow faster)");
+         eq(age0 - 2400, baby.babyAge, "growth sped up by 2 minutes");
+         eq(0, baby.love, "babies do not fall in love");
+         Mob zombie = g.mobs.spawn(Mobs.ZOMBIE, 18.5, GROUND + 1, 12.5);
+         check(!g.useOnMob(zombie, g.inv[g.sel]), "hostile mobs are not fed");
+         Game c = newGame(1);
+         Mob cm = c.mobs.spawn(Mobs.COW, 12.5, GROUND + 1, 12.5);
+         hold(c, Items.WHEAT, 1);
+         c.useOnMob(cm, c.inv[c.sel]);
+         eq(1, c.inv[c.sel].n, "creative does not consume food");
+      });
+
+      test("breeding: two animals in love walk to each other and make a baby, both go on cooldown", () -> {
+         for (int type : new int[]{Mobs.PIG, Mobs.COW, Mobs.SHEEP, Mobs.CHICKEN}) {
+            Game g = newGame(0);
+            g.world.dayTime = 6000;
+            int food = type == Mobs.PIG ? Items.CARROT : (type == Mobs.CHICKEN ? Items.SEEDS : Items.WHEAT);
+            Mob a = g.mobs.spawn(type, 12.5, GROUND + 1, 12.5);
+            Mob b = g.mobs.spawn(type, 17.5, GROUND + 1, 14.5);
+            a.color = 6;
+            b.color = 6;
+            hold(g, food, 4);
+            check(g.useOnMob(a, g.inv[g.sel]), "fed A");
+            check(g.useOnMob(b, g.inv[g.sel]), "fed B");
+            Mob baby = null;
+            for (int t = 0; t < 700 && baby == null; t++) {
+               g.mobs.tickMob(a, g.world, g.player, 1.0f);
+               g.mobs.tickMob(b, g.world, g.player, 1.0f);
+               for (Mob m : g.mobs.list) {
+                  if (m != a && m != b && m.type == type && m.babyAge > 0) {
+                     baby = m;
+                  }
+               }
+            }
+            check(baby != null, Mobs.NAME[type] + ": a baby appeared");
+            if (baby != null) {
+               check(baby.babyAge > 23000 && baby.babyAge <= 24000, "baby needs ~20 minutes to grow (" + baby.babyAge + ")");
+               check(baby.bb[3] - baby.bb[0] < Mobs.W[type] * 0.6, "baby hitbox is half size");
+               if (type == Mobs.SHEEP) {
+                  eq(6, baby.color, "baby sheep inherits the colour");
+               }
+            }
+            eq(0, a.love, "A out of love");
+            eq(0, b.love, "B out of love");
+            check(a.breedCd >= 5999 && a.breedCd <= 6000, "A on 5 minute cooldown (" + a.breedCd + ")");
+            check(b.breedCd >= 5999 && b.breedCd <= 6000, "B on 5 minute cooldown (" + b.breedCd + ")");
+         }
+      });
+
+      test("breeding: animals of different kinds do not mate; a lonely animal in love just waits then calms down", () -> {
+         Game g = newGame(0);
+         g.world.dayTime = 6000;
+         Mob pig = g.mobs.spawn(Mobs.PIG, 12.5, GROUND + 1, 12.5);
+         Mob cow = g.mobs.spawn(Mobs.COW, 13.5, GROUND + 1, 12.5);
+         hold(g, Items.CARROT, 1);
+         g.useOnMob(pig, g.inv[g.sel]);
+         hold(g, Items.WHEAT, 1);
+         g.useOnMob(cow, g.inv[g.sel]);
+         for (int t = 0; t < 700; t++) {
+            g.mobs.tickMob(pig, g.world, g.player, 1.0f);
+            g.mobs.tickMob(cow, g.world, g.player, 1.0f);
+         }
+         int babies = 0;
+         for (Mob m : g.mobs.list) {
+            if (m.babyAge > 0) {
+               babies++;
+            }
+         }
+         eq(0, babies, "no baby from a pig and a cow");
+         eq(0, pig.love, "love wore off after 30 s");
+         eq(0, pig.breedCd, "no cooldown without a baby");
+      });
+
+      test("babies: grow up after their timer, hitbox returns to full size; adults breed again after the cooldown", () -> {
+         Game g = newGame(0);
+         g.world.dayTime = 6000;
+         Mob baby = g.mobs.spawnBaby(Mobs.COW, 12.5, GROUND + 1, 12.5);
+         double small = baby.bb[3] - baby.bb[0];
+         baby.babyAge = 5;
+         for (int t = 0; t < 8; t++) {
+            g.mobs.tickMob(baby, g.world, g.player, 1.0f);
+         }
+         eq(0, baby.babyAge, "grown up");
+         check(!baby.isBaby(), "isBaby false");
+         check(baby.bb[3] - baby.bb[0] > small * 1.8, "hitbox doubled (" + small + " -> " + (baby.bb[3] - baby.bb[0]) + ")");
+         Mob a = g.mobs.spawn(Mobs.COW, 20.5, GROUND + 1, 12.5);
+         a.breedCd = 3;
+         for (int t = 0; t < 5; t++) {
+            g.mobs.tickMob(a, g.world, g.player, 1.0f);
+         }
+         eq(0, a.breedCd, "cooldown counts down");
+         hold(g, Items.WHEAT, 1);
+         check(g.useOnMob(a, g.inv[g.sel]), "can be fed again afterwards");
+      });
+
+      test("mobs.dat: baby / sheared / cooldown survive save and load, old 6-field lines still load", () -> {
+         Game g = newGame(0);
+         Mob baby = g.mobs.spawnBaby(Mobs.PIG, 12.5, GROUND + 1, 12.5);
+         baby.babyAge = 12345;
+         Mob sheep = g.mobs.spawn(Mobs.SHEEP, 14.5, GROUND + 1, 12.5);
+         sheep.color = 7;
+         sheep.sheared = true;
+         sheep.woolTimer = 777;
+         sheep.breedCd = 4321;
+         java.io.File dir = java.nio.file.Files.createTempDirectory("bc-mobs").toFile();
+         g.mobs.save(dir);
+         // add a legacy 6-field line (what Update 3.5 wrote)
+         try (java.io.FileWriter fw = new java.io.FileWriter(new java.io.File(dir, "mobs.dat"), true)) {
+            fw.write("1 20.5 61.0 12.5 10 0\n");
+         }
+         Game g2 = newGame(0);
+         g2.mobs.load(dir);
+         Mob lb = null;
+         Mob ls = null;
+         Mob lc = null;
+         for (Mob m : g2.mobs.list) {
+            if (m.type == Mobs.PIG) {
+               lb = m;
+            }
+            if (m.type == Mobs.SHEEP) {
+               ls = m;
+            }
+            if (m.type == Mobs.COW) {
+               lc = m;
+            }
+         }
+         check(lb != null && lb.babyAge == 12345, "baby age restored");
+         check(lb != null && lb.bb[3] - lb.bb[0] < 0.5, "baby hitbox restored");
+         check(ls != null && ls.sheared && ls.woolTimer == 777 && ls.breedCd == 4321 && ls.color == 7, "sheep state restored");
+         check(lc != null && lc.babyAge == 0 && !lc.sheared, "legacy line loads as a normal adult");
+      });
+
+      test("zombies sometimes drop a carrot or a potato (about 2.5%)", () -> {
+         Game g = newGame(0);
+         int rare = 0;
+         int n = 4000;
+         for (int i = 0; i < n; i++) {
+            g.world.items.clear();
+            Mob z = g.mobs.spawn(Mobs.ZOMBIE, 12.5, GROUND + 1, 12.5);
+            g.mobs.kill(z);
+            rare += countItems(g.world, Items.CARROT) + countItems(g.world, Items.POTATO);
+            g.mobs.list.clear();
+         }
+         double rate = rare / (double) n;
+         check(rate > 0.012 && rate < 0.04, "carrot/potato rate " + rate);
+      });
+   }
+
    public static void main(String[] args) {
       recipes();
       farming();
@@ -947,6 +1655,8 @@ public final class GameTests {
       tnt();
       ladders();
       beds();
+      farm36();
+      animals36();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

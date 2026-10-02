@@ -1,0 +1,13 @@
+# Fingerprint keys (prefixes) whose VALUE is allowed to differ from the original Update 3.5 jar because it was changed
+# on purpose. Fingerprints that are new (absent from the 3.5 jar) are always fine. Everything else - terrain
+# generation, lighting, physics, simulation, meshing of the old blocks, all old textures ... - must stay identical;
+# tools/runtests.py equivalence fails otherwise.
+#
+# Update 3.6 (farm update): new blocks/items/recipes, so the data tables and what enumerates them change.
+statics Blocks.
+statics Items.
+statics Recipes.
+tex sprites
+tex iconBoxes
+mesh showcase
+recipes

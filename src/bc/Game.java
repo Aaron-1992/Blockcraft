@@ -33,7 +33,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.5";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.6";
    public Options opt;
    public World world;
    public Player player;
@@ -186,7 +186,7 @@ public final class Game {
       GLFW.glfwWindowHint(131076, 0);
       GLFW.glfwWindowHint(131075, 1);
       GLFW.glfwWindowHint(135173, 24);
-      this.window = GLFW.glfwCreateWindow(this.winW, this.winH, "Blockcraft 1.12 - Update 3.5", 0L, 0L);
+      this.window = GLFW.glfwCreateWindow(this.winW, this.winH, TITLE_STR, 0L, 0L);
       if (this.window == 0L) {
          throw new RuntimeException("Failed to create the GLFW window (OpenGL 2.1+ required)");
       }
@@ -1768,8 +1768,13 @@ public final class Game {
             this.breakProg = 0.0F;
          }
 
-         boolean var19 = false;
-         if (var2 && this.target != null && (!this.player.sneaking || var3 == null)) {
+         boolean var19 = var2 && this.targetMob != null && this.useOnMob(this.targetMob, var3);
+         if (var19) {
+            this.swinging = true;
+            this.swing = 1.0E-4F;
+         }
+
+         if (!var19 && var2 && this.target != null && (!this.player.sneaking || var3 == null)) {
             var19 = this.useBlock();
          }
 
@@ -1891,14 +1896,18 @@ public final class Game {
          int var6 = Blocks.drop[var4];
          int var7 = 1;
          if (Blocks.isCrop(var4)) {
-            if (var4 == 131) {
-               this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 286, 1);
-               int var8 = this.rnd.nextInt(4);
-               if (var8 > 0) {
-                  this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 285, var8);
+            if (Blocks.isRipe(var4)) {
+               if (Blocks.cropBase(var4) == 124) {
+                  this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 286, 1);
+                  int var8 = this.rnd.nextInt(4);
+                  if (var8 > 0) {
+                     this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 285, var8);
+                  }
+               } else {
+                  this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.cropSeedItem(var4), 1 + this.rnd.nextInt(4));
                }
             } else {
-               this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 285, 1);
+               this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks.cropSeedItem(var4), 1);
             }
          } else {
             switch (var4) {
@@ -1914,12 +1923,14 @@ public final class Game {
                   var6 = 260;
                   break;
                case 29:
-                  var6 = this.rnd.nextInt(8) == 0 ? 285 : 0;
+                  var6 = var5 == 340 ? 29 : (this.rnd.nextInt(8) == 0 ? 285 : 0);
                   break;
                default:
                   if (Blocks.isLeaves(var4)) {
                      var6 = 0;
-                     if (this.rnd.nextInt(20) == 0 && var4 == 12) {
+                     if (var5 == 340) {
+                        var6 = var4;
+                     } else if (this.rnd.nextInt(20) == 0 && var4 == 12) {
                         var6 = 270;
                      } else if (this.rnd.nextInt(50) == 0) {
                         var6 = 256;
@@ -2086,14 +2097,16 @@ public final class Game {
       }
    }
 
+   /** Plants wheat seeds / a carrot / a potato on the top face of the targeted farmland. */
    boolean placeSeeds(Stack var1) {
-      if (this.target.ny == 1 && this.world.getBlock(this.target.x, this.target.y, this.target.z) == 123) {
+      int var3 = Items.plantBlock(var1.id);
+      if (var3 != 0 && this.target.ny == 1 && Blocks.isFarmland(this.world.getBlock(this.target.x, this.target.y, this.target.z))) {
          int var2 = this.target.y + 1;
          if (!Blocks.replaceable[this.world.getBlock(this.target.x, var2, this.target.z)]) {
             return false;
          }
 
-         this.world.setBlock(this.target.x, var2, this.target.z, 124);
+         this.world.setBlock(this.target.x, var2, this.target.z, var3);
          this.meshNow(this.target.x, var2, this.target.z);
          if (!this.player.creative) {
             var1.n--;
@@ -2105,6 +2118,105 @@ public final class Game {
          return true;
       } else {
          return false;
+      }
+   }
+
+   /**
+    * Bone meal: instantly grows the targeted crop by 2-5 stages, or sprinkles tall grass and the odd flower around
+    * a targeted grass block.
+    */
+   boolean useBoneMeal(Stack var1) {
+      if (this.target == null || this.player.adventure) {
+         return false;
+      }
+
+      int var2 = this.target.x;
+      int var3 = this.target.y;
+      int var4 = this.target.z;
+      int var5 = this.world.getBlock(var2, var3, var4);
+      if (Blocks.isFarmland(var5) && Blocks.isCrop(this.world.getBlock(var2, var3 + 1, var4))) {
+         var3++;
+         var5 = this.world.getBlock(var2, var3, var4);
+      }
+
+      if (Blocks.isCrop(var5) && !Blocks.isRipe(var5)) {
+         int var6 = Math.min(7, Blocks.cropStage(var5) + 2 + this.rnd.nextInt(4));
+         this.world.setBlock(var2, var3, var4, Blocks.cropBase(var5) + var6);
+         this.meshNow(var2, var3, var4);
+      } else {
+         if (var5 != 2 || this.target.ny != 1 || this.world.getBlock(var2, var3 + 1, var4) != 0) {
+            return false;
+         }
+
+         for (int var7 = 0; var7 < 24; var7++) {
+            int var8 = var2 + this.rnd.nextInt(7) - 3;
+            int var9 = var4 + this.rnd.nextInt(7) - 3;
+            int var10 = var3 + this.rnd.nextInt(3) - 1;
+            if (this.world.getBlock(var8, var10, var9) == 2 && this.world.getBlock(var8, var10 + 1, var9) == 0) {
+               this.world.setBlock(var8, var10 + 1, var9, this.rnd.nextInt(8) == 0 ? 30 + this.rnd.nextInt(2) : 29);
+               this.meshNow(var8, var10 + 1, var9);
+            }
+         }
+      }
+
+      if (!this.player.creative) {
+         var1.n--;
+         if (var1.n <= 0) {
+            this.inv[this.sel] = null;
+         }
+      }
+
+      return true;
+   }
+
+   /** Right-click on a mob with an item in hand: shear a sheep, or feed an animal (breeding / growing up). */
+   boolean useOnMob(Mob var1, Stack var2) {
+      if (var2 == null || var1.dead || this.player.adventure || this.player.spectator) {
+         return false;
+      }
+
+      if (var2.id == Items.SHEARS && this.mobs.shear(var1)) {
+         if (!this.player.creative) {
+            this.damageHeld(1);
+         }
+
+         return true;
+      }
+
+      if (this.mobs.feed(var1, var2.id)) {
+         if (!this.player.creative) {
+            var2.n--;
+            if (var2.n <= 0) {
+               this.inv[this.sel] = null;
+            }
+         }
+
+         this.loveParticles(var1);
+         return true;
+      }
+
+      return false;
+   }
+
+   /** A few red particles rising from the mob (breeding "hearts"). */
+   void loveParticles(Mob var1) {
+      for (int var2 = 0; var2 < 7; var2++) {
+         Game.Particle var3 = new Game.Particle();
+         var3.x = (float)(var1.x + (this.rnd.nextFloat() - 0.5F) * Mobs.W[var1.type]);
+         var3.y = (float)(var1.y + Mobs.H[var1.type] * (0.6F + this.rnd.nextFloat() * 0.6F));
+         var3.z = (float)(var1.z + (this.rnd.nextFloat() - 0.5F) * Mobs.W[var1.type]);
+         var3.vx = (this.rnd.nextFloat() - 0.5F) * 0.05F;
+         var3.vy = 0.05F + this.rnd.nextFloat() * 0.08F;
+         var3.vz = (this.rnd.nextFloat() - 0.5F) * 0.05F;
+         var3.size = 0.09F + this.rnd.nextFloat() * 0.04F;
+         var3.u = 1.0F / 256.0F;
+         var3.v = 65.0F / 256.0F;
+         var3.life = 25 + this.rnd.nextInt(15);
+         var3.shade = 1.0F;
+         var3.r = 1.0F;
+         var3.g = 0.25F;
+         var3.b = 0.4F;
+         this.particles.add(var3);
       }
    }
 
@@ -2185,6 +2297,14 @@ public final class Game {
       double var9 = -Math.sin(var5);
       double var11 = Math.cos(var3) * Math.cos(var5);
       double var13 = this.player.creative ? 5.0 : 4.5;
+      if (var2 == 336 || var2 == 337) {
+         return this.target != null && !this.player.adventure && this.placeSeeds(var1);
+      }
+
+      if (var2 == 339) {
+         return this.useBoneMeal(var1);
+      }
+
       if (var2 == 282) {
          this.world.rayFluids = true;
          Hit var19 = this.world.raycast(this.player.x, this.player.y + this.player.eye, this.player.z, var7, var9, var11, var13);
@@ -2353,7 +2473,7 @@ public final class Game {
          return this.placeBed(var1);
       }
 
-      if (var1 != null && var1.id == 285) {
+      if (var1 != null && Items.plantBlock(var1.id) != 0) {
          return this.placeSeeds(var1);
       }
 
@@ -2678,7 +2798,7 @@ public final class Game {
       this.gui.text(var3, var1 - var5 / 2.0F, var2, -1118482, false, var4);
       this.gui.text(var3, var1 - var5 / 2.0F + 1.0F, var2 + 1.0F, -5197648, false, var4);
       this.gui.text(var3, var1 - var5 / 2.0F, var2, -1, false, var4);
-      this.gui.centered("JAVA EDITION  1.12  -  UPDATE 3.5", var1, var2 + 8.0F * var4 + 4.0F, -5592406, true, 1.0F);
+      this.gui.centered("JAVA EDITION  1.12  -  UPDATE 3.6", var1, var2 + 8.0F * var4 + 4.0F, -5592406, true, 1.0F);
       GL11.glPushMatrix();
       GL11.glTranslatef(var1 + var5 / 2.0F - 20.0F, var2 + 8.0F * var4 + 4.0F, 0.0F);
       GL11.glRotatef(-20.0F, 0.0F, 0.0F, 1.0F);
@@ -2713,7 +2833,7 @@ public final class Game {
          this.setScreen(Game.S.OPTIONS);
       });
       this.button("Quit Game", var1 + 2.0F, var9 + 52.0F, 98.0F, var8, true, () -> GLFW.glfwSetWindowShouldClose(this.window, true));
-      this.gui.text("Update 3.5", 2.0F, this.gui.h - 10.0F, -1, true);
+      this.gui.text("Update 3.6", 2.0F, this.gui.h - 10.0F, -1, true);
       String var10 = "Not affiliated with Mojang";
       this.gui.text(var10, this.gui.w - Gui.textWidth(var10) - 2.0F, this.gui.h - 10.0F, -1, true);
    }
@@ -3137,7 +3257,7 @@ public final class Game {
       float var7 = ((this.player.yaw + 180.0F) % 360.0F + 360.0F) % 360.0F - 180.0F;
       long var8 = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576L;
       String[] var10 = new String[]{
-         "Blockcraft 1.12 Update 3.5",
+         "Blockcraft 1.12 Update 3.6",
          this.fps + " fps, " + this.rend.visibleSections + " sections, " + this.rend.drawCalls + " draws",
          "C: " + (this.world == null ? 0 : this.world.chunks.size()) + " chunks loaded, mesh queue: " + this.rend.inflight.get(),
          "Mem: "

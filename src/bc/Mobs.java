@@ -169,6 +169,21 @@ public final class Mobs {
       var1.pwalkAmp = var1.walkAmp;
       var1.pswell = var1.swell;
       var1.age++;
+      if (var1.love > 0) {
+         var1.love--;
+      }
+
+      if (var1.breedCd > 0) {
+         var1.breedCd--;
+      }
+
+      if (var1.babyAge > 0 && --var1.babyAge == 0) {
+         var1.setPos(var1.x, var1.y, var1.z);
+      }
+
+      if (var1.sheared && --var1.woolTimer <= 0) {
+         var1.sheared = false;
+      }
       if (var1.hurtTime > 0) {
          var1.hurtTime--;
       }
@@ -359,11 +374,23 @@ public final class Mobs {
                }
                break;
             default:
+               Mobs.Mob mate = var1.flee <= 0 && var1.love > 0 ? this.findMate(var1) : null;
                if (var1.flee > 0) {
                   var1.flee--;
                   var1.dirYaw = angleTo(var1.x - var1.fleeX, var1.z - var1.fleeZ);
                   var12 = true;
                   var13 *= 1.9;
+               } else if (mate != null) {
+                  double var48 = mate.x - var1.x;
+                  double var49 = mate.z - var1.z;
+                  double var50 = Math.sqrt(var48 * var48 + var49 * var49);
+                  var1.dirYaw = angleTo(var48, var49);
+                  var26 = var1.dirYaw;
+                  var12 = var50 > 0.9;
+                  var13 *= 1.4;
+                  if (var50 < 1.7 && Math.abs(mate.y - var1.y) < 1.5 && mate.love > 0) {
+                     this.breed(var1, mate);
+                  }
                } else {
                   this.wanderAI(var1);
                   var12 = var1.moving;
@@ -592,6 +619,97 @@ public final class Mobs {
       return false;
    }
 
+   /** What an animal likes to be fed: pigs carrots/potatoes, cows and sheep wheat, chickens seeds. */
+   public static boolean isBreedFood(int type, int item) {
+      switch (type) {
+         case 0:
+            return item == 336 || item == 337;
+         case 1:
+         case 2:
+            return item == 286;
+         case 3:
+            return item == 285;
+         default:
+            return false;
+      }
+   }
+
+   /**
+    * Right-click with an item: returns true if the animal accepted it as food. A grown-up that is not on cooldown
+    * goes into love mode (30 s); a baby grows up faster.
+    */
+   public boolean feed(Mobs.Mob m, int item) {
+      if (m.dead || hostile(m.type) || !isBreedFood(m.type, item)) {
+         return false;
+      }
+
+      if (m.babyAge > 0) {
+         m.babyAge = Math.max(1, m.babyAge - 2400);
+         return true;
+      }
+
+      if (m.love > 0 || m.breedCd > 0) {
+         return false;
+      }
+
+      m.love = 600;
+      return true;
+   }
+
+   /** Another grown-up of the same kind that is also in love, within 10 blocks. */
+   Mobs.Mob findMate(Mobs.Mob m) {
+      Mobs.Mob best = null;
+      double bestD = 100.0;
+
+      for (Mobs.Mob o : this.list) {
+         if (o != m && !o.dead && o.type == m.type && o.love > 0 && o.babyAge == 0) {
+            double dx = o.x - m.x;
+            double dz = o.z - m.z;
+            double d = dx * dx + dz * dz;
+            if (d < bestD) {
+               bestD = d;
+               best = o;
+            }
+         }
+      }
+
+      return best;
+   }
+
+   /** Two animals in love meet: a baby appears between them and both go on a 5 minute cooldown. */
+   void breed(Mobs.Mob a, Mobs.Mob b) {
+      a.love = 0;
+      b.love = 0;
+      a.breedCd = 6000;
+      b.breedCd = 6000;
+      Mobs.Mob baby = this.spawnBaby(a.type, (a.x + b.x) / 2.0, Math.max(a.y, b.y), (a.z + b.z) / 2.0);
+      if (a.type == 2) {
+         baby.color = this.rnd.nextBoolean() ? a.color : b.color;
+      }
+
+      this.g.loveParticles(a);
+      this.g.loveParticles(b);
+   }
+
+   public Mobs.Mob spawnBaby(int type, double x, double y, double z) {
+      Mobs.Mob baby = this.spawn(type, x, y, z);
+      baby.babyAge = 24000;
+      baby.setPos(x, y, z);
+      return baby;
+   }
+
+   /** Shears on a grown-up, woolly sheep: 1-3 wool of its colour; the wool regrows after 4-8 minutes. */
+   public boolean shear(Mobs.Mob m) {
+      if (m.type != 2 || m.sheared || m.babyAge > 0 || m.dead) {
+         return false;
+      }
+
+      m.sheared = true;
+      m.woolTimer = 4800 + this.rnd.nextInt(4800);
+      this.g.world.dropItem(m.x, m.y + 0.6, m.z, 34 + m.color, 1 + this.rnd.nextInt(3));
+      return true;
+   }
+
    public boolean hurtMob(Mobs.Mob var1, int var2, double var3, double var5, double var7, boolean var9) {
       if (!var1.dead && var1.invuln <= 0) {
          var1.health -= var2;
@@ -631,6 +749,10 @@ public final class Mobs {
       var1.deathTime = 0;
       World var2 = this.g.world;
       boolean var3 = var1.burn > 0;
+      if (var1.babyAge > 0) {
+         return;
+      }
+
       switch (var1.type) {
          case 0:
             this.drop(var2, var1, var3 ? 273 : 272, 1 + this.rnd.nextInt(3));
@@ -640,7 +762,10 @@ public final class Mobs {
             this.drop(var2, var1, var3 ? 275 : 274, 1 + this.rnd.nextInt(3));
             break;
          case 2:
-            this.drop(var2, var1, 34 + var1.color, 1);
+            if (!var1.sheared) {
+               this.drop(var2, var1, 34 + var1.color, 1);
+            }
+
             this.drop(var2, var1, var3 ? 279 : 278, 1 + this.rnd.nextInt(2));
             break;
          case 3:
@@ -649,6 +774,9 @@ public final class Mobs {
             break;
          case 4:
             this.drop(var2, var1, 280, this.rnd.nextInt(3));
+            if (this.rnd.nextInt(40) == 0) {
+               this.drop(var2, var1, this.rnd.nextBoolean() ? 336 : 337, 1);
+            }
             break;
          case 5:
             this.drop(var2, var1, 264, this.rnd.nextInt(3));
@@ -958,7 +1086,7 @@ public final class Mobs {
          try {
             for (Mobs.Mob var4 : this.list) {
                if (!var4.dead && !hostile(var4.type) && Math.abs(var4.x - this.g.player.x) < 120.0 && Math.abs(var4.z - this.g.player.z) < 120.0) {
-                  var2.println(var4.type + " " + var4.x + " " + var4.y + " " + var4.z + " " + var4.health + " " + var4.color);
+                  var2.println(var4.type + " " + var4.x + " " + var4.y + " " + var4.z + " " + var4.health + " " + var4.color + " " + var4.babyAge + " " + (var4.sheared ? 1 : 0) + " " + var4.woolTimer + " " + var4.breedCd);
                }
             }
          } catch (Throwable var6) {
@@ -993,6 +1121,13 @@ public final class Mobs {
                      );
                      var6.health = Integer.parseInt(var5[4]);
                      var6.color = Integer.parseInt(var5[5]);
+                     if (var5.length >= 10) {
+                        var6.babyAge = Integer.parseInt(var5[6]);
+                        var6.sheared = Integer.parseInt(var5[7]) != 0;
+                        var6.woolTimer = Integer.parseInt(var5[8]);
+                        var6.breedCd = Integer.parseInt(var5[9]);
+                        var6.setPos(var6.x, var6.y, var6.z);
+                     }
                   }
                }
             } catch (Throwable var8) {
@@ -1074,17 +1209,31 @@ public final class Mobs {
       public final double[] bb = new double[6];
       public int swell;
       public int pswell;
+      /** Ticks until this animal is grown up (0 = adult). Babies are half size and cannot breed. */
+      public int babyAge;
+      /** > 0: in love (was fed), looks for a partner of the same kind. */
+      public int love;
+      /** > 0: cannot breed yet. */
+      public int breedCd;
+      public boolean sheared;
+      /** Ticks until a sheared sheep has regrown its wool. */
+      public int woolTimer;
+
+      public boolean isBaby() {
+         return this.babyAge > 0;
+      }
 
       void setPos(double var1, double var3, double var5) {
          this.x = var1;
          this.y = var3;
          this.z = var5;
-         float var7 = Mobs.W[this.type] / 2.0F;
+         float var8 = this.babyAge > 0 ? 0.5F : 1.0F;
+         float var7 = Mobs.W[this.type] * var8 / 2.0F;
          this.bb[0] = this.x - var7;
          this.bb[1] = this.y;
          this.bb[2] = this.z - var7;
          this.bb[3] = this.x + var7;
-         this.bb[4] = this.y + Mobs.H[this.type];
+         this.bb[4] = this.y + Mobs.H[this.type] * var8;
          this.bb[5] = this.z + var7;
       }
    }

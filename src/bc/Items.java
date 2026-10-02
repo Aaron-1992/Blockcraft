@@ -37,7 +37,12 @@ public final class Items {
    public static final int HOE0 = 290;
    public static final int TOOL_BASE = 300;
    public static final int ARMOR_BASE = 320;
-   public static final int END = 336;
+   public static final int CARROT = 336;
+   public static final int POTATO = 337;
+   public static final int BAKED_POTATO = 338;
+   public static final int BONE_MEAL = 339;
+   public static final int SHEARS = 340;
+   public static final int END = 341;
    public static final int ITEM_TILE_BASE = 65;
    public static final int C_NONE = 0;
    public static final int C_PICK = 1;
@@ -87,6 +92,11 @@ public final class Items {
 
    public static boolean isHoe(int var0) {
       return var0 >= 290 && var0 < 295;
+   }
+
+   /** Items that are planted on farmland: wheat seeds, carrots, potatoes. Returns the block id of growth stage 0, or 0. */
+   public static int plantBlock(int var0) {
+      return var0 == 285 ? 124 : (var0 == 336 ? 142 : (var0 == 337 ? 150 : 0));
    }
 
    public static boolean isItem(int var0) {
@@ -285,6 +295,13 @@ public final class Items {
       maxStack[288] = 1;
       maxStack[289] = 1;
       maxDmg[288] = 64;
+      def(336, "Carrot", 149);
+      def(337, "Potato", 150);
+      def(338, "Baked Potato", 151);
+      def(339, "Bone Meal", 152);
+      def(340, "Shears", 153);
+      maxStack[340] = 1;
+      maxDmg[340] = 238;
 
       for (int var1 = 0; var1 < 5; var1++) {
          int var2 = 290 + var1;
@@ -305,6 +322,9 @@ public final class Items {
       food(278, 2, 1.2F);
       food(279, 6, 9.6F);
       food(280, 4, 0.8F);
+      food(336, 3, 3.6F);
+      food(337, 1, 0.6F);
+      food(338, 5, 6.0F);
 
       for (int var30 = 0; var30 < 5; var30++) {
          for (int var32 = 0; var32 < 4; var32++) {
