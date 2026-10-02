@@ -1,6 +1,7 @@
 name: Windows smoke test
 
-# Installs the game like a player would (3.5 base zip + the freshly built update pack) on a real Windows machine,
+# Installs the game like a player would (3.5 base zip + the update pack that is COMMITTED in releases/ - i.e. the exact
+# files the owner downloads) on a real Windows machine,
 # adds a software OpenGL (Mesa) because GitHub's Windows runners have no GPU, starts the real Blockcraft.exe through the
 # game's built-in test hooks and commits screenshots + logs to ci-results/windows/.
 # Trigger: push a change to ci/windows-trigger.txt (first line = comma separated scene names from tools/shots.py).
@@ -24,11 +25,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -36,8 +32,9 @@ jobs:
       - name: Install Pillow
         run: python -m pip install pillow
 
-      - name: Build the game and the update pack
-        run: python tools/build.py --patch
+      - name: Which release is being tested
+        shell: bash
+        run: ls -la releases/ && sha256sum releases/*.zip
 
       - name: Smoke test (real Blockcraft.exe, software OpenGL)
         continue-on-error: true

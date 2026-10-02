@@ -83,13 +83,23 @@ def run_scene(game_dir, name, props, timeout):
     home = os.path.join(os.path.expanduser("~"), ".blockcraft112")
     shutil.rmtree(home, ignore_errors=True)
     env = dict(os.environ)
-    env["JAVA_TOOL_OPTIONS"] = " ".join(props)
     env["GALLIUM_DRIVER"] = "llvmpipe"
     env["LP_NUM_THREADS"] = "2"
     env["MESA_GL_VERSION_OVERRIDE"] = "4.5COMPAT"
     exe = os.path.join(game_dir, "Blockcraft.exe")
+    opts = " ".join(props)
+    if len(opts) > 900:
+        # The Launch4j stub probes `java -version` and chokes on a huge "Picked up JAVA_TOOL_OPTIONS" line, so scenes with
+        # long properties start the bundled JRE directly, with the exe itself as the jar (it IS a jar with a stub in front).
+        cmd = [os.path.join(game_dir, "jre", "bin", "java.exe"), "-Xmx2G"] + props + ["-jar", exe]
+        how = "java.exe -jar Blockcraft.exe"
+    else:
+        cmd = [exe]
+        env["JAVA_TOOL_OPTIONS"] = opts
+        how = "Blockcraft.exe (Launch4j stub)"
+    log("%s: starting via %s" % (name, how))
     t0 = time.time()
-    p = subprocess.Popen([exe], env=env, cwd=game_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    p = subprocess.Popen(cmd, env=env, cwd=game_dir, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
         out, _ = p.communicate(timeout=timeout)
         status = "exit code %s" % p.returncode
