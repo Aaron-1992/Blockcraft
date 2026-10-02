@@ -18,6 +18,8 @@ public final class Options {
    public boolean fullscreen = false;
    public int lodDistance = 64;
    public boolean shaders = true;
+   /** Update 3.8: rain, snow, thunderstorms and storm clouds (off = fair-weather clouds only). */
+   public boolean weather = true;
    final File file;
 
    public Options(File var1) {
@@ -43,6 +45,7 @@ public final class Options {
                this.fullscreen = Boolean.parseBoolean(var2.getProperty("fullscreen", "false"));
                this.lodDistance = Integer.parseInt(var2.getProperty("lodDistance", "64"));
                this.shaders = Boolean.parseBoolean(var2.getProperty("shaders", "true"));
+               this.weather = Boolean.parseBoolean(var2.getProperty("weather", "true"));
             } catch (Throwable var5) {
                try {
                   var1.close();
@@ -73,6 +76,7 @@ public final class Options {
       var1.setProperty("fullscreen", this.fullscreen + "");
       var1.setProperty("lodDistance", this.lodDistance + "");
       var1.setProperty("shaders", this.shaders + "");
+      var1.setProperty("weather", this.weather + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

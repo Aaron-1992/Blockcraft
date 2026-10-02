@@ -18,3 +18,6 @@ gen seed=
 world seed=
 tick
 statics World.LOOT
+
+# ---- Update 3.8 (weather): the cloud shader was rewritten on purpose (weather field, storm clouds, lightning glow)
+statics ShaderSrc.CLOUD_FS

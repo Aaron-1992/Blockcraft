@@ -124,8 +124,12 @@ public final class Shaders {
    final float[] viewM = new float[16];
    final float[] invViewM = new float[16];
    boolean sceneActive;
-   public static final float CLOUD_Y0 = 168.0F;
-   public static final float CLOUD_Y1 = 216.0F;
+   /** The slab the cloud shader marches through: lowest storm base .. highest storm top (Update 3.8). */
+   public static final float CLOUD_Y0 = 140.0F;
+   public static final float CLOUD_Y1 = 330.0F;
+   /** Update 3.8: how much of the sun's direct light gets through the clouds (set by the renderer every frame). */
+   public float sunAtten = 1.0F;
+   int wnoiseTex;
 
    int compile(int var1, String var2) {
       int var3 = GL20.glCreateShader(var1);
@@ -175,6 +179,7 @@ public final class Shaders {
             this.pCloud = this.program(QUAD_VS, ShaderSrc.CLOUD_FS);
             this.pBlit = this.program(QUAD_VS, ShaderSrc.BLIT_FS);
             this.makeNoise();
+            this.makeWeatherNoise();
             this.cloudsOk = true;
          } catch (Throwable var2) {
             this.cloudsOk = false;
@@ -466,7 +471,7 @@ public final class Shaders {
       GL20.glUniform3f(this.loc(this.pWorld, "fogColor"), var11[0], var11[1], var11[2]);
       GL20.glUniform2f(this.loc(this.pWorld, "fogRange"), var9, var10);
       GL20.glUniform3f(this.loc(this.pWorld, "sunDir"), this.sunX, this.sunY, this.sunZ);
-      float var24 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F));
+      float var24 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
       this.sunUp = var24;
       this.u1f(this.pWorld, "sunUp", var24);
       this.u1f(this.pWorld, "dayF", var14);
@@ -529,7 +534,7 @@ public final class Shaders {
                float var11 = 1.0F - Math.max(0.0F, Math.min(1.0F, (var10 - 0.9F) / 1.0F));
                float var12 = Math.max(0.0F, Math.min(1.0F, (var3 - 0.01F) / 0.12F));
                float var13 = 1.0F - Math.max(0.0F, Math.min(1.0F, var3 * 4.0F));
-               this.rayAmt = 0.2F * var12 * var11 * (1.0F + 0.7F * var13);
+               this.rayAmt = 0.2F * var12 * var11 * (1.0F + 0.7F * var13) * this.sunAtten;
                if (this.rayAmt < 0.002F) {
                   this.rayAmt = 0.0F;
                } else {
@@ -677,7 +682,7 @@ public final class Shaders {
          GL20.glUniform3f(this.loc(this.pLod, "fogColor"), var10[0], var10[1], var10[2]);
          GL20.glUniform2f(this.loc(this.pLod, "fogRange"), var8, var9);
          GL20.glUniform3f(this.loc(this.pLod, "sunDir"), this.sunX, this.sunY, this.sunZ);
-         float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F));
+         float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
          this.u1f(this.pLod, "sunUp", var14);
          this.u1f(this.pLod, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
          GL20.glUniform3f(this.loc(this.pLod, "skyTop"), var11[0], var11[1], var11[2]);
@@ -775,6 +780,29 @@ public final class Shaders {
       GL11.glTexParameteri(3553, 10243, 10497);
    }
 
+   /** The two weather maps (R = layer A, G = layer B) the cloud shader reads; the CPU samples the same bytes. */
+   void makeWeatherNoise() {
+      int n = Weather.NS;
+      ByteBuffer buf = BufferUtils.createByteBuffer(n * n * 4);
+      for (int i = 0; i < n * n; i++) {
+         buf.put(Weather.MAP_A[i]).put(Weather.MAP_B[i]).put((byte)0).put((byte)-1);
+      }
+
+      buf.flip();
+      this.wnoiseTex = GL11.glGenTextures();
+      GL11.glBindTexture(3553, this.wnoiseTex);
+      GL11.glTexImage2D(3553, 0, 6408, n, n, 0, 6408, 5121, buf);
+      GL11.glTexParameteri(3553, 10241, 9729);
+      GL11.glTexParameteri(3553, 10240, 9729);
+      GL11.glTexParameteri(3553, 10242, 10497);
+      GL11.glTexParameteri(3553, 10243, 10497);
+   }
+
+   static double mod9000(double v) {
+      double m = v % 9000.0;
+      return m < 0 ? m + 9000.0 : m;
+   }
+
    void quadZ(float var1) {
       GL11.glBegin(7);
       GL11.glTexCoord2f(0.0F, 0.0F);
@@ -788,8 +816,10 @@ public final class Shaders {
       GL11.glEnd();
    }
 
-   public void renderClouds(float[] var1, float[] var2, double var3, double var5, double var7, float[] var9, float[] var10, float[] var11, int var12, int var13) {
-      if (this.cloudsOk && this.ok && this.sceneActive) {
+   public void renderClouds(
+      float[] var1, float[] var2, double var3, double var5, double var7, float[] var9, float[] var10, float[] var11, int var12, int var13, WeatherFx fx
+   ) {
+      if (this.cloudsOk && this.ok && this.sceneActive && fx.snap != null) {
          this.calcView(var2);
          float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F));
          float var15 = Math.max(0.0F, Math.min(1.0F, this.sunY * 3.0F));
@@ -824,20 +854,40 @@ public final class Shaders {
          this.u1i(this.pCloud, "depthTex", 1);
          GL20.glUniformMatrix4fv(this.loc(this.pCloud, "invView"), false, this.invViewM);
          GL20.glUniform2f(this.loc(this.pCloud, "projScale"), var1[0], var1[5]);
-         GL20.glUniform3f(this.loc(this.pCloud, "camPos"), (float)(var3 % 100000.0), (float)var5, (float)(var7 % 100000.0));
+         GL20.glUniform3f(this.loc(this.pCloud, "camPos"), (float)mod9000(var3), (float)var5, (float)mod9000(var7));
          this.u1f(this.pCloud, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
+         this.u1i(this.pCloud, "wnoise", 2);
+         Weather.Snap sn = fx.snap;
+         GL20.glUniform4f(this.loc(this.pCloud, "wOff"), (float)mod9000(sn.oax), (float)mod9000(sn.oaz), (float)mod9000(sn.obx), (float)mod9000(sn.obz));
+         GL20.glUniform4f(this.loc(this.pCloud, "wThr"), Weather.C0, Weather.C1, Weather.T0, Weather.T1);
+         GL20.glUniform4f(this.loc(this.pCloud, "wFx"), sn.bias, sn.lo, sn.hi, sn.amt);
+         float[] cells = new float[16];
+         for (int var30 = 0; var30 < sn.cells.length / 4; var30++) {
+            cells[var30 * 4] = (float)(sn.cells[var30 * 4] - var3);
+            cells[var30 * 4 + 1] = (float)(sn.cells[var30 * 4 + 1] - var7);
+            cells[var30 * 4 + 2] = sn.cells[var30 * 4 + 2];
+            cells[var30 * 4 + 3] = sn.cells[var30 * 4 + 3];
+         }
+
+         GL20.glUniform4fv(this.loc(this.pCloud, "wCells[0]"), cells);
+         GL20.glUniform4f(this.loc(this.pCloud, "wFlash"), fx.flashX - (float)var3, fx.flashY - (float)var5, fx.flashZ - (float)var7, fx.flashAmt);
+         GL20.glUniform3f(this.loc(this.pCloud, "wOnCap"), sn.on ? 1.0F : 0.0F, Weather.FAIR, sn.calmAmt);
          GL20.glUniform3f(this.loc(this.pCloud, "sunDir"), this.sunX, this.sunY, this.sunZ);
          GL20.glUniform3f(this.loc(this.pCloud, "sunCol"), var16 * var14, var17 * var14, var18 * var14);
          GL20.glUniform3f(this.loc(this.pCloud, "ambCol"), var20, var21, var22);
          GL20.glUniform3f(this.loc(this.pCloud, "fogCol"), var11[0], var11[1], var11[2]);
          GL20.glUniform2f(this.loc(this.pCloud, "zNF"), var23, var24);
-         GL20.glUniform2f(this.loc(this.pCloud, "cloudY"), 168.0F, 216.0F);
-         this.u1f(this.pCloud, "coverage", 0.56F);
+         GL20.glUniform2f(this.loc(this.pCloud, "cloudY"), CLOUD_Y0, CLOUD_Y1);
+         GL13.glActiveTexture(33986);
+         GL11.glBindTexture(3553, this.wnoiseTex);
          GL13.glActiveTexture(33985);
          GL11.glBindTexture(3553, this.sceneDepth);
          GL13.glActiveTexture(33984);
          GL11.glBindTexture(3553, this.noiseTex);
          this.quad();
+         GL13.glActiveTexture(33986);
+         GL11.glBindTexture(3553, 0);
+         GL13.glActiveTexture(33984);
          GL30.glBindFramebuffer(36160, this.sceneFbo);
          GL11.glViewport(0, 0, var12, var13);
          GL13.glActiveTexture(33985);
@@ -847,7 +897,7 @@ public final class Shaders {
          GL20.glUseProgram(this.pBlit);
          this.u1i(this.pBlit, "img", 0);
          GL11.glEnable(2929);
-         GL11.glDepthFunc(var5 > 166.0 ? 519 : 515);
+         GL11.glDepthFunc(519); // storm clouds can be in front of mountains and the camera can be inside them: composite everywhere
          GL11.glEnable(3042);
          GL11.glBlendFunc(1, 771);
          this.quadZ(0.99999F);

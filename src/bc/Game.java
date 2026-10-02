@@ -33,7 +33,9 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.7";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.8";
+   /** "3.8": the version without the words, for the title screen and the F3 screen. */
+   public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
    public Options opt;
    public World world;
    public Player player;
@@ -241,6 +243,45 @@ public final class Game {
       }
    }
 
+   /** Weather test hooks: bc.weather=clear|rain|thunder|cell:dx,dz,radius  bc.wtime=<weather ticks>  bc.biome=<biome id for all loaded chunks> */
+   void autoWeather() {
+      Weather w = this.world.weather;
+      w.natural();
+      w.calmUntil = 0L;
+      w.enabled = true;
+      String t = System.getProperty("bc.wtime");
+      if (t != null) {
+         w.ticks = Long.parseLong(t);
+      }
+
+      String m = System.getProperty("bc.weather");
+      if (m != null) {
+         if (m.equals("clear")) {
+            w.force(1, 99999L);
+            w.instant();
+         } else if (m.equals("rain")) {
+            w.force(2, 99999L);
+            w.instant();
+         } else if (m.equals("thunder")) {
+            w.force(3, 99999L);
+            w.instant();
+         } else if (m.equals("calm")) {
+            w.calm = true;
+         } else if (m.startsWith("cell:")) {
+            String[] c = m.substring(5).split(",");
+            w.calm = true;
+            w.placeStorm(this.player.x + Double.parseDouble(c[0]), this.player.z + Double.parseDouble(c[1]), Float.parseFloat(c[2]));
+         }
+      }
+
+      String biome = System.getProperty("bc.biome");
+      if (biome != null) {
+         for (Chunk c : this.world.chunks.values()) {
+            Arrays.fill(c.biome, (byte)Integer.parseInt(biome));
+         }
+      }
+   }
+
    void autoTest() {
       String var1 = System.getProperty("bc.title");
       if (var1 != null) {
@@ -275,6 +316,17 @@ public final class Game {
             if ("off".equals(System.getProperty("bc.fire"))) {
                this.world.fire.spread = false; // screenshots: fires neither burn out nor spread
             }
+
+            if (System.getProperty("bc.weather") != null || System.getProperty("bc.wtime") != null || System.getProperty("bc.biome") != null) {
+               this.autoWeather();
+            }
+         }
+
+         if (this.autoFrames >= Integer.getInteger("bc.shot", 100) - 4 && System.getProperty("bc.bolt") != null) {
+            // a fresh lightning bolt every frame so the screenshot catches the blinding first stroke
+            String[] b = System.getProperty("bc.bolt").split(",");
+            this.world.weather.bolts.clear();
+            this.world.weather.strike(this.player.x + Double.parseDouble(b[0]), this.player.z + Double.parseDouble(b[1]), false);
          }
 
          if (this.autoFrames == 12 && System.getProperty("bc.hold") != null) {
@@ -576,6 +628,7 @@ public final class Game {
       if (var1) {
          this.player.setMode(var3);
          this.world.dayTime = 1000L;
+         this.world.weather.startFair();
          int[] var16 = this.world.gen.findSpawn();
          this.spawnXZ = new int[]{var16[0], var16[2]};
          this.player.setPos(var16[0] + 0.5, 200.0, var16[2] + 0.5);
@@ -646,10 +699,12 @@ public final class Game {
    /** /firespread is saved with the world (level.properties) so a world where fire was switched off stays safe. */
    void storeFireSetting(Properties p) {
       p.setProperty("firespread", this.world.fire.spread + "");
+      this.world.weather.save(p);
    }
 
    void restoreFireSetting(Properties p) {
       this.world.fire.spread = !"false".equals(p.getProperty("firespread"));
+      this.world.weather.load(p);
    }
 
    static double d(Properties var0, String var1, double var2) {
@@ -1101,6 +1156,49 @@ public final class Game {
       this.chatTimes.add(System.currentTimeMillis());
    }
 
+   /** /weather [clear|rain|thunder [seconds]] [storm [distance]] [natural] [on|off] [info] */
+   void weatherCommand(String[] a) {
+      Weather w = this.world.weather;
+      String sub = a.length > 1 ? a[1].toLowerCase() : "info";
+      long secs = a.length > 2 ? Long.parseLong(a[2]) : 360L;
+      switch (sub) {
+         case "clear":
+            w.force(1, secs);
+            this.say("Weather: clearing up for " + secs + " s");
+            break;
+         case "rain":
+            w.force(2, secs);
+            this.say("Weather: rain for " + secs + " s");
+            break;
+         case "thunder":
+            w.force(3, a.length > 2 ? secs : 240L);
+            this.say("Weather: thunderstorm for " + (a.length > 2 ? secs : 240L) + " s");
+            break;
+         case "storm":
+            double dist = a.length > 2 ? Double.parseDouble(a[2]) : 900.0;
+            w.summonStorm(this.player.x, this.player.z, Math.max(0.0, dist));
+            this.say("A thunderstorm is brewing " + (int)dist + " blocks upwind and drifting your way");
+            break;
+         case "natural":
+         case "reset":
+            w.natural();
+            this.say("Weather: natural again");
+            break;
+         case "off":
+            w.enabled = false;
+            this.say("Weather is off (only fair-weather clouds)");
+            break;
+         case "on":
+            w.enabled = true;
+            this.say("Weather is on");
+            break;
+         default:
+            String near = w.nearestStorm(this.player.x, this.player.z);
+            this.say("Weather here: " + w.describe(this.player.x, this.player.z) + (near == null ? "; no thunderstorm in sight" : "; nearest thunderstorm: " + near));
+            this.say("/weather clear|rain|thunder [seconds]   /weather storm [distance]   /weather natural|on|off");
+      }
+   }
+
    void runCommand(String var1) {
       if (!var1.startsWith("/")) {
          this.say("<Player> " + var1);
@@ -1251,8 +1349,11 @@ public final class Game {
 
                   this.say("Fire spread is " + (this.world.fire.spread ? "on" : "off") + "  (/firespread on|off)");
                   break;
+               case "weather":
+                  this.weatherCommand(var2);
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread");
+                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
@@ -2063,6 +2164,38 @@ public final class Game {
       }
    }
 
+   /** Update 3.8: a droplet of rain bouncing off the ground (or a ring on water). */
+   void splashParticle(double x, double y, double z, boolean water) {
+      Game.Particle p = new Game.Particle();
+      p.x = (float)x;
+      p.y = (float)y;
+      p.z = (float)z;
+      p.u = 1.0F / 256.0F;
+      p.v = 65.0F / 256.0F;
+      p.shade = 1.0F;
+      if (water) {
+         p.vy = 0.0F;
+         p.grav = 0.0F;
+         p.size = 0.05F;
+         p.life = 5 + this.rnd.nextInt(3);
+         p.r = 0.78F;
+         p.g = 0.88F;
+         p.b = 1.0F;
+      } else {
+         p.vx = (this.rnd.nextFloat() - 0.5F) * 0.05F;
+         p.vz = (this.rnd.nextFloat() - 0.5F) * 0.05F;
+         p.vy = 0.07F + this.rnd.nextFloat() * 0.05F;
+         p.grav = 0.05F;
+         p.size = 0.025F + this.rnd.nextFloat() * 0.015F;
+         p.life = 4 + this.rnd.nextInt(3);
+         p.r = 0.7F;
+         p.g = 0.82F;
+         p.b = 1.0F;
+      }
+
+      this.particles.add(p);
+   }
+
    /** One spark (or a puff of smoke) of a fire or a burning creature. */
    void flameParticle(double x, double y, double z, boolean smoke) {
       Game.Particle p = new Game.Particle();
@@ -2463,10 +2596,10 @@ public final class Game {
       int var8 = Blocks.isBedHead(var4) ? var1 - var6 : var1;
       int var9 = Blocks.isBedHead(var4) ? var3 - var7 : var3;
       long var10 = this.world.dayTime % 24000L;
-      boolean var12 = var10 >= 12541L && var10 < 23459L;
+      boolean var12 = var10 >= 12541L && var10 < 23459L || this.world.weather.thunderingAt(this.player.x, this.player.z);
       if (!var12) {
          this.bedPos = new int[]{var8, var2, var9};
-         this.say("You can only sleep at night (respawn point set)");
+         this.say("You can only sleep at night or in a thunderstorm (respawn point set)");
       } else {
          for (Mob var14 : this.mobs.list) {
             if (!var14.dead && var14.type >= 4 && Math.abs(var14.x - var1) < 8.0 && Math.abs(var14.z - var3) < 8.0 && Math.abs(var14.y - var2) < 5.0) {
@@ -2477,6 +2610,8 @@ public final class Game {
 
          this.bedPos = new int[]{var8, var2, var9};
          this.world.dayTime = (this.world.dayTime / 24000L + 1L) * 24000L + 100L;
+         this.world.weather.natural(); // sleeping through the night clears the sky: fair weather for the next few minutes
+         this.world.weather.calmUntil = this.world.weather.ticks + 7200L;
          this.player.health = Math.max(this.player.health, Math.min(20, this.player.health + 4));
          this.say("Good morning! Respawn point set.");
       }
@@ -3013,7 +3148,7 @@ public final class Game {
       this.gui.text(var3, var1 - var5 / 2.0F, var2, -1118482, false, var4);
       this.gui.text(var3, var1 - var5 / 2.0F + 1.0F, var2 + 1.0F, -5197648, false, var4);
       this.gui.text(var3, var1 - var5 / 2.0F, var2, -1, false, var4);
-      this.gui.centered("JAVA EDITION  1.12  -  UPDATE 3.6", var1, var2 + 8.0F * var4 + 4.0F, -5592406, true, 1.0F);
+      this.gui.centered("JAVA EDITION  1.12  -  UPDATE " + VERSION_STR, var1, var2 + 8.0F * var4 + 4.0F, -5592406, true, 1.0F);
       GL11.glPushMatrix();
       GL11.glTranslatef(var1 + var5 / 2.0F - 20.0F, var2 + 8.0F * var4 + 4.0F, 0.0F);
       GL11.glRotatef(-20.0F, 0.0F, 0.0F, 1.0F);
@@ -3048,7 +3183,7 @@ public final class Game {
          this.setScreen(Game.S.OPTIONS);
       });
       this.button("Quit Game", var1 + 2.0F, var9 + 52.0F, 98.0F, var8, true, () -> GLFW.glfwSetWindowShouldClose(this.window, true));
-      this.gui.text("Update 3.6", 2.0F, this.gui.h - 10.0F, -1, true);
+      this.gui.text("Update " + VERSION_STR, 2.0F, this.gui.h - 10.0F, -1, true);
       String var10 = "Not affiliated with Mojang";
       this.gui.text(var10, this.gui.w - Gui.textWidth(var10) - 2.0F, this.gui.h - 10.0F, -1, true);
    }
@@ -3285,6 +3420,7 @@ public final class Game {
          this.opt.lodDistance = var6[(var2x + 1) % var6.length];
       });
       this.button("Shaders: " + this.onOff(this.opt.shaders), var3, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.shaders = !this.opt.shaders);
+      this.button("Weather: " + this.onOff(this.opt.weather), var4, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.weather = !this.opt.weather);
       this.button("Done", var1 - 100.0F, var2 + 148.0F, 200.0F, 20.0F, true, () -> {
          this.opt.save();
          this.setScreen(this.optionsReturn);
@@ -3481,7 +3617,7 @@ public final class Game {
       float var7 = ((this.player.yaw + 180.0F) % 360.0F + 360.0F) % 360.0F - 180.0F;
       long var8 = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576L;
       String[] var10 = new String[]{
-         "Blockcraft 1.12 Update 3.6",
+         "Blockcraft 1.12 Update " + VERSION_STR,
          this.fps + " fps, " + this.rend.visibleSections + " sections, " + this.rend.drawCalls + " draws",
          "C: " + (this.world == null ? 0 : this.world.chunks.size()) + " chunks loaded, mesh queue: " + this.rend.inflight.get(),
          "Mem: "
@@ -3504,6 +3640,8 @@ public final class Game {
          String.format("Facing: %s (%.1f / %.1f)", new Object[]{DIRS[var6], var7, this.player.pitch}),
          "Light: " + this.world.getSky(var1, var2, var3) + " sky, " + this.world.getBlk(var1, var2, var3) + " block",
          "Biome: " + var5,
+         "Weather: " + this.world.weather.describe(this.player.x, this.player.z)
+            + String.format("   cover %.2f rain %.2f storm %.2f   wet %.2f", new Object[]{this.rend.wfx.cover, this.rend.wfx.rain, this.rend.wfx.storm, this.world.weather.wet}),
          "Seed: " + this.world.seed + "   Time: " + this.world.dayTime % 24000L + "  Day " + this.world.dayTime / 24000L,
          this.target == null
             ? ""

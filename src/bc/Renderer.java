@@ -32,6 +32,8 @@ public final class Renderer {
    public double camZ;
    public Lod lod;
    public Shaders sh;
+   /** Update 3.8: weather rendering (clouds without shaders, rain, snow, lightning). */
+   public final WeatherFx wfx = new WeatherFx(this);
    int shFrames;
    final float[] proj = new float[16];
    final float[] mv = new float[16];
@@ -103,6 +105,7 @@ public final class Renderer {
 
    public void shutdown() {
       this.meshPool.shutdownNow();
+      this.wfx.dispose();
    }
 
    public void onUnload(Chunk var1) {
@@ -336,6 +339,35 @@ public final class Renderer {
          this.topG = lerp(this.topG, 0.35F, var7 * 0.12F);
          this.topB = lerp(this.topB, 0.55F, var7 * 0.12F);
       }
+
+      // Update 3.8 - weather: overcast skies are grey and dark, storms darker still, lightning lights everything up
+      this.wfx.updateLocal(var3);
+      float ov = this.wfx.overcast;
+      float st = this.wfx.storm;
+      if (ov > 0.001F) {
+         float k = Math.min(0.92F, ov * 0.92F);
+         float dk = 1.0F - 0.34F * st;
+         float lt = 0.3F * this.topR + 0.59F * this.topG + 0.11F * this.topB;
+         float lf = 0.3F * this.fogR + 0.59F * this.fogG + 0.11F * this.fogB;
+         this.topR = lerp(this.topR, lt * 0.66F * dk, k);
+         this.topG = lerp(this.topG, lt * 0.71F * dk, k);
+         this.topB = lerp(this.topB, lt * 0.80F * dk, k);
+         this.fogR = lerp(this.fogR, lf * 0.80F * dk, k);
+         this.fogG = lerp(this.fogG, lf * 0.84F * dk, k);
+         this.fogB = lerp(this.fogB, lf * 0.90F * dk, k);
+         this.skyLightFactor *= 1.0F - 0.32F * ov - 0.14F * st;
+      }
+
+      float fl = this.wfx.flash;
+      if (fl > 0.001F) {
+         this.topR = lerp(this.topR, 0.62F, fl * 0.55F);
+         this.topG = lerp(this.topG, 0.70F, fl * 0.55F);
+         this.topB = lerp(this.topB, 0.92F, fl * 0.55F);
+         this.fogR = lerp(this.fogR, 0.78F, fl * 0.5F);
+         this.fogG = lerp(this.fogG, 0.84F, fl * 0.5F);
+         this.fogB = lerp(this.fogB, 0.98F, fl * 0.5F);
+         this.skyLightFactor = lerp(this.skyLightFactor, 1.0F, fl * 0.7F);
+      }
    }
 
    void updateLightmap() {
@@ -487,6 +519,10 @@ public final class Renderer {
 
       var12 = var14;
       var11 = var14 * (var16 ? 0.4F : 0.55F);
+      // Update 3.8: rain and storms pull the haze in close
+      float wxFog = Math.min(1.0F, this.wfx.rain * 0.9F + this.wfx.storm * 0.1F);
+      var11 *= 1.0F - 0.55F * wxFog;
+      var12 *= 1.0F - 0.30F * wxFog;
       if (var6) {
          float var17 = 0.35F + 0.65F * this.daylight;
          var41 = 0.05F * var17;
@@ -517,7 +553,7 @@ public final class Renderer {
       }
 
       double var18 = 0.05;
-      double var20 = Math.max(400.0, var14 * 1.15 + 64.0);
+      double var20 = Math.max(this.g.opt.clouds || this.g.opt.weather ? 4200.0 : 400.0, var14 * 1.15 + 64.0);
       double var22 = var18 * Math.tan(Math.toRadians(var46) / 2.0);
       double var24 = var22 * var2 / var3;
       GL11.glMatrixMode(5889);
@@ -543,6 +579,7 @@ public final class Renderer {
       float[] var26 = new float[]{var41, var42, var43};
       float[] var27 = new float[]{this.topR, this.topG, this.topB};
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
+      this.sh.sunAtten = this.wfx.sunVis;
       if (var16 && !var6 && !var7) {
          GL11.glEnable(2929);
          GL11.glDepthMask(true);
@@ -564,6 +601,7 @@ public final class Renderer {
          }
       }
 
+      this.sh.sunAtten = this.wfx.sunVis;
       this.vis.clear();
       int var48 = (int)Math.floor(this.camX) >> 4;
       int var49 = (int)Math.floor(this.camZ) >> 4;
@@ -599,7 +637,7 @@ public final class Renderer {
          float var55 = (float)(-Math.sin(var52));
          float var58 = (float)Math.cos(var52);
          this.sh.setSun(var55, var58, 0.0F);
-         var51 = var58 > 0.08F && !var7 && this.caveF > 0.08F;
+         var51 = var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F;
          if (var51) {
             if (++this.shFrames >= 30 || this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ)) {
                this.shFrames = 0;
@@ -660,7 +698,7 @@ public final class Renderer {
       }
 
       if (this.g.opt.clouds && !var6 && !var7 && (!var50 || !this.sh.cloudsOk || !this.sh.sceneActive)) {
-         this.drawClouds(var1, var41, var42, var43);
+         this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
       }
 
       GL11.glEnable(3042);
@@ -696,7 +734,12 @@ public final class Renderer {
       GL11.glDisable(2912);
       GL11.glDepthMask(true);
       if (var50 && this.g.opt.clouds && !var6 && !var7 && this.sh.cloudsOk && this.sh.sceneActive) {
-         this.sh.renderClouds(this.proj, this.mv, this.camX, this.camY, this.camZ, var27, var28, var26, var2, var3);
+         this.sh.renderClouds(this.proj, this.mv, this.camX, this.camY, this.camZ, var27, var28, var26, var2, var3, this.wfx);
+      }
+
+      if (!var6 && !var7) {
+         // rain curtains in the distance, rain / snow around you, lightning
+         this.wfx.drawOverlays(var1, var41, var42, var43);
       }
    }
 
@@ -914,8 +957,24 @@ public final class Renderer {
             for (int var11 = 0; var11 < 2; var11++) {
                double var12 = Math.toRadians(var6[var7 + var11]);
                float var14 = var6[var7 + var11] <= 0.0 ? 0.0F : (float)Math.pow(Math.sin(var12), 0.6);
-               GL11.glColor3f(lerp(var1, this.topR, var14), lerp(var2, this.topG, var14), lerp(var3, this.topB, var14));
-               GL11.glVertex3d(Math.cos(var9) * Math.cos(var12) * var4, Math.sin(var12) * var4, Math.sin(var9) * Math.cos(var12) * var4);
+               double vx = Math.cos(var9) * Math.cos(var12);
+               double vy = Math.sin(var12);
+               double vz = Math.sin(var9) * Math.cos(var12);
+               float cr = lerp(var1, this.topR, var14);
+               float cg = lerp(var2, this.topG, var14);
+               float cb = lerp(var3, this.topB, var14);
+               float gl = this.wfx.gloom(vx, vy, vz);
+               if (gl > 0.002F) {
+                  // Update 3.8: the sky turns grey and dark in the direction of clouds and storms
+                  float lum = 0.3F * cr + 0.59F * cg + 0.11F * cb;
+                  float k = Math.min(0.85F, gl * 0.9F);
+                  cr = lerp(cr, lum * 0.62F, k);
+                  cg = lerp(cg, lum * 0.67F, k);
+                  cb = lerp(cb, lum * 0.76F, k);
+               }
+
+               GL11.glColor3f(cr, cg, cb);
+               GL11.glVertex3d(vx * var4, vy * var4, vz * var4);
             }
          }
 
@@ -929,7 +988,7 @@ public final class Renderer {
          GL11.glEnable(3042);
          GL11.glBlendFunc(770, 771);
          GL11.glPointSize(2.0F);
-         GL11.glColor4f(1.0F, 1.0F, 1.0F, var15 * var15 * 0.9F);
+         GL11.glColor4f(1.0F, 1.0F, 1.0F, var15 * var15 * 0.9F * (1.0F - 0.9F * this.wfx.overcast));
          GL11.glBegin(0);
 
          for (int var16 = 0; var16 < 700; var16++) {
@@ -944,7 +1003,8 @@ public final class Renderer {
       GL11.glEnable(3553);
       GL13.glActiveTexture(33984);
       GL11.glBindTexture(3553, Tex.sun);
-      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      float sv = 0.18F + 0.82F * this.wfx.sunVis;
+      GL11.glColor4f(sv, sv, sv, 1.0F);
       float var17 = 30.0F;
       float var19 = 100.0F;
       GL11.glBegin(7);

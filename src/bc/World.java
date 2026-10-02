@@ -41,6 +41,8 @@ public final class World {
    public final ArrayList<World.Falling> fallers = new ArrayList();
    /** Fire (Update 3.7): ages, spreading, burning out. */
    public final Fire fire = new Fire(this);
+   /** Update 3.8: weather field, rain, lightning. */
+   public final Weather weather;
    private final Random rnd = new Random();
    private final ExecutorService pool;
    private final ConcurrentLinkedQueue<Chunk> ready = new ConcurrentLinkedQueue();
@@ -70,6 +72,7 @@ public final class World {
    public World(long var1, File var3) {
       this.seed = var1;
       this.gen = new Gen(var1);
+      this.weather = new Weather(this);
       this.dir = var3;
       if (var3 != null) {
          var3.mkdirs();
@@ -722,6 +725,7 @@ public final class World {
       this.fallers.removeIf(var0 -> var0.dead);
       this.tickCrops();
       this.fire.tick();
+      this.weather.tick();
 
       for (World.Item var13 : this.items) {
          this.tickItem(var13);
@@ -910,7 +914,7 @@ public final class World {
          }
       }
 
-      return false;
+      return this.weather.rainingAt(x, y + 1, z); // Update 3.8: rain waters the fields
    }
 
    /**

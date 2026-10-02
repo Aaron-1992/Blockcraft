@@ -190,6 +190,12 @@ final class Fire {
       }
 
       int age = (int)st[0];
+      // Update 3.8: rain puts fires out (Minecraft: 20% + 3% per age step on every update)
+      if (w.weather.rainingAt(x, y, z) && this.rnd.nextFloat() < 0.2F + age * 0.03F) {
+         w.setBlock(x, y, z, 0);
+         return;
+      }
+
       if (age < 15) {
          age += this.rnd.nextInt(3) / 2;
          st[0] = age;

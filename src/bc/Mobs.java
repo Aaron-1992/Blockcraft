@@ -234,7 +234,11 @@ public final class Mobs {
       }
 
       if (!var1.dead) {
-         if ((var1.type == 4 || var1.type == 5) && var4 > 0.7 && !var1.inWater && var2.getSky(var5, (int)Math.floor(var1.y + 1.5), var6) >= 15) {
+         if ((var1.type == 4 || var1.type == 5)
+            && var4 > 0.7
+            && !var1.inWater
+            && var2.getSky(var5, (int)Math.floor(var1.y + 1.5), var6) >= 15
+            && !var2.weather.rainingAt(var5, (int)Math.floor(var1.y + 1.5), var6)) {
             var1.burn = 40;
          }
 
@@ -834,7 +838,7 @@ public final class Mobs {
    }
 
    void explode(Mobs.Mob var1) {
-      this.blast(var1.x, var1.y + 0.8, var1.z, 3, var1);
+      this.blast(var1.x, var1.y + 0.8, var1.z, var1.charged ? 6 : 3, var1);
       var1.dead = true;
       var1.deathTime = 20;
    }
@@ -1246,6 +1250,8 @@ public final class Mobs {
       public final double[] bb = new double[6];
       public int swell;
       public int pswell;
+      /** Update 3.8: a creeper that was struck by lightning explodes with twice the power and glows blue. */
+      public boolean charged;
       /** Ticks until this animal is grown up (0 = adult). Babies are half size and cannot breed. */
       public int babyAge;
       /** > 0: in love (was fed), looks for a partner of the same kind. */
