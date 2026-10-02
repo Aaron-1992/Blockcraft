@@ -275,6 +275,11 @@ public final class Game {
       }
 
       w.noLightning = "off".equals(System.getProperty("bc.lightning"));
+      this.autoBiome();
+   }
+
+   /** bc.biome=<id>: every loaded chunk gets this biome (re-applied while chunks are still loading in). */
+   void autoBiome() {
       String biome = System.getProperty("bc.biome");
       if (biome != null) {
          for (Chunk c : this.world.chunks.values()) {
@@ -321,6 +326,10 @@ public final class Game {
             if (System.getProperty("bc.weather") != null || System.getProperty("bc.wtime") != null || System.getProperty("bc.biome") != null) {
                this.autoWeather();
             }
+         }
+
+         if (this.autoFrames % 15 == 0 && System.getProperty("bc.biome") != null) {
+            this.autoBiome();
          }
 
          if (this.autoFrames >= Integer.getInteger("bc.shot", 100) - 4 && System.getProperty("bc.bolt") != null) {

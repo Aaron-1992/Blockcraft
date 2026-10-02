@@ -739,7 +739,7 @@ public final class Weather {
       b.z = z;
       int gy = this.surfaceY((int)Math.floor(x), (int)Math.floor(z));
       b.ground = gy + 1;
-      b.top = baseAlt(s.storm(x, z)) + 6.0;
+      b.top = baseAlt(s.storm(x, z)) + 16.0;
       b.life = 22;
       b.seg = boltGeometry(this.rnd.nextLong(), x, b.top, z, b.ground);
       Game g = this.world == null ? null : this.world.game;

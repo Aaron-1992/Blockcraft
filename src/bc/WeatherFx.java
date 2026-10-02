@@ -68,6 +68,7 @@ final class WeatherFx {
    int texWhite;
    int texRain;
    int texSnow;
+   int texSnowVeil;
    int texShaft;
    final int[] vboCloud = new int[2];
    int vboShaft;
@@ -136,7 +137,8 @@ final class WeatherFx {
             }
          }
       }
-      this.overcast = Math.min(1.0F, this.cover * 0.9F + this.storm * 0.1F);
+      // light cloud does not grey the sky: only real overcast does
+      this.overcast = Math.min(1.0F, Weather.smooth(0.40F, 1.0F, this.cover) * 0.95F + this.storm * 0.1F);
       // sun: look at the cloud cover where the line from the camera to the sun crosses the cloud layer
       double sa = this.r.sunAngle;
       double sx = -Math.sin(sa);
@@ -144,7 +146,7 @@ final class WeatherFx {
       if (sy > 0.04) {
          double d = Math.min(3000.0, Math.max(0.0, (Weather.BASE_FAIR - this.r.camY)) / sy);
          float c = this.snap.cover(x + sx * d, z);
-         this.sunVis = 1.0F - 0.92F * c;
+         this.sunVis = 1.0F - 0.92F * Weather.smooth(0.35F, 1.0F, c);
       } else {
          this.sunVis = 1.0F;
       }
@@ -177,7 +179,7 @@ final class WeatherFx {
          }
 
          this.snap.at(this.r.camX + dx * sc * f, this.r.camZ + dz * sc * f, this.tmp);
-         g = Math.max(g, this.tmp[0] * 0.45F + this.tmp[2] * 0.55F);
+         g = Math.max(g, Weather.smooth(0.45F, 1.0F, this.tmp[0]) * 0.45F + this.tmp[2] * 0.55F);
       }
 
       // strongest overhead, weaker at the horizon (the haze there is the fog colour)
@@ -194,7 +196,8 @@ final class WeatherFx {
       this.texWhite = Tex.upload(1, 1, new int[]{-1}, false, true);
       this.texRain = mip(Tex.upload(64, 128, streaks(64, 128, 12, 12, 40, 0.50F, 6001L), true, true));
       this.texShaft = mip(Tex.upload(64, 256, veil(64, 256, 30, 24, 90, 6002L), true, true));
-      this.texSnow = mip(Tex.upload(32, 32, flakes(32, 3, 6003L), true, true));
+      this.texSnow = mip(Tex.upload(32, 32, flakes(32, 5, 6003L), true, true));
+      this.texSnowVeil = mip(Tex.upload(64, 256, snowVeil(64, 256, 6004L), true, true));
    }
 
    static int mip(int tex) {
@@ -265,13 +268,53 @@ final class WeatherFx {
       return px;
    }
 
+   /** Snow seen from far away: a soft pale veil with slow vertical dapple and a few short soft blobs instead of rain streaks. */
+   static int[] snowVeil(int w, int h, long seed) {
+      Random rnd = new Random(seed);
+      float[] a = new float[w * h];
+      for (int i = 0; i < 70; i++) {
+         int x = rnd.nextInt(w);
+         int y = rnd.nextInt(h);
+         int len = 6 + rnd.nextInt(10);
+         float amp = 0.25F + 0.35F * rnd.nextFloat();
+         for (int k = 0; k < len; k++) {
+            float t = (float)k / len;
+            float prof = (float)Math.sin(Math.PI * t);
+            for (int d = -1; d <= 1; d++) {
+               float v = amp * prof * (d == 0 ? 1.0F : 0.4F);
+               int idx = ((y + k) % h) * w + (x + d + w) % w;
+               a[idx] = Math.max(a[idx], v);
+            }
+         }
+      }
+
+      float[] low = new float[w * 8];
+      for (int i = 0; i < low.length; i++) {
+         low[i] = rnd.nextFloat();
+      }
+
+      int[] px = new int[w * h];
+      for (int y = 0; y < h; y++) {
+         for (int x = 0; x < w; x++) {
+            float a0 = low[(y * 8 / h) * w + x];
+            float a1 = low[((y * 8 / h + 1) % 8) * w + x];
+            float f = y * 8.0F / h - (float)Math.floor(y * 8.0F / h);
+            float band = a0 + (a1 - a0) * f;
+            int al = Math.min(255, (int)((0.12F + 0.10F * band + a[y * w + x]) * 255.0F));
+            px[y * w + x] = al << 24 | 0xF4F8FF;
+         }
+      }
+
+      return px;
+   }
+
    static int[] flakes(int s, int count, long seed) {
       Random rnd = new Random(seed);
       float[] a = new float[s * s];
       for (int i = 0; i < count; i++) {
          float cx = rnd.nextInt(s) + 0.5F;
          float cy = rnd.nextInt(s) + 0.5F;
-         float rad = 1.2F + rnd.nextFloat() * 1.4F;
+         float rad = 1.7F + rnd.nextFloat() * 1.5F;
          for (int y = -3; y <= 3; y++) {
             for (int x = -3; x <= 3; x++) {
                float d = (float)Math.sqrt(x * x + y * y) / rad;
@@ -292,6 +335,32 @@ final class WeatherFx {
    }
 
    // ================================================================ cloud + shaft mesh (worker thread)
+   /** Vertex buffers are recycled: the cloud mesh is rebuilt every few seconds and direct buffers are only freed lazily by the GC. */
+   static final java.util.ArrayDeque<VB> POOL = new java.util.ArrayDeque<>();
+
+   static VB acquire() {
+      synchronized (POOL) {
+         VB v = POOL.pollFirst();
+         if (v != null) {
+            v.b.clear();
+            v.n = 0;
+            return v;
+         }
+      }
+
+      return new VB();
+   }
+
+   static void recycle(Result r) {
+      synchronized (POOL) {
+         for (VB v : new VB[]{r.cloud[0], r.cloud[1], r.shaft}) {
+            if (v != null && POOL.size() < 8) {
+               POOL.addFirst(v);
+            }
+         }
+      }
+   }
+
    static final class VB {
       ByteBuffer b = ByteBuffer.allocateDirect(1 << 20).order(ByteOrder.nativeOrder());
       int n;
@@ -408,6 +477,7 @@ final class WeatherFx {
       float[] bot = new float[n * n];
       float[] cov = new float[n * n];
       float[] stm = new float[n * n];
+      float[] rnn = new float[n * n];
       float[] thk = new float[n * n];
       float[] o3 = new float[4];
       for (int j = 0; j < n; j++) {
@@ -429,6 +499,7 @@ final class WeatherFx {
             float storm = o3[2];
             cov[idx] = cover;
             stm[idx] = storm;
+            rnn[idx] = o3[1];
             if (cover < 0.03F) {
                continue;
             }
@@ -466,7 +537,7 @@ final class WeatherFx {
          }
       }
 
-      VB cb = new VB();
+      VB cb = acquire();
       final float edgeR = RADS[1] * (float)CELLS[1];
       for (int j = 0; j < n; j++) {
          for (int i = 0; i < n; i++) {
@@ -481,7 +552,7 @@ final class WeatherFx {
             float x1 = x0 + cell;
             float z0 = j * cell;
             float z1 = z0 + cell;
-            float storm = stm[idx];
+            float storm = Math.max(stm[idx], 0.65F * rnn[idx]); // darkness: thunderheads and rain-bearing cloud are dark
             float cover = cov[idx];
             double cu = (ui0 + i + 0.5) * cell;
             double cv = (uj0 + j + 0.5) * cell;
@@ -497,11 +568,12 @@ final class WeatherFx {
             // fairly bright, the flanks and above all the bases of a thunderhead are dark.
             float lump = Weather.samp(NOISE_G, cu * (1.0 / 90.0) + 0.37, cv * (1.0 / 90.0) + 0.11);
             float a = 0.90F * fade;
-            float tc = (1.0F - 0.10F * cover) * (1.0F - 0.30F * storm) * (0.90F + 0.20F * lump);
+            float grey = Weather.smooth(0.45F, 1.0F, cover);
+            float tc = (1.0F - 0.22F * grey) * (1.0F - 0.30F * storm) * (0.90F + 0.20F * lump);
             int ct = rgba(tc, tc, tc * 1.02F, a);
-            float bc = (0.66F - 0.50F * storm) * (1.0F - 0.30F * cover * (1.0F - storm)) * (1.0F - 0.30F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
+            float bc = (0.66F - 0.50F * storm) * (1.0F - 0.30F * grey * (1.0F - storm)) * (1.0F - 0.30F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
             int cbm = rgba(bc, bc, bc * 1.06F, Math.min(1.0F, a * 1.05F));
-            float sideK = (0.84F - 0.50F * storm) * (1.0F - 0.12F * cover * (1.0F - storm)) * (0.92F + 0.16F * lump);
+            float sideK = (0.84F - 0.50F * storm) * (1.0F - 0.18F * grey * (1.0F - storm)) * (0.92F + 0.16F * lump);
             float grad = 0.30F + 0.40F * storm;
             // top and bottom
             cb.v(x0, t, z0, ct);
@@ -581,7 +653,7 @@ final class WeatherFx {
     * (64 blocks) near the camera and a coarse one (192 blocks) out to 3.6 km, so a storm on the horizon has its rain too.
     */
    static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res) {
-      VB vb = new VB();
+      VB vb = acquire();
       float[] o3 = new float[4];
       Weather wx = world == null ? null : world.weather;
       for (int level = 0; level < 2; level++) {
@@ -706,6 +778,7 @@ final class WeatherFx {
       Result done = this.ready.getAndSet(null);
       if (done != null) {
          this.upload(done);
+         recycle(done);
       }
 
       if (this.building) {
@@ -873,7 +946,7 @@ final class WeatherFx {
       GL11.glPushMatrix();
       GL11.glTranslated(this.builtOffXNow(sn) - this.r.camX, -this.r.camY, this.builtOffZNow(sn) - this.r.camZ);
       GL11.glEnable(3553);
-      GL11.glBindTexture(3553, this.texShaft);
+      GL11.glBindTexture(3553, this.snowy > 0.5F ? this.texSnowVeil : this.texShaft);
       GL11.glTexEnvi(8960, 8704, 8448);
       // unit 1: multiply with the light tint (previous * constant), alpha untouched
       GL13.glActiveTexture(33985);
@@ -1046,7 +1119,7 @@ final class WeatherFx {
             double mdx = b.x - cx;
             double mdz = b.z - cz;
             double dist = Math.sqrt(mdx * mdx + mdz * mdz) + 20.0;
-            float wscale = (float)Math.max(0.7, dist * 0.0042);
+            float wscale = (float)Math.max(0.8, dist * 0.0050);
             if (pass == 0) {
                GL11.glColor4f(0.45F, 0.58F, 1.0F, 0.30F * e);
             } else {

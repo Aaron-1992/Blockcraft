@@ -860,6 +860,7 @@ public final class Shaders {
          Weather.Snap sn = fx.snap;
          GL20.glUniform4f(this.loc(this.pCloud, "wOff"), (float)mod9000(sn.oax), (float)mod9000(sn.oaz), (float)mod9000(sn.obx), (float)mod9000(sn.obz));
          GL20.glUniform4f(this.loc(this.pCloud, "wThr"), Weather.C0, Weather.C1, Weather.T0, Weather.T1);
+         GL20.glUniform2f(this.loc(this.pCloud, "wRain"), Weather.R0, Weather.R1);
          GL20.glUniform4f(this.loc(this.pCloud, "wFx"), sn.bias, sn.lo, sn.hi, sn.amt);
          float[] cells = new float[16];
          for (int var30 = 0; var30 < sn.cells.length / 4; var30++) {
