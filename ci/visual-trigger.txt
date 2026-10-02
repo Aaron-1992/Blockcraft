@@ -1,1 +1,2 @@
-title,day-plain,mobs,farm,sheep36,pigs36,inv-creative-2,kitchen37,night37
+wx-fair,wx-storm,wx-rain,wx-overcast,wx-storm-sh
+jar=build
