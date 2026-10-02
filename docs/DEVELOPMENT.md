@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.6"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.7"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -40,7 +40,7 @@ python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-wind
 
 ```
 python3 tools/runtests.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation/meshing vs the ORIGINAL 3.5 jar
-python3 tools/runtests.py unit          # test/bc/GameTests.java: ~3,200 checks of the game logic, no GPU needed
+python3 tools/runtests.py unit          # test/bc/GameTests.java + Tests37.java: ~11,000 checks of the game logic, no GPU needed
 python3 tools/runtests.py               # both (this is what CI runs)
 ```
 
@@ -56,12 +56,19 @@ every procedural texture, every static table) for the old jar and for the freshl
 key by key. A value that changed on purpose must be listed in `test/equivalence-allowed.txt`; brand-new
 fingerprints are always accepted; anything else is a regression.
 
+`runtests.py equivalence` also runs a **strict pass**: with `-Dbc.noextras=true` (switches off the one worldgen addition since 3.5,
+`Gen.plantShoreAndPatches` = shore sugar cane + pumpkin patches) the `gen`, `world`, `tick` and `mesh terrain` fingerprints must be
+*identical* to the 3.5 jar - proof that the extras are purely additive and that nothing else in terrain generation changed. New
+worldgen features must keep working that way: use their own `Random` stream (never the shared chunk RNG) and put the whole pass behind
+`Gen.extras`. `Tests37.worldgen` additionally checks cell by cell that only cane / pumpkins were added, only into air.
+
 **What is NOT covered headless:** everything that calls OpenGL (`Renderer`, `Shaders`, `Gui` drawing, `MobRender`
 drawing, `Lod` upload). That is what the *Visual* workflow is for.
 
 ### Visual workflow (headless OpenGL on GitHub)
 
-Edit `ci/visual-trigger.txt` (first line = comma separated scene names from `tools/shots.py`, or `all`) and push:
+Edit `ci/visual-trigger.txt` (first line = comma separated scene names from `tools/shots.py`, or `all`; an optional second line
+`jar=build` tests the freshly built jar instead of the newest committed `releases/*-patch.zip`) and push:
 GitHub runs the real game under Xvfb with Mesa llvmpipe, the scenes use the game's own `-Dbc.*` hooks (below), and
 side-by-side JPEGs + `report.md` (with timings) are committed to `ci-results/shots/` on the same branch.
 Scenes marked *only new* run with the new jar only; the others also run the original 3.5 jar (`ref`) for an A/B picture.
@@ -81,7 +88,8 @@ instead (the exe is a jar with a stub in front). Both visual workflows test the 
 `-Dbc.auto=1` starts a world and exits after one screenshot (`~/.blockcraft112/screenshots`). Useful companions:
 `bc.seed`, `bc.mode`, `bc.rd` (render distance), `bc.lod`, `bc.shaders=false`, `bc.cam=x,y,z,yaw,pitch`, `bc.time`,
 `bc.shot=<frame>`, `bc.set=x,y,z,id;...` (place blocks at frame 70), `bc.summon=pig,baby:cow,sheared:sheep,...` (with `bc.summonDist`, `bc.summonDy` for close-ups),
-`bc.inv=creative|craft|player|furnace|chest` with `bc.page`, `bc.tnt=x,y,z`, `bc.kit`, `bc.hold=<id>`, `bc.title=<screen>`.
+`bc.inv=creative|craft|player|furnace|chest` with `bc.page`, `bc.tnt=x,y,z`, `bc.kit`, `bc.hold=<id>`, `bc.title=<screen>`,
+`bc.fire=off` (freezes fires: they neither spread nor burn out - for screenshots).
 
 ## How the source was recovered (2026-10-02)
 
@@ -98,18 +106,20 @@ The 3.5 source did not survive the move away from the first chat, so it was deco
 
 ## How to add content (what the code expects)
 
-**A block** (ids 159..255 are free; keep `Blocks.COUNT` = last id + 1, a block is ONE BYTE and has no metadata, so
+**A block** (ids 195..255 are free - 3.7 used 159-194; keep `Blocks.COUNT` = last id + 1, a block is ONE BYTE and has no metadata, so
 rotations/stages use consecutive ids):
 1. `Blocks`: constant + `def(id, name, hardness, opaque, tile)` in the static initialiser; then `kind[id]`
    (0 cube, 1 cross, 2 box, 3 fluid, 4 stair, 5 wall torch, 6 fence, 7 crop), `box`/`coll`, `drop`, `mineClass`/`needTool`,
    `faces(id, top, bottom, side)` for different tiles. Add it to `Blocks.creativeList()` if players should get it.
 2. Art: a function returning `int[256]` (ARGB, 16x16) in `TexExtra` and `Tex.blit(tile, pixels)` in `TexExtra.blocks()`.
-   The atlas is 16x16 tiles; tiles 0..218 are taken (3.6 uses 203 wet farmland, 204-207 carrots, 208-211 potatoes,
-   212-213 hay, 214-218 item icons 336-340). **Next free tile: 219.** Preview art with `bc.TexSheet`.
+   The atlas is 16x16 tiles; tiles 0..245 are taken (3.6 uses 203 wet farmland, 204-207 carrots, 208-211 potatoes,
+   212-213 hay, 214-218 item icons 336-340; 3.7 uses 219-245, all drawn in `TexArt37`: cane, bookshelf, pumpkin/melon faces,
+   4 stem groups, cake, the animated fire tile 235, item icons 236-245). **Next free tile: 246.** Preview art with
+   `bc.TexSheet out.png` (add `37` as 2nd argument for only the 3.7 art).
 3. Behaviour: `World.blockUpdate` (reacts to neighbour changes), `World.tickCrops` (random ticks within 32 blocks of the
    player), `Game.useBlock` (right-click), `Game.placeBlock`, `Game.breakBlock` / `Game.blockDrops`.
 
-**An item** (ids 341..399 free; the arrays in `Items` are sized 400): `Items.def(id, name, tileOffset)` (the atlas tile is
+**An item** (ids 351..399 free - 3.7 used 341-350; the arrays in `Items` are sized 400): `Items.def(id, name, tileOffset)` (the atlas tile is
 `65 + tileOffset`), `maxStack[]`, `maxDmg[]`, `food(id, hunger, saturation)`; icon in `TexExtra.newSprite` (range hook in
 `TexExtra.sprite`) - the registration loop in `TexExtra.blocks()` covers ids 256..399; recipes in `Recipes`
 (`shaped`, `shapeless`, `smelt`); right-click behaviour in `Game.useSpecial` (runs *before* eating and placing).
@@ -120,9 +130,14 @@ so old lines still load).
 
 ## Conventions / gotchas
 
-* Blocks are one **byte** per cell (IDs 0..255, `Blocks.COUNT` = 141 so far) and there is **no metadata**: rotated/staged
+* Blocks are one **byte** per cell (IDs 0..255, `Blocks.COUNT` = 195 so far) and there is **no metadata**: rotated/staged
   blocks use consecutive IDs (beds 133–140, wheat stages 124–131, ladders 119–122, doors 73–81, stairs 93–112 ...).
   Items live in the same id space as blocks below 256; non-block items start at 256.
+* **Fire** (`Fire.java`, one block id 194): blocks have no metadata, so the fire's age lives in `World.fire.cells`
+  (position -> {age, next update tick}); `World.setBlock` keeps it in sync and `World.updateChunks` refills it from chunk data
+  (`Fire.scanChunk`), so ages restart after a reload. The rules are Minecraft 1.12's `BlockFire` (see the class comment);
+  `World.fire.spread = false` (`/firespread off`) freezes everything. Other state that cannot live in a block (stem fruit
+  "attachment", cane age) is deliberately not modelled: stems always count as fully grown at stage 7, cane grows by random ticks.
 * World ticks run at 20 per second from `Game.update`; `World.tick()` does fluids, block updates, falling blocks/TNT,
   crops (only within 32 blocks of the player), items, furnaces.
 * Save data lives in `%USERPROFILE%\.blockcraft112` (worlds under `saves\`, options, `latest.log`, `crash.log`).

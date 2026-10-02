@@ -1069,6 +1069,61 @@ final class Tests37 {
          check(cow.burn >= 150, "lava sets creatures alight (" + cow.burn + ")");
       });
 
+      test("fire: a forest fire at the edge of the loaded world: no crash, nothing spreads into unloaded chunks, it dies down", () -> {
+         Game g = newGame(0);
+         g.world.fire.rnd.setSeed(21);
+         // a grove of logs with leaves on top, right at the east edge of the loaded area (chunks -2..2 -> x up to 47)
+         for (int x = 36; x <= 47; x++) {
+            for (int z = 36; z <= 47; z++) {
+               if ((x + z) % 3 == 0) {
+                  for (int y = 1; y <= 4; y++) {
+                     g.world.setBlock(x, GROUND + y, z, Blocks.LOG_OAK);
+                  }
+               }
+               for (int y = 5; y <= 6; y++) {
+                  g.world.setBlock(x, GROUND + y, z, Blocks.LEAVES_OAK);
+               }
+            }
+         }
+         check(g.world.fire.ignite(40, GROUND + 7, 40), "lit the canopy");
+         long start = System.nanoTime();
+         int peak = 0;
+         for (int i = 0; i < 12000 && (i < 200 || g.world.fire.count() > 0); i++) {
+            g.world.tick();
+            peak = Math.max(peak, g.world.fire.count());
+         }
+         long ms = (System.nanoTime() - start) / 1000000L;
+         check(peak >= 10, "a real forest fire: up to " + peak + " fires at once");
+         check(ms < 20000, "and it is cheap enough to simulate: 12000 ticks took " + ms + " ms");
+         eq(0, g.world.fire.count(), "the fire died down");
+         int leaves = count(g.world, 36, GROUND + 5, 36, 47, GROUND + 6, 47, Blocks.LEAVES_OAK);
+         check(leaves < 288 * 0.7, "most leaves burned (" + leaves + " of 288 left)");
+         eq(0, g.world.getBlock(48, GROUND + 5, 40) + g.world.getBlock(50, GROUND + 5, 40), "nothing exists beyond the loaded area");
+      });
+
+      test("fire: dropped items burn up in a fire; /firespread is saved with the world", () -> {
+         Game g = newGame(0);
+         g.world.fire.ignite(20, GROUND + 1, 20);
+         g.world.dropItem(20.5, GROUND + 1.2, 20.5, Blocks.PLANKS, 3);
+         g.world.dropItem(24.5, GROUND + 1.2, 20.5, Blocks.PLANKS, 3);
+         eq(6, countItems(g.world, Blocks.PLANKS), "two stacks lying around");
+         g.world.setBlock(20, GROUND + 1, 20, Blocks.FIRE); // (already burning)
+         tick(g.world, 3);
+         eq(3, countItems(g.world, Blocks.PLANKS), "the stack in the fire burned up, the other one is fine");
+         // level.properties round trip
+         java.util.Properties p = new java.util.Properties();
+         g.storeFireSetting(p);
+         eq("true", p.getProperty("firespread"), "stored: on");
+         g.runCommand("/firespread off");
+         g.storeFireSetting(p);
+         eq("false", p.getProperty("firespread"), "stored: off");
+         Game h = newGame(0);
+         h.restoreFireSetting(p);
+         check(!h.world.fire.spread, "a world saved with fire off loads with fire off");
+         h.restoreFireSetting(new java.util.Properties());
+         check(h.world.fire.spread, "worlds from older versions (no setting) have fire on, like Minecraft");
+      });
+
       test("fire: the visuals - 16 distinct animation frames with transparency, particles of a fire block", () -> {
          Set<Long> sums = new HashSet<>();
          for (int f = 0; f < 16; f++) {

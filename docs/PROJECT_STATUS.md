@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-02 (Update 3.6)._
+_Last updated: 2026-10-02 (Update 3.7)._
 
 ## What it is
 
@@ -9,7 +9,22 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.6 – "the farm update"
+## Current state: Update 3.7 – "the kitchen & fire update"
+
+- **Fire** (`Fire.java`, Minecraft 1.12 rules): flint & steel lights a fire on the clicked face; it ages, burns out on bare ground after
+  ~10-30 s, spreads to planks / logs / leaves / wool / bookshelves / hay / tall grass / flowers and consumes them, sets TNT off, and
+  lava lights nearby flammables. Player, animals and monsters burn (1 damage/s, water puts it out, cooked meat drops from burning
+  animals, flame overlay on screen, sparks and smoke particles). `/firespread on|off` is the safety switch (like gamerule doFireTick).
+- **Sugar cane** (shore worldgen, up to 3 high, grows by random ticks, needs water next to its ground), **sugar, paper, book,
+  bookshelf** (drops 3 books).
+- **Pumpkins and melons**: pumpkin patches in worldgen, seeds in dungeon chests, 8-stage stems that grow a fruit beside them (one at a
+  time, bone meal works), melon slices, **shears carve pumpkins**, **jack o'lantern** (light 15), pumpkin pie.
+- **Cake** (7 bites, 2 hunger per slice), **milk** (bucket on a cow; crafting returns the empty buckets), **eggs** (chickens lay them).
+- **Animals follow** a player holding their food.
+- Under the hood: 36 new block ids (159-194), items 341-350, atlas tiles 219-245, `TexArt37`, `Fire`, `Gen.plantShoreAndPatches`
+  (separate random stream - provably additive), 100+ new tests (`test/bc/Tests37.java`).
+
+## Update 3.6 (still in the game) – "the farm update"
 
 - **Farmland needs water.** Farmland with water within 4 blocks (same level or one higher) becomes *wet* (new darker block).
   Crops grow ~40 % faster on wet farmland than in 3.5 and ~40 % slower on dry farmland. Dry farmland with nothing planted
@@ -40,9 +55,10 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 |---|---|---|
 | The recovered source equals the shipped 3.5 jar | `tools/runtests.py equivalence`: 437 fingerprints (terrain of 4 seeds, threaded world + lighting, spawn search, 6000 collision trials, crafting, a 600-tick fluid/sand/TNT simulation, chunk meshing of terrain and of *every* block id, every old texture, every static table) | identical |
 | …including the OpenGL classes that cannot run headless | `tools/classcompare.py`: per-method comparison of what the original bytecode calls/reads/writes/loads vs the recompiled classes (718 methods) | 21 differences, all compiler codegen / dead code / a shared lambda |
-| Game logic of 3.5 *and* 3.6 | `test/bc/GameTests.java`: 3,536 checks on a real `Game`/`World`/`Player` without OpenGL: every recipe, hoe/seeds/growth/harvest rates, buckets, flint & steel + TNT blasts/chains/damage, ladders (placement, climbing, falling), beds (placement, sleeping rules, respawn), hydration, drying, trampling (also through real player physics), hay landing, carrots/potatoes/bone meal, shears, breeding, growing up, save/load, atlas tiles | all pass |
+| Game logic of 3.5, 3.6 *and* 3.7 | `test/bc/GameTests.java` + `Tests37.java`: 11,458 checks on a real `Game`/`World`/`Player` without OpenGL: every recipe, hoe/seeds/growth/harvest rates, buckets, flint & steel + TNT blasts/chains/damage, ladders (placement, climbing, falling), beds (placement, sleeping rules, respawn), hydration, drying, trampling (also through real player physics), hay landing, carrots/potatoes/bone meal, shears, breeding, growing up, save/load, atlas tiles; 3.7: cane rules/growth, stems/fruit, carving, cake, milk, eggs, following food, fire (ignite, age, spread, burn out, TNT, lava, water, `/firespread`, burning player and animals), shore/pumpkin worldgen, meshing of every new block | all pass |
 | Builds with a real JDK | GitHub Actions `CI` (javac, JDK 21) on every push | green |
 | Rendering (Linux, headless OpenGL) | GitHub Actions `Visual`: the real game under Xvfb + Mesa llvmpipe; the ORIGINAL 3.5 jar and the new jar render the same scenes (`ci-results/shots/*.jpg`, left = 3.5, right = new) | 7 scenes (world by day/night, mobs, inventory pages, ...) differ by 0.00 - 0.21 % of the pixels; the shader pack looks identical (its animated water/clouds make 9.6 % of the pixels differ) |
+| Terrain generation is unchanged by 3.7 | `runtests.py equivalence` strict pass: with the worldgen extras off (`-Dbc.noextras=true`) `gen`/`world`/`tick`/`mesh terrain` fingerprints are identical to the 3.5 jar | identical |
 | 3.6 content on screen | same workflow: farm field with all growth stages on wet and dry farmland, irrigation ditch, hay bales, baby animals, sheared sheep, creative inventory page with the new icons | renders correctly (`ci-results/shots/farm*.jpg`, `mobs36*.jpg`, `inv-creative-2.jpg`) |
 | **The real Windows build** | GitHub Actions `Windows smoke test`: a Windows Server machine installs the 3.5 base zip + the committed update pack exactly like a player (`tools/win_smoke.py`), Mesa software OpenGL next to `javaw.exe`, then starts the real `Blockcraft.exe` (Launch4j stub -> bundled JRE -> jar -> LWJGL Windows natives -> OpenGL) | title screen, world, farm scene, baby animals and inventory all start, render and exit cleanly (`ci-results/windows/`) |
 | A physical GPU / real hardware | - | never run. Software OpenGL is slow but behaves like the real thing for these features; GPU-driver quirks cannot be ruled out. |
@@ -52,8 +68,8 @@ exercised through the same code paths the mouse/keyboard use and **work as desig
 
 ## Known gaps / ideas
 
-- Not implemented: milk, eggs/egg throwing, mobs trampling crops, flint & steel lighting fires,
-  animals following their parents, villagers, weather, boats/minecarts, signs, fishing, enchanting…
+- Not implemented: egg throwing, mobs trampling crops, animals following their parents, rain (fire never gets rained out),
+  boats/minecarts, signs, fishing, enchanting, naturally generated melons (seeds come from dungeon chests), fire from lightning…
 - The sheep model has no separate "sheared" geometry: a sheared sheep is the same box tinted skin-pink with the head tuft hidden.
 - Hearts for breeding are plain red particles.
 

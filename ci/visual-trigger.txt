@@ -1,2 +1,1 @@
-kitchen37,night37,inv-creative-2,day-plain,farm
-jar=build
+title,day-plain,mobs,farm,sheep36,pigs36,inv-creative-2,kitchen37,night37

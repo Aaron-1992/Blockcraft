@@ -600,6 +600,7 @@ public final class Game {
          this.player.sat = (float)d(var4, "sat", 5.0);
          this.player.flying = Boolean.parseBoolean(var4.getProperty("flying", "false")) || var17 == 3;
          this.world.dayTime = (long)d(var4, "time", 1000.0);
+         this.restoreFireSetting(var4);
          this.spawnXZ = new int[]{(int)d(var4, "spawnx", 0.0), (int)d(var4, "spawnz", 0.0)};
          this.bedPos = var4.getProperty("bedy") == null ? null : new int[]{(int)d(var4, "bedx", 0.0), (int)d(var4, "bedy", 0.0), (int)d(var4, "bedz", 0.0)};
          this.sel = (int)d(var4, "sel", 0.0);
@@ -642,6 +643,15 @@ public final class Game {
       return var1.toString();
    }
 
+   /** /firespread is saved with the world (level.properties) so a world where fire was switched off stays safe. */
+   void storeFireSetting(Properties p) {
+      p.setProperty("firespread", this.world.fire.spread + "");
+   }
+
+   void restoreFireSetting(Properties p) {
+      this.world.fire.spread = !"false".equals(p.getProperty("firespread"));
+   }
+
    static double d(Properties var0, String var1, double var2) {
       try {
          return Double.parseDouble(var0.getProperty(var1, var2 + ""));
@@ -671,6 +681,7 @@ public final class Game {
          var1.setProperty("time", this.world.dayTime + "");
          var1.setProperty("spawnx", this.spawnXZ[0] + "");
          var1.setProperty("spawnz", this.spawnXZ[1] + "");
+         this.storeFireSetting(var1);
          if (this.bedPos != null) {
             var1.setProperty("bedx", this.bedPos[0] + "");
             var1.setProperty("bedy", this.bedPos[1] + "");
@@ -2066,9 +2077,9 @@ public final class Game {
       p.grav = -0.002F;
       if (smoke) {
          p.vy = 0.03F + this.rnd.nextFloat() * 0.02F;
-         p.size = 0.16F + this.rnd.nextFloat() * 0.1F;
+         p.size = 0.08F + this.rnd.nextFloat() * 0.06F;
          p.life = 22 + this.rnd.nextInt(14);
-         float g = 0.18F + this.rnd.nextFloat() * 0.15F;
+         float g = 0.22F + this.rnd.nextFloat() * 0.2F;
          p.r = g;
          p.g = g;
          p.b = g;

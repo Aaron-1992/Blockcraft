@@ -18,7 +18,7 @@ WHAT'S NEW IN UPDATE 3.7  (the kitchen & fire update)
     You, animals and monsters catch fire in a fire or in lava: 1 damage per second until it burns out or you jump into
     water (flames show on your screen). Animals that die while burning drop cooked meat.
     A house fire can ruin a base, so there is a switch:  /firespread off  freezes every fire (it neither spreads nor burns
-    out),  /firespread on  turns it back on. Creative players are immune.
+    out),  /firespread on  turns it back on (saved with the world). Creative players are immune.
   * SUGAR CANE grows by itself along shores: sand, grass or dirt with water next to it (new chunks only), up to 3 blocks
     high. Plant it yourself on such ground or on top of other cane; it pops off when its ground or water is gone and
     slowly grows while you are near. 1 cane -> 1 sugar; 3 canes in a row -> 3 PAPER; 3 paper + 1 leather -> BOOK;

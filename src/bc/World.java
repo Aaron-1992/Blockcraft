@@ -1274,8 +1274,8 @@ public final class World {
          int var3 = (int)Math.floor(var1.z);
          if (this.isLoaded(var2, var3)) {
             int var4 = this.getBlock(var2, (int)Math.floor(var1.y + 0.1), var3);
-            if (Blocks.isLava(var4)) {
-               var1.dead = true;
+            if (Blocks.isLava(var4) || Blocks.isFire(var4)) {
+               var1.dead = true; // items burn up in lava and in fire
             } else {
                if (Blocks.isWater(var4)) {
                   var1.vy = Math.min(var1.vy + 0.02, 0.1);

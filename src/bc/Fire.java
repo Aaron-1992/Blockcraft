@@ -335,7 +335,7 @@ final class Fire {
          double dz = World.uz(key) + 0.5 - g.player.z;
          if (dx * dx + dz * dz < 576.0) {
             if (this.rnd.nextInt(3) == 0) {
-               g.flameParticle(World.ux(key) + 0.2 + this.rnd.nextDouble() * 0.6, World.uy(key) + 0.4 + this.rnd.nextDouble() * 0.5, World.uz(key) + 0.2 + this.rnd.nextDouble() * 0.6, this.rnd.nextInt(3) == 0);
+               g.flameParticle(World.ux(key) + 0.2 + this.rnd.nextDouble() * 0.6, World.uy(key) + 0.4 + this.rnd.nextDouble() * 0.5, World.uz(key) + 0.2 + this.rnd.nextDouble() * 0.6, this.rnd.nextInt(4) == 0);
                if (++spawned >= 8) {
                   return;
                }

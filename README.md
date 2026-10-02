@@ -1,6 +1,6 @@
 # Blockcraft
 
-An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.6**
+An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.7**
 ("the farm update": wet/dry farmland, trampling, carrots, potatoes, bone meal, hay bales, shears, animal breeding).
 
 ## Download and play (the easy way)
@@ -34,6 +34,6 @@ See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) (build, tests, layout, how to a
 
 ```
 python3 tools/build.py --patch     # build the game and the small update pack  (finds/downloads a compiler by itself)
-python3 tools/runtests.py          # headless tests: ~3,500 game-logic checks + "unchanged vs 3.5" fingerprints
+python3 tools/runtests.py          # headless tests: ~11,000 game-logic checks + "unchanged vs 3.5" fingerprints
 python3 tools/make_release.py      # assemble the release files (full zip + patch + notes) into build/release/
 ```
