@@ -33,7 +33,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.6";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.7";
    public Options opt;
    public World world;
    public Player player;
@@ -270,6 +270,10 @@ public final class Game {
 
             if (System.getProperty("bc.debug") != null) {
                this.debug = true;
+            }
+
+            if ("off".equals(System.getProperty("bc.fire"))) {
+               this.world.fire.spread = false; // screenshots: fires neither burn out nor spread
             }
          }
 

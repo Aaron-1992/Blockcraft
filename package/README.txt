@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.6)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.7)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,41 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.7  (the kitchen & fire update)
+  * FIRE: right-click with Flint and Steel on the face you are pointing at to light a fire there (it needs a solid block
+    under it or something flammable next to it). It works like Minecraft 1.12's fire: it ages, burns out on its own on bare
+    ground after roughly 10-30 seconds, and spreads to planks, logs, leaves, wool, bookshelves, hay bales, tall grass and
+    flowers - what burns is gone for good (no drops). A fire next to TNT sets it off. Lava lights flammable blocks next to it
+    now and then. Fire gives light (level 15). Punch it or flood it with water to put it out; blocks can be placed into it.
+    You, animals and monsters catch fire in a fire or in lava: 1 damage per second until it burns out or you jump into
+    water (flames show on your screen). Animals that die while burning drop cooked meat.
+    A house fire can ruin a base, so there is a switch:  /firespread off  freezes every fire (it neither spreads nor burns
+    out),  /firespread on  turns it back on. Creative players are immune.
+  * SUGAR CANE grows by itself along shores: sand, grass or dirt with water next to it (new chunks only), up to 3 blocks
+    high. Plant it yourself on such ground or on top of other cane; it pops off when its ground or water is gone and
+    slowly grows while you are near. 1 cane -> 1 sugar; 3 canes in a row -> 3 PAPER; 3 paper + 1 leather -> BOOK;
+    6 planks + 3 books -> BOOKSHELF (drops 3 books, burns).
+  * PUMPKINS and MELONS: pumpkin patches now appear on grassland (new chunks only); dungeon chests can hold pumpkin and melon
+    seeds. 1 pumpkin -> 4 pumpkin seeds, 1 melon slice -> 1 melon seed. Plant seeds on farmland: the stem grows through 8
+    stages and then puts a fruit on a free grass/dirt/farmland spot beside it - one at a time, harvest it and it makes
+    another. Bone meal works on stems. A melon drops 3-7 slices (1 hunger each; 9 slices -> melon block).
+    Right-click a pumpkin with SHEARS to carve a face into it (4 seeds drop). Carved pumpkin with a torch under it
+    -> JACK O'LANTERN (light 15). Carved pumpkins and lanterns are placed facing you.
+    PUMPKIN PIE = pumpkin + sugar + egg (4 hunger).
+  * CAKE: 3 milk buckets, 2 sugar, 1 egg, 3 wheat (MMM / SES / WWW). Place it on solid ground; right-click it to eat a
+    slice (1 hunger, and only when you are hungry); 7 slices, then it is gone.
+  * MILK: right-click a grown-up cow with an empty bucket. Milk is only an ingredient (the cake gives you the empty
+    buckets back). EGGS: every grown-up chicken lays one about every 5-10 minutes.
+  * ANIMALS FOLLOW FOOD: hold wheat (cows, sheep), carrots or potatoes (pigs) or seeds (chickens) and the animals that
+    like it within 9 blocks walk over to you.
+  * All new blocks and items are in the creative inventory (page 2); /give pumpkin, /give cake ... also work.
+  * Honest note: all the rules above are covered by automated tests (11,000+ checks) and the terrain / lighting / physics /
+    crafting code that was not meant to change is proven identical to Update 3.5 (with the new shore cane and pumpkin patches
+    switched off, a generated world is bit-for-bit the 3.5 world). The textures, the fire animation and the flame screen
+    effect were only checked as pictures and in automated screenshots on a software renderer - the game itself has still
+    not been played on real Windows hardware.
+    Not in this update: rain/weather, boats, fishing, throwing eggs, melons and pumpkins generating naturally in jungles.
 
 WHAT'S NEW IN UPDATE 3.6  (the farm update)
   * FARMLAND NEEDS WATER: farmland with water within 4 blocks (on its level or one higher) turns dark and "wet".

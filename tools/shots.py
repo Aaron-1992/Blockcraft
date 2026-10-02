@@ -60,6 +60,57 @@ def farm_blocks():
     return out
 
 
+def kitchen_blocks():
+    """Update 3.7 showcase on the flat strip: stems in 8 stages + fruit, cake (7 bites), carved pumpkins and
+    jack o'lanterns (4 facings), bookshelves, sugar cane beside water, and fires on wood / grass."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 5):
+                out.append((x, y, z, 0))
+    for z in (73, 74):
+        out.append((137, gy, z, 50))                    # water west of the stems keeps the farmland wet
+    for i in range(8):
+        x = 138 + i
+        out.append((x, gy, 73, 141))
+        out.append((x, gy + 1, 73, 171 + i))            # pumpkin stems, stage 0..7
+        out.append((x, gy, 74, 141))
+        out.append((x, gy + 1, 74, 179 + i))            # melon stems, stage 0..7
+    for x, z, b in ((146, 73, 161), (147, 73, 161), (146, 74, 170), (147, 74, 170), (148, 74, 170)):
+        out.append((x, gy + 1, z, b))                   # fruit next to the stems
+    for i in range(7):
+        out.append((138 + i, gy + 1, 75, 187 + i))      # cake: whole ... one slice left
+    out.append((146, gy + 1, 75, 161))
+    for i in range(4):
+        out.append((138 + i, gy + 1, 76, 162 + i))      # carved pumpkins, face on N / S / E / W
+        out.append((143 + i, gy + 1, 76, 166 + i))      # jack o'lanterns
+    for x in (148, 149):
+        for y in (gy + 1, gy + 2):
+            out.append((x, y, 76, 160))                 # bookshelves
+    out.append((140, gy, 77, 50))                       # water: the cane next to it may stand
+    out.append((144, gy, 77, 50))
+    for y in (gy + 1, gy + 2, gy + 3):
+        out.append((139, y, 77, 159))
+    for y in (gy + 1, gy + 2):
+        out.append((141, y, 77, 159))
+    out.append((143, gy + 1, 77, 159))
+    out.append((145, gy + 1, 77, 159))
+    out.append((147, gy + 1, 77, 170))
+    out.append((148, gy + 1, 77, 161))
+    out.append((139, gy + 1, 78, 5))                    # fire on planks / bookshelf / wool / bare grass
+    out.append((139, gy + 2, 78, 194))
+    out.append((141, gy + 1, 78, 194))
+    out.append((143, gy + 1, 78, 34))
+    out.append((143, gy + 2, 78, 194))
+    out.append((144, gy + 1, 78, 194))
+    out.append((146, gy + 1, 78, 160))
+    out.append((146, gy + 2, 78, 194))
+    out.append((147, gy + 1, 78, 5))
+    out.append((148, gy + 1, 78, 194))
+    return out
+
+
 # name -> (props, only_new)
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
@@ -72,6 +123,8 @@ SCENES = {
     "sheep36":        (COMMON + ["-Dbc.cam=140,65.5,60,0,22", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=sheep,sheared:sheep,baby:sheep", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.3", "-Dbc.shot=100"], True),
     "pigs36":         (COMMON + ["-Dbc.cam=140,65.5,60,0,22", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=baby:pig,pig,baby:cow,cow", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.3", "-Dbc.shot=100"], True),
     "inv-creative-2": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=1", "-Dbc.shot=110"], True),
+    "kitchen37":      (COMMON + ["-Dbc.cam=143.5,72.5,69.0,0,40", "-Dbc.time=6000"] + PLAIN + [sets(kitchen_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
+    "night37":        (COMMON + ["-Dbc.cam=145.5,70.0,71.0,0,34", "-Dbc.time=18000"] + PLAIN + [sets(kitchen_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
@@ -136,6 +189,8 @@ def composite(paths, labels, out):
 
 def release_jar():
     """The blockcraft.jar inside the newest committed update pack (the exact artifact players get), if there is one."""
+    if os.environ.get("BC_NEW_JAR") == "build":
+        return None  # test the freshly built jar instead (ci/visual-trigger.txt, line 2: jar=build)
     packs = sorted(glob.glob(os.path.join(ROOT, "releases", "Blockcraft-UPDATE*-patch.zip")))
     if not packs:
         return None

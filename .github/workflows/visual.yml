@@ -50,6 +50,8 @@ jobs:
           if [ -z "$SCENES" ]; then SCENES="$(head -n1 ci/visual-trigger.txt | tr -d '[:space:]')"; fi
           case "$SCENES" in ''|*[!a-z0-9,-]*|[0-9]*) SCENES=all;; esac
           echo "scenes: $SCENES"
+          # line 2 of ci/visual-trigger.txt = "jar=build": test the freshly built jar instead of the newest committed update pack
+          if sed -n 2p ci/visual-trigger.txt | grep -q '^jar=build'; then export BC_NEW_JAR=build; echo "using the freshly built jar"; fi
           timeout 33m python3 tools/shots.py --scenes "$SCENES" 2>&1 | tee build/shots.log
 
       - name: Output (readable through the check-run API)
