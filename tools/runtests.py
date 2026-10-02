@@ -2,9 +2,9 @@
 """
 Runs the headless tests (no GPU / display needed).
 
-    python3 tools/test.py equivalence   fingerprint the logic code and compare with the ORIGINAL Update 3.5 jar
-    python3 tools/test.py unit          game-logic tests (crafting, farming, ladders, buckets, TNT, beds, ...)
-    python3 tools/test.py               both
+    python3 tools/runtests.py equivalence   fingerprint the logic code and compare with the ORIGINAL Update 3.5 jar
+    python3 tools/runtests.py unit          game-logic tests (crafting, farming, ladders, buckets, TNT, beds, ...)
+    python3 tools/runtests.py               both
 
 `equivalence` only makes sense for code that was NOT intentionally changed since 3.5; once a feature changes
 behaviour on purpose, the fingerprints of the touched parts are expected to differ (see docs/DEVELOPMENT.md).

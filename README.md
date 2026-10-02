@@ -10,5 +10,5 @@ An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL
 
 ```
 python3 tools/build.py --patch     # build the game and the small update pack
-python3 tools/test.py              # headless tests
+python3 tools/runtests.py              # headless tests
 ```

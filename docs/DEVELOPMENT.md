@@ -38,8 +38,8 @@ python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-wind
 ## Tests
 
 ```
-python3 tools/test.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation vs the ORIGINAL 3.5 jar
-python3 tools/test.py unit          # game-logic tests (test/bc/GameTests.java)
+python3 tools/runtests.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation vs the ORIGINAL 3.5 jar
+python3 tools/runtests.py unit          # game-logic tests (test/bc/GameTests.java)
 ```
 
 `Equivalence` was how the recovered source was proven faithful: 224 fingerprint lines (4 seeds of terrain,

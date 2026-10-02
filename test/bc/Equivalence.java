@@ -2,6 +2,8 @@ package bc;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -10,7 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
+import java.nio.FloatBuffer;
 import java.util.zip.CRC32;
+import org.lwjgl.system.MemoryUtil;
 
 /**
  * Deterministic "fingerprint" of the game's pure-logic subsystems (no OpenGL needed).
@@ -118,7 +122,7 @@ public final class Equivalence {
 
    // ---------- 1. static tables ----------
    static void statics() throws Exception {
-      String[] names = {"Blocks", "Items", "Recipes", "Mobs", "Structs", "Phys", "Gen", "Chunk", "World", "Noise", "Player", "Stack", "TileEntity", "TexExtra"};
+      String[] names = {"Blocks", "Items", "Recipes", "Mobs", "Structs", "Phys", "Gen", "Chunk", "World", "Noise", "Player", "Stack", "TileEntity", "TexExtra", "ShaderSrc"};
       for (String n : names) {
          Class<?> c;
          try {
@@ -371,8 +375,211 @@ public final class Equivalence {
       p("tick region=" + hex(acc) + " items=" + w.items.size() + " fallers=" + w.fallers.size() + " tick=" + w.tickCount);
    }
 
+
+   // ---------- 7. CPU-side texture / text / icon generators (no GL involved) ----------
+   static final String[] PURE = {
+      "Tex:t", "Tex:argb", "Tex:clamp", "Tex:rgb", "TexExtra:", "Gui:textWidth", "Gui:stripCodes", "Gui:isEdge", "Gui:tintFor",
+      "Gui:iconBoxes", "Gui:sx", "Gui:sy", "Lod:hash", "Lod:pack", "Lod:code", "Lod:shade", "Lod:spR", "MobRender:hash",
+      "MobRender:vnoise", "MobRender:mul", "MobRender:lerpAngle", "Mesher:lu", "Mesher:ci", "Gen:clamp", "Gen:smooth"
+   };
+
+   static boolean wanted(String cls, String name) {
+      for (String w : PURE) {
+         int i = w.indexOf(':');
+         if (w.substring(0, i).equals(cls) && name.startsWith(w.substring(i + 1))) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   static Object[] sampleArgs(Class<?>[] pt, int trial) {
+      int[] ints = trial == 0 ? new int[]{16, 8, 3, 1, 2, 5, 9, 12, 4, 6} : trial == 1 ? new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9} : new int[]{255, 17, 33, 64, 101, 7, 250, 31, 90, 14};
+      int ii = 0;
+      Object[] a = new Object[pt.length];
+      for (int i = 0; i < pt.length; i++) {
+         Class<?> t = pt[i];
+         if (t == int.class) {
+            a[i] = ints[ii++ % ints.length];
+         } else if (t == long.class) {
+            a[i] = 1234567L + trial;
+         } else if (t == float.class) {
+            a[i] = 0.25F + trial * 0.37F;
+         } else if (t == double.class) {
+            a[i] = 0.5 + trial * 1.3;
+         } else if (t == boolean.class) {
+            a[i] = trial % 2 == 0;
+         } else if (t == String.class) {
+            a[i] = trial == 0 ? "Hello \u00a7cWorld \u00a7l!" : trial == 1 ? "" : "The quick brown fox 0123456789";
+         } else if (t == int[].class) {
+            a[i] = new int[]{0xFF336699, 0xFF99AA33, 0xFFAA3366, 0xFF223344};
+         } else {
+            return null;
+         }
+      }
+      return a;
+   }
+
+   static void tex() throws Exception {
+      for (String cn : new String[]{"Tex", "TexExtra", "Gui", "Lod", "MobRender", "Mesher", "Gen"}) {
+         Class<?> c = Class.forName("bc." + cn);
+         Method[] ms = c.getDeclaredMethods();
+         Arrays.sort(ms, (x, y) -> (x.getName() + x.toGenericString()).compareTo(y.getName() + y.toGenericString()));
+         for (Method m : ms) {
+            if (!Modifier.isStatic(m.getModifiers()) || m.isSynthetic() || !wanted(cn, m.getName())) {
+               continue;
+            }
+            for (int trial = 0; trial < 3; trial++) {
+               Object[] args = sampleArgs(m.getParameterTypes(), trial);
+               if (args == null) {
+                  continue;
+               }
+               m.setAccessible(true);
+               String label = "tex " + cn + "." + m.getName() + Arrays.toString(m.getParameterTypes()).replace("class ", "") + "#" + trial;
+               try {
+                  p(label + " = " + hex(h(m.invoke(null, args))));
+               } catch (InvocationTargetException e) {
+                  p(label + " threw " + e.getCause().getClass().getSimpleName());
+               }
+            }
+         }
+      }
+      // sprites for every item id, and the full block tile builders
+      long acc = 0;
+      for (int id = 0; id < 520; id++) {
+         try {
+            acc = mix(acc, h(TexExtra.sprite(id)));
+         } catch (Throwable t) {
+            acc = mix(acc, t.getClass().getSimpleName().hashCode());
+         }
+      }
+      p("tex sprites 0..519 = " + hex(acc));
+      acc = 0;
+      for (int id = 0; id < 520; id++) {
+         try {
+            acc = mix(acc, h(Gui.iconBoxes(id)));
+         } catch (Throwable t) {
+            acc = mix(acc, t.getClass().getSimpleName().hashCode());
+         }
+      }
+      p("tex iconBoxes 0..519 = " + hex(acc));
+      try {
+         MobRender.build();
+         long mr = 0;
+         for (Field f : MobRender.class.getDeclaredFields()) {
+            if (Modifier.isStatic(f.getModifiers()) && !f.isSynthetic()) {
+               f.setAccessible(true);
+               mr = mix(mr, mix(f.getName().hashCode(), h(f.get(null))));
+            }
+         }
+         p("tex MobRender.build statics = " + hex(mr));
+      } catch (Throwable t) {
+         p("tex MobRender.build threw " + t.getClass().getSimpleName());
+      }
+   }
+
+   // ---------- 8. chunk meshing (vertex data) ----------
+   static long floats(FloatBuffer fb) {
+      if (fb == null) {
+         return 0;
+      }
+      long r = 31;
+      FloatBuffer d = fb.duplicate();
+      while (d.hasRemaining()) {
+         r = mix(r, Float.floatToRawIntBits(d.get()));
+      }
+      return mix(r, fb.limit());
+   }
+
+   static void mesh() throws Exception {
+      // (a) natural terrain
+      World w = newWorld(12345);
+      load(w, 0, 0, 3);
+      long acc = 0;
+      int verts = 0;
+      for (int cz = -1; cz <= 1; cz++) {
+         for (int cx = -1; cx <= 1; cx++) {
+            Chunk c = w.chunk(cx, cz);
+            for (int sy = 0; sy < 16; sy++) {
+               for (int flag = 0; flag < 2; flag++) {
+                  Mesher.Result r = Mesher.build(w, c, sy, flag == 1);
+                  acc = mix(acc, mix(floats(r.opaque), floats(r.trans)));
+                  acc = mix(acc, mix(r.nO, r.nT));
+                  verts += r.nO + r.nT;
+                  if (r.opaque != null) {
+                     MemoryUtil.memFree(r.opaque);
+                  }
+                  if (r.trans != null) {
+                     MemoryUtil.memFree(r.trans);
+                  }
+               }
+            }
+         }
+      }
+      p("mesh terrain verts=" + verts + " acc=" + hex(acc));
+      // (b) showcase: every block id once, on a stone floor, in 4 chunks
+      World s = newWorld(1);
+      for (int cz = -1; cz <= 2; cz++) {
+         for (int cx = -1; cx <= 2; cx++) {
+            Chunk c = new Chunk(cx, cz);
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  c.set(x, 0, z, Blocks.BEDROCK);
+                  for (int y = 1; y < 60; y++) {
+                     c.set(x, y, z, Blocks.STONE);
+                  }
+               }
+            }
+            if (cx >= 0 && cx <= 1 && cz >= 0 && cz <= 1) {
+               int base = 1 + (cz * 2 + cx) * 35;
+               for (int k = 0; k < 35; k++) {
+                  int id = base + k;
+                  if (id < Blocks.COUNT) {
+                     c.set(1 + (k % 7) * 2, 60, 1 + (k / 7) * 3, id);
+                  }
+               }
+               // some neighbours so fences/stairs/water/crops link and light
+               c.set(2, 60, 14, Blocks.FENCE);
+               c.set(3, 60, 14, Blocks.FENCE);
+               c.set(3, 61, 14, Blocks.TORCH);
+               c.set(5, 60, 14, Blocks.WATER);
+               c.set(6, 60, 14, Blocks.WATER);
+               c.set(6, 61, 14, Blocks.WATER);
+            }
+            c.computeHeightmap();
+            s.chunks.put(World.key(cx, cz), c);
+         }
+      }
+      for (Chunk c : new ArrayList<>(s.chunks.values())) {
+         s.lightChunk(c);
+      }
+      acc = 0;
+      verts = 0;
+      for (int cz = 0; cz <= 1; cz++) {
+         for (int cx = 0; cx <= 1; cx++) {
+            Chunk c = s.chunk(cx, cz);
+            for (int sy = 3; sy <= 4; sy++) {
+               for (int flag = 0; flag < 2; flag++) {
+                  Mesher.Result r = Mesher.build(s, c, sy, flag == 1);
+                  long v = mix(floats(r.opaque), floats(r.trans));
+                  acc = mix(acc, v);
+                  verts += r.nO + r.nT;
+                  p("mesh showcase chunk " + cx + "," + cz + " sec " + sy + " flag " + flag + " nO=" + r.nO + " nT=" + r.nT + " = " + hex(v));
+                  if (r.opaque != null) {
+                     MemoryUtil.memFree(r.opaque);
+                  }
+                  if (r.trans != null) {
+                     MemoryUtil.memFree(r.trans);
+                  }
+               }
+            }
+         }
+      }
+      p("mesh showcase verts=" + verts + " acc=" + hex(acc));
+   }
+
    public static void main(String[] args) throws Exception {
-      List<String> sections = args.length == 0 ? List.of("statics", "gen", "world", "phys", "recipes", "tick") : List.of(args);
+      List<String> sections = args.length == 0 ? List.of("statics", "gen", "world", "phys", "recipes", "tick", "tex", "mesh") : List.of(args);
       for (String s : sections) {
          switch (s) {
             case "statics" -> statics();
@@ -381,6 +588,8 @@ public final class Equivalence {
             case "phys" -> phys();
             case "recipes" -> recipes();
             case "tick" -> tick();
+            case "tex" -> tex();
+            case "mesh" -> mesh();
             default -> p("unknown section " + s);
          }
       }
