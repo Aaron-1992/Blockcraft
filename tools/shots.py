@@ -30,16 +30,18 @@ COMMON = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lo
 CAM = "-Dbc.cam=133,92,71,45,22"
 
 # name -> (props, only_new)
+# Software OpenGL is slow: the shader pack (raymarched clouds, shadows, bloom) can take seconds per frame at
+# 720p, so almost every scene uses the plain renderer; only one scene exercises shaders, with very few frames.
+PLAIN = ["-Dbc.shaders=false"]
 SCENES = {
-    "title":      (["-Dbc.title=TITLE"], False),
-    "day":        (COMMON + [CAM, "-Dbc.time=6000", "-Dbc.shot=260"], False),
-    "day-plain":  (COMMON + [CAM, "-Dbc.time=6000", "-Dbc.shaders=false", "-Dbc.shot=260"], False),
-    "sunset":     (COMMON + ["-Dbc.cam=133,80,71,200,6", "-Dbc.time=12700", "-Dbc.shot=260"], False),
-    "night":      (COMMON + ["-Dbc.cam=133,80,71,45,15", "-Dbc.time=18000", "-Dbc.shaders=false", "-Dbc.shot=260"], False),
-    "mobs":       (COMMON + [CAM, "-Dbc.time=6000", "-Dbc.shaders=false", "-Dbc.summon=pig,cow,sheep,chicken,zombie,skeleton,creeper,spider", "-Dbc.shot=300"], False),
-    "inv-creative-1": (COMMON + [CAM, "-Dbc.shaders=false", "-Dbc.inv=creative", "-Dbc.page=0", "-Dbc.shot=220"], False),
-    "inv-creative-2": (COMMON + [CAM, "-Dbc.shaders=false", "-Dbc.inv=creative", "-Dbc.page=1", "-Dbc.shot=220"], False),
-    "inv-craft":  (COMMON + [CAM, "-Dbc.shaders=false", "-Dbc.inv=craft", "-Dbc.shot=220"], False),
+    "title":          (["-Dbc.title=TITLE"], False),
+    "day-plain":      (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=120"], False),
+    "night":          (COMMON + ["-Dbc.cam=133,80,71,45,15", "-Dbc.time=18000"] + PLAIN + ["-Dbc.shot=120"], False),
+    "mobs":           (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=pig,cow,sheep,chicken,zombie,skeleton,creeper,spider", "-Dbc.shot=150"], False),
+    "inv-creative-1": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=0", "-Dbc.shot=130"], False),
+    "inv-creative-2": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.page=1", "-Dbc.shot=130"], False),
+    "inv-craft":      (COMMON + [CAM] + PLAIN + ["-Dbc.inv=craft", "-Dbc.shot=130"], False),
+    "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32", CAM, "-Dbc.time=6000", "-Dbc.shot=30"], False),
 }
 
 
@@ -99,11 +101,18 @@ def composite(paths, labels, out):
     im(*args)
 
 
+def write_report(rows):
+    with open(os.path.join(OUT, "report.md"), "w") as f:
+        f.write("# Visual run %s\n\n| scene | rendered by | differing pixels (ref vs new) |\n|---|---|---|\n" % time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()))
+        for r in rows:
+            f.write("| %s | %s | %s |\n" % (r["scene"], ", ".join(r["have"]) or "NOTHING", "n/a" if r["diff"] is None else "%.2f%%" % r["diff"]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenes", default="all")
     ap.add_argument("--jar", action="append", help="label=path (repeatable)")
-    ap.add_argument("--timeout", type=int, default=420)
+    ap.add_argument("--timeout", type=int, default=180)
     a = ap.parse_args()
     jars = {}
     if a.jar:
@@ -134,14 +143,12 @@ def main():
             row["diff"] = diff_pct(got["ref"], got["new"])
         row["have"] = have
         rows.append(row)
+        write_report(rows)
         # keep the repo small: only the side-by-side JPEG is kept, full PNGs are deleted
         for l in got:
             if got[l] and os.path.exists(got[l]):
                 os.remove(got[l])
-    with open(os.path.join(OUT, "report.md"), "w") as f:
-        f.write("# Visual run %s\n\n| scene | rendered by | differing pixels (ref vs new) |\n|---|---|---|\n" % time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()))
-        for r in rows:
-            f.write("| %s | %s | %s |\n" % (r["scene"], ", ".join(r["have"]) or "NOTHING", "n/a" if r["diff"] is None else "%.2f%%" % r["diff"]))
+    write_report(rows)
     print(open(os.path.join(OUT, "report.md")).read())
 
 

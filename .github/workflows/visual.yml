@@ -16,6 +16,11 @@ on:
 permissions:
   contents: write
 
+# a newer run replaces an older one that is still going
+concurrency:
+  group: visual
+  cancel-in-progress: true
+
 jobs:
   shots:
     runs-on: ubuntu-latest
@@ -38,7 +43,17 @@ jobs:
         run: python3 tools/build.py
 
       - name: Screenshots
-        run: python3 tools/shots.py --scenes "${{ github.event.inputs.scenes || 'all' }}"
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          timeout 33m python3 tools/shots.py --scenes "${{ github.event.inputs.scenes || 'all' }}" 2>&1 | tee build/shots.log
+
+      - name: Output (readable through the check-run API)
+        if: always()
+        run: |
+          python3 tools/ci_annotate.py build/shots.log "shots log" notice
+          ls -la ci-results/shots ci-results/shots/logs 2>/dev/null | head -60 > build/shots-ls.txt || true
+          python3 tools/ci_annotate.py build/shots-ls.txt "shots files" notice
 
       - name: Commit results to the branch
         run: |
