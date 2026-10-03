@@ -81,7 +81,7 @@ public final class Renderer {
          this.lod.dispose();
       }
 
-      this.lod = var1 == null ? null : new Lod(this, var1.gen);
+      this.lod = var1 == null ? null : new Lod(this, var1.gen, var1.lodMap);
    }
 
    public Renderer(Game var1) {
@@ -143,19 +143,14 @@ public final class Renderer {
       return true;
    }
 
+   /**
+    * Is the chunk on the screen as real terrain, so that the LOD under it can stay hidden? Update 3.11: once every section has been meshed
+    * once, yes - a section that is being re-meshed (a burning tree, a block placed) still shows its old mesh until the new one replaces it,
+    * and the distant terrain, with its generator trees, used to flash up through the real chunk for those moments.
+    */
    public boolean chunkMeshed(int var1, int var2) {
       Chunk var3 = this.g.world.chunk(var1, var2);
-      if (var3 != null && var3.lit) {
-         for (Section var7 : var3.sections) {
-            if (var7.dirty || var7.inFlight) {
-               return false;
-            }
-         }
-
-         return true;
-      } else {
-         return false;
-      }
+      return var3 != null && var3.lit && var3.everMeshed;
    }
 
    public void scheduleMeshes(World var1, int var2) {
@@ -261,6 +256,8 @@ public final class Renderer {
       Section var4 = var1.sections[var2];
       var4.nO = var3.nO;
       var4.nT = var3.nT;
+      var1.markMeshed(var2);
+
       if (var3.nO > 0) {
          if (var4.vboO == 0) {
             var4.vboO = GL15.glGenBuffers();

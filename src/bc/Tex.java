@@ -726,6 +726,22 @@ public final class Tex {
    }
 
    public static void init() {
+      initPixels();
+      atlas = upload(256, 256, atlasPixels, false, false);
+      GL11.glBindTexture(3553, atlas);
+      GL11.glTexParameteri(3553, 10241, 9986);
+      GL11.glTexParameteri(3553, 33085, 4);
+      GL30.glGenerateMipmap(3553);
+      crack = upload(160, 16, crackPixels(), false, false);
+      clouds = upload(256, 256, cloudPixels(), false, true);
+      sun = upload(32, 32, sunPixels(), true, false);
+      moon = upload(16, 16, moonPixels(), false, false);
+      lightmap = upload(16, 16, new int[256], true, false);
+      loadFont();
+   }
+
+   /** Update 3.11: paints every tile into {@link #atlasPixels} without touching OpenGL (the LOD colours and the tests read them). */
+   static void initPixels() {
       blit(0, tGrassTop());
       blit(1, dirt());
       blit(2, tGrassOverlay());
@@ -775,17 +791,6 @@ public final class Tex {
       }
 
       TexExtra.blocks();
-      atlas = upload(256, 256, atlasPixels, false, false);
-      GL11.glBindTexture(3553, atlas);
-      GL11.glTexParameteri(3553, 10241, 9986);
-      GL11.glTexParameteri(3553, 33085, 4);
-      GL30.glGenerateMipmap(3553);
-      crack = upload(160, 16, crackPixels(), false, false);
-      clouds = upload(256, 256, cloudPixels(), false, true);
-      sun = upload(32, 32, sunPixels(), true, false);
-      moon = upload(16, 16, moonPixels(), false, false);
-      lightmap = upload(16, 16, new int[256], true, false);
-      loadFont();
    }
 
    static int[] dirt() {

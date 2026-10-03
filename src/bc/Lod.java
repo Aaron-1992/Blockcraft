@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
@@ -29,6 +30,9 @@ public final class Lod {
    static final float LAND_SHIFT = 2.5F;
    static final float WATER_SHIFT = 0.2F;
    final Gen gen;
+   /** Update 3.11: what the world really looks like where it was changed (null: the generator only). */
+   final LodMap map;
+   final AtomicLong epoch = new AtomicLong();
    final Renderer rend;
    final ConcurrentHashMap<Long, Lod.Tile> tiles = new ConcurrentHashMap();
    final ExecutorService pool;
@@ -47,8 +51,17 @@ public final class Lod {
    ArrayList<Lod.Tile> drawList = new ArrayList();
 
    public Lod(Renderer var1, Gen var2) {
+      this(var1, var2, null);
+   }
+
+   public Lod(Renderer var1, Gen var2, LodMap map) {
       this.rend = var1;
       this.gen = var2;
+      this.map = map;
+      if (map != null) {
+         map.listener = this::invalidate;
+      }
+
       int var3 = Math.max(1, Math.min(3, Runtime.getRuntime().availableProcessors() - 1));
       this.pool = Executors.newFixedThreadPool(var3, var0 -> {
          Thread var1x = new Thread(var0, "lod-gen");
@@ -125,182 +138,188 @@ public final class Lod {
       return var0 & 16777215 | var1 << 24;
    }
 
-   void build(Lod.Tile var1) {
-      int var2 = var1.size / 32;
-      float var3 = Math.min(2.5F, 0.4F + var2 * 0.35F);
-      int var4 = 34;
-      int[] var5 = new int[var4 * var4];
-      int[] var6 = new int[var4 * var4];
-      boolean[] var7 = new boolean[var4 * var4];
-      int[] var8 = new int[var4 * var4];
-      int[] var9 = new int[var4 * var4];
-      List<Village> var10 = var1.size <= 256 ? this.villagesFor(var1.x0 - 8, var1.z0 - 8, var1.x0 + var1.size + 8, var1.z0 + var1.size + 8) : null;
+   /**
+    * Builds the mesh of a tile: 32 x 32 cells, one column each (the surface of the cell's middle), walls down to lower neighbours, trees and
+    * houses as boxes. Update 3.11: where the world has a {@link LodMap.Sum summary} of the chunk (it was changed) the cell shows what is really
+    * there; elsewhere it is still the generator. Every quad is counter-clockwise seen from the outside (back faces are culled).
+    */
+   void build(Lod.Tile t) {
+      final int cs = t.size / 32; // blocks per cell
+      final float sink = Math.min(2.5F, 0.4F + cs * 0.35F); // the land is sunk a little: it hides under the real terrain
+      final int w = 34;
+      t.builtEpoch = this.epoch.get();
+      int[] topY = new int[w * w]; // the plane of the cell's surface: y of its top block + 1
+      int[] rgb = new int[w * w];
+      boolean[] wet = new boolean[w * w];
+      int[] terrain = new int[w * w]; // height of the terrain (for the wall colours of mountains)
+      int[] biome = new int[w * w];
+      int[] cliff = new int[w * w]; // colour of the wall under a real surface (0 = the biome rules)
+      List<Village> villages = t.size <= 256 ? this.villagesFor(t.x0 - 8, t.z0 - 8, t.x0 + t.size + 8, t.z0 + t.size + 8) : null;
 
-      for (int var11 = 0; var11 < var4; var11++) {
-         for (int var12 = 0; var12 < var4; var12++) {
-            int var13 = var1.x0 + (var12 - 1) * var2 + var2 / 2;
-            int var14 = var1.z0 + (var11 - 1) * var2 + var2 / 2;
-            Col var15 = this.gen.column(var13, var14);
-            int var16 = var11 * var4 + var12;
-            var8[var16] = var15.h;
-            var9[var16] = var15.biome;
-            boolean var18 = var15.h < 63;
-            int var17;
-            if (var18) {
-               float var19 = Math.min(1.0F, (63 - var15.h) / 30.0F);
-               int var20 = (int)(58.0F * (1.0F - var19 * 0.6F));
-               int var21 = (int)(104.0F * (1.0F - var19 * 0.5F));
-               int var22 = (int)(208.0F * (1.0F - var19 * 0.4F));
-               var17 = var20 << 16 | var21 << 8 | var22;
-               if (var15.biome == 5) {
-               }
+      for (int cz = 0; cz < w; cz++) {
+         for (int cx = 0; cx < w; cx++) {
+            int x = t.x0 + (cx - 1) * cs + cs / 2;
+            int z = t.z0 + (cz - 1) * cs + cs / 2;
+            int i = cz * w + cx;
+            LodMap.Sum sum = this.map == null ? null : this.map.get(x >> 4, z >> 4);
+            if (sum != null) {
+               int k = (z & 15) * 16 + (x & 15);
+               wet[i] = sum.depth[k] > 0;
+               topY[i] = sum.top[k];
+               rgb[i] = sum.rgb[k];
+               cliff[i] = sum.side[k];
+               terrain[i] = sum.top[k] - 1;
+               biome[i] = 2;
+               continue;
+            }
+
+            Col col = this.gen.column(x, z);
+            terrain[i] = col.h;
+            biome[i] = col.biome;
+            boolean sea = col.h < 63;
+            int c;
+            if (sea) {
+               float d = Math.min(1.0F, (63 - col.h) / 30.0F);
+               c = (int)(58.0F * (1.0F - d * 0.6F)) << 16 | (int)(104.0F * (1.0F - d * 0.5F)) << 8 | (int)(208.0F * (1.0F - d * 0.4F));
             } else {
-               switch (var15.biome) {
+               switch (col.biome) {
                   case 1:
-                     var17 = 14735012;
+                     c = 14735012;
                      break;
                   case 2:
                   default:
-                     var17 = shade(Gen.grassColorFor(var15.t, var15.hu), 0.8F);
+                     c = shade(Gen.grassColorFor(col.t, col.hu), 0.8F);
                      break;
                   case 3:
-                     int var52 = Gen.grassColorFor(var15.t, var15.hu);
-                     var17 = (int)((var52 >> 16 & 0xFF) * 0.72F) << 16 | (int)((var52 >> 8 & 0xFF) * 0.76F) << 8 | (int)((var52 & 0xFF) * 0.72F);
+                     int g = Gen.grassColorFor(col.t, col.hu);
+                     c = (int)((g >> 16 & 0xFF) * 0.72F) << 16 | (int)((g >> 8 & 0xFF) * 0.76F) << 8 | (int)((g & 0xFF) * 0.72F);
                      break;
                   case 4:
-                     var17 = 14931876;
+                     c = 14931876;
                      break;
                   case 5:
-                     var17 = 15594485;
+                     c = 15594485;
                      break;
                   case 6:
-                     if (var15.h > 125) {
-                        var17 = 15791350;
-                     } else if (var15.h > 98) {
-                        var17 = 9079434;
+                     if (col.h > 125) {
+                        c = 15791350;
+                     } else if (col.h > 98) {
+                        c = 9079434;
                      } else {
-                        var17 = shade(Gen.grassColorFor(var15.t, var15.hu), 0.8F);
+                        c = shade(Gen.grassColorFor(col.t, col.hu), 0.8F);
                      }
                }
             }
 
-            if (!var18 && var2 <= 4 && var10 != null) {
-               for (Village var55 : var10) {
-                  for (Path var59 : var55.paths) {
-                     if (var13 >= var59.x0 && var13 <= var59.x1 && var14 >= var59.z0 && var14 <= var59.z1) {
-                        var17 = var55.desert ? 14471328 : 8748922;
+            if (!sea && cs <= 4 && villages != null) {
+               for (Village v : villages) {
+                  for (Path p : v.paths) {
+                     if (x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1) {
+                        c = v.desert ? 14471328 : 8748922;
                      }
                   }
                }
             }
 
-            var7[var16] = var18;
-            var5[var16] = var18 ? 63 : var15.h + 1;
-            var6[var16] = var17;
+            wet[i] = sea;
+            topY[i] = sea ? 63 : col.h + 1;
+            rgb[i] = c;
          }
       }
 
-      ByteBuffer var43 = ByteBuffer.allocateDirect(786432).order(ByteOrder.nativeOrder());
-      int[] var44 = new int[]{0};
-
-      for (int var45 = 1; var45 <= 32; var45++) {
-         for (int var47 = 1; var47 <= 32; var47++) {
-            int var48 = var45 * var4 + var47;
-            float var49 = var7[var48] ? 0.2F : var3;
-            float var50 = var5[var48] - var49;
-            float var51 = (var47 - 1) * var2;
-            float var54 = var51 + var2;
-            float var56 = (var45 - 1) * var2;
-            float var58 = var56 + var2;
-            float var60 = (hash(var1.x0 / var2 + var47, var1.z0 / var2 + var45) - 0.5F) * 0.12F;
-            int var23 = var6[var48];
-            int var24 = code(pack(var23, 1.0F, var60), var7[var48] ? 180 : 255);
-            var43 = ensure(var43);
-            float var25 = 0.04F * Math.max(1, var2 / 8);
-            float var26 = var47 == 1 ? var51 - var25 : var51;
-            float var27 = var47 == 32 ? var54 + var25 : var54;
-            float var28 = var45 == 1 ? var56 - var25 : var56;
-            float var29 = var45 == 32 ? var58 + var25 : var58;
-            quad(var43, var44, var26, var50, var28, var27, var50, var28, var27, var50, var29, var26, var50, var29, var24);
-            int[][] var30 = new int[][]{{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-
-            for (int var31 = 0; var31 < 4; var31++) {
-               int var32 = var47 + var30[var31][0];
-               int var33 = var45 + var30[var31][1];
-               int var34 = var33 * var4 + var32;
-               float var35 = var5[var34] - (var7[var34] ? 0.2F : var3);
-               boolean var36 = var31 == 0 && var47 == 1 || var31 == 1 && var47 == 32 || var31 == 2 && var45 == 1 || var31 == 3 && var45 == 32;
-               if (!var7[var48] || !var7[var34]) {
-                  float var37;
-                  if (var35 < var50) {
-                     var37 = var36 ? var35 - 14.0F : var35;
+      ByteBuffer bb = ByteBuffer.allocateDirect(786432).order(ByteOrder.nativeOrder());
+      int[] n = new int[]{0};
+      int[][] dirs = new int[][]{{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+      for (int cz = 1; cz <= 32; cz++) {
+         for (int cx = 1; cx <= 32; cx++) {
+            int i = cz * w + cx;
+            float y = topY[i] - (wet[i] ? 0.2F : sink);
+            float x0 = (cx - 1) * cs;
+            float x1 = x0 + cs;
+            float z0 = (cz - 1) * cs;
+            float z1 = z0 + cs;
+            float jitter = (hash(t.x0 / cs + cx, t.z0 / cs + cz) - 0.5F) * 0.12F;
+            int base = rgb[i];
+            int topCode = code(pack(base, 1.0F, jitter), wet[i] ? 180 : 255);
+            bb = ensure(bb);
+            float e = 0.04F * Math.max(1, cs / 8); // a sliver of overlap at the tile's edge: no crack between tiles
+            float ex0 = cx == 1 ? x0 - e : x0;
+            float ex1 = cx == 32 ? x1 + e : x1;
+            float ez0 = cz == 1 ? z0 - e : z0;
+            float ez1 = cz == 32 ? z1 + e : z1;
+            quadN(bb, n, 0, 1, 0, ex0, y, ez0, ex1, y, ez0, ex1, y, ez1, ex0, y, ez1, topCode);
+            for (int d = 0; d < 4; d++) {
+               int ni = (cz + dirs[d][1]) * w + cx + dirs[d][0];
+               float ny = topY[ni] - (wet[ni] ? 0.2F : sink);
+               boolean edge = d == 0 && cx == 1 || d == 1 && cx == 32 || d == 2 && cz == 1 || d == 3 && cz == 32;
+               if (!wet[i] || !wet[ni]) {
+                  float low;
+                  if (ny < y) {
+                     low = edge ? ny - 14.0F : ny;
                   } else {
-                     if (!var36) {
+                     if (!edge) {
                         continue;
                      }
 
-                     var37 = var50 - 14.0F;
+                     low = y - 14.0F;
                   }
 
-                  boolean var39 = var9[var48] == 2 || var9[var48] == 3 || var9[var48] == 6 && var8[var48] <= 98;
-                  int var38;
-                  if (var7[var48]) {
-                     var38 = var23;
-                  } else if (var39) {
-                     float var40 = var50 - var35;
-                     if (var40 <= 1.5F) {
-                        var38 = (int)((var23 >> 16 & 0xFF) * 0.82F) << 16 | (int)((var23 >> 8 & 0xFF) * 0.82F) << 8 | (int)((var23 & 0xFF) * 0.82F);
-                     } else {
-                        var38 = var40 <= 5.0F ? 7033395 : 8026746;
-                     }
+                  int wall;
+                  float drop = y - ny;
+                  if (wet[i]) {
+                     wall = base;
+                  } else if (cliff[i] != 0) {
+                     wall = drop <= 1.5F ? shade(base, 0.82F) : cliff[i];
+                  } else if (biome[i] == 2 || biome[i] == 3 || biome[i] == 6 && terrain[i] <= 98) {
+                     wall = drop <= 1.5F ? shade(base, 0.82F) : (drop <= 5.0F ? 7033395 : 8026746);
                   } else {
-                     var38 = (int)((var23 >> 16 & 0xFF) * 0.82F) << 16 | (int)((var23 >> 8 & 0xFF) * 0.82F) << 8 | (int)((var23 & 0xFF) * 0.82F);
+                     wall = shade(base, 0.82F);
                   }
 
-                  float var61 = var31 < 2 ? 0.72F : 0.84F;
-                  int var41 = code(pack(var38, var61, var60), var31 == 0 ? 210 : (var31 == 1 ? 195 : (var31 == 2 ? 240 : 225)));
-                  var43 = ensure(var43);
-                  switch (var31) {
+                  float face = d < 2 ? 0.72F : 0.84F;
+                  int wallCode = code(pack(wall, face, jitter), d == 0 ? 210 : (d == 1 ? 195 : (d == 2 ? 240 : 225)));
+                  bb = ensure(bb);
+                  switch (d) {
                      case 0:
-                        quad(var43, var44, var51, var50, var58, var51, var50, var56, var51, var37, var56, var51, var37, var58, var41);
+                        quadN(bb, n, -1, 0, 0, x0, y, z1, x0, y, z0, x0, low, z0, x0, low, z1, wallCode);
                         break;
                      case 1:
-                        quad(var43, var44, var54, var50, var56, var54, var50, var58, var54, var37, var58, var54, var37, var56, var41);
+                        quadN(bb, n, 1, 0, 0, x1, y, z0, x1, y, z1, x1, low, z1, x1, low, z0, wallCode);
                         break;
                      case 2:
-                        quad(var43, var44, var51, var50, var56, var54, var50, var56, var54, var37, var56, var51, var37, var56, var41);
+                        quadN(bb, n, 0, 0, -1, x0, y, z0, x1, y, z0, x1, low, z0, x0, low, z0, wallCode);
                         break;
                      default:
-                        quad(var43, var44, var54, var50, var58, var51, var50, var58, var51, var37, var58, var54, var37, var58, var41);
+                        quadN(bb, n, 0, 0, 1, x1, y, z1, x0, y, z1, x0, low, z1, x1, low, z1, wallCode);
                   }
                }
             }
          }
       }
 
-      if (var1.size <= 256) {
-         Lod.Mb var46 = new Lod.Mb();
-         var46.bb = var43;
-         var46.n = var44[0];
+      if (t.size <= 256) {
+         Lod.Mb mb = new Lod.Mb();
+         mb.bb = bb;
+         mb.n = n[0];
 
          try {
-            this.trees(var1, var46, var10, var3);
-            if (var10 != null) {
-               this.buildings(var1, var46, var10);
+            this.trees(t, mb, villages, sink);
+            if (villages != null) {
+               this.buildings(t, mb, villages);
             }
-         } catch (Throwable var42) {
-            var42.printStackTrace();
+         } catch (Throwable ex) {
+            ex.printStackTrace();
          }
 
-         var43 = var46.bb;
-         var44[0] = var46.n;
+         bb = mb.bb;
+         n[0] = mb.n;
       }
 
-      var43.flip();
-      var1.data = var43;
-      var1.vcount = var44[0];
-      var1.state = 2;
-      this.uploads.add(var1);
+      bb.flip();
+      t.data = bb;
+      t.vcount = n[0];
+      t.state = 2;
+      this.uploads.add(t);
    }
 
    List<Village> villagesFor(int var1, int var2, int var3, int var4) {
@@ -342,11 +361,11 @@ public final class Lod {
       int var13 = code(pack(var7, 0.68F, var8), 210);
       int var14 = code(var12, 225);
       int var15 = code(var13, 195);
-      quad(var16, var10, var1, var5, var3, var4, var5, var3, var4, var5, var6, var1, var5, var6, var11);
-      quad(var16, var10, var1, var5, var3, var4, var5, var3, var4, var2, var3, var1, var2, var3, var12);
-      quad(var16, var10, var4, var5, var6, var1, var5, var6, var1, var2, var6, var4, var2, var6, var14);
-      quad(var16, var10, var1, var5, var6, var1, var5, var3, var1, var2, var3, var1, var2, var6, var13);
-      quad(var16, var10, var4, var5, var3, var4, var5, var6, var4, var2, var6, var4, var2, var3, var15);
+      quadN(var16, var10, 0, 1, 0, var1, var5, var3, var4, var5, var3, var4, var5, var6, var1, var5, var6, var11);
+      quadN(var16, var10, 0, 0, -1, var1, var5, var3, var4, var5, var3, var4, var2, var3, var1, var2, var3, var12);
+      quadN(var16, var10, 0, 0, 1, var4, var5, var6, var1, var5, var6, var1, var2, var6, var4, var2, var6, var14);
+      quadN(var16, var10, -1, 0, 0, var1, var5, var6, var1, var5, var3, var1, var2, var3, var1, var2, var6, var13);
+      quadN(var16, var10, 1, 0, 0, var4, var5, var3, var4, var5, var6, var4, var2, var6, var4, var2, var3, var15);
       var0.n = var0.n + var10[0];
    }
 
@@ -372,6 +391,20 @@ public final class Lod {
                int var21 = var11 * 16 + var15;
                if (var20 >= var1.x0 && var20 < var1.x0 + var1.size && var21 >= var1.z0 && var21 < var1.z0 + var1.size && !(var16 > 0.85F)) {
                   Col var22 = this.gen.column(var20, var21);
+                  int ground = var22.h; // y of the block the tree stands on
+                  if (this.map != null) {
+                     // Update 3.11: where the chunk was changed the tree is only drawn if its trunk is still there (burnt, felled, dug away: gone)
+                     LodMap.Sum sum = this.map.get(var20 >> 4, var21 >> 4);
+                     if (sum != null) {
+                        int k = (var21 & 15) * 16 + (var20 & 15);
+                        if (sum.trunk[k] < 3 || sum.depth[k] > 0) {
+                           continue;
+                        }
+
+                        ground = sum.top[k] - 1;
+                     }
+                  }
+
                   if (var22.h >= 64 && var22.h <= 235 && !this.gen.entrance(var20, var21)) {
                      int var23;
                      switch (var22.biome) {
@@ -418,8 +451,8 @@ public final class Lod {
                      if (!var24) {
                         float var47 = var20 - var1.x0 + 0.5F;
                         float var48 = var21 - var1.z0 + 0.5F;
-                        float var49 = var22.h + 1 - Math.min(2.5F, 0.4F + var1.size / 32 * 0.35F);
-                        float var50 = var22.h + 1;
+                        float var49 = ground + 1 - Math.min(2.5F, 0.4F + var1.size / 32 * 0.35F);
+                        float var50 = ground + 1;
                         float var29 = (hash(var20, var21) - 0.5F) * 0.14F;
                         Random var32 = new Random(var19);
                         int var30;
@@ -579,6 +612,10 @@ public final class Lod {
       for (Village var7 : var3) {
          for (Bld var9 : var7.blds) {
             if (var9.bx1 >= var1.x0 - 4 && var9.bx0 <= var1.x0 + var1.size + 4 && var9.bz1 >= var1.z0 - 4 && var9.bz0 <= var1.z0 + var1.size + 4) {
+               if (this.map != null && this.map.get((var9.bx0 + var9.bx1) / 2 >> 4, (var9.bz0 + var9.bz1) / 2 >> 4) != null) {
+                  continue; // Update 3.11: the chunk in the middle of the house was changed - what is really there is part of the surface
+               }
+
                if (var9.type == 1) {
                   int var25 = var9.desert ? 14208152 : 8026746;
                   box(var2, var9.x0 - var4, var9.y0 - 4, var9.z0 - var5, var9.x0 + 3 - var4, var9.y0 + 1, var9.z0 + 3 - var5, var25, 0.02F);
@@ -661,6 +698,22 @@ public final class Lod {
       var0.putFloat(var1).putFloat(var2).putFloat(var3).putInt(var4);
    }
 
+   /** A quad whose corners are given in any order; they are written counter-clockwise seen from the side the normal (nx, ny, nz) points to. */
+   static void quadN(ByteBuffer b, int[] n, float nx, float ny, float nz, float x0, float y0, float z0, float x1, float y1, float z1, float x2, float y2, float z2, float x3, float y3, float z3, int col) {
+      float ax = x1 - x0;
+      float ay = y1 - y0;
+      float az = z1 - z0;
+      float bx = x2 - x0;
+      float by = y2 - y0;
+      float bz = z2 - z0;
+      float dot = (ay * bz - az * by) * nx + (az * bx - ax * bz) * ny + (ax * by - ay * bx) * nz;
+      if (dot >= 0.0F) {
+         quad(b, n, x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3, col);
+      } else {
+         quad(b, n, x0, y0, z0, x3, y3, z3, x2, y2, z2, x1, y1, z1, col);
+      }
+   }
+
    static void quad(
       ByteBuffer var0,
       int[] var1,
@@ -703,6 +756,7 @@ public final class Lod {
             var2.count = var2.vcount;
             var2.data = null;
             var2.state = 3;
+            var2.builtFrame = this.frame;
             this.built++;
          }
       }
@@ -761,6 +815,11 @@ public final class Lod {
       GL11.glEnableClientState(32886);
       GL11.glEnable(32823);
       GL11.glPolygonOffset(1.0F, 8.0F);
+      boolean cull = Renderer.cullFaces();
+      if (cull) {
+         GL11.glEnable(2884); // Update 3.11: every LOD quad is counter-clockwise seen from outside; the ground is see-through from below
+      }
+
       this.drawn = 0;
 
       for (Lod.Tile var19 : this.drawList) {
@@ -774,6 +833,10 @@ public final class Lod {
             GL11.glPopMatrix();
             this.drawn++;
          }
+      }
+
+      if (cull) {
+         GL11.glDisable(2884);
       }
 
       GL11.glDisable(32823);
@@ -827,14 +890,15 @@ public final class Lod {
       if (!(var4 > this.maxDist)) {
          if (var3 != 32 || !this.insideInner(var1, var2, var3) || !this.covered(var1, var2)) {
             if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.78F + 80.0F)) {
-               boolean var6 = var3 > 32 && var4 < var3 * 3.0;
+               // (Update 3.11: a tile that may reach into the real chunks is always split down to 32, which is skipped where the chunks are meshed)
+               boolean var6 = var3 > 32 && (var4 < var3 * 3.0 || var4 < this.innerHalf + 48.0);
                if (!var6) {
                   Lod.Tile var16 = this.tile(var3, var1, var2);
                   var16.lastUse = this.frame;
                   if (!ready(var16)) {
                      this.request(var16);
                   } else {
-                     this.drawList.add(var16);
+                     this.drawList.add(this.refresh(var16));
                   }
                } else {
                   int var7 = var3 / 2;
@@ -886,7 +950,7 @@ public final class Lod {
 
       while (var1.hasNext()) {
          Lod.Tile var2 = (Lod.Tile)((Entry)var1.next()).getValue();
-         if (this.frame - var2.lastUse > 900L && (var2.state == 3 || var2.state == 4 || var2.state == 0)) {
+         if (this.frame - var2.lastUse > 900L && (var2.state == 3 || var2.state == 4 || var2.state == 0) && var2.replacement == null) {
             if (var2.vbo != 0) {
                GL15.glDeleteBuffers(var2.vbo);
             }
@@ -904,9 +968,75 @@ public final class Lod {
          if (var2.vbo != 0) {
             GL15.glDeleteBuffers(var2.vbo);
          }
+
+         if (var2.replacement != null && var2.replacement.vbo != 0) {
+            GL15.glDeleteBuffers(var2.replacement.vbo);
+         }
       }
 
       this.tiles.clear();
+      if (this.map != null && this.map.listener != null) {
+         this.map.listener = null;
+      }
+   }
+
+   // ------------------------------------------------------------------ Update 3.11: tiles follow the world
+   /** The summary of chunk (cx, cz) changed: every tile that contains it is outdated and is rebuilt when it is next drawn (not more often than every few seconds). */
+   void invalidate(int cx, int cz) {
+      long e = this.epoch.incrementAndGet();
+      for (int size = 32; size <= 1024; size *= 2) {
+         int x0 = Math.floorDiv(cx * 16, size) * size;
+         int z0 = Math.floorDiv(cz * 16, size) * size;
+         Lod.Tile t = (Lod.Tile)this.tiles.get(key(size, x0, z0));
+         if (t != null) {
+            t.dirtyEpoch = e;
+         }
+      }
+   }
+
+   /** Frames a tile of this size is left alone after it was built before it is rebuilt for a change (the big ones hardly ever change visibly). */
+   static long minAge(int size) {
+      return (long)(Math.min(1800, 90L * (size / 32)) * AGE);
+   }
+
+   /** -Dbc.lodage=0.05 shortens the rest an outdated tile gets (screenshot scenes only run a couple of hundred frames). */
+   static final double AGE = Double.parseDouble(System.getProperty("bc.lodage", "1"));
+
+   /**
+    * An outdated tile keeps being drawn while its replacement is built; when that is ready it takes the old one's place in one step, so
+    * nothing flickers or is missing in between.
+    */
+   Lod.Tile refresh(Lod.Tile t) {
+      Lod.Tile r = t.replacement;
+      if (r != null) {
+         if (ready(r)) {
+            this.tiles.put(key(t.size, t.x0, t.z0), r);
+            t.replacement = null;
+            if (t.vbo != 0) {
+               GL15.glDeleteBuffers(t.vbo);
+               t.vbo = 0;
+            }
+
+            t.state = 5;
+            r.lastUse = this.frame;
+            return r;
+         }
+
+         if (r.state == 0) {
+            this.request(r);
+         }
+
+         return t;
+      }
+
+      if (t.dirtyEpoch > t.builtEpoch && this.frame - t.builtFrame >= minAge(t.size) && this.inflight.get() < 6) {
+         Lod.Tile n = new Lod.Tile(t.size, t.x0, t.z0);
+         n.lastUse = this.frame;
+         t.replacement = n;
+         this.request(n);
+      }
+
+      return t;
    }
 
    static final class Mb {
@@ -926,6 +1056,11 @@ public final class Lod {
       long lastUse;
       long coverFrame;
       boolean covered;
+      /** Update 3.11: the epoch (see Lod.invalidate) the tile was built at / last found outdated at, the frame it was uploaded, its replacement. */
+      volatile long builtEpoch;
+      volatile long dirtyEpoch;
+      long builtFrame;
+      volatile Lod.Tile replacement;
 
       Tile(int var1, int var2, int var3) {
          this.size = var1;

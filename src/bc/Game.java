@@ -556,6 +556,14 @@ public final class Game {
             }
          }
 
+         if (System.getProperty("bc.tp") != null) {
+            // bc.tp=frame:x,y,z - teleports the player at that frame (fly away from a scene so its chunks unload and the LOD has to show them)
+            String[] tp = System.getProperty("bc.tp").split("[:,]");
+            if (this.autoFrames == Integer.parseInt(tp[0])) {
+               this.player.setPos(Double.parseDouble(tp[1]), Double.parseDouble(tp[2]), Double.parseDouble(tp[3]));
+            }
+         }
+
          if (this.autoFrames == 70 && System.getProperty("bc.set") != null) {
             for (String var6 : System.getProperty("bc.set").split(";")) {
                String[] var7 = var6.split(",");

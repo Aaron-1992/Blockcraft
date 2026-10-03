@@ -222,6 +222,26 @@ def slabs_blocks():
     return out
 
 
+def doors_blocks():
+    """Update 3.11: every kind of door in the open (closed and open, all four facings, upper and lower half), one with a block behind it."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 5):
+                out.append((x, y, z, 0))
+    for f in range(4):
+        out.append((138 + f * 2, gy + 1, 74, 73 + f))        # closed, lower half
+        out.append((138 + f * 2, gy + 2, 74, 81 + f))        # closed, upper half
+        out.append((138 + f * 2, gy + 1, 77, 77 + f))        # open
+        out.append((138 + f * 2, gy + 2, 77, 85 + f))
+    out.append((147, gy + 1, 74, 73))                          # a closed door with stone behind it (the old mesher lost its +z face)
+    out.append((147, gy + 2, 74, 81))
+    out.append((147, gy + 1, 75, 1))
+    out.append((147, gy + 2, 75, 1))
+    return out
+
+
 # name -> (props, only_new)
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
@@ -278,6 +298,19 @@ SCENES = {
     "meteors":        (COMMON + ["-Dbc.cam=143.5,70,62,0,-22", "-Dbc.time=18000", "-Dbc.disaster=meteor:30,80,70;meteor:-36,95,64;meteor:5,110,76", "-Dbc.dfreeze=34", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
     "meteor-crater":  (COMMON + ["-Dbc.cam=143.5,92,68,0,52", "-Dbc.time=18000", "-Dbc.disaster=meteor:0,30,30", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=230"], True),
     "options310":     (["-Dbc.auto=1", "-Dbc.title=OPTIONS"], True),
+    # ---- Update 3.11: single-sided faces. Spectator mode (bc.mode=3, given after COMMON's mode so it wins) with the camera inside the ground looking up:
+    # the ground must be see-through from below.
+    "under-map":      (COMMON + ["-Dbc.mode=3", "-Dbc.cam=140,45,70,-60,-35", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "under-map-sh":   (COMMON + ["-Dbc.mode=3", "-Dbc.cam=140,45,70,-60,-35", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    # the camera in a pool looks up at the surface: seen from below it must still be there
+    "under-water":    (COMMON + ["-Dbc.cam=144.5,67.6,74.5,0,-55", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.fill=140,66,70,148,70,78,50"] + PLAIN + ["-Dbc.shot=130"], True),
+    "doors311":       (COMMON + ["-Dbc.cam=144,71,70.0,0,22", "-Dbc.time=6000"] + PLAIN + [sets(doors_blocks()), "-Dbc.shot=150"], True),
+    # the LOD shows what the world looks like after it was changed: a brick tower and a pit are made near the start, then the player flies away
+    # (their chunks unload and are summarised) and looks back at them from a distance
+    "lod-changes":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32", "-Dbc.cam=133,92,71,-90,6", "-Dbc.weather=calm", "-Dbc.time=6000", "-Dbc.lodage=0.02",
+                       "-Dbc.fill=150,60,60,161,140,71,16;166,50,60,178,90,72,0", "-Dbc.tp=110:-60,100,71"] + PLAIN + ["-Dbc.shot=260"], True),
+    # the same place without any change: what the generator makes of it (to see what the tower and the pit replaced)
+    "lod-changes-ref": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32", "-Dbc.cam=-60,100,71,-90,6", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=160"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),

@@ -45,6 +45,8 @@ public final class World {
    public final Trees trees = new Trees(this);
    /** Update 3.10: tornadoes, earthquakes, meteors (see Disasters). */
    public final Disasters disasters = new Disasters(this);
+   /** Update 3.11: what the distant terrain shows for chunks that were changed (see LodMap). */
+   public final LodMap lodMap = new LodMap();
    /** Update 3.8: weather field, rain, lightning. */
    public final Weather weather;
    private final Random rnd = new Random();
@@ -83,6 +85,12 @@ public final class World {
       }
 
       this.loadTiles();
+      if (var3 != null) {
+         this.lodMap.load(var3);
+         // chunk files from before 3.11 have no summary yet: a background thread makes them (chunks that are loaded are summarised from live data)
+         this.lodMap.scan(var3, this.gen, (cx, cz) -> this.chunks.containsKey(key(cx, cz)));
+      }
+
       this.pool = Executors.newFixedThreadPool(genThreads(), var0 -> {
          Thread var1x = new Thread(var0, "chunk-gen");
          var1x.setDaemon(true);
@@ -276,6 +284,7 @@ public final class World {
             try {
                var2.write(var1.blocks);
                var1.modified = false;
+               var1.lodDirty = 0L;
             } catch (Throwable var6) {
                try {
                   var2.close();
@@ -287,8 +296,22 @@ public final class World {
             }
 
             var2.close();
+            // Update 3.11: the distant terrain shows what is really there (a house, a pit, a burnt forest) even after the chunk is gone
+            this.lodMap.update(var1, this.gen);
+            this.lodMap.stamp(var1.cx, var1.cz, this.chunkFile(var1.cx, var1.cz).lastModified());
          } catch (IOException var7) {
             System.err.println("Failed to save chunk: " + var7);
+         }
+      }
+   }
+
+   /** Update 3.11: chunks that were changed more than two seconds ago get a fresh LOD summary (the distant terrain follows a burning forest). */
+   void lodRefresh() {
+      for (Chunk c : this.chunks.values()) {
+         long d = c.lodDirty;
+         if (d != 0L && this.tickCount - d >= 40L) {
+            c.lodDirty = 0L;
+            this.lodMap.update(c, this.gen);
          }
       }
    }
@@ -302,9 +325,11 @@ public final class World {
       }
 
       this.saveTiles();
+      this.lodMap.save(this.dir);
    }
 
    public void shutdown() {
+      this.lodMap.stop = true;
       this.pool.shutdownNow();
    }
 
@@ -592,6 +617,7 @@ public final class World {
 
          var5.set(var6, var2, var7, var4);
          var5.modified = true;
+         var5.lodDirty = this.tickCount + 1L;
          if (var4 == Blocks.FIRE) {
             this.fire.added(var1, var2, var3);
          } else if (var8 == Blocks.FIRE) {
@@ -700,6 +726,10 @@ public final class World {
    public void tick() {
       this.tickCount++;
       this.dayTime++;
+      if (this.tickCount % 20L == 0L) {
+         this.lodRefresh();
+      }
+
       int var1 = 0;
 
       while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {

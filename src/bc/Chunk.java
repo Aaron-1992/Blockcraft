@@ -11,6 +11,10 @@ public final class Chunk {
    public final int[] foliageColor = new int[256];
    public final byte[] biome = new byte[256];
    public volatile boolean modified;
+   /** Update 3.11: tick of the last block change since the LOD summary was made (0 = the summary is up to date). */
+   public volatile long lodDirty;
+   /** Update 3.11: set once the chunk's sections have all been meshed at least once - from then on the LOD under it stays hidden. */
+   public volatile boolean everMeshed;
    public boolean lit;
    public volatile boolean unloaded;
    public final Chunk.Section[] sections = new Chunk.Section[16];
@@ -21,6 +25,19 @@ public final class Chunk {
 
       for (int var3 = 0; var3 < 16; var3++) {
          this.sections[var3] = new Chunk.Section();
+      }
+   }
+
+   /** Update 3.11: section sy has been meshed and uploaded; once all 16 have, the chunk counts as covered for the LOD (see Renderer.chunkMeshed). */
+   public void markMeshed(int sy) {
+      this.sections[sy].meshed = true;
+      if (!this.everMeshed) {
+         boolean all = true;
+         for (Chunk.Section sec : this.sections) {
+            all &= sec.meshed;
+         }
+
+         this.everMeshed = all;
       }
    }
 
@@ -77,5 +94,7 @@ public final class Chunk {
       public boolean inFlight;
       public int version;
       public boolean empty = true;
+      /** Update 3.11: has been meshed (and uploaded) at least once. */
+      public boolean meshed;
    }
 }
