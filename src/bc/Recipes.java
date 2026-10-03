@@ -260,6 +260,9 @@ public final class Recipes {
       for (int var14 = 0; var14 < 4; var14++) {
          fuel.put(Items.toolId(0, var14 == 0 ? 4 : var14), 200);
       }
+
+      // ---- Update 3.12 ----
+      Items312.recipes();
    }
 
    static final class Recipe {

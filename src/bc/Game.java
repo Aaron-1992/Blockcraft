@@ -98,6 +98,17 @@ public final class Game {
    String seedField = "";
    int newMode = 1;
    boolean needSpawn;
+   // ---- Update 3.12: dimensions ----
+   /** The world's folder: the Overworld's chunks live in it, the Nether's in DIM-1 and the End's in DIM1. */
+   File rootDir;
+   /** The fire / weather / disaster settings of the Overworld, kept while the player is in another dimension (a new World object has its own). */
+   Properties overworldSettings = new Properties();
+   /** Ticks the player has been standing in a portal, and: the player came out of a portal and has not left it yet. */
+   int portalTime;
+   boolean portalLock;
+   /** While another dimension loads: where the player comes out ({x, z}); and how (0 through a portal, 1 at the spawn point, 2 in the End). */
+   double[] arrivalAt;
+   int arrivalKind;
    int[] spawnXZ = new int[]{0, 0};
    int[] bedPos = null;
    double[] spawnPos = new double[]{0.0, 80.0, 0.0};
@@ -642,7 +653,7 @@ public final class Game {
                   mobName = mobName.substring(8);
                }
 
-               for (int var21 = 0; var21 < 8; var21++) {
+               for (int var21 = 0; var21 < Mobs.N; var21++) {
                   if (Mobs.NAME[var21].equals(mobName)) {
                      double var8 = (var20 - (var14.length - 1) / 2.0) * 1.6;
                      double mx = this.player.x - Math.sin(var17) * summonDist + Math.cos(var17) * var8;
@@ -863,7 +874,18 @@ public final class Game {
       }
 
       var8.mkdirs();
-      this.world = new World(var6, var8);
+      this.rootDir = var8;
+      int startDim = var1 ? Dim.OVERWORLD : (int)d(var4, "dim", 0.0);
+      if (!Dim.valid(startDim)) {
+         startDim = Dim.OVERWORLD;
+      }
+
+      this.overworldSettings = new Properties();
+      this.overworldSettings.putAll(var4);
+      this.portalTime = 0;
+      this.portalLock = false;
+      this.arrivalAt = null;
+      this.world = new World(var6, Dim.dir(var8, startDim), startDim);
       this.world.game = this;
       this.rend.setLod(this.world);
       this.mobs.clear();
@@ -909,13 +931,16 @@ public final class Game {
          this.player.sat = (float)d(var4, "sat", 5.0);
          this.player.flying = Boolean.parseBoolean(var4.getProperty("flying", "false")) || var17 == 3;
          this.world.dayTime = (long)d(var4, "time", 1000.0);
-         this.restoreFireSetting(var4);
+         if (this.world.dim == Dim.OVERWORLD) {
+            this.restoreFireSetting(var4);
+         }
+
          this.spawnXZ = new int[]{(int)d(var4, "spawnx", 0.0), (int)d(var4, "spawnz", 0.0)};
          this.bedPos = var4.getProperty("bedy") == null ? null : new int[]{(int)d(var4, "bedx", 0.0), (int)d(var4, "bedy", 0.0), (int)d(var4, "bedz", 0.0)};
          this.sel = (int)d(var4, "sel", 0.0);
          parseStacks(var4.getProperty("inv", ""), this.inv);
          parseStacks(var4.getProperty("armor", ""), this.armor);
-         this.mobs.load(var8);
+         this.mobs.load(this.world.dir);
          this.needSpawn = false;
       }
 
@@ -954,6 +979,17 @@ public final class Game {
 
    /** /firespread is saved with the world (level.properties) so a world where fire was switched off stays safe. */
    void storeFireSetting(Properties p) {
+      if (this.world.dim != Dim.OVERWORLD) {
+         // somewhere else: the settings of the Overworld were stored when the player left it
+         if (p != this.overworldSettings) {
+            for (String k : this.overworldSettings.stringPropertyNames()) {
+               p.setProperty(k, this.overworldSettings.getProperty(k));
+            }
+         }
+
+         return;
+      }
+
       p.setProperty("firespread", this.world.fire.spread + "");
       p.setProperty("treefall", this.world.trees.enabled + "");
       this.world.disasters.save(p);
@@ -978,9 +1014,14 @@ public final class Game {
    void saveWorld() {
       if (this.world != null) {
          this.world.saveAll();
-         this.mobs.save(this.worldDir());
+         this.mobs.save(this.world.dir);
+         if (this.rootDir == null && this.world.dir == null) {
+            return; // a world that only lives in memory (tests)
+         }
+
          Properties var1 = new Properties();
          var1.setProperty("seed", this.world.seed + "");
+         var1.setProperty("dim", this.world.dim + "");
          var1.setProperty("name", this.worldDisplayName);
          var1.setProperty("x", this.player.x + "");
          var1.setProperty("y", this.player.y + "");
@@ -1008,7 +1049,7 @@ public final class Game {
          var1.setProperty("armor", stacksToString(this.armor));
 
          try {
-            FileOutputStream var2 = new FileOutputStream(new File(this.world.dir, "level.properties"));
+            FileOutputStream var2 = new FileOutputStream(new File(this.rootDir != null ? this.rootDir : this.world.dir, "level.properties"));
 
             try {
                var1.store(var2, "Blockcraft level");
@@ -1027,6 +1068,80 @@ public final class Game {
             var7.printStackTrace();
          }
       }
+   }
+
+   /**
+    * Update 3.12: moves the player to another dimension. The world that is left is saved and closed, the new one is opened (it is its own
+    * World object with its own chunks, tiles and mobs), and the loading screen is shown until the chunks around (x, z) are ready; then
+    * {@link #finishArrival} puts the player where they belong.
+    */
+   void switchDimension(int dim, double x, double z, int kind) {
+      if (this.world == null || !Dim.valid(dim)) {
+         return;
+      }
+
+      World old = this.world;
+      if (old.dim == Dim.OVERWORLD) {
+         this.storeFireSetting(this.overworldSettings);
+      }
+
+      this.saveWorld();
+      for (Chunk c : old.chunks.values()) {
+         c.unloaded = true;
+         if (this.rend != null) {
+            this.rend.onUnload(c);
+         }
+      }
+
+      old.chunks.clear();
+      old.shutdown();
+      World nw = new World(old.seed, Dim.dir(this.rootDir != null ? this.rootDir : old.dir, dim), dim);
+      nw.game = this;
+      nw.saveEnabled = old.saveEnabled;
+      nw.dayTime = old.dayTime;
+      this.world = nw;
+      if (this.rend != null) {
+         nw.unloadHook = this.rend::onUnload;
+         this.rend.setLod(nw);
+      }
+
+      this.mobs.clear();
+      this.mobs.load(nw.dir);
+      if (dim == Dim.OVERWORLD) {
+         this.restoreFireSetting(this.overworldSettings);
+      }
+
+      this.target = null;
+      this.targetMob = null;
+      this.particles.clear();
+      this.portalTime = 0;
+      this.player.setPos(x, dim == Dim.NETHER ? 70.0 : (dim == Dim.END ? 70.0 : 200.0), z);
+      this.arrivalAt = new double[]{x, z};
+      this.arrivalKind = kind;
+      this.setScreen(Game.S.LOADING);
+   }
+
+   /** The chunks around the arrival point are loaded: use or build the portal there, and put the player in it. */
+   void finishArrival() {
+      double[] at = this.arrivalAt;
+      this.arrivalAt = null;
+      double[] pos = null;
+      if (this.arrivalKind == 0) {
+         pos = Portals.arrive(this.world, at[0], at[1]);
+         this.portalLock = true;
+      } else if (this.arrivalKind == 2) {
+         pos = new double[]{at[0], 0.0, at[1]};
+      } else {
+         pos = this.findStand((int)Math.floor(at[0]), (int)Math.floor(at[1]));
+      }
+
+      if (pos == null) {
+         pos = new double[]{at[0], 100.0, at[1]};
+      }
+
+      this.player.setPos(pos[0], pos[1], pos[2]);
+      this.player.fallDistance = 0.0F;
+      this.player.updateBox();
    }
 
    void quitToTitle() {
@@ -1073,6 +1188,23 @@ public final class Game {
 
    void respawn() {
       double[] var1 = null;
+      if (this.world.dim != Dim.OVERWORLD) {
+         // Update 3.12: whoever dies in the Nether or in the End wakes up at home in the Overworld
+         this.player.dead = false;
+         this.player.burn = 0;
+         this.player.health = 20;
+         this.player.food = 20;
+         this.player.sat = 5.0F;
+         this.player.exh = 0.0F;
+         this.player.air = 300;
+         this.player.fallDistance = 0.0F;
+         this.player.invuln = 0;
+         this.deathHandled = false;
+         int[] home = this.bedPos != null ? new int[]{this.bedPos[0], this.bedPos[2]} : this.spawnXZ;
+         this.switchDimension(Dim.OVERWORLD, home[0] + 0.5, home[1] + 0.5, 1);
+         return;
+      }
+
       if (this.bedPos != null) {
          if (Blocks.isBed(this.world.getBlock(this.bedPos[0], this.bedPos[1], this.bedPos[2]))) {
             var1 = this.findStand(this.bedPos[0], this.bedPos[2]);
@@ -1549,14 +1681,14 @@ public final class Game {
                   int var13 = -1;
                   String var17 = var2.length > 1 ? var2[1].toLowerCase() : "";
 
-                  for (int var20 = 0; var20 < 8; var20++) {
+                  for (int var20 = 0; var20 < Mobs.N; var20++) {
                      if (Mobs.NAME[var20].equals(var17)) {
                         var13 = var20;
                      }
                   }
 
                   if (var13 < 0) {
-                     this.say("§cUsage: /summon <pig|cow|sheep|chicken|zombie|skeleton|creeper|spider> [count]");
+                     this.say("§cUsage: /summon <" + String.join("|", java.util.Arrays.copyOf(Mobs.NAME, Mobs.N)) + "> [count]");
                   } else {
                      int var21 = var2.length > 2 ? Math.max(1, Math.min(20, Integer.parseInt(var2[2]))) : 1;
                      double var25 = Math.toRadians(this.player.yaw);
@@ -1935,6 +2067,12 @@ public final class Game {
             }
 
             this.loadingMsg = "Chunks: " + var18 + "/" + var16;
+            if (var19 && this.arrivalAt != null) {
+               // Update 3.12: the new dimension is there: put the player in the portal (this may build one, which the next frames mesh before play goes on)
+               this.finishArrival();
+               var19 = false;
+            }
+
             if (var19) {
                if (this.needSpawn) {
                   double[] var21 = this.findStand(this.spawnXZ[0], this.spawnXZ[1]);
@@ -2226,6 +2364,8 @@ public final class Game {
       if (!var1) {
          this.leftDown = false;
       }
+
+      Portals.tickPlayer(this);
    }
 
    void Tex_tick() {
@@ -3027,6 +3167,13 @@ public final class Game {
    }
 
    void sleepAt(int var1, int var2, int var3) {
+      if (this.world.dim != Dim.OVERWORLD) {
+         // Update 3.12: a bed in the Nether or the End blows up (as in Minecraft)
+         this.world.setBlock(var1, var2, var3, 0);
+         this.mobs.blast(var1 + 0.5, var2 + 0.5, var3 + 0.5, 5, null);
+         return;
+      }
+
       int var4 = this.world.getBlock(var1, var2, var3);
       int var5 = var4 - 133 & 3;
       int var6 = var5 == 2 ? 1 : (var5 == 3 ? -1 : 0);
@@ -3040,7 +3187,7 @@ public final class Game {
          this.say("You can only sleep at night or in a thunderstorm (respawn point set)");
       } else {
          for (Mob var14 : this.mobs.list) {
-            if (!var14.dead && var14.type >= 4 && Math.abs(var14.x - var1) < 8.0 && Math.abs(var14.z - var3) < 8.0 && Math.abs(var14.y - var2) < 5.0) {
+            if (!var14.dead && Mobs.hostile(var14.type) && Math.abs(var14.x - var1) < 8.0 && Math.abs(var14.z - var3) < 8.0 && Math.abs(var14.y - var2) < 5.0) {
                this.say("You may not rest now, there are monsters nearby");
                return;
             }
@@ -4237,6 +4384,13 @@ public final class Game {
 
       if (this.player.eyeInWater) {
          this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, 1612726464);
+      }
+
+      if (this.portalTime > 0) {
+         // Update 3.12: the purple haze of a nether portal grows while you stand in it
+         float k = Math.min(1.0F, this.portalTime / 70.0F);
+         int pulse = (int)(10.0F * Math.sin(this.tickCount * 0.4F));
+         this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, Math.min(255, (int)(k * 150.0F) + pulse) << 24 | 0x7020C0);
       }
 
       if (this.player.burn > 0 && !this.player.creative) {

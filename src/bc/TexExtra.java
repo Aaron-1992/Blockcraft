@@ -71,8 +71,9 @@ final class TexExtra {
       Tex.blit(213, hayTop());
       TexArt37.blocks();
       TexArt310.blocks();
+      TexArt312.blocks();
 
-      for (int var2 = 256; var2 < 400; var2++) {
+      for (int var2 = 256; var2 < Blocks.EXT0; var2++) {
          if (Items.name[var2] != null) {
             int[] var1 = sprite(var2);
             if (var1 != null) {
@@ -662,6 +663,10 @@ final class TexExtra {
    }
 
    static int[] sprite(int var0) {
+      if (var0 >= Items.QUARTZ) {
+         return TexArt312.sprite(var0);
+      }
+
       if (var0 >= 336 && var0 <= 340) {
          return newSprite(var0);
       }

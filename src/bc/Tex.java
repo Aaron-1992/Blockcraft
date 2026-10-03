@@ -867,6 +867,7 @@ public final class Tex {
          upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix));
          upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix));
          upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix));
+         upload(tx(TexArt312.PORTAL), ty(TexArt312.PORTAL), blendFrames(TexArt312.portalFrames[a], TexArt312.portalFrames[b], mix));
          if ((key & 3) == 0) {
             GL30.glGenerateMipmap(3553);
          }
@@ -1058,9 +1059,10 @@ public final class Tex {
             float var10 = var5 * (var0 < 0.99F ? 0.86F + 0.14F * var0 : 1.0F) + var6 * (0.62F + 0.38F * var6);
             float var11 = var5 * var8 + var6 * (0.35F + 0.65F * var6 * var6);
             float var12 = 0.045F;
-            var9 = Math.max(var12 * 0.9F, var9);
-            var10 = Math.max(var12 * 0.9F, var10);
-            var11 = Math.max(var12 * 1.2F, var11);
+            // Update 3.12: the Nether and the End are never pitch black (var1 = ambient light of the dimension)
+            var9 = Math.max(var12 * 0.9F + var1, var9);
+            var10 = Math.max(var12 * 0.9F + var1 * 0.8F, var10);
+            var11 = Math.max(var12 * 1.2F + var1 * 0.78F, var11);
             var9 = gamma(var9, var2);
             var10 = gamma(var10, var2);
             var11 = gamma(var11, var2);

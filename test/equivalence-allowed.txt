@@ -27,3 +27,6 @@ statics ShaderSrc.LOD_VS
 # ---- Update 3.9 (interior surfaces): the default "smart" leaf mode drops faces between two enclosed leaf blocks, so terrain with trees meshes
 # differently; the strict pass below runs with -Dbc.leaves=0 (fancy = 3.5's behaviour) and must still match 3.5 exactly
 mesh terrain
+
+# ---- Update 3.12 (dimensions, villages, 1.12 content): more mobs (the mob tables grew), new blocks / items / recipes (already allowed above) ----
+statics Mobs.

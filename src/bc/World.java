@@ -28,6 +28,8 @@ import java.util.zip.GZIPOutputStream;
 
 public final class World {
    public final long seed;
+   /** Update 3.12: 0 = Overworld, -1 = Nether, 1 = End (see Dim). */
+   public final int dim;
    public final Gen gen;
    public final File dir;
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
@@ -76,16 +78,26 @@ public final class World {
    public boolean rayFluids;
 
    public World(long var1, File var3) {
+      this(var1, var3, Dim.OVERWORLD);
+   }
+
+   public World(long var1, File var3, int dimension) {
       this.seed = var1;
-      this.gen = new Gen(var1);
+      this.dim = dimension;
+      this.gen = Dim.makeGen(dimension, var1);
       this.weather = new Weather(this);
+      if (dimension != Dim.OVERWORLD) {
+         this.weather.enabled = false;
+         this.disasters.enabled = false;
+      }
+
       this.dir = var3;
       if (var3 != null) {
          var3.mkdirs();
       }
 
       this.loadTiles();
-      if (var3 != null) {
+      if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
          // chunk files from before 3.11 have no summary yet: a background thread makes them (chunks that are loaded are summarised from live data)
          this.lodMap.scan(var3, this.gen, (cx, cz) -> this.chunks.containsKey(key(cx, cz)));
@@ -297,8 +309,10 @@ public final class World {
 
             var2.close();
             // Update 3.11: the distant terrain shows what is really there (a house, a pit, a burnt forest) even after the chunk is gone
-            this.lodMap.update(var1, this.gen);
-            this.lodMap.stamp(var1.cx, var1.cz, this.chunkFile(var1.cx, var1.cz).lastModified());
+            if (this.dim == Dim.OVERWORLD) {
+               this.lodMap.update(var1, this.gen);
+               this.lodMap.stamp(var1.cx, var1.cz, this.chunkFile(var1.cx, var1.cz).lastModified());
+            }
          } catch (IOException var7) {
             System.err.println("Failed to save chunk: " + var7);
          }
@@ -325,7 +339,9 @@ public final class World {
       }
 
       this.saveTiles();
-      this.lodMap.save(this.dir);
+      if (this.dim == Dim.OVERWORLD) {
+         this.lodMap.save(this.dir);
+      }
    }
 
    public void shutdown() {
@@ -502,41 +518,45 @@ public final class World {
          this.chunk(var1.cx + 1, var1.cz), this.chunk(var1.cx - 1, var1.cz), this.chunk(var1.cx, var1.cz + 1), this.chunk(var1.cx, var1.cz - 1)
       };
 
-      for (int var5 = 0; var5 < 16; var5++) {
-         for (int var6 = 0; var6 < 16; var6++) {
-            int var7 = var1.hm[var5 * 16 + var6];
+      if (this.dim == Dim.OVERWORLD) {
+         // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
+         for (int var5 = 0; var5 < 16; var5++) {
+            for (int var6 = 0; var6 < 16; var6++) {
+               int var7 = var1.hm[var5 * 16 + var6];
 
-            for (int var8 = var7 + 1; var8 < 256; var8++) {
-               var1.setSky(var6, var8, var5, 15);
-            }
-
-            int var21 = var7;
-            int[][] var9 = new int[][]{{var6 + 1, var5}, {var6 - 1, var5}, {var6, var5 + 1}, {var6, var5 - 1}};
-
-            for (int[] var13 : var9) {
-               int var14;
-               if (var13[0] >= 0 && var13[0] < 16 && var13[1] >= 0 && var13[1] < 16) {
-                  var14 = var1.hm[var13[1] * 16 + var13[0]];
-               } else {
-                  Chunk var15 = this.chunk(var2 + var13[0] >> 4, var3 + var13[1] >> 4);
-                  var14 = var15 == null ? var7 : var15.hm[(var13[1] & 15) * 16 + (var13[0] & 15)];
+               for (int var8 = var7 + 1; var8 < 256; var8++) {
+                  var1.setSky(var6, var8, var5, 15);
                }
 
-               if (var14 > var21) {
-                  var21 = var14;
+               int var21 = var7;
+               int[][] var9 = new int[][]{{var6 + 1, var5}, {var6 - 1, var5}, {var6, var5 + 1}, {var6, var5 - 1}};
+
+               for (int[] var13 : var9) {
+                  int var14;
+                  if (var13[0] >= 0 && var13[0] < 16 && var13[1] >= 0 && var13[1] < 16) {
+                     var14 = var1.hm[var13[1] * 16 + var13[0]];
+                  } else {
+                     Chunk var15 = this.chunk(var2 + var13[0] >> 4, var3 + var13[1] >> 4);
+                     var14 = var15 == null ? var7 : var15.hm[(var13[1] & 15) * 16 + (var13[0] & 15)];
+                  }
+
+                  if (var14 > var21) {
+                     var21 = var14;
+                  }
                }
-            }
 
-            int var26 = Math.min(255, Math.max(var7 + 1, var21));
+               int var26 = Math.min(255, Math.max(var7 + 1, var21));
 
-            for (int var28 = var7 + 1; var28 <= var26; var28++) {
-               this.addQ.add(pack(var2 + var6, var28, var3 + var5));
+               for (int var28 = var7 + 1; var28 <= var26; var28++) {
+                  this.addQ.add(pack(var2 + var6, var28, var3 + var5));
+               }
             }
          }
+
+         this.pullNeighbors(var1, true, var4);
+         this.propagate(true);
       }
 
-      this.pullNeighbors(var1, true, var4);
-      this.propagate(true);
       short[] var16 = var1.blocks;
 
       for (int var17 = 0; var17 < var16.length; var17++) {
@@ -620,6 +640,7 @@ public final class World {
          var5.lodDirty = this.tickCount + 1L;
          if (var4 == Blocks.FIRE) {
             this.fire.added(var1, var2, var3);
+            Portals.tryLight(this, var1, var2, var3);
          } else if (var8 == Blocks.FIRE) {
             this.fire.removed(var1, var2, var3);
          }
@@ -637,7 +658,7 @@ public final class World {
             int var12 = 0;
             if (!var10) {
                var12 = Blocks.emit[var4];
-            } else if (Blocks.opacity[var4] == 0 && (var2 == 255 || this.getSky(var1, var2 + 1, var3) == 15)) {
+            } else if (this.dim == Dim.OVERWORLD && Blocks.opacity[var4] == 0 && (var2 == 255 || this.getSky(var1, var2 + 1, var3) == 15)) {
                var12 = 15;
             }
 
@@ -716,6 +737,7 @@ public final class World {
                || var8 == 28
                || Blocks.isDoor(var8)
                || Blocks.isCake(var8)
+               || Blocks.isPortal(var8)
                || Blocks.isWallTorch(var8)) {
                this.scheduleBlock(var5, var6, var7);
             }
@@ -726,7 +748,7 @@ public final class World {
    public void tick() {
       this.tickCount++;
       this.dayTime++;
-      if (this.tickCount % 20L == 0L) {
+      if (this.tickCount % 20L == 0L && this.dim == Dim.OVERWORLD) {
          this.lodRefresh();
       }
 
@@ -764,8 +786,11 @@ public final class World {
       this.tickCrops();
       this.fire.tick();
       this.trees.tick();
-      this.disasters.tick();
-      this.weather.tick();
+      if (this.dim == Dim.OVERWORLD) {
+         // no sky, no weather, no earthquakes in the other dimensions
+         this.disasters.tick();
+         this.weather.tick();
+      }
 
       for (World.Item var13 : this.items) {
          this.tickItem(var13);
@@ -1018,6 +1043,10 @@ public final class World {
          }
       } else if (Blocks.isFire(var4)) {
          this.fire.check(var1, var2, var3);
+      } else if (Blocks.isPortal(var4)) {
+         if (!Portals.intact(this, var1, var2, var3)) {
+            this.setBlock(var1, var2, var3, 0);
+         }
       } else {
          if (var4 != 7 && var4 != 8) {
             if (Blocks.kind[var4] == 1 || var4 == 32) {

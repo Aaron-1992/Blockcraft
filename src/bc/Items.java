@@ -53,6 +53,16 @@ public final class Items {
    public static final int EGG = 349;
    public static final int CAKE = 350;
    public static final int END = 351;
+   // ---- Update 3.12 ----
+   public static final int QUARTZ = 352;
+   public static final int NETHER_BRICK = 353;
+   public static final int BLAZE_ROD = 354;
+   public static final int BLAZE_POWDER = 355;
+   public static final int GHAST_TEAR = 356;
+   public static final int GOLD_NUGGET = 357;
+   public static final int ENDER_PEARL = 358;
+   public static final int EYE_OF_ENDER = 359;
+   public static final int EMERALD = 360;
    public static final int ITEM_TILE_BASE = 65;
    public static final int C_NONE = 0;
    public static final int C_PICK = 1;
@@ -93,6 +103,13 @@ public final class Items {
       name[var0] = var1;
       tile[var0] = 65 + var2;
       maxStack[var0] = 64;
+   }
+
+   /** Update 3.12: an item whose picture is the atlas tile {@code tile} (any tile, not only 65 + offset). */
+   static void defTile(int id, String itemName, int atlasTile) {
+      name[id] = itemName;
+      tile[id] = atlasTile;
+      maxStack[id] = 64;
    }
 
    private static void food(int var0, int var1, float var2) {
@@ -374,5 +391,8 @@ public final class Items {
             maxDmg[var34] = ARMOR_DUR_BASE[var33] * ARMOR_DUR_MUL[var31];
          }
       }
+
+      // ---- Update 3.12 ----
+      Items312.register();
    }
 }

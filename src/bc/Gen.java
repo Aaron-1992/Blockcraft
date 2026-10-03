@@ -2,7 +2,7 @@ package bc;
 
 import java.util.Random;
 
-public final class Gen {
+public class Gen {
    public static final int SEA = 63;
    public static final int OCEAN = 0;
    public static final int BEACH = 1;

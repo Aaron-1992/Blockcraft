@@ -53,6 +53,7 @@ public final class Renderer {
    public float sunAngle;
    float lastLm = -1.0F;
    float lastGamma = -1.0F;
+   float lastAmbient = -1.0F;
    final float[] stars = new float[2100];
    public int visibleSections;
    public int drawCalls;
@@ -81,7 +82,8 @@ public final class Renderer {
          this.lod.dispose();
       }
 
-      this.lod = var1 == null ? null : new Lod(this, var1.gen, var1.lodMap);
+      // Update 3.12: only the Overworld has distant terrain (LOD); the Nether and the End are drawn as far as the view distance goes
+      this.lod = var1 == null || var1.dim != Dim.OVERWORLD ? null : new Lod(this, var1.gen, var1.lodMap);
    }
 
    public Renderer(Game var1) {
@@ -318,6 +320,20 @@ public final class Renderer {
    }
 
    public void computeSky(long var1, float var3) {
+      World cw = this.g.world;
+      if (cw != null && cw.dim != Dim.OVERWORLD) {
+         // Update 3.12: no sun, no day and night, no weather: a fixed fog colour, a fixed light
+         float[] fc = Dim.fog(cw.dim);
+         this.fogR = this.topR = fc[0];
+         this.fogG = this.topG = fc[1];
+         this.fogB = this.topB = fc[2];
+         this.daylight = cw.dim == Dim.NETHER ? 0.4F : 0.3F;
+         this.skyLightFactor = 1.0F;
+         this.sunAngle = (float)(Math.PI * 1.5);
+         this.wfx.updateLocal(var3);
+         return;
+      }
+
       float var4 = (float)(var1 % 24000L) + var3;
       this.sunAngle = (float)((Math.PI * 2) * (var4 - 6000.0F) / 24000.0);
       float var5 = (float)Math.cos(this.sunAngle);
@@ -377,12 +393,14 @@ public final class Renderer {
 
    void updateLightmap() {
       float var1 = this.g.opt.gamma;
-      if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma) {
+      float ambient = this.g.world == null ? 0.0F : Dim.ambient(this.g.world.dim);
+      if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient) {
          GL13.glActiveTexture(33985);
-         Tex.updateLightmap(this.skyLightFactor, 0.0F, var1);
+         Tex.updateLightmap(this.skyLightFactor, ambient, var1);
          GL13.glActiveTexture(33984);
          this.lastLm = this.skyLightFactor;
          this.lastGamma = var1;
+         this.lastAmbient = ambient;
       }
    }
 
@@ -409,7 +427,7 @@ public final class Renderer {
 
       float var13 = Tex.lightCurve(var11) * this.skyLightFactor;
       float var14 = Tex.lightCurve(var12);
-      return Math.max(0.08F, Math.min(1.0F, Math.max(var13, var14) + 0.05F));
+      return Math.max(0.08F + Dim.ambient(var1.dim), Math.min(1.0F, Math.max(var13, var14) + 0.05F));
    }
 
    void extractFrustum() {
@@ -559,6 +577,12 @@ public final class Renderer {
          var11 = 1.0F; // Update 3.11: the ground is see-through for a spectator: the sky shows through it, no cave darkness
       }
 
+      // Update 3.12: the Nether and the End have no sky: nothing of the sky is drawn, and being "under ground" does not darken the fog
+      final boolean skyOn = var5.dim == Dim.OVERWORLD;
+      if (!skyOn) {
+         var11 = 1.0F;
+      }
+
       this.caveF = this.caveF + (var11 - this.caveF) * 0.04F;
       float var12 = 0.04F + 0.96F * this.caveF;
       this.fogR *= var12;
@@ -580,6 +604,10 @@ public final class Renderer {
 
       var12 = var14;
       var11 = var14 * (var16 ? 0.4F : 0.55F);
+      if (var5.dim == Dim.NETHER) {
+         var12 = Math.min(var12, 104.0F); // the thick red haze of the Nether
+         var11 = var12 * 0.1F;
+      }
       // Update 3.8: rain and storms pull the haze in close
       float wxFog = Math.min(1.0F, this.wfx.rain * 0.9F + this.wfx.storm * 0.1F);
       var11 *= 1.0F - 0.55F * wxFog;
@@ -628,7 +656,7 @@ public final class Renderer {
       GL11.glGetFloatv(2982, this.mv);
       this.extractFrustum();
       GL11.glDisable(2912);
-      if (!var6 && !var7) {
+      if (!var6 && !var7 && skyOn) {
          this.drawSky(var41, var42, var43);
       }
 
@@ -698,7 +726,7 @@ public final class Renderer {
          float var55 = (float)(-Math.sin(var52));
          float var58 = (float)Math.cos(var52);
          this.sh.setSun(var55, var58, 0.0F);
-         var51 = var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F;
+         var51 = skyOn && var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F;
          if (var51) {
             if (++this.shFrames >= 30 || this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ)) {
                this.shFrames = 0;
@@ -783,7 +811,7 @@ public final class Renderer {
          this.drawSelection();
       }
 
-      if (this.g.opt.clouds && !var6 && !var7 && (!var50 || !this.sh.cloudsOk || !this.sh.sceneActive)) {
+      if (skyOn && this.g.opt.clouds && !var6 && !var7 && (!var50 || !this.sh.cloudsOk || !this.sh.sceneActive)) {
          this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
       }
 
@@ -844,11 +872,11 @@ public final class Renderer {
       GL11.glDisable(3042);
       GL11.glDisable(2912);
       GL11.glDepthMask(true);
-      if (var50 && this.g.opt.clouds && !var6 && !var7 && this.sh.cloudsOk && this.sh.sceneActive) {
+      if (skyOn && var50 && this.g.opt.clouds && !var6 && !var7 && this.sh.cloudsOk && this.sh.sceneActive) {
          this.sh.renderClouds(this.proj, this.mv, this.camX, this.camY, this.camZ, var27, var28, var26, var2, var3, this.wfx);
       }
 
-      if (!var6 && !var7) {
+      if (skyOn && !var6 && !var7) {
          // Update 3.10: tornado funnels and wall clouds, meteors
          DisasterFx.drawSky(this, var1);
          // rain curtains in the distance, rain / snow around you, lightning
@@ -929,6 +957,8 @@ public final class Renderer {
          return new float[]{1.0F, 0.82F, 0.5F};
       } else if (Blocks.isLava(var0)) {
          return new float[]{1.0F, 0.42F, 0.1F};
+      } else if (Blocks.isPortal(var0)) {
+         return new float[]{0.62F, 0.3F, 1.0F};
       } else {
          return var0 == 68 ? new float[]{1.0F, 0.55F, 0.22F} : new float[]{1.0F, 0.66F, 0.3F};
       }

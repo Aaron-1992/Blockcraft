@@ -20,9 +20,21 @@ public final class Mobs {
    public static final int SKELETON = 5;
    public static final int CREEPER = 6;
    public static final int SPIDER = 7;
-   public static final int N = 8;
-   public static final String[] NAME = new String[]{"pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider"};
-   static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16};
+   // ---- Update 3.12 ----
+   public static final int ZOMBIE_PIGMAN = 8;
+   public static final int GHAST = 9;
+   public static final int BLAZE = 10;
+   public static final int MAGMA_CUBE = 11;
+   public static final int VILLAGER = 12;
+   public static final int IRON_GOLEM = 13;
+   public static final int ENDERMAN = 14;
+   public static final int ENDER_DRAGON = 15;
+   public static final int PARROT = 16;
+   public static final int N = 12;
+   public static final String[] NAME = new String[]{
+      "pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider", "pigman", "ghast", "blaze", "magmacube", "villager", "irongolem", "enderman", "enderdragon", "parrot"
+   };
+   static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16, 20, 10, 20, 16, 20, 100, 40, 200, 6};
    /** Lights a creeper's fuse (flint and steel). False for anything else, or if it is already lit. */
    public boolean ignite(Mobs.Mob m) {
       if (m == null || m.dead || m.type != CREEPER || m.ignited) {
@@ -40,20 +52,24 @@ public final class Mobs {
     * getting on top of it.
     */
    static final double JUMP = 0.42 / 0.98 + 0.08;
-   static final float[] W = new float[]{0.9F, 0.9F, 0.9F, 0.4F, 0.6F, 0.6F, 0.6F, 1.4F};
-   static final float[] H = new float[]{0.9F, 1.4F, 1.3F, 0.7F, 1.95F, 1.99F, 1.7F, 0.9F};
-   static final float[] SPD = new float[]{0.1F, 0.1F, 0.1F, 0.1F, 0.13F, 0.125F, 0.125F, 0.17F};
+   static final float[] W = new float[]{0.9F, 0.9F, 0.9F, 0.4F, 0.6F, 0.6F, 0.6F, 1.4F, 0.6F, 4.0F, 0.6F, 0.52F, 0.6F, 1.4F, 0.6F, 8.0F, 0.5F};
+   static final float[] H = new float[]{0.9F, 1.4F, 1.3F, 0.7F, 1.95F, 1.99F, 1.7F, 0.9F, 1.95F, 4.0F, 1.8F, 0.52F, 1.95F, 2.7F, 2.9F, 4.0F, 0.9F};
+   static final float[] SPD = new float[]{0.1F, 0.1F, 0.1F, 0.1F, 0.13F, 0.125F, 0.125F, 0.17F, 0.12F, 0.05F, 0.06F, 0.1F, 0.1F, 0.1F, 0.16F, 0.5F, 0.12F};
    static final int[] SHEEP_COLORS = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 7, 15, 12, 6};
    final Game g;
    public final ArrayList<Mobs.Mob> list = new ArrayList();
    public final ArrayList<Mobs.Arrow> arrows = new ArrayList();
+   /** Update 3.12: what ghasts and blazes shoot. */
+   public final ArrayList<Mobs312.Fireball> fireballs = new ArrayList();
+   /** Update 3.12: the vertical speed a flying mob (ghast, blaze, dragon, parrot) is working towards this tick. */
+   double flyVy;
    final Random rnd = new Random();
    int timer;
    final double[] res = new double[3];
    final HashMap<Long, Integer> spawnerCd = new HashMap();
 
    public static boolean hostile(int var0) {
-      return var0 >= 4;
+      return var0 >= 4 && !Mobs312.peaceful(var0);
    }
 
    public Mobs(Game var1) {
@@ -63,6 +79,7 @@ public final class Mobs {
    public void clear() {
       this.list.clear();
       this.arrows.clear();
+      this.fireballs.clear();
    }
 
    public int count(boolean var1) {
@@ -99,6 +116,8 @@ public final class Mobs {
       if (var1 == 2) {
          var8.color = SHEEP_COLORS[this.rnd.nextInt(SHEEP_COLORS.length)];
       }
+
+      Mobs312.born(var8, this.rnd);
 
       this.list.add(var8);
       return var8;
@@ -146,12 +165,18 @@ public final class Mobs {
          }
 
          if (this.timer % 20 == 0) {
-            this.spawnHostile(var1, var2, var3);
+            if (var1.dim == Dim.OVERWORLD) {
+               this.spawnHostile(var1, var2, var3);
+            } else {
+               Mobs312.spawnElsewhere(this, var1, var2);
+            }
          }
 
-         if (this.timer % 40 == 7) {
+         if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD) {
             this.spawnPassive(var1, var2);
          }
+
+         Mobs312.tickFireballs(this, var1, var2);
       }
    }
 
@@ -220,7 +245,7 @@ public final class Mobs {
       int var5 = (int)Math.floor(var1.x);
       int var6 = (int)Math.floor(var1.z);
       var1.inWater = Blocks.isWater(var2.getBlock(var5, (int)Math.floor(var1.y + 0.3), var6));
-      boolean var7 = Blocks.isLava(var2.getBlock(var5, (int)Math.floor(var1.y + 0.1), var6));
+      boolean var7 = Blocks.isLava(var2.getBlock(var5, (int)Math.floor(var1.y + 0.1), var6)) && !Mobs312.fireproof(var1.type);
       if (var7 && var1.age % 10 == 0) {
          this.hurtMob(var1, 4, var1.x, var1.z, 0.0, false);
       }
@@ -230,7 +255,7 @@ public final class Mobs {
       }
 
       // Update 3.7: standing in a fire sets a creature alight
-      if (Blocks.isFire(var2.getBlock(var5, (int)Math.floor(var1.y + 0.1), var6)) || Blocks.isFire(var2.getBlock(var5, (int)Math.floor(var1.y + 0.9), var6))) {
+      if (!Mobs312.fireproof(var1.type) && (Blocks.isFire(var2.getBlock(var5, (int)Math.floor(var1.y + 0.1), var6)) || Blocks.isFire(var2.getBlock(var5, (int)Math.floor(var1.y + 0.9), var6)))) {
          var1.burn = Math.max(var1.burn, 160);
          if (var1.age % 10 == 0) {
             this.hurtMob(var1, 1, var1.x, var1.z, 0.0, false);
@@ -278,6 +303,7 @@ public final class Mobs {
          double var10 = 0.0;
          boolean var12 = false;
          var1.hasTarget = false;
+         this.flyVy = 0.0;
          double var13 = SPD[var1.type];
          boolean var15 = hostile(var1.type) && this.targetable(var3);
          double var16 = var3.x - var1.x;
@@ -428,6 +454,22 @@ public final class Mobs {
                   var1.cd--;
                }
                break;
+            case 8:
+            case 9:
+            case 10:
+            case 11:
+               // Update 3.12: the mobs of the Nether (Mobs312)
+               Mobs312.Intent intent312 = Mobs312.think(this, var1, var2, var3, var4);
+               var12 = intent312.moving;
+               var13 *= intent312.speed;
+               if (!Float.isNaN(intent312.headYaw)) {
+                  var26 = intent312.headYaw;
+               }
+
+               if (!Float.isNaN(intent312.headPitch)) {
+                  var27 = intent312.headPitch;
+               }
+               break;
             default:
                Mobs.Mob mate = var1.flee <= 0 && var1.love > 0 ? this.findMate(var1) : null;
                if (var1.flee > 0) {
@@ -479,7 +521,7 @@ public final class Mobs {
          var42 = Math.max(-50.0F, Math.min(50.0F, var42));
          var1.headYaw = var1.headYaw + (var1.yaw + var42 - var1.headYaw) * 0.4F;
          var1.headPitch = var1.headPitch + (var27 - var1.headPitch) * 0.4F;
-         if (var12 && !var1.hasTarget && var1.flee <= 0) {
+         if (var12 && !var1.hasTarget && var1.flee <= 0 && !Mobs312.flies(var1.type)) {
             double var29 = var1.x + var8 * 8.0;
             double var31 = var1.z + var10 * 8.0;
             int var33 = (int)Math.floor(var1.y);
@@ -509,8 +551,13 @@ public final class Mobs {
          double var44 = var1.onGround ? 0.4 : 0.06;
          var1.vx = var1.vx + (var8 - var1.vx) * var44;
          var1.vz = var1.vz + (var10 - var1.vz) * var44;
-         var1.vy -= 0.08;
-         var1.vy *= 0.98;
+         if (Mobs312.flies(var1.type)) {
+            var1.vy += (this.flyVy - var1.vy) * 0.15;
+         } else {
+            var1.vy -= 0.08;
+            var1.vy *= 0.98;
+         }
+
          if (var1.inWater) {
             var1.vy *= 0.8;
             var1.vy += 0.045;
@@ -799,6 +846,7 @@ public final class Mobs {
             var1.fleeZ = var5;
          } else if (var9) {
             var1.angry = 400;
+            Mobs312.angerNeighbours(this, var1);
          }
 
          if (var1.health <= 0) {
@@ -854,6 +902,9 @@ public final class Mobs {
             break;
          case 7:
             this.drop(var2, var1, 263, this.rnd.nextInt(3));
+            break;
+         default:
+            Mobs312.kill(this, var1, var2);
       }
    }
 
@@ -1007,6 +1058,9 @@ public final class Mobs {
                         if (var12 < 6) {
                            int var22 = (int)(Math.abs(var9) % 3L);
                            var22 = var22 == 0 ? 4 : (var22 == 1 ? 5 : 7);
+                           if (var1.dim == Dim.NETHER) {
+                              var22 = BLAZE; // the spawners of a nether fortress make blazes
+                           }
                            int var24 = 1 + this.rnd.nextInt(3);
 
                            for (int var15 = 0; var15 < var24; var15++) {
@@ -1147,6 +1201,10 @@ public final class Mobs {
    }
 
    public void save(File var1) {
+      if (var1 == null) {
+         return;
+      }
+
       try {
          PrintWriter var2 = new PrintWriter(new FileWriter(new File(var1, "mobs.dat")));
 
@@ -1173,6 +1231,10 @@ public final class Mobs {
    }
 
    public void load(File var1) {
+      if (var1 == null) {
+         return;
+      }
+
       File var2 = new File(var1, "mobs.dat");
       if (var2.exists()) {
          try {
@@ -1291,6 +1353,11 @@ public final class Mobs {
       public int woolTimer;
       /** Ticks until a (grown-up) chicken lays its next egg; 0 = not started yet. */
       public int eggTimer;
+      /** Update 3.12: magma cubes: 1 small .. 3 large (the size is also the scale of the model and of the box). */
+      public int size;
+      public float scale = 1.0F;
+      /** Update 3.12: a little data of a mob that has more than a type (the profession of a villager, the colour of a parrot ...). */
+      public int variant;
 
       public boolean isBaby() {
          return this.babyAge > 0;
@@ -1300,7 +1367,7 @@ public final class Mobs {
          this.x = var1;
          this.y = var3;
          this.z = var5;
-         float var8 = this.babyAge > 0 ? 0.5F : 1.0F;
+         float var8 = (this.babyAge > 0 ? 0.5F : 1.0F) * this.scale;
          float var7 = Mobs.W[this.type] * var8 / 2.0F;
          this.bb[0] = this.x - var7;
          this.bb[1] = this.y;

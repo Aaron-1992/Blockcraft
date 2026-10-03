@@ -475,7 +475,7 @@ public final class Gui {
       } else if (Blocks.isSlab(var0)) {
          return new double[][]{{0.0, 0.0, 0.0, 1.0, 0.5, 1.0}};
       } else {
-         return var0 == 118
+         return Blocks.isFence(var0)
             ? new double[][]{{0.375, 0.0, 0.375, 0.625, 1.0, 0.625}, {0.0, 0.62, 0.44, 1.0, 0.82, 0.56}, {0.0, 0.22, 0.44, 1.0, 0.42, 0.56}}
             : null;
       }

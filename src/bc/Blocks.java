@@ -85,6 +85,24 @@ public final class Blocks {
     */
    public static final int MAX = 4096;
    public static final int EXT0 = 1024;
+   // ---- Update 3.12: the Nether ----
+   public static final int NETHERRACK = 1024;
+   public static final int SOUL_SAND = 1025;
+   public static final int QUARTZ_ORE = 1026;
+   public static final int NETHER_BRICKS = 1027;
+   public static final int MAGMA = 1028;
+   public static final int QUARTZ_BLOCK = 1029;
+   /** The purple film in an obsidian frame: _X lies in the x/y plane (you walk through it along z), _Z in the z/y plane. */
+   public static final int PORTAL_X = 1030;
+   public static final int PORTAL_Z = 1031;
+   public static final int NETHER_BRICK_FENCE = 1032;
+   // ---- Update 3.12: the End ----
+   public static final int END_STONE = 1040;
+   /** The frame blocks of the End portal (in strongholds): empty, and with an eye of ender in it. */
+   public static final int END_FRAME = 1041;
+   public static final int END_FRAME_EYE = 1042;
+   public static final int END_PORTAL = 1043;
+   public static final int DRAGON_EGG = 1044;
 
    /** True for every id that can be a block (0..255 and EXT0..MAX-1); the ids in between are items. */
    public static boolean isBlockId(int id) {
@@ -100,6 +118,8 @@ public final class Blocks {
    public static final int K_WTORCH = 5;
    public static final int K_FENCE = 6;
    public static final int K_CROP = 7;
+   /** Update 3.12: a flat, translucent film in the middle of the cell (nether portal). */
+   public static final int K_PORTAL = 8;
    public static final int T_NONE = 0;
    public static final int T_GRASS = 1;
    public static final int T_FOLIAGE = 2;
@@ -329,6 +349,20 @@ public final class Blocks {
       return var0 >= 12 && var0 <= 14;
    }
 
+   /** Update 3.12: the film inside a nether portal frame. */
+   public static boolean isPortal(int var0) {
+      return var0 == PORTAL_X || var0 == PORTAL_Z;
+   }
+
+   /** Fences link to each other (the oak fence and the nether brick fence do too). */
+   public static boolean isFence(int var0) {
+      return var0 == FENCE || var0 == NETHER_BRICK_FENCE;
+   }
+
+   public static boolean isEndFrame(int var0) {
+      return var0 == END_FRAME || var0 == END_FRAME_EYE;
+   }
+
    public static boolean isLog(int var0) {
       return var0 >= 9 && var0 <= 11;
    }
@@ -359,7 +393,7 @@ public final class Blocks {
    }
 
    public static boolean targetable(int var0) {
-      return var0 != 0 && !isFluid(var0);
+      return var0 != 0 && !isFluid(var0) && !isPortal(var0) && var0 != END_PORTAL;
    }
 
    public static boolean breakable(int var0) {
@@ -417,6 +451,7 @@ public final class Blocks {
          var1.add(var13);
       }
 
+      Blocks312.addToCreative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -897,5 +932,8 @@ public final class Blocks {
          mineClass[ax] = 2;
          mineClass[az] = 2;
       }
+
+      // ---- Update 3.12: everything new lives in Blocks312 (ids from EXT0 up) ----
+      Blocks312.register();
    }
 }

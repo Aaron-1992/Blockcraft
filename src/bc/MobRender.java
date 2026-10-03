@@ -19,7 +19,7 @@ public final class MobRender {
    static final int STATIC = 9;
    static final int SLEGR = 10;
    static final int SLEGL = 11;
-   static final MobRender.Model[] models = new MobRender.Model[8];
+   static final MobRender.Model[] models = new MobRender.Model[Mobs.N];
    static boolean built;
    static final int[] SHEEP_RGB = new int[16];
    static int[] pix;
@@ -158,6 +158,7 @@ public final class MobRender {
          }
 
          models[7] = var0;
+         MobModels312.build(models);
 
          for (MobRender.Model var32 : models) {
             paint(var32);
@@ -265,6 +266,12 @@ public final class MobRender {
                         case 6:
                            float var13 = vnoise(var8 * 0.5F, var9 * 0.5F, 9);
                            var12 = 0.72F + var13 * 0.55F;
+                     }
+
+                     float[] px312 = MobModels312.pixel(var0, var2, var8, var9, var3);
+                     if (px312 != null) {
+                        var11 = (int)px312[0];
+                        var12 = px312[1];
                      }
 
                      put(var8, var9, mul(var11, var5 * var12 * (1.0F + var10)) & 16777215);
@@ -380,6 +387,8 @@ public final class MobRender {
             put(var14[0] + 4, var14[1] + 4, 10489872);
       }
 
+      MobModels312.details(var0);
+
       ByteBuffer var31 = BufferUtils.createByteBuffer(var0.tw * var0.th * 4);
 
       for (int var38 = 0; var38 < pix.length; var38++) {
@@ -456,12 +465,14 @@ public final class MobRender {
          double var14 = var8 - var1.camX;
          double var16 = var10 - var1.camY;
          double var18 = var12 - var1.camZ;
-         if (!(var14 * var14 + var16 * var16 + var18 * var18 > 6400.0) && var1.visible((float)var14, (float)var16 + 1.0F, (float)var18, 2.2F)) {
+         float reach = Math.max(2.2F, Mobs.W[var7.type] * var7.scale * 0.9F);
+         if (!(var14 * var14 + var16 * var16 + var18 * var18 > 6400.0 + reach * reach * 16.0) && var1.visible((float)var14, (float)var16 + Mobs.H[var7.type] * var7.scale * 0.5F, (float)var18, reach)) {
             drawMob(var7, var3, var1, var2, var8, var10, var12);
          }
       }
 
       drawArrows(var4, var1, var2);
+      drawFireballs(var4, var1, var2);
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
       if (var5) {
          GL11.glEnable(2884);
@@ -509,6 +520,11 @@ public final class MobRender {
          GL11.glScalef(0.5F, 0.5F, 0.5F);
       }
 
+      float modelScale = var10.scale * var0.scale;
+      if (modelScale != 1.0F) {
+         GL11.glScalef(modelScale, modelScale, modelScale);
+      }
+
       if (var0.dead) {
          float var21 = Math.min(1.0F, (var0.deathTime + var3) / 20.0F);
          GL11.glTranslatef(0.0F, 0.3F * var21, 0.0F);
@@ -540,6 +556,11 @@ public final class MobRender {
 
       for (MobRender.Part var28 : var10.parts) {
          GL11.glPushMatrix();
+         if (var28.kind == 12) {
+            // Update 3.12: the rods of a blaze circle round its head, each ring at its own pace
+            GL11.glRotatef((var0.age + var3) * (var28.ry > 30.0F ? -3.0F : 4.5F) + var28.ry, 0.0F, 1.0F, 0.0F);
+         }
+
          GL11.glTranslatef(var28.px / 16.0F, var28.py / 16.0F, var28.pz / 16.0F);
          switch (var28.kind) {
             case 1:
@@ -563,7 +584,7 @@ public final class MobRender {
             case 5:
             case 6:
                float var30 = var28.kind == 5 ? 1.0F : -1.0F;
-               if (var0.type == 4) {
+               if (var0.type == 4 || var0.type == Mobs.ZOMBIE_PIGMAN) {
                   float var32 = (float)Math.sin((var0.age + var3) * 0.09F) * 3.0F;
                   float var25 = var0.hasTarget ? -90.0F : -35.0F;
                   if (var0.attackAnim > 0) {
@@ -586,6 +607,14 @@ public final class MobRender {
                float var29 = var0.onGround ? 0.0F : (float)(Math.sin((var0.age + var3) * 1.1F) * 50.0 + 40.0);
                GL11.glRotatef(var28.kind == 7 ? -var29 : var29, 0.0F, 0.0F, 1.0F);
                GL11.glRotatef(var28.kind == 7 ? 4.0F : -4.0F, 0.0F, 0.0F, 1.0F);
+               break;
+            case 12:
+               GL11.glTranslatef(0.0F, (float)Math.sin((var0.age + var3) * 0.15F + var28.idx) * 0.07F, 0.0F);
+               break;
+            case 13:
+               // the tentacles of a ghast sway
+               GL11.glRotatef((float)Math.sin((var0.age + var3) * 0.12F + var28.idx * 0.9F) * 9.0F, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef((float)Math.cos((var0.age + var3) * 0.1F + var28.idx * 1.3F) * 9.0F, 0.0F, 0.0F, 1.0F);
                break;
             case 10:
             case 11:
@@ -616,6 +645,53 @@ public final class MobRender {
       }
 
       GL11.glPopMatrix();
+   }
+
+   /** Update 3.12: fireballs are glowing cubes (an orange one with a yellow heart) that tumble as they fly; not lit by the world, they glow. */
+   static void drawFireballs(Mobs ms, Renderer rend, float partial) {
+      if (ms.fireballs.isEmpty()) {
+         return;
+      }
+
+      GL11.glDisable(3553);
+      for (Mobs312.Fireball f : ms.fireballs) {
+         double x = f.px + (f.x - f.px) * partial - rend.camX;
+         double y = f.py + (f.y - f.py) * partial - rend.camY;
+         double z = f.pz + (f.z - f.pz) * partial - rend.camZ;
+         float s = f.big ? 0.42F : 0.2F;
+         GL11.glPushMatrix();
+         GL11.glTranslated(x, y, z);
+         GL11.glRotatef((f.life + partial) * 23.0F, 1.0F, 0.6F, 0.3F);
+         for (int layer = 0; layer < 2; layer++) {
+            float h = layer == 0 ? s : s * 0.55F;
+            if (layer == 0) {
+               GL11.glColor3f(1.0F, 0.45F, 0.06F);
+            } else {
+               GL11.glColor3f(1.0F, 0.9F, 0.35F);
+            }
+
+            GL11.glBegin(7);
+            for (int face = 0; face < 6; face++) {
+               int axis = face / 2;
+               float sign = face % 2 == 0 ? 1.0F : -1.0F;
+               for (int c = 0; c < 4; c++) {
+                  float u = c == 0 || c == 3 ? -h : h;
+                  float v = c < 2 ? -h : h;
+                  float vx = axis == 0 ? sign * h : (axis == 1 ? u : u);
+                  float vy = axis == 1 ? sign * h : v;
+                  float vz = axis == 2 ? sign * h : (axis == 0 ? u : v);
+                  GL11.glVertex3f(vx, vy, vz);
+               }
+            }
+
+            GL11.glEnd();
+         }
+
+         GL11.glPopMatrix();
+      }
+
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      GL11.glEnable(3553);
    }
 
    static void drawArrows(Mobs var0, Renderer var1, float var2) {
@@ -715,6 +791,8 @@ public final class MobRender {
       int cy = 0;
       int rowH = 0;
       int type;
+      /** Update 3.12: the whole model is drawn this many times bigger (the ghast). */
+      float scale = 1.0F;
 
       MobRender.Part add(int var1, int var2, int var3, int var4, int var5, float var6, float var7, float var8, float var9, float var10, float var11) {
          MobRender.Part var12 = new MobRender.Part();

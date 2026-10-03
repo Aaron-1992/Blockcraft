@@ -155,6 +155,9 @@ public final class Mesher {
                         break;
                      case 7:
                         crop(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case 8:
+                        portal(var4, var29, var26, var28, var30);
                   }
                }
             }
@@ -578,6 +581,32 @@ public final class Mesher {
       }
    }
 
+   /** Update 3.12: the film of a nether portal - one plane through the middle of the cell, seen from both sides, blended (translucent buffer). */
+   static void portal(Mesher.Scratch s, int x, int y, int z, int id) {
+      int light = s.L[ci(x + 1, y + 1, z + 1)] & 255;
+      float sky = light >> 4 & 15;
+      float blk = Math.max(light & 15, Blocks.emit[id]);
+      boolean alongX = id == Blocks.PORTAL_X;
+      int tile = Blocks.tiles[id][0];
+      for (int v = 0; v < 4; v++) {
+         float u = v == 1 || v == 2 ? 1.0F : 0.0F;
+         float h = v >= 2 ? 1.0F : 0.0F;
+         s.qx[v] = x + (alongX ? u : 0.5F);
+         s.qy[v] = y + h;
+         s.qz[v] = z + (alongX ? 0.5F : u);
+         s.qu[v] = u;
+         s.qv[v] = 1.0F - h;
+         s.qr[v] = s.qg[v] = s.qb[v] = 1.0F;
+         s.qa[v] = 0.9F;
+         s.qm[v] = lu(sky);
+         s.ql[v] = lu(blk);
+      }
+
+      s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
+      emit(s, s.t, tile, false);
+      emitBack(s, s.t, tile);
+   }
+
    static void box(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
       boxBB(var0, var1, var2, var3, var4, var5, Blocks.box[var5], null);
    }
@@ -664,7 +693,7 @@ public final class Mesher {
 
    static boolean fenceLink(Mesher.Scratch var0, int var1, int var2, int var3) {
       int var4 = var0.B[ci(var1, var2, var3)] & 0xFFFF;
-      return var4 == 118 || Blocks.opaque[var4];
+      return Blocks.isFence(var4) || Blocks.opaque[var4];
    }
 
    static void fence(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
