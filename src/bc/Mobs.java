@@ -23,6 +23,16 @@ public final class Mobs {
    public static final int N = 8;
    public static final String[] NAME = new String[]{"pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider"};
    static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16};
+   /** Lights a creeper's fuse (flint and steel). False for anything else, or if it is already lit. */
+   public boolean ignite(Mobs.Mob m) {
+      if (m == null || m.dead || m.type != CREEPER || m.ignited) {
+         return false;
+      }
+
+      m.ignited = true;
+      return true;
+   }
+
    /**
     * Jump speed of a mob that walks into something. A mob's tick applies gravity BEFORE it moves, so it needs 0.42 / 0.98 + 0.08 to move
     * up by Minecraft's 0.42 in the first tick and reach the same height (1.25 blocks, enough for one block but not for two). With the old
@@ -346,7 +356,16 @@ public final class Mobs {
                }
                break;
             case 6:
-               if (var15 && var24 < 18.0) {
+               if (var1.ignited) {
+                  // Update 3.9: lit with flint and steel - it stops, hisses and goes off after the normal fuse, whatever the distance
+                  var1.fuse++;
+                  var12 = false;
+                  if (var15) {
+                     var1.dirYaw = angleTo(var16, var18);
+                     var26 = var1.dirYaw;
+                     var27 = (float)(-Math.toDegrees(Math.atan2(var20, var22)));
+                  }
+               } else if (var15 && var24 < 18.0) {
                   var1.hasTarget = true;
                   var1.dirYaw = angleTo(var16, var18);
                   var26 = var1.dirYaw;
@@ -1259,6 +1278,8 @@ public final class Mobs {
       public int pswell;
       /** Update 3.8: a creeper that was struck by lightning explodes with twice the power and glows blue. */
       public boolean charged;
+      /** Update 3.9: set alight with flint and steel (creepers only): the fuse runs down by itself */
+      public boolean ignited;
       /** Ticks until this animal is grown up (0 = adult). Babies are half size and cannot breed. */
       public int babyAge;
       /** > 0: in love (was fed), looks for a partner of the same kind. */

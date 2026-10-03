@@ -33,6 +33,8 @@ final class Tests39 {
       options();
       polish();
       steps();
+      creepers();
+      fireLook();
    }
 
    static File tmpDir() throws IOException {
@@ -550,6 +552,174 @@ final class Tests39 {
             Mobs.Mob m = mobs.get(i);
             check(m.x < 14.0, Mobs.NAME[m.type] + " stays in front of a two-block wall: x=" + m.x);
             check(peak[i] > 1.15 && peak[i] < 1.35, Mobs.NAME[m.type] + " jumps 1.25 blocks high: " + peak[i]);
+         }
+      });
+   }
+
+   // ------------------------------------------------------------------ creepers can be lit (To do: "Make Creepers ignitable")
+   static void creepers() {
+      test("flint and steel lights a creeper's fuse: it stops, swells and goes off after 1.5 s even when the player is far away", () -> {
+         Game g = newGame(0);
+         g.inv[g.sel] = new Stack(Items.FLINT_STEEL, 1);
+         Mobs.Mob far = g.mobs.spawn(Mobs.CREEPER, 40.5, GROUND + 1, 8.5); // 32 blocks away: it never noticed the player
+         check(!far.ignited, "not lit yet");
+         check(g.useOnMob(far, g.held()), "right-click with flint and steel lights it");
+         check(far.ignited, "lit");
+         eq(1, g.held().dmg, "uses one point of durability");
+         check(!g.useOnMob(far, g.held()), "a creeper that is already lit cannot be lit again (and the steel is not used up)");
+         eq(1, g.held().dmg, "still one point");
+         double x0 = far.x;
+         double z0 = far.z;
+         int swellMax = 0;
+         for (int t = 0; t < 29; t++) {
+            g.mobs.tickMob(far, g.world, g.player, 1.0f);
+            swellMax = Math.max(swellMax, far.swell);
+            check(!far.dead, "still fizzing after " + (t + 1) + " ticks");
+         }
+
+         check(swellMax >= 28, "it swells while the fuse burns: " + swellMax);
+         check(Math.hypot(far.x - x0, far.z - z0) < 0.5, "it stands still while lit");
+         for (int t = 0; t < 4; t++) {
+            g.mobs.tickMob(far, g.world, g.player, 1.0f);
+         }
+
+         check(far.dead, "and then it explodes");
+         eq(Blocks.AIR, g.world.getBlock(40, GROUND, 8), "the blast leaves a crater in the ground it stood on");
+      });
+      test("only creepers can be lit; creative mode keeps the steel; a charged creeper still blasts twice as hard when lit", () -> {
+         Game g = newGame(0);
+         g.inv[g.sel] = new Stack(Items.FLINT_STEEL, 1);
+         for (int type : new int[]{Mobs.PIG, Mobs.COW, Mobs.SHEEP, Mobs.CHICKEN, Mobs.ZOMBIE, Mobs.SKELETON, Mobs.SPIDER}) {
+            Mobs.Mob m = g.mobs.spawn(type, 14.5, GROUND + 1, 8.5);
+            check(!g.useOnMob(m, g.held()), Mobs.NAME[type] + " cannot be lit");
+            check(!m.ignited, Mobs.NAME[type] + " is not ignited");
+         }
+
+         eq(0, g.held().dmg, "no durability used");
+         Game c = newGame(1);
+         c.inv[c.sel] = new Stack(Items.FLINT_STEEL, 1);
+         Mobs.Mob cr = c.mobs.spawn(Mobs.CREEPER, 14.5, GROUND + 1, 8.5);
+         check(c.useOnMob(cr, c.held()), "creative: lights it too");
+         eq(0, c.held().dmg, "creative: no durability used");
+         Game h = newGame(0);
+         h.inv[h.sel] = new Stack(Items.STICK, 1);
+         Mobs.Mob plain = h.mobs.spawn(Mobs.CREEPER, 14.5, GROUND + 1, 8.5);
+         check(!h.useOnMob(plain, h.held()), "a stick does nothing");
+         // a charged, lit creeper next to a block wall: radius 6, not 3
+         Game w = newGame(0);
+         w.inv[w.sel] = new Stack(Items.FLINT_STEEL, 1);
+         for (int dx = -5; dx <= 5; dx += 5) {
+            w.world.setBlock(30 + dx, GROUND + 1, 30, Blocks.STONE);
+         }
+
+         Mobs.Mob ch = w.mobs.spawn(Mobs.CREEPER, 30.5, GROUND + 1, 30.5);
+         ch.charged = true;
+         w.useOnMob(ch, w.held());
+         for (int t = 0; t < 40 && !ch.dead; t++) {
+            w.mobs.tickMob(ch, w.world, w.player, 1.0f);
+         }
+
+         check(ch.dead, "it blew up");
+         eq(Blocks.AIR, w.world.getBlock(35, GROUND + 1, 30), "a stone block 5 blocks away is gone (charged blast)");
+      });
+   }
+
+   // ------------------------------------------------------------------ fire clings to blocks (To do: "Display fire like in Minecraft when it is attached to a block")
+   /** The vertices {x,y,z} that a fire adds to the mesh of chunk (0,0), given the blocks set up around it before. */
+   static java.util.List<float[]> fireVertices(World w, Chunk c, int x, int y, int z) {
+      java.util.HashMap<String, Integer> base = new java.util.HashMap<>();
+      w.setBlock(x, y, z, 0);
+      Mesher.Result b = Mesher.build(w, c, 3, false);
+      for (int i = 0; i < b.nO; i++) {
+         base.merge(b.opaque.get(i * 11) + "," + b.opaque.get(i * 11 + 1) + "," + b.opaque.get(i * 11 + 2), 1, Integer::sum);
+      }
+
+      w.setBlock(x, y, z, Blocks.FIRE);
+      Mesher.Result r = Mesher.build(w, c, 3, false);
+      java.util.ArrayList<float[]> out = new java.util.ArrayList<>();
+      for (int i = 0; i < r.nO; i++) {
+         float[] v = {r.opaque.get(i * 11), r.opaque.get(i * 11 + 1), r.opaque.get(i * 11 + 2)};
+         String key = v[0] + "," + v[1] + "," + v[2];
+         Integer n = base.get(key);
+         if (n != null && n > 0) {
+            base.put(key, n - 1);
+         } else {
+            out.add(v);
+         }
+      }
+
+      for (Mesher.Result m : new Mesher.Result[]{r, b}) {
+         if (m.opaque != null) {
+            org.lwjgl.system.MemoryUtil.memFree(m.opaque);
+         }
+
+         if (m.trans != null) {
+            org.lwjgl.system.MemoryUtil.memFree(m.trans);
+         }
+      }
+
+      w.setBlock(x, y, z, 0);
+      return out;
+   }
+
+   static void fireLook() {
+      test("fire like in Minecraft: an X on solid ground, flames on the wall it hangs on, flames from a ceiling it hangs from", () -> {
+         Game g = newGame(1);
+         World w = g.world;
+         Chunk c = w.chunk(0, 0);
+         int y = GROUND + 3; // in the air: nothing solid below unless the test puts it there
+         int ly = y - 48; // mesh coordinates are local to the 16-high section (3 = y 48..63)
+         // 1) on the grass: the X (2 quads)
+         eq(8, fireVertices(w, c, 5, GROUND + 1, 5).size(), "fire on grass: two crossed planes");
+         // 2) hanging on a wooden wall, nothing below: one plane in front of the wall
+         w.setBlock(6, y, 5, Blocks.PLANKS);
+         java.util.List<float[]> wall = fireVertices(w, c, 5, y, 5);
+         eq(4, wall.size(), "fire hanging on a wall east of it: one flame plane");
+         for (float[] v : wall) {
+            check(v[0] >= 5.80F && v[0] <= 5.99F, "the plane is just in front of the wall's face (x=6): " + v[0]);
+            check(v[2] >= 5.0F && v[2] <= 6.0F && v[1] >= ly && v[1] <= ly + 1.0F, "and covers the face: " + v[1] + "/" + v[2]);
+         }
+
+         double lean = 0;
+         for (float[] v : wall) {
+            lean = Math.max(lean, 5.99 - v[0]);
+         }
+
+         check(lean > 0.05, "the flames lean away from the wall at the top: " + lean);
+         // 3) a corner: two walls, two planes; plus a flammable ceiling: two more crossed planes
+         w.setBlock(5, y, 6, Blocks.LOG_OAK);
+         eq(8, fireVertices(w, c, 5, y, 5).size(), "two flammable neighbours: two planes");
+         w.setBlock(5, y + 1, 5, Blocks.LEAVES_OAK);
+         eq(16, fireVertices(w, c, 5, y, 5).size(), "plus a flammable ceiling: two crossed planes more");
+         for (float[] v : fireVertices(w, c, 5, y, 5)) {
+            check(v[1] >= ly, "nothing sticks out below the cell: " + v[1]);
+         }
+
+         // 4) a non-flammable neighbour does not get flames: stone beside the fire, nothing flammable, nothing below -> the plain X
+         w.setBlock(6, y, 5, 0);
+         w.setBlock(5, y, 6, 0);
+         w.setBlock(5, y + 1, 5, 0);
+         w.setBlock(4, y, 5, Blocks.STONE);
+         eq(8, fireVertices(w, c, 5, y, 5).size(), "stone is not flammable: the X (nothing to hang on)");
+         // 5) flammable below counts as ground: the X even with a wall next to it
+         w.setBlock(4, y, 5, 0);
+         w.setBlock(5, y - 1, 5, Blocks.PLANKS);
+         w.setBlock(6, y, 5, Blocks.PLANKS);
+         eq(8, fireVertices(w, c, 5, y, 5).size(), "on planks: the X, like Minecraft's default fire state");
+         // 6) the other three directions get their plane too, inside their own cell
+         w.setBlock(5, y - 1, 5, 0);
+         w.setBlock(6, y, 5, 0);
+         for (int[] d : new int[][]{{-1, 0}, {0, 1}, {0, -1}}) {
+            w.setBlock(5 + d[0], y, 5 + d[1], Blocks.PLANKS);
+            java.util.List<float[]> p = fireVertices(w, c, 5, y, 5);
+            eq(4, p.size(), "one plane for the wall at " + d[0] + "," + d[1]);
+            for (float[] v : p) {
+               check(v[0] > 5.0F - 1e-3F && v[0] < 6.0F + 1e-3F && v[2] > 5.0F - 1e-3F && v[2] < 6.0F + 1e-3F, "inside its own cell: " + v[0] + "," + v[2]);
+               double toWall = d[0] != 0 ? Math.abs(v[0] - (d[0] > 0 ? 6.0 : 5.0)) : Math.abs(v[2] - (d[1] > 0 ? 6.0 : 5.0));
+               check(toWall < 0.2, "next to the wall: " + toWall);
+            }
+
+            w.setBlock(5 + d[0], y, 5 + d[1], 0);
          }
       });
    }

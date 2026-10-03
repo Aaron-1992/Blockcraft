@@ -89,7 +89,11 @@ public final class Mesher {
                         cube(var4, var1, var29, var26, var28, var30, var3);
                         break;
                      case 1:
-                        cross(var4, var1, var29, var26, var28, var30);
+                        if (var30 == Blocks.FIRE) {
+                           fire(var4, var1, var29, var26, var28);
+                        } else {
+                           cross(var4, var1, var29, var26, var28, var30);
+                        }
                         break;
                      case 2:
                         box(var4, var1, var29, var26, var28, var30);
@@ -372,6 +376,90 @@ public final class Mesher {
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
          emit(var0, var0.o, Blocks.tiles[var5][0], false);
+      }
+   }
+
+   // ------------------------------------------------------------------ Update 3.9: fire that clings to blocks (Minecraft 1.12's fire models)
+   static final int[][] FIRE_SIDES = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+   /**
+    * Fire like in Minecraft: standing on a solid block (or on something flammable) it is the familiar X of two crossed flame planes.
+    * With nothing under it, it hangs on the flammable blocks around it instead: a flame plane covers every side face that touches a
+    * flammable neighbour, and one hangs from a flammable ceiling. (If no neighbour qualifies - e.g. for the moment before the fire
+    * is put out - the X is drawn.)
+    */
+   static void fire(Mesher.Scratch var0, Chunk var1, int x, int y, int z) {
+      int below = var0.B[ci(x + 1, y, z + 1)] & 255;
+      boolean floor = Fire.solidTop(below) || Fire.flammability(below) > 0;
+      int drawn = 0;
+      if (!floor) {
+         int lightIdx = ci(x + 1, y + 1, z + 1);
+         int light = var0.L[lightIdx] & 255;
+         float sky = light >> 4 & 15;
+         float blk = light & 15;
+         for (int[] d : FIRE_SIDES) {
+            if (Fire.flammability(var0.B[ci(x + 1 + d[0], y + 1, z + 1 + d[1])] & 255) > 0) {
+               fireWall(var0, x, y, z, d[0], d[1], sky, blk);
+               drawn++;
+            }
+         }
+
+         if (Fire.flammability(var0.B[ci(x + 1, y + 2, z + 1)] & 255) > 0) {
+            fireCeiling(var0, x, y, z, sky, blk);
+            drawn++;
+         }
+      }
+
+      if (floor || drawn == 0) {
+         cross(var0, var1, x, y, z, Blocks.FIRE);
+      }
+   }
+
+   /** One quad of flames just in front of the face of the neighbour at (dx, dz), leaning a little away from it. */
+   static void fireWall(Mesher.Scratch var0, int x, int y, int z, int dx, int dz, float sky, float blk) {
+      float near = 0.02F;
+      float lean = 0.12F;
+      // along-the-wall axis spans 0..1; the plane stands near the neighbour's face and its top leans towards the cell's middle
+      for (int v = 0; v < 4; v++) {
+         boolean top = v >= 2;
+         boolean second = v == 1 || v == 2;
+         float along = second ? 1.0F : 0.0F;
+         float across = (dx != 0 ? (dx > 0 ? 1.0F - near : near) : (dz > 0 ? 1.0F - near : near)) - (top ? Math.signum(dx != 0 ? dx : dz) * lean : 0.0F);
+         var0.qx[v] = x + (dx != 0 ? across : along);
+         var0.qy[v] = y + (top ? 1.0F : 0.0F);
+         var0.qz[v] = z + (dz != 0 ? across : along);
+         var0.qu[v] = second ? 1.0F : 0.0F;
+         var0.qv[v] = top ? 0.0F : 1.0F;
+         var0.qr[v] = var0.qg[v] = var0.qb[v] = 1.0F;
+         var0.qa[v] = 1.0F;
+         var0.qm[v] = lu(sky);
+         var0.ql[v] = lu(blk);
+      }
+
+      var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+      emit(var0, var0.o, Blocks.tiles[Blocks.FIRE][0], false);
+   }
+
+   /** Flames hanging from a flammable ceiling: two crossed planes in the upper part of the cell. */
+   static void fireCeiling(Mesher.Scratch var0, int x, int y, int z, float sky, float blk) {
+      for (int plane = 0; plane < 2; plane++) {
+         for (int v = 0; v < 4; v++) {
+            boolean top = v >= 2;
+            boolean second = v == 1 || v == 2;
+            float along = second ? 0.9F : 0.1F;
+            var0.qx[v] = x + (plane == 0 ? along : 0.5F);
+            var0.qy[v] = y + (top ? 1.0F : 0.3F);
+            var0.qz[v] = z + (plane == 0 ? 0.5F : along);
+            var0.qu[v] = second ? 1.0F : 0.0F;
+            var0.qv[v] = top ? 0.0F : 1.0F;
+            var0.qr[v] = var0.qg[v] = var0.qb[v] = 1.0F;
+            var0.qa[v] = 1.0F;
+            var0.qm[v] = lu(sky);
+            var0.ql[v] = lu(blk);
+         }
+
+         var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
+         emit(var0, var0.o, Blocks.tiles[Blocks.FIRE][0], false);
       }
    }
 

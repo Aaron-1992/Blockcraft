@@ -371,6 +371,11 @@ public final class Game {
          if (this.autoFrames == 50 && System.getProperty("bc.skinbrowse") != null) {
             this.browseSkin();
          }
+      } else if (this.screen == Game.S.PAUSE && System.getProperty("bc.pause") != null) {
+         // the pause menu is up: give it a few frames to draw, then take the picture
+         if (++this.autoFrames >= 108) {
+            this.autoShotNow = true;
+         }
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
@@ -2617,6 +2622,14 @@ public final class Game {
       }
 
       if (var2.id == Items.SHEARS && this.mobs.shear(var1)) {
+         if (!this.player.creative) {
+            this.damageHeld(1);
+         }
+
+         return true;
+      }
+
+      if (var2.id == Items.FLINT_STEEL && this.mobs.ignite(var1)) {
          if (!this.player.creative) {
             this.damageHeld(1);
          }

@@ -112,6 +112,33 @@ def kitchen_blocks():
     return out
 
 
+def firewall_blocks():
+    """Update 3.9 fire models: flames on a plank wall (fire in front of it, nothing below), in a corner (two walls), hanging from a
+    plank ceiling, and for comparison fires standing on grass and on planks (the X)."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 6):
+                out.append((x, y, z, 0))
+    for x in range(139, 144):
+        for y in (gy + 1, gy + 2, gy + 3):
+            out.append((x, y, 77, 5))                   # a plank wall, 5 wide and 3 high
+    for x, y in ((140, gy + 2), (142, gy + 2), (141, gy + 3)):
+        out.append((x, y, 76, 194))                     # fires on its front face (nothing below them)
+    for y in (gy + 1, gy + 2, gy + 3):
+        out.append((145, y, 77, 5))                     # an inside corner of planks
+        out.append((146, y, 76, 5))
+    out.append((145, gy + 2, 76, 194))                  # fire in the corner: two walls
+    for x in (148, 149, 150):
+        out.append((x, gy + 4, 76, 5))                  # a plank ceiling
+    out.append((149, gy + 3, 76, 194))                  # fire hanging from it
+    out.append((137, gy + 1, 75, 194))                  # on grass: the X
+    out.append((138, gy + 1, 75, 5))
+    out.append((138, gy + 2, 75, 194))                  # on planks: the X
+    return out
+
+
 # name -> (props, only_new)
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
@@ -157,6 +184,8 @@ SCENES = {
     "skin-hold-block": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.hold=1", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "inv-player":     (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.skin=demo", "-Dbc.mouse=560,160", "-Dbc.shot=110"], True),
     "inv-player-def": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.mouse=120,60", "-Dbc.shot=110"], True),
+    "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
+    "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "pause-menu":     (COMMON + [CAM] + PLAIN + ["-Dbc.pause=1", "-Dbc.shot=110"], True),
     "skin-screen":    (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo"], True),
     # real network import of an account's skin (needs internet: the Windows smoke test machine has it) and the file dialog opening

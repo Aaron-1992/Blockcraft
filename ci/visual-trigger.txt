@@ -1,2 +1,2 @@
-title,pause-menu,inv-player,skin-first,skin-back
+firewall,firewall-night,pause-menu,inv-player
 jar=build
