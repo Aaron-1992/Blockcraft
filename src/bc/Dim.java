@@ -38,7 +38,7 @@ public final class Dim {
 
    /** Light that is always there (0..1): the lightmap never goes darker than this. The Nether glows a little, the End a bit more. */
    public static float ambient(int d) {
-      return d == NETHER ? 0.085F : (d == END ? 0.2F : 0.0F);
+      return d == NETHER ? 0.19F : (d == END ? 0.26F : 0.0F);
    }
 
    /** The colour of the fog / the sky behind everything. */

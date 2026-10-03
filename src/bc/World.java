@@ -40,6 +40,8 @@ public final class World {
    public Game game;
    public final HashMap<Long, TileEntity> tiles = new HashMap();
    public final ArrayList<World.Item> items = new ArrayList();
+   /** Update 3.12: the fight against the Ender Dragon (only in the End). */
+   public EndFight fight;
    public final ArrayList<World.Falling> fallers = new ArrayList();
    /** Fire (Update 3.7): ages, spreading, burning out. */
    public final Fire fire = new Fire(this);
@@ -96,6 +98,7 @@ public final class World {
          var3.mkdirs();
       }
 
+      this.fight = dimension == Dim.END ? new EndFight(this) : null;
       this.loadTiles();
       if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
@@ -1336,6 +1339,11 @@ public final class World {
    }
 
    private void tickItem(World.Item var1) {
+      if (var1.eye) {
+         EndPortals.tickEye(this, var1);
+         return;
+      }
+
       var1.age++;
       if (var1.delay > 0) {
          var1.delay--;
@@ -1722,6 +1730,14 @@ public final class World {
       public int dmg;
       public boolean dead;
       public float spin;
+      /** Update 3.12: an Eye of Ender in flight: it flies from (lx, ly, lz) to above (ax, az) and then drops like any other item. */
+      public boolean eye;
+      public int eyeT;
+      public double lx;
+      public double ly;
+      public double lz;
+      public double ax;
+      public double az;
    }
 
    static final class LongQ {

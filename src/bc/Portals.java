@@ -179,6 +179,22 @@ final class Portals {
 
       World w = g.world;
       Player p = g.player;
+      // Update 3.12: an End portal takes you at once (to the End from the Overworld, home from the End)
+      if (EndPortals.touching(w, p.bb) != null) {
+         if (!g.portalLock) {
+            g.portalLock = true;
+            g.portalTime = 0;
+            if (w.dim == Dim.END) {
+               double[] home = g.homeXZ();
+               g.switchDimension(Dim.OVERWORLD, home[0], home[1], 1);
+            } else {
+               g.switchDimension(Dim.END, EndGen.PLATFORM_X + 0.5, EndGen.PLATFORM_Y + 1.0, EndGen.PLATFORM_Z + 0.5, 2);
+            }
+         }
+
+         return;
+      }
+
       int[] cell = touching(w, p.bb);
       if (cell != null) {
          if (!g.portalLock) {

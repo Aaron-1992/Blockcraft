@@ -34,6 +34,8 @@ final class Mobs312 {
       int life;
       /** The big ghast kind (blows a hole) or the small blaze kind (sets things alight). */
       boolean big;
+      /** The dragon's breath: purple, leaves a cloud that hurts instead of blowing a hole. */
+      boolean dragon;
    }
 
    static boolean peaceful(int type) {
@@ -41,7 +43,12 @@ final class Mobs312 {
    }
 
    static boolean fireproof(int type) {
-      return type == Mobs.ZOMBIE_PIGMAN || type == Mobs.GHAST || type == Mobs.BLAZE || type == Mobs.MAGMA_CUBE || type == Mobs.ENDER_DRAGON;
+      return type == Mobs.ZOMBIE_PIGMAN || type == Mobs.GHAST || type == Mobs.BLAZE || type == Mobs.MAGMA_CUBE || type == Mobs.ENDER_DRAGON || type == Mobs.END_CRYSTAL;
+   }
+
+   /** Never despawns, however far away. */
+   static boolean persistent(int type) {
+      return type == Mobs.ENDER_DRAGON || type == Mobs.END_CRYSTAL;
    }
 
    /** Mobs that float: no gravity, they steer their height ({@link Mobs#flyVy}). */
@@ -89,11 +96,228 @@ final class Mobs312 {
          case Mobs.MAGMA_CUBE:
             magma(ms, m, target, dx, dz, dy, d2, d3, in);
             break;
+         case Mobs.ENDERMAN:
+            enderman(ms, m, w, p, target, dx, dz, dy, d2, d3, in);
+            break;
          default:
             break;
       }
 
       return in;
+   }
+
+   // ------------------------------------------------------------------ the End
+   /** The dragon and the crystals have their own tick (they do not walk). True: this mob has been ticked. */
+   static boolean tickSpecial(Mobs ms, Mob m, World w, Player p) {
+      if (m.type == Mobs.ENDER_DRAGON) {
+         Dragon.tick(ms, m, w, p);
+         return true;
+      }
+
+      if (m.type == Mobs.END_CRYSTAL) {
+         Dragon.crystalTick(ms, m, w);
+         return true;
+      }
+
+      return false;
+   }
+
+   /** Every tick of a dead mob. */
+   static void tickDying(Mobs ms, Mob m, World w) {
+      if (m.type == Mobs.ENDER_DRAGON) {
+         Dragon.dying(ms, m, w);
+      }
+   }
+
+   /** A dead mob has been taken out of the list (its death animation is over). */
+   static void removed(Mobs ms, Mob m, World w) {
+      if (m.type == Mobs.ENDER_DRAGON && w.fight != null) {
+         w.fight.openPortal(true);
+         ms.g.toast("The Ender Dragon is dead!", "The way out has opened in the middle of the island");
+      }
+   }
+
+   /** A mob was hurt. */
+   static void hurt(Mobs ms, Mob m, int dmg, boolean byPlayer) {
+      if (m.dead) {
+         return;
+      }
+
+      if (m.type == Mobs.ENDERMAN && ms.g.world != null) {
+         m.angry = Math.max(m.angry, 600);
+         if (ms.rnd.nextInt(3) == 0) {
+            teleport(ms, m, ms.g.world, m.x, m.z, 14.0, 4.0);
+         }
+      } else if (m.type == Mobs.ENDER_DRAGON && byPlayer && m.phase == Dragon.CIRCLE && m.phaseT > 60 && ms.rnd.nextInt(3) == 0) {
+         m.phaseT = 400;
+      }
+   }
+
+   private static boolean free(World w, int x, int y, int z) {
+      int id = w.getBlock(x, y, z);
+      return id == 0 || Blocks.coll[id] == null && !Blocks.isFluid(id);
+   }
+
+   /** An enderman blinks to a free spot between minD and range blocks from (cx, cz) that has solid ground. */
+   static boolean teleport(Mobs ms, Mob m, World w, double cx, double cz, double range, double minD) {
+      for (int i = 0; i < 24; i++) {
+         double a = ms.rnd.nextDouble() * Math.PI * 2.0;
+         double d = minD + ms.rnd.nextDouble() * (range - minD);
+         int x = (int)Math.floor(cx + Math.cos(a) * d);
+         int z = (int)Math.floor(cz + Math.sin(a) * d);
+         if (!w.isLoaded(x, z)) {
+            continue;
+         }
+
+         int top = Math.min(250, (int)m.y + 8);
+         for (int y = top; y > top - 18 && y > 1; y--) {
+            int below = w.getBlock(x, y - 1, z);
+            if (Blocks.solid[below] && !Blocks.isFluid(below) && !Blocks.isLeaves(below) && free(w, x, y, z) && free(w, x, y + 1, z) && free(w, x, y + 2, z)) {
+               teleportEffect(ms, m.x, m.y, m.z);
+               m.px = m.x = x + 0.5;
+               m.py = m.y = y;
+               m.pz = m.z = z + 0.5;
+               m.vx = m.vy = m.vz = 0.0;
+               m.setPos(m.x, m.y, m.z);
+               teleportEffect(ms, m.x, m.y, m.z);
+               m.tpCd = 40;
+               return true;
+            }
+
+            if (Blocks.coll[below] != null) {
+               break;
+            }
+         }
+      }
+
+      return false;
+   }
+
+   private static void teleportEffect(Mobs ms, double x, double y, double z) {
+      if (ms.g.rend == null) {
+         return;
+      }
+
+      for (int i = 0; i < 14; i++) {
+         ms.g.portalParticle(x + (ms.rnd.nextDouble() - 0.5) * 0.8, y + ms.rnd.nextDouble() * 2.6, z + (ms.rnd.nextDouble() - 0.5) * 0.8, 0.75F, 0.25F, 0.95F);
+      }
+   }
+
+   /** Is the player looking straight at the enderman's head (and can see it)? */
+   static boolean lookedAt(Mobs ms, World w, Player p, Mob m) {
+      double ex = p.x;
+      double ey = p.y + p.eye;
+      double ez = p.z;
+      double yaw = Math.toRadians(p.yaw);
+      double pitch = Math.toRadians(p.pitch);
+      double lx = -Math.sin(yaw) * Math.cos(pitch);
+      double ly = -Math.sin(pitch);
+      double lz = Math.cos(yaw) * Math.cos(pitch);
+      double hx = m.x - ex;
+      double hy = m.y + 2.55 - ey;
+      double hz = m.z - ez;
+      double dist = Math.sqrt(hx * hx + hy * hy + hz * hz);
+      if (dist < 0.5) {
+         return true;
+      }
+
+      if ((lx * hx + ly * hy + lz * hz) / dist < 1.0 - 0.03 / dist) {
+         return false;
+      }
+
+      return ms.hasLOS(w, ex, ey, ez, m.x, m.y + 2.55, m.z);
+   }
+
+   /** Calm until you look it in the face (or hit it); then it blinks about and hits hard. Water hurts it. */
+   private static void enderman(Mobs ms, Mob m, World w, Player p, boolean target, double dx, double dz, double dy, double d2, double d3, Intent in) {
+      if (m.tpCd > 0) {
+         m.tpCd--;
+      }
+
+      if (m.cd > 0) {
+         m.cd--;
+      }
+
+      if (m.inWater) {
+         // it is hurt as long as it is wet (once every half second) and tries to get away
+         ms.hurtMob(m, 1, m.x, m.z, 0.0, false);
+         if (m.tpCd <= 0 && !m.dead && m.invuln > 5) {
+            teleport(ms, m, w, m.x, m.z, 24.0, 6.0);
+         }
+      }
+
+      if (target && d3 < 64.0 && m.angry <= 0 && lookedAt(ms, w, p, m)) {
+         m.angry = 600;
+      }
+
+      if (target && m.angry > 0 && d3 < 48.0) {
+         m.hasTarget = true;
+         m.dirYaw = Mobs.angleTo(dx, dz);
+         in.headYaw = m.dirYaw;
+         in.headPitch = pitchTo(dy, d2);
+         in.moving = d2 > 1.3;
+         in.speed = 1.5;
+         if (d2 < 1.9 && Math.abs(dy) < 2.6 && m.cd <= 0) {
+            m.cd = 20;
+            m.attackAnim = 8;
+            ms.g.damagePlayer(6, m.x, m.z);
+         }
+
+         if (m.tpCd <= 0 && d2 > 5.0 && ms.rnd.nextInt(70) == 0) {
+            teleport(ms, m, w, p.x, p.z, 5.0, 2.5);
+         }
+      } else {
+         ms.wanderAI(m);
+         in.moving = m.moving;
+         in.speed = 0.5;
+         if (m.tpCd <= 0 && ms.rnd.nextInt(1200) == 0) {
+            teleport(ms, m, w, m.x, m.z, 14.0, 4.0);
+         }
+      }
+   }
+
+   /** The dragon's breath: a purple fireball that leaves a cloud where it lands. */
+   static void shootDragon(Mobs ms, Mob m, double tx, double ty, double tz) {
+      shoot(ms, m, tx, ty, tz, 0.75, true);
+      if (!ms.fireballs.isEmpty()) {
+         ms.fireballs.get(ms.fireballs.size() - 1).dragon = true;
+      }
+   }
+
+   /** Endermen on the ground of the island, a handful at a time. */
+   static void spawnEnd(Mobs ms, World w, Player p) {
+      int n = 0;
+      for (Mob m : ms.list) {
+         if (m.type == Mobs.ENDERMAN && !m.dead) {
+            n++;
+         }
+      }
+
+      if (n >= 9) {
+         return;
+      }
+
+      for (int tries = 0; tries < 8; tries++) {
+         double a = ms.rnd.nextDouble() * Math.PI * 2.0;
+         double d = 16.0 + ms.rnd.nextDouble() * 22.0;
+         int x = (int)Math.floor(p.x + Math.cos(a) * d);
+         int z = (int)Math.floor(p.z + Math.sin(a) * d);
+         if (!w.isLoaded(x, z)) {
+            continue;
+         }
+
+         for (int y = EndGen.TOP + 6; y > EndGen.TOP - 12; y--) {
+            int below = w.getBlock(x, y - 1, z);
+            if (below == Blocks.END_STONE && free(w, x, y, z) && free(w, x, y + 1, z) && free(w, x, y + 2, z)) {
+               ms.spawn(Mobs.ENDERMAN, x + 0.5, y, z + 0.5);
+               return;
+            }
+
+            if (below != 0) {
+               break;
+            }
+         }
+      }
    }
 
    private static float pitchTo(double dy, double d2) {
@@ -310,7 +534,7 @@ final class Mobs312 {
                boom = true;
             } else {
                for (Mob o : ms.list) {
-                  if (!o.dead && o.type != Mobs.GHAST && o.type != Mobs.BLAZE && f.x > o.bb[0] && f.x < o.bb[3] && f.y > o.bb[1] && f.y < o.bb[4] && f.z > o.bb[2] && f.z < o.bb[5]) {
+                  if (!o.dead && o.type != Mobs.GHAST && o.type != Mobs.BLAZE && !(f.dragon && (o.type == Mobs.ENDER_DRAGON || o.type == Mobs.END_CRYSTAL)) && f.x > o.bb[0] && f.x < o.bb[3] && f.y > o.bb[1] && f.y < o.bb[4] && f.z > o.bb[2] && f.z < o.bb[5]) {
                      boom = true;
                      break;
                   }
@@ -334,6 +558,23 @@ final class Mobs312 {
 
    /** A fireball arrives. Big (ghast): a hole about 1.5 blocks wide, 6 damage near it, fires. Small (blaze): 5 damage and sets you alight, a fire. */
    static void explode(Mobs ms, World w, Player p, Fireball f) {
+      if (f.dragon) {
+         if (w.fight != null) {
+            w.fight.addCloud(f.x, f.y, f.z);
+         }
+
+         ms.g.explosionParticles(f.x, f.y, f.z);
+         if (ms.targetable(p)) {
+            double d = Math.sqrt((p.x - f.x) * (p.x - f.x) + (p.y + 0.9 - f.y) * (p.y + 0.9 - f.y) + (p.z - f.z) * (p.z - f.z));
+            if (d < 4.0) {
+               p.invuln = 0;
+               ms.g.damagePlayer(Math.max(2, (int)Math.round(8.0 * (1.0 - d / 4.0))), f.x, f.z);
+            }
+         }
+
+         return;
+      }
+
       double r = f.big ? 1.6 : 0.6;
       int x0 = (int)Math.floor(f.x);
       int y0 = (int)Math.floor(f.y);
@@ -430,6 +671,17 @@ final class Mobs312 {
          case Mobs.BLAZE:
             ms.drop(w, m, Items.BLAZE_ROD, ms.rnd.nextInt(2));
             break;
+         case Mobs.ENDERMAN:
+            ms.drop(w, m, Items.ENDER_PEARL, ms.rnd.nextInt(2) + (ms.rnd.nextInt(5) == 0 ? 1 : 0));
+            break;
+         case Mobs.END_CRYSTAL:
+            Dragon.crystalBlows(ms, m, w);
+            break;
+         case Mobs.ENDER_DRAGON:
+            if (w.fight != null) {
+               w.fight.dragonKilled();
+            }
+            break;
          case Mobs.MAGMA_CUBE:
             if (m.size > 1) {
                int n = 2 + ms.rnd.nextInt(2);
@@ -475,6 +727,8 @@ final class Mobs312 {
 
       if (w.dim == Dim.NETHER) {
          spawnNether(ms, w, p);
+      } else if (w.dim == Dim.END) {
+         spawnEnd(ms, w, p);
       }
    }
 

@@ -25,16 +25,18 @@ public final class Mobs {
    public static final int GHAST = 9;
    public static final int BLAZE = 10;
    public static final int MAGMA_CUBE = 11;
-   public static final int VILLAGER = 12;
-   public static final int IRON_GOLEM = 13;
-   public static final int ENDERMAN = 14;
-   public static final int ENDER_DRAGON = 15;
-   public static final int PARROT = 16;
-   public static final int N = 12;
+   public static final int ENDERMAN = 12;
+   public static final int ENDER_DRAGON = 13;
+   public static final int END_CRYSTAL = 14;
+   /** The ids from here on are reserved for the villages and the parrots (no models yet: N stops before them). */
+   public static final int VILLAGER = 15;
+   public static final int IRON_GOLEM = 16;
+   public static final int PARROT = 17;
+   public static final int N = 15;
    public static final String[] NAME = new String[]{
-      "pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider", "pigman", "ghast", "blaze", "magmacube", "villager", "irongolem", "enderman", "enderdragon", "parrot"
+      "pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider", "pigman", "ghast", "blaze", "magmacube", "enderman", "enderdragon", "endcrystal", "villager", "irongolem", "parrot"
    };
-   static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16, 20, 10, 20, 16, 20, 100, 40, 200, 6};
+   static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16, 20, 10, 20, 16, 40, 200, 1, 20, 100, 6};
    /** Lights a creeper's fuse (flint and steel). False for anything else, or if it is already lit. */
    public boolean ignite(Mobs.Mob m) {
       if (m == null || m.dead || m.type != CREEPER || m.ignited) {
@@ -52,9 +54,9 @@ public final class Mobs {
     * getting on top of it.
     */
    static final double JUMP = 0.42 / 0.98 + 0.08;
-   static final float[] W = new float[]{0.9F, 0.9F, 0.9F, 0.4F, 0.6F, 0.6F, 0.6F, 1.4F, 0.6F, 4.0F, 0.6F, 0.52F, 0.6F, 1.4F, 0.6F, 8.0F, 0.5F};
-   static final float[] H = new float[]{0.9F, 1.4F, 1.3F, 0.7F, 1.95F, 1.99F, 1.7F, 0.9F, 1.95F, 4.0F, 1.8F, 0.52F, 1.95F, 2.7F, 2.9F, 4.0F, 0.9F};
-   static final float[] SPD = new float[]{0.1F, 0.1F, 0.1F, 0.1F, 0.13F, 0.125F, 0.125F, 0.17F, 0.12F, 0.05F, 0.06F, 0.1F, 0.1F, 0.1F, 0.16F, 0.5F, 0.12F};
+   static final float[] W = new float[]{0.9F, 0.9F, 0.9F, 0.4F, 0.6F, 0.6F, 0.6F, 1.4F, 0.6F, 4.0F, 0.6F, 0.52F, 0.6F, 8.0F, 1.6F, 0.6F, 1.4F, 0.5F};
+   static final float[] H = new float[]{0.9F, 1.4F, 1.3F, 0.7F, 1.95F, 1.99F, 1.7F, 0.9F, 1.95F, 4.0F, 1.8F, 0.52F, 2.9F, 4.0F, 1.6F, 1.95F, 2.7F, 0.9F};
+   static final float[] SPD = new float[]{0.1F, 0.1F, 0.1F, 0.1F, 0.13F, 0.125F, 0.125F, 0.17F, 0.12F, 0.05F, 0.06F, 0.1F, 0.16F, 0.5F, 0.0F, 0.1F, 0.1F, 0.12F};
    static final int[] SHEEP_COLORS = new int[]{0, 0, 0, 0, 0, 0, 0, 0, 8, 8, 7, 15, 12, 6};
    final Game g;
    public final ArrayList<Mobs.Mob> list = new ArrayList();
@@ -133,14 +135,16 @@ public final class Mobs {
             Mobs.Mob var5 = (Mobs.Mob)this.list.get(var4);
             if (var5.dead) {
                var5.deathTime++;
-               if (var5.deathTime >= 20) {
+               Mobs312.tickDying(this, var5, var1);
+               if (var5.deathTime >= (var5.type == ENDER_DRAGON ? Dragon.DEATH_TICKS : 20)) {
                   this.list.remove(var4);
+                  Mobs312.removed(this, var5, var1);
                }
             } else {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;
                double var10 = var6 * var6 + var8 * var8;
-               if (!(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
+               if (Mobs312.persistent(var5.type) || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
                   if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
                      this.tickMob(var5, var1, var2, var3);
                      if (var5.y < -20.0) {
@@ -240,6 +244,11 @@ public final class Mobs {
 
       if (var1.angry > 0) {
          var1.angry--;
+      }
+
+      // Update 3.12: the dragon and the End crystals do not walk, they have their own tick
+      if (Mobs312.tickSpecial(this, var1, var2, var3)) {
+         return;
       }
 
       int var5 = (int)Math.floor(var1.x);
@@ -458,7 +467,8 @@ public final class Mobs {
             case 9:
             case 10:
             case 11:
-               // Update 3.12: the mobs of the Nether (Mobs312)
+            case 12:
+               // Update 3.12: the mobs of the Nether and the Enderman (Mobs312)
                Mobs312.Intent intent312 = Mobs312.think(this, var1, var2, var3, var4);
                var12 = intent312.moving;
                var13 *= intent312.speed;
@@ -849,6 +859,8 @@ public final class Mobs {
             Mobs312.angerNeighbours(this, var1);
          }
 
+         Mobs312.hurt(this, var1, var2, var9);
+
          if (var1.health <= 0) {
             this.kill(var1);
          }
@@ -1125,6 +1137,10 @@ public final class Mobs {
                         if (Math.max(var27, var28) <= 7) {
                            int var16 = this.rnd.nextInt(100);
                            int var17 = var16 < 38 ? 4 : (var16 < 66 ? 5 : (var16 < 92 ? 6 : 7));
+                           if (Gen.extras && var16 >= 97) {
+                              var17 = ENDERMAN; // Update 3.12: three in a hundred are tall, dark and teleporting
+                           }
+
                            int var18 = var17 != 4 && var17 != 5 ? 1 : 1 + this.rnd.nextInt(2);
 
                            for (int var19 = 0; var19 < var18; var19++) {
@@ -1307,6 +1323,20 @@ public final class Mobs {
       public int color;
       public int angry;
       public int attackAnim;
+      /** Update 3.12: a free number for the mob's own mind (an End crystal: which pillar it sits on) and the phase of a boss. */
+      public int tag;
+      public int phase;
+      public int phaseT;
+      public int tpCd;
+      public double hx;
+      public double hy;
+      public double hz;
+      public double tx;
+      public double ty;
+      public double tz;
+      public float aux;
+      public float rad;
+      
       public int strafeDir = 1;
       public double x;
       public double y;

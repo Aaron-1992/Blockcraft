@@ -24,6 +24,7 @@ public final class MobRender {
    static final int[] SHEEP_RGB = new int[16];
    static int[] pix;
    static int PW;
+   static int PH = 64;
 
    private MobRender() {
    }
@@ -167,8 +168,15 @@ public final class MobRender {
    }
 
    static void put(int var0, int var1, int var2) {
-      if (var0 >= 0 && var1 >= 0 && var0 < PW && var1 < 64) {
+      if (var0 >= 0 && var1 >= 0 && var0 < PW && var1 < PH) {
          pix[var1 * PW + var0] = 0xFF000000 | var2;
+      }
+   }
+
+   /** Update 3.12: a see-through pixel (the alpha test throws it away). */
+   static void clear(int x, int y) {
+      if (x >= 0 && y >= 0 && x < PW && y < PH) {
+         pix[y * PW + x] = 0;
       }
    }
 
@@ -191,6 +199,7 @@ public final class MobRender {
 
    static void paint(MobRender.Model var0) {
       PW = var0.tw;
+      PH = var0.th;
       pix = new int[var0.tw * var0.th];
 
       for (MobRender.Part var2 : var0.parts) {
@@ -459,6 +468,10 @@ public final class MobRender {
       GL11.glEnable(2929);
 
       for (Mob var7 : var4.list) {
+         if (var7.dead && var7.type == Mobs.END_CRYSTAL) {
+            continue; // blown up
+         }
+
          double var8 = var7.px + (var7.x - var7.px) * var2;
          double var10 = var7.py + (var7.y - var7.py) * var2;
          double var12 = var7.pz + (var7.z - var7.pz) * var2;
@@ -525,7 +538,12 @@ public final class MobRender {
          GL11.glScalef(modelScale, modelScale, modelScale);
       }
 
-      if (var0.dead) {
+      if (var0.dead && var0.type == Mobs.ENDER_DRAGON) {
+         // Update 3.12: the dying dragon hangs in the air and shakes harder and harder, getting whiter and whiter
+         float dt = (var0.deathTime + var3) / Dragon.DEATH_TICKS;
+         GL11.glTranslatef((float)Math.sin((var0.age + var0.deathTime + var3) * 2.3F) * 0.12F * dt, (float)Math.sin((var0.deathTime + var3) * 1.9F) * 0.08F * dt, 0.0F);
+         var12[0] = var12[1] = var12[2] = 0.8F + 0.9F * dt;
+      } else if (var0.dead) {
          float var21 = Math.min(1.0F, (var0.deathTime + var3) / 20.0F);
          GL11.glTranslatef(0.0F, 0.3F * var21, 0.0F);
          GL11.glRotatef(var21 * 90.0F, 0.0F, 0.0F, 1.0F);
@@ -598,6 +616,14 @@ public final class MobRender {
                   } else {
                      GL11.glRotatef(-var18 * var30, 1.0F, 0.0F, 0.0F);
                   }
+               } else if (var0.type == Mobs.ENDERMAN) {
+                  // the long arms hang and swing; when it is angry they come up and flail
+                  float up = var0.hasTarget ? -55.0F + (float)Math.sin((var0.age + var3) * 0.5F + var30) * 9.0F : -var18 * var30 * 0.4F;
+                  if (var0.attackAnim > 0) {
+                     up -= (var0.attackAnim - var3) * 4.0F;
+                  }
+
+                  GL11.glRotatef(up, 1.0F, 0.0F, 0.0F);
                } else {
                   GL11.glRotatef(-var18 * var30, 1.0F, 0.0F, 0.0F);
                }
@@ -615,6 +641,57 @@ public final class MobRender {
                // the tentacles of a ghast sway
                GL11.glRotatef((float)Math.sin((var0.age + var3) * 0.12F + var28.idx * 0.9F) * 9.0F, 1.0F, 0.0F, 0.0F);
                GL11.glRotatef((float)Math.cos((var0.age + var3) * 0.1F + var28.idx * 1.3F) * 9.0F, 0.0F, 0.0F, 1.0F);
+               break;
+            case 14: {
+               // Update 3.12: the jaw of an enderman / the dragon follows the head and drops open
+               GL11.glRotatef(-Math.max(-50.0F, Math.min(50.0F, var14)), 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(var15, 1.0F, 0.0F, 0.0F);
+               float open;
+               if (var0.type == Mobs.ENDERMAN) {
+                  open = var0.angry > 0 ? 32.0F + (float)Math.sin((var0.age + var3) * 0.7F) * 6.0F : 0.0F;
+                  GL11.glTranslatef(0.0F, 0.0F, -4.0F / 16.0F);
+                  GL11.glRotatef(open, 1.0F, 0.0F, 0.0F);
+                  GL11.glTranslatef(0.0F, 0.0F, 4.0F / 16.0F);
+               } else {
+                  open = var0.attackAnim > 0 ? 30.0F * Math.min(1.0F, var0.attackAnim / 6.0F) : 5.0F + (float)Math.sin((var0.age + var3) * 0.12F) * 3.0F;
+                  GL11.glRotatef(open, 1.0F, 0.0F, 0.0F);
+               }
+
+               break;
+            }
+            case 15:
+            case 16: {
+               // the dragon's wings: two parts, the outer one lags behind the inner one - a wave runs along the wing
+               float sgn = var28.px > 0.0F ? 1.0F : -1.0F;
+               boolean perched = var0.type == Mobs.ENDER_DRAGON && var0.phase == Dragon.PERCH && !var0.dead;
+               float ph = perched ? (var0.age + var3) * 0.06F : var16 * 0.5F;
+               float amp = var0.dead ? 5.0F : (perched ? 14.0F : 32.0F);
+               GL11.glRotatef(sgn * (amp * (float)Math.sin(ph) + 6.0F), 0.0F, 0.0F, 1.0F);
+               if (var28.kind == 16) {
+                  GL11.glTranslatef(sgn * 28.0F / 16.0F, 0.0F, 0.0F);
+                  GL11.glRotatef(sgn * (amp * 0.7F * (float)Math.sin(ph - 0.9F) + 14.0F), 0.0F, 0.0F, 1.0F);
+               }
+
+               break;
+            }
+            case 17: {
+               // the tail whips from side to side, more and more towards the tip
+               int seg = (int)var28.rx;
+               float wag = (float)Math.sin(var16 * 0.3F - seg * 0.55F) * (seg + 1) * 0.55F;
+               float lift = (float)Math.cos(var16 * 0.3F - seg * 0.55F) * (seg + 1) * 0.3F;
+               GL11.glTranslatef(wag / 16.0F, lift / 16.0F, 0.0F);
+               break;
+            }
+            case 18:
+               // the glass of an End crystal turns and bobs, the core turns the other way
+               GL11.glTranslatef(0.0F, (float)Math.sin((var0.age + var3) * 0.1F) * 0.09F, 0.0F);
+               GL11.glRotatef((var0.age + var3) * 3.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(32.0F, 1.0F, 0.0F, 1.0F);
+               break;
+            case 19:
+               GL11.glTranslatef(0.0F, (float)Math.sin((var0.age + var3) * 0.1F) * 0.09F, 0.0F);
+               GL11.glRotatef(-(var0.age + var3) * 4.5F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(32.0F, 1.0F, 0.0F, 1.0F);
                break;
             case 10:
             case 11:
@@ -658,14 +735,20 @@ public final class MobRender {
          double x = f.px + (f.x - f.px) * partial - rend.camX;
          double y = f.py + (f.y - f.py) * partial - rend.camY;
          double z = f.pz + (f.z - f.pz) * partial - rend.camZ;
-         float s = f.big ? 0.42F : 0.2F;
+         float s = f.dragon ? 0.5F : (f.big ? 0.42F : 0.2F);
          GL11.glPushMatrix();
          GL11.glTranslated(x, y, z);
          GL11.glRotatef((f.life + partial) * 23.0F, 1.0F, 0.6F, 0.3F);
          for (int layer = 0; layer < 2; layer++) {
             float h = layer == 0 ? s : s * 0.55F;
             if (layer == 0) {
-               GL11.glColor3f(1.0F, 0.45F, 0.06F);
+               if (f.dragon) {
+                  GL11.glColor3f(0.65F, 0.18F, 0.95F);
+               } else {
+                  GL11.glColor3f(1.0F, 0.45F, 0.06F);
+               }
+            } else if (f.dragon) {
+               GL11.glColor3f(1.0F, 0.75F, 1.0F);
             } else {
                GL11.glColor3f(1.0F, 0.9F, 0.35F);
             }

@@ -20,6 +20,7 @@ final class Tests312 {
       netherMobs();
       fortress();
       stronghold();
+      end();
    }
 
    static void deleteAll(File f) {
@@ -644,10 +645,20 @@ final class Tests312 {
    // ------------------------------------------------------------------ the mobs of the Nether
    static void netherMobs() {
       test("mob table: the new kinds are in every table, hostile / peaceful are told apart", () -> {
-         eq(12, Mobs.N, "twelve mobs so far");
-         for (int t = 0; t < Mobs.N; t++) {
-            check(Mobs.NAME[t] != null && Mobs.HP[t] > 0 && Mobs.W[t] > 0 && Mobs.H[t] > 0 && Mobs.SPD[t] > 0, "mob " + t + " has name, health, size and speed");
+         eq(15, Mobs.N, "fifteen mobs so far (the villagers come later)");
+         for (int t = 0; t < Mobs.NAME.length; t++) {
+            check(Mobs.NAME[t] != null && Mobs.HP[t] > 0 && Mobs.W[t] > 0 && Mobs.H[t] > 0 && (Mobs.SPD[t] > 0 || t == Mobs.END_CRYSTAL), "mob " + t + " has name, health, size and speed");
          }
+
+         eq(18, Mobs.NAME.length, "names for the mobs that are still to come as well");
+         eq(18, Mobs.HP.length, "health");
+         eq(18, Mobs.W.length, "width");
+         eq(18, Mobs.H.length, "height");
+         eq(18, Mobs.SPD.length, "speed");
+         eq("enderman", Mobs.NAME[Mobs.ENDERMAN], "ids and names agree");
+         eq("endcrystal", Mobs.NAME[Mobs.END_CRYSTAL], "ids and names agree (crystal)");
+         eq("parrot", Mobs.NAME[Mobs.PARROT], "ids and names agree (parrot)");
+         check(Mobs.hostile(Mobs.ENDERMAN) && Mobs.hostile(Mobs.ENDER_DRAGON), "the End's monsters are hostile");
 
          check(!Mobs.hostile(Mobs.PIG) && !Mobs.hostile(Mobs.CHICKEN), "animals are not hostile");
          check(Mobs.hostile(Mobs.ZOMBIE) && Mobs.hostile(Mobs.ZOMBIE_PIGMAN) && Mobs.hostile(Mobs.GHAST) && Mobs.hostile(Mobs.BLAZE) && Mobs.hostile(Mobs.MAGMA_CUBE), "the monsters are");
@@ -657,11 +668,11 @@ final class Tests312 {
          // the models: every box fits into its texture, every part has a kind the renderer knows
          MobRender.Model[] models = new MobRender.Model[Mobs.N];
          MobModels312.build(models);
-         for (int t = Mobs.ZOMBIE_PIGMAN; t <= Mobs.MAGMA_CUBE; t++) {
+         for (int t = Mobs.ZOMBIE_PIGMAN; t <= Mobs.END_CRYSTAL; t++) {
             MobRender.Model m = models[t];
             check(m != null && m.parts.size() > 0, Mobs.NAME[t] + " has a model");
             for (MobRender.Part p : m.parts) {
-               check(p.kind >= 1 && p.kind <= 13, Mobs.NAME[t] + ": part kind " + p.kind);
+               check(p.kind >= 1 && p.kind <= 19, Mobs.NAME[t] + ": part kind " + p.kind);
                if (!p.shared) {
                   check(p.u + 2 * (p.d + p.w) <= m.tw || p.u >= 0, Mobs.NAME[t] + ": box in the texture");
                   check(p.v + p.d + p.h <= m.th, Mobs.NAME[t] + ": box in the texture (height " + (p.v + p.d + p.h) + ")");
@@ -677,6 +688,7 @@ final class Tests312 {
 
       test("zombie pigmen: calm until hit, then they all come; fire does nothing to them; what they drop", () -> {
          Game g = newGame(0);
+         g.mobs.rnd.setSeed(20123L + 678);
          Mobs.Mob near = g.mobs.spawn(Mobs.ZOMBIE_PIGMAN, 14.5, GROUND + 1, 8.5);
          Mobs.Mob mate = g.mobs.spawn(Mobs.ZOMBIE_PIGMAN, 20.5, GROUND + 1, 12.5);
          Mobs.Mob far = g.mobs.spawn(Mobs.ZOMBIE_PIGMAN, 8.5, GROUND + 1, -29.5);
@@ -731,6 +743,7 @@ final class Tests312 {
 
       test("ghasts float and throw fireballs that blow holes and hurt; blazes hover and shoot bursts that set you alight", () -> {
          Game g = newGame(0);
+         g.mobs.rnd.setSeed(20123L + 732);
          World w = g.world;
          Mobs.Mob ghast = g.mobs.spawn(Mobs.GHAST, 8.5, GROUND + 12, 34.5);
          check(ghast.bb[4] - ghast.bb[1] > 3.9, "a ghast is four blocks high");
@@ -769,6 +782,7 @@ final class Tests312 {
          check(count(w, 26, GROUND - 1, 26, 34, GROUND + 3, 34, Blocks.FIRE) > 0, "and there are fires");
          // a blaze
          Game g2 = newGame(0);
+         g2.mobs.rnd.setSeed(20123L + 770);
          Mobs.Mob blaze = g2.mobs.spawn(Mobs.BLAZE, 8.5, GROUND + 3, 22.5);
          int shots = 0;
          boolean burning = false;
@@ -783,6 +797,7 @@ final class Tests312 {
          check(blaze.y > GROUND + 0.5, "it hovers");
          // blaze rods
          Game g3 = newGame(0);
+         g3.mobs.rnd.setSeed(20123L + 784);
          Mobs.Mob b = g3.mobs.spawn(Mobs.BLAZE, 30.5, GROUND + 3, 30.5);
          java.util.HashSet<Integer> drops = new java.util.HashSet<>();
          for (int i = 0; i < 200; i++) {
@@ -798,6 +813,7 @@ final class Tests312 {
          eq(Items.BLAZE_ROD, b.type == Mobs.BLAZE ? Items.BLAZE_ROD : 0, "a blaze");
          // ghast drops
          Game g4 = newGame(0);
+         g4.mobs.rnd.setSeed(20123L + 799);
          java.util.HashSet<Integer> gd = new java.util.HashSet<>();
          for (int i = 0; i < 200; i++) {
             Mobs.Mob d = g4.mobs.spawn(Mobs.GHAST, 40.5, GROUND + 6, 40.5);
@@ -813,6 +829,7 @@ final class Tests312 {
 
       test("magma cubes: three sizes, they hop at you, they burn nothing of theirs, and split into smaller ones when they die", () -> {
          Game g = newGame(0);
+         g.mobs.rnd.setSeed(20123L + 814);
          Mobs.Mob big = g.mobs.spawn(Mobs.MAGMA_CUBE, 14.5, GROUND + 1, 8.5);
          eq(3, big.size, "a new one is large");
          eq(16, big.health, "16 health");
@@ -867,6 +884,7 @@ final class Tests312 {
 
       test("the Nether fills with its own mobs, standing on something, never inside a wall", () -> {
          Game g = newGame(0);
+         g.mobs.rnd.setSeed(20123L + 868);
          World ow = g.world;
          ow.shutdown();
          World w = new World(77L, null, Dim.NETHER);
@@ -990,6 +1008,7 @@ final class Tests312 {
 
       test("Nether fortress: the spawner in the throne room makes blazes, guards stand on the bricks", () -> {
          Game g = newGame(0);
+         g.mobs.rnd.setSeed(20123L + 991);
          g.world.shutdown();
          World w = new World(12345L, null, Dim.NETHER);
          g.world = w;
@@ -1236,6 +1255,630 @@ final class Tests312 {
                Chunk again = gen.generate(cx0 + 2, cz0 + 2);
                check(java.util.Arrays.equals(again.blocks, cs[2][2].blocks), "a chunk is generated the same every time");
             }
+         }
+      });
+   }
+
+   // ------------------------------------------------------------------ the End
+   static Game endGame(long seed, File dir) throws Exception {
+      Game g = newGame(0);
+      g.mobs.rnd.setSeed(seed);
+      g.world.shutdown();
+      World w = new World(seed, dir, Dim.END);
+      w.saveEnabled = dir != null;
+      g.world = w;
+      w.game = g;
+      g.screen = Game.S.PLAY;
+      load(w, 0, 0, 3);
+      g.player.setMode(0);
+      g.player.setPos(EndGen.PLATFORM_X + 0.5, EndGen.PLATFORM_Y + 1.0, EndGen.PLATFORM_Z + 0.5);
+      return g;
+   }
+
+   static void end() {
+      test("the End: one island in the void, the same in every world; ten obsidian pillars with bedrock on top; the fountain; the platform", () -> {
+         EndGen a = new EndGen(1L);
+         EndGen b = new EndGen(987654321L);
+         check(java.util.Arrays.equals(a.generate(0, 0).blocks, b.generate(0, 0).blocks), "the same island whatever the seed");
+         check(java.util.Arrays.equals(a.generate(-2, 1).blocks, b.generate(-2, 1).blocks), "the same island whatever the seed (a rim chunk)");
+         int solid = 0;
+         for (short blk : a.generate(9, 9).blocks) {
+            if (blk != 0) {
+               solid++;
+            }
+         }
+
+         eq(0, solid, "nothing out at 150 blocks: the void");
+         for (int deg = 0; deg < 360; deg += 15) {
+            int x = (int)Math.round(Math.cos(Math.toRadians(deg)) * 44.0);
+            int z = (int)Math.round(Math.sin(Math.toRadians(deg)) * 44.0);
+            check(EndGen.groundTop(x, z) >= 56, "ground under the pillar ring at " + deg + " degrees: " + EndGen.groundTop(x, z));
+            check(EndGen.groundTop((int)Math.round(Math.cos(Math.toRadians(deg)) * 75.0), (int)Math.round(Math.sin(Math.toRadians(deg)) * 75.0)) < 0, "the island ends before 75 blocks");
+            check(EndGen.groundBottom(x, z) < EndGen.groundTop(x, z) - 2, "the island is thick here");
+         }
+
+         World w = new World(5L, null, Dim.END);
+         load(w, 0, 0, 3);
+         load(w, 3, 0, 2);
+         eq(Blocks.END_STONE, w.getBlock(8, EndGen.TOP, 0), "end stone on top of the island");
+         eq(Blocks.END_STONE, w.getBlock(8, EndGen.TOP - 5, 0), "end stone below the top");
+         eq(0, w.getBlock(8, EndGen.TOP + 1, 0), "air above");
+         java.util.TreeSet<Integer> heights = new java.util.TreeSet<>();
+         for (int[] p : EndGen.PILLARS) {
+            heights.add(p[2]);
+            load(w, p[0] >> 4, p[1] >> 4, 1);
+            eq(Blocks.BEDROCK, w.getBlock(p[0], p[2], p[1]), "bedrock on top of the pillar at " + p[0] + "," + p[1]);
+            eq(Blocks.OBSIDIAN, w.getBlock(p[0], p[2] - 1, p[1]), "obsidian below it");
+            eq(Blocks.OBSIDIAN, w.getBlock(p[0], p[2] - 12, p[1]), "obsidian further down");
+            eq(0, w.getBlock(p[0], p[2] + 1, p[1]), "free air for the crystal");
+            eq(Blocks.OBSIDIAN, w.getBlock(p[0] + p[3] - 1, p[2] - 1, p[1]), "as wide as it says");
+            eq(0, w.getBlock(p[0] + p[3] + 2, p[2] - 1, p[1]), "and not wider");
+         }
+
+         eq(10, heights.size(), "ten different heights");
+         eq(76, (int)heights.first(), "the lowest is 76");
+         eq(103, (int)heights.last(), "the highest is 103");
+         // the fountain
+         eq(Blocks.BEDROCK, w.getBlock(0, EndGen.TOP, 0), "fountain floor");
+         eq(Blocks.BEDROCK, w.getBlock(0, EndGen.TOP + 4, 0), "the bedrock pillar in the middle is four high");
+         eq(0, w.getBlock(0, EndGen.TOP + 5, 0), "with the place for the egg on top");
+         eq(Blocks.BEDROCK, w.getBlock(3, EndGen.TOP + 1, 0), "the rim");
+         eq(Blocks.TORCH, w.getBlock(3, EndGen.TOP + 2, 0), "torches on the rim");
+         eq(0, w.getBlock(1, EndGen.TOP + 1, 1), "the dish is empty where the portal will be");
+         eq(Blocks.BEDROCK, w.getBlock(1, EndGen.TOP, 1), "and has a bedrock floor");
+         for (int[] c : EndGen.exitPortalCells()) {
+            eq(0, w.getBlock(c[0], c[1], c[2]), "a free cell for the exit portal");
+         }
+
+         // the platform you arrive on
+         load(w, EndGen.PLATFORM_X >> 4, 0, 2);
+         for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+               eq(Blocks.OBSIDIAN, w.getBlock(EndGen.PLATFORM_X + dx, EndGen.PLATFORM_Y, EndGen.PLATFORM_Z + dz), "platform obsidian at " + dx + "," + dz);
+               eq(0, w.getBlock(EndGen.PLATFORM_X + dx, EndGen.PLATFORM_Y + 2, EndGen.PLATFORM_Z + dz), "room above the platform");
+            }
+         }
+
+         check(w.getBlock(EndGen.PLATFORM_X, EndGen.PLATFORM_Y + 1, EndGen.PLATFORM_Z) == 0, "the place you arrive in is free");
+         check(!w.gen.getClass().equals(Gen.class), "the End has a generator of its own");
+         check(!Dim.hasSky(Dim.END) && Dim.ambient(Dim.END) > 0.1F, "no sky, but not pitch black");
+         w.shutdown();
+      });
+
+      test("End portal frames: an eye in every one of the twelve and the pit fills with portal; not before, not with something in the pit", () -> {
+         Game g = newGame(0);
+         int y = GROUND + 1;
+         int cx = 8;
+         int cz = 8;
+         for (int[] r : EndPortals.RING) {
+            g.world.setBlock(cx + r[0], y, cz + r[1], Blocks.END_FRAME);
+         }
+
+         g.inv[0] = new Stack(Items.EYE_OF_ENDER, 12);
+         g.sel = 0;
+         g.player.setMode(0);
+         for (int i = 0; i < 11; i++) {
+            int[] r = EndPortals.RING[i];
+            check(EndPortals.insertEye(g, cx + r[0], y, cz + r[1]), "eye " + i + " goes in");
+            eq(Blocks.END_FRAME_EYE, g.world.getBlock(cx + r[0], y, cz + r[1]), "the frame has its eye");
+            eq(0, count(g.world, cx - 1, y, cz - 1, cx + 1, y, cz + 1, Blocks.END_PORTAL), "no portal yet");
+         }
+
+         eq(1, g.countItem(Items.EYE_OF_ENDER), "eleven eyes used up");
+         check(EndPortals.insertEye(g, cx + EndPortals.RING[0][0], y, cz + EndPortals.RING[0][1]), "a frame that has an eye takes no second one");
+         eq(1, g.countItem(Items.EYE_OF_ENDER), "and nothing is used up");
+         // the real thing: aim at the last frame and use it
+         int[] last = EndPortals.RING[11];
+         World.Hit h = new World.Hit();
+         h.x = cx + last[0];
+         h.y = y;
+         h.z = cz + last[1];
+         h.ny = 1;
+         g.target = h;
+         check(g.useBlock(), "right click on the last frame");
+         eq(9, count(g.world, cx - 1, y, cz - 1, cx + 1, y, cz + 1, Blocks.END_PORTAL), "the pit is full of portal");
+         eq(0, g.countItem(Items.EYE_OF_ENDER), "twelve eyes are gone");
+         check(Blocks.END_PORTAL < Blocks.MAX && !Blocks.solid[Blocks.END_PORTAL], "you can walk into it");
+         check(EndPortals.touching(g.world, new double[]{cx + 0.2, y, cz + 0.2, cx + 0.8, y + 1.8, cz + 0.8}) != null, "standing in it is noticed");
+         check(EndPortals.touching(g.world, new double[]{cx + 5.2, y, cz + 5.2, cx + 5.8, y + 1.8, cz + 5.8}) == null, "standing beside it is not");
+         // a ring with a block in the pit
+         int cx2 = 24;
+         for (int[] r : EndPortals.RING) {
+            g.world.setBlock(cx2 + r[0], y, cz + r[1], Blocks.END_FRAME_EYE);
+         }
+
+         g.world.setBlock(cx2, y, cz, Blocks.STONE);
+         eq(null, EndPortals.tryOpen(g.world, cx2 + 2, y, cz), "something in the pit: no portal");
+         g.world.setBlock(cx2, y, cz, 0);
+         int[] opened = EndPortals.tryOpen(g.world, cx2 + 2, y, cz);
+         check(opened != null && opened[0] == cx2 && opened[1] == cz, "free again: it opens");
+         // creative mode: the eye is not used up
+         int cx3 = 8;
+         int cz3 = -16;
+         for (int[] r : EndPortals.RING) {
+            g.world.setBlock(cx3 + r[0], y, cz3 + r[1], Blocks.END_FRAME);
+         }
+
+         g.player.setMode(1);
+         g.inv[0] = new Stack(Items.EYE_OF_ENDER, 1);
+         for (int[] r : EndPortals.RING) {
+            EndPortals.insertEye(g, cx3 + r[0], y, cz3 + r[1]);
+         }
+
+         eq(9, count(g.world, cx3 - 1, y, cz3 - 1, cx3 + 1, y, cz3 + 1, Blocks.END_PORTAL), "creative: portal as well");
+         eq(1, g.countItem(Items.EYE_OF_ENDER), "and the single eye is still there");
+         check(Blocks.hardness[Blocks.END_FRAME] < 0.0F && Blocks.hardness[Blocks.END_FRAME_EYE] < 0.0F, "frames cannot be broken");
+      });
+
+      test("an Eye of Ender thrown into the air flies towards the nearest stronghold, rises, hovers, then drops - or breaks", () -> {
+         Game g = newGame(0);
+         g.player.setMode(0);
+         g.player.setPos(8.5, GROUND + 1, 8.5);
+         g.player.yaw = 0.0F;
+         g.inv[0] = new Stack(Items.EYE_OF_ENDER, 40);
+         g.sel = 0;
+         g.world.dayTime = 1000;
+         Stronghold s = Stronghold.nearest(g.world.seed, 8.5, 8.5);
+         EndPortals.rnd.setSeed(11L);
+         check(g.useSpecial(g.inv[0]), "the eye is thrown");
+         eq(39, g.countItem(Items.EYE_OF_ENDER), "one is used up");
+         World.Item it = null;
+         for (World.Item i : g.world.items) {
+            if (i.eye) {
+               it = i;
+            }
+         }
+
+         check(it != null, "an eye is in the air");
+         double want = Math.atan2(s.cz - it.lz, s.cx - it.lx);
+         double got = Math.atan2(it.az - it.lz, it.ax - it.lx);
+         check(Math.abs(want - got) < 0.01, "it flies towards the stronghold at " + s.cx + "," + s.cz);
+         check(Math.abs(Math.hypot(it.ax - it.lx, it.az - it.lz) - 12.0) < 0.01, "twelve blocks at a time");
+         check(it.delay > 1000, "nobody can pick it up in the air");
+         double top = it.y;
+         for (int i = 0; i < 40 && it.eye; i++) {
+            it.eyeT += 0;
+            EndPortals.tickEye(g.world, it);
+            top = Math.max(top, it.y);
+         }
+
+         check(top > it.ly + 5.0, "it rises about six blocks (" + (top - it.ly) + ")");
+         for (int i = 0; i < 40 && it.eye; i++) {
+            EndPortals.tickEye(g.world, it);
+         }
+
+         check(!it.eye, "the flight is over after about three seconds");
+         check(it.dead || it.delay <= 10, "it either broke or is an item that can be picked up again");
+         // a lot of throws: some of them break, most do not
+         int broke = 0;
+         int kept = 0;
+         for (int n = 0; n < 40; n++) {
+            World.Item e = g.world.dropItem(8.5, GROUND + 5.0, 8.5, Items.EYE_OF_ENDER, 1, 0);
+            e.eye = true;
+            e.lx = e.x;
+            e.ly = e.y;
+            e.lz = e.z;
+            e.ax = e.x + 5.0;
+            e.az = e.z;
+            for (int i = 0; i < 70 && e.eye; i++) {
+               EndPortals.tickEye(g.world, e);
+            }
+
+            if (e.dead) {
+               broke++;
+            } else {
+               kept++;
+            }
+         }
+
+         check(broke > 0 && kept > 20, "about one in five breaks: " + broke + " of 40");
+         // in the Nether it just goes up and comes down again
+         Game n = newGame(0);
+         n.world.shutdown();
+         World nw = new World(3L, null, Dim.NETHER);
+         n.world = nw;
+         nw.game = n;
+         n.player.setMode(0);
+         n.player.setPos(2.5, 70.0, 2.5);
+         n.inv[0] = new Stack(Items.EYE_OF_ENDER, 3);
+         n.sel = 0;
+         check(n.useSpecial(n.inv[0]), "thrown in the Nether");
+         World.Item ne = nw.items.get(0);
+         check(Math.abs(ne.ax - ne.lx) < 0.01 && Math.abs(ne.az - ne.lz) < 0.01, "straight up: there are no strongholds here");
+         nw.shutdown();
+      });
+
+      test("End portal travel: the Overworld portal leads to the platform, the exit leads home; /dim end; falling out of the world", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("endtrip").toFile();
+         Game g = null;
+         try {
+            g = newGame(1);
+            g.world.shutdown();
+            World ow = new World(4321L, dir);
+            ow.saveEnabled = true;
+            for (int cz = -6; cz <= 6; cz++) {
+               for (int cx = -6; cx <= 6; cx++) {
+                  Chunk c = new Chunk(cx, cz);
+                  for (int x = 0; x < 16; x++) {
+                     for (int z = 0; z < 16; z++) {
+                        c.set(x, 0, z, Blocks.BEDROCK);
+                        for (int y = 1; y < GROUND; y++) {
+                           c.set(x, y, z, Blocks.STONE);
+                        }
+
+                        c.set(x, GROUND, z, Blocks.GRASS);
+                     }
+                  }
+
+                  c.computeHeightmap();
+                  c.modified = true;
+                  ow.chunks.put(World.key(cx, cz), c);
+               }
+            }
+
+            for (Chunk c : new java.util.ArrayList<>(ow.chunks.values())) {
+               ow.lightChunk(c);
+            }
+
+            ow.game = g;
+            g.world = ow;
+            g.rootDir = dir;
+            g.screen = Game.S.PLAY;
+            g.spawnXZ = new int[]{12, 12};
+            int y = GROUND + 1;
+            for (int dz = -1; dz <= 1; dz++) {
+               for (int dx = -1; dx <= 1; dx++) {
+                  ow.setBlock(30 + dx, y, 30 + dz, Blocks.END_PORTAL);
+               }
+            }
+
+            g.player.setMode(0);
+            g.player.setPos(30.5, y, 30.5);
+            Portals.tickPlayer(g);
+            eq(Dim.END, g.world.dim, "in the End at once");
+            eq(Game.S.LOADING, g.screen, "behind the loading screen");
+            check(g.arrivalKind == 2 && Math.abs(g.arrivalAt[0] - (EndGen.PLATFORM_X + 0.5)) < 0.01 && Math.abs(g.arrivalAt[2] - (EndGen.PLATFORM_Y + 1.0)) < 0.01, "the way in is the platform");
+            load(g.world, EndGen.PLATFORM_X >> 4, 0, 2);
+            g.finishArrival();
+            g.screen = Game.S.PLAY;
+            check(Math.abs(g.player.x - (EndGen.PLATFORM_X + 0.5)) < 0.01 && Math.abs(g.player.y - 64.0) < 0.01, "standing on the platform");
+            check(!Phys.collides(g.world, g.player.bb), "not stuck in anything");
+            check(g.world.fight != null, "the End has a fight");
+            int crystals = 0;
+            int dragons = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.END_CRYSTAL) {
+                  crystals++;
+               }
+
+               if (m.type == Mobs.ENDER_DRAGON) {
+                  dragons++;
+                  eq(200, m.health, "a dragon with all of its health");
+               }
+            }
+
+            eq(10, crystals, "ten crystals");
+            eq(1, dragons, "and one dragon");
+            for (int i = 0; i < 100; i++) {
+               Portals.tickPlayer(g);
+            }
+
+            eq(Dim.END, g.world.dim, "standing next to nothing: still there");
+            // a second arrival does not bring a second dragon
+            g.world.fight.enter(g);
+            int again = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.ENDER_DRAGON || m.type == Mobs.END_CRYSTAL) {
+                  again++;
+               }
+            }
+
+            eq(11, again, "no doubles");
+            // falling into the void
+            g.player.setPos(g.player.x, -20.0, g.player.z);
+            g.voidCheck();
+            check(g.player.dead, "the void kills");
+            g.respawn();
+            eq(Dim.OVERWORLD, g.world.dim, "dead in the End: home in the Overworld");
+            load(g.world, 0, 0, 2);
+            g.finishArrival();
+            g.screen = Game.S.PLAY;
+            check(Math.abs(g.player.x - 12.5) < 1.5 && Math.abs(g.player.z - 12.5) < 1.5, "at the world spawn (" + g.player.x + ", " + g.player.z + ")");
+            // /dim end and /dim overworld
+            g.runCommand("/dim end");
+            eq(Dim.END, g.world.dim, "/dim end");
+            check(g.arrivalKind == 2, "arrives on the platform");
+            load(g.world, EndGen.PLATFORM_X >> 4, 0, 2);
+            g.finishArrival();
+            g.screen = Game.S.PLAY;
+            g.runCommand("/dim overworld");
+            eq(Dim.OVERWORLD, g.world.dim, "/dim overworld");
+            check(g.arrivalKind == 1 && Math.abs(g.arrivalAt[0] - 12.5) < 0.01, "and home, not to a portal");
+            // what was saved
+            check(new File(dir, "DIM1").isDirectory() && new File(dir, "DIM1").list().length > 0, "the End has its own folder with chunks");
+            check(new File(new File(dir, "DIM1"), "fight.properties").exists(), "and remembers the fight");
+         } finally {
+            if (g != null && g.world != null) {
+               g.world.shutdown();
+            }
+
+            deleteAll(dir);
+         }
+      });
+
+      test("endermen: calm until you look them in the face or hit them, then they blink and hit hard; water hurts them; pearls", () -> {
+         Game g = newGame(0);
+         g.mobs.rnd.setSeed(555L);
+         g.player.setMode(0);
+         g.player.setPos(8.5, GROUND + 1, 8.5);
+         Mobs.Mob e = g.mobs.spawn(Mobs.ENDERMAN, 17.5, GROUND + 1, 8.5);
+         // looking away
+         g.player.yaw = 90.0F;
+         g.player.pitch = 0.0F;
+         for (int i = 0; i < 80; i++) {
+            g.mobs.tick();
+            g.player.health = 20;
+         }
+
+         eq(0, e.angry, "calm while you look somewhere else");
+         e.setPos(17.5, GROUND + 1, 8.5);
+         // looking at it: yaw towards +x is -90
+         double dx = e.x - g.player.x;
+         double dy = e.y + 2.55 - (g.player.y + g.player.eye);
+         double d2 = Math.sqrt(dx * dx + (e.z - g.player.z) * (e.z - g.player.z));
+         g.player.yaw = Mobs.angleTo(dx, e.z - g.player.z);
+         g.player.pitch = (float)(-Math.toDegrees(Math.atan2(dy, d2)));
+         check(Mobs312.lookedAt(g.mobs, g.world, g.player, e), "the head is in the middle of the view");
+         g.player.pitch += 40.0F;
+         check(!Mobs312.lookedAt(g.mobs, g.world, g.player, e), "looking 40 degrees too low: not looked at");
+         g.player.pitch -= 40.0F;
+         g.world.setBlock(12, GROUND + 1, 8, Blocks.STONE);
+         g.world.setBlock(12, GROUND + 2, 8, Blocks.STONE);
+         g.world.setBlock(12, GROUND + 3, 8, Blocks.STONE);
+         g.world.setBlock(12, GROUND + 4, 8, Blocks.STONE);
+         check(!Mobs312.lookedAt(g.mobs, g.world, g.player, e), "a wall in between: not looked at");
+         for (int y = GROUND + 1; y <= GROUND + 4; y++) {
+            g.world.setBlock(12, y, 8, 0);
+         }
+
+         int hp = g.player.health;
+         boolean angry = false;
+         for (int i = 0; i < 400 && g.player.health == hp; i++) {
+            g.mobs.tick();
+            angry |= e.angry > 0;
+         }
+
+         check(angry, "it noticed");
+         check(g.player.health < hp, "and it hit: " + g.player.health);
+         // it blinks about when it is hurt
+         g.player.health = 20;
+         g.player.dead = false;
+         Mobs.Mob b = g.mobs.spawn(Mobs.ENDERMAN, 20.5, GROUND + 1, 20.5);
+         int jumps = 0;
+         double lx = b.x;
+         double lz = b.z;
+         for (int i = 0; i < 40; i++) {
+            b.invuln = 0;
+            g.mobs.hurtMob(b, 1, 8.5, 8.5, 0.0, true);
+            if (Math.hypot(b.x - lx, b.z - lz) > 2.0) {
+               jumps++;
+            }
+
+            lx = b.x;
+            lz = b.z;
+         }
+
+         check(jumps >= 3 && jumps <= 35, "it teleports when hit now and then: " + jumps + " of 40");
+         check(b.angry > 0, "and is angry");
+         check(!Phys.collides(g.world, b.bb), "never inside a block");
+         // water
+         for (int x = 28; x <= 34; x++) {
+            for (int z = 28; z <= 34; z++) {
+               g.world.setBlock(x, GROUND + 1, z, Blocks.WATER);
+            }
+         }
+
+         Mobs.Mob swimmer = g.mobs.spawn(Mobs.ENDERMAN, 31.5, GROUND + 1, 31.5);
+         int before = swimmer.health;
+         for (int i = 0; i < 60; i++) {
+            g.mobs.tick();
+            g.player.health = 20;
+         }
+
+         check(swimmer.health < before || swimmer.dead, "water hurts an enderman (" + swimmer.health + " of " + before + ")");
+         // pearls
+         int pearls = 0;
+         for (int i = 0; i < 30; i++) {
+            Mobs.Mob d = g.mobs.spawn(Mobs.ENDERMAN, 40.5, GROUND + 1, 40.5);
+            d.health = 1;
+            g.mobs.hurtMob(d, 5, 40.0, 40.0, 0.0, false);
+         }
+
+         for (World.Item it : g.world.items) {
+            if (it.id == Items.ENDER_PEARL) {
+               pearls += it.count;
+            }
+         }
+
+         check(pearls > 5 && pearls < 40, "about one pearl for every second one: " + pearls);
+      });
+
+      test("End crystals blow up when hit and hurt a dragon that is close; the dragon heals while one stands", () -> {
+         Game g = endGame(2024L, null);
+         g.world.fight.enter(g);
+         Mobs.Mob dragon = g.world.fight.dragon(g.mobs);
+         check(dragon != null, "a dragon");
+         Mobs.Mob crystal = null;
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m.type == Mobs.END_CRYSTAL && m.tag == 0) {
+               crystal = m;
+            }
+         }
+
+         check(crystal != null, "the crystal on pillar 0");
+         int[] p = EndGen.PILLARS[0];
+         check(Math.abs(crystal.x - (p[0] + 0.5)) < 0.01 && Math.abs(crystal.y - (p[2] + 1.0)) < 0.01, "it stands on the bedrock on top of the pillar");
+         check(Mobs.hostile(Mobs.END_CRYSTAL) && Mobs312.persistent(Mobs.END_CRYSTAL) && Mobs312.persistent(Mobs.ENDER_DRAGON), "never despawn");
+         // it heals while crystals stand
+         g.player.setPos(EndGen.PLATFORM_X + 0.5, EndGen.PLATFORM_Y + 1.0, EndGen.PLATFORM_Z + 0.5);
+         dragon.health = 100;
+         for (int i = 0; i < 100; i++) {
+            g.mobs.tick();
+            g.player.health = 20;
+         }
+
+         check(dragon.health >= 108 && dragon.health <= 112, "+1 every half second: " + dragon.health);
+         // a crystal is destroyed by any hit, and explodes
+         crystal.health = 1;
+         dragon.x = p[0] + 3.0;
+         dragon.y = p[2];
+         dragon.z = p[1] + 3.0;
+         dragon.setPos(dragon.x, dragon.y, dragon.z);
+         dragon.invuln = 0;
+         int hpBefore = dragon.health;
+         g.mobs.hurtMob(crystal, 1, 0.0, 0.0, 0.0, true);
+         check(crystal.dead, "a single hit is enough");
+         check((g.world.fight.gone & 1) != 0, "the fight remembers it");
+         check(dragon.health <= hpBefore - 8, "the dragon next to it was hurt by the blast: " + hpBefore + " -> " + dragon.health);
+         eq(Blocks.BEDROCK, g.world.getBlock(p[0], p[2], p[1]), "the bedrock under it is still there");
+         eq(Blocks.OBSIDIAN, g.world.getBlock(p[0], p[2] - 1, p[1]), "and the pillar");
+         for (int i = 0; i < 25; i++) {
+            g.mobs.tick();
+            g.player.health = 20;
+         }
+
+         int left = 0;
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m.type == Mobs.END_CRYSTAL && !m.dead) {
+               left++;
+            }
+         }
+
+         eq(9, left, "nine left");
+         check(!g.mobs.list.contains(crystal), "and the exploded one is gone from the list at once");
+         // no crystals: no healing
+         for (Mobs.Mob m : new java.util.ArrayList<>(g.mobs.list)) {
+            if (m.type == Mobs.END_CRYSTAL && !m.dead) {
+               m.health = 1;
+               g.mobs.hurtMob(m, 1, 0.0, 0.0, 0.0, true);
+            }
+         }
+
+         eq(1023, g.world.fight.gone, "all ten are gone");
+         dragon.health = 60;
+         for (int i = 0; i < 100; i++) {
+            g.mobs.tick();
+            g.player.health = 20;
+         }
+
+         check(dragon.health == 60, "it stays as it is: " + dragon.health);
+         g.world.shutdown();
+      });
+
+      test("the Ender Dragon: circles, swoops with its breath, rams, lands on the fountain, takes off again; killing it opens the exit portal and lays the egg", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("dragon").toFile();
+         Game g = null;
+         try {
+            g = endGame(99L, dir);
+            load(g.world, 0, 0, 3);
+            g.world.fight.enter(g);
+            Mobs.Mob d = g.world.fight.dragon(g.mobs);
+            d.health = 200;
+            boolean[] phases = new boolean[5];
+            boolean breath = false;
+            double maxR = 0;
+            double minY = 999;
+            double maxY = 0;
+            for (int i = 0; i < 4500; i++) {
+               g.mobs.tick();
+               g.player.health = 20;
+               g.player.invuln = 0;
+               phases[d.phase] = true;
+               if (d.phase == Dragon.PERCH) {
+                  check(Math.abs(d.x - 0.5) < 1.7 && Math.abs(d.z - 0.5) < 1.7 && Math.abs(d.y - (EndGen.TOP + 2.0)) < 1.7, "perched on the fountain (" + d.x + ", " + d.y + ", " + d.z + ")");
+               } else if (d.phase == Dragon.CIRCLE) {
+                  maxR = Math.max(maxR, Math.hypot(d.x, d.z));
+                  minY = Math.min(minY, d.y);
+                  maxY = Math.max(maxY, d.y);
+               }
+
+               for (Mobs312.Fireball f : g.mobs.fireballs) {
+                  breath |= f.dragon;
+               }
+
+               if (d.dead) {
+                  break;
+               }
+            }
+
+            for (int i = 0; i < 5; i++) {
+               check(phases[i], "the dragon was in phase " + i);
+            }
+
+            check(breath, "it breathed a purple fireball");
+            check(maxR > 20.0 && maxR < 90.0, "circling at 20-90 blocks from the middle (after a swoop it spirals back in): " + maxR);
+            check(minY > 60.0 && maxY < 110.0, "between 60 and 110 high: " + minY + " .. " + maxY);
+            // it rams
+            g.mobs.fireballs.clear();
+            d.phase = Dragon.CIRCLE;
+            d.phaseT = 0;
+            g.player.setPos(d.x, d.y + 1.0, d.z);
+            g.player.invuln = 0;
+            g.player.health = 20;
+            d.cd = 0;
+            g.mobs.tick();
+            check(g.player.health < 20, "it hurts whoever is inside it: " + g.player.health);
+            // purple clouds hurt
+            g.world.fight.addCloud(20.5, 70.0, 20.5);
+            g.player.setPos(20.5, 70.0, 20.5);
+            g.player.health = 20;
+            g.player.invuln = 0;
+            g.player.setMode(0);
+            for (int i = 0; i < 25; i++) {
+               g.world.fight.tick(g);
+               g.player.invuln = 0;
+            }
+
+            check(g.player.health <= 18, "standing in the breath hurts: " + g.player.health);
+            g.world.fight.clouds.clear();
+            // it dies
+            g.player.setPos(EndGen.PLATFORM_X + 0.5, EndGen.PLATFORM_Y + 1.0, EndGen.PLATFORM_Z + 0.5);
+            g.player.health = 20;
+            d.invuln = 0;
+            g.mobs.hurtMob(d, 500, 0.0, 0.0, 0.0, true);
+            check(d.dead, "dead");
+            check(g.world.fight.defeated, "the fight is won");
+            eq(0, count(g.world, -1, EndGen.TOP + 1, -1, 1, EndGen.TOP + 1, 1, Blocks.END_PORTAL), "the portal is not there yet while it dies");
+            for (int i = 0; i < Dragon.DEATH_TICKS - 2; i++) {
+               g.mobs.tick();
+               g.player.health = 20;
+            }
+
+            check(g.mobs.list.contains(d), "it takes its time to die");
+            for (int i = 0; i < 4; i++) {
+               g.mobs.tick();
+            }
+
+            check(!g.mobs.list.contains(d), "and then it is gone");
+            eq(8, count(g.world, -1, EndGen.TOP + 1, -1, 1, EndGen.TOP + 1, 1, Blocks.END_PORTAL), "the exit portal rings the bedrock pillar");
+            eq(Blocks.DRAGON_EGG, g.world.getBlock(0, EndGen.TOP + 5, 0), "the egg sits on the pillar");
+            check(g.toastTicks > 0 && g.toastTitle.contains("Dragon"), "a message on the screen");
+            // standing in the exit: home
+            g.spawnXZ = new int[]{12, 12};
+            g.player.setPos(1.5, EndGen.TOP + 1.0, 0.5);
+            check(EndPortals.touching(g.world, g.player.bb) != null, "in the exit portal");
+            Portals.tickPlayer(g);
+            eq(Dim.OVERWORLD, g.world.dim, "the exit leads home");
+            // the End remembers: no dragon next time, the portal is there
+            World again = new World(99L, dir, Dim.END);
+            check(again.fight.defeated && again.fight.egg, "saved: the dragon is dead, the egg has been laid");
+            again.shutdown();
+         } finally {
+            if (g != null && g.world != null) {
+               g.world.shutdown();
+            }
+
+            deleteAll(dir);
          }
       });
    }

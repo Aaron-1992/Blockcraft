@@ -818,6 +818,7 @@ public final class Renderer {
       GL11.glEnable(3042);
       GL11.glBlendFunc(770, 771);
       GL11.glDisable(3008);
+      GL11.glEnable(3553); // Update 3.12: the selection box switches texturing off; without clouds (the Nether) nothing switched it back on: the portal film was a flat colour
       GL11.glBindTexture(3553, Tex.atlas);
       lightmapUnit(true);
       arrays(true);

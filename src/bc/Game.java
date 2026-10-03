@@ -1021,6 +1021,10 @@ public final class Game {
       if (this.world != null) {
          this.world.saveAll();
          this.mobs.save(this.world.dir);
+         if (this.world.fight != null) {
+            this.world.fight.save(this);
+         }
+
          if (this.rootDir == null && this.world.dir == null) {
             return; // a world that only lives in memory (tests)
          }
@@ -1153,6 +1157,70 @@ public final class Game {
       this.player.setPos(pos[0], pos[1], pos[2]);
       this.player.fallDistance = 0.0F;
       this.player.updateBox();
+      if (this.world.fight != null) {
+         this.world.fight.enter(this);
+      }
+   }
+
+   /** Where you wake up in the Overworld after the End or the Nether: next to your bed, else at the world spawn (x, z). */
+   double[] homeXZ() {
+      int[] h = this.bedPos != null ? new int[]{this.bedPos[0], this.bedPos[2]} : this.spawnXZ;
+      return new double[]{h[0] + 0.5, h[1] + 0.5};
+   }
+
+   /** Update 3.12: a coloured spark that drifts about (teleporting endermen, portals, eyes of ender, the dragon's breath). */
+   void portalParticle(double x, double y, double z, float r, float g, float b) {
+      Game.Particle p = new Game.Particle();
+      p.x = (float)x;
+      p.y = (float)y;
+      p.z = (float)z;
+      p.vx = (this.rnd.nextFloat() - 0.5F) * 0.05F;
+      p.vy = (this.rnd.nextFloat() - 0.3F) * 0.04F;
+      p.vz = (this.rnd.nextFloat() - 0.5F) * 0.05F;
+      p.u = (Tex.tx(64) + 1) / (float)Tex.PX;
+      p.v = (Tex.ty(64) + 1) / (float)Tex.PX;
+      p.shade = 1.0F;
+      p.grav = 0.0F;
+      p.size = 0.07F + this.rnd.nextFloat() * 0.06F;
+      p.life = 16 + this.rnd.nextInt(14);
+      p.r = r;
+      p.g = g * (0.8F + this.rnd.nextFloat() * 0.4F);
+      p.b = b;
+      this.particles.add(p);
+   }
+
+   /** Update 3.12: a message in big letters at the top of the screen for a few seconds (the dragon is dead, ...). */
+   void toast(String title, String text) {
+      this.toastTitle = title;
+      this.toastText = text;
+      this.toastTicks = 260;
+   }
+
+   String toastTitle = "";
+   String toastText = "";
+   int toastTicks;
+
+   /** The boss bar of the Ender Dragon and the toast, drawn on top of the hotbar's layer. */
+   void drawBossBar() {
+      if (this.world != null && this.world.fight != null && !this.player.spectator) {
+         Mobs.Mob d = this.world.fight.dragon(this.mobs);
+         if (d != null) {
+            float x = (float)Math.floor((this.gui.w - 182.0F) / 2.0F);
+            float frac = Math.max(0.0F, Math.min(1.0F, d.health / (float)EndFight.DRAGON_HP));
+            this.gui.centered("Ender Dragon", this.gui.w / 2.0F, 6.0F, 0xFFFFFF, true, 1.0F);
+            this.gui.rect(x - 1.0F, 17.0F, 184.0F, 9.0F, 0xFF000000);
+            this.gui.rect(x, 18.0F, 182.0F, 7.0F, 0xFF3A1250);
+            this.gui.rect(x, 18.0F, 182.0F * frac, 7.0F, 0xFFC040F0);
+            this.gui.rect(x, 18.0F, 182.0F * frac, 2.0F, 0xFFE8A0FF);
+         }
+      }
+
+      if (this.toastTicks > 0) {
+         float fade = Math.min(1.0F, this.toastTicks / 30.0F);
+         int a = (int)(255.0F * fade) << 24;
+         this.gui.centered(this.toastTitle, this.gui.w / 2.0F, this.gui.h * 0.2F, 0xFFFF80 | a, true, 2.0F);
+         this.gui.centered(this.toastText, this.gui.w / 2.0F, this.gui.h * 0.2F + 24.0F, 0xFFFFFF | a, true, 1.0F);
+      }
    }
 
    void quitToTitle() {
@@ -1211,8 +1279,8 @@ public final class Game {
          this.player.fallDistance = 0.0F;
          this.player.invuln = 0;
          this.deathHandled = false;
-         int[] home = this.bedPos != null ? new int[]{this.bedPos[0], this.bedPos[2]} : this.spawnXZ;
-         this.switchDimension(Dim.OVERWORLD, home[0] + 0.5, home[1] + 0.5, 1);
+         double[] home = this.homeXZ();
+         this.switchDimension(Dim.OVERWORLD, home[0], home[1], 1);
          return;
       }
 
@@ -1696,7 +1764,12 @@ public final class Game {
                   } else if (dn == this.world.dim) {
                      this.say("You are already in " + Dim.name(dn));
                   } else if (dn == Dim.END) {
-                     this.say("§cThe End cannot be reached yet");
+                     this.say("Travelling to " + Dim.name(dn) + " ...");
+                     this.switchDimension(Dim.END, EndGen.PLATFORM_X + 0.5, EndGen.PLATFORM_Y + 1.0, EndGen.PLATFORM_Z + 0.5, 2);
+                  } else if (this.world.dim == Dim.END) {
+                     double[] home = this.homeXZ();
+                     this.say("Travelling to " + Dim.name(dn) + " ...");
+                     this.switchDimension(Dim.OVERWORLD, home[0], home[1], 1);
                   } else {
                      double dscale = Dim.scale(this.world.dim, dn);
                      this.say("Travelling to " + Dim.name(dn) + " ...");
@@ -2392,6 +2465,23 @@ public final class Game {
       }
 
       Portals.tickPlayer(this);
+      if (this.toastTicks > 0) {
+         this.toastTicks--;
+      }
+
+      if (this.world.fight != null && this.screen != Game.S.PAUSE) {
+         this.world.fight.tick(this);
+      }
+
+      this.voidCheck();
+   }
+
+   /** Update 3.12: the End has no floor under the island - whoever falls out of the world is gone. */
+   void voidCheck() {
+      if (this.world.dim == Dim.END && this.player.y < -12.0 && !this.player.dead && !this.player.spectator) {
+         this.player.health = 0;
+         this.player.dead = true;
+      }
    }
 
    void Tex_tick() {
@@ -2600,6 +2690,10 @@ public final class Game {
 
       if (var1 == Blocks.PUMPKIN && this.heldId() == Items.SHEARS && !this.player.adventure) {
          return this.carvePumpkin();
+      }
+
+      if ((var1 == Blocks.END_FRAME || var1 == Blocks.END_FRAME_EYE) && this.heldId() == Items.EYE_OF_ENDER && !this.player.adventure) {
+         return EndPortals.insertEye(this, this.target.x, this.target.y, this.target.z);
       }
 
       switch (var1) {
@@ -3242,6 +3336,10 @@ public final class Game {
 
       if (var2 == 339) {
          return this.useBoneMeal(var1);
+      }
+
+      if (var2 == Items.EYE_OF_ENDER) {
+         return !this.player.adventure && EndPortals.throwEye(this, var1);
       }
 
       if (var2 == 282) {
@@ -4394,6 +4492,7 @@ public final class Game {
          }
 
          this.drawHotbar();
+         this.drawBossBar();
       }
 
       if (this.debug) {
