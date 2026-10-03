@@ -1,2 +1,1 @@
-adv-toast-long,adv-toast,nether-fortress-b
-jar=build
+title,options310,inv-player,inv-creative-2,pause-menu,day-shaders,day-plain,mobs-sh,village-day,lod-top-sh,under-water,wx-fair
