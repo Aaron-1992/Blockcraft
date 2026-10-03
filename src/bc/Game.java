@@ -468,7 +468,7 @@ public final class Game {
          if (++this.autoFrames >= 108) {
             this.autoShotNow = true;
          }
-      } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV) {
+      } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
          if (this.autoFrames == 1) {

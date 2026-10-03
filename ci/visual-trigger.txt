@@ -1,2 +1,2 @@
-colors-misc,adv-screen,adv-adventure,adv-toast,wx-fair,wx-storm,wx-storm-bolt,wx-rain,wx-overcast,wx-snow,village-trade
+adv-screen,adv-adventure,parrots,parrot-shoulder,colors-misc
 jar=build
