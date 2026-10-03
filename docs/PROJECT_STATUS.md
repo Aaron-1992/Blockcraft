@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-03 (Update 3.10)._
+_Last updated: 2026-10-03 (Update 3.11)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
@@ -18,6 +18,23 @@ _Last updated: 2026-10-03 (Update 3.10)._
 | 10 | Hide interior surfaces (performance) | **done in Update 3.9**: `Mesher.leafMode` (Options > Leaves: Fancy / Smart / Fast) - leaf-to-leaf faces were ~30 % of all faces in a forest |
 | 11 | Fix mobs not being able to jump up a block | **done in Update 3.9** (`Mobs.JUMP`) |
 
+## Second to-do list (the owner's "To do.txt" of 2026-10-03, commit c52da00)
+
+| # | Item | State |
+|---|---|---|
+| 1 | Fix hand models | **done in 3.11**: Minecraft 1.12's own transforms for the empty arm, flat items, tools, blocks, flat blocks (torch, flowers), swing, swap, eating, sway; third-person held items (`Renderer.renderHand`, `PlayerModel.drawArmFirstPerson` / `drawHeld`) |
+| 2 | Make entities react to shader lighting | **done in 3.11**: `ShaderSrc.ENTITY_FS` (sun tint, shade + terrain shadows, placed lights, fog) for mobs, items, falling blocks, debris, your body and your hand |
+| 3 | Make clouds and weather more realistic | **partly done in 3.11**: the shader sky (billows that lean with height, eroded edges, silver lining, height-dependent ambient, a cirrus layer, steeper storm towers). The blocky no-shader clouds only got the same tower walls; rain, snow and lightning are unchanged |
+| 4 | Make water look better with shader | **done in 3.11**: `ShaderSrc.WATER_FS` (depth colour, refraction, foam, layered ripples, glitter, mirrored terrain with "FANCY") |
+| 5 | Add more 1.12 features | open (only ideas so far) |
+| 6 | Upgrade the villages | open |
+| 7 | Dimensions | open |
+| 8 | Fix door culling | **done in 3.11**: `Mesher.boxBB` tested the wrong side for the two z faces (a bug since 3.5) |
+| 9 | Make textures only render from one side | **done in 3.11**: GL back-face culling for terrain and LOD, back quads for plants / crops / flames / water surfaces |
+| 10 | Better animations (Fresh Animations style) | **done in 3.11** for mobs, the player body and the first-person hand (`Anim`); no new models, no sound |
+| 11 | Make LODs resemble what is in the chunk when something is broken or built | **done in 3.11**: `LodMap` summaries of changed chunks (saved in `lod.dat`, old saves scanned in the background), tiles rebuilt and swapped without a gap |
+| 12 | Fix LODs popping up in fully rendered chunks when trees burn | **done in 3.11**: `Chunk.everMeshed` (a chunk stays covered while a section is re-meshed), tiles that may reach the real chunks are always split to 32 |
+
 ## What it is
 
 Blockcraft is an original Minecraft-Java-1.12-style block sandbox for Windows ("an original clone": no Mojang code or
@@ -25,7 +42,22 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.10 – "natural disasters and falling trees"
+## Current state: Update 3.11 – "hands, water, distant terrain, animation"
+
+- **Single-sided faces** (`Renderer.cullFaces`, `Mesher.emitBack`): terrain and LOD are drawn with back-face culling (every block's mesh and every LOD quad winds counter-clockwise
+  seen from outside - `Tests311` checks all of them); plants, crops, flames and the top of water / lava get a second quad facing the other way. `-Dbc.legacymesh=true` gives the
+  3.5 meshes back (the strict equivalence pass uses it), `-Dbc.nocull=true` draws double-sided again. A spectator under the map sees the sky (no cave darkening) and no LOD walls.
+- **Doors** (`Mesher.boxBB`): the face-against-a-neighbour test used the even / odd face number to pick the min / max side, but the face order is +y -y -z +z +x -x, so the z faces were swapped.
+- **LOD from the real world** (`LodMap`, `Lod`, `Chunk.lodDirty`, `World.lodRefresh`): summaries of changed chunks, `lod.dat`, background scan, `Lod.invalidate` / `refresh`, trees drawn only where a
+  trunk of >= 3 logs still stands, no generator houses over changed chunks; `Chunk.everMeshed` for the coverage test; hooks `-Dbc.tp=frame:x,y,z`, `-Dbc.lodage`.
+- **Hands** (`Renderer.renderHand`, `PlayerModel`): Minecraft 1.12's `ItemRenderer` numbers; `Game.tickArm` (sway), `bobDist` / `bobAmp` (hand bob, `/bobbing`), hooks `bc.handswing`, `bc.handeat`.
+- **Shaders**: `ENTITY_FS` (`Shaders.useEntity`, `Renderer.brightnessAt` forwards each entity's light level), `WATER_FS` (derived from `WORLD_FS` at class load by `ShaderSrc.deriveWater`; needs
+  a copy of the scene's colour and depth: `Shaders.copyScene`), `Options.waterQ` (1 = no mirrored terrain, 2 = FANCY), the clouds in `CLOUD_FS`. `tools/glsl_check.py` parses every shader
+  without a GPU (CI runs it).
+- **Animation** (`Anim`, `MobRender.drawMob`, `PlayerModel.draw`): pure functions, unit-tested for range and smoothness; hooks `bc.walkphase`, `bc.graze`, `bc.posewalk`.
+- Under the hood: tests grew to ~487,000 checks (`Tests311`); `Tex.initPixels` (the atlas without OpenGL).
+
+## Update 3.10 (still in the game) – "natural disasters and falling trees"
 
 - **Falling trees** (`Trees.java`): breaking a log of a tree with leaves makes everything above the cut tip over as one rigid piece (90 degrees about the cut cell,
   away from the player, else the best free direction; none when walled in). The trunk lands as **logs on their side** (`Blocks.LOG_X0` 220-222 / `LOG_Z0` 223-225, bark turned
@@ -135,6 +167,8 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 | 3.10 disasters | `TestsDisasters`: what a tornado takes and what never (every block class), a tornado's life cycle and speed, 900 ticks over a yard of every block class, uprooting, the force field on a real `Player` + a cow, debris flight and landing, quakes (shake by distance, plants, plateau crumbling, flat ground stays flat, trees topple), meteors (straight flight, crater, fires, obsidian, unloaded ground), natural starts and their switches, `/disaster`, saving | all pass |
 | 3.10 on screen | `Visual` scenes `treefall-30`, `treefall-65`, `treefall-down`, `logs310`, `tornado-mid`, `tornado-close`, `tornado-night`, `quake`, `meteors`, `meteor-crater`, `options310` | render correctly (`ci-results/shots/`) |
 | 3.10 on the real Windows build | `Windows smoke test` (the committed 3.10 update pack installed over the 3.5 base zip, the real `Blockcraft.exe` under Mesa software OpenGL): `title`, `options310` (the new Disasters button), `tornado-close`, `meteors`, `quake` in the first run; `treefall-65`, `treefall-down` (the tree half way down and landed) and `logs310` in the second (the first run's `treefall-65` hung because the Launch4j stub cannot take 888 characters of `JAVA_TOOL_OPTIONS` - a harness limit, `win_smoke.py` now starts such scenes with java.exe directly) | all start, render and exit cleanly (`ci-results/windows/`; the first run's pictures are in the history of that folder) |
+| 3.11 faces, doors, LOD, animation maths | `Tests311`: the winding of every block's mesh, a back quad for every plant / crop / flame / water surface, all 16 door blocks x 64 combinations of solid neighbours, the LOD summaries (flat ground, tower, pit, water, trees, cabin pillars), `lod.dat` round trip, the scan of old chunk files, the LOD tile built from a summary, trees validated against trunks, every LOD quad's winding against its face code, tile invalidation and the swap, `Chunk.everMeshed`, the animation functions | all pass |
+| 3.11 on screen | `Visual` scenes `under-map(-sh)`, `doors311`, `lod-changes` (+ `-ref`), `hand-*`, `skin-hold-*`, `skin-run`, `mobs-sh`, `mobs-shade-*`, `mobs-torch-*`, `water-*`, `wx-*` | render correctly (`ci-results/shots/`); the cloud changes are subtle in fair weather |
 | A physical GPU / real hardware | - | never run. Software OpenGL is slow but behaves like the real thing for these features; GPU-driver quirks cannot be ruled out. |
 
 The 3.5 features that the first chat could not test (hoe, seeds, bucket, flint & steel right-clicks; sleeping; ladder climbing) were

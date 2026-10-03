@@ -429,7 +429,7 @@ final class WeatherFx {
    /** Vertical size of the cloud above its base: thin sheets in fair weather, towers where the thunderhead (core) is, with lumpy tops. */
    static float thickness(float cover, float core, double u, double v) {
       float lump = Weather.samp(NOISE_R, u * (1.0 / 600.0), v * (1.0 / 600.0));
-      return 46.0F + 28.0F * cover + 150.0F * core * (0.65F + 0.35F * lump);
+      return 46.0F + 28.0F * cover + 150.0F * Weather.smooth(0.22F, 0.58F, core) * (0.65F + 0.35F * lump);
    }
 
    static float groundAt(World w, int x, int z) {

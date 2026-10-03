@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.10)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.11)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,48 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.11  (hands, water, distant terrain, animation)
+  * FACES ARE SINGLE-SIDED, like in Minecraft. Go under the map in spectator mode (/gamemode spectator, F to fly): the ground is see-through
+    from below, you see the sky, clouds, the undersides of trees and houses and the caves - not a textured ceiling. (Plants, crops, flames and
+    the surface of water are still seen from both sides.) The sky no longer goes black when a spectator is underground.
+  * DOORS HAVE BOTH SIDES. A door lost its visible big face whenever a solid block stood right against that side (a bug that was also in 3.5:
+    the test for "is this face pressed against a neighbour" looked at the wrong side for two of the six faces). The same bug hid the riser of some
+    stairs. Fixed for every door, stair, slab, fence and torch; checked for every door state with every combination of neighbours.
+  * THE DISTANT TERRAIN (LOD) SHOWS WHAT IS REALLY THERE. It used to be the world as the generator made it, so a tower you built, a pit you
+    dug or a forest you cut down was not there when you looked at it from far away (and the old forest came back). Now every chunk that was
+    changed is summarised (the height and colour of what is on top, water depth, which trees still stand) when it is saved and two seconds
+    after the last change; the distant terrain is rebuilt from that (a few seconds later, without a gap). Worlds from before 3.11 are
+    scanned once in the background when you open them (a file lod.dat appears in the world's folder).
+  * THE DISTANT TERRAIN NO LONGER FLASHES UP INSIDE CHUNKS THAT ARE DRAWN, for instance while trees burn: a chunk counts as covered
+    once it has been drawn, and keeps counting while a part of it is being rebuilt. Where the real chunks stop, the distant tiles
+    are always the small ones, so nothing big overlaps the near terrain.
+  * HANDS LIKE MINECRAFT 1.12. The empty hand is your arm in your skin, reaching forward from the bottom right with the hand end
+    towards the middle of the screen. Tools, food, torches and flowers are held as flat items with Minecraft's own position and angle,
+    blocks as the little cube at the bottom right. The swing, the swap animation when you change the slot, eating (the food rises to
+    your mouth and bobs) and the sway when you turn the camera use Minecraft's formulas; the hand also bobs with every step
+    (switch: /bobbing on|off). In F5 view the item sits in the hand the way it does for other players in Minecraft (a sword points
+    forward and up, flat items hang from the fist).
+  * SHADERS: ANIMALS, MONSTERS AND YOU ARE LIT LIKE THE TERRAIN. With shaders on, mobs, dropped items, falling blocks, flying debris,
+    your own body and your hand get the warm sun, the cool blue shade (also under trees: they receive the terrain's shadows), the glow of
+    torches and other lights, and the same fog. Before, they were lit by one flat number.
+  * SHADERS: BETTER WATER. The colour now depends on depth (clear turquoise and the sand visible through shallow water, deep blue
+    further out), the bed is seen through the rippling surface (refraction), there is white foam along the shore, the ripples are
+    four layers of noise drifting in different directions, the sun leaves a glitter path, and with "FANCY" the shore, trees and hills
+    are mirrored in the water. Options -> "Shaders: OFF / ON / FANCY" (ON = everything except the mirrored terrain, which costs the most).
+    If a graphics driver cannot run the new water program the game uses the old water by itself.
+  * CLOUDS (shader sky): the cloud shapes bulge and lean with height instead of standing in columns, edges are eroded and wispy,
+    thin edges glow towards the sun (silver lining), the bottoms are a bit greyer than the tops, a thin high layer of ice-cloud
+    streaks shows in fair weather, and the walls of thunderhead towers are steeper.
+  * ANIMATION (like Minecraft packs such as "Fresh Animations"): animals and monsters bounce and sway with every step, breathe when
+    they stand, are thrown back when hit, nod while walking; pigs, cows and sheep now and then put their heads down and chew; chickens
+    peck the air with every step; baby animals have bigger heads; legs spread when an animal jumps or falls. You: the shoulders turn against the hips
+    when you walk, you lean forward when you sprint, and your arms go out in the air.
+  * Honest notes. Everything above that can be tested without a screen is (the face winding of every block, all door
+    states, the distant terrain's summaries, the saving and the rebuilding, the animation maths: 480,000+ checks), and the pictures
+    were looked at from a software renderer and through the real Blockcraft.exe on a Windows test machine. What has NOT been tried
+    is how it feels and runs on a real graphics card: the new water program in particular is the heaviest shader in the game.
+    If it is slow, set Options -> Shaders to ON or OFF. Villages, the Nether and more 1.12 features are NOT in this update.
 
 WHAT'S NEW IN UPDATE 3.10  (natural disasters and falling trees)
   * TREES FALL OVER. Chop through a tree's trunk (usually the bottom log) and the whole tree above the cut tips over like a felled

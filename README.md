@@ -1,9 +1,10 @@
 # Blockcraft
 
-An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.10**
-("natural disasters and falling trees": tornadoes, earthquakes and meteors, trees that tip over when you chop them and can be
-harvested lying down). Earlier updates added skins and fire like Minecraft's (3.9), weather (3.8), kitchen & fire (3.7) and
-farming (3.6) - see `package/README.txt`.
+An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.11**
+("hands, water, distant terrain, animation": Minecraft's own hand and item positions, single-sided faces, doors fixed, the
+distant terrain shows what you built or broke, entities and water that react to the shaders, better clouds, animation).
+Earlier updates added natural disasters and falling trees (3.10), skins and fire like Minecraft's (3.9), weather (3.8),
+kitchen & fire (3.7) and farming (3.6) - see `package/README.txt`.
 
 ## Download and play (the easy way)
 

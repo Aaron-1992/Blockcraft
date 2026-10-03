@@ -1,2 +1,1 @@
-wx-compare-sh,wx-storm-sh,wx-storm-far-sh,wx-sunset-sh,mobs-walk,mobs-graze,skin-run,water-day-sh
-jar=build
+wx-compare-sh,wx-storm-sh,wx-sunset-sh,mobs-sh,hand-sword

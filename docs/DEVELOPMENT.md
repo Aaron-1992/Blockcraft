@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.10"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.11"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -222,6 +222,19 @@ so old lines still load).
   ribbons with three soft glow discs. Camera shake is in `Renderer.renderWorld` (position + a little rotation, `Game.shake` fades by itself).
 * Tests: `TestsDisasters` (rule tables, ground height, the life of a tornado, what it tears and what it leaves, uprooting, the force field with a real `Player` and a cow, debris flight and landing,
   quakes, meteors, natural starts and their switches, commands, saving).
+
+## Update 3.11 notes
+
+* **Culling.** `Renderer.renderWorld` and `Lod.render` enable `GL_CULL_FACE` only around their chunk / tile loops (everything else keeps the old state: weather, sky, entities
+  draw double-sided). Every mesh must wind counter-clockwise seen from outside: cubes / boxes / stairs / fences use `Mesher.FC`, the LOD uses `Lod.quadN` (it orders the corners from the
+  face's intended normal). New geometry that is seen from both sides needs a back quad (`Mesher.emitBack`). `Tests311.culling` fails if a block's face points into the block.
+* **LOD summaries** (`LodMap.Sum`, 256 columns per chunk): `top` (plane of the surface = y of the top block + 1), `depth` (water over the bed), `trunk` (upright logs with leaves above), `rgb` and `side`
+  colours. Made by `World.saveChunk`, `World.lodRefresh` (2 s after the last `setBlock`) and the background scan of chunk files without a summary. `Lod.build` reads a summary where it exists.
+  A summary is NOT made for unchanged chunks (they equal the generator). Changing how the generator draws the LOD does not change summaries; changing `LodMap.summarize` needs `MAGIC` bumped
+  (old files would be read with the wrong meaning).
+* **Shader programs**: `pWorld` (terrain), `pWater` (the same source with the water branch replaced: `ShaderSrc.WATER_DECL` + `WATER_MAIN` spliced in by `deriveWater`), `pEntity`, `pLod`, `pCloud` ...
+  A program that fails to compile only costs its own effect (`waterOk`, `entityOk`, `lodOk`, `cloudsOk`). Run `python3 tools/glsl_check.py` after touching any shader string.
+* **Test hooks** (3.11): `bc.tp=frame:x,y,z`, `bc.lodage`, `bc.handswing`, `bc.handeat`, `bc.graze`, `bc.walkphase=phase,amp`, `bc.posewalk=phase,amp,sprint`, `bc.waterq`, `bc.nocull`, `bc.legacymesh`.
 
 ## Conventions / gotchas
 

@@ -25,6 +25,9 @@ jobs:
       - name: Build (javac) and make the update pack
         run: python3 tools/build.py --patch
 
+      - name: GLSL syntax check of every shader (no GPU needed)
+        run: python3 tools/glsl_check.py
+
       - name: Headless tests (equivalence vs the 3.5 jar + unit tests)
         run: |
           set -o pipefail
