@@ -1,23 +1,21 @@
-Fix Hand models
+Massive world gen overhaul
 
-make entities react to shader lighting
+Massive structure overhaul
 
-make Clouds and weather more realistic
+Massive Models overhaul 
 
-Make water look better with shader
+Massive Texture overhaul
 
-add more 1.12 features
+Massive Animation overhaul
 
-Upgrade the villages
+Massive graphics overhaul
 
-Dimensions
+New title screen (Maybe like in minecraft with the Spinning backround?)
 
-Fix door culling (can some times be missing a side when open or closed)
+Multiple world gen Settings
 
-Make textures only render from one side (go under map with spectator to see what i mean)
+Make inventory more understandable
 
-Better animations (like minecraft with Fresh animations)
+Clean up Settings screen
 
-Make LODS actually resemble what is in that chunk when something gets broken or built
-
-Also fix LODS popping up in fully rendered chunks when Burning trees etc
+and add missing Features from last update
