@@ -4,7 +4,8 @@ public final class Chunk {
    public static final int H = 256;
    public final int cx;
    public final int cz;
-   public final byte[] blocks = new byte[65536];
+   /** Update 3.12: block ids are 12 bits wide (0..4095), so the array holds shorts (Update 3.5 - 3.11 used one byte per block). */
+   public final short[] blocks = new short[65536];
    public final byte[] light = new byte[65536];
    public final int[] hm = new int[256];
    public final int[] grassColor = new int[256];
@@ -41,16 +42,73 @@ public final class Chunk {
       }
    }
 
+   /** Marks the extension of a chunk file that holds block ids above 255 (see {@link #writeBlocks}). */
+   static final int EXT_MAGIC = 0x42435831; // "BCX1"
+
+   /**
+    * Update 3.12: the block part of a chunk file. Files of Update 3.5 - 3.11 hold the 65536 block ids as bytes; this format keeps that part
+    * unchanged (the low 8 bits of every id, so old files stay readable and an old game still reads the blocks it knows) and appends the
+    * high 4 bits as a second array behind a magic number - only when some id is above 255.
+    */
+   static void writeBlocks(java.io.DataOutputStream out, short[] blocks) throws java.io.IOException {
+      byte[] lo = new byte[blocks.length];
+      byte[] hi = null;
+      for (int i = 0; i < blocks.length; i++) {
+         int id = blocks[i] & 0xFFFF;
+         lo[i] = (byte)id;
+         if (id > 255) {
+            if (hi == null) {
+               hi = new byte[blocks.length];
+            }
+
+            hi[i] = (byte)(id >> 8);
+         }
+      }
+
+      out.write(lo);
+      if (hi != null) {
+         out.writeInt(EXT_MAGIC);
+         out.write(hi);
+      }
+   }
+
+   /** The counterpart of {@link #writeBlocks}: reads the blocks of a chunk file written by any version since 3.5 into {@code dst} (65536 ids). */
+   static void readBlocks(java.io.DataInputStream in, short[] dst) throws java.io.IOException {
+      byte[] lo = new byte[dst.length];
+      in.readFully(lo);
+      for (int i = 0; i < dst.length; i++) {
+         dst[i] = (short)(lo[i] & 255);
+      }
+
+      int b0 = in.read();
+      if (b0 < 0) {
+         return; // a file from before Update 3.12
+      }
+
+      int magic = b0 << 24 | in.readUnsignedByte() << 16 | in.readUnsignedByte() << 8 | in.readUnsignedByte();
+      if (magic != EXT_MAGIC) {
+         return; // unknown trailer: ignore it
+      }
+
+      byte[] hi = new byte[dst.length];
+      in.readFully(hi);
+      for (int i = 0; i < dst.length; i++) {
+         if (hi[i] != 0) {
+            dst[i] = (short)((hi[i] & 15) << 8 | lo[i] & 255);
+         }
+      }
+   }
+
    public static int idx(int var0, int var1, int var2) {
       return var1 << 8 | var2 << 4 | var0;
    }
 
    public int get(int var1, int var2, int var3) {
-      return this.blocks[idx(var1, var2, var3)] & 0xFF;
+      return this.blocks[idx(var1, var2, var3)] & 0xFFFF;
    }
 
    public void set(int var1, int var2, int var3, int var4) {
-      this.blocks[idx(var1, var2, var3)] = (byte)var4;
+      this.blocks[idx(var1, var2, var3)] = (short)var4;
    }
 
    public int sky(int var1, int var2, int var3) {
@@ -76,7 +134,7 @@ public final class Chunk {
          for (int var2 = 0; var2 < 16; var2++) {
             int var3 = 255;
 
-            while (var3 > 0 && Blocks.opacity[this.blocks[idx(var2, var3, var1)] & 0xFF] == 0) {
+            while (var3 > 0 && Blocks.opacity[this.blocks[idx(var2, var3, var1)] & 0xFFFF] == 0) {
                var3--;
             }
 

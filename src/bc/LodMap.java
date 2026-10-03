@@ -94,11 +94,11 @@ public final class LodMap {
       int g = 0;
       int b = 0;
       int n = 0;
-      int x0 = tile % 16 * 16;
-      int y0 = tile / 16 * 16;
+      int x0 = Tex.tx(tile);
+      int y0 = Tex.ty(tile);
       for (int y = 0; y < 16; y++) {
          for (int x = 0; x < 16; x++) {
-            int p = Tex.atlasPixels[(y0 + y) * 256 + x0 + x];
+            int p = Tex.atlasPixels[(y0 + y) * Tex.PX + x0 + x];
             if (p >>> 24 >= 128) {
                r += p >> 16 & 255;
                g += p >> 8 & 255;
@@ -121,8 +121,8 @@ public final class LodMap {
       synchronized (LodMap.class) {
          a = top ? topAvg : sideAvg;
          if (a == null) {
-            a = new int[256];
-            for (int id = 1; id < 256; id++) {
+            a = new int[Blocks.MAX];
+            for (int id = 1; id < Blocks.MAX; id++) {
                int[] t = Blocks.tiles[id];
                int c = t == null ? -1 : avgTile(t[top ? 0 : Math.min(2, t.length - 1)]);
                a[id] = c < 0 ? 0x808080 : c;
@@ -172,7 +172,7 @@ public final class LodMap {
     * @param grass   biome colours of the 256 columns (index z * 16 + x) or null: then the generator is asked
     * @param foliage the same for leaves (unused now: leaves are skipped) or null
     */
-   public static Sum summarize(byte[] blocks, int[] grass, int[] foliage, Gen gen, int cx, int cz) {
+   public static Sum summarize(short[] blocks, int[] grass, int[] foliage, Gen gen, int cx, int cz) {
       Sum s = new Sum();
       for (int z = 0; z < 16; z++) {
          for (int x = 0; x < 16; x++) {
@@ -182,7 +182,7 @@ public final class LodMap {
             int logs = 0;
             int id = 0;
             while (y > 0) {
-               id = blocks[Chunk.idx(x, y, z)] & 255;
+               id = blocks[Chunk.idx(x, y, z)] & 0xFFFF;
                if (Blocks.isLeaves(id)) {
                   leaves = true; // the crown of a tree: not ground
                } else if (leaves && Blocks.isLog(id)) {
@@ -196,7 +196,7 @@ public final class LodMap {
 
             if (Blocks.isWater(id)) {
                int bed = y;
-               while (bed > 0 && Blocks.isWater(blocks[Chunk.idx(x, bed, z)] & 255)) {
+               while (bed > 0 && Blocks.isWater(blocks[Chunk.idx(x, bed, z)] & 0xFFFF)) {
                   bed--;
                }
 
@@ -204,7 +204,7 @@ public final class LodMap {
                s.top[i] = (short)(y + 1);
                s.depth[i] = (byte)d;
                s.rgb[i] = waterColor(d);
-               int below = blocks[Chunk.idx(x, bed, z)] & 255;
+               int below = blocks[Chunk.idx(x, bed, z)] & 0xFFFF;
                s.side[i] = shade(averages(true)[below == 0 ? 3 : below], 0.8F);
             } else {
                int g = 0;
@@ -214,7 +214,7 @@ public final class LodMap {
 
                s.top[i] = (short)(y + 1);
                s.rgb[i] = topColor(id, g);
-               int below = y >= 2 ? blocks[Chunk.idx(x, y - 2, z)] & 255 : id;
+               int below = y >= 2 ? blocks[Chunk.idx(x, y - 2, z)] & 0xFFFF : id;
                if (below == 0 || skippable(below) || Blocks.isWater(below) || Blocks.isLeaves(below)) {
                   below = id;
                }
@@ -336,7 +336,7 @@ public final class LodMap {
       File[] files = dir.listFiles((d, name) -> name.startsWith("c.") && name.endsWith(".gz"));
       int made = 0;
       if (files != null) {
-         byte[] blocks = new byte[65536];
+         short[] blocks = new short[65536];
          for (File f : files) {
             if (this.stop) {
                break;
@@ -363,7 +363,7 @@ public final class LodMap {
             }
 
             try (DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new FileInputStream(f))))) {
-               in.readFully(blocks);
+               Chunk.readBlocks(in, blocks);
             } catch (IOException | RuntimeException e) {
                continue;
             }

@@ -147,6 +147,23 @@ public final class Equivalence {
       }
    }
 
+   /**
+    * The blocks of a chunk as the byte array they were up to Update 3.11 (low 8 bits of every id). Read through Chunk.get() so the same
+    * test classes also run against the old 3.5 jar, where Chunk.blocks is a byte[] and not a short[].
+    */
+   static byte[] blockBytes(Chunk c) {
+      byte[] b = new byte[65536];
+      for (int y = 0; y < 256; y++) {
+         for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16; x++) {
+               b[Chunk.idx(x, y, z)] = (byte)c.get(x, y, z);
+            }
+         }
+      }
+
+      return b;
+   }
+
    // ---------- 2. raw terrain generation ----------
    static void gen() {
       long[] seeds = {1L, 12345L, 987654321L, -42L};
@@ -158,7 +175,7 @@ public final class Equivalence {
          for (int cz = -3; cz <= 3; cz++) {
             for (int cx = -3; cx <= 3; cx++) {
                Chunk c = g.generate(cx, cz);
-               long v = mix(mix(h(c.blocks), h(c.hm)), mix(mix(h(c.grassColor), h(c.foliageColor)), h(c.biome)));
+               long v = mix(mix(h(blockBytes(c)), h(c.hm)), mix(mix(h(c.grassColor), h(c.foliageColor)), h(c.biome)));
                all = mix(all, v);
                if (cx == 0 && cz == 0 || cx == 3 && cz == -2) {
                   p("gen seed=" + seed + " chunk " + cx + "," + cz + " = " + hex(v));
@@ -210,7 +227,7 @@ public final class Equivalence {
          int lit = 0;
          for (long k : keys) {
             Chunk c = w.chunks.get(k);
-            blocks = mix(blocks, mix(k, h(c.blocks)));
+            blocks = mix(blocks, mix(k, h(blockBytes(c))));
             light = mix(light, mix(k, h(c.light)));
             if (c.lit) {
                lit++;
@@ -467,12 +484,44 @@ public final class Equivalence {
    }
 
    // ---------- 8. chunk meshing (vertex data) ----------
+   /** Tiles per atlas row: 32 since Update 3.12, 16 before (the 3.5 jar has no Tex.COLS). */
+   static int atlasCols() {
+      try {
+         return Class.forName("bc.Tex").getField("COLS").getInt(null);
+      } catch (ReflectiveOperationException e) {
+         return 16;
+      }
+   }
+
    static long floats(FloatBuffer fb) {
       if (fb == null) {
          return 0;
       }
       long r = 31;
       FloatBuffer d = fb.duplicate();
+      if (d.remaining() % 11 == 0) {
+         // 11 floats per vertex: x y z u v r g b a m l. The atlas got bigger in Update 3.12, so u / v are compared as "which tile, and where in
+         // it" (to 2%), not as raw texture coordinates; everything else bit for bit.
+         int cols = atlasCols();
+         while (d.hasRemaining()) {
+            for (int k = 0; k < 11; k++) {
+               float f = d.get(d.position() + k);
+               if (k == 3 || k == 4) {
+                  continue;
+               }
+               r = mix(r, Float.floatToRawIntBits(f));
+            }
+
+            float u = d.get(d.position() + 3) * cols;
+            float v = d.get(d.position() + 4) * cols;
+            int tile = (int)Math.floor(v) * cols + (int)Math.floor(u);
+            r = mix(r, mix(tile, Math.round((u - Math.floor(u)) * 50) * 64L + Math.round((v - Math.floor(v)) * 50)));
+            d.position(d.position() + 11);
+         }
+
+         return mix(r, fb.limit());
+      }
+
       while (d.hasRemaining()) {
          r = mix(r, Float.floatToRawIntBits(d.get()));
       }

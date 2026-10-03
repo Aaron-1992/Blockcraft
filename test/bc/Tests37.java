@@ -1171,8 +1171,8 @@ final class Tests37 {
                Gen.extras = true;
                Chunk now = gen.generate(cx, cz);
                for (int i = 0; i < ref.blocks.length; i++) {
-                  int a = ref.blocks[i] & 255;
-                  int b = now.blocks[i] & 255;
+                  int a = ref.blocks[i] & 0xFFFF;
+                  int b = now.blocks[i] & 0xFFFF;
                   if (a != b) {
                      diff++;
                      check(b == Blocks.SUGAR_CANE || b == Blocks.PUMPKIN, "only cane / pumpkins were added (" + b + " replaced " + a + ")");
@@ -1182,7 +1182,7 @@ final class Tests37 {
                      int y = i >> 8;
                      if (b == Blocks.SUGAR_CANE) {
                         canes++;
-                        int below = now.blocks[Chunk.idx(x, y - 1, z)] & 255;
+                        int below = now.blocks[Chunk.idx(x, y - 1, z)] & 0xFFFF;
                         if (below != Blocks.SUGAR_CANE) {
                            stacks++;
                            check(y == 63 && below == Blocks.SAND, "cane stacks start at y=63 on sand (y=" + y + ", below " + below + ")");
@@ -1191,7 +1191,7 @@ final class Tests37 {
                            for (int[] d : around) {
                               int nx = x + d[0];
                               int nz = z + d[1];
-                              if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && Blocks.isWater(now.blocks[Chunk.idx(nx, y - 1, nz)] & 255)) {
+                              if (nx >= 0 && nx < 16 && nz >= 0 && nz < 16 && Blocks.isWater(now.blocks[Chunk.idx(nx, y - 1, nz)] & 0xFFFF)) {
                                  water = true;
                               }
                            }
@@ -1200,7 +1200,7 @@ final class Tests37 {
                         check(y <= 65, "cane is at most 3 high");
                      } else {
                         pumpkins++;
-                        eq(Blocks.GRASS, now.blocks[Chunk.idx(x, y - 1, z)] & 255, "pumpkins sit on grass");
+                        eq(Blocks.GRASS, now.blocks[Chunk.idx(x, y - 1, z)] & 0xFFFF, "pumpkins sit on grass");
                      }
                   }
                }

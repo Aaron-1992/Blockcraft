@@ -23,14 +23,14 @@ public final class Structs {
       int var5 = var1 - var0.cx * 16;
       int var6 = var3 - var0.cz * 16;
       if (var5 >= 0 && var5 <= 15 && var6 >= 0 && var6 <= 15 && var2 >= 0 && var2 <= 255) {
-         var0.blocks[Chunk.idx(var5, var2, var6)] = (byte)var4;
+         var0.blocks[Chunk.idx(var5, var2, var6)] = (short)var4;
       }
    }
 
    static int get(Chunk var0, int var1, int var2, int var3) {
       int var4 = var1 - var0.cx * 16;
       int var5 = var3 - var0.cz * 16;
-      return var4 >= 0 && var4 <= 15 && var5 >= 0 && var5 <= 15 && var2 >= 0 && var2 <= 255 ? var0.blocks[Chunk.idx(var4, var2, var5)] & 0xFF : -1;
+      return var4 >= 0 && var4 <= 15 && var5 >= 0 && var5 <= 15 && var2 >= 0 && var2 <= 255 ? var0.blocks[Chunk.idx(var4, var2, var5)] & 0xFFFF : -1;
    }
 
    static boolean overlaps(Chunk var0, int var1, int var2, int var3, int var4) {
@@ -46,7 +46,7 @@ public final class Structs {
       for (int var12 = Math.max(0, var2); var12 <= Math.min(255, var5); var12++) {
          for (int var13 = var10; var13 <= var11; var13++) {
             for (int var14 = var8; var14 <= var9; var14++) {
-               var0.blocks[Chunk.idx(var14 - var0.cx * 16, var12, var13 - var0.cz * 16)] = (byte)var7;
+               var0.blocks[Chunk.idx(var14 - var0.cx * 16, var12, var13 - var0.cz * 16)] = (short)var7;
             }
          }
       }
@@ -587,7 +587,7 @@ public final class Structs {
       int[] var9 = worldPos(var2, var5, var6);
       if (overlaps(var1, var8[0], var8[1], var8[0], var8[1])) {
          int var10 = get(var1, var9[0], var7, var9[1]);
-         if (var10 > 0 && var10 < 256 && Blocks.solid[var10] && Blocks.opaque[var10]) {
+         if (var10 > 0 && var10 < Blocks.MAX && Blocks.solid[var10] && Blocks.opaque[var10]) {
             if (get(var1, var8[0], var7, var8[1]) <= 0) {
                set(var1, var8[0], var7, var8[1], 89 + faceOf(var9[0] - var8[0], var9[1] - var8[1]));
             }

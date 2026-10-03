@@ -162,7 +162,7 @@ final class TestsFall {
             boolean painted = false;
             for (int y = 0; y < 16; y++) {
                for (int x = 0; x < 16; x++) {
-                  int atlas = Tex.atlasPixels[(turned / 16 * 16 + y) * 256 + turned % 16 * 16 + x];
+                  int atlas = Tex.atlasPixels[(Tex.ty(turned) + y) * Tex.PX + Tex.tx(turned) + x];
                   painted |= atlas >>> 24 != 0;
                   transposed &= atlas == src[x * 16 + y];
                }
@@ -782,7 +782,7 @@ final class TestsFall {
 
                   float cu = (q[3] + q[8] + q[13] + q[18]) / 4.0F;
                   float cv = (q[4] + q[9] + q[14] + q[19]) / 4.0F;
-                  int tile = (int)Math.floor(cv * 16.0F) * 16 + (int)Math.floor(cu * 16.0F);
+                  int tile = (int)Math.floor(cv * Tex.COLS) * Tex.COLS + (int)Math.floor(cu * Tex.COLS);
                   check(face >= 0, "found the face of a quad");
                   if (face >= 0) {
                      eq(Blocks.tiles[id][face], tile, Blocks.name[id] + " axis " + axis + " face " + face + " uses its tile");

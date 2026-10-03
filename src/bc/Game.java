@@ -2596,8 +2596,8 @@ public final class Game {
       p.x = (float)x;
       p.y = (float)y;
       p.z = (float)z;
-      p.u = 1.0F / 256.0F;
-      p.v = 65.0F / 256.0F;
+      p.u = (Tex.tx(64) + 1) / (float)Tex.PX;
+      p.v = (Tex.ty(64) + 1) / (float)Tex.PX;
       p.shade = 1.0F;
       if (water) {
          p.vy = 0.0F;
@@ -2630,8 +2630,8 @@ public final class Game {
       p.z = (float)z;
       p.vx = (this.rnd.nextFloat() - 0.5F) * 0.02F;
       p.vz = (this.rnd.nextFloat() - 0.5F) * 0.02F;
-      p.u = 1.0F / 256.0F;
-      p.v = 65.0F / 256.0F;
+      p.u = (Tex.tx(64) + 1) / (float)Tex.PX;
+      p.v = (Tex.ty(64) + 1) / (float)Tex.PX;
       p.shade = 1.0F;
       p.grav = -0.002F;
       if (smoke) {
@@ -2656,8 +2656,8 @@ public final class Game {
 
    void explosionParticles(double var1, double var3, double var5) {
       int var7 = Blocks.tiles[4][2];
-      int var8 = var7 % 16 * 16;
-      int var9 = var7 / 16 * 16;
+      int var8 = Tex.tx(var7);
+      int var9 = Tex.ty(var7);
 
       for (int var10 = 0; var10 < 60; var10++) {
          Game.Particle var11 = new Game.Particle();
@@ -2668,8 +2668,8 @@ public final class Game {
          var11.vy = this.rnd.nextFloat() * 0.3F;
          var11.vz = (this.rnd.nextFloat() - 0.5F) * 0.4F;
          var11.size = 0.15F + this.rnd.nextFloat() * 0.12F;
-         var11.u = (var8 + this.rnd.nextInt(12)) / 256.0F;
-         var11.v = (var9 + this.rnd.nextInt(12)) / 256.0F;
+         var11.u = (var8 + this.rnd.nextInt(12)) / (float)Tex.PX;
+         var11.v = (var9 + this.rnd.nextInt(12)) / (float)Tex.PX;
          var11.life = 20 + this.rnd.nextInt(20);
          var11.shade = 1.0F;
          this.particles.add(var11);
@@ -2886,8 +2886,8 @@ public final class Game {
          var3.vy = 0.05F + this.rnd.nextFloat() * 0.08F;
          var3.vz = (this.rnd.nextFloat() - 0.5F) * 0.05F;
          var3.size = 0.09F + this.rnd.nextFloat() * 0.04F;
-         var3.u = 1.0F / 256.0F;
-         var3.v = 65.0F / 256.0F;
+         var3.u = (Tex.tx(64) + 1) / (float)Tex.PX;
+         var3.v = (Tex.ty(64) + 1) / (float)Tex.PX;
          var3.life = 25 + this.rnd.nextInt(15);
          var3.shade = 1.0F;
          var3.r = 1.0F;
@@ -3257,7 +3257,7 @@ public final class Game {
          return this.placeSeeds(var1);
       }
 
-      if (var1 != null && var1.id < 256) {
+      if (var1 != null && Blocks.isBlockId(var1.id)) {
          int var2 = var1.id;
          int var3 = this.target.x;
          int var4 = this.target.y;
@@ -3458,8 +3458,8 @@ public final class Game {
          var6 = Blocks.tiles[var4][0];
       }
 
-      int var7 = var6 % 16 * 16;
-      int var8 = var6 / 16 * 16;
+      int var7 = Tex.tx(var6);
+      int var8 = Tex.ty(var6);
       int[] var9 = Gui.tintFor(var4);
 
       for (int var10 = 0; var10 < var5; var10++) {
@@ -3471,8 +3471,8 @@ public final class Game {
          var11.vy = this.rnd.nextFloat() * 0.2F;
          var11.vz = (this.rnd.nextFloat() - 0.5F) * 0.2F;
          var11.size = 0.07F + this.rnd.nextFloat() * 0.05F;
-         var11.u = (var7 + this.rnd.nextInt(12)) / 256.0F;
-         var11.v = (var8 + this.rnd.nextInt(12)) / 256.0F;
+         var11.u = (var7 + this.rnd.nextInt(12)) / (float)Tex.PX;
+         var11.v = (var8 + this.rnd.nextInt(12)) / (float)Tex.PX;
          var11.life = 15 + this.rnd.nextInt(20);
          var11.shade = 0.6F;
          if (var9 != null && Blocks.tint[var4] == 2) {

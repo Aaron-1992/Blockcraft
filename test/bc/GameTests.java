@@ -1370,11 +1370,11 @@ public final class GameTests {
       test("atlas: every tile >= 160 used by a block or item is actually painted (TexExtra.blocks)", () -> {
          TexExtra.blocks(); // pure CPU: fills Tex.atlasPixels for the tiles TexExtra owns
          java.util.function.IntPredicate painted = tile -> {
-            int ox = tile % 16 * 16;
-            int oy = tile / 16 * 16;
+            int ox = Tex.tx(tile);
+            int oy = Tex.ty(tile);
             for (int y = 0; y < 16; y++) {
                for (int x = 0; x < 16; x++) {
-                  if (Tex.atlasPixels[(oy + y) * 256 + ox + x] >>> 24 != 0) {
+                  if (Tex.atlasPixels[(oy + y) * Tex.PX + ox + x] >>> 24 != 0) {
                      return true;
                   }
                }
@@ -1707,6 +1707,7 @@ public final class GameTests {
       Tests39.run();
       Tests310.run();
       Tests311.run();
+      Tests312.run();
       TestsFall.run();
       TestsDisasters.run();
       System.out.println();

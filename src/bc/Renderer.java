@@ -874,7 +874,7 @@ public final class Renderer {
                for (int var11 = var3; var11 <= var4; var11++) {
                   for (int var12 = 0; var12 < 16; var12++) {
                      for (int var13 = 0; var13 < 16; var13++) {
-                        int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 255;
+                        int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
                         if (var14 != 0 && Blocks.emit[var14] >= 10) {
                            float var15 = var10.cx * 16 + var13 + 0.5F;
                            float var16 = var10.cz * 16 + var12 + 0.5F;
@@ -941,7 +941,7 @@ public final class Renderer {
       float var2 = (float)(System.nanoTime() / 1.0E9);
       float var3 = 1.0F + 0.05F * (float)Math.sin(var2 * 11.0F) + 0.04F * (float)Math.sin(var2 * 23.0F + 1.0F);
       int var4 = this.g.heldId();
-      int var5 = var4 > 0 && var4 < 256 ? Blocks.emit[var4] : 0;
+      int var5 = var4 > 0 && Blocks.isBlockId(var4) ? Blocks.emit[var4] : 0;
       if (var5 > 0) {
          float var6 = this.mv[0];
          float var7 = this.mv[4];
@@ -970,7 +970,7 @@ public final class Renderer {
             break;
          }
 
-         if (var19.id > 0 && var19.id < 256 && Blocks.emit[var19.id] > 0) {
+         if (var19.id > 0 && Blocks.isBlockId(var19.id) && Blocks.emit[var19.id] > 0) {
             double var20 = var19.x - this.camX;
             double var23 = var19.y + 0.25 - this.camY;
             double var26 = var19.z - this.camZ;
@@ -1003,7 +1003,7 @@ public final class Renderer {
          }
 
          int var24 = (int)var22[3];
-         if (var24 >= 0 && var24 < 256) {
+         if (Blocks.isBlockId(var24)) {
             float[] var25 = lightColor(var24);
             float var27 = var22[0] * 12.9898F + var22[2] * 78.233F;
             float var28 = 1.0F + 0.06F * (float)Math.sin(var2 * 9.0F + var27) + 0.04F * (float)Math.sin(var2 * 17.0F + var27 * 2.0F);
@@ -1267,25 +1267,25 @@ public final class Renderer {
          return var1;
       }
 
-      int var3 = var2 % 16 * 16;
-      int var4 = var2 / 16 * 16;
+      int var3 = Tex.tx(var2);
+      int var4 = Tex.ty(var2);
       ArrayList var5 = new ArrayList();
       float var6 = 0.03125F;
 
       for (int var7 = 0; var7 < 16; var7++) {
          for (int var8 = 0; var8 < 16; var8++) {
-            int var9 = Tex.atlasPixels[(var4 + var7) * 256 + var3 + var8];
+            int var9 = Tex.atlasPixels[(var4 + var7) * Tex.PX + var3 + var8];
             if (var9 >>> 24 != 0) {
                float var10 = var8 / 16.0F - 0.5F;
                float var11 = (var8 + 1) / 16.0F - 0.5F;
                float var12 = 0.5F - var7 / 16.0F;
                float var13 = 0.5F - (var7 + 1) / 16.0F;
-               float var14 = (var3 + var8 + 0.5F) / 256.0F;
-               float var15 = (var4 + var7 + 0.5F) / 256.0F;
-               float var16 = (var3 + var8) / 256.0F;
-               float var17 = (var3 + var8 + 1) / 256.0F;
-               float var18 = (var4 + var7) / 256.0F;
-               float var19 = (var4 + var7 + 1) / 256.0F;
+               float var14 = (var3 + var8 + 0.5F) / Tex.PX;
+               float var15 = (var4 + var7 + 0.5F) / Tex.PX;
+               float var16 = (var3 + var8) / (float)Tex.PX;
+               float var17 = (var3 + var8 + 1) / (float)Tex.PX;
+               float var18 = (var4 + var7) / (float)Tex.PX;
+               float var19 = (var4 + var7 + 1) / (float)Tex.PX;
                var5.add(
                   new float[]{
                      var10,
@@ -1342,7 +1342,7 @@ public final class Renderer {
                      0.8F
                   }
                );
-               if (var8 == 0 || Tex.atlasPixels[(var4 + var7) * 256 + var3 + var8 - 1] >>> 24 == 0) {
+               if (var8 == 0 || Tex.atlasPixels[(var4 + var7) * Tex.PX + var3 + var8 - 1] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var10,
@@ -1373,7 +1373,7 @@ public final class Renderer {
                   );
                }
 
-               if (var8 == 15 || Tex.atlasPixels[(var4 + var7) * 256 + var3 + var8 + 1] >>> 24 == 0) {
+               if (var8 == 15 || Tex.atlasPixels[(var4 + var7) * Tex.PX + var3 + var8 + 1] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var11,
@@ -1404,7 +1404,7 @@ public final class Renderer {
                   );
                }
 
-               if (var7 == 0 || Tex.atlasPixels[(var4 + var7 - 1) * 256 + var3 + var8] >>> 24 == 0) {
+               if (var7 == 0 || Tex.atlasPixels[(var4 + var7 - 1) * Tex.PX + var3 + var8] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var10,
@@ -1435,7 +1435,7 @@ public final class Renderer {
                   );
                }
 
-               if (var7 == 15 || Tex.atlasPixels[(var4 + var7 + 1) * 256 + var3 + var8] >>> 24 == 0) {
+               if (var7 == 15 || Tex.atlasPixels[(var4 + var7 + 1) * Tex.PX + var3 + var8] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var10,
@@ -1549,13 +1549,13 @@ public final class Renderer {
                      }
 
                      GL11.glColor3f(var32, var33, var34);
-                     float var18 = var30 % 16 / 16.0F;
-                     float var19 = var30 / 16 / 16.0F;
+                     float var18 = Tex.tu(var30);
+                     float var19 = Tex.tv(var30);
 
                      for (int var20 = 0; var20 < 4; var20++) {
                         int[] var21 = Mesher.FC[var29][var20];
                         Mesher.uvFor(var29, var21[0], var21[1], var21[2], var22);
-                        GL11.glTexCoord2f(var18 + var22[0] / 16.0F, var19 + var22[1] / 16.0F);
+                        GL11.glTexCoord2f(var18 + var22[0] * Tex.TS, var19 + var22[1] * Tex.TS);
                         GL11.glVertex3f(
                            (float)(var27[0] + var21[0] * (var27[3] - var27[0])) - 0.5F,
                            (float)(var27[1] + var21[1] * (var27[4] - var27[1])) - 0.5F,
@@ -1568,8 +1568,8 @@ public final class Renderer {
          }
       } else {
          int var4 = Blocks.tiles[var0][0];
-         float var5 = var4 % 16 / 16.0F;
-         float var6 = var4 / 16 / 16.0F;
+         float var5 = Tex.tu(var4);
+         float var6 = Tex.tv(var4);
          float var7 = var1;
          float var8 = var1;
          float var9 = var1;
@@ -1589,7 +1589,7 @@ public final class Renderer {
 
          for (float[] var16 : var10) {
             for (int var17 = 0; var17 < 4; var17++) {
-               GL11.glTexCoord2f(var5 + var11[var17] / 16.0F, var6 + var12[var17] / 16.0F);
+               GL11.glTexCoord2f(var5 + var11[var17] * Tex.TS, var6 + var12[var17] * Tex.TS);
                GL11.glVertex3f(var16[var17 * 3], var16[var17 * 3 + 1], var16[var17 * 3 + 2]);
             }
          }
@@ -1654,8 +1654,8 @@ public final class Renderer {
          GL11.glPushMatrix();
          GL11.glTranslated(var5 - this.camX, var7 - this.camY + 0.25 + var12, var9 - this.camZ);
          GL11.glRotatef(var4.spin + var1 * 3.0F, 0.0F, 1.0F, 0.0F);
-         float var13 = var4.id < 256 && Blocks.kind[var4.id] == 0 ? 0.25F : 0.35F;
-         if (var4.id >= 256) {
+         float var13 = Blocks.isBlockId(var4.id) && Blocks.kind[var4.id] == 0 ? 0.25F : 0.35F;
+         if (Items.isItem(var4.id)) {
             GL11.glScalef(0.45F, 0.45F, 0.45F);
             drawItemModel(var4.id, var11);
          } else {
@@ -1744,12 +1744,12 @@ public final class Renderer {
             GL11.glColor3f(shade, shade, shade);
          }
 
-         float u0 = tile % 16 / 16.0F;
-         float v0 = tile / 16 / 16.0F;
+         float u0 = Tex.tu(tile);
+         float v0 = Tex.tv(tile);
          for (int k = 0; k < 4; k++) {
             int[] c = Mesher.FC[face][k];
             Mesher.uvFor(face, c[0], c[1], c[2], uv);
-            GL11.glTexCoord2f(u0 + uv[0] / 16.0F, v0 + uv[1] / 16.0F);
+            GL11.glTexCoord2f(u0 + uv[0] * Tex.TS, v0 + uv[1] * Tex.TS);
             GL11.glVertex3f(ox + c[0] - 0.5F, oy + c[1] - 0.5F, oz + c[2] - 0.5F);
          }
       }
@@ -1775,8 +1775,8 @@ public final class Renderer {
             float var18 = var10.size;
             float var19 = var10.u;
             float var20 = var10.v;
-            float var21 = var10.u + 0.015625F;
-            float var22 = var10.v + 0.015625F;
+            float var21 = var10.u + 4.0F / Tex.PX;
+            float var22 = var10.v + 4.0F / Tex.PX;
             GL11.glTexCoord2f(var19, var22);
             GL11.glVertex3d(var11 - var5 * var18, var13 - var18, var15 - var7 * var18);
             GL11.glTexCoord2f(var21, var22);
@@ -1858,13 +1858,13 @@ public final class Renderer {
             GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
          }
 
-         if (id >= 256 || flatBlock(id)) {
+         if (Items.isItem(id) || flatBlock(id)) {
             // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
             GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
             GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
             GL11.glRotatef(25.0F, 0.0F, 0.0F, 1.0F);
             GL11.glScalef(0.68F, 0.68F, 0.68F);
-            if (id >= 256) {
+            if (Items.isItem(id)) {
                drawItemModel(id, bright);
             } else {
                drawFlatBlock(id, bright);

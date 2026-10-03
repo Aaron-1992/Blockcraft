@@ -174,7 +174,7 @@ public final class Gen {
 
    public Chunk generate(int var1, int var2) {
       Chunk var3 = new Chunk(var1, var2);
-      byte[] var4 = var3.blocks;
+      short[] var4 = var3.blocks;
       Random var5 = new Random(this.seed * 31L + var1 * 341873128712L + var2 * 132897987541L);
       int[] var6 = new int[256];
       int[] var7 = new int[256];
@@ -238,7 +238,7 @@ public final class Gen {
                   var30 = 17;
                }
 
-               var4[Chunk.idx(var9, var29, var8)] = (byte)var30;
+               var4[Chunk.idx(var9, var29, var8)] = (short)var30;
             }
 
             for (int var47 = var16 + 1; var47 < 63; var47++) {
@@ -255,9 +255,9 @@ public final class Gen {
             }
 
             for (int var49 = 6; var49 <= var48; var49++) {
-               int var50 = var4[Chunk.idx(var9, var49, var8)] & 255;
+               int var50 = var4[Chunk.idx(var9, var49, var8)] & 0xFFFF;
                if (var50 != 6 && !Blocks.isFluid(var50) && this.carve(var10, var49, var11)) {
-                  var4[Chunk.idx(var9, var49, var8)] = (byte)(var49 <= 10 ? 58 : 0);
+                  var4[Chunk.idx(var9, var49, var8)] = (short)(var49 <= 10 ? 58 : 0);
                }
             }
          }
@@ -279,7 +279,7 @@ public final class Gen {
             int var36 = var6[var34 * 16 + var35];
             int var13 = var7[var34 * 16 + var35];
             if (var36 >= 63 && var36 <= 240) {
-               int var37 = var4[Chunk.idx(var35, var36, var34)] & 255;
+               int var37 = var4[Chunk.idx(var35, var36, var34)] & 0xFFFF;
                float var15 = var33.nextFloat();
                if (var4[Chunk.idx(var35, var36 + 1, var34)] == 0) {
                   if (var37 != 2 || var13 != 2 && var13 != 3) {
@@ -308,7 +308,7 @@ public final class Gen {
                      float var38 = var13 == 2 ? 0.2F : 0.1F;
                      float var40 = var13 == 2 ? 0.014F : 0.006F;
                      if (var15 < var40) {
-                        var4[Chunk.idx(var35, var36 + 1, var34)] = (byte)(var33.nextBoolean() ? 30 : 31);
+                        var4[Chunk.idx(var35, var36 + 1, var34)] = (short)(var33.nextBoolean() ? 30 : 31);
                      } else if (var15 < var40 + var38) {
                         var4[Chunk.idx(var35, var36 + 1, var34)] = 29;
                      }
@@ -397,9 +397,9 @@ public final class Gen {
 
          for (int var12 = 0; var12 < var5; var12++) {
             if (var9 >= 0 && var9 < 16 && var10 >= 0 && var10 < 16 && var11 > 0 && var11 < 255) {
-               int var13 = var1.blocks[Chunk.idx(var9, var11, var10)] & 255;
+               int var13 = var1.blocks[Chunk.idx(var9, var11, var10)] & 0xFFFF;
                if (var13 == 1) {
-                  var1.blocks[Chunk.idx(var9, var11, var10)] = (byte)var3;
+                  var1.blocks[Chunk.idx(var9, var11, var10)] = (short)var3;
                }
             }
 
@@ -474,10 +474,10 @@ public final class Gen {
       int var7 = var3 - var0.cz * 16;
       if (var6 >= 0 && var6 <= 15 && var7 >= 0 && var7 <= 15 && var2 >= 0 && var2 <= 255) {
          int var8 = Chunk.idx(var6, var2, var7);
-         int var9 = var0.blocks[var8] & 255;
+         int var9 = var0.blocks[var8] & 0xFFFF;
          if (!var5 || var9 == 0 || var9 == 29 || Blocks.isLeaves(var9)) {
             if (!Blocks.isFluid(var9)) {
-               var0.blocks[var8] = (byte)var4;
+               var0.blocks[var8] = (short)var4;
             }
          }
       }

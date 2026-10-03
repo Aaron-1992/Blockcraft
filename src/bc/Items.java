@@ -82,12 +82,12 @@ public final class Items {
    static final int[][] ARMOR_POINTS = new int[][]{{1, 3, 2, 1}, {2, 6, 5, 2}, {2, 5, 3, 1}, {3, 8, 6, 3}};
    static final int[] ARMOR_DUR_MUL = new int[]{5, 15, 7, 33};
    static final int[] ARMOR_DUR_BASE = new int[]{11, 16, 15, 13};
-   static final String[] name = new String[400];
-   static final int[] tile = new int[400];
-   static final int[] maxDmg = new int[400];
-   static final int[] maxStack = new int[400];
-   static final int[] foodPts = new int[400];
-   static final float[] foodSat = new float[400];
+   static final String[] name = new String[Blocks.EXT0];
+   static final int[] tile = new int[Blocks.EXT0];
+   static final int[] maxDmg = new int[Blocks.EXT0];
+   static final int[] maxStack = new int[Blocks.EXT0];
+   static final int[] foodPts = new int[Blocks.EXT0];
+   static final float[] foodSat = new float[Blocks.EXT0];
 
    private static void def(int var0, String var1, int var2) {
       name[var0] = var1;
@@ -109,13 +109,14 @@ public final class Items {
       return var0 == 285 ? 124 : (var0 == 336 ? 142 : (var0 == 337 ? 150 : (var0 == 341 ? 171 : (var0 == 342 ? 179 : 0))));
    }
 
+   /** Update 3.12: items own the ids 256..1023; ids from Blocks.EXT0 up are (new) blocks again. */
    public static boolean isItem(int var0) {
-      return var0 >= 256;
+      return var0 >= 256 && var0 < Blocks.EXT0;
    }
 
    public static String name(int var0) {
-      if (var0 < 256) {
-         return Blocks.name[var0];
+      if (!isItem(var0)) {
+         return var0 >= 0 && var0 < Blocks.MAX ? Blocks.name[var0] : "Block " + var0;
       } else {
          return var0 < name.length && name[var0] != null ? name[var0] : "Item " + var0;
       }
@@ -126,15 +127,15 @@ public final class Items {
    }
 
    public static int maxStack(int var0) {
-      return var0 >= 256 && var0 < 400 ? maxStack[var0] : 64;
+      return var0 >= 256 && var0 < Blocks.EXT0 ? maxStack[var0] : 64;
    }
 
    public static int maxDamage(int var0) {
-      return var0 >= 256 && var0 < 400 ? maxDmg[var0] : 0;
+      return var0 >= 256 && var0 < Blocks.EXT0 ? maxDmg[var0] : 0;
    }
 
    public static boolean isFood(int var0) {
-      return var0 >= 256 && var0 < 400 && foodPts[var0] > 0;
+      return var0 >= 256 && var0 < Blocks.EXT0 && foodPts[var0] > 0;
    }
 
    public static boolean isTool(int var0) {
@@ -260,7 +261,7 @@ public final class Items {
    }
 
    static {
-      for (int var0 = 0; var0 < 400; var0++) {
+      for (int var0 = 0; var0 < Blocks.EXT0; var0++) {
          maxStack[var0] = 64;
       }
 

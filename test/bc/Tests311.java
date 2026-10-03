@@ -319,26 +319,26 @@ final class Tests311 {
    static final int SEA = 60;
 
    /** A chunk of flat ground: stone to y 58, dirt 59-60, grass at y 61 (so the surface plane is 62). */
-   static byte[] flatChunk() {
-      byte[] b = new byte[65536];
+   static short[] flatChunk() {
+      short[] b = new short[65536];
       for (int z = 0; z < 16; z++) {
          for (int x = 0; x < 16; x++) {
-            b[Chunk.idx(x, 0, z)] = (byte)Blocks.BEDROCK;
+            b[Chunk.idx(x, 0, z)] = (short)Blocks.BEDROCK;
             for (int y = 1; y <= 58; y++) {
-               b[Chunk.idx(x, y, z)] = (byte)Blocks.STONE;
+               b[Chunk.idx(x, y, z)] = (short)Blocks.STONE;
             }
 
-            b[Chunk.idx(x, 59, z)] = (byte)Blocks.DIRT;
-            b[Chunk.idx(x, 60, z)] = (byte)Blocks.DIRT;
-            b[Chunk.idx(x, 61, z)] = (byte)Blocks.GRASS;
+            b[Chunk.idx(x, 59, z)] = (short)Blocks.DIRT;
+            b[Chunk.idx(x, 60, z)] = (short)Blocks.DIRT;
+            b[Chunk.idx(x, 61, z)] = (short)Blocks.GRASS;
          }
       }
 
       return b;
    }
 
-   static void put(byte[] b, int x, int y, int z, int id) {
-      b[Chunk.idx(x, y, z)] = (byte)id;
+   static void put(short[] b, int x, int y, int z, int id) {
+      b[Chunk.idx(x, y, z)] = (short)id;
    }
 
    static int grassTint() {
@@ -348,7 +348,7 @@ final class Tests311 {
    static void lodSummaries() {
       Tex.initPixels();
       test("LOD summary: flat ground, a tower, a pit, water, a tree, a cabin pillar and plants - what is really on top, and what is not ground", () -> {
-         byte[] b = flatChunk();
+         short[] b = flatChunk();
          int[] grass = new int[256];
          java.util.Arrays.fill(grass, grassTint());
          for (int y = 62; y <= 64; y++) {
@@ -403,7 +403,7 @@ final class Tests311 {
          java.io.File dir = java.nio.file.Files.createTempDirectory("lodmap").toFile();
          try {
             LodMap m = new LodMap();
-            byte[] b = flatChunk();
+            short[] b = flatChunk();
             for (int y = 62; y <= 66; y++) {
                put(b, 3, y, 3, Blocks.COBBLE);
             }
@@ -425,7 +425,7 @@ final class Tests311 {
             // the scan: chunk files c.<x>.<z>.gz hold the gzipped blocks
             java.io.File f = new java.io.File(dir, "c.-4.7.gz");
             try (java.io.DataOutputStream o = new java.io.DataOutputStream(new java.util.zip.GZIPOutputStream(new java.io.FileOutputStream(f)))) {
-               o.write(b);
+               Chunk.writeBlocks(o, b);
             }
 
             LodMap m3 = new LodMap();
@@ -515,7 +515,7 @@ final class Tests311 {
             Gen.Col col = gen.column(20, 20);
             check(Math.abs(g0.v[0][1] - (col.h + 1 - 0.75F)) < 1e-3F || col.h < 63, "the generator's height under the 1-block cells: " + g0.v[0][1] + " vs " + (col.h + 1));
             // a summary for chunk 0,0 only: a 5-high tower at (4, 5) on flat ground at plane 70
-            byte[] b = flatChunk();
+            short[] b = flatChunk();
             for (int y = 0; y < 256; y++) {
                if (y > 61) {
                   break;
@@ -731,7 +731,7 @@ final class Tests311 {
             for (int cz = 0; cz <= 1; cz++) {
                for (int cx = 0; cx <= 1; cx++) {
                   Chunk c = new Chunk(cx, cz);
-                  byte[] flat = flatChunk();
+                  short[] flat = flatChunk();
                   System.arraycopy(flat, 0, c.blocks, 0, flat.length);
                   c.computeHeightmap();
                   c.lit = true;
@@ -772,10 +772,10 @@ final class Tests311 {
             java.io.File dir2 = java.nio.file.Files.createTempDirectory("lodold").toFile();
             try {
                java.io.File f = new java.io.File(dir2, "c.2.3.gz");
-               byte[] flat = flatChunk();
+               short[] flat = flatChunk();
                put(flat, 1, 62, 1, Blocks.BRICKS);
                try (java.io.DataOutputStream o = new java.io.DataOutputStream(new java.util.zip.GZIPOutputStream(new java.io.FileOutputStream(f)))) {
-                  o.write(flat);
+                  Chunk.writeBlocks(o, flat);
                }
 
                World w3 = new World(777L, dir2);

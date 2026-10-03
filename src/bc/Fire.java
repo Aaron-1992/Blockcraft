@@ -114,7 +114,7 @@ final class Fire {
 
    /** Called when a chunk comes into the world: every fire block in it starts burning (age 0). */
    void scanChunk(Chunk c) {
-      byte fire = (byte)Blocks.FIRE;
+      short fire = (short)Blocks.FIRE;
       for (int i = 0; i < c.blocks.length; i++) {
          if (c.blocks[i] == fire) {
             this.added(c.cx * 16 + (i & 15), i >> 8, c.cz * 16 + (i >> 4 & 15));

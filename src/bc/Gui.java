@@ -91,12 +91,10 @@ public final class Gui {
    public void dirtBackground(float var1) {
       int var2 = 0xFF000000 | (int)(var1 * 255.0F) << 16 | (int)(var1 * 255.0F) << 8 | (int)(var1 * 255.0F);
       float var3 = 32.0F;
-      int var4 = 1;
-      int var5 = 0;
-      float var6 = var4 / 16.0F;
-      float var7 = var5 / 16.0F;
-      float var8 = var6 + 0.0625F;
-      float var9 = var7 + 0.0625F;
+      float var6 = Tex.tu(1);
+      float var7 = Tex.tv(1);
+      float var8 = var6 + Tex.TS;
+      float var9 = var7 + Tex.TS;
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.atlas);
       color(var2);
@@ -353,13 +351,13 @@ public final class Gui {
 
    private void v(float var1, float var2, float var3, float var4, float var5, float var6, float var7, float var8, float var9, float var10) {
       GL11.glColor4f(var5, var6, var7, var8);
-      GL11.glTexCoord2f(var9 + var3 / 16.0F, var10 + var4 / 16.0F);
+      GL11.glTexCoord2f(var9 + var3 * Tex.TS, var10 + var4 * Tex.TS);
       GL11.glVertex2f(var1, var2);
    }
 
    private void face(int var1, float[] var2, float[] var3, float var4, int[] var5, boolean var6) {
-      float var7 = var1 % 16 / 16.0F;
-      float var8 = var1 / 16 / 16.0F;
+      float var7 = Tex.tu(var1);
+      float var8 = Tex.tv(var1);
       float var9 = var4;
       float var10 = var4;
       float var11 = var4;
@@ -379,8 +377,8 @@ public final class Gui {
 
    public void itemIcon(int var1, float var2, float var3, float var4) {
       int var5 = Items.tile[var1];
-      float var6 = var5 % 16 / 16.0F;
-      float var7 = var5 / 16 / 16.0F;
+      float var6 = Tex.tu(var5);
+      float var7 = Tex.tv(var5);
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.atlas);
       GL11.glEnable(3008);
@@ -389,11 +387,11 @@ public final class Gui {
       GL11.glBegin(7);
       GL11.glTexCoord2f(var6, var7);
       GL11.glVertex2f(var2, var3);
-      GL11.glTexCoord2f(var6 + 0.0625F, var7);
+      GL11.glTexCoord2f(var6 + Tex.TS, var7);
       GL11.glVertex2f(var2 + var4, var3);
-      GL11.glTexCoord2f(var6 + 0.0625F, var7 + 0.0625F);
+      GL11.glTexCoord2f(var6 + Tex.TS, var7 + Tex.TS);
       GL11.glVertex2f(var2 + var4, var3 + var4);
-      GL11.glTexCoord2f(var6, var7 + 0.0625F);
+      GL11.glTexCoord2f(var6, var7 + Tex.TS);
       GL11.glVertex2f(var2, var3 + var4);
       GL11.glEnd();
       GL11.glDisable(3008);
@@ -470,7 +468,7 @@ public final class Gui {
    }
 
    public static double[][] iconBoxes(int var0) {
-      if (var0 < 0 || var0 >= 256) {
+      if (!Blocks.isBlockId(var0)) {
          return null;
       } else if (Blocks.isStair(var0)) {
          return new double[][]{{0.0, 0.0, 0.0, 1.0, 0.5, 1.0}, {0.0, 0.5, 0.0, 1.0, 1.0, 0.5}};
@@ -485,7 +483,7 @@ public final class Gui {
 
    public void icon(int var1, float var2, float var3, float var4) {
       if (var1 != 0) {
-         if (var1 >= 256) {
+         if (Items.isItem(var1)) {
             this.itemIcon(var1, var2, var3, var4);
          } else {
             GL11.glEnable(3553);

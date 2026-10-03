@@ -100,7 +100,30 @@ public final class Tex {
       {160, 39, 34},
       {20, 21, 25}
    };
-   static int[] atlasPixels = new int[65536];
+   /** Update 3.12: the atlas holds COLS x COLS tiles of 16 x 16 pixels (it was 16 x 16 tiles = 256 x 256 pixels up to Update 3.11). */
+   public static final int COLS = 32;
+   public static final int PX = COLS * 16;
+   /** The size of one tile in texture coordinates. */
+   public static final float TS = 1.0F / COLS;
+   static int[] atlasPixels = new int[PX * PX];
+
+   /** Texture coordinate (u / v) of the left / top edge of a tile. */
+   public static float tu(int tile) {
+      return tile % COLS * TS;
+   }
+
+   public static float tv(int tile) {
+      return tile / COLS * TS;
+   }
+
+   /** Pixel position of a tile's top left corner in the atlas. */
+   public static int tx(int tile) {
+      return tile % COLS * 16;
+   }
+
+   public static int ty(int tile) {
+      return tile / COLS * 16;
+   }
    static final int[] lmBuf = new int[256];
 
    static int argb(int var0, int var1, int var2, int var3) {
@@ -717,17 +740,17 @@ public final class Tex {
    }
 
    static void blit(int var0, int[] var1) {
-      int var2 = var0 % 16 * 16;
-      int var3 = var0 / 16 * 16;
+      int var2 = tx(var0);
+      int var3 = ty(var0);
 
       for (int var4 = 0; var4 < 16; var4++) {
-         System.arraycopy(var1, var4 * 16, atlasPixels, (var3 + var4) * 256 + var2, 16);
+         System.arraycopy(var1, var4 * 16, atlasPixels, (var3 + var4) * PX + var2, 16);
       }
    }
 
    public static void init() {
       initPixels();
-      atlas = upload(256, 256, atlasPixels, false, false);
+      atlas = upload(PX, PX, atlasPixels, false, false);
       GL11.glBindTexture(3553, atlas);
       GL11.glTexParameteri(3553, 10241, 9986);
       GL11.glTexParameteri(3553, 33085, 4);
@@ -841,9 +864,9 @@ public final class Tex {
          int a = f0 & 15;
          int b = a + 1 & 15;
          GL11.glBindTexture(3553, atlas);
-         upload(112, 16, blendFrames(waterFrames[a], waterFrames[b], mix));
-         upload(128, 16, blendFrames(lavaFrames[a], lavaFrames[b], mix));
-         upload(235 % 16 * 16, 235 / 16 * 16, blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix));
+         upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix));
+         upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix));
+         upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix));
          if ((key & 3) == 0) {
             GL30.glGenerateMipmap(3553);
          }

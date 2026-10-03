@@ -79,6 +79,17 @@ public final class Blocks {
    public static final int LOG_X0 = 220;
    public static final int LOG_Z0 = 223;
    public static final int COUNT = 226;
+   /**
+    * Update 3.12: block ids are 12 bits wide. The ids 0..255 are the blocks of Update 3.5 - 3.10 (226..255 stay free), 256..1023 belong to the
+    * ITEMS (so every saved inventory keeps working), and the new blocks live in EXT0..MAX-1.
+    */
+   public static final int MAX = 4096;
+   public static final int EXT0 = 1024;
+
+   /** True for every id that can be a block (0..255 and EXT0..MAX-1); the ids in between are items. */
+   public static boolean isBlockId(int id) {
+      return id >= 0 && id < 256 || id >= EXT0 && id < MAX;
+   }
    public static final int[] STAIR_MAT = new int[]{5, 4, 27, 16, 17};
    public static final String[] STAIR_NAME = new String[]{"Oak Wood", "Cobblestone", "Stone Brick", "Brick", "Sandstone"};
    public static final int K_CUBE = 0;
@@ -92,24 +103,24 @@ public final class Blocks {
    public static final int T_NONE = 0;
    public static final int T_GRASS = 1;
    public static final int T_FOLIAGE = 2;
-   public static final String[] name = new String[256];
-   public static final boolean[] opaque = new boolean[256];
-   public static final int[] opacity = new int[256];
-   public static final boolean[] solid = new boolean[256];
-   public static final int[] emit = new int[256];
-   public static final float[] hardness = new float[256];
-   public static final int[] kind = new int[256];
-   public static final int[] tint = new int[256];
-   public static final int[][] tiles = new int[256][6];
-   public static final boolean[] replaceable = new boolean[256];
-   public static final int[] drop = new int[256];
-   public static final boolean[] cutout = new boolean[256];
-   public static final double[][] coll = new double[256][];
-   public static final double[][] box = new double[256][];
-   public static final double[][][] collMulti = new double[256][][];
-   public static final int[] mineClass = new int[256];
-   public static final boolean[] needTool = new boolean[256];
-   public static final int[] harvestLevel = new int[256];
+   public static final String[] name = new String[MAX];
+   public static final boolean[] opaque = new boolean[MAX];
+   public static final int[] opacity = new int[MAX];
+   public static final boolean[] solid = new boolean[MAX];
+   public static final int[] emit = new int[MAX];
+   public static final float[] hardness = new float[MAX];
+   public static final int[] kind = new int[MAX];
+   public static final int[] tint = new int[MAX];
+   public static final int[][] tiles = new int[MAX][6];
+   public static final boolean[] replaceable = new boolean[MAX];
+   public static final int[] drop = new int[MAX];
+   public static final boolean[] cutout = new boolean[MAX];
+   public static final double[][] coll = new double[MAX][];
+   public static final double[][] box = new double[MAX][];
+   public static final double[][][] collMulti = new double[MAX][][];
+   public static final int[] mineClass = new int[MAX];
+   public static final boolean[] needTool = new boolean[MAX];
+   public static final int[] harvestLevel = new int[MAX];
 
    static void def(int var0, String var1, float var2, boolean var3, int var4) {
       name[var0] = var1;
@@ -426,7 +437,7 @@ public final class Blocks {
    }
 
    static {
-      for (int var0 = 0; var0 < 256; var0++) {
+      for (int var0 = 0; var0 < MAX; var0++) {
          name[var0] = "Unknown";
          drop[var0] = var0;
          hardness[var0] = 1.0F;

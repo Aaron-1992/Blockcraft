@@ -122,7 +122,7 @@ public final class World {
    public int getBlock(int var1, int var2, int var3) {
       if (var2 >= 0 && var2 <= 255) {
          Chunk var4 = (Chunk)this.chunks.get(key(var1 >> 4, var3 >> 4));
-         return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & 0xFF;
+         return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & 0xFFFF;
       } else {
          return 0;
       }
@@ -166,7 +166,7 @@ public final class World {
                      DataInputStream var7 = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new FileInputStream(var6))));
 
                      try {
-                        var7.readFully(var5.blocks);
+                        Chunk.readBlocks(var7, var5.blocks);
                         var5.computeHeightmap();
                      } catch (Throwable var11) {
                         try {
@@ -282,7 +282,7 @@ public final class World {
             DataOutputStream var2 = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(this.chunkFile(var1.cx, var1.cz)))));
 
             try {
-               var2.write(var1.blocks);
+               Chunk.writeBlocks(var2, var1.blocks);
                var1.modified = false;
                var1.lodDirty = 0L;
             } catch (Throwable var6) {
@@ -421,7 +421,7 @@ public final class World {
                      if (var13 != null) {
                         int var14 = var10 & 15;
                         int var15 = var12 & 15;
-                        int var16 = Blocks.opacity[var13.blocks[Chunk.idx(var14, var11, var15)] & 0xFF];
+                        int var16 = Blocks.opacity[var13.blocks[Chunk.idx(var14, var11, var15)] & 0xFFFF];
                         if (var16 < 15) {
                            int var17 = var8 - Math.max(1, var16);
                            if (var1 && var9 == 3 && var8 == 15 && var16 == 0) {
@@ -537,10 +537,10 @@ public final class World {
 
       this.pullNeighbors(var1, true, var4);
       this.propagate(true);
-      byte[] var16 = var1.blocks;
+      short[] var16 = var1.blocks;
 
       for (int var17 = 0; var17 < var16.length; var17++) {
-         int var19 = Blocks.emit[var16[var17] & 0xFF];
+         int var19 = Blocks.emit[var16[var17] & 0xFFFF];
          if (var19 > 0) {
             var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
             int var22 = var17 >> 8;
@@ -591,7 +591,7 @@ public final class World {
                   if (var10 > 1) {
                      byte var11 = (byte)(var4 == 0 ? 15 : (var4 == 1 ? 0 : var8));
                      byte var12 = (byte)(var4 == 2 ? 15 : (var4 == 3 ? 0 : var9));
-                     if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & 0xFF] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
+                     if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & 0xFFFF] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
                         this.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
                      }
                   }
