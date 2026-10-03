@@ -1334,7 +1334,7 @@ public final class GameTests {
          for (int id = 141; id < Blocks.COUNT; id++) {
             check(Blocks.name[id] != null, "block " + id + " has a name");
          }
-         eq(220, Blocks.COUNT, "COUNT");
+         eq(226, Blocks.COUNT, "COUNT");
          for (int id = 336; id <= 340; id++) {
             check(Items.name[id] != null, "item " + id + " has a name");
             check(TexExtra.sprite(id) != null, "item " + id + " has a sprite");
@@ -1705,6 +1705,7 @@ public final class GameTests {
       Tests38.run();
       Tests39.run();
       Tests310.run();
+      TestsFall.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

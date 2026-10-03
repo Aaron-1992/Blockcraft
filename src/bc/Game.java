@@ -110,6 +110,9 @@ public final class Game {
     * Update 3.9: the equip animation. The item in the hand lowers and the new one rises when you switch slots or the item in the slot changes;
     * the hand keeps drawing {@link #shownId} (which lags behind the selected item) until it is out of sight. Rates like Minecraft's: 0.4 per tick.
     */
+   /** Update 3.10: camera shake 0..1.5 (earthquakes, a tree hitting the ground, a meteor); {@link #addShake} raises it, it fades by itself. */
+   float shake;
+   float pshake;
    float equip = 1.0F;
    float pEquip = 1.0F;
    int shownSel = -1;
@@ -481,6 +484,38 @@ public final class Game {
             this.sel = Integer.getInteger("bc.sel", 0);
          }
 
+         if (this.autoFrames == 68 && System.getProperty("bc.fill") != null) {
+            // bc.fill=x0,y0,z0,x1,y1,z1,id;...  fills boxes (before bc.set: room for a scene)
+            for (String box : System.getProperty("bc.fill").split(";")) {
+               String[] f = box.split(",");
+               int[] n = new int[7];
+               for (int i = 0; i < 7; i++) {
+                  n[i] = Integer.parseInt(f[i]);
+               }
+
+               for (int x = Math.min(n[0], n[3]); x <= Math.max(n[0], n[3]); x++) {
+                  for (int y = Math.min(n[1], n[4]); y <= Math.max(n[1], n[4]); y++) {
+                     for (int z = Math.min(n[2], n[5]); z <= Math.max(n[2], n[5]); z++) {
+                        this.world.setBlock(x, y, z, n[6]);
+                     }
+                  }
+               }
+            }
+         }
+
+         if (this.autoFrames == 80 && System.getProperty("bc.fell") != null) {
+            // bc.fell=x,y,z,dx,dz: cut the log at (x, y, z); the tree above it falls towards (dx, dz)
+            String[] f = System.getProperty("bc.fell").split(",");
+            int fx = Integer.parseInt(f[0]);
+            int fy = Integer.parseInt(f[1]);
+            int fz = Integer.parseInt(f[2]);
+            this.world.setBlock(fx, fy, fz, 0);
+            Trees.Plan plan = this.world.trees.collect(fx, fy, fz);
+            if (plan == null || !this.world.trees.start(plan, Double.parseDouble(f[3]) * 10.0, Double.parseDouble(f[4]) * 10.0, null)) {
+               System.out.println("[trees] bc.fell: no tree falls at " + fx + "," + fy + "," + fz);
+            }
+         }
+
          if (this.autoFrames == 70 && System.getProperty("bc.set") != null) {
             for (String var6 : System.getProperty("bc.set").split(";")) {
                String[] var7 = var6.split(",");
@@ -838,11 +873,13 @@ public final class Game {
    /** /firespread is saved with the world (level.properties) so a world where fire was switched off stays safe. */
    void storeFireSetting(Properties p) {
       p.setProperty("firespread", this.world.fire.spread + "");
+      p.setProperty("treefall", this.world.trees.enabled + "");
       this.world.weather.save(p);
    }
 
    void restoreFireSetting(Properties p) {
       this.world.fire.spread = !"false".equals(p.getProperty("firespread"));
+      this.world.trees.enabled = !"false".equals(p.getProperty("treefall"));
       this.world.weather.load(p);
    }
 
@@ -935,7 +972,7 @@ public final class Game {
                      for (int var8 = 255; var8 > 0; var8--) {
                         int var9 = this.world.getBlock(var6, var8, var7);
                         if (var9 != 0) {
-                           if (Blocks.solid[var9] && !Blocks.isLeaves(var9) && !Blocks.isLog(var9) && var9 != 28) {
+                           if (Blocks.solid[var9] && !Blocks.isLeaves(var9) && !Blocks.isAnyLog(var9) && var9 != 28) {
                               return new double[]{var6 + 0.5, var8 + 1, var7 + 0.5};
                            }
                            break;
@@ -1504,8 +1541,15 @@ public final class Game {
                case "weather":
                   this.weatherCommand(var2);
                   break;
+               case "treefall":
+                  if (var2.length > 1 && (var2[1].equalsIgnoreCase("on") || var2[1].equalsIgnoreCase("off"))) {
+                     this.world.trees.enabled = var2[1].equalsIgnoreCase("on");
+                  }
+
+                  this.say("Falling trees are " + (this.world.trees.enabled ? "on" : "off") + "  (/treefall on|off)");
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather");
+                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather /treefall");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
@@ -1926,8 +1970,16 @@ public final class Game {
       }
    }
 
+   void addShake(float amount) {
+      if (amount > this.shake) {
+         this.shake = Math.min(1.5F, amount);
+      }
+   }
+
    void tick() {
       this.tickCount++;
+      this.pshake = this.shake;
+      this.shake = this.shake < 0.004F ? 0.0F : this.shake * 0.9F;
       this.tickEquip();
       this.world.tick();
       this.world.fire.particles(this);
@@ -2564,6 +2616,10 @@ public final class Game {
          }
 
          this.meshNow(var1, var2, var3);
+         if (Blocks.isLog(var4)) {
+            // Update 3.10: cutting through a trunk makes the tree above fall over
+            this.world.trees.fell(var1, var2, var3, this.player.x, this.player.z);
+         }
       }
    }
 
@@ -3211,6 +3267,11 @@ public final class Game {
 
                if (var2 == 28 && var18 != 7 && var18 != 28) {
                   return false;
+               }
+
+               if (Blocks.isLog(var2) && var9 == 0 && (var8 != 0 || var10 != 0)) {
+                  // Update 3.10: a log put against the side of a block lies down along that axis (like Minecraft's); the felled trees are made of them
+                  var2 = Blocks.sideLog(var2, var8 != 0 ? 0 : 1);
                }
 
                if (!this.world.setBlock(var3, var4, var5, var2)) {

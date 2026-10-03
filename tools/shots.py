@@ -112,6 +112,39 @@ def kitchen_blocks():
     return out
 
 
+def tree_blocks(x, gy, z, h=7, log=9, leaf=12):
+    """A tree for the falling-tree scenes: a trunk of h logs on the ground cell (x, gy, z) and a small crown (the same shape as
+    TestsFall.plant): layers h-1 and h are 5x5 without the corners, the top layer a plus."""
+    out = []
+    for k in range(1, h + 1):
+        out.append((x, gy + k, z, log))
+    top = gy + h
+    for dy in (-1, 0, 1):
+        r = 1 if dy == 1 else 2
+        for dx in range(-r, r + 1):
+            for dz in range(-r, r + 1):
+                skip = (abs(dx) + abs(dz) > 1) if dy == 1 else (abs(dx) == 2 and abs(dz) == 2)
+                if skip or (dx == 0 and dz == 0 and dy <= 0):
+                    continue
+                out.append((x + dx, top + dy, z + dz, leaf))
+    return out
+
+
+def lumber_blocks():
+    """Logs on their side (Update 3.10): oak / birch / spruce along x and along z, with one upright log of each for comparison."""
+    out = []
+    gy = 66
+    for i in range(3):
+        x = 139 + i * 4
+        out.append((x, gy + 1, 74, 9 + i))              # upright, for comparison
+        for k in range(1, 4):
+            out.append((x + 1, gy + 1, 74 + k, 220 + i))   # along x
+            out.append((x + 2, gy + 1, 74 + k, 223 + i))   # along z
+        out.append((x + 1, gy + 2, 75, 220 + i))
+        out.append((x + 2, gy + 2, 76, 223 + i))
+    return out
+
+
 def firewall_blocks():
     """Update 3.9 fire models: flames on a plank wall (fire in front of it, nothing below), in a corner (two walls), hanging from a
     plank ceiling, and for comparison fires standing on grass and on planks (the X)."""
@@ -208,6 +241,10 @@ SCENES = {
     "skin-hold-block": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.hold=1", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "inv-player":     (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.skin=demo", "-Dbc.mouse=560,160", "-Dbc.shot=110"], True),
     "inv-player-def": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.mouse=120,60", "-Dbc.shot=110"], True),
+    "treefall-30":    (COMMON + ["-Dbc.cam=145.5,71,63.0,0,4", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=139,67,69,152,80,80,0", sets(tree_blocks(145, 66, 74)), "-Dbc.fell=145,67,74,1,0", "-Dbc.fellangle=30", "-Dbc.shot=150"], True),
+    "treefall-65":    (COMMON + ["-Dbc.cam=145.5,71,63.0,0,4", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=139,67,69,152,80,80,0", sets(tree_blocks(145, 66, 74)), "-Dbc.fell=145,67,74,1,0", "-Dbc.fellangle=65", "-Dbc.shot=150"], True),
+    "treefall-down":  (COMMON + ["-Dbc.cam=148.0,72,63.0,0,24", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=139,67,69,154,80,80,0", sets(tree_blocks(145, 66, 74)), "-Dbc.fell=145,67,74,1,0", "-Dbc.shot=240"], True),
+    "logs310":        (COMMON + ["-Dbc.cam=145.5,70.5,70.0,0,24", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=137,67,72,153,72,80,0", sets(lumber_blocks()), "-Dbc.shot=150"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),

@@ -70,6 +70,7 @@ final class TexExtra {
       Tex.blit(212, haySide());
       Tex.blit(213, hayTop());
       TexArt37.blocks();
+      TexArt310.blocks();
 
       for (int var2 = 256; var2 < 400; var2++) {
          if (Items.name[var2] != null) {

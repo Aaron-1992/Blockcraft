@@ -36,8 +36,8 @@ final class Fire {
    static int encouragement(int id) {
       if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96 || id == Blocks.SLAB_TOP0 || id >= Blocks.STAIR_TOP0 && id <= Blocks.STAIR_TOP0 + 3) {
          return 5; // oak planks, slab, fence, stairs
-      } else if (id >= 9 && id <= 11) {
-         return 5; // logs
+      } else if (Blocks.isAnyLog(id)) {
+         return 5; // logs (upright or fallen)
       } else if (id >= 12 && id <= 14 || id >= 34 && id <= 49 || id == 160) {
          return 30; // leaves, wool, bookshelf
       } else if (id == 132) {
@@ -51,7 +51,7 @@ final class Fire {
    static int flammability(int id) {
       if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96 || id == Blocks.SLAB_TOP0 || id >= Blocks.STAIR_TOP0 && id <= Blocks.STAIR_TOP0 + 3) {
          return 20;
-      } else if (id >= 9 && id <= 11) {
+      } else if (Blocks.isAnyLog(id)) {
          return 5;
       } else if (id >= 12 && id <= 14 || id >= 34 && id <= 49) {
          return 60;

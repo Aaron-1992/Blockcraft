@@ -41,6 +41,8 @@ public final class World {
    public final ArrayList<World.Falling> fallers = new ArrayList();
    /** Fire (Update 3.7): ages, spreading, burning out. */
    public final Fire fire = new Fire(this);
+   /** Update 3.10: trees that are falling over (see Trees). */
+   public final Trees trees = new Trees(this);
    /** Update 3.8: weather field, rain, lightning. */
    public final Weather weather;
    private final Random rnd = new Random();
@@ -290,6 +292,7 @@ public final class World {
    }
 
    public void saveAll() {
+      this.trees.finishAll(); // a tree in the air is put down first, or its blocks would be lost
       for (Chunk var2 : this.chunks.values()) {
          if (var2.modified) {
             this.saveChunk(var2);
@@ -728,6 +731,7 @@ public final class World {
       this.fallers.removeIf(var0 -> var0.dead);
       this.tickCrops();
       this.fire.tick();
+      this.trees.tick();
       this.weather.tick();
 
       for (World.Item var13 : this.items) {

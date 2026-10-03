@@ -1,2 +1,2 @@
-slabs,slabs-sh,skin-hold-sh,leaves-fancy,leaves-smart,leaves-fast
+treefall-30,treefall-65,treefall-down,logs310
 jar=build

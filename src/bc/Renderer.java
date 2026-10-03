@@ -511,6 +511,17 @@ public final class Renderer {
          this.viewPitch = (float)cv[4];
       }
 
+      float shk = this.g.pshake + (this.g.shake - this.g.pshake) * var1;
+      if (shk > 0.0F) {
+         // Update 3.10: earthquakes, trees hitting the ground and meteors shake the camera (position and a little rotation)
+         double ph = (this.g.tickCount + var1) * 0.9;
+         this.camX += (Math.sin(ph * 1.7) + Math.sin(ph * 3.1 + 0.7)) * 0.5 * shk * 0.06;
+         this.camY += Math.sin(ph * 2.3 + 1.0) * shk * 0.07;
+         this.camZ += (Math.sin(ph * 1.3 + 2.0) + Math.sin(ph * 2.9 + 1.9)) * 0.5 * shk * 0.06;
+         this.viewYaw += (float)(Math.sin(ph * 2.1 + 0.5) * shk * 0.9);
+         this.viewPitch += (float)(Math.sin(ph * 1.9 + 2.5) * shk * 0.7);
+      }
+
       boolean var6 = var4.eyeInWater;
       boolean var7 = Blocks.isLava(var5.getBlock((int)Math.floor(this.camX), (int)Math.floor(this.camY), (int)Math.floor(this.camZ)));
       int var8 = (int)Math.floor(this.camX);
@@ -1574,6 +1585,68 @@ public final class Renderer {
          GL11.glScalef(0.99F, 0.99F, 0.99F);
          drawBlockModel(var15.id, var16);
          GL11.glPopMatrix();
+      }
+
+      this.drawFallingTrees(var1);
+   }
+
+   /**
+    * Update 3.10: trees that are falling over (see Trees): the blocks turn as one piece about the cell that was cut, 0..90 degrees
+    * (the axis (dz, 0, -dx) tips "up" towards the fall direction), then the lying trunk drops.
+    */
+   void drawFallingTrees(float partial) {
+      World w = this.g.world;
+      if (w.trees.falling().isEmpty()) {
+         return;
+      }
+
+      GL11.glEnable(2929);
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, Tex.atlas);
+      GL11.glEnable(3008);
+      GL11.glAlphaFunc(516, 0.3F);
+      float[] uv = new float[2];
+      for (Trees.Fall f : w.trees.falling()) {
+         double cx = f.pivotX() + 0.5;
+         double cy = f.pivotY() + 0.5 - f.drop(partial);
+         double cz = f.pivotZ() + 0.5;
+         float bright = this.brightnessAt(w, cx + f.dx() * 2.0, cy + 1.5, cz + f.dz() * 2.0);
+         GL11.glPushMatrix();
+         GL11.glTranslated(cx - this.camX, cy - this.camY, cz - this.camZ);
+         GL11.glRotatef(f.angle(partial), f.dz(), 0.0F, -f.dx());
+         GL11.glBegin(7);
+         for (int i = 0; i < f.count(); i++) {
+            emitCube(f.blockId(i), f.offX(i), f.offY(i), f.offZ(i), bright, uv);
+         }
+
+         GL11.glEnd();
+         GL11.glPopMatrix();
+      }
+
+      GL11.glDisable(3008);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   /** The six faces of a full block centred at (ox, oy, oz) in immediate mode (what drawBlockModel does for a cube, without the state changes). */
+   static void emitCube(int id, float ox, float oy, float oz, float bright, float[] uv) {
+      int[] tint = Blocks.tint[id] == 2 ? Gui.tintFor(id) : null;
+      for (int face = 0; face < 6; face++) {
+         int tile = Blocks.tiles[id][face];
+         float shade = Mesher.SHADE[face] * bright;
+         if (tint != null) {
+            GL11.glColor3f(shade * tint[0] / 255.0F, shade * tint[1] / 255.0F, shade * tint[2] / 255.0F);
+         } else {
+            GL11.glColor3f(shade, shade, shade);
+         }
+
+         float u0 = tile % 16 / 16.0F;
+         float v0 = tile / 16 / 16.0F;
+         for (int k = 0; k < 4; k++) {
+            int[] c = Mesher.FC[face][k];
+            Mesher.uvFor(face, c[0], c[1], c[2], uv);
+            GL11.glTexCoord2f(u0 + uv[0] / 16.0F, v0 + uv[1] / 16.0F);
+            GL11.glVertex3f(ox + c[0] - 0.5F, oy + c[1] - 0.5F, oz + c[2] - 0.5F);
+         }
       }
    }
 

@@ -75,7 +75,10 @@ public final class Blocks {
    public static final int MELON_STEM = 179;
    public static final int CAKE = 187;
    public static final int FIRE = 194;
-   public static final int COUNT = 220;
+   /** Update 3.10: logs lying on their side (felled trees): 220..222 along the x axis, 223..225 along the z axis (oak, birch, spruce). */
+   public static final int LOG_X0 = 220;
+   public static final int LOG_Z0 = 223;
+   public static final int COUNT = 226;
    public static final int[] STAIR_MAT = new int[]{5, 4, 27, 16, 17};
    public static final String[] STAIR_NAME = new String[]{"Oak Wood", "Cobblestone", "Stone Brick", "Brick", "Sandstone"};
    public static final int K_CUBE = 0;
@@ -304,6 +307,8 @@ public final class Blocks {
          return stemSeedItem(var0);
       } else if (isCake(var0)) {
          return 350;
+      } else if (isSideLog(var0)) {
+         return uprightLog(var0);
       } else {
          return isFire(var0) ? 0 : var0;
       }
@@ -315,6 +320,31 @@ public final class Blocks {
 
    public static boolean isLog(int var0) {
       return var0 >= 9 && var0 <= 11;
+   }
+
+   /** A log lying on its side (220..225), as a felled tree leaves them. */
+   public static boolean isSideLog(int var0) {
+      return var0 >= LOG_X0 && var0 < LOG_X0 + 6;
+   }
+
+   /** Upright log or log on its side. */
+   public static boolean isAnyLog(int var0) {
+      return var0 >= 9 && var0 <= 11 || var0 >= LOG_X0 && var0 < LOG_X0 + 6;
+   }
+
+   /** The side log of an upright log (9..11) lying along the x axis (axis 0) or the z axis (axis 1). */
+   public static int sideLog(int upright, int axis) {
+      return (axis == 0 ? LOG_X0 : LOG_Z0) + (upright - 9);
+   }
+
+   /** The upright log (9..11) that goes with a side log. */
+   public static int uprightLog(int sideLog) {
+      return 9 + (sideLog - LOG_X0) % 3;
+   }
+
+   /** 0 = a side log along the x axis, 1 = along the z axis. */
+   public static int sideLogAxis(int sideLog) {
+      return sideLog >= LOG_Z0 ? 1 : 0;
    }
 
    public static boolean targetable(int var0) {
@@ -830,5 +860,31 @@ public final class Blocks {
       emit[194] = 15;
       drop[194] = 0;
       box[194] = new double[]{0.1, 0.0, 0.1, 0.9, 0.9, 0.9};
+
+      // ---- Update 3.10: logs lying on their side (felled trees). Tiles 246..248 are the bark turned by 90 degrees (TexArt310). ----
+      int[] barkTile = new int[]{7, 33, 31};
+      int[] endTile = new int[]{8, 8, 32};
+      String[] logName = new String[]{"Oak Log", "Birch Log", "Spruce Log"};
+      for (int var80 = 0; var80 < 3; var80++) {
+         int bark = barkTile[var80];
+         int barkTurned = 246 + var80;
+         int end = endTile[var80];
+         int ax = LOG_X0 + var80;
+         int az = LOG_Z0 + var80;
+         def(ax, logName[var80], 2.0F, true, bark);
+         def(az, logName[var80], 2.0F, true, bark);
+         // faces: 0 top, 1 bottom, 2 north (-z), 3 south (+z), 4 east (+x), 5 west (-x): the ends show the rings, the grain runs along the log
+         int[] tx = new int[]{barkTurned, barkTurned, barkTurned, barkTurned, end, end};
+         int[] tz = new int[]{bark, bark, end, end, barkTurned, barkTurned};
+         for (int var81 = 0; var81 < 6; var81++) {
+            tiles[ax][var81] = tx[var81];
+            tiles[az][var81] = tz[var81];
+         }
+
+         drop[ax] = 9 + var80;
+         drop[az] = 9 + var80;
+         mineClass[ax] = 2;
+         mineClass[az] = 2;
+      }
    }
 }

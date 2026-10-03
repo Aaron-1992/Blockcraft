@@ -51,7 +51,7 @@ final class Tests310 {
       test("upside-down stairs and top slabs: ids, shapes, drops and tool rules mirror the normal ones", () -> {
          eq(195, Blocks.STAIR_TOP0, "first upside-down stair");
          eq(215, Blocks.SLAB_TOP0, "first top slab");
-         eq(220, Blocks.COUNT, "block count");
+         eq(Blocks.LOG_X0 + 6, Blocks.COUNT, "block count (the last ones are the logs on their side)");
          for (int mat = 0; mat < 5; mat++) {
             int slab = Blocks.SLAB_TOP0 + mat;
             check(Blocks.isSlab(slab) && Blocks.isTopSlab(slab) && !Blocks.isStair(slab), "top slab " + mat + " is a top slab");
