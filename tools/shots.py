@@ -145,6 +145,32 @@ def lumber_blocks():
     return out
 
 
+def quake_blocks():
+    """Update 3.10: something for an earthquake to shake: a dirt plateau with torches, glass and flowers on top and around it."""
+    out = []
+    gy = 66
+    for x in range(139, 151):
+        for z in range(72, 82):
+            for y in range(gy + 1, gy + 6):
+                out.append((x, y, z, 0))
+    for x in range(141, 148):
+        for z in range(74, 81):
+            for y in range(gy + 1, gy + 4):
+                out.append((x, y, z, 3 if y < gy + 3 else 2))
+    for x in (141, 143, 145, 147):
+        out.append((x, gy + 4, 74, 32))                  # torches on the edge
+        out.append((x, gy + 4, 80, 32))
+    for z in (76, 78):
+        out.append((141, gy + 4, z, 15))                 # glass
+        out.append((147, gy + 4, z, 15))
+        out.append((141, gy + 5, z, 15))
+        out.append((147, gy + 5, z, 15))
+    for x in range(139, 151, 2):
+        out.append((x, gy + 1, 72, 30 + (x // 2) % 2))   # flowers at the foot
+        out.append((x, gy + 1, 82, 29))
+    return out
+
+
 def firewall_blocks():
     """Update 3.9 fire models: flames on a plank wall (fire in front of it, nothing below), in a corner (two walls), hanging from a
     plank ceiling, and for comparison fires standing on grass and on planks (the X)."""
@@ -245,6 +271,12 @@ SCENES = {
     "treefall-65":    (COMMON + ["-Dbc.cam=145.5,71,63.0,0,4", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=139,67,69,152,80,80,0", sets(tree_blocks(145, 66, 74)), "-Dbc.fell=145,67,74,1,0", "-Dbc.fellangle=65", "-Dbc.shot=150"], True),
     "treefall-down":  (COMMON + ["-Dbc.cam=148.0,72,63.0,0,24", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=139,67,69,154,80,80,0", sets(tree_blocks(145, 66, 74)), "-Dbc.fell=145,67,74,1,0", "-Dbc.shot=240"], True),
     "logs310":        (COMMON + ["-Dbc.cam=145.5,70.5,70.0,0,24", "-Dbc.time=6000"] + PLAIN + ["-Dbc.fill=137,67,72,153,72,80,0", sets(lumber_blocks()), "-Dbc.shot=150"], True),
+    "tornado-mid":    (COMMON + ["-Dbc.rd=4", "-Dbc.cam=143.5,70,62,0,-14", "-Dbc.time=6000", "-Dbc.disaster=tornado:0,54,1.1,0", "-Dbc.dfreeze=260", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=210"], True),
+    "tornado-close":  (COMMON + ["-Dbc.cam=143.5,69,62,0,-12", "-Dbc.time=6000", "-Dbc.disaster=tornado:0,26,1.0,0", "-Dbc.dfreeze=260", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=210"], True),
+    "tornado-night":  (COMMON + ["-Dbc.rd=4", "-Dbc.cam=143.5,70,62,0,-14", "-Dbc.time=18000", "-Dbc.disaster=tornado:0,54,1.1,0", "-Dbc.dfreeze=260", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=210"], True),
+    "quake":          (COMMON + ["-Dbc.cam=144,72,66.5,0,34", "-Dbc.time=6000", "-Dbc.fill=139,67,72,150,72,82,0", sets(quake_blocks()), "-Dbc.disaster=quake:0,12,3,900", "-Dbc.dfreeze=200", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=230"], True),
+    "meteors":        (COMMON + ["-Dbc.cam=143.5,70,62,0,-22", "-Dbc.time=18000", "-Dbc.disaster=meteor:30,80,70;meteor:-36,95,64;meteor:5,110,76", "-Dbc.dfreeze=34", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
+    "meteor-crater":  (COMMON + ["-Dbc.cam=143.5,78,54,0,32", "-Dbc.time=18000", "-Dbc.disaster=meteor:0,30,30", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=230"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),

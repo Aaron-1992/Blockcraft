@@ -22,6 +22,8 @@ public final class Options {
    public boolean shaders = true;
    /** Update 3.8: rain, snow, thunderstorms and storm clouds (off = fair-weather clouds only). */
    public boolean weather = true;
+   /** Update 3.10: natural disasters (tornadoes, earthquakes, meteors); /disaster on|off switches them per world as well. */
+   public boolean disasters = true;
    /** Update 3.9: the chosen skin (a file name in the skins folder, or Skins.DEFAULT). */
    public String skin = Skins.DEFAULT;
    final File file;
@@ -51,6 +53,7 @@ public final class Options {
                this.lodDistance = Integer.parseInt(var2.getProperty("lodDistance", "64"));
                this.shaders = Boolean.parseBoolean(var2.getProperty("shaders", "true"));
                this.weather = Boolean.parseBoolean(var2.getProperty("weather", "true"));
+               this.disasters = Boolean.parseBoolean(var2.getProperty("disasters", "true"));
                this.skin = var2.getProperty("skin", Skins.DEFAULT);
             } catch (Throwable var5) {
                try {
@@ -84,6 +87,7 @@ public final class Options {
       var1.setProperty("lodDistance", this.lodDistance + "");
       var1.setProperty("shaders", this.shaders + "");
       var1.setProperty("weather", this.weather + "");
+      var1.setProperty("disasters", this.disasters + "");
       var1.setProperty("skin", this.skin);
 
       try {

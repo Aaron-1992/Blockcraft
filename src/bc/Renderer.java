@@ -515,11 +515,11 @@ public final class Renderer {
       if (shk > 0.0F) {
          // Update 3.10: earthquakes, trees hitting the ground and meteors shake the camera (position and a little rotation)
          double ph = (this.g.tickCount + var1) * 0.9;
-         this.camX += (Math.sin(ph * 1.7) + Math.sin(ph * 3.1 + 0.7)) * 0.5 * shk * 0.06;
-         this.camY += Math.sin(ph * 2.3 + 1.0) * shk * 0.07;
-         this.camZ += (Math.sin(ph * 1.3 + 2.0) + Math.sin(ph * 2.9 + 1.9)) * 0.5 * shk * 0.06;
-         this.viewYaw += (float)(Math.sin(ph * 2.1 + 0.5) * shk * 0.9);
-         this.viewPitch += (float)(Math.sin(ph * 1.9 + 2.5) * shk * 0.7);
+         this.camX += (Math.sin(ph * 1.7) + Math.sin(ph * 3.1 + 0.7)) * 0.5 * shk * 0.12;
+         this.camY += Math.sin(ph * 2.3 + 1.0) * shk * 0.14;
+         this.camZ += (Math.sin(ph * 1.3 + 2.0) + Math.sin(ph * 2.9 + 1.9)) * 0.5 * shk * 0.12;
+         this.viewYaw += (float)(Math.sin(ph * 2.1 + 0.5) * shk * 1.6);
+         this.viewPitch += (float)(Math.sin(ph * 1.9 + 2.5) * shk * 1.2);
       }
 
       boolean var6 = var4.eyeInWater;
@@ -769,6 +769,8 @@ public final class Renderer {
       }
 
       if (!var6 && !var7) {
+         // Update 3.10: tornado funnels and wall clouds, meteors
+         DisasterFx.drawSky(this, var1);
          // rain curtains in the distance, rain / snow around you, lightning
          this.wfx.drawOverlays(var1, var41, var42, var43);
       }
@@ -1588,6 +1590,7 @@ public final class Renderer {
       }
 
       this.drawFallingTrees(var1);
+      DisasterFx.drawDebris(this, var1);
    }
 
    /**

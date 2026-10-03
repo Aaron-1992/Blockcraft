@@ -43,6 +43,8 @@ public final class World {
    public final Fire fire = new Fire(this);
    /** Update 3.10: trees that are falling over (see Trees). */
    public final Trees trees = new Trees(this);
+   /** Update 3.10: tornadoes, earthquakes, meteors (see Disasters). */
+   public final Disasters disasters = new Disasters(this);
    /** Update 3.8: weather field, rain, lightning. */
    public final Weather weather;
    private final Random rnd = new Random();
@@ -732,6 +734,7 @@ public final class World {
       this.tickCrops();
       this.fire.tick();
       this.trees.tick();
+      this.disasters.tick();
       this.weather.tick();
 
       for (World.Item var13 : this.items) {

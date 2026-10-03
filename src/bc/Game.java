@@ -337,6 +337,42 @@ public final class Game {
       this.autoBiome();
    }
 
+   /**
+    * bc.disaster=tornado:dx,dz[,size[,speed]] | quake:dx,dz[,magnitude[,life]] | meteor:dx,dz[,flight] - starts a disaster relative to the player
+    * (the camera) for screenshots: the tornado is fully grown and, with speed 0 (the default), stands still; -Dbc.dfreeze=N stops everything N ticks later.
+    */
+   void autoDisaster(String specs) {
+      for (String spec : specs.split(";")) {
+         this.autoDisaster1(spec);
+      }
+   }
+
+   void autoDisaster1(String spec) {
+      Disasters d = this.world.disasters;
+      String[] kv = spec.split(":", 2);
+      String[] a = kv.length > 1 ? kv[1].split(",") : new String[0];
+      double dx = a.length > 0 ? Double.parseDouble(a[0]) : 0.0;
+      double dz = a.length > 1 ? Double.parseDouble(a[1]) : 40.0;
+      double x = this.player.x + dx;
+      double z = this.player.z + dz;
+      d.frozenAt = d.clock;
+      switch (kv[0]) {
+         case "tornado":
+            Disasters.Tornado t = d.spawnTornado(x, z, 1.0, 0.0, a.length > 2 ? Float.parseFloat(a[2]) : 1.1F, true);
+            t.speed = a.length > 3 ? Double.parseDouble(a[3]) : 0.0;
+            t.life = 99999;
+            break;
+         case "quake":
+            d.startQuake(x, z, a.length > 2 ? Float.parseFloat(a[2]) : 2.5F, a.length > 3 ? Integer.parseInt(a[3]) : 400);
+            break;
+         case "meteor":
+            d.spawnMeteor(x, z, 0.6, 1.0, a.length > 2 ? Integer.parseInt(a[2]) : 60, 1.6F);
+            break;
+         default:
+            System.out.println("[disasters] bc.disaster: unknown kind " + kv[0]);
+      }
+   }
+
    /** bc.biome=<id>: every loaded chunk gets this biome (re-applied while chunks are still loading in). */
    void autoBiome() {
       String biome = System.getProperty("bc.biome");
@@ -501,6 +537,10 @@ public final class Game {
                   }
                }
             }
+         }
+
+         if (this.autoFrames == 75 && System.getProperty("bc.disaster") != null) {
+            this.autoDisaster(System.getProperty("bc.disaster"));
          }
 
          if (this.autoFrames == 80 && System.getProperty("bc.fell") != null) {
@@ -874,12 +914,14 @@ public final class Game {
    void storeFireSetting(Properties p) {
       p.setProperty("firespread", this.world.fire.spread + "");
       p.setProperty("treefall", this.world.trees.enabled + "");
+      this.world.disasters.save(p);
       this.world.weather.save(p);
    }
 
    void restoreFireSetting(Properties p) {
       this.world.fire.spread = !"false".equals(p.getProperty("firespread"));
       this.world.trees.enabled = !"false".equals(p.getProperty("treefall"));
+      this.world.disasters.load(p);
       this.world.weather.load(p);
    }
 
@@ -1541,6 +1583,10 @@ public final class Game {
                case "weather":
                   this.weatherCommand(var2);
                   break;
+               case "disaster":
+               case "disasters":
+                  this.world.disasters.command(this, var2);
+                  break;
                case "treefall":
                   if (var2.length > 1 && (var2[1].equalsIgnoreCase("on") || var2[1].equalsIgnoreCase("off"))) {
                      this.world.trees.enabled = var2[1].equalsIgnoreCase("on");
@@ -1549,7 +1595,7 @@ public final class Game {
                   this.say("Falling trees are " + (this.world.trees.enabled ? "on" : "off") + "  (/treefall on|off)");
                   break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather /treefall");
+                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather /treefall /disaster");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
@@ -4056,6 +4102,7 @@ public final class Game {
          Mesher.leafMode = this.opt.leaves;
          this.remeshAll();
       });
+      this.button("Disasters: " + this.onOff(this.opt.disasters), var4, var2 + 144.0F, var5, 20.0F, true, () -> this.opt.disasters = !this.opt.disasters);
       this.button("Done", var1 - 100.0F, var2 + 172.0F, 200.0F, 20.0F, true, () -> {
          this.opt.save();
          this.setScreen(this.optionsReturn);

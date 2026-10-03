@@ -97,6 +97,7 @@ public final class GameTests {
       g.world = w;
       w.game = g;
       w.weather.enabled = false; // game-logic tests must not depend on the weather; Tests38 turns it on where it matters
+      w.disasters.enabled = false; // ... nor on a random earthquake after 10 minutes of ticks; TestsDisasters turns them on where it matters
       g.player = new Player();
       g.player.setMode(mode);
       g.player.setPos(8.5, GROUND + 1, 8.5);
@@ -1706,6 +1707,7 @@ public final class GameTests {
       Tests39.run();
       Tests310.run();
       TestsFall.run();
+      TestsDisasters.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

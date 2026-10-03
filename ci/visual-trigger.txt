@@ -1,2 +1,2 @@
-treefall-30,treefall-65,treefall-down,logs310
+tornado-mid,tornado-close,tornado-night,quake,meteors,meteor-crater
 jar=build
