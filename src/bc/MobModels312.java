@@ -19,6 +19,41 @@ final class MobModels312 {
       models[Mobs.ENDERMAN] = enderman();
       models[Mobs.ENDER_DRAGON] = dragon();
       models[Mobs.END_CRYSTAL] = crystal();
+      models[Mobs.VILLAGER] = villager();
+      models[Mobs.IRON_GOLEM] = golem();
+   }
+
+   /** The colour that marks the robe of a villager in its texture: the renderer tints it with the colour of the profession. */
+   static final int ROBE_MARK = 0xE6E6E6;
+
+   /** A big nose, a unibrow, a long robe with the arms crossed in front of it. */
+   private static Model villager() {
+      Model m = new Model();
+      m.type = Mobs.VILLAGER;
+      int skin = 0xC8967A;
+      m.add(1, skin, 8, 10, 8, -4.0F, 0.0F, -4.0F, 0.0F, 22.0F, 0.0F);
+      m.add(1, 0xB07E62, 2, 4, 2, -1.0F, 1.0F, 4.0F, 0.0F, 22.0F, 0.0F);
+      m.add(2, ROBE_MARK, 8, 12, 4, -4.0F, -12.0F, -2.0F, 0.0F, 22.0F, 0.0F);
+      m.add(2, ROBE_MARK, 8, 4, 4, -4.0F, -2.0F, 2.0F, 0.0F, 18.0F, 0.0F);
+      Part leg = m.add(3, 0x5A4632, 4, 10, 4, -2.0F, -10.0F, -2.0F, 2.0F, 10.0F, 0.0F);
+      m.addLike(leg, 4, -2.0F, 10.0F, 0.0F);
+      return m;
+   }
+
+   /** Iron grey, taller than a door, arms that reach to the knees, vines on the chest. */
+   private static Model golem() {
+      Model m = new Model();
+      m.type = Mobs.IRON_GOLEM;
+      int iron = 0xB4B0A8;
+      m.add(2, iron, 18, 12, 11, -9.0F, -12.0F, -5.5F, 0.0F, 33.0F, 0.0F);
+      m.add(2, iron, 9, 5, 6, -4.5F, -5.0F, -3.0F, 0.0F, 21.0F, 0.0F);
+      m.add(1, iron, 8, 10, 8, -4.0F, 0.0F, -4.0F, 0.0F, 33.0F, 0.0F);
+      m.add(1, 0x8C8478, 2, 4, 2, -1.0F, 2.0F, 4.0F, 0.0F, 33.0F, 0.0F);
+      Part arm = m.add(5, iron, 4, 30, 6, -2.0F, -28.0F, -3.0F, 11.0F, 31.0F, 0.0F);
+      m.addLike(arm, 6, -11.0F, 31.0F, 0.0F);
+      Part leg = m.add(3, iron, 6, 16, 5, -3.0F, -16.0F, -2.5F, 5.0F, 16.0F, 0.0F);
+      m.addLike(leg, 4, -5.0F, 16.0F, 0.0F);
+      return m;
    }
 
    /** Tall, black, long arms and legs, a jaw that drops open when it is angry, purple eyes. */
@@ -156,6 +191,13 @@ final class MobModels312 {
             return new float[]{c, 0.9F + MobRender.hash(x, y, 5) * 0.2F};
          case Mobs.ENDERMAN:
             return new float[]{part.color, 0.85F + MobRender.hash(x, y, 61) * 0.3F};
+         case Mobs.VILLAGER:
+            return new float[]{part.color, 0.9F + MobRender.hash(x, y, 41) * 0.16F + (part.color == ROBE_MARK && y % 5 == 0 ? -0.1F : 0.0F)};
+         case Mobs.IRON_GOLEM: {
+            float v = MobRender.vnoise(x * 0.3F, y * 0.3F, 29);
+            int vine = v > 0.72F ? 0x4C7A3C : part.color;
+            return new float[]{vine, 0.82F + MobRender.hash(x, y, 53) * 0.3F};
+         }
          case Mobs.ENDER_DRAGON:
             return new float[]{part.color, 0.8F + MobRender.vnoise(x * 0.35F, y * 0.35F, 71) * 0.45F};
          case Mobs.END_CRYSTAL:
@@ -224,6 +266,34 @@ final class MobModels312 {
 
             for (int px = 2; px < 6; px++) {
                MobRender.put(f[0] + px, f[1] + 6, 0x240C08);
+            }
+
+            break;
+         }
+         case Mobs.VILLAGER: {
+            // a dark brow across both eyes, the eyes, a mouth
+            int[] f = MobRender.face(model.parts.get(0), 3);
+            for (int px = 1; px < 7; px++) {
+               MobRender.put(f[0] + px, f[1] + 3, 0x4A3020);
+            }
+
+            for (int px : new int[]{1, 2, 5, 6}) {
+               MobRender.put(f[0] + px, f[1] + 4, px == 2 || px == 5 ? 0x3C7A3C : 0xFFFFFF);
+            }
+
+            MobRender.put(f[0] + 3, f[1] + 8, 0x6A4A38);
+            MobRender.put(f[0] + 4, f[1] + 8, 0x6A4A38);
+            break;
+         }
+         case Mobs.IRON_GOLEM: {
+            // two glaring eyes, a long nose, a stern line for a mouth
+            int[] f = MobRender.face(model.parts.get(2), 3);
+            MobRender.put(f[0] + 1, f[1] + 3, 0x202020);
+            MobRender.put(f[0] + 2, f[1] + 3, 0xE0A020);
+            MobRender.put(f[0] + 5, f[1] + 3, 0xE0A020);
+            MobRender.put(f[0] + 6, f[1] + 3, 0x202020);
+            for (int px = 2; px < 6; px++) {
+               MobRender.put(f[0] + px, f[1] + 8, 0x303030);
             }
 
             break;

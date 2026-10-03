@@ -8,6 +8,8 @@ final class Menu {
    static final int FURNACE = 2;
    static final int CHEST = 3;
    static final int CREATIVE = 4;
+   /** Update 3.12: a villager's trades (profession in {@link #profession}). */
+   static final int TRADE = 5;
    static final int NORMAL = 0;
    static final int OUTPUT = 1;
    static final int ARMOR = 2;
@@ -30,11 +32,18 @@ final class Menu {
    final ArrayList<Menu.Slot> paletteSlots = new ArrayList();
    int firstInvSlot;
    int invSlotCount;
+   int profession;
+   Trades.Trade[] trades = new Trades.Trade[0];
 
    Menu(Game var1, int var2, TileEntity var3) {
+      this(var1, var2, var3, 0);
+   }
+
+   Menu(Game var1, int var2, TileEntity var3, int profession) {
       this.g = var1;
       this.kind = var2;
       this.tile = var3;
+      this.profession = profession;
       this.build();
    }
 
@@ -109,6 +118,24 @@ final class Menu {
 
             for (int var4 = 0; var4 < 27; var4++) {
                this.add(this.tile.slots, var4, 8 + var4 % 9 * 18, 18 + var4 / 9 * 18, 0);
+            }
+
+            this.playerInv(84.0F, 142.0F, 8.0F);
+            break;
+         case 5:
+            // Update 3.12: two columns of three trades: [price] [price] -> [goods]; a click on the goods buys
+            this.title = Trades.name(this.profession);
+            this.trades = Trades.offers(this.profession);
+            for (int i = 0; i < this.trades.length; i++) {
+               Trades.Trade t = this.trades[i];
+               float x0 = i < 3 ? 8.0F : 92.0F;
+               float y0 = 18.0F + i % 3 * 18;
+               Stack[] a = new Stack[]{new Stack(t.a, t.an)};
+               Stack[] b = new Stack[]{t.bn > 0 ? new Stack(t.b, t.bn) : null};
+               Stack[] o = new Stack[]{new Stack(t.out, t.outN)};
+               this.add(a, 0, x0, y0, 6);
+               this.add(b, 0, x0 + 18.0F, y0, 6);
+               this.add(o, 0, x0 + 54.0F, y0, 7).armorPiece = i;
             }
 
             this.playerInv(84.0F, 142.0F, 8.0F);
@@ -192,6 +219,18 @@ final class Menu {
 
    void click(Menu.Slot var1, int var2, boolean var3) {
       Stack var4 = this.g.cursor;
+      if (var1.type == 6) {
+         return;
+      }
+
+      if (var1.type == 7) {
+         if (var1.armorPiece >= 0 && var1.armorPiece < this.trades.length) {
+            Trades.buy(this.g, this.trades[var1.armorPiece]);
+         }
+
+         return;
+      }
+
       if (var1.type == 5) {
          int var8 = this.page * 45 + var1.idx;
          if (var4 != null) {
@@ -477,6 +516,18 @@ final class Menu {
       } else if (this.kind == 1) {
          var1.rect(var4 + 90.0F, var5 + 41.0F, 22.0F, 3.0F, -7631989);
          var1.rect(var4 + 104.0F, var5 + 37.0F, 3.0F, 11.0F, -7631989);
+      } else if (this.kind == 5) {
+         for (int i = 0; i < this.trades.length; i++) {
+            float x0 = i < 3 ? 8.0F : 92.0F;
+            float y0 = 18.0F + i % 3 * 18;
+            boolean ok = Trades.has(this.g, this.trades[i]);
+            var1.rect(var4 + x0 + 38.0F, var5 + y0 + 7.0F, 12.0F, 3.0F, ok ? -13730510 : -7631989);
+            var1.rect(var4 + x0 + 46.0F, var5 + y0 + 4.0F, 3.0F, 9.0F, ok ? -13730510 : -7631989);
+         }
+
+         if (this.trades.length == 0) {
+            var1.text("Hrmmm.", var4 + 60.0F, var5 + 40.0F, -12566464, false);
+         }
       } else if (this.kind == 2) {
          float var10 = this.tile.cook / 200.0F;
          var1.rect(var4 + 79.0F, var5 + 35.0F, 24.0F, 16.0F, -7631989);

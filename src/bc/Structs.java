@@ -225,7 +225,131 @@ public final class Structs {
          var3.maxZ = Math.max(var3.maxZ, var44.z1);
       }
 
+      if (Gen.extras) {
+         this.upgrade(var3);
+      }
+
       return var3;
+   }
+
+   /**
+    * Update 3.12: what the villages got on top of the old ones: a smithy (one of the houses with furnaces and a chest), two to four farms
+    * with crops and a water channel, lamp posts beside the paths. Uses a random stream of its own: the buildings that were planned
+    * before are exactly where they were.
+    */
+   void upgrade(Structs.Village v) {
+      Random r = new Random(this.seed * 7046029254386353131L + v.cx * 31L + v.cz * 1000003L + 4242L);
+      // the smithy
+      for (Structs.Bld b : v.blds) {
+         if (b.type == 0 && !b.chest && b.w >= 5) {
+            b.type = 4;
+            break;
+         }
+      }
+
+      // the farms
+      int want = 2 + r.nextInt(3);
+      int farms = 0;
+      for (int tries = 0; tries < 40 && farms < want; tries++) {
+         double ang = r.nextDouble() * Math.PI * 2.0;
+         double dist = 14.0 + r.nextDouble() * 30.0;
+         int fx = v.cx + (int)Math.round(Math.cos(ang) * dist);
+         int fz = v.cz + (int)Math.round(Math.sin(ang) * dist);
+         Structs.Bld f = new Structs.Bld();
+         f.type = 3;
+         f.desert = v.desert;
+         f.w = 9;
+         f.d = 7;
+         f.wallH = 1;
+         int dx = v.cx - fx;
+         int dz = v.cz - fz;
+         if (Math.abs(dx) > Math.abs(dz)) {
+            f.dir = dx > 0 ? 3 : 2;
+         } else {
+            f.dir = dz > 0 ? 1 : 0;
+         }
+
+         int ex = f.dir < 2 ? f.w : f.d;
+         int ez = f.dir < 2 ? f.d : f.w;
+         f.x0 = fx - ex / 2;
+         f.z0 = fz - ez / 2;
+         finish(f);
+         boolean clash = false;
+         for (Structs.Bld o : v.blds) {
+            if (f.bx1 + 3 >= o.bx0 && f.bx0 - 3 <= o.bx1 && f.bz1 + 3 >= o.bz0 && f.bz0 - 3 <= o.bz1) {
+               clash = true;
+            }
+         }
+
+         if (clash) {
+            continue;
+         }
+
+         Col mid = this.gen.column(fx, fz);
+         if (mid.h < 64 || Math.abs(mid.h - v.cy) > 4) {
+            continue;
+         }
+
+         int[][] corners = new int[][]{{f.bx0, f.bz0}, {f.bx1, f.bz0}, {f.bx0, f.bz1}, {f.bx1, f.bz1}};
+         for (int[] c : corners) {
+            Col cc = this.gen.column(c[0], c[1]);
+            if (cc.h < 64 || Math.abs(cc.h - mid.h) > 1) {
+               clash = true;
+            }
+         }
+
+         if (clash) {
+            continue;
+         }
+
+         f.y0 = mid.h;
+         v.blds.add(f);
+         farms++;
+         // a path from the middle of the village to the gate of the farm
+         int[] gate = worldPos(f, f.w / 2, -1);
+         Structs.Path p1 = new Structs.Path();
+         Structs.Path p2 = new Structs.Path();
+         p1.x0 = Math.min(v.cx, gate[0]);
+         p1.x1 = Math.max(v.cx, gate[0]);
+         p1.z0 = p1.z1 = v.cz + 2;
+         p2.x0 = p2.x1 = gate[0];
+         p2.z0 = Math.min(v.cz + 2, gate[1]);
+         p2.z1 = Math.max(v.cz + 2, gate[1]);
+         v.paths.add(p1);
+         v.paths.add(p2);
+      }
+
+      // lamp posts beside the paths, one every eight blocks
+      for (Structs.Path p : v.paths) {
+         boolean alongX = p.z0 == p.z1;
+         for (int k = alongX ? p.x0 + 4 : p.z0 + 4; k <= (alongX ? p.x1 : p.z1) - 2; k += 8) {
+            int[] lamp = alongX ? new int[]{k, p.z0 + 1} : new int[]{p.x0 + 1, k};
+            boolean near = false;
+            for (int[] o : v.lamps) {
+               if (Math.abs(o[0] - lamp[0]) < 7 && Math.abs(o[1] - lamp[1]) < 7) {
+                  near = true;
+               }
+            }
+
+            if (!near) {
+               v.lamps.add(lamp);
+            }
+         }
+      }
+
+      for (Structs.Bld b : v.blds) {
+         v.minX = Math.min(v.minX, b.bx0);
+         v.minZ = Math.min(v.minZ, b.bz0);
+         v.maxX = Math.max(v.maxX, b.bx1);
+         v.maxZ = Math.max(v.maxZ, b.bz1);
+      }
+
+      for (Structs.Path p : v.paths) {
+         v.minX = Math.min(v.minX, p.x0);
+         v.minZ = Math.min(v.minZ, p.z0);
+         v.maxX = Math.max(v.maxX, p.x1);
+         v.maxZ = Math.max(v.maxZ, p.z1);
+      }
    }
 
    static void finish(Structs.Bld var0) {
@@ -282,9 +406,17 @@ public final class Structs {
                   if (overlaps(var1, var13.bx0 - 1, var13.bz0 - 1, var13.bx1 + 2, var13.bz1 + 2)) {
                      if (var13.type == 1) {
                         this.well(var1, var13);
+                     } else if (var13.type == 3) {
+                        this.farm(var1, var13);
                      } else {
                         this.house(var1, var13, var9);
                      }
+                  }
+               }
+
+               for (int[] lamp : var9.lamps) {
+                  if (overlaps(var1, lamp[0], lamp[1], lamp[0], lamp[1])) {
+                     this.lamp(var1, lamp[0], lamp[1], var9);
                   }
                }
             }
@@ -387,6 +519,76 @@ public final class Structs {
 
       set(var1, var2.x0 + 1, var3 + 4, var2.z0 + 1, 5);
       set(var1, var2.x0 + 1, var3 + 5, var2.z0 + 1, 113);
+   }
+
+   /** Update 3.12: a lamp post - three fences and a torch - on the ground beside a path. */
+   void lamp(Chunk c, int x, int z, Structs.Village v) {
+      int y = 130;
+      while (y > 40 && soft(get(c, x, y, z)) && !Blocks.isFluid(get(c, x, y, z))) {
+         y--;
+      }
+
+      int ground = get(c, x, y, z);
+      if (ground == 2 || ground == 3 || ground == 7 || ground == 8 || ground == 17) {
+         set(c, x, y + 1, z, 118);
+         set(c, x, y + 2, z, 118);
+         set(c, x, y + 3, z, 118);
+         set(c, x, y + 4, z, 32);
+      }
+   }
+
+   /**
+    * Update 3.12: a farm - 9 x 7 blocks, a fence round it with a gate in front, a channel of water down the middle and four rows of
+    * wheat, carrots or potatoes on wet farmland (some of it ripe), a torch on every corner post.
+    */
+   void farm(Chunk c, Structs.Bld f) {
+      int y = f.y0;
+      Random r = new Random(f.x0 * 31L + f.z0 * 17L + f.y0 * 7L + 5L);
+      int crop = r.nextInt(3);
+      int base = crop == 0 ? Blocks.WHEAT : (crop == 1 ? Blocks.CARROT0 : Blocks.POTATO0);
+      int other = r.nextBoolean() ? Blocks.WHEAT : Blocks.CARROT0;
+      for (int j = -1; j <= f.d; j++) {
+         for (int i = -1; i <= f.w; i++) {
+            int[] p = worldPos(f, i, j);
+            if (!overlaps(c, p[0], p[1], p[0], p[1])) {
+               continue;
+            }
+
+            boolean inside = i >= 0 && i < f.w && j >= 0 && j < f.d;
+            if (!inside) {
+               for (int h = 1; h <= 3; h++) {
+                  int id = get(c, p[0], y + h, p[1]);
+                  if (id > 0 && (id == 29 || id == 30 || id == 31 || Blocks.isLeaves(id))) {
+                     set(c, p[0], y + h, p[1], 0);
+                  }
+               }
+
+               continue;
+            }
+
+            this.foundation(c, p[0], p[1], y, 3, 5);
+            boolean edge = i == 0 || i == f.w - 1 || j == 0 || j == f.d - 1;
+            boolean gate = j == 0 && i == f.w / 2;
+            if (edge) {
+               set(c, p[0], y, p[1], 3);
+               if (!gate) {
+                  set(c, p[0], y + 1, p[1], 118);
+                  boolean post = (i == 0 || i == f.w - 1) && (j == 0 || j == f.d - 1);
+                  if (post) {
+                     set(c, p[0], y + 2, p[1], 118);
+                     set(c, p[0], y + 3, p[1], 32);
+                  }
+               }
+            } else if (j == f.d / 2) {
+               set(c, p[0], y, p[1], 50);
+            } else {
+               set(c, p[0], y, p[1], Blocks.FARMLAND_WET);
+               int stage = 3 + r.nextInt(5);
+               int kind = j < f.d / 2 ? base : (r.nextInt(4) == 0 ? other : base);
+               set(c, p[0], y + 1, p[1], kind + stage);
+            }
+         }
+      }
    }
 
    static int doorId(Structs.Bld var0, int var1, boolean var2, Random var3) {
@@ -514,7 +716,15 @@ public final class Structs {
          }
       }
 
-      if (var2.chest) {
+      if (var2.type == 4) {
+         // Update 3.12: the smithy - two furnaces in a row and a chest at the far corner
+         int[] f1 = worldPos(var2, 1, var12 - 2);
+         int[] f2 = worldPos(var2, 2, var12 - 2);
+         int[] ch = worldPos(var2, var11 - 2, var12 - 2);
+         set(var1, f1[0], var4 + 1, f1[1], 67);
+         set(var1, f2[0], var4 + 1, f2[1], 67);
+         set(var1, ch[0], var4 + 1, ch[1], 70);
+      } else if (var2.chest) {
          int[] var39 = worldPos(var2, var11 - 2, var12 - 2);
          set(var1, var39[0], var4 + 1, var39[1], 70);
          set(var1, var39[0], var4 + 2, var39[1], 0);
@@ -916,6 +1126,8 @@ public final class Structs {
       boolean desert;
       ArrayList<Structs.Bld> blds = new ArrayList();
       ArrayList<Structs.Path> paths = new ArrayList();
+      /** Update 3.12: lamp posts {x, z} beside the paths. */
+      ArrayList<int[]> lamps = new ArrayList();
       int minX;
       int minZ;
       int maxX;

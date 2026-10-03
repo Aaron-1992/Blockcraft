@@ -42,6 +42,8 @@ public final class World {
    public final ArrayList<World.Item> items = new ArrayList();
    /** Update 3.12: the fight against the Ender Dragon (only in the End). */
    public EndFight fight;
+   /** Update 3.12: villages (region key) that have been given their villagers; saved in villages.dat. */
+   public final java.util.HashSet<Long> populated = new java.util.HashSet<>();
    public final ArrayList<World.Falling> fallers = new ArrayList();
    /** Fire (Update 3.7): ages, spreading, burning out. */
    public final Fire fire = new Fire(this);
@@ -99,6 +101,7 @@ public final class World {
       }
 
       this.fight = dimension == Dim.END ? new EndFight(this) : null;
+      this.loadPopulated();
       this.loadTiles();
       if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
@@ -342,8 +345,45 @@ public final class World {
       }
 
       this.saveTiles();
+      this.savePopulated();
       if (this.dim == Dim.OVERWORLD) {
          this.lodMap.save(this.dir);
+      }
+   }
+
+   private void loadPopulated() {
+      if (this.dir == null || this.dim != Dim.OVERWORLD) {
+         return;
+      }
+
+      java.io.File f = new java.io.File(this.dir, "villages.dat");
+      if (!f.exists()) {
+         return;
+      }
+
+      try (java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(f))) {
+         String line;
+         while ((line = in.readLine()) != null) {
+            if (!line.trim().isEmpty()) {
+               this.populated.add(Long.parseLong(line.trim()));
+            }
+         }
+      } catch (java.io.IOException | RuntimeException e) {
+         e.printStackTrace();
+      }
+   }
+
+   private void savePopulated() {
+      if (this.dir == null || this.dim != Dim.OVERWORLD || this.populated.isEmpty()) {
+         return;
+      }
+
+      try (java.io.PrintWriter out = new java.io.PrintWriter(new java.io.FileWriter(new java.io.File(this.dir, "villages.dat")))) {
+         for (long k : this.populated) {
+            out.println(k);
+         }
+      } catch (java.io.IOException e) {
+         e.printStackTrace();
       }
    }
 

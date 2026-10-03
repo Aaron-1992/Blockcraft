@@ -32,7 +32,7 @@ public final class Mobs {
    public static final int VILLAGER = 15;
    public static final int IRON_GOLEM = 16;
    public static final int PARROT = 17;
-   public static final int N = 15;
+   public static final int N = 17;
    public static final String[] NAME = new String[]{
       "pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider", "pigman", "ghast", "blaze", "magmacube", "enderman", "enderdragon", "endcrystal", "villager", "irongolem", "parrot"
    };
@@ -144,7 +144,7 @@ public final class Mobs {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;
                double var10 = var6 * var6 + var8 * var8;
-               if (Mobs312.persistent(var5.type) || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
+               if (Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
                   if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
                      this.tickMob(var5, var1, var2, var3);
                      if (var5.y < -20.0) {
@@ -178,6 +178,7 @@ public final class Mobs {
 
          if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD) {
             this.spawnPassive(var1, var2);
+            Mobs312.spawnVillagers(this, var1, var2);
          }
 
          Mobs312.tickFireballs(this, var1, var2);
@@ -468,7 +469,9 @@ public final class Mobs {
             case 10:
             case 11:
             case 12:
-               // Update 3.12: the mobs of the Nether and the Enderman (Mobs312)
+            case 15:
+            case 16:
+               // Update 3.12: the mobs of the Nether, the Enderman, the villagers and the iron golems (Mobs312)
                Mobs312.Intent intent312 = Mobs312.think(this, var1, var2, var3, var4);
                var12 = intent312.moving;
                var13 *= intent312.speed;
@@ -1226,7 +1229,7 @@ public final class Mobs {
 
          try {
             for (Mobs.Mob var4 : this.list) {
-               if (!var4.dead && !hostile(var4.type) && Math.abs(var4.x - this.g.player.x) < 120.0 && Math.abs(var4.z - this.g.player.z) < 120.0) {
+               if (!var4.dead && (Mobs312.keepsForever(var4.type) || !hostile(var4.type) && Math.abs(var4.x - this.g.player.x) < 120.0 && Math.abs(var4.z - this.g.player.z) < 120.0)) {
                   var2.println(var4.type + " " + var4.x + " " + var4.y + " " + var4.z + " " + var4.health + " " + var4.color + " " + var4.babyAge + " " + (var4.sheared ? 1 : 0) + " " + var4.woolTimer + " " + var4.breedCd);
                }
             }

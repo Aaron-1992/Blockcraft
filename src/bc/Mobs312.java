@@ -42,6 +42,11 @@ final class Mobs312 {
       return type == Mobs.VILLAGER || type == Mobs.IRON_GOLEM || type == Mobs.PARROT;
    }
 
+   /** Villagers and golems are never lost: not by walking away from them, not by leaving the game. */
+   static boolean keepsForever(int type) {
+      return type == Mobs.VILLAGER || type == Mobs.IRON_GOLEM;
+   }
+
    static boolean fireproof(int type) {
       return type == Mobs.ZOMBIE_PIGMAN || type == Mobs.GHAST || type == Mobs.BLAZE || type == Mobs.MAGMA_CUBE || type == Mobs.ENDER_DRAGON || type == Mobs.END_CRYSTAL;
    }
@@ -99,11 +104,179 @@ final class Mobs312 {
          case Mobs.ENDERMAN:
             enderman(ms, m, w, p, target, dx, dz, dy, d2, d3, in);
             break;
+         case Mobs.VILLAGER:
+            villager(ms, m, dx, dz, d2, in);
+            break;
+         case Mobs.IRON_GOLEM:
+            golem(ms, m, in);
+            break;
          default:
             break;
       }
 
       return in;
+   }
+
+   // ------------------------------------------------------------------ villages
+   /** Stays within about 26 blocks of where it first stood (the village). */
+   private static void leash(Mobs ms, Mob m) {
+      if (m.hy == 0.0) {
+         m.hx = m.x;
+         m.hz = m.z;
+         m.hy = 1.0;
+      }
+
+      double hd = Math.hypot(m.hx - m.x, m.hz - m.z);
+      if (hd > 26.0) {
+         m.dirYaw = Mobs.angleTo(m.hx - m.x, m.hz - m.z);
+         m.moving = true;
+         m.wander = 30;
+      } else {
+         ms.wanderAI(m);
+      }
+   }
+
+   /** Wanders about the village; runs from monsters that come close and from whoever hurt it; looks at you. */
+   private static void villager(Mobs ms, Mob m, double dx, double dz, double d2, Intent in) {
+      if (m.flee > 0) {
+         m.flee--;
+         m.dirYaw = Mobs.angleTo(m.x - m.fleeX, m.z - m.fleeZ);
+         in.moving = true;
+         in.speed = 1.9;
+         return;
+      }
+
+      Mob scary = null;
+      double best = 64.0;
+      for (Mob o : ms.list) {
+         if (!o.dead && Mobs.hostile(o.type) && o.type != Mobs.ENDER_DRAGON && o.type != Mobs.END_CRYSTAL && o.type != Mobs.ENDERMAN && o.type != Mobs.ZOMBIE_PIGMAN) {
+            double d = (o.x - m.x) * (o.x - m.x) + (o.z - m.z) * (o.z - m.z);
+            if (d < best && Math.abs(o.y - m.y) < 4.0) {
+               best = d;
+               scary = o;
+            }
+         }
+      }
+
+      if (scary != null) {
+         m.dirYaw = Mobs.angleTo(m.x - scary.x, m.z - scary.z);
+         in.moving = true;
+         in.speed = 1.6;
+         return;
+      }
+
+      leash(ms, m);
+      in.moving = m.moving;
+      in.speed = 0.55;
+      if (d2 < 5.0 && !in.moving) {
+         in.headYaw = Mobs.angleTo(dx, dz);
+      }
+   }
+
+   /** Walks about the village and beats up monsters that come near it. */
+   private static void golem(Mobs ms, Mob m, Intent in) {
+      if (m.cd > 0) {
+         m.cd--;
+      }
+
+      Mob prey = null;
+      double best = 18.0 * 18.0;
+      for (Mob o : ms.list) {
+         boolean foe = o.type == Mobs.ZOMBIE || o.type == Mobs.SKELETON || o.type == Mobs.CREEPER || o.type == Mobs.SPIDER || o.type == Mobs.MAGMA_CUBE
+            || (o.type == Mobs.ZOMBIE_PIGMAN || o.type == Mobs.ENDERMAN) && o.angry > 0;
+         if (!o.dead && foe) {
+            double d = (o.x - m.x) * (o.x - m.x) + (o.z - m.z) * (o.z - m.z);
+            if (d < best && Math.abs(o.y - m.y) < 5.0) {
+               best = d;
+               prey = o;
+            }
+         }
+      }
+
+      if (prey != null) {
+         double dx = prey.x - m.x;
+         double dz = prey.z - m.z;
+         double d2 = Math.sqrt(dx * dx + dz * dz);
+         m.hasTarget = true;
+         m.dirYaw = Mobs.angleTo(dx, dz);
+         in.headYaw = m.dirYaw;
+         in.moving = d2 > 2.0;
+         in.speed = 1.2;
+         if (d2 < 2.9 && Math.abs(prey.y - m.y) < 3.0 && m.cd <= 0) {
+            m.cd = 36;
+            m.attackAnim = 10;
+            ms.hurtMob(prey, 7 + ms.rnd.nextInt(10), m.x, m.z, 1.0, false);
+            prey.vy = 0.55;
+         }
+      } else {
+         leash(ms, m);
+         in.moving = m.moving;
+         in.speed = 0.5;
+      }
+   }
+
+   /** Gives every village near the player its villagers (once) - and an iron golem if it has enough houses. */
+   static void spawnVillagers(Mobs ms, World w, Player p) {
+      if (!Gen.extras || w.dim != Dim.OVERWORLD || p.dead) {
+         return;
+      }
+
+      int rx = Math.floorDiv((int)Math.floor(p.x), 320);
+      int rz = Math.floorDiv((int)Math.floor(p.z), 320);
+      for (int dx = -1; dx <= 1; dx++) {
+         for (int dz = -1; dz <= 1; dz++) {
+            Structs.Village v = w.gen.structs.village(rx + dx, rz + dz);
+            if (!v.valid) {
+               continue;
+            }
+
+            long key = (long)(rx + dx) << 32 ^ (rz + dz) & 4294967295L;
+            if (w.populated.contains(key) || Math.hypot(p.x - v.cx, p.z - v.cz) > 70.0 || !w.isLoaded(v.cx, v.cz)) {
+               continue;
+            }
+
+            int houses = 0;
+            for (Structs.Bld b : v.blds) {
+               if (b.type == 0 || b.type == 4 || b.type == 2) {
+                  houses++;
+               }
+            }
+
+            int n = Math.max(2, Math.min(6, houses / 2 + 1));
+            int placed = 0;
+            for (int tries = 0; tries < 60 && placed < n + (houses >= 5 ? 1 : 0); tries++) {
+               double a = ms.rnd.nextDouble() * Math.PI * 2.0;
+               double d = 3.0 + ms.rnd.nextDouble() * 16.0;
+               int x = v.cx + (int)Math.round(Math.cos(a) * d);
+               int z = v.cz + (int)Math.round(Math.sin(a) * d);
+               if (!w.isLoaded(x, z)) {
+                  continue;
+               }
+
+               for (int y = v.cy + 6; y > v.cy - 6; y--) {
+                  int below = w.getBlock(x, y - 1, z);
+                  if (Blocks.solid[below] && !Blocks.isFluid(below) && !Blocks.isLeaves(below) && free(w, x, y, z) && free(w, x, y + 1, z)) {
+                     boolean golem = placed == n;
+                     Mob m = ms.spawn(golem ? Mobs.IRON_GOLEM : Mobs.VILLAGER, x + 0.5, y, z + 0.5);
+                     if (!golem) {
+                        int[] jobs = new int[]{0, 0, 1, 2, 3, 4, 4, 5};
+                        m.color = jobs[ms.rnd.nextInt(jobs.length)];
+                     }
+
+                     m.hx = v.cx;
+                     m.hz = v.cz;
+                     m.hy = 1.0;
+                     placed++;
+                     break;
+                  }
+               }
+            }
+
+            if (placed > 0) {
+               w.populated.add(key);
+            }
+         }
+      }
    }
 
    // ------------------------------------------------------------------ the End

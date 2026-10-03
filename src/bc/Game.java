@@ -3108,7 +3108,18 @@ public final class Game {
    }
 
    /** Right-click on a mob with an item in hand: shear a sheep, or feed an animal (breeding / growing up). */
+   /** Update 3.12: right click on a villager opens its trades. */
+   boolean openTrade(Mob v) {
+      this.menu = new Menu(this, Menu.TRADE, null, v.color);
+      this.setScreen(Game.S.INV);
+      return true;
+   }
+
    boolean useOnMob(Mob var1, Stack var2) {
+      if (var1.type == Mobs.VILLAGER && !var1.dead && !this.player.spectator && !this.player.adventure) {
+         return this.openTrade(var1);
+      }
+
       if (var2 == null || var1.dead || this.player.adventure || this.player.spectator) {
          return false;
       }

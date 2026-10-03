@@ -21,6 +21,7 @@ final class Tests312 {
       fortress();
       stronghold();
       end();
+      villages();
    }
 
    static void deleteAll(File f) {
@@ -645,7 +646,7 @@ final class Tests312 {
    // ------------------------------------------------------------------ the mobs of the Nether
    static void netherMobs() {
       test("mob table: the new kinds are in every table, hostile / peaceful are told apart", () -> {
-         eq(15, Mobs.N, "fifteen mobs so far (the villagers come later)");
+         eq(17, Mobs.N, "seventeen mobs so far (the parrots come later)");
          for (int t = 0; t < Mobs.NAME.length; t++) {
             check(Mobs.NAME[t] != null && Mobs.HP[t] > 0 && Mobs.W[t] > 0 && Mobs.H[t] > 0 && (Mobs.SPD[t] > 0 || t == Mobs.END_CRYSTAL), "mob " + t + " has name, health, size and speed");
          }
@@ -668,7 +669,7 @@ final class Tests312 {
          // the models: every box fits into its texture, every part has a kind the renderer knows
          MobRender.Model[] models = new MobRender.Model[Mobs.N];
          MobModels312.build(models);
-         for (int t = Mobs.ZOMBIE_PIGMAN; t <= Mobs.END_CRYSTAL; t++) {
+         for (int t = Mobs.ZOMBIE_PIGMAN; t < Mobs.N; t++) {
             MobRender.Model m = models[t];
             check(m != null && m.parts.size() > 0, Mobs.NAME[t] + " has a model");
             for (MobRender.Part p : m.parts) {
@@ -1880,6 +1881,380 @@ final class Tests312 {
 
             deleteAll(dir);
          }
+      });
+   }
+
+   // ------------------------------------------------------------------ villages
+   static Structs.Village firstVillage(Gen gen, int minFarms) {
+      for (int rx = -2; rx <= 2; rx++) {
+         for (int rz = -2; rz <= 2; rz++) {
+            Structs.Village v = gen.structs.village(rx, rz);
+            if (v.valid) {
+               int farms = 0;
+               for (Structs.Bld b : v.blds) {
+                  if (b.type == 3) {
+                     farms++;
+                  }
+               }
+
+               if (farms >= minFarms) {
+                  return v;
+               }
+            }
+         }
+      }
+
+      return null;
+   }
+
+   static void villages() {
+      test("villages: farms with crops and water, a smithy, lamp posts - and none of it when the extras are off (the old villages stay as they were)", () -> {
+         boolean was = Gen.extras;
+         try {
+            Gen.extras = true;
+            Gen gen = new Gen(12345L);
+            Structs.Village v = firstVillage(gen, 2);
+            check(v != null, "a village with farms");
+            int farms = 0;
+            int smithies = 0;
+            for (Structs.Bld b : v.blds) {
+               if (b.type == 3) {
+                  farms++;
+                  check(b.w == 9 && b.d == 7 && b.y0 >= 64, "a farm of 9 x 7 on dry land");
+                  for (Structs.Bld o : v.blds) {
+                     if (o != b) {
+                        check(!(b.bx1 + 2 >= o.bx0 && b.bx0 - 2 <= o.bx1 && b.bz1 + 2 >= o.bz0 && b.bz0 - 2 <= o.bz1), "farms do not touch other buildings");
+                     }
+                  }
+               } else if (b.type == 4) {
+                  smithies++;
+               }
+            }
+
+            check(farms >= 2 && farms <= 4, "two to four farms: " + farms);
+            eq(1, smithies, "one smithy");
+            check(v.lamps.size() >= 8, "lamp posts: " + v.lamps.size());
+            // the same village without the extras
+            Gen.extras = false;
+            Gen strict = new Gen(12345L);
+            Structs.Village old = strict.structs.village(v.cx >= 0 ? v.cx / 320 : -1 - (-v.cx - 1) / 320, v.cz >= 0 ? v.cz / 320 : -1 - (-v.cz - 1) / 320);
+            check(old.valid && old.cx == v.cx && old.cz == v.cz, "the same village in the same place");
+            eq(0, old.lamps.size(), "no lamps in the old villages");
+            int oldBuildings = 0;
+            for (Structs.Bld b : old.blds) {
+               check(b.type != 3 && b.type != 4, "no new building types");
+               oldBuildings++;
+            }
+
+            check(oldBuildings + farms == v.blds.size(), "the new village has all the old buildings and the farms: " + oldBuildings + " + " + farms + " = " + v.blds.size());
+            for (int i = 0; i < old.blds.size(); i++) {
+               Structs.Bld a = old.blds.get(i);
+               Structs.Bld b = v.blds.get(i);
+               check(a.x0 == b.x0 && a.z0 == b.z0 && a.w == b.w && a.d == b.d && a.dir == b.dir && a.y0 == b.y0, "building " + i + " is where it was");
+            }
+         } finally {
+            Gen.extras = was;
+         }
+      });
+
+      test("a farm in the generated world: wet farmland, crops, a channel of water, a fence with a gate, torches; the lamp posts", () -> {
+         boolean was = Gen.extras;
+         try {
+            Gen.extras = true;
+            Gen gen = new Gen(12345L);
+            Structs.Village v = firstVillage(gen, 1);
+            Structs.Bld f = null;
+            for (Structs.Bld b : v.blds) {
+               if (b.type == 3) {
+                  f = b;
+               }
+            }
+
+            int cx0 = Math.floorDiv(f.bx0 - 2, 16);
+            int cx1 = Math.floorDiv(f.bx1 + 2, 16);
+            int cz0 = Math.floorDiv(f.bz0 - 2, 16);
+            int cz1 = Math.floorDiv(f.bz1 + 2, 16);
+            Chunk[][] cs = new Chunk[cz1 - cz0 + 1][cx1 - cx0 + 1];
+            for (int cz = cz0; cz <= cz1; cz++) {
+               for (int cx = cx0; cx <= cx1; cx++) {
+                  cs[cz - cz0][cx - cx0] = gen.generate(cx, cz);
+               }
+            }
+
+            int wet = 0;
+            int crops = 0;
+            int ripe = 0;
+            int water = 0;
+            int fence = 0;
+            int torches = 0;
+            for (int x = f.bx0; x <= f.bx1; x++) {
+               for (int z = f.bz0; z <= f.bz1; z++) {
+                  int ground = at(cs, cx0, cz0, x, f.y0, z);
+                  if (ground == Blocks.FARMLAND_WET) {
+                     wet++;
+                  } else if (ground == Blocks.WATER) {
+                     water++;
+                  }
+
+                  int above = at(cs, cx0, cz0, x, f.y0 + 1, z);
+                  if (above >= Blocks.WHEAT && above <= Blocks.POTATO0 + 7) {
+                     crops++;
+                     if (above == Blocks.WHEAT + 7 || above == Blocks.CARROT0 + 7 || above == Blocks.POTATO0 + 7) {
+                        ripe++;
+                     }
+                  } else if (above == Blocks.FENCE) {
+                     fence++;
+                  }
+
+                  if (at(cs, cx0, cz0, x, f.y0 + 3, z) == Blocks.TORCH) {
+                     torches++;
+                  }
+               }
+            }
+
+            check(wet >= 20, "wet farmland: " + wet);
+            check(crops >= 20, "crops: " + crops);
+            check(ripe >= 1, "some of them ripe: " + ripe);
+            check(water >= 5, "a channel of water: " + water);
+            check(fence >= 14, "a fence: " + fence);
+            eq(4, torches, "a torch on every corner post");
+            int lampsFound = 0;
+            for (int[] lamp : v.lamps) {
+               Chunk c = null;
+               int lcx = Math.floorDiv(lamp[0], 16);
+               int lcz = Math.floorDiv(lamp[1], 16);
+               c = gen.generate(lcx, lcz);
+               for (int y = 120; y > 50; y--) {
+                  int id = c.get(lamp[0] - lcx * 16, y, lamp[1] - lcz * 16);
+                  if (id == Blocks.TORCH && c.get(lamp[0] - lcx * 16, y - 1, lamp[1] - lcz * 16) == Blocks.FENCE && c.get(lamp[0] - lcx * 16, y - 3, lamp[1] - lcz * 16) == Blocks.FENCE) {
+                     lampsFound++;
+                     break;
+                  }
+               }
+
+               if (lampsFound >= 3) {
+                  break;
+               }
+            }
+
+            check(lampsFound >= 3, "lamp posts of three fences and a torch: " + lampsFound);
+         } finally {
+            Gen.extras = was;
+         }
+      });
+
+      test("villagers and iron golems appear in a village once (and are kept), a farmer is hit or a zombie comes near: they run; the golem fights", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("village").toFile();
+         boolean was = Gen.extras;
+         Game g = null;
+         try {
+            Gen.extras = true;
+            g = newGame(0);
+            g.world.shutdown();
+            World w = new World(12345L, dir);
+            w.saveEnabled = true;
+            g.world = w;
+            w.game = g;
+            g.rootDir = dir;
+            g.screen = Game.S.PLAY;
+            g.mobs.rnd.setSeed(42L);
+            Structs.Village v = firstVillage(w.gen, 1);
+            load(w, v.cx >> 4, v.cz >> 4, 3);
+            g.player.setMode(0);
+            g.player.setPos(v.cx + 30.5, v.cy + 3, v.cz + 0.5);
+            Mobs312.spawnVillagers(g.mobs, w, g.player);
+            int villagers = 0;
+            int golems = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.VILLAGER) {
+                  villagers++;
+                  check(m.color >= 0 && m.color <= 5, "a profession");
+                  check(Math.hypot(m.x - v.cx, m.z - v.cz) < 25.0, "inside the village");
+                  check(!Phys.collides(w, m.bb), "not inside a block");
+               } else if (m.type == Mobs.IRON_GOLEM) {
+                  golems++;
+               }
+            }
+
+            check(villagers >= 2 && villagers <= 6, "two to six villagers: " + villagers);
+            check(golems <= 1, "at most one golem: " + golems);
+            check(w.populated.size() == 1, "the village is marked");
+            int before = g.mobs.list.size();
+            Mobs312.spawnVillagers(g.mobs, w, g.player);
+            eq(before, g.mobs.list.size(), "only once");
+            // far away: they are not lost
+            g.player.setPos(v.cx + 400.0, v.cy + 3, v.cz);
+            for (int i = 0; i < 5; i++) {
+               g.mobs.tick();
+            }
+
+            int still = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.VILLAGER || m.type == Mobs.IRON_GOLEM) {
+                  still++;
+               }
+            }
+
+            eq(villagers + golems, still, "300 blocks away they are still in the list");
+            g.mobs.save(w.dir);
+            w.saveAll();
+            check(new File(dir, "villages.dat").exists(), "villages.dat");
+            g.mobs.clear();
+            g.mobs.load(w.dir);
+            int loaded = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.VILLAGER) {
+                  loaded++;
+               }
+            }
+
+            eq(villagers, loaded, "saved and loaded again - however far you were");
+            World again = new World(12345L, dir);
+            check(again.populated.size() == 1, "the village is remembered as populated");
+            again.shutdown();
+            // behaviour: a zombie nearby makes a villager run away
+            g.player.setPos(v.cx + 0.5, v.cy + 3, v.cz + 30.5);
+            g.mobs.clear();
+            load(w, v.cx >> 4, v.cz >> 4, 3);
+            double gy = v.cy + 1;
+            int sx = v.cx + 40;
+            int sz = v.cz - 40;
+            for (int x = sx - 6; x <= sx + 6; x++) {
+               for (int z = sz - 6; z <= sz + 6; z++) {
+                  for (int y = v.cy + 1; y <= v.cy + 8; y++) {
+                     w.setBlock(x, y, z, 0);
+                  }
+
+                  w.setBlock(x, v.cy, z, Blocks.STONE);
+               }
+            }
+
+            Mobs.Mob vil = g.mobs.spawn(Mobs.VILLAGER, sx + 0.5, gy, sz + 0.5);
+            vil.hx = sx;
+            vil.hz = sz;
+            vil.hy = 1.0;
+            Mobs.Mob z = g.mobs.spawn(Mobs.ZOMBIE, sx + 4.5, gy, sz + 0.5);
+            double d0 = Math.hypot(vil.x - z.x, vil.z - z.z);
+            g.player.setPos(sx + 0.5, gy, sz + 20.5);
+            for (int i = 0; i < 40; i++) {
+               g.mobs.tick();
+               z.x = sx + 4.5;
+               z.z = sz + 0.5;
+               z.setPos(z.x, z.y, z.z);
+            }
+
+            check(Math.hypot(vil.x - z.x, vil.z - z.z) > d0 + 2.0 || Math.hypot(vil.x - sx, vil.z - sz) > 4.0, "the villager ran away from the zombie");
+            g.mobs.list.remove(z);
+            // a golem breaks a zombie
+            Mobs.Mob gol = g.mobs.spawn(Mobs.IRON_GOLEM, sx - 3.5, gy, sz + 0.5);
+            gol.hx = sx;
+            gol.hz = sz;
+            gol.hy = 1.0;
+            Mobs.Mob zom = g.mobs.spawn(Mobs.ZOMBIE, sx + 3.5, gy, sz + 0.5);
+            for (int i = 0; i < 200 && !zom.dead; i++) {
+               g.mobs.tick();
+               g.player.health = 20;
+            }
+
+            check(zom.dead, "the golem killed the zombie");
+            check(gol.health == 100, "and was not hurt");
+            // hurt a villager: it runs
+            Mobs.Mob victim = g.mobs.spawn(Mobs.VILLAGER, sx + 0.5, gy, sz - 4.5);
+            victim.hx = sx;
+            victim.hz = sz;
+            victim.hy = 1.0;
+            g.mobs.hurtMob(victim, 1, sx + 0.5, sz - 2.5, 0.0, true);
+            check(victim.flee > 0 && victim.angry == 0, "it runs, it does not fight back");
+            check(!Mobs.hostile(Mobs.VILLAGER) && !Mobs.hostile(Mobs.IRON_GOLEM), "neither is a monster");
+         } finally {
+            Gen.extras = was;
+            if (g != null && g.world != null) {
+               g.world.shutdown();
+            }
+
+            deleteAll(dir);
+         }
+      });
+
+      test("trading: right click on a villager opens its trades; click the goods to buy; the price comes out of the inventory; emeralds are the money", () -> {
+         Game g = newGame(0);
+         g.player.setMode(0);
+         Mobs.Mob v = g.mobs.spawn(Mobs.VILLAGER, 10.5, GROUND + 1, 10.5);
+         v.color = Trades.FARMER;
+         check(g.useOnMob(v, null), "an empty hand is enough to talk to a villager");
+         eq(Game.S.INV, g.screen, "the trade screen is open");
+         eq(Menu.TRADE, g.menu.kind, "it is the trade menu");
+         eq("Farmer", g.menu.title, "titled by the profession");
+         eq(6, g.menu.trades.length, "six trades");
+         eq(18 + 36, g.menu.slots.size(), "three slots a trade and the inventory");
+         Menu.Slot buy = null;
+         for (Menu.Slot s : g.menu.slots) {
+            if (s.type == 7 && s.armorPiece == 0) {
+               buy = s;
+            }
+         }
+
+         check(buy != null && g.menu.stackIn(buy).id == Items.EMERALD, "the first trade gives an emerald");
+         g.menu.click(buy, 0, false);
+         eq(0, g.countItem(Items.EMERALD), "nothing to pay with: nothing happens");
+         g.inv[0] = new Stack(Items.WHEAT, 40);
+         g.menu.click(buy, 0, false);
+         eq(22, g.countItem(Items.WHEAT), "18 wheat paid");
+         eq(1, g.countItem(Items.EMERALD), "an emerald in return");
+         g.menu.click(buy, 0, false);
+         eq(4, g.countItem(Items.WHEAT), "again");
+         eq(2, g.countItem(Items.EMERALD), "two emeralds");
+         g.menu.click(buy, 0, false);
+         eq(4, g.countItem(Items.WHEAT), "not enough wheat for a third");
+         // buying with emeralds
+         Menu.Slot bread = null;
+         for (Menu.Slot s : g.menu.slots) {
+            if (s.type == 7 && s.armorPiece == 3) {
+               bread = s;
+            }
+         }
+
+         g.menu.click(bread, 0, false);
+         eq(1, g.countItem(Items.EMERALD), "an emerald for bread");
+         eq(4, g.countItem(Items.BREAD), "four loaves");
+         g.menu.close();
+         // every profession has trades, the nitwit has none, and every trade is possible
+         for (int p = 0; p < 5; p++) {
+            Trades.Trade[] t = Trades.offers(p);
+            check(t.length >= 4 && t.length <= 6, Trades.name(p) + " has " + t.length + " trades");
+            for (Trades.Trade tr : t) {
+               check(tr.an > 0 && tr.outN > 0 && Items.name(tr.out) != null && Items.name(tr.a) != null, Trades.name(p) + ": a complete trade");
+               check(tr.a == Items.EMERALD || tr.out == Items.EMERALD, Trades.name(p) + ": emeralds on one side");
+            }
+         }
+
+         eq(0, Trades.offers(Trades.NITWIT).length, "the nitwit has nothing to trade");
+         // the smith sells iron tools for emeralds
+         g.inv[0] = new Stack(Items.EMERALD, 20);
+         Menu m = new Menu(g, Menu.TRADE, null, Trades.SMITH);
+         Menu.Slot sword = null;
+         for (Menu.Slot s : m.slots) {
+            if (s.type == 7 && s.armorPiece == 3) {
+               sword = s;
+            }
+         }
+
+         int e0 = g.countItem(Items.EMERALD);
+         m.click(sword, 0, false);
+         eq(e0 - 7, g.countItem(Items.EMERALD), "an iron sword costs seven");
+         check(g.countItem(Items.toolId(4, 2)) == 1, "and there it is");
+         // creative: free
+         g.player.setMode(1);
+         int emeralds = g.countItem(Items.EMERALD);
+         m.click(sword, 0, false);
+         eq(emeralds, g.countItem(Items.EMERALD), "creative players pay nothing");
+         // the priest sells an ender pearl
+         boolean pearl = false;
+         for (Trades.Trade tr : Trades.offers(Trades.PRIEST)) {
+            pearl |= tr.out == Items.ENDER_PEARL;
+         }
+
+         check(pearl, "the priest sells ender pearls: the way to the End is open without a single enderman");
       });
    }
 }

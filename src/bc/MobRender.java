@@ -616,6 +616,14 @@ public final class MobRender {
                   } else {
                      GL11.glRotatef(-var18 * var30, 1.0F, 0.0F, 0.0F);
                   }
+               } else if (var0.type == Mobs.IRON_GOLEM) {
+                  // both arms swing with the step; a punch throws them up and over
+                  float up = -var18 * var30 * 0.55F;
+                  if (var0.attackAnim > 0) {
+                     up = -100.0F + (10 - (var0.attackAnim - var3)) * 7.0F;
+                  }
+
+                  GL11.glRotatef(up, 1.0F, 0.0F, 0.0F);
                } else if (var0.type == Mobs.ENDERMAN) {
                   // the long arms hang and swing; when it is angry they come up and flail
                   float up = var0.hasTarget ? -55.0F + (float)Math.sin((var0.age + var3) * 0.5F + var30) * 9.0F : -var18 * var30 * 0.4F;
@@ -706,6 +714,10 @@ public final class MobRender {
                float[] skin = new float[]{var12[0] * 244.0F / 230.0F, var12[1] * 190.0F / 230.0F, var12[2] * 175.0F / 230.0F};
                drawBox(var10, var28, var11, skin);
             }
+         } else if (var0.type == Mobs.VILLAGER && var28.color == MobModels312.ROBE_MARK) {
+            int rgb = Trades.ROBE[Math.max(0, Math.min(Trades.ROBE.length - 1, var0.color))];
+            float[] robe = new float[]{var12[0] * (rgb >> 16 & 0xFF) / 230.0F, var12[1] * (rgb >> 8 & 0xFF) / 230.0F, var12[2] * (rgb & 0xFF) / 230.0F};
+            drawBox(var10, var28, var11, robe);
          } else if (var0.type == 2 && var28.color == 15132390 && !var20) {
             int var31 = SHEEP_RGB[var0.color];
             float[] var33 = new float[]{var12[0] * (var31 >> 16 & 0xFF) / 230.0F, var12[1] * (var31 >> 8 & 0xFF) / 230.0F, var12[2] * (var31 & 0xFF) / 230.0F};

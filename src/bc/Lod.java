@@ -616,7 +616,11 @@ public final class Lod {
                   continue; // Update 3.11: the chunk in the middle of the house was changed - what is really there is part of the surface
                }
 
-               if (var9.type == 1) {
+               if (var9.type == 3) {
+                  // Update 3.12: a farm is a flat green field with a fence round it
+                  box(var2, var9.bx0 - var4, var9.y0 - 4, var9.bz0 - var5, var9.bx1 + 1 - var4, var9.y0 + 1, var9.bz1 + 1 - var5, 4958260, 0.02F);
+                  box(var2, var9.bx0 - var4, var9.y0 + 1, var9.bz0 - var5, var9.bx1 + 1 - var4, var9.y0 + 2, var9.bz1 + 1 - var5, 8283680, 0.03F);
+               } else if (var9.type == 1) {
                   int var25 = var9.desert ? 14208152 : 8026746;
                   box(var2, var9.x0 - var4, var9.y0 - 4, var9.z0 - var5, var9.x0 + 3 - var4, var9.y0 + 1, var9.z0 + 3 - var5, var25, 0.02F);
                   int[][] var26 = new int[][]{{0, 0}, {2, 0}, {0, 2}, {2, 2}};
