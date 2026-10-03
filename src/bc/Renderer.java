@@ -1548,7 +1548,7 @@ public final class Renderer {
    /** Update 3.11: a torch, flower, ladder ... in the hand is its tile as a sprite, like Minecraft's flat items. */
    static boolean flatBlock(int id) {
       int k = Blocks.kind[id];
-      return k == 1 || k == 7 || Blocks.isLadder(id) || id == 32 || Blocks.isWallTorch(id);
+      return k == 1 || k == 7 || Blocks.isLadder(id) || id == 32 || Blocks.isWallTorch(id) || Blocks313.flatItem(id);
    }
 
    static void drawFlatBlock(int id, float bright) {
@@ -1587,7 +1587,7 @@ public final class Renderer {
       int var2 = Blocks.kind[var0];
       int[] var3 = Gui.tintFor(var0);
       GL11.glBegin(7);
-      if (var2 != 1 && var2 != 7 && !Blocks.isLadder(var0) && var0 != 32 && !Blocks.isWallTorch(var0)) {
+      if (var2 != 1 && var2 != 7 && !Blocks.isLadder(var0) && var0 != 32 && !Blocks.isWallTorch(var0) && !Blocks313.flatItem(var0)) {
          float[] var22 = new float[2];
          double[][] var23 = Gui.iconBoxes(var0);
          if (var23 == null) {

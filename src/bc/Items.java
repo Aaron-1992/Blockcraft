@@ -234,7 +234,7 @@ public final class Items {
       if (var2 == 0) {
          return false;
       } else {
-         return var2 != 4 ? Blocks.mineClass[var1] == var2 : var1 == 12 || Blocks.isLeaves(var1) || var1 == 29;
+         return var2 != 4 ? Blocks.mineClass[var1] == var2 : var1 == 12 || Blocks.isLeaves(var1) || var1 == 29 || Blocks313.shearable(var1);
       }
    }
 

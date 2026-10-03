@@ -181,34 +181,11 @@ public final class Lod {
             if (sea) {
                float d = Math.min(1.0F, (63 - col.h) / 30.0F);
                c = (int)(58.0F * (1.0F - d * 0.6F)) << 16 | (int)(104.0F * (1.0F - d * 0.5F)) << 8 | (int)(208.0F * (1.0F - d * 0.4F));
-            } else {
-               switch (col.biome) {
-                  case 1:
-                     c = 14735012;
-                     break;
-                  case 2:
-                  default:
-                     c = shade(Gen.grassColorFor(col.t, col.hu), 0.8F);
-                     break;
-                  case 3:
-                     int g = Gen.grassColorFor(col.t, col.hu);
-                     c = (int)((g >> 16 & 0xFF) * 0.72F) << 16 | (int)((g >> 8 & 0xFF) * 0.76F) << 8 | (int)((g & 0xFF) * 0.72F);
-                     break;
-                  case 4:
-                     c = 14931876;
-                     break;
-                  case 5:
-                     c = 15594485;
-                     break;
-                  case 6:
-                     if (col.h > 125) {
-                        c = 15791350;
-                     } else if (col.h > 98) {
-                        c = 9079434;
-                     } else {
-                        c = shade(Gen.grassColorFor(col.t, col.hu), 0.8F);
-                     }
+               if (col.biome > 6) {
+                  c = Biomes.lodWater(col.biome, c);
                }
+            } else {
+               c = Biomes.lodColor(col.biome, col.h, col.t, col.hu);
             }
 
             if (!sea && cs <= 4 && villages != null) {

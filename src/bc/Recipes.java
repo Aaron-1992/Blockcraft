@@ -16,6 +16,8 @@ public final class Recipes {
          return var1 == 0;
       } else if (var0 == -1) {
          return Blocks.isLog(var1);
+      } else if (var0 == 5) {
+         return Blocks313.isPlanks(var1); // Update 3.13: every kind of planks counts as planks
       } else {
          return var0 != -3 ? var0 == var1 : var1 >= 34 && var1 < 50;
       }
@@ -173,6 +175,10 @@ public final class Recipes {
       int var0 = 5;
       int var1 = 256;
       int var2 = 4;
+      for (int sp = 0; sp < 6; sp++) {
+         shapeless(Blocks313.plank(sp), 4, Blocks.WOOD_LOG[sp]); // Update 3.13: a log gives the planks of its own wood
+      }
+
       shapeless(5, 4, -1);
       shaped(256, 4, new String[]{"P", "P"}, 'P', Integer.valueOf(var0));
       shaped(66, 1, new String[]{"PP", "PP"}, 'P', Integer.valueOf(var0));
@@ -258,6 +264,22 @@ public final class Recipes {
       for (int var8 : new int[]{9, 10, 11, 5, 66, 69}) {
          fuel.put(var8, 300);
       }
+
+      // ---- Update 3.13 ----
+      for (int sp = 3; sp < 6; sp++) {
+         smelt.put(Blocks.WOOD_LOG[sp], new Stack(257, 1));
+         fuel.put(Blocks.WOOD_LOG[sp], 300);
+      }
+
+      for (int sp = 1; sp < 6; sp++) {
+         fuel.put(Blocks313.plank(sp), 300);
+      }
+
+      shaped(Blocks313.DIORITE, 2, new String[]{"CQ", "QC"}, 'C', Blocks.COBBLE, 'Q', Items.QUARTZ);
+      shapeless(Blocks313.GRANITE, 2, Blocks313.DIORITE, Items.QUARTZ);
+      shapeless(Blocks313.ANDESITE, 2, Blocks313.DIORITE, Blocks.COBBLE);
+      shaped(Blocks313.RED_SANDSTONE, 1, new String[]{"SS", "SS"}, 'S', Blocks313.RED_SAND);
+      shapeless(Blocks313.PACKED_ICE, 1, Blocks313.ICE, Blocks313.ICE, Blocks313.ICE, Blocks313.ICE);
 
       fuel.put(256, 100);
       fuel.put(268, 300);

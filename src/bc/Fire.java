@@ -49,15 +49,15 @@ final class Fire {
 
    /** How likely a block is to be consumed by neighbouring fire (Minecraft's "flammability"); 0 = does not burn. */
    static int flammability(int id) {
-      if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96 || id == Blocks.SLAB_TOP0 || id >= Blocks.STAIR_TOP0 && id <= Blocks.STAIR_TOP0 + 3) {
+      if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96 || id == Blocks.SLAB_TOP0 || id >= Blocks.STAIR_TOP0 && id <= Blocks.STAIR_TOP0 + 3 || Blocks313.isPlanks(id)) {
          return 20;
-      } else if (Blocks.isAnyLog(id)) {
+      } else if (Blocks.isAnyLog(id) || id == Blocks313.MUSH_STEM) {
          return 5;
-      } else if (id >= 12 && id <= 14 || id >= 34 && id <= 49) {
+      } else if (Blocks.isLeaves(id) || id >= 34 && id <= 49 || Blocks313.isVine(id)) {
          return 60;
       } else if (id == 160 || id == 158) {
          return 20;
-      } else if (id == 132 || id == 29 || id == 30 || id == 31) {
+      } else if (id == 132 || id == 29 || id == 30 || id == 31 || id == Blocks313.FERN || id == Blocks313.DEAD_BUSH || Blocks313.isFlower(id) || Blocks313.isDouble(id)) {
          return 100;
       } else {
          return 0;

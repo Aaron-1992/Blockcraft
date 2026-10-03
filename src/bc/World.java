@@ -80,15 +80,23 @@ public final class World {
    private final double[] res = new double[3];
    static final double[] FULL;
    public boolean rayFluids;
+   /** Update 3.13: what the world was created with (generator type, structures). */
+   public final WorldSettings settings;
 
    public World(long var1, File var3) {
       this(var1, var3, Dim.OVERWORLD);
    }
 
    public World(long var1, File var3, int dimension) {
+      this(var1, var3, dimension, WorldSettings.classic());
+   }
+
+   /** Update 3.13: the world settings pick the Overworld generator (old worlds and the tests use the classic one). */
+   public World(long var1, File var3, int dimension, WorldSettings st) {
       this.seed = var1;
       this.dim = dimension;
-      this.gen = Dim.makeGen(dimension, var1);
+      this.settings = st == null ? WorldSettings.classic() : st;
+      this.gen = Dim.makeGen(dimension, var1, this.settings);
       this.weather = new Weather(this);
       if (dimension != Dim.OVERWORLD) {
          this.weather.enabled = false;
@@ -771,6 +779,7 @@ public final class World {
                this.scheduleFluid(var5, var6, var7, Blocks.isWater(var8) ? 5 : 30);
             } else if (var8 == 7
                || var8 == 8
+               || Blocks313.needsUpdate(var8)
                || Color312.isPowder(var8)
                || Blocks.kind[var8] == 1
                || Blocks.isLadder(var8)
@@ -1039,6 +1048,72 @@ public final class World {
 
    private void blockUpdate(int var1, int var2, int var3) {
       int var4 = this.getBlock(var1, var2, var3);
+      if (Blocks313.isDouble(var4)) {
+         // Update 3.13: tall plants are two blocks: the upper half needs the lower one, the lower one needs ground and the upper half
+         if (Blocks313.isDoubleUpper(var4)) {
+            if (this.getBlock(var1, var2 - 1, var3) != var4 - 1) {
+               this.setBlock(var1, var2, var3, 0);
+            }
+         } else {
+            int ground = this.getBlock(var1, var2 - 1, var3);
+            if (!Blocks.solid[ground] || ground == 28 || this.getBlock(var1, var2 + 1, var3) != var4 + 1) {
+               int item = Blocks.drop[var4];
+               this.setBlock(var1, var2, var3, 0);
+               if (item != 0) {
+                  this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, item, 1);
+               }
+            }
+         }
+
+         return;
+      }
+
+      if (var4 == Blocks313.LILY_PAD) {
+         int below = this.getBlock(var1, var2 - 1, var3);
+         if (!Blocks.isWater(below) || Blocks.fluidLevel(below) != 0) {
+            this.setBlock(var1, var2, var3, 0);
+            this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Blocks313.LILY_PAD, 1);
+         }
+
+         return;
+      }
+
+      if (var4 == Blocks313.SNOW_LAYER) {
+         int below = this.getBlock(var1, var2 - 1, var3);
+         if (!Blocks.solid[below] || Blocks.kind[below] != 0 || below == Blocks313.ICE) {
+            this.setBlock(var1, var2, var3, 0);
+         }
+
+         return;
+      }
+
+      if (Blocks313.isVine(var4)) {
+         int mask = var4 - Blocks313.VINE0;
+         int keep = 0;
+         int[] dxs = new int[]{0, 1, 0, -1};
+         int[] dzs = new int[]{-1, 0, 1, 0};
+         for (int side = 0; side < 4; side++) {
+            int nb = this.getBlock(var1 + dxs[side], var2, var3 + dzs[side]);
+            if (Blocks.opaque[nb] && Blocks.solid[nb]) {
+               keep |= 1 << side;
+            }
+         }
+
+         int above = this.getBlock(var1, var2 + 1, var3);
+         if (Blocks313.isVine(above)) {
+            keep |= above - Blocks313.VINE0;
+         }
+
+         keep &= mask;
+         if (keep == 0) {
+            this.setBlock(var1, var2, var3, 0);
+         } else if (keep != mask) {
+            this.setBlock(var1, var2, var3, Blocks313.VINE0 + keep);
+         }
+
+         return;
+      }
+
       if (Blocks.isLadder(var4)) {
          int var18 = var4 - 119;
          int var23 = var1 + (var18 == 2 ? 1 : (var18 == 3 ? -1 : 0));
@@ -1092,7 +1167,7 @@ public final class World {
             this.setBlock(var1, var2, var3, 0);
          }
       } else {
-         if (var4 != 7 && var4 != 8 && !Color312.isPowder(var4)) {
+         if (var4 != 7 && var4 != 8 && var4 != Blocks313.RED_SAND && !Color312.isPowder(var4)) {
             if (Blocks.kind[var4] == 1 || var4 == 32) {
                int var15 = this.getBlock(var1, var2 - 1, var3);
                if (!Blocks.solid[var15] || var15 == 28) {

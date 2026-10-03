@@ -95,7 +95,7 @@ public final class Structs {
          var6 = var1 * var5 + 70 + var4.nextInt(var5 - 140);
          var7 = var2 * var5 + 70 + var4.nextInt(var5 - 140);
          Col var11 = this.gen.column(var6, var7);
-         if ((var11.biome == 2 || var11.biome == 4) && var11.h >= 65 && var11.h <= 90) {
+         if (Biomes.village(var11.biome) && var11.h >= 65 && var11.h <= 90) {
             boolean var12 = true;
 
             for (int[] var16 : new int[][]{{12, 0}, {-12, 0}, {0, 12}, {0, -12}}) {

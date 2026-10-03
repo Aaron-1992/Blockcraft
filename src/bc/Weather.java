@@ -436,15 +436,7 @@ public final class Weather {
          }
       }
 
-      if (biome == Gen.DESERT) {
-         return -1;
-      }
-
-      if (biome == Gen.TUNDRA || biome == 6 && h >= 112) {
-         return 2;
-      }
-
-      return 1;
+      return Biomes.precipitation(biome, h);
    }
 
    /** Highest storm and thunderhead within about 5.4 km of (px, pz): the cloud shader only has to march the tall slab when there is one. */

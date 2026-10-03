@@ -72,6 +72,7 @@ final class TexExtra {
       TexArt37.blocks();
       TexArt310.blocks();
       TexArt312.blocks();
+      TexArt313.blocks();
 
       for (int var2 = 256; var2 < Blocks.EXT0; var2++) {
          if (Items.name[var2] != null) {

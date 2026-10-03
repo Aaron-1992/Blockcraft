@@ -890,6 +890,10 @@ public final class Game {
       var0.delete();
    }
 
+   /** Update 3.13: the settings the Create New World screen is building, and those of the world that is open. */
+   WorldSettings newSettings = new WorldSettings();
+   WorldSettings worldSettings = WorldSettings.classic();
+
    void startWorld(boolean var1, String var2, int var3) {
       Properties var4 = new Properties();
       String var5 = this.newName;
@@ -949,7 +953,22 @@ public final class Game {
       this.portalTime = 0;
       this.portalLock = false;
       this.arrivalAt = null;
-      this.world = new World(var6, Dim.dir(var8, startDim), startDim);
+      WorldSettings ws;
+      if (var1) {
+         ws = this.newSettings.copy();
+         if (System.getProperty("bc.auto") != null) {
+            // the screenshot and test scenes were made on the classic terrain: they keep it unless a scene asks for another type
+            ws.type = Integer.parseInt(System.getProperty("bc.gen", "0"));
+            ws.flat = Integer.parseInt(System.getProperty("bc.flat", "0"));
+            ws.structures = !"false".equals(System.getProperty("bc.structs", "true"));
+            ws.bonusChest = "true".equals(System.getProperty("bc.bonus", "false"));
+         }
+      } else {
+         ws = WorldSettings.load(var4);
+      }
+
+      this.worldSettings = ws;
+      this.world = new World(var6, Dim.dir(var8, startDim), startDim, ws);
       this.world.game = this;
       this.rend.setLod(this.world);
       this.mobs.clear();
@@ -1106,6 +1125,7 @@ public final class Game {
          var1.setProperty("sat", this.player.sat + "");
          var1.setProperty("flying", this.player.flying + "");
          var1.setProperty("time", this.world.dayTime + "");
+         this.worldSettings.save(var1);
          var1.setProperty("spawnx", this.spawnXZ[0] + "");
          var1.setProperty("spawnz", this.spawnXZ[1] + "");
          this.storeFireSetting(var1);
@@ -1171,7 +1191,7 @@ public final class Game {
 
       old.chunks.clear();
       old.shutdown();
-      World nw = new World(old.seed, Dim.dir(this.rootDir != null ? this.rootDir : old.dir, dim), dim);
+      World nw = new World(old.seed, Dim.dir(this.rootDir != null ? this.rootDir : old.dir, dim), dim, this.worldSettings);
       nw.game = this;
       nw.saveEnabled = old.saveEnabled;
       nw.dayTime = old.dayTime;
@@ -3083,6 +3103,10 @@ public final class Game {
          }
 
          this.world.setBlock(var1, var2, var3, 0);
+         if (var4 == Blocks313.ICE && !this.player.creative && this.world.getBlock(var1, var2 - 1, var3) != 0) {
+            this.world.setBlock(var1, var2, var3, Blocks.WATER); // Update 3.13: broken ice melts to water
+         }
+
          if (Blocks.isDoor(var4)) {
             int var13 = Blocks.isDoorLo(var4) ? var2 + 1 : var2 - 1;
             if (Blocks.isDoor(this.world.getBlock(var1, var13, var3))) {
@@ -3658,8 +3682,94 @@ public final class Game {
       }
    }
 
+   /** Update 3.13: a lily pad goes on the surface of a still water block, whichever face of it you aim at. */
+   boolean placeLily(Stack s) {
+      double yaw = Math.toRadians(this.player.yaw);
+      double pitch = Math.toRadians(this.player.pitch);
+      this.world.rayFluids = true;
+      Hit h = this.world.raycast(this.player.x, this.player.y + this.player.eye, this.player.z, -Math.sin(yaw) * Math.cos(pitch), -Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch),
+         this.player.creative ? 5.0 : 4.5);
+      this.world.rayFluids = false;
+      if (h == null) {
+         return false;
+      }
+
+      int below = this.world.getBlock(h.x, h.y, h.z);
+      if (!Blocks.isWater(below) || Blocks.fluidLevel(below) != 0 || h.y + 1 > 255) {
+         return false;
+      }
+
+      int at = this.world.getBlock(h.x, h.y + 1, h.z);
+      if (at != 0 && !Blocks.replaceable[at]) {
+         return false;
+      }
+
+      if (!this.world.setBlock(h.x, h.y + 1, h.z, Blocks313.LILY_PAD)) {
+         return false;
+      }
+
+      this.meshNow(h.x, h.y + 1, h.z);
+      if (!this.player.creative) {
+         s.n--;
+         if (s.n <= 0) {
+            this.inv[this.sel] = null;
+         }
+      }
+
+      return true;
+   }
+
+   /** Update 3.13: a vine clings to the side of a block: the cell next to the face you aim at gets a vine on its wall side. */
+   boolean placeVine(Stack s) {
+      if (this.target == null || this.target.ny != 0) {
+         return false;
+      }
+
+      int x = this.target.x + this.target.nx;
+      int y = this.target.y;
+      int z = this.target.z + this.target.nz;
+      int wall = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+      if (!Blocks.opaque[wall] || !Blocks.solid[wall]) {
+         return false;
+      }
+
+      int bit = this.target.nz < 0 ? 4 : (this.target.nz > 0 ? 1 : (this.target.nx > 0 ? 8 : 2));
+      int at = this.world.getBlock(x, y, z);
+      int id;
+      if (Blocks313.isVine(at)) {
+         id = at | bit;
+         id = Blocks313.VINE0 + (id - Blocks313.VINE0 | bit);
+      } else if (at == 0 || Blocks.replaceable[at]) {
+         id = Blocks313.VINE0 + bit;
+      } else {
+         return false;
+      }
+
+      if (!this.world.setBlock(x, y, z, id)) {
+         return false;
+      }
+
+      this.meshNow(x, y, z);
+      if (!this.player.creative) {
+         s.n--;
+         if (s.n <= 0) {
+            this.inv[this.sel] = null;
+         }
+      }
+
+      return true;
+   }
+
    boolean placeBlock() {
       Stack var1 = this.inv[this.sel];
+      if (var1 != null && var1.id == Blocks313.LILY_PAD) {
+         return this.placeLily(var1);
+      }
+
+      if (var1 != null && Blocks313.isVine(var1.id)) {
+         return this.placeVine(var1);
+      }
+
       if (var1 != null && var1.id == 281) {
          return this.placeDoor(var1);
       }
@@ -3813,8 +3923,21 @@ public final class Game {
                   var2 = Blocks.sideLog(var2, var8 != 0 ? 0 : 1);
                }
 
+               boolean tallPlant = Blocks313.isDouble(var2) && !Blocks313.isDoubleUpper(var2);
+               if (tallPlant) {
+                  int above = var4 + 1 > 255 ? 1 : this.world.getBlock(var3, var4 + 1, var5);
+                  if (above != 0 && !Blocks.replaceable[above]) {
+                     return false;
+                  }
+               }
+
                if (!this.world.setBlock(var3, var4, var5, var2)) {
                   return false;
+               }
+
+               if (tallPlant) {
+                  this.world.setBlock(var3, var4 + 1, var5, var2 + 1);
+                  this.meshNow(var3, var4 + 1, var5);
                }
 
                this.meshNow(var3, var4, var5);
@@ -3873,7 +3996,7 @@ public final class Game {
 
    void spawnBreakParticles(int var1, int var2, int var3, int var4, int var5) {
       int var6 = Blocks.tiles[var4][2];
-      if (Blocks.kind[var4] == 1 || Blocks.kind[var4] == 7 || Blocks.isLadder(var4)) {
+      if (Blocks.kind[var4] == 1 || Blocks.kind[var4] == 7 || Blocks.isLadder(var4) || Blocks313.flatItem(var4)) {
          var6 = Blocks.tiles[var4][0];
       }
 
@@ -4812,7 +4935,7 @@ public final class Game {
       int var2 = (int)Math.floor(this.player.y);
       int var3 = (int)Math.floor(this.player.z);
       Chunk var4 = this.world.chunkAt(var1, var3);
-      String var5 = var4 == null ? "?" : Gen.BIOME_NAMES[var4.biome[(var3 & 15) * 16 + (var1 & 15)]];
+      String var5 = var4 == null ? "?" : Biomes.name(var4.biome[(var3 & 15) * 16 + (var1 & 15)]);
       int var6 = ((int)Math.floor(this.player.yaw / 90.0 + 0.5) % 4 + 4) % 4;
       float var7 = ((this.player.yaw + 180.0F) % 360.0F + 360.0F) % 360.0F - 180.0F;
       long var8 = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576L;

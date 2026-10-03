@@ -784,7 +784,7 @@ final class Mobs312 {
          }
 
          Chunk c = w.chunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
-         if (c == null || c.biome[(z & 15) * 16 + (x & 15)] != 3) {
+         if (c == null || !(c.biome[(z & 15) * 16 + (x & 15)] == 3 || c.biome[(z & 15) * 16 + (x & 15)] == Biomes.JUNGLE || c.biome[(z & 15) * 16 + (x & 15)] == Biomes.FLOWER_FOREST)) {
             continue;
          }
 

@@ -158,6 +158,9 @@ public final class Mesher {
                         break;
                      case 8:
                         portal(var4, var29, var26, var28, var30);
+                        break;
+                     case 9:
+                        vine(var4, var1, var29, var26, var28, var30);
                   }
                }
             }
@@ -303,11 +306,12 @@ public final class Mesher {
          int var17 = ci(var9 + var16[0], var10 + var16[1], var11 + var16[2]);
          int var18 = var7[var17] & 0xFFFF;
          if (!Blocks.opaque[var18] && (var5 != 15 || var18 != 15) && !(Blocks.isLeaves(var5) && hiddenLeafFace(var7, var9, var10, var11, var15, var18))) {
-            if (Color312.isStainedGlass(var5)) {
+            if (Color312.isStainedGlass(var5) || var5 == Blocks313.ICE) {
                // Update 3.12: stained glass is translucent (blended pass); the faces between two panes of the same kind are not drawn
+               // (Update 3.13: ice is the same, a little less see-through)
                if (var18 != var5) {
                   int tile = Blocks.tiles[var5][var15];
-                  quad(var0, var15, var2, var3, var4, var17, var12, tile, 1.0F, 1.0F, 1.0F, Color312.GLASS_ALPHA, var6, 0.0F, var14);
+                  quad(var0, var15, var2, var3, var4, var17, var12, tile, 1.0F, 1.0F, 1.0F, var5 == Blocks313.ICE ? 0.84F : Color312.GLASS_ALPHA, var6, 0.0F, var14);
                   emit(var0, var0.t, tile, flipFor(var0));
                }
 
@@ -616,6 +620,66 @@ public final class Mesher {
       s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
       emit(s, s.t, tile, false);
       emitBack(s, s.t, tile);
+   }
+
+   /** Update 3.13: vines: a thin leafy plane in front of each wall the vine clings to (north 1, east 2, south 4, west 8). */
+   static void vine(Mesher.Scratch s, Chunk c, int x, int y, int z, int id) {
+      int mask = id - Blocks313.VINE0;
+      int light = s.L[ci(x + 1, y + 1, z + 1)] & 255;
+      float sky = light >> 4 & 15;
+      float blk = light & 15;
+      int tint = tintColor(c, id, x, z);
+      float r = (tint >> 16 & 0xFF) / 255.0F;
+      float g = (tint >> 8 & 0xFF) / 255.0F;
+      float b = (tint & 0xFF) / 255.0F;
+      int tile = Blocks.tiles[id][0];
+      float e = 0.04F;
+      for (int side = 0; side < 4; side++) {
+         if ((mask & 1 << side) == 0) {
+            continue;
+         }
+
+         for (int v = 0; v < 4; v++) {
+            float u = v == 1 || v == 2 ? 1.0F : 0.0F;
+            float h = v >= 2 ? 1.0F : 0.0F;
+            float px;
+            float pz;
+            switch (side) {
+               case 0:
+                  px = u;
+                  pz = e;
+                  break;
+               case 1:
+                  px = 1.0F - e;
+                  pz = u;
+                  break;
+               case 2:
+                  px = 1.0F - u;
+                  pz = 1.0F - e;
+                  break;
+               default:
+                  px = e;
+                  pz = 1.0F - u;
+                  break;
+            }
+
+            s.qx[v] = x + px;
+            s.qy[v] = y + h;
+            s.qz[v] = z + pz;
+            s.qu[v] = u;
+            s.qv[v] = 1.0F - h;
+            s.qr[v] = 0.92F * r;
+            s.qg[v] = 0.92F * g;
+            s.qb[v] = 0.92F * b;
+            s.qa[v] = 1.0F;
+            s.qm[v] = lu(sky);
+            s.ql[v] = lu(blk);
+         }
+
+         s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
+         emit(s, s.o, tile, false);
+         emitBack(s, s.o, tile);
+      }
    }
 
    static void box(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
@@ -931,6 +995,11 @@ public final class Mesher {
       }
 
       int var26 = var9 ? 23 : 24;
+      // Update 3.13: the water of a swamp is greenish, a warm sea turquoise, a frozen one pale (Chunk.waterColor); lava stays as it is
+      int wc = var9 ? var1.waterColor[var4 * 16 + var2] : 0xFFFFFF;
+      float wr = (wc >> 16 & 0xFF) / 255.0F;
+      float wg = (wc >> 8 & 0xFF) / 255.0F;
+      float wb = (wc & 0xFF) / 255.0F;
 
       for (int var27 = 0; var27 < 6; var27++) {
          int[] var16 = FN[var27];
@@ -960,9 +1029,9 @@ public final class Mesher {
                var0.qu[var22] = var12[0];
                var0.qv[var22] = var12[1];
                float var25 = var9 ? SHADE[var27] : 0.8F + 0.2F * SHADE[var27];
-               var0.qr[var22] = var25;
-               var0.qg[var22] = var25;
-               var0.qb[var22] = var25;
+               var0.qr[var22] = var25 * wr;
+               var0.qg[var22] = var25 * wg;
+               var0.qb[var22] = var25 * wb;
                var0.qa[var22] = var9 ? 0.72F : 1.0F;
                var0.qm[var22] = lu(var20);
                var0.ql[var22] = lu(var21);

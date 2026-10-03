@@ -492,7 +492,7 @@ public final class Gui {
             GL11.glAlphaFunc(516, 0.1F);
             int var5 = Blocks.kind[var1];
             GL11.glBegin(7);
-            if (var5 == 1 || var5 == 7 || Blocks.isLadder(var1) || var1 == 32 || Blocks.isWallTorch(var1)) {
+            if (var5 == 1 || var5 == 7 || Blocks.isLadder(var1) || var1 == 32 || Blocks.isWallTorch(var1) || Blocks313.flatItem(var1)) {
                int[] var24 = tintFor(var1);
                float[] var26 = new float[]{var2, var2 + var4, var2 + var4, var2};
                float[] var28 = new float[]{var3, var3, var3 + var4, var3 + var4};

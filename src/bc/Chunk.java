@@ -11,6 +11,8 @@ public final class Chunk {
    public final int[] grassColor = new int[256];
    public final int[] foliageColor = new int[256];
    public final byte[] biome = new byte[256];
+   /** Update 3.13: the tint of the water surface in every column (0xFFFFFF = the plain blue of the picture). */
+   public final int[] waterColor = new int[256];
    public volatile boolean modified;
    /** Update 3.11: tick of the last block change since the LOD summary was made (0 = the summary is up to date). */
    public volatile long lodDirty;
@@ -23,6 +25,7 @@ public final class Chunk {
    public Chunk(int var1, int var2) {
       this.cx = var1;
       this.cz = var2;
+      java.util.Arrays.fill(this.waterColor, 0xFFFFFF);
 
       for (int var3 = 0; var3 < 16; var3++) {
          this.sections[var3] = new Chunk.Section();

@@ -135,6 +135,8 @@ public final class Blocks {
    public static final int K_CROP = 7;
    /** Update 3.12: a flat, translucent film in the middle of the cell (nether portal). */
    public static final int K_PORTAL = 8;
+   /** Update 3.13: vines: thin leafy planes against the walls named in the low four bits of the id (1 north, 2 east, 4 south, 8 west). */
+   public static final int K_VINE = 9;
    public static final int T_NONE = 0;
    public static final int T_GRASS = 1;
    public static final int T_FOLIAGE = 2;
@@ -156,6 +158,27 @@ public final class Blocks {
    public static final int[] mineClass = new int[MAX];
    public static final boolean[] needTool = new boolean[MAX];
    public static final int[] harvestLevel = new int[MAX];
+   // ---- Update 3.13: the woods. Species 0 oak, 1 birch, 2 spruce, 3 jungle, 4 acacia, 5 dark oak. ----
+   static final int[] WOOD_LOG = new int[]{9, 10, 11, 1156, 1157, 1158};
+   static final int[] WOOD_SX = new int[]{220, 221, 222, 1159, 1160, 1161};
+   static final int[] WOOD_SZ = new int[]{223, 224, 225, 1162, 1163, 1164};
+   static final int[] WOOD_LEAVES = new int[]{12, 13, 14, 1165, 1166, 1167};
+   /** 0 no log, 1 upright, 2 lying along x, 3 lying along z. */
+   static final byte[] logKind = new byte[MAX];
+   static final byte[] logSpecies = new byte[MAX];
+   static final boolean[] leafTable = new boolean[MAX];
+
+   static {
+      for (int sp = 0; sp < 6; sp++) {
+         logKind[WOOD_LOG[sp]] = 1;
+         logKind[WOOD_SX[sp]] = 2;
+         logKind[WOOD_SZ[sp]] = 3;
+         logSpecies[WOOD_LOG[sp]] = (byte)sp;
+         logSpecies[WOOD_SX[sp]] = (byte)sp;
+         logSpecies[WOOD_SZ[sp]] = (byte)sp;
+         leafTable[WOOD_LEAVES[sp]] = true;
+      }
+   }
 
    static void def(int var0, String var1, float var2, boolean var3, int var4) {
       name[var0] = var1;
@@ -266,6 +289,11 @@ public final class Blocks {
       return var0 >= 119 && var0 < 123;
    }
 
+   /** Ladders and (Update 3.13) vines: you climb them. */
+   public static boolean climbable(int var0) {
+      return isLadder(var0) || var0 > 1199 && var0 <= 1214;
+   }
+
    /** Any growing crop block: wheat 124-131, carrots 142-149, potatoes 150-157 (8 growth stages each). */
    public static boolean isCrop(int var0) {
       return var0 >= 124 && var0 < 132 || var0 >= 142 && var0 < 158;
@@ -361,7 +389,7 @@ public final class Blocks {
    }
 
    public static boolean isLeaves(int var0) {
-      return var0 >= 12 && var0 <= 14;
+      return var0 >= 0 && var0 < MAX && leafTable[var0];
    }
 
    /** Update 3.12: the film inside a nether portal frame. */
@@ -379,32 +407,33 @@ public final class Blocks {
    }
 
    public static boolean isLog(int var0) {
-      return var0 >= 9 && var0 <= 11;
+      return var0 >= 0 && var0 < MAX && logKind[var0] == 1;
    }
 
-   /** A log lying on its side (220..225), as a felled tree leaves them. */
+   /** A log lying on its side (220..225 and the ones of the new woods), as a felled tree leaves them. */
    public static boolean isSideLog(int var0) {
-      return var0 >= LOG_X0 && var0 < LOG_X0 + 6;
+      return var0 >= 0 && var0 < MAX && logKind[var0] >= 2;
    }
 
    /** Upright log or log on its side. */
    public static boolean isAnyLog(int var0) {
-      return var0 >= 9 && var0 <= 11 || var0 >= LOG_X0 && var0 < LOG_X0 + 6;
+      return var0 >= 0 && var0 < MAX && logKind[var0] != 0;
    }
 
-   /** The side log of an upright log (9..11) lying along the x axis (axis 0) or the z axis (axis 1). */
+   /** The side log of an upright log lying along the x axis (axis 0) or the z axis (axis 1). */
    public static int sideLog(int upright, int axis) {
-      return (axis == 0 ? LOG_X0 : LOG_Z0) + (upright - 9);
+      int sp = logSpecies[upright];
+      return axis == 0 ? WOOD_SX[sp] : WOOD_SZ[sp];
    }
 
-   /** The upright log (9..11) that goes with a side log. */
+   /** The upright log that goes with a side log. */
    public static int uprightLog(int sideLog) {
-      return 9 + (sideLog - LOG_X0) % 3;
+      return WOOD_LOG[logSpecies[sideLog]];
    }
 
    /** 0 = a side log along the x axis, 1 = along the z axis. */
    public static int sideLogAxis(int sideLog) {
-      return sideLog >= LOG_Z0 ? 1 : 0;
+      return logKind[sideLog] == 3 ? 1 : 0;
    }
 
    public static boolean targetable(int var0) {
@@ -467,6 +496,7 @@ public final class Blocks {
       }
 
       Blocks312.addToCreative(var1);
+      Blocks313.addToCreative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -950,5 +980,6 @@ public final class Blocks {
 
       // ---- Update 3.12: everything new lives in Blocks312 (ids from EXT0 up) ----
       Blocks312.register();
+      Blocks313.register();
    }
 }

@@ -89,10 +89,32 @@ public final class Dim {
    }
 
    static Gen makeGen(int d, long seed) {
+      return makeGen(d, seed, WorldSettings.classic());
+   }
+
+   /** Update 3.13: the Overworld generator depends on what the world was created with (the classic one for old worlds). */
+   static Gen makeGen(int d, long seed, WorldSettings st) {
       if (d == NETHER) {
          return new NetherGen(seed);
       }
 
-      return d == END ? new EndGen(seed) : new Gen(seed);
+      if (d == END) {
+         return new EndGen(seed);
+      }
+
+      Gen g;
+      if (st == null || st.type == WorldSettings.CLASSIC) {
+         g = new Gen(seed);
+      } else if (st.type == WorldSettings.FLAT) {
+         g = new FlatGen(seed, st);
+      } else {
+         g = new TerraGen(seed, st);
+      }
+
+      if (st != null) {
+         g.settings = st;
+      }
+
+      return g;
    }
 }

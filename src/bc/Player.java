@@ -343,7 +343,7 @@ public final class Player {
    boolean onLadder(World var1) {
       int var2 = fl(this.x);
       int var3 = fl(this.z);
-      return Blocks.isLadder(var1.getBlock(var2, fl(this.y + 0.05), var3)) || Blocks.isLadder(var1.getBlock(var2, fl(this.y + 0.9), var3));
+      return Blocks.climbable(var1.getBlock(var2, fl(this.y + 0.05), var3)) || Blocks.climbable(var1.getBlock(var2, fl(this.y + 0.9), var3));
    }
 
    boolean fluidIn(World var1, boolean var2) {
