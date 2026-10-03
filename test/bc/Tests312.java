@@ -19,6 +19,7 @@ final class Tests312 {
       nether();
       netherMobs();
       fortress();
+      stronghold();
    }
 
    static void deleteAll(File f) {
@@ -972,54 +973,17 @@ final class Tests312 {
             }
 
             // walk through it: breadth first through open air from the middle of the first hall
-            int sx = best.ox;
-            int sy = best.oy + 1;
-            int sz = best.oz;
-            eq(0, at(cs, cx0, cz0, sx, sy, sz), "the middle of the central hall is open");
-            int w = best.maxX - best.minX + 3;
-            int d = best.maxZ - best.minZ + 3;
-            int hgt = 12;
-            boolean[] seen = new boolean[w * d * hgt];
-            int[] queue = new int[w * d * hgt];
-            int qh = 0;
-            int qt = 0;
-            int base = best.oy;
-            queue[qt++] = ((sx - best.minX + 1) * d + (sz - best.minZ + 1)) * hgt + 1;
-            seen[queue[0]] = true;
-            int[][] nb = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
-            while (qh < qt) {
-               int cur = queue[qh++];
-               int yy = cur % hgt;
-               int zz = (cur / hgt) % d;
-               int xx = cur / hgt / d;
-               for (int[] n : nb) {
-                  int nx = xx + n[0];
-                  int ny = yy + n[1];
-                  int nz = zz + n[2];
-                  if (nx < 0 || nz < 0 || ny < 0 || nx >= w || nz >= d || ny >= hgt) {
-                     continue;
-                  }
-
-                  int key = (nx * d + nz) * hgt + ny;
-                  if (seen[key] || at(cs, cx0, cz0, nx + best.minX - 1, base + ny, nz + best.minZ - 1) != 0) {
-                     continue;
-                  }
-
-                  seen[key] = true;
-                  queue[qt++] = key;
-               }
-            }
-
+            eq(0, at(cs, cx0, cz0, best.ox, best.oy + 1, best.oz), "the middle of the central hall is open");
+            Reach walk = new Reach(cs, cx0, cz0, best.minX, best.maxX, best.minZ, best.maxZ, best.oy, 12, best.ox, best.oy + 1, best.oz);
             for (int[] s : best.spawners) {
-               int key = ((s[0] - best.minX + 1) * d + (s[2] - best.minZ + 1)) * hgt + (s[1] + 1 - base);
-               check(seen[key], "the cell above the spawner at " + s[0] + "," + s[2] + " can be reached on foot (seed " + seed + ")");
+               check(walk.can(s[0], s[1] + 1, s[2]), "the cell above the spawner at " + s[0] + "," + s[2] + " can be reached on foot (seed " + seed + ")");
             }
 
             for (int[] ch : best.chests) {
-               int key = ((ch[0] - best.minX + 1) * d + (ch[2] - best.minZ + 1)) * hgt + (ch[1] + 1 - base);
-               check(seen[key], "the cell above the chest at " + ch[0] + "," + ch[2] + " can be reached on foot (seed " + seed + ")");
+               check(walk.can(ch[0], ch[1] + 1, ch[2]), "the cell above the chest at " + ch[0] + "," + ch[2] + " can be reached on foot (seed " + seed + ")");
             }
 
+            int qt = walk.count;
             check(qt > 1500, "a big connected space: " + qt + " cells");
          }
       });
@@ -1056,20 +1020,25 @@ final class Tests312 {
          }
 
          check(blazes > 0, "the spawner made a blaze");
-         // guards: spawn attempts around the player on the fortress floor give blazes / skeletons
-         g.mobs.list.clear();
+         // guards: spawn attempts around the player in the fortress give blazes / skeletons when the floor is nether brick
+         g.mobs.rnd.setSeed(4242L);
          int guards = 0;
-         for (int i = 0; i < 300; i++) {
+         int onBricks = 0;
+         for (int batch = 0; batch < 80 && guards == 0; batch++) {
+            g.mobs.list.clear();
             Mobs312.spawnNether(g.mobs, w, g.player);
-         }
-
-         for (Mobs.Mob m : g.mobs.list) {
-            if (m.type == Mobs.SKELETON || m.type == Mobs.BLAZE) {
-               guards++;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (w.getBlock((int)Math.floor(m.x), (int)Math.floor(m.y) - 1, (int)Math.floor(m.z)) == Blocks.NETHER_BRICKS) {
+                  onBricks++;
+                  check(m.type == Mobs.SKELETON || m.type == Mobs.BLAZE || m.type == Mobs.ZOMBIE_PIGMAN, "only guards on the bricks, not a " + Mobs.NAME[m.type]);
+                  if (m.type != Mobs.ZOMBIE_PIGMAN) {
+                     guards++;
+                  }
+               }
             }
          }
 
-         check(guards > 0, "guards turned up: " + g.mobs.list.size() + " mobs");
+         check(guards > 0, "guards turned up on the bricks (" + onBricks + " mobs stood on bricks)");
          w.shutdown();
       });
 
@@ -1100,5 +1069,174 @@ final class Tests312 {
       }
 
       return cs[cz][cx].get(Math.floorMod(x, 16), y, Math.floorMod(z, 16));
+   }
+
+   /** Breadth first search through open air (id 0) inside a box of chunks: which cells can be walked to from a start cell? */
+   static final class Reach {
+      final boolean[] seen;
+      final int minX;
+      final int minZ;
+      final int w;
+      final int d;
+      final int hgt;
+      final int base;
+      int count;
+
+      Reach(Chunk[][] cs, int cx0, int cz0, int minX, int maxX, int minZ, int maxZ, int base, int hgt, int sx, int sy, int sz) {
+         this.minX = minX;
+         this.minZ = minZ;
+         this.w = maxX - minX + 3;
+         this.d = maxZ - minZ + 3;
+         this.hgt = hgt;
+         this.base = base;
+         this.seen = new boolean[w * d * hgt];
+         int[] queue = new int[w * d * hgt];
+         int qh = 0;
+         int qt = 0;
+         int start = ((sx - minX + 1) * d + (sz - minZ + 1)) * hgt + (sy - base);
+         queue[qt++] = start;
+         seen[start] = true;
+         int[][] nb = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+         while (qh < qt) {
+            int cur = queue[qh++];
+            int yy = cur % hgt;
+            int zz = (cur / hgt) % d;
+            int xx = cur / hgt / d;
+            for (int[] n : nb) {
+               int nx = xx + n[0];
+               int ny = yy + n[1];
+               int nz = zz + n[2];
+               if (nx < 0 || nz < 0 || ny < 0 || nx >= w || nz >= d || ny >= hgt) {
+                  continue;
+               }
+
+               int key = (nx * d + nz) * hgt + ny;
+               if (seen[key] || at(cs, cx0, cz0, nx + minX - 1, base + ny, nz + minZ - 1) != 0) {
+                  continue;
+               }
+
+               seen[key] = true;
+               queue[qt++] = key;
+            }
+         }
+
+         this.count = qt;
+      }
+
+      boolean can(int x, int y, int z) {
+         int ix = x - minX + 1;
+         int iz = z - minZ + 1;
+         int iy = y - base;
+         return ix >= 0 && iz >= 0 && iy >= 0 && ix < w && iz < d && iy < hgt && seen[(ix * d + iz) * hgt + iy];
+      }
+   }
+
+   // ------------------------------------------------------------------ strongholds
+   static void stronghold() {
+      test("strongholds: three rings around the middle, the same list every time, an eye of ender finds the nearest", () -> {
+         Stronghold[] a = Stronghold.all(12345L);
+         eq(19, a.length, "3 + 6 + 10 strongholds");
+         Stronghold[] b = Stronghold.all(12345L);
+         for (int i = 0; i < a.length; i++) {
+            eq(a[i].cx, b[i].cx, "same x");
+            eq(a[i].cz, b[i].cz, "same z");
+            double dist = Math.sqrt((double)a[i].cx * a[i].cx + (double)a[i].cz * a[i].cz);
+            if (i < 3) {
+               check(dist > 630 && dist < 970, "ring 1 stronghold " + i + " is " + dist + " blocks out");
+            } else if (i < 9) {
+               check(dist > 1490 && dist < 2110, "ring 2 stronghold " + i + " is " + dist + " blocks out");
+            } else {
+               check(dist > 2790 && dist < 3410, "ring 3 stronghold " + i + " is " + dist + " blocks out");
+            }
+         }
+
+         Stronghold other = Stronghold.all(99L)[0];
+         check(other.cx != a[0].cx || other.cz != a[0].cz, "another seed, other places");
+         Stronghold n = Stronghold.nearest(12345L, a[4].cx + 10.0, a[4].cz - 10.0);
+         eq(4, n.index, "the nearest one to a place right next to #4");
+      });
+
+      test("stronghold: portal room with 12 frames around a lava pit, a spawner, a library, chests - and everything can be walked to", () -> {
+         for (long seed : new long[]{12345L, 31L}) {
+            Gen gen = new Gen(seed);
+            for (int which = 0; which < 3; which++) {
+               Stronghold sh = Stronghold.all(seed)[which];
+               Stronghold.Plan p = sh.plan();
+               check(p.oy >= 20 && p.oy < 32 && p.rooms >= 5 && p.hasLibrary && !p.chests.isEmpty(), "rooms, a library and chests");
+               check(p.maxX - p.minX <= 2 * Stronghold.REACH + 12 && p.maxZ - p.minZ <= 2 * Stronghold.REACH + 12, "not too big");
+               int cx0 = Math.floorDiv(p.minX, 16) - 1;
+               int cx1 = Math.floorDiv(p.maxX, 16) + 1;
+               int cz0 = Math.floorDiv(p.minZ, 16) - 1;
+               int cz1 = Math.floorDiv(p.maxZ, 16) + 1;
+               Chunk[][] cs = new Chunk[cz1 - cz0 + 1][cx1 - cx0 + 1];
+               int bricks = 0;
+               for (int cz = cz0; cz <= cz1; cz++) {
+                  for (int cx = cx0; cx <= cx1; cx++) {
+                     Chunk c = gen.generate(cx, cz);
+                     cs[cz - cz0][cx - cx0] = c;
+                     for (short blk : c.blocks) {
+                        if (blk == Blocks.STONEBRICK) {
+                           bricks++;
+                        }
+                     }
+                  }
+               }
+
+               check(bricks > 1500, "a stronghold of stone bricks: " + bricks);
+               int eyes = 0;
+               eq(12, p.frames.size(), "twelve frames");
+               for (int[] f : p.frames) {
+                  int id = at(cs, cx0, cz0, f[0], f[1], f[2]);
+                  check(id == Blocks.END_FRAME || id == Blocks.END_FRAME_EYE, "a frame at " + f[0] + "," + f[2] + " (" + id + ")");
+                  if (id == Blocks.END_FRAME_EYE) {
+                     eyes++;
+                  }
+               }
+
+               check(eyes < 7, "some frames hold an eye but never all: " + eyes);
+               for (int x = -1; x <= 1; x++) {
+                  for (int z = -1; z <= 1; z++) {
+                     eq(0, at(cs, cx0, cz0, p.ox + x, p.oy, p.oz + z), "the pit is open above the lava");
+                     eq(Blocks.LAVA, at(cs, cx0, cz0, p.ox + x, p.oy - 1, p.oz + z), "lava in the pit");
+                  }
+               }
+
+               int[] sp = p.spawners.get(0);
+               eq(Blocks.SPAWNER, at(cs, cx0, cz0, sp[0], sp[1], sp[2]), "the spawner");
+               int books = 0;
+               for (int dz = 0; dz < cs.length; dz++) {
+                  for (int dx = 0; dx < cs[0].length; dx++) {
+                     for (short blk : cs[dz][dx].blocks) {
+                        if (blk == Blocks.BOOKSHELF) {
+                           books++;
+                        }
+                     }
+                  }
+               }
+
+               check(books >= 20, "a library: " + books + " bookshelves");
+               for (int[] ch : p.chests) {
+                  eq(Blocks.CHEST_LOOT, at(cs, cx0, cz0, ch[0], ch[1], ch[2]), "a loot chest");
+               }
+
+               // from the portal room to everything
+               eq(0, at(cs, cx0, cz0, p.ox + 4, p.oy + 1, p.oz), "the portal room is open");
+               Reach walk = new Reach(cs, cx0, cz0, p.minX, p.maxX, p.minZ, p.maxZ, p.oy, 12, p.ox + 4, p.oy + 1, p.oz);
+               for (int[] f : p.frames) {
+                  check(walk.can(f[0], f[1] + 1, f[2]), "the cell above the frame at " + f[0] + "," + f[2] + " can be reached on foot (seed " + seed + ")");
+               }
+
+               for (int[] ch : p.chests) {
+                  check(walk.can(ch[0], ch[1] + 1, ch[2]), "the cell above the chest at " + ch[0] + "," + ch[2] + " can be reached on foot (seed " + seed + ", stronghold " + which + ")");
+               }
+
+               check(walk.can(sp[0], sp[1] + 1, sp[2]), "the cell above the spawner can be reached");
+               check(walk.count > 1500, "a big connected space: " + walk.count + " cells");
+               // the same chunk twice is the same
+               Chunk again = gen.generate(cx0 + 2, cz0 + 2);
+               check(java.util.Arrays.equals(again.blocks, cs[2][2].blocks), "a chunk is generated the same every time");
+            }
+         }
+      });
    }
 }

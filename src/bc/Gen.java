@@ -320,6 +320,10 @@ public class Gen {
 
       this.plantTrees(var3);
       this.structs.apply(var3);
+      if (extras) {
+         Stronghold.apply(this.seed, var3); // Update 3.12: the buried castles with the way to the End
+      }
+
       this.plantShoreAndPatches(var3, var6, var7);
       var3.computeHeightmap();
       return var3;

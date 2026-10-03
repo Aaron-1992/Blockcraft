@@ -33,48 +33,17 @@ final class NetherFortress {
       this.seed = seed;
    }
 
-   static final class Box {
-      final int x0, y0, z0, x1, y1, z1;
-      final short id;
-      /** details like railings, windows and lamps never fill a passage that another piece cut through them */
-      boolean soft;
-
-      Box(int xa, int ya, int za, int xb, int yb, int zb, int id) {
-         this.x0 = Math.min(xa, xb);
-         this.x1 = Math.max(xa, xb);
-         this.y0 = Math.min(ya, yb);
-         this.y1 = Math.max(ya, yb);
-         this.z0 = Math.min(za, zb);
-         this.z1 = Math.max(za, zb);
-         this.id = (short)id;
-      }
-   }
-
-   static final class Plan {
+   static final class Plan extends BoxPlan {
       boolean present;
       int ox;
       int oy;
       int oz;
-      int minX = Integer.MAX_VALUE;
-      int maxX = Integer.MIN_VALUE;
-      int minZ = Integer.MAX_VALUE;
-      int maxZ = Integer.MIN_VALUE;
-      final List<Box> shell = new ArrayList<>();
-      final List<Box> air = new ArrayList<>();
-      final List<Box> decor = new ArrayList<>();
-      /** columns that grow downwards from the floor until they find rock: x, y of the topmost block, z */
-      final List<int[]> pillars = new ArrayList<>();
       final List<int[]> spawners = new ArrayList<>();
       final List<int[]> chests = new ArrayList<>();
       /** outer x0, z0, x1, z1 of every room - rooms never overlap each other */
       final List<int[]> roomRects = new ArrayList<>();
       boolean hasThrone;
       int rooms;
-
-      void soft(int xa, int ya, int za, int xb, int yb, int zb, int id) {
-         this.add(this.decor, xa, ya, za, xb, yb, zb, id);
-         this.decor.get(this.decor.size() - 1).soft = true;
-      }
 
       boolean roomFree(int cx, int cz, int w) {
          for (int[] r : this.roomRects) {
@@ -84,15 +53,6 @@ final class NetherFortress {
          }
 
          return true;
-      }
-
-      void add(List<Box> layer, int xa, int ya, int za, int xb, int yb, int zb, int id) {
-         Box b = new Box(xa, ya, za, xb, yb, zb, id);
-         layer.add(b);
-         this.minX = Math.min(this.minX, b.x0);
-         this.maxX = Math.max(this.maxX, b.x1);
-         this.minZ = Math.min(this.minZ, b.z0);
-         this.maxZ = Math.max(this.maxZ, b.z1);
       }
 
       boolean inReach(int x, int z) {
@@ -346,74 +306,9 @@ final class NetherFortress {
 
    /** Builds the part of the fortress that lies in this chunk. */
    void apply(Chunk c) {
-      int x0 = c.cx * 16;
-      int z0 = c.cz * 16;
-      Plan p = this.planAt(x0 + 8, z0 + 8);
-      if (!p.present || p.maxX < x0 || p.minX > x0 + 15 || p.maxZ < z0 || p.minZ > z0 + 15) {
-         return;
-      }
-
-      boolean[] carved = new boolean[16 * 128 * 16];
-      for (Box b : p.shell) {
-         fill(c, b, null, false);
-      }
-
-      for (int[] q : p.pillars) {
-         pillar(c, q[0], q[1], q[2]);
-      }
-
-      for (Box b : p.air) {
-         fill(c, b, carved, false);
-      }
-
-      for (Box b : p.decor) {
-         fill(c, b, carved, b.soft);
-      }
-   }
-
-   /** Fills the part of the box that lies in the chunk; air boxes mark what they cut out, soft boxes leave those cells alone. */
-   private static void fill(Chunk c, Box b, boolean[] carved, boolean soft) {
-      int x0 = c.cx * 16;
-      int z0 = c.cz * 16;
-      int xa = Math.max(b.x0, x0);
-      int xb = Math.min(b.x1, x0 + 15);
-      int za = Math.max(b.z0, z0);
-      int zb = Math.min(b.z1, z0 + 15);
-      if (xa > xb || za > zb) {
-         return;
-      }
-
-      for (int z = za; z <= zb; z++) {
-         for (int x = xa; x <= xb; x++) {
-            for (int y = Math.max(1, b.y0); y <= Math.min(NetherGen.TOP - 1, b.y1); y++) {
-               int i = Chunk.idx(x - x0, y, z - z0);
-               if (soft && carved[i]) {
-                  continue;
-               }
-
-               c.blocks[i] = b.id;
-               if (b.id == 0 && carved != null) {
-                  carved[i] = true;
-               }
-            }
-         }
-      }
-   }
-
-   private static void pillar(Chunk c, int x, int top, int z) {
-      int lx = x - c.cx * 16;
-      int lz = z - c.cz * 16;
-      if (lx < 0 || lx > 15 || lz < 0 || lz > 15) {
-         return;
-      }
-
-      for (int y = top; y >= 1; y--) {
-         int id = c.blocks[Chunk.idx(lx, y, lz)];
-         if (id != 0 && !Blocks.isLava(id)) {
-            break;
-         }
-
-         c.blocks[Chunk.idx(lx, y, lz)] = (short)Blocks.NETHER_BRICKS;
+      Plan p = this.planAt(c.cx * 16 + 8, c.cz * 16 + 8);
+      if (p.present) {
+         p.apply(c, Blocks.NETHER_BRICKS, NetherGen.TOP - 1);
       }
    }
 }
