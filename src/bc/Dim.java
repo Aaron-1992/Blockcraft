@@ -38,7 +38,15 @@ public final class Dim {
 
    /** Light that is always there (0..1): the lightmap never goes darker than this. The Nether glows a little, the End a bit more. */
    public static float ambient(int d) {
-      return d == NETHER ? 0.27F : (d == END ? 0.40F : 0.0F);
+      return d == NETHER ? 0.27F : (d == END ? 0.46F : 0.0F);
+   }
+
+   /**
+    * How much of {@link #ambient} the green and the blue channel of the lightmap get: the Nether's glow is warm (red), the End's is
+    * neutral, so that end stone stays the pale cream it is (it looked brown with the warm tint).
+    */
+   public static float[] ambientTint(int d) {
+      return d == END ? new float[]{1.0F, 1.04F} : new float[]{0.8F, 0.78F};
    }
 
    /** The colour of the fog / the sky behind everything. */

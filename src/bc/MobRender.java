@@ -759,18 +759,22 @@ public final class MobRender {
          double x = f.px + (f.x - f.px) * partial - rend.camX;
          double y = f.py + (f.y - f.py) * partial - rend.camY;
          double z = f.pz + (f.z - f.pz) * partial - rend.camZ;
-         float s = f.dragon ? 0.5F : (f.big ? 0.42F : 0.2F);
+         float s = f.pearl ? 0.13F : (f.dragon ? 0.5F : (f.big ? 0.42F : 0.2F));
          GL11.glPushMatrix();
          GL11.glTranslated(x, y, z);
          GL11.glRotatef((f.life + partial) * 23.0F, 1.0F, 0.6F, 0.3F);
          for (int layer = 0; layer < 2; layer++) {
             float h = layer == 0 ? s : s * 0.55F;
             if (layer == 0) {
-               if (f.dragon) {
+               if (f.pearl) {
+                  GL11.glColor3f(0.08F, 0.42F, 0.36F);
+               } else if (f.dragon) {
                   GL11.glColor3f(0.65F, 0.18F, 0.95F);
                } else {
                   GL11.glColor3f(1.0F, 0.45F, 0.06F);
                }
+            } else if (f.pearl) {
+               GL11.glColor3f(0.55F, 0.95F, 0.82F);
             } else if (f.dragon) {
                GL11.glColor3f(1.0F, 0.75F, 1.0F);
             } else {

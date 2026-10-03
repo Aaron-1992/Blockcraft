@@ -225,6 +225,11 @@ public final class Player {
                }
             }
 
+            // Update 3.12: a magma block burns the feet of whoever stands on it without sneaking (1 damage every half second)
+            if (this.onGround && !this.sneaking && !this.flying && this.invuln == 0 && var1.getBlock(fireX, fl(this.y - 0.05), fireZ) == Blocks.MAGMA) {
+               this.hurt(1);
+            }
+
             if (this.burn > 0) {
                this.burn--;
                if (this.inWater) {
@@ -434,6 +439,11 @@ public final class Player {
          this.vy *= 0.98;
          this.vx *= var4;
          this.vz *= var4;
+         // Update 3.12: soul sand drags (Minecraft: motion x 0.4 on every tick spent on it)
+         if (this.onGround && !this.flying && var1.getBlock(fl(this.x), fl(this.y - 0.05), fl(this.z)) == Blocks.SOUL_SAND) {
+            this.vx *= 0.4;
+            this.vz *= 0.4;
+         }
       }
    }
 

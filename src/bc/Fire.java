@@ -201,15 +201,17 @@ final class Fire {
          st[0] = age;
       }
 
+      // Update 3.12: fire on netherrack (and on the bedrock of the End) never burns out by itself
+      boolean eternal = below == Blocks.NETHERRACK || below == Blocks.BEDROCK && w.dim == Dim.END;
       if (!feeds) {
-         if (!solidTop(below) || age > 3) {
+         if (!eternal && (!solidTop(below) || age > 3)) {
             w.setBlock(x, y, z, 0);
          }
 
          return;
       }
 
-      if (flammability(below) == 0 && age == 15 && this.rnd.nextInt(4) == 0) {
+      if (!eternal && flammability(below) == 0 && age == 15 && this.rnd.nextInt(4) == 0) {
          w.setBlock(x, y, z, 0);
          return;
       }

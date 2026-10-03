@@ -395,6 +395,9 @@ public final class Renderer {
       float var1 = this.g.opt.gamma;
       float ambient = this.g.world == null ? 0.0F : Dim.ambient(this.g.world.dim);
       if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient) {
+         float[] tint = Dim.ambientTint(this.g.world == null ? Dim.OVERWORLD : this.g.world.dim);
+         Tex.ambG = tint[0];
+         Tex.ambB = tint[1];
          GL13.glActiveTexture(33985);
          Tex.updateLightmap(this.skyLightFactor, ambient, var1);
          GL13.glActiveTexture(33984);

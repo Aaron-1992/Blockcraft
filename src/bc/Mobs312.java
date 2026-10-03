@@ -36,6 +36,12 @@ final class Mobs312 {
       boolean big;
       /** The dragon's breath: purple, leaves a cloud that hurts instead of blowing a hole. */
       boolean dragon;
+      /** An ender pearl the player threw: it arcs down and takes the player where it lands. */
+      boolean pearl;
+      /** The last position that was free of blocks (where a pearl lands). */
+      double lx;
+      double ly;
+      double lz;
    }
 
    static boolean peaceful(int type) {
@@ -951,6 +957,102 @@ final class Mobs312 {
       }
    }
 
+   // ------------------------------------------------------------------ ender pearls
+   /** Right click with an ender pearl: it flies off along your line of sight at 1.5 blocks a tick (one throw a second). */
+   static boolean throwPearl(Game g, Stack held) {
+      Player p = g.player;
+      if (g.world == null || g.mobs == null || p.dead || p.spectator) {
+         return false;
+      }
+
+      for (Fireball o : g.mobs.fireballs) {
+         if (o.pearl && o.life < 20) {
+            return false;
+         }
+      }
+
+      double yaw = Math.toRadians(p.yaw);
+      double pitch = Math.toRadians(p.pitch);
+      double dx = -Math.sin(yaw) * Math.cos(pitch);
+      double dy = -Math.sin(pitch);
+      double dz = Math.cos(yaw) * Math.cos(pitch);
+      Fireball f = new Fireball();
+      f.pearl = true;
+      f.x = f.px = f.lx = p.x + dx * 0.5;
+      f.y = f.py = f.ly = p.y + p.eye - 0.1 + dy * 0.5;
+      f.z = f.pz = f.lz = p.z + dz * 0.5;
+      f.vx = dx * 1.5;
+      f.vy = dy * 1.5;
+      f.vz = dz * 1.5;
+      g.mobs.fireballs.add(f);
+      if (!p.creative) {
+         held.n--;
+         if (held.n <= 0) {
+            g.inv[g.sel] = null;
+         }
+      }
+
+      return true;
+   }
+
+   /** Where the player's feet fit around a point where a pearl came to rest (null: nowhere, the pearl is lost). */
+   static double[] pearlSpot(World w, double x, double y, double z) {
+      double[][] around = {{0, 0}, {0.35, 0}, {-0.35, 0}, {0, 0.35}, {0, -0.35}, {0.6, 0.6}, {-0.6, 0.6}, {0.6, -0.6}, {-0.6, -0.6}};
+      double[] lower = {0.0, -0.3, -0.6, -0.9, -1.2, -1.6, 0.4, 0.8};
+      double[] bb = new double[6];
+      for (double[] o : around) {
+         for (double dy : lower) {
+            double fx = x + o[0];
+            double fy = y + dy;
+            double fz = z + o[1];
+            if (fy < 1.0 || fy > 250.0) {
+               continue;
+            }
+
+            bb[0] = fx - 0.3;
+            bb[1] = fy;
+            bb[2] = fz - 0.3;
+            bb[3] = fx + 0.3;
+            bb[4] = fy + 1.8;
+            bb[5] = fz + 0.3;
+            if (!Phys.collides(w, bb)) {
+               return new double[]{fx, fy, fz};
+            }
+         }
+      }
+
+      return null;
+   }
+
+   /** The pearl came down: sparks, you appear there (5 damage like a fall, armour does not help), more sparks. */
+   static void pearlLand(Mobs ms, World w, Player p, Fireball f) {
+      Game g = ms.g;
+      if (p.dead || p.spectator || g.world != w) {
+         return;
+      }
+
+      double[] spot = pearlSpot(w, f.lx, f.ly, f.lz);
+      if (spot == null) {
+         return;
+      }
+
+      for (int k = 0; k < 24; k++) {
+         g.portalParticle(p.x + (ms.rnd.nextDouble() - 0.5) * 0.6, p.y + ms.rnd.nextDouble() * 1.8, p.z + (ms.rnd.nextDouble() - 0.5) * 0.6, 0.55F, 0.25F, 0.9F);
+      }
+
+      p.setPos(spot[0], spot[1], spot[2]);
+      p.fallDistance = 0.0F;
+      p.flying = p.flying && p.creative;
+      if (!p.creative) {
+         p.invuln = 0;
+         p.hurt(5);
+      }
+
+      for (int k = 0; k < 24; k++) {
+         g.portalParticle(spot[0] + (ms.rnd.nextDouble() - 0.5) * 0.6, spot[1] + ms.rnd.nextDouble() * 1.8, spot[2] + (ms.rnd.nextDouble() - 0.5) * 0.6, 0.55F, 0.25F, 0.9F);
+      }
+   }
+
    // ------------------------------------------------------------------ fireballs
    static void shoot(Mobs ms, Mob m, double tx, double ty, double tz, double speed, boolean big) {
       Fireball f = new Fireball();
@@ -990,7 +1092,17 @@ final class Mobs312 {
          f.life++;
          boolean boom = false;
          boolean gone = f.life > 400;
+         if (f.pearl) {
+            f.vy -= 0.03;
+            f.vx *= 0.99;
+            f.vy *= 0.99;
+            f.vz *= 0.99;
+         }
+
          for (int s = 0; s < 4 && !boom && !gone; s++) {
+            f.lx = f.x;
+            f.ly = f.y;
+            f.lz = f.z;
             f.x += f.vx / 4.0;
             f.y += f.vy / 4.0;
             f.z += f.vz / 4.0;
@@ -1005,11 +1117,11 @@ final class Mobs312 {
             int id = w.getBlock(bx, by, bz);
             if (id != 0 && Blocks.coll[id] != null) {
                boom = true;
-            } else if (ms.targetable(p) && f.x > p.bb[0] - 0.25 && f.x < p.bb[3] + 0.25 && f.y > p.bb[1] - 0.25 && f.y < p.bb[4] + 0.25 && f.z > p.bb[2] - 0.25 && f.z < p.bb[5] + 0.25) {
+            } else if (!f.pearl && ms.targetable(p) && f.x > p.bb[0] - 0.25 && f.x < p.bb[3] + 0.25 && f.y > p.bb[1] - 0.25 && f.y < p.bb[4] + 0.25 && f.z > p.bb[2] - 0.25 && f.z < p.bb[5] + 0.25) {
                boom = true;
             } else {
                for (Mob o : ms.list) {
-                  if (!o.dead && o.type != Mobs.GHAST && o.type != Mobs.BLAZE && !(f.dragon && (o.type == Mobs.ENDER_DRAGON || o.type == Mobs.END_CRYSTAL)) && f.x > o.bb[0] && f.x < o.bb[3] && f.y > o.bb[1] && f.y < o.bb[4] && f.z > o.bb[2] && f.z < o.bb[5]) {
+                  if (!o.dead && (f.pearl || o.type != Mobs.GHAST && o.type != Mobs.BLAZE) && !(f.dragon && (o.type == Mobs.ENDER_DRAGON || o.type == Mobs.END_CRYSTAL)) && f.x > o.bb[0] && f.x < o.bb[3] && f.y > o.bb[1] && f.y < o.bb[4] && f.z > o.bb[2] && f.z < o.bb[5]) {
                      boom = true;
                      break;
                   }
@@ -1017,7 +1129,11 @@ final class Mobs312 {
             }
          }
 
-         if (f.life % 2 == 0 && !gone) {
+         if (f.pearl) {
+            if (!gone) {
+               ms.g.portalParticle(f.x, f.y, f.z, 0.55F, 0.25F, 0.9F);
+            }
+         } else if (f.life % 2 == 0 && !gone) {
             ms.g.flameParticle(f.x, f.y, f.z, f.big);
          }
 
@@ -1033,6 +1149,11 @@ final class Mobs312 {
 
    /** A fireball arrives. Big (ghast): a hole about 1.5 blocks wide, 6 damage near it, fires. Small (blaze): 5 damage and sets you alight, a fire. */
    static void explode(Mobs ms, World w, Player p, Fireball f) {
+      if (f.pearl) {
+         pearlLand(ms, w, p, f);
+         return;
+      }
+
       if (f.dragon) {
          if (w.fight != null) {
             w.fight.addCloud(f.x, f.y, f.z);

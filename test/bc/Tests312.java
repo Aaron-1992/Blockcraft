@@ -25,6 +25,8 @@ final class Tests312 {
       colors();
       parrots();
       advancements();
+      pearls();
+      netherRules();
    }
 
    static void deleteAll(File f) {
@@ -3347,6 +3349,200 @@ final class Tests312 {
       }
 
       return new int[]{(int)(r / 256), (int)(g / 256), (int)(b / 256)};
+   }
+
+   // ------------------------------------------------------------------ small rules of the Nether
+   static void netherRules() {
+      test("rules: fire on netherrack never burns out (on stone it does); soul sand drags; a magma block burns your feet", () -> {
+         Game g = newGame(0);
+         g.world.fire.rnd.setSeed(21);
+         g.world.setBlock(20, GROUND + 1, 20, Blocks.NETHERRACK);
+         g.world.setBlock(30, GROUND + 1, 20, Blocks.STONE);
+         check(g.world.fire.ignite(20, GROUND + 2, 20), "fire on netherrack");
+         check(g.world.fire.ignite(30, GROUND + 2, 20), "fire on stone");
+         int gone = Tests37.tickUntil(g.world, 6000, () -> g.world.getBlock(30, GROUND + 2, 20) != Blocks.FIRE);
+         check(gone >= 0, "the fire on stone burned out");
+         for (int i = 0; i < 6000; i++) {
+            g.world.tick();
+         }
+
+         eq(Blocks.FIRE, g.world.getBlock(20, GROUND + 2, 20), "twelve thousand ticks later the fire on netherrack still burns");
+         eq(Blocks.NETHERRACK, g.world.getBlock(20, GROUND + 1, 20), "and the netherrack is still there");
+
+         // soul sand: the same walk covers far less ground
+         double[] dist = new double[2];
+         for (int k = 0; k < 2; k++) {
+            Game h = newGame(0);
+            for (int x = 0; x < 30; x++) {
+               for (int z = 0; z < 30; z++) {
+                  h.world.setBlock(x, GROUND, z, k == 0 ? Blocks.STONE : Blocks.SOUL_SAND);
+               }
+            }
+
+            h.player.setPos(8.5, GROUND + 1, 8.5);
+            h.player.yaw = 0.0F;
+            for (int i = 0; i < 40; i++) {
+               h.player.tick(h.world, 0.0f, 1.0f, false, false, false);
+            }
+
+            dist[k] = Math.hypot(h.player.x - 8.5, h.player.z - 8.5);
+         }
+
+         check(dist[0] > 3.0, "walks on stone: " + dist[0]);
+         check(dist[1] < dist[0] * 0.6 && dist[1] > 0.3, "soul sand drags: " + dist[1] + " against " + dist[0]);
+
+         // magma: standing costs health, sneaking does not, creative does not
+         int[] hp = new int[3];
+         for (int k = 0; k < 3; k++) {
+            Game h = newGame(k == 2 ? 1 : 0);
+            h.world.setBlock(8, GROUND, 8, Blocks.MAGMA);
+            h.player.setPos(8.5, GROUND + 1, 8.5);
+            h.player.food = 10; // no natural regeneration to hide the damage
+            h.player.sat = 0.0F;
+            for (int i = 0; i < 60; i++) {
+               h.player.tick(h.world, 0.0f, 0.0f, false, k == 1, false);
+            }
+
+            hp[k] = h.player.health;
+         }
+
+         check(hp[0] <= 17 && hp[0] >= 13, "standing on magma: health " + hp[0]);
+         eq(20, hp[1], "sneaking on magma is safe");
+         eq(20, hp[2], "creative is safe");
+      });
+   }
+
+   // ------------------------------------------------------------------ ender pearls
+   static void pearls() {
+      test("pearls: a right click throws one (not in adventure mode, one a second), creative keeps its stack", () -> {
+         Game g = newGame(0);
+         g.inv[g.sel] = new Stack(Items.ENDER_PEARL, 3);
+         check(g.useSpecial(g.inv[g.sel]), "the first throw works");
+         eq(2, g.inv[g.sel].n, "one pearl less");
+         eq(1, g.mobs.fireballs.size(), "one pearl in the air");
+         check(g.mobs.fireballs.get(0).pearl, "it is a pearl");
+         check(!g.useSpecial(g.inv[g.sel]), "a second throw straight away is refused");
+         eq(2, g.inv[g.sel].n, "nothing was used up");
+         g.mobs.fireballs.clear();
+         g.player.setMode(2);
+         check(!g.useSpecial(g.inv[g.sel]), "no throwing in adventure mode");
+         g.player.setMode(1);
+         check(g.useSpecial(g.inv[g.sel]), "creative throws");
+         eq(2, g.inv[g.sel].n, "creative keeps the stack");
+         g.player.setMode(3);
+         g.mobs.fireballs.clear();
+         check(!g.useSpecial(g.inv[g.sel]), "spectators cannot throw");
+      });
+
+      test("pearls: it arcs down and you land where it did - 5 damage, no armour help, no fall damage, never inside a block", () -> {
+         Game g = newGame(0);
+         g.player.yaw = 0.0F;
+         g.player.pitch = 0.0F;
+         g.inv[g.sel] = new Stack(Items.ENDER_PEARL, 4);
+         check(g.useSpecial(g.inv[g.sel]), "thrown");
+         double startY = g.mobs.fireballs.get(0).y;
+         int ticks = 0;
+         double topY = startY;
+         while (!g.mobs.fireballs.isEmpty() && ticks < 200) {
+            Mobs312.tickFireballs(g.mobs, g.world, g.player);
+            if (!g.mobs.fireballs.isEmpty()) {
+               topY = Math.max(topY, g.mobs.fireballs.get(0).y);
+            }
+
+            ticks++;
+         }
+
+         check(ticks > 5 && ticks < 40, "it flew for a few ticks: " + ticks);
+         check(topY <= startY + 0.01, "thrown level it only falls");
+         check(g.player.z > 18.0 && g.player.z < 30.0, "you arrived ahead: z = " + g.player.z);
+         check(Math.abs(g.player.x - 8.5) < 1.0, "straight ahead: x = " + g.player.x);
+         check(g.player.y >= GROUND + 0.99 && g.player.y < GROUND + 2.5, "on the ground, not in it: y = " + g.player.y);
+         eq(15, g.player.health, "5 damage");
+         eq(0.0F, g.player.fallDistance, "no fall damage to come");
+         g.player.updateBox();
+         check(!Phys.collides(g.world, g.player.bb), "not inside a block");
+      });
+
+      test("pearls: a wall stops it, you stand in front of the wall; creative takes no damage; straight up comes back down to where you were", () -> {
+         Game g = newGame(1);
+         for (int y = GROUND + 1; y <= GROUND + 18; y++) {
+            for (int x = -4; x <= 20; x++) {
+               g.world.setBlock(x, y, 30, Blocks.STONE);
+            }
+         }
+
+         g.player.yaw = 0.0F;
+         g.player.pitch = -8.0F;
+         g.inv[g.sel] = new Stack(Items.ENDER_PEARL, 2);
+         check(g.useSpecial(g.inv[g.sel]), "thrown");
+         for (int i = 0; i < 100 && !g.mobs.fireballs.isEmpty(); i++) {
+            Mobs312.tickFireballs(g.mobs, g.world, g.player);
+         }
+
+         check(g.player.z > 26.5 && g.player.z <= 29.71, "in front of the wall: z = " + g.player.z);
+         eq(20, g.player.health, "creative: no damage");
+         g.player.updateBox();
+         check(!Phys.collides(g.world, g.player.bb), "not inside the wall");
+
+         g.player.setMode(0);
+         g.player.setPos(8.5, GROUND + 1, 8.5);
+         g.player.pitch = -90.0F;
+         g.player.invuln = 5;
+         check(g.useSpecial(g.inv[g.sel]), "thrown straight up");
+         for (int i = 0; i < 400 && !g.mobs.fireballs.isEmpty(); i++) {
+            Mobs312.tickFireballs(g.mobs, g.world, g.player);
+         }
+
+         check(Math.hypot(g.player.x - 8.5, g.player.z - 8.5) < 2.5, "back near where you were: " + g.player.x + " " + g.player.z);
+         eq(15, g.player.health, "5 damage even straight after being hurt");
+      });
+
+      test("pearls: out of the loaded world or into the void nothing happens; a dead player is not moved; no spot, no teleport", () -> {
+         Game g = newGame(0);
+         g.player.yaw = 0.0F;
+         g.player.pitch = 85.0F;
+         g.player.setPos(8.5, GROUND + 1, 8.5);
+         // take the ground out of a wide column right below you (down to the bedrock): the pearl falls out of the world
+         for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -4; dz <= 12; dz++) {
+               for (int y = 0; y <= GROUND; y++) {
+                  g.world.setBlock(8 + dx, y, 8 + dz, 0);
+               }
+            }
+         }
+
+         g.inv[g.sel] = new Stack(Items.ENDER_PEARL, 2);
+         check(g.useSpecial(g.inv[g.sel]), "thrown into the hole");
+         for (int i = 0; i < 200 && !g.mobs.fireballs.isEmpty(); i++) {
+            Mobs312.tickFireballs(g.mobs, g.world, g.player);
+         }
+
+         eq(20, g.player.health, "no damage when the pearl fell out of the world");
+         check(Math.abs(g.player.x - 8.5) < 0.01 && Math.abs(g.player.z - 8.5) < 0.01, "you stayed where you were");
+         // a point inside solid rock has no spot
+         for (int x = 28; x <= 40; x++) {
+            for (int y = GROUND - 12; y <= GROUND - 3; y++) {
+               for (int z = 28; z <= 40; z++) {
+                  g.world.setBlock(x, y, z, Blocks.STONE);
+               }
+            }
+         }
+
+         check(Mobs312.pearlSpot(g.world, 34.5, GROUND - 7.5, 34.5) == null, "deep inside rock there is no spot");
+         check(Mobs312.pearlSpot(g.world, 34.5, GROUND + 1.2, 34.5) != null, "above the ground there is");
+         g.mobs.fireballs.clear();
+         Mobs312.Fireball f = new Mobs312.Fireball();
+         f.pearl = true;
+         f.lx = 20.5;
+         f.ly = GROUND + 1.5;
+         f.lz = 20.5;
+         g.player.dead = true;
+         Mobs312.explode(g.mobs, g.world, g.player, f);
+         check(Math.abs(g.player.x - 8.5) < 0.01, "a dead player stays");
+         g.player.dead = false;
+         Mobs312.explode(g.mobs, g.world, g.player, f);
+         check(Math.abs(g.player.x - 20.5) < 0.7 && Math.abs(g.player.z - 20.5) < 0.7, "a live one arrives");
+      });
    }
 
    static void free(Mesher.Result r) {

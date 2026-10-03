@@ -1048,6 +1048,10 @@ public final class Tex {
       return var1 / (4.0F - 3.0F * var1);
    }
 
+   /** Update 3.12: the share of the dimension's ambient light in the green and blue channel (see {@link Dim#ambientTint}). */
+   static float ambG = 0.8F;
+   static float ambB = 0.78F;
+
    public static void updateLightmap(float var0, float var1, float var2) {
       for (int var3 = 0; var3 < 16; var3++) {
          for (int var4 = 0; var4 < 16; var4++) {
@@ -1061,8 +1065,8 @@ public final class Tex {
             float var12 = 0.045F;
             // Update 3.12: the Nether and the End are never pitch black (var1 = ambient light of the dimension)
             var9 = Math.max(var12 * 0.9F + var1, var9);
-            var10 = Math.max(var12 * 0.9F + var1 * 0.8F, var10);
-            var11 = Math.max(var12 * 1.2F + var1 * 0.78F, var11);
+            var10 = Math.max(var12 * 0.9F + var1 * ambG, var10);
+            var11 = Math.max(var12 * 1.2F + var1 * ambB, var11);
             var9 = gamma(var9, var2);
             var10 = gamma(var10, var2);
             var11 = gamma(var11, var2);

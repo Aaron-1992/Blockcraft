@@ -3477,6 +3477,10 @@ public final class Game {
          return this.useBoneMeal(var1);
       }
 
+      if (var2 == Items.ENDER_PEARL) {
+         return !this.player.adventure && Mobs312.throwPearl(this, var1);
+      }
+
       if (var2 == Items.EYE_OF_ENDER) {
          boolean thrown = !this.player.adventure && EndPortals.throwEye(this, var1);
          if (thrown) {
