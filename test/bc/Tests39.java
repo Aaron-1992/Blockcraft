@@ -676,6 +676,11 @@ final class Tests39 {
       return out;
    }
 
+   /** Since 3.11 every flame plane comes with its back (back-face culling): twice the vertices. */
+   static int back() {
+      return Mesher.legacy ? 1 : 2;
+   }
+
    static void fireLook() {
       test("fire like in Minecraft: an X on solid ground, flames on the wall it hangs on, flames from a ceiling it hangs from", () -> {
          Game g = newGame(1);
@@ -684,11 +689,11 @@ final class Tests39 {
          int y = GROUND + 3; // in the air: nothing solid below unless the test puts it there
          int ly = y - 48; // mesh coordinates are local to the 16-high section (3 = y 48..63)
          // 1) on the grass: the X (2 quads)
-         eq(8, fireVertices(w, c, 5, GROUND + 1, 5).size(), "fire on grass: two crossed planes");
+         eq(8 * back(), fireVertices(w, c, 5, GROUND + 1, 5).size(), "fire on grass: two crossed planes (each with its back)");
          // 2) hanging on a wooden wall, nothing below: one plane in front of the wall
          w.setBlock(6, y, 5, Blocks.PLANKS);
          java.util.List<float[]> wall = fireVertices(w, c, 5, y, 5);
-         eq(4, wall.size(), "fire hanging on a wall east of it: one flame plane");
+         eq(4 * back(), wall.size(), "fire hanging on a wall east of it: one flame plane");
          for (float[] v : wall) {
             check(v[0] >= 5.80F && v[0] <= 5.99F, "the plane is just in front of the wall's face (x=6): " + v[0]);
             check(v[2] >= 5.0F && v[2] <= 6.0F && v[1] >= ly && v[1] <= ly + 1.0F, "and covers the face: " + v[1] + "/" + v[2]);
@@ -702,9 +707,9 @@ final class Tests39 {
          check(lean > 0.05, "the flames lean away from the wall at the top: " + lean);
          // 3) a corner: two walls, two planes; plus a flammable ceiling: two more crossed planes
          w.setBlock(5, y, 6, Blocks.LOG_OAK);
-         eq(8, fireVertices(w, c, 5, y, 5).size(), "two flammable neighbours: two planes");
+         eq(8 * back(), fireVertices(w, c, 5, y, 5).size(), "two flammable neighbours: two planes");
          w.setBlock(5, y + 1, 5, Blocks.LEAVES_OAK);
-         eq(16, fireVertices(w, c, 5, y, 5).size(), "plus a flammable ceiling: two crossed planes more");
+         eq(16 * back(), fireVertices(w, c, 5, y, 5).size(), "plus a flammable ceiling: two crossed planes more");
          for (float[] v : fireVertices(w, c, 5, y, 5)) {
             check(v[1] >= ly, "nothing sticks out below the cell: " + v[1]);
          }
@@ -714,19 +719,19 @@ final class Tests39 {
          w.setBlock(5, y, 6, 0);
          w.setBlock(5, y + 1, 5, 0);
          w.setBlock(4, y, 5, Blocks.STONE);
-         eq(8, fireVertices(w, c, 5, y, 5).size(), "stone is not flammable: the X (nothing to hang on)");
+         eq(8 * back(), fireVertices(w, c, 5, y, 5).size(), "stone is not flammable: the X (nothing to hang on)");
          // 5) flammable below counts as ground: the X even with a wall next to it
          w.setBlock(4, y, 5, 0);
          w.setBlock(5, y - 1, 5, Blocks.PLANKS);
          w.setBlock(6, y, 5, Blocks.PLANKS);
-         eq(8, fireVertices(w, c, 5, y, 5).size(), "on planks: the X, like Minecraft's default fire state");
+         eq(8 * back(), fireVertices(w, c, 5, y, 5).size(), "on planks: the X, like Minecraft's default fire state");
          // 6) the other three directions get their plane too, inside their own cell
          w.setBlock(5, y - 1, 5, 0);
          w.setBlock(6, y, 5, 0);
          for (int[] d : new int[][]{{-1, 0}, {0, 1}, {0, -1}}) {
             w.setBlock(5 + d[0], y, 5 + d[1], Blocks.PLANKS);
             java.util.List<float[]> p = fireVertices(w, c, 5, y, 5);
-            eq(4, p.size(), "one plane for the wall at " + d[0] + "," + d[1]);
+            eq(4 * back(), p.size(), "one plane for the wall at " + d[0] + "," + d[1]);
             for (float[] v : p) {
                check(v[0] > 5.0F - 1e-3F && v[0] < 6.0F + 1e-3F && v[2] > 5.0F - 1e-3F && v[2] < 6.0F + 1e-3F, "inside its own cell: " + v[0] + "," + v[2]);
                double toWall = d[0] != 0 ? Math.abs(v[0] - (d[0] > 0 ? 6.0 : 5.0)) : Math.abs(v[2] - (d[1] > 0 ? 6.0 : 5.0));

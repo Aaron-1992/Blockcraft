@@ -1706,6 +1706,7 @@ public final class GameTests {
       Tests38.run();
       Tests39.run();
       Tests310.run();
+      Tests311.run();
       TestsFall.run();
       TestsDisasters.run();
       System.out.println();

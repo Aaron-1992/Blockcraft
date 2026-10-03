@@ -34,6 +34,15 @@ public final class Mesher {
     */
    public static volatile int leafMode = Integer.getInteger("bc.leaves", 1);
 
+   /**
+    * Update 3.11: faces are drawn from their front side only (GL back-face culling, like Minecraft), so everything that has to be seen from
+    * both sides - plants, crops, flames, the top of a water or lava surface - gets a second quad that faces the other way, and the test that
+    * decides whether the face of a box lies against a neighbouring block now looks at the right side for the z faces (before, a thin door
+    * lost its visible big face when an opaque block stood against that side). {@code -Dbc.legacymesh=true} restores the meshes of Update 3.5
+    * exactly (the strict equivalence pass compares them with the original jar).
+    */
+   public static volatile boolean legacy = Boolean.getBoolean("bc.legacymesh");
+
    /** True if every face neighbour of the block at padded position (x, y, z) is solid or a leaf (so none of its faces can be seen from outside). */
    static boolean enclosed(byte[] blocks, int x, int y, int z) {
       if (x < 1 || x > 16 || y < 1 || y > 16 || z < 1 || z > 16) {
@@ -201,6 +210,37 @@ public final class Mesher {
 
       for (int var10 = 0; var10 < 4; var10++) {
          int var11 = var3 ? var10 + 1 & 3 : var10;
+         var1.v(
+            var0.qx[var11],
+            var0.qy[var11],
+            var0.qz[var11],
+            var6 + (var7 - var6) * var0.qu[var11],
+            var8 + (var9 - var8) * var0.qv[var11],
+            var0.qr[var11],
+            var0.qg[var11],
+            var0.qb[var11],
+            var0.qa[var11],
+            var0.qm[var11],
+            var0.ql[var11]
+         );
+      }
+   }
+
+   /** The quad that is in the scratch arrays, once more with the corners in the opposite order: it faces the other way (back-face culling). */
+   static void emitBack(Mesher.Scratch var0, Mesher.FB var1, int var2) {
+      if (legacy) {
+         return;
+      }
+
+      float var4 = var2 % 16 / 16.0F;
+      float var5 = var2 / 16 / 16.0F;
+      float var6 = var4 + 2.0E-4F;
+      float var7 = var4 + 0.0625F - 2.0E-4F;
+      float var8 = var5 + 2.0E-4F;
+      float var9 = var5 + 0.0625F - 2.0E-4F;
+
+      for (int var10 = 0; var10 < 4; var10++) {
+         int var11 = -var10 & 3;
          var1.v(
             var0.qx[var11],
             var0.qy[var11],
@@ -410,6 +450,7 @@ public final class Mesher {
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
          emit(var0, var0.o, Blocks.tiles[var5][0], false);
+         emitBack(var0, var0.o, Blocks.tiles[var5][0]);
       }
    }
 
@@ -472,6 +513,7 @@ public final class Mesher {
 
       var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
       emit(var0, var0.o, Blocks.tiles[Blocks.FIRE][0], false);
+      emitBack(var0, var0.o, Blocks.tiles[Blocks.FIRE][0]);
    }
 
    /** Flames hanging from a flammable ceiling: two crossed planes in the upper part of the cell. */
@@ -494,6 +536,7 @@ public final class Mesher {
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
          emit(var0, var0.o, Blocks.tiles[Blocks.FIRE][0], false);
+         emitBack(var0, var0.o, Blocks.tiles[Blocks.FIRE][0]);
       }
    }
 
@@ -528,6 +571,7 @@ public final class Mesher {
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
          emit(var0, var0.o, Blocks.tiles[var5][0], false);
+         emitBack(var0, var0.o, Blocks.tiles[var5][0]);
       }
    }
 
@@ -742,8 +786,11 @@ public final class Mesher {
          }
 
          int var31 = var14 / 2 == 0 ? 1 : (var14 / 2 == 1 ? 2 : 0);
-         double var33 = var14 % 2 == 0 ? var6[3 + var31] : var6[var31];
-         boolean var32 = var14 % 2 == 0 ? var33 >= 1.0 : var33 <= 0.0;
+         // faces 2 and 3 are -z and +z (FN order), so "the positive side" is not simply the even faces: with the old test a thin door lost its
+         // visible big face whenever an opaque block stood against that side (Update 3.11)
+         boolean var40 = legacy ? var14 % 2 == 0 : FN[var14][var31] > 0;
+         double var33 = var40 ? var6[3 + var31] : var6[var31];
+         boolean var32 = var40 ? var33 >= 1.0 : var33 <= 0.0;
          if (var32) {
             int var34 = var0.B[ci(var8 + var15[0], var9 + var15[1], var10 + var15[2])] & 255;
             if (Blocks.opaque[var34]) {
@@ -880,6 +927,9 @@ public final class Mesher {
 
             var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
             emit(var0, var10, var26, false);
+            if (var27 == 0) {
+               emitBack(var0, var10, var26); // the surface is also seen from below (from under water)
+            }
          }
       }
    }

@@ -1248,7 +1248,7 @@ final class Tests37 {
                org.lwjgl.system.MemoryUtil.memFree(base.trans);
             }
             if (Blocks.kind[id] == 1) {
-               eq(8, added, "block " + id + " (" + Blocks.name[id] + ") cross-shaped: 2 quads");
+               eq(Mesher.legacy ? 8 : 16, added, "block " + id + " (" + Blocks.name[id] + ") cross-shaped: 2 quads, each with its back since 3.11");
             } else if (Blocks.kind[id] == 0) {
                eq(16, added, "block " + id + " (" + Blocks.name[id] + ") opaque cube: 5 faces, minus the grass top it covers");
             } else {

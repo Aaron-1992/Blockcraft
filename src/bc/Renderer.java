@@ -452,6 +452,13 @@ public final class Renderer {
       return true;
    }
 
+   static final boolean NOCULL = Boolean.getBoolean("bc.nocull");
+
+   /** Update 3.11: back faces are not drawn (the meshes of Update 3.5 are drawn double-sided, as before). */
+   static boolean cullFaces() {
+      return !NOCULL && !Mesher.legacy;
+   }
+
    static void lightmapUnit(boolean var0) {
       GL13.glActiveTexture(33985);
       if (var0) {
@@ -702,6 +709,12 @@ public final class Renderer {
          this.sh.useWorld(this.mv, this.camX, this.camY, this.camZ, false, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23);
       }
 
+      // Update 3.11: faces are single-sided like in Minecraft (go under the map in spectator mode: the ground is see-through from below)
+      boolean cull = cullFaces();
+      if (cull) {
+         GL11.glEnable(2884);
+      }
+
       for (Renderer.Vis var56 : this.vis) {
          Section var59 = var56.c.sections[var56.sy];
          if (var59.nO != 0 && var59.vboO != 0) {
@@ -712,6 +725,10 @@ public final class Renderer {
             this.drawCalls++;
             GL11.glPopMatrix();
          }
+      }
+
+      if (cull) {
+         GL11.glDisable(2884);
       }
 
       arrays(false);
@@ -742,6 +759,10 @@ public final class Renderer {
          this.sh.useWorld(this.mv, this.camX, this.camY, this.camZ, true, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23);
       }
 
+      if (cull) {
+         GL11.glEnable(2884);
+      }
+
       for (int var54 = this.vis.size() - 1; var54 >= 0; var54--) {
          Renderer.Vis var57 = (Renderer.Vis)this.vis.get(var54);
          Section var60 = var57.c.sections[var57.sy];
@@ -753,6 +774,10 @@ public final class Renderer {
             this.drawCalls++;
             GL11.glPopMatrix();
          }
+      }
+
+      if (cull) {
+         GL11.glDisable(2884);
       }
 
       arrays(false);
