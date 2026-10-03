@@ -506,6 +506,16 @@ final class Mobs312 {
          }
 
          int roll = ms.rnd.nextInt(100);
+         if (w.getBlock(x, floor - 1, z) == Blocks.NETHER_BRICKS) {
+            // on the floor of a fortress: blazes and skeletons guard it
+            Mob guard = ms.spawn(roll < 45 ? Mobs.BLAZE : (roll < 85 ? Mobs.SKELETON : Mobs.ZOMBIE_PIGMAN), x + 0.5, floor, z + 0.5);
+            if (Phys.collides(w, guard.bb)) {
+               ms.list.remove(guard);
+            }
+
+            return;
+         }
+
          if (roll < 14 && floor + 3 < 118 && roomFor(w, x, floor + 3, z, 2, 4)) {
             Mob g = ms.spawn(Mobs.GHAST, x + 0.5, floor + 3, z + 0.5);
             if (Phys.collides(w, g.bb)) {

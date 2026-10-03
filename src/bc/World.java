@@ -1220,8 +1220,9 @@ public final class World {
    void fillLoot(TileEntity var1) {
       Random var2 = new Random(this.seed * 31L + tkey(var1.x, var1.y, var1.z));
       int var3 = 0;
+      int[][] table = this.dim == Dim.NETHER ? Items312.NETHER_LOOT : LOOT;
 
-      for (int[] var7 : LOOT) {
+      for (int[] var7 : table) {
          var3 += var7[3];
       }
 
@@ -1230,7 +1231,7 @@ public final class World {
       for (int var15 = 0; var15 < var14; var15++) {
          int var16 = var2.nextInt(var3);
 
-         for (int[] var10 : LOOT) {
+         for (int[] var10 : table) {
             var16 -= var10[3];
             if (var16 < 0) {
                int var11 = var10[1] + var2.nextInt(var10[2] - var10[1] + 1);

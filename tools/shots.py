@@ -271,8 +271,54 @@ def torch_blocks():
 
 
 # name -> (props, only_new)
+def portal_blocks(x, y, z, axis=0):
+    """Update 3.12: an obsidian frame (4 x 5, corners left out) with the portal film in it; (x, y, z) = bottom corner of the 2 x 3 interior."""
+    out = []
+    dx, dz = (1, 0) if axis == 0 else (0, 1)
+    for i in range(-1, 3):
+        out.append((x + dx * i, y - 1, z + dz * i, 26))
+        out.append((x + dx * i, y + 3, z + dz * i, 26))
+    for j in range(3):
+        out.append((x - dx, y + j, z - dz, 26))
+        out.append((x + dx * 2, y + j, z + dz * 2, 26))
+        for i in range(2):
+            out.append((x + dx * i, y + j, z + dz * i, 1030 + axis))
+    return out
+
+
+def overworld_portal_blocks():
+    """The flat grass strip (surface y=66): air around, a portal in the middle, some netherrack and soul sand and a magma block beside it."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 7):
+                out.append((x, y, z, 0))
+    out += portal_blocks(143, gy + 1, 75)
+    for x in range(139, 148):
+        out.append((x, gy, 73, 1024))
+    out.append((140, gy, 74, 1025))
+    out.append((141, gy, 74, 1028))
+    out.append((146, gy + 1, 74, 1027))
+    out.append((147, gy + 1, 74, 1027))
+    return out
+
+
+NETHER = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.dim=-1"]
+
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
+    # ---- Update 3.12: the Nether (seed 12345: a lava lake with a wide cavern around x=30, z=-96; flat floor for a portal at x=22, y=41, z=-116)
+    "nether-vista":       (NETHER + ["-Dbc.cam=30,48,-96,-90,4"] + PLAIN + ["-Dbc.shot=150"], True),
+    "nether-vista-sh":    (NETHER + ["-Dbc.cam=30,48,-96,-90,4", "-Dbc.shot=150"], True),
+    "nether-vista-west":  (NETHER + ["-Dbc.cam=30,48,-96,90,2"] + PLAIN + ["-Dbc.shot=150"], True),
+    "nether-portal":      (NETHER + ["-Dbc.cam=23,43,-111,180,8", sets(portal_blocks(22, 41, -116))] + PLAIN + ["-Dbc.shot=150"], True),
+    "nether-portal-sh":   (NETHER + ["-Dbc.cam=23,43,-111,180,8", sets(portal_blocks(22, 41, -116)), "-Dbc.shot=150"], True),
+    "nether-mobs":        (NETHER + ["-Dbc.cam=23,43,-111,180,6", "-Dbc.summon=pigman,magmacube,blaze,pigman", "-Dbc.summonDist=6", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=150"], True),
+    "nether-ghast":       (NETHER + ["-Dbc.cam=30,48,-96,-90,2", "-Dbc.summon=ghast", "-Dbc.summonDist=14", "-Dbc.summonDy=0"] + PLAIN + ["-Dbc.shot=110"], True),
+    "portal-day":         (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
+    "portal-day-sh":      (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks()), "-Dbc.shot=170"], True),
+
     "title":          (["-Dbc.auto=1", "-Dbc.title=TITLE"], False),
     "day-plain":      (COMMON + [CAM, "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=100"], False),
     "mobs":           (COMMON + ["-Dbc.cam=140,70,60,0,48", "-Dbc.time=6000"] + PLAIN + ["-Dbc.summon=pig,cow,sheep,chicken,creeper", "-Dbc.shot=110"], False),

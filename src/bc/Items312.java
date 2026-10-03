@@ -8,6 +8,27 @@ final class Items312 {
    private Items312() {
    }
 
+   /** What the chests of a nether fortress hold: {item, least, most, weight}. */
+   static final int[][] NETHER_LOOT = {
+      {Items.GOLD_INGOT, 2, 6, 12},
+      {Items.IRON_INGOT, 2, 5, 8},
+      {Items.GOLD_NUGGET, 5, 14, 10},
+      {Items.DIAMOND, 1, 2, 3},
+      {Items.FLINT_STEEL, 1, 1, 4},
+      {Blocks.OBSIDIAN, 2, 4, 4},
+      {Blocks.NETHER_BRICKS, 4, 10, 5},
+      {Items.COAL, 3, 8, 6},
+      {Items.BONE, 2, 6, 5},
+      {Items.toolId(3, 4), 1, 1, 4},
+      {Items.toolId(2, 4), 1, 1, 3},
+      {Items.armorId(2, 1), 1, 1, 3},
+      {Items.armorId(2, 0), 1, 1, 3},
+      {Items.armorId(1, 1), 1, 1, 2},
+      {Items.armorId(1, 2), 1, 1, 2},
+      {Items.APPLE, 2, 4, 4},
+      {Items.ARROW, 4, 12, 4}
+   };
+
    private static void item(int id, String name) {
       Items.defTile(id, name, TexArt312.ITEM0 + (id - Items.QUARTZ));
    }

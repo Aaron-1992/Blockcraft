@@ -1,1 +1,2 @@
-wx-compare-sh,wx-storm-sh,wx-sunset-sh,mobs-sh,hand-sword
+nether-vista,nether-vista-sh,nether-portal,nether-portal-sh,nether-mobs,nether-ghast,portal-day,portal-day-sh
+jar=build

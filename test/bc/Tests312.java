@@ -18,6 +18,7 @@ final class Tests312 {
       foundation();
       nether();
       netherMobs();
+      fortress();
    }
 
    static void deleteAll(File f) {
@@ -616,6 +617,19 @@ final class Tests312 {
             g.switchDimension(Dim.NETHER, 10.0, 10.0, 0);
             load(g.world, 0, 0, 2);
             eq(Blocks.MAGMA, g.world.getBlock(2, 70, 2), "the Nether remembers what was built in it");
+            // the /dim command does the same trip without waiting in a portal
+            g.finishArrival();
+            g.screen = Game.S.PLAY;
+            double px = g.player.x;
+            g.runCommand("/dim overworld");
+            eq(Dim.OVERWORLD, g.world.dim, "/dim overworld");
+            check(g.arrivalAt != null && Math.abs(g.arrivalAt[0] - px * 8.0) < 0.01, "/dim goes to 8 times the place");
+            load(g.world, (int)Math.floor(g.player.x) >> 4, (int)Math.floor(g.player.z) >> 4, 2);
+            g.finishArrival();
+            g.screen = Game.S.PLAY;
+            g.runCommand("/dim overworld");
+            eq(Dim.OVERWORLD, g.world.dim, "already there: nothing happens");
+            eq(Game.S.PLAY, g.screen, "and the screen stays");
          } finally {
             if (g != null && g.world != null) {
                g.world.shutdown();
@@ -876,7 +890,7 @@ final class Tests312 {
 
          for (Mobs.Mob m : g.mobs.list) {
             kinds.add(m.type);
-            check(m.type == Mobs.ZOMBIE_PIGMAN || m.type == Mobs.GHAST || m.type == Mobs.MAGMA_CUBE, "only nether mobs (" + Mobs.NAME[m.type] + ")");
+            check(m.type == Mobs.ZOMBIE_PIGMAN || m.type == Mobs.GHAST || m.type == Mobs.MAGMA_CUBE || m.type == Mobs.BLAZE || m.type == Mobs.SKELETON, "only nether mobs (" + Mobs.NAME[m.type] + ")");
             check(!Phys.collides(w, m.bb), Mobs.NAME[m.type] + " is not inside a block");
             double dx = m.x - g.player.x;
             double dz = m.z - g.player.z;
@@ -892,5 +906,199 @@ final class Tests312 {
 
          w.shutdown();
       });
+   }
+
+   // ------------------------------------------------------------------ nether fortresses
+   static void fortress() {
+      test("Nether fortress: regions, shape, spawner and chests are where the plan says, every part can be walked to, chunks are repeatable", () -> {
+         for (long seed : new long[]{12345L, 777L, 99L}) {
+            NetherGen gen = new NetherGen(seed);
+            int present = 0;
+            NetherFortress.Plan best = null;
+            for (int rz = -2; rz <= 2; rz++) {
+               for (int rx = -2; rx <= 2; rx++) {
+                  NetherFortress.Plan p = gen.fortress.plan(rx, rz);
+                  check(p == gen.fortress.plan(rx, rz), "the plan is made once");
+                  if (!p.present) {
+                     continue;
+                  }
+
+                  present++;
+                  check(p.minX >= rx * 256 && p.maxX < rx * 256 + 256 && p.minZ >= rz * 256 && p.maxZ < rz * 256 + 256, "a fortress stays inside its region " + rx + "," + rz + ": x " + p.minX + ".." + p.maxX + " z " + p.minZ + ".." + p.maxZ);
+                  check(p.maxX - p.minX < 2 * NetherFortress.REACH + 12 && p.maxZ - p.minZ < 2 * NetherFortress.REACH + 12, "not too big");
+                  check(p.oy >= 52 && p.oy < 64 && p.rooms >= 2 && p.hasThrone && !p.spawners.isEmpty() && !p.chests.isEmpty(), "every fortress has rooms, a throne room and chests");
+                  if (best == null && p.maxX - p.minX > 100) {
+                     best = p;
+                  }
+               }
+            }
+
+            check(present >= 8 && present <= 22, "about 70% of the regions have a fortress (" + present + " of 25), seed " + seed);
+            check(best != null, "a big fortress to look at, seed " + seed);
+            if (best == null) {
+               continue;
+            }
+
+            // build every chunk of it
+            int cx0 = Math.floorDiv(best.minX, 16) - 1;
+            int cx1 = Math.floorDiv(best.maxX, 16) + 1;
+            int cz0 = Math.floorDiv(best.minZ, 16) - 1;
+            int cz1 = Math.floorDiv(best.maxZ, 16) + 1;
+            Chunk[][] cs = new Chunk[cz1 - cz0 + 1][cx1 - cx0 + 1];
+            int bricks = 0;
+            for (int cz = cz0; cz <= cz1; cz++) {
+               for (int cx = cx0; cx <= cx1; cx++) {
+                  Chunk c = gen.generate(cx, cz);
+                  cs[cz - cz0][cx - cx0] = c;
+                  for (short b : c.blocks) {
+                     if (b == Blocks.NETHER_BRICKS) {
+                        bricks++;
+                     }
+                  }
+               }
+            }
+
+            check(bricks > 1500, "a fortress of nether bricks: " + bricks);
+            // the same chunk again is identical
+            Chunk again = gen.generate(cx0 + 3, cz0 + 3);
+            check(java.util.Arrays.equals(again.blocks, cs[3][3].blocks), "a chunk is generated the same every time");
+            // what stands where
+            for (int[] s : best.spawners) {
+               eq(Blocks.SPAWNER, at(cs, cx0, cz0, s[0], s[1], s[2]), "the blaze spawner is there");
+            }
+
+            for (int[] ch : best.chests) {
+               eq(Blocks.CHEST_LOOT, at(cs, cx0, cz0, ch[0], ch[1], ch[2]), "a loot chest is there");
+            }
+
+            // walk through it: breadth first through open air from the middle of the first hall
+            int sx = best.ox;
+            int sy = best.oy + 1;
+            int sz = best.oz;
+            eq(0, at(cs, cx0, cz0, sx, sy, sz), "the middle of the central hall is open");
+            int w = best.maxX - best.minX + 3;
+            int d = best.maxZ - best.minZ + 3;
+            int hgt = 12;
+            boolean[] seen = new boolean[w * d * hgt];
+            int[] queue = new int[w * d * hgt];
+            int qh = 0;
+            int qt = 0;
+            int base = best.oy;
+            queue[qt++] = ((sx - best.minX + 1) * d + (sz - best.minZ + 1)) * hgt + 1;
+            seen[queue[0]] = true;
+            int[][] nb = {{1, 0, 0}, {-1, 0, 0}, {0, 0, 1}, {0, 0, -1}, {0, 1, 0}, {0, -1, 0}};
+            while (qh < qt) {
+               int cur = queue[qh++];
+               int yy = cur % hgt;
+               int zz = (cur / hgt) % d;
+               int xx = cur / hgt / d;
+               for (int[] n : nb) {
+                  int nx = xx + n[0];
+                  int ny = yy + n[1];
+                  int nz = zz + n[2];
+                  if (nx < 0 || nz < 0 || ny < 0 || nx >= w || nz >= d || ny >= hgt) {
+                     continue;
+                  }
+
+                  int key = (nx * d + nz) * hgt + ny;
+                  if (seen[key] || at(cs, cx0, cz0, nx + best.minX - 1, base + ny, nz + best.minZ - 1) != 0) {
+                     continue;
+                  }
+
+                  seen[key] = true;
+                  queue[qt++] = key;
+               }
+            }
+
+            for (int[] s : best.spawners) {
+               int key = ((s[0] - best.minX + 1) * d + (s[2] - best.minZ + 1)) * hgt + (s[1] + 1 - base);
+               check(seen[key], "the cell above the spawner at " + s[0] + "," + s[2] + " can be reached on foot (seed " + seed + ")");
+            }
+
+            for (int[] ch : best.chests) {
+               int key = ((ch[0] - best.minX + 1) * d + (ch[2] - best.minZ + 1)) * hgt + (ch[1] + 1 - base);
+               check(seen[key], "the cell above the chest at " + ch[0] + "," + ch[2] + " can be reached on foot (seed " + seed + ")");
+            }
+
+            check(qt > 1500, "a big connected space: " + qt + " cells");
+         }
+      });
+
+      test("Nether fortress: the spawner in the throne room makes blazes, guards stand on the bricks", () -> {
+         Game g = newGame(0);
+         g.world.shutdown();
+         World w = new World(12345L, null, Dim.NETHER);
+         g.world = w;
+         w.game = g;
+         NetherFortress.Plan best = null;
+         for (int rx = -2; rx <= 2 && best == null; rx++) {
+            NetherFortress.Plan p = ((NetherGen)w.gen).fortress.plan(rx, 0);
+            if (p.present && !p.spawners.isEmpty()) {
+               best = p;
+            }
+         }
+
+         check(best != null, "a fortress with a spawner");
+         int[] sp = best.spawners.get(0);
+         int cx = Math.floorDiv(sp[0], 16);
+         int cz = Math.floorDiv(sp[2], 16);
+         load(w, cx, cz, 2);
+         eq(Blocks.SPAWNER, w.getBlock(sp[0], sp[1], sp[2]), "the spawner is in the loaded world");
+         g.player.setPos(sp[0] + 0.5, sp[1] + 1, sp[2] + 3.5);
+         int blazes = 0;
+         for (int i = 0; i < 40 && blazes == 0; i++) {
+            g.mobs.tickSpawners(w, g.player);
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.BLAZE) {
+                  blazes++;
+               }
+            }
+         }
+
+         check(blazes > 0, "the spawner made a blaze");
+         // guards: spawn attempts around the player on the fortress floor give blazes / skeletons
+         g.mobs.list.clear();
+         int guards = 0;
+         for (int i = 0; i < 300; i++) {
+            Mobs312.spawnNether(g.mobs, w, g.player);
+         }
+
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m.type == Mobs.SKELETON || m.type == Mobs.BLAZE) {
+               guards++;
+            }
+         }
+
+         check(guards > 0, "guards turned up: " + g.mobs.list.size() + " mobs");
+         w.shutdown();
+      });
+
+      test("Nether fortress: the chest holds nether loot", () -> {
+         World w = new World(12345L, null, Dim.NETHER);
+         load(w, 0, 0, 1);
+         w.setBlock(0, 60, 0, Blocks.CHEST_LOOT);
+         TileEntity t = w.getOrCreateTile(0, 60, 0);
+         int n = 0;
+         for (Stack s : t.slots) {
+            if (s != null) {
+               n++;
+            }
+         }
+
+         check(n >= 3, "the chest has things in it: " + n);
+         check(w.getBlock(0, 60, 0) == Blocks.CHEST, "opening makes it an ordinary chest");
+         w.shutdown();
+      });
+   }
+
+   /** The block at world position (x, y, z) in the grid of chunks cs, which starts at chunk (cx0, cz0). */
+   static int at(Chunk[][] cs, int cx0, int cz0, int x, int y, int z) {
+      int cx = Math.floorDiv(x, 16) - cx0;
+      int cz = Math.floorDiv(z, 16) - cz0;
+      if (cx < 0 || cz < 0 || cz >= cs.length || cx >= cs[0].length) {
+         return Blocks.BEDROCK;
+      }
+
+      return cs[cz][cx].get(Math.floorMod(x, 16), y, Math.floorMod(z, 16));
    }
 }

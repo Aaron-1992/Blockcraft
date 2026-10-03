@@ -487,6 +487,12 @@ public final class Game {
                this.debug = true;
             }
 
+            if (System.getProperty("bc.dim") != null && var2 != null) {
+               // Update 3.12 test hook: start in another dimension (bc.dim=-1 Nether, 1 End); bc.cam is then a position in THAT dimension
+               String[] dc = var2.split(",");
+               this.switchDimension(Integer.getInteger("bc.dim"), Double.parseDouble(dc[0]), Double.parseDouble(dc[1]), Double.parseDouble(dc[2]), 2);
+            }
+
             if ("off".equals(System.getProperty("bc.fire"))) {
                this.world.fire.spread = false; // screenshots: fires neither burn out nor spread
             }
@@ -1076,6 +1082,11 @@ public final class Game {
     * {@link #finishArrival} puts the player where they belong.
     */
    void switchDimension(int dim, double x, double z, int kind) {
+      this.switchDimension(dim, x, Double.NaN, z, kind);
+   }
+
+   /** Like the above; kind 2 puts the player at exactly (x, y, z). */
+   void switchDimension(int dim, double x, double y, double z, int kind) {
       if (this.world == null || !Dim.valid(dim)) {
          return;
       }
@@ -1116,7 +1127,7 @@ public final class Game {
       this.particles.clear();
       this.portalTime = 0;
       this.player.setPos(x, dim == Dim.NETHER ? 70.0 : (dim == Dim.END ? 70.0 : 200.0), z);
-      this.arrivalAt = new double[]{x, z};
+      this.arrivalAt = new double[]{x, z, y};
       this.arrivalKind = kind;
       this.setScreen(Game.S.LOADING);
    }
@@ -1130,7 +1141,7 @@ public final class Game {
          pos = Portals.arrive(this.world, at[0], at[1]);
          this.portalLock = true;
       } else if (this.arrivalKind == 2) {
-         pos = new double[]{at[0], 0.0, at[1]};
+         pos = new double[]{at[0], Double.isNaN(at[2]) ? 70.0 : at[2], at[1]};
       } else {
          pos = this.findStand((int)Math.floor(at[0]), (int)Math.floor(at[1]));
       }
@@ -1677,6 +1688,21 @@ public final class Game {
                case "seed":
                   this.say("Seed: [" + this.world.seed + "]");
                   break;
+               case "dim":
+               case "dimension":
+                  int dn = var2.length > 1 ? Dim.parse(var2[1]) : Integer.MIN_VALUE;
+                  if (dn == Integer.MIN_VALUE) {
+                     this.say("§cUsage: /dim <overworld|nether|end>   (you are in " + Dim.name(this.world.dim) + ")");
+                  } else if (dn == this.world.dim) {
+                     this.say("You are already in " + Dim.name(dn));
+                  } else if (dn == Dim.END) {
+                     this.say("§cThe End cannot be reached yet");
+                  } else {
+                     double dscale = Dim.scale(this.world.dim, dn);
+                     this.say("Travelling to " + Dim.name(dn) + " ...");
+                     this.switchDimension(dn, this.player.x * dscale, this.player.z * dscale, 0);
+                  }
+                  break;
                case "summon":
                   int var13 = -1;
                   String var17 = var2.length > 1 ? var2[1].toLowerCase() : "";
@@ -1777,7 +1803,7 @@ public final class Game {
                   this.say("The hand bobs when you walk: " + (this.opt.bobbing ? "on" : "off") + "  (/bobbing on|off)");
                   break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing");
+                  this.say("Commands: /gamemode /time set /tp /seed /dim /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
