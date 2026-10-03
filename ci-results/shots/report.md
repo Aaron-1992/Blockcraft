@@ -1,15 +1,15 @@
-# Visual run 2026-10-03 11:55:49 UTC
+# Visual run 2026-10-03 12:03:07 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| skin-screen | new | n/a |
-| skin-screen-narrow | new | n/a |
-| skin-screen-tiny | new | n/a |
-| skin-screen-def | new | n/a |
+| slabs | new | n/a |
+| leaves-fancy | new | n/a |
+| leaves-smart | new | n/a |
+| leaves-fast | new | n/a |
 
 ## timings
 
-- skin-screen/new: exit 0 in 8s
-- skin-screen-narrow/new: exit 0 in 2s
-- skin-screen-tiny/new: exit 0 in 2s
-- skin-screen-def/new: exit 0 in 2s
+- slabs/new: exit 0 in 69s
+- leaves-fancy/new: exit 0 in 29s
+- leaves-smart/new: exit 0 in 29s
+- leaves-fast/new: exit 0 in 29s
