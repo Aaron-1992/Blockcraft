@@ -461,6 +461,9 @@ final class Menu {
       }
 
       if (this.kind == 0) {
+         // Update 3.9: you, in your skin, looking at the mouse
+         var1.inset(var4 + 29.0F, var5 + 8.0F, 66.0F, 72.0F);
+         PlayerModel.drawLooking(this.g.skinPixels(), this.g.skinSlim(), var4 + 62.0F, var5 + 75.0F, 30.0F, var2, var3, (float)(System.nanoTime() / 1.0E9 % 100000.0));
          var1.rect(var4 + 136.0F, var5 + 33.0F, 12.0F, 3.0F, -7631989);
          var1.rect(var4 + 144.0F, var5 + 30.0F, 3.0F, 9.0F, -7631989);
 

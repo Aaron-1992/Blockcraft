@@ -29,6 +29,8 @@ final class PlayerModel {
       float swing = -1.0F;
       boolean sneak;
       float age;
+      /** id of the item in the right hand (0 = empty hand) */
+      int held;
    }
 
    // ------------------------------------------------------------------ geometry
@@ -189,10 +191,20 @@ final class PlayerModel {
             back -= 22.0F;
          }
 
+         if (side == 0 && p.held > 0) {
+            back -= 18.0F; // the arm that holds something is lifted a little, like in Minecraft
+         }
+
          GL11.glRotatef(back, 1.0F, 0.0F, 0.0F);
          GL11.glRotatef(side == 0 ? -3.0F : 3.0F, 0.0F, 0.0F, 1.0F); // hang a little outwards
          if (side == 0) {
             layered(slim ? -2.0F : -3.0F, -10.0F, -2.0F, aw, 12, 4, 40, 16, 40, 32, 0.25F, bright);
+            if (p.held > 0) {
+               drawHeld(p.held, slim, bright);
+               GL11.glBindTexture(3553, texture(px)); // the item drew with the block atlas
+               GL11.glEnable(3008);
+               GL11.glAlphaFunc(516, 0.1F);
+            }
          } else {
             layered(-1.0F, -10.0F, -2.0F, aw, 12, 4, 32, 48, 48, 48, 0.25F, bright);
          }
@@ -211,6 +223,32 @@ final class PlayerModel {
       GL11.glPopMatrix();
       GL11.glDisable(3008);
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   /**
+    * The item in the right hand, in the frame of the arm (origin = shoulder, the arm hangs along -y, its front is +z), in model pixels.
+    * Flat items (tools, food, ...) are held with the handle in the fist and the tip pointing forward and up, like in Minecraft;
+    * blocks are a small cube in front of the fist.
+    */
+   static void drawHeld(int id, boolean slim, float bright) {
+      GL11.glPushMatrix();
+      GL11.glTranslatef(slim ? -0.5F : -1.0F, -9.0F, 0.0F);
+      if (id >= 256) {
+         boolean tool = Items.isTool(id) || id == 268;
+         float size = tool ? 13.0F : 10.0F;
+         GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F); // the sprite plane along the body's side, facing outwards, its right edge forward
+         GL11.glScalef(size, size, size);
+         GL11.glTranslatef(0.28F, 0.28F, 0.0F);      // the handle (bottom left of the sprite) sits in the fist
+         Renderer.drawItemModel(id, bright);
+      } else {
+         float size = Blocks.kind[id] == 0 ? 7.0F : 9.0F;
+         GL11.glTranslatef(0.0F, 1.0F, 4.0F);
+         GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
+         GL11.glScalef(size, size, size);
+         Renderer.drawBlockModel(id, Math.max(bright, id == 32 ? 0.9F : 0.0F));
+      }
+
+      GL11.glPopMatrix();
    }
 
    /** The right arm alone for the first-person view (empty hand): origin at the shoulder, hanging down along -y. */
@@ -234,6 +272,25 @@ final class PlayerModel {
       p.bodyYaw = 0.0F;
       p.age = time * 20.0F;
       p.amp = 0.0F;
+      drawIn2D(px, slim, cx, cy, scale, yaw, p);
+   }
+
+   /**
+    * The model in the survival inventory: it faces you and turns its head and body towards the mouse like the player in Minecraft's
+    * inventory. (mx, my) is the mouse in GUI units, the feet are at (cx, cy).
+    */
+   static void drawLooking(int[] px, boolean slim, float cx, float cy, float scale, float mx, float my, float time) {
+      float eyeY = cy - 1.62F * scale;
+      float ax = (float)Math.atan((mx - cx) / 40.0F); // > 0: the mouse is to the right of the player
+      float ay = (float)Math.atan((eyeY - my) / 40.0F); // > 0: the mouse is above the eyes
+      Pose p = new Pose();
+      p.age = time * 20.0F;
+      p.headYaw = -ax * 20.0F; // the head turns 20 degrees further than the body (positive headYaw turns towards -x = the viewer's left)
+      p.headPitch = -ay * 20.0F;
+      drawIn2D(px, slim, cx, cy, scale, ax * 20.0F, p);
+   }
+
+   private static void drawIn2D(int[] px, boolean slim, float cx, float cy, float scale, float yaw, Pose p) {
       GL11.glClear(256);
       GL11.glEnable(2929);
       GL11.glPushMatrix();

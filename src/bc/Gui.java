@@ -250,6 +250,13 @@ public final class Gui {
       this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, -1, true, 1.0F);
    }
 
+   /** A sunken rectangle with the inventory's slot colours (the box behind the player model). */
+   public void inset(float x, float y, float w, float h) {
+      this.rect(x, y, w, h, -1);
+      this.rect(x, y, w - 1.0F, h - 1.0F, -13158601);
+      this.rect(x + 1.0F, y + 1.0F, w - 2.0F, h - 2.0F, -7631989);
+   }
+
    public void slot(float var1, float var2, float var3) {
       this.rect(var1, var2, var3, var3, -13158601);
       this.rect(var1, var2, var3 - 1.0F, 1.0F, -13158601);

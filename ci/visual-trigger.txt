@@ -1,2 +1,2 @@
-skin-front,skin-back,skin-first,skin-screen,skin-screen-def
+skin-screen,skin-screen-def,inv-player,inv-player-def,skin-hold-a,skin-hold-b,skin-hold-block,skin-front
 jar=build

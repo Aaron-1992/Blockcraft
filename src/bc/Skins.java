@@ -307,7 +307,7 @@ public final class Skins {
          return;
       }
 
-      if (!name.matches("[A-Za-z0-9_]{1,16}")) {
+      if (!name.matches("[A-Za-z0-9_]{1,16}") && uuidOf(name) == null) {
          this.status = "A Minecraft username has 1-16 letters, digits or _";
          return;
       }
@@ -426,18 +426,21 @@ public final class Skins {
 
    String downloadUser(String name) throws Exception {
       HttpClient c = client();
-      byte[] prof = fetch(c, "https://api.minecraftservices.com/minecraft/profile/lookup/name/" + name);
-      if (prof == null) {
-         prof = fetch(c, "https://api.mojang.com/users/profiles/minecraft/" + name);
-      }
-
-      if (prof == null) {
-         throw new IOException("no Minecraft account called " + name);
-      }
-
-      String id = profileId(new String(prof, StandardCharsets.UTF_8));
+      String id = uuidOf(name);
       if (id == null) {
-         throw new IOException("unexpected answer from the profile server");
+         byte[] prof = fetch(c, "https://api.minecraftservices.com/minecraft/profile/lookup/name/" + name);
+         if (prof == null) {
+            prof = fetch(c, "https://api.mojang.com/users/profiles/minecraft/" + name);
+         }
+
+         if (prof == null) {
+            throw new IOException("no Minecraft account called " + name);
+         }
+
+         id = profileId(new String(prof, StandardCharsets.UTF_8));
+         if (id == null) {
+            throw new IOException("unexpected answer from the profile server");
+         }
       }
 
       this.status = "Downloading the skin of " + name + " ...";
@@ -446,11 +449,14 @@ public final class Skins {
          throw new IOException("the skin server has no profile for " + name);
       }
 
-      String[] tex = textureInfo(new String(session, StandardCharsets.UTF_8));
+      String sessionJson = new String(session, StandardCharsets.UTF_8);
+      String[] tex = textureInfo(sessionJson);
       if (tex == null) {
          throw new IOException(name + " has no custom skin");
       }
 
+      String account = profileName(sessionJson);
+      final String fileName = account != null ? account : (uuidOf(name) != null ? "account" : name);
       byte[] png = fetch(c, tex[0].replaceFirst("^http:", "https:"));
       if (png == null) {
          throw new IOException("the skin image is gone");
@@ -462,7 +468,7 @@ public final class Skins {
          String got;
          synchronized (this) {
             // keep the account's name as the file name
-            File dst = this.freeFile(name);
+            File dst = this.freeFile(fileName);
             int[] px = load(tmp);
             BufferedImage out = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
             out.setRGB(0, 0, SIZE, SIZE, px, 0, SIZE);
@@ -483,6 +489,28 @@ public final class Skins {
    static final Pattern P_VALUE = Pattern.compile("\"name\"\\s*:\\s*\"textures\"\\s*,\\s*\"value\"\\s*:\\s*\"([A-Za-z0-9+/=]+)\"");
    static final Pattern P_VALUE2 = Pattern.compile("\"value\"\\s*:\\s*\"([A-Za-z0-9+/=]+)\"");
    static final Pattern P_SKIN = Pattern.compile("\"SKIN\"\\s*:\\s*\\{\\s*\"url\"\\s*:\\s*\"(https?://[^\"]+)\"(?:\\s*,\\s*\"metadata\"\\s*:\\s*\\{\\s*\"model\"\\s*:\\s*\"([a-z]+)\")?");
+
+   static final Pattern P_PROFILE_NAME = Pattern.compile("\"id\"\\s*:\\s*\"[0-9a-fA-F]{32}\"\\s*,\\s*\"name\"\\s*:\\s*\"([A-Za-z0-9_]{1,16})\"");
+
+   /** An account id written as 32 hex digits or the dashed 8-4-4-4-12 form, as 32 lower-case hex digits; null for anything else. */
+   static String uuidOf(String text) {
+      if (text == null) {
+         return null;
+      }
+
+      String t = text.trim();
+      if (t.matches("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")) {
+         t = t.replace("-", "");
+      }
+
+      return t.matches("[0-9a-fA-F]{32}") ? t.toLowerCase() : null;
+   }
+
+   /** The account name in a session-server answer ({"id":"...","name":"...",...}), or null. */
+   static String profileName(String json) {
+      Matcher m = P_PROFILE_NAME.matcher(json);
+      return m.find() ? m.group(1) : null;
+   }
 
    /** The account id in a profile answer ({"id":"...","name":"..."}), or null. */
    static String profileId(String json) {

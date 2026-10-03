@@ -31,6 +31,7 @@ final class Tests39 {
       pose();
       camera();
       options();
+      polish();
    }
 
    static File tmpDir() throws IOException {
@@ -407,6 +408,61 @@ final class Tests39 {
          g.importSkin(junk);
          eq("dropped_one.png", g.opt.skin, "a bad file does not change the skin");
          check(g.skinMsg.startsWith("Not a usable skin"), g.skinMsg);
+      });
+   }
+
+   // ------------------------------------------------------------------ the polish after the first 3.9 build
+   static void polish() {
+      test("account ids: 32 hex digits or the dashed form are understood (and nothing else); the session answer gives the account's own name", () -> {
+         eq("069a79f444e94726a5befca90e38aaf5", Skins.uuidOf("069a79f444e94726a5befca90e38aaf5"), "plain");
+         eq("069a79f444e94726a5befca90e38aaf5", Skins.uuidOf("  069A79F4-44E9-4726-A5BE-FCA90E38AAF5 "), "dashed, upper case, padded");
+         eq(null, Skins.uuidOf("069a79f444e94726a5befca90e38aaf"), "31 digits");
+         eq(null, Skins.uuidOf("069a79f444e94726a5befca90e38aafZ"), "not hex");
+         eq(null, Skins.uuidOf("Notch"), "a name is not an id");
+         eq(null, Skins.uuidOf(null), "null");
+         eq("jeb_", Skins.profileName("{\"id\":\"853c80ef3c3749fdaa49938b674adae6\",\"name\":\"jeb_\",\"properties\":[{\"name\":\"textures\",\"value\":\"AAAA\"}]}"), "name from the session answer");
+         eq(null, Skins.profileName("{\"properties\":[{\"name\":\"textures\",\"value\":\"AAAA\"}]}"), "no account name -> null (not 'textures')");
+         Skins sk = new Skins(tmpDir());
+         sk.importUser("bad name!");
+         check(sk.status.contains("1-16") && !sk.busy, "a name with a space is still refused: " + sk.status);
+      });
+      test("the Skins screen's text lines fit a window that is 400 GUI units wide, and clipText shortens long lines to fit", () -> {
+         // the font's glyph widths normally come from res/font.bin through OpenGL: read them directly so the widths are real here
+         try (java.io.DataInputStream in = new java.io.DataInputStream(new java.io.FileInputStream("res/font.bin"))) {
+            for (int i = 0; i < 4; i++) {
+               in.readUnsignedByte();
+            }
+
+            for (int i = 0; i < 96; i++) {
+               Tex.fontW[i] = in.readUnsignedByte();
+            }
+         }
+
+         check(Gui.textWidth("Hello world") > 30, "the font widths are loaded: " + Gui.textWidth("Hello world"));
+         for (String line : new String[]{"Drag a skin .png onto this window to wear it.", "Or copy a file path, link or username, then Ctrl+V.",
+            "Choose a Minecraft skin (a 64x64 PNG)", "Minecraft username:", "Arms: Classic (4 px)", "Import skin file...", "Open skins folder"}) {
+            check(Gui.textWidth(line) <= 380, "fits: '" + line + "' = " + Gui.textWidth(line));
+         }
+         String longLine = "Could not import: the server answered 429 and then something else that is far too long to show";
+         String clipped = Game.clipText(longLine, 300.0F);
+         check(Gui.textWidth(clipped) <= 300, "clipped width " + Gui.textWidth(clipped));
+         check(clipped.endsWith("~") && clipped.startsWith("Could not"), "clipped: " + clipped);
+         eq("short", Game.clipText("short", 300.0F), "short lines stay as they are");
+      });
+      test("the pose carries the item in the right hand (0 = empty hand); the body model draws it in the fist", () -> {
+         Game g = newGame(1);
+         g.inv[g.sel] = null;
+         eq(0, g.pose(0.0F).held, "empty hand");
+         g.inv[g.sel] = new Stack(Items.BOW, 1);
+         eq(Items.BOW, g.pose(0.0F).held, "bow");
+         g.inv[g.sel] = new Stack(Blocks.STONE, 12);
+         eq(Blocks.STONE, g.pose(0.0F).held, "a block");
+      });
+      test("a skin dialog leaves nothing behind: the dialog flags start clear and the fullscreen return flag is only set by the dialog", () -> {
+         Game g = newGame(1);
+         check(!g.skinBrowsing, "not browsing");
+         check(!g.skinRefull, "no pending return to fullscreen");
+         check(g.skinDrops.isEmpty(), "no pending drops");
       });
    }
 }

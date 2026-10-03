@@ -151,7 +151,16 @@ SCENES = {
     "skin-front":     (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "skin-back":      (COMMON + ["-Dbc.cam=140.5,67,74.5,35,12", "-Dbc.view=1", "-Dbc.skin=demo", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "skin-first":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.skin=demo", "-Dbc.emptyhand=1", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    # the held item in the hand, seen from the side (the body is turned 45 degrees away from the camera), and the inventory preview
+    "skin-hold-a":    (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=45", "-Dbc.skin=demo", "-Dbc.hold=316", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "skin-hold-b":    (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.skin=demo", "-Dbc.hold=316", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "skin-hold-block": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.hold=1", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "inv-player":     (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.skin=demo", "-Dbc.mouse=560,160", "-Dbc.shot=110"], True),
+    "inv-player-def": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.mouse=120,60", "-Dbc.shot=110"], True),
     "skin-screen":    (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo"], True),
+    # real network import of an account's skin (needs internet: the Windows smoke test machine has it) and the file dialog opening
+    "skin-net":       (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skinuser=jeb_"], True),
+    "skin-dialog":    (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skinbrowse=1"], True),
     "skin-screen-def": (["-Dbc.auto=1", "-Dbc.title=SKINS"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }

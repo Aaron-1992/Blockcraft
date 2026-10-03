@@ -7,6 +7,8 @@ public final class Main {
    public static void main(String[] var0) {
       try {
          new Game().run();
+         // everything is saved and closed; do not let a lingering AWT thread (the skin file dialog) keep the process alive
+         System.exit(0);
       } catch (Throwable var9) {
          Throwable var1 = var9;
 

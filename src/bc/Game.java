@@ -123,6 +123,8 @@ public final class Game {
    String skinMsg = "";
    Game.S skinReturn = Game.S.TITLE;
    volatile boolean skinBrowsing;
+   /** the game was fullscreen when the file dialog opened: go back to it once the dialog is gone */
+   volatile boolean skinRefull;
    final java.util.concurrent.ConcurrentLinkedQueue<File> skinDrops = new java.util.concurrent.ConcurrentLinkedQueue<>();
    final Random rnd = new Random();
    String splash;
@@ -146,6 +148,7 @@ public final class Game {
    int dragging = -1;
    int autoFrames;
    int autoShots;
+   long autoNetStart;
    boolean autoShotNow;
    String worldName = "world1";
    String newName = "";
@@ -346,8 +349,27 @@ public final class Game {
             this.setScreen(Game.S.valueOf(var1));
          }
 
-         if (this.autoFrames == 60) {
+         String netUser = System.getProperty("bc.skinuser");
+         if (netUser != null && this.skins != null) {
+            // import a real account's skin over the network, then take the picture (at most 90 s later)
+            if (this.autoFrames == 42) {
+               this.autoNetStart = System.nanoTime();
+               this.skins.importUser(netUser);
+            }
+
+            if (this.autoFrames > 42 && !this.skins.busy && this.autoFrames >= 60 && !this.autoShotNow) {
+               System.out.println("[skins] import of " + netUser + ": " + this.skins.status);
+               this.autoShotNow = true;
+            } else if (this.autoFrames > 42 && this.skins.busy && System.nanoTime() - this.autoNetStart > 90_000_000_000L && !this.autoShotNow) {
+               System.out.println("[skins] import of " + netUser + " still busy after 90 s: " + this.skins.status);
+               this.autoShotNow = true;
+            }
+         } else if (this.autoFrames == 60) {
             this.autoShotNow = true;
+         }
+
+         if (this.autoFrames == 50 && System.getProperty("bc.skinbrowse") != null) {
+            this.browseSkin();
          }
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV) {
          String var2 = System.getProperty("bc.cam");
@@ -396,6 +418,18 @@ public final class Game {
             String[] b = System.getProperty("bc.bolt").split(",");
             this.world.weather.bolts.clear();
             this.world.weather.strike(this.player.x + Double.parseDouble(b[0]), this.player.z + Double.parseDouble(b[1]), false);
+         }
+
+         if (System.getProperty("bc.mouse") != null) {
+            String[] mp = System.getProperty("bc.mouse").split(","); // the mouse position in framebuffer pixels (the player model in the inventory looks at it)
+            this.mouseX = Double.parseDouble(mp[0]);
+            this.mouseY = Double.parseDouble(mp[1]);
+         }
+
+         if (this.autoFrames == 12 && System.getProperty("bc.bodyyaw") != null) {
+            // the body turned away from the camera by this many degrees (third-person screenshots from the side)
+            this.poseInit = true;
+            this.bodyYaw = this.pBodyYaw = this.player.yaw + Float.parseFloat(System.getProperty("bc.bodyyaw"));
          }
 
          if (this.autoFrames == 12 && System.getProperty("bc.emptyhand") != null) {
@@ -1683,6 +1717,11 @@ public final class Game {
          this.importSkin(dropped);
       }
 
+      if (this.skinRefull) {
+         this.skinRefull = false;
+         this.setFullscreen(true);
+      }
+
       if (this.skins != null && this.skins.imported != null) {
          this.opt.skin = this.skins.imported;
          this.opt.save();
@@ -1810,6 +1849,8 @@ public final class Game {
       p.swing = this.swinging ? this.swingPrev + (this.swing - this.swingPrev) * partial : -1.0F;
       p.sneak = pl.sneaking && !pl.flying;
       p.age = this.tickCount + partial;
+      Stack held = this.inv[this.sel];
+      p.held = held == null ? 0 : held.id;
       return p;
    }
 
@@ -3539,6 +3580,20 @@ public final class Game {
    }
 
    // ------------------------------------------------------------------ Update 3.9: the Skins screen
+   /** Shortens a line with a trailing "~" until it is at most maxW GUI units wide. */
+   static String clipText(String s, float maxW) {
+      if (Gui.textWidth(s) <= maxW) {
+         return s;
+      }
+
+      String t = s;
+      while (t.length() > 1 && Gui.textWidth(t + "~") > maxW) {
+         t = t.substring(0, t.length() - 1);
+      }
+
+      return t + "~";
+   }
+
    void drawSkins() {
       float cx = this.gui.w / 2.0F;
       this.gui.centered("Skins", cx, 8.0F, -1, true, 1.0F);
@@ -3614,10 +3669,11 @@ public final class Game {
       this.button("Open skins folder", pcx - 70.0F, fy + 22.0F, 140.0F, 18.0F, true, this::openSkinsFolder);
       String st = this.skins.busy || this.skins.status.length() > 0 && this.skinMsg.isEmpty() ? this.skins.status : this.skinMsg;
       if (!st.isEmpty()) {
-         this.gui.centered(st.length() > 70 ? st.substring(0, 69) + "~" : st, cx, this.gui.h - 52.0F, st.startsWith("Imported") ? -8323200 : (st.startsWith("Could not") || st.startsWith("Not a") ? -43691 : -5592406), true, 1.0F);
+         this.gui.centered(clipText(st, this.gui.w - 8.0F), cx, this.gui.h - 62.0F, st.startsWith("Imported") ? -8323200 : (st.startsWith("Could not") || st.startsWith("Not a") ? -43691 : -5592406), true, 1.0F);
       }
 
-      this.gui.centered("Tip: drag a skin .png onto this window - or copy its file path, a link or a name and press Ctrl+V", cx, this.gui.h - 40.0F, -8355712, true, 1.0F);
+      this.gui.centered(clipText("Drag a skin .png onto this window to wear it.", this.gui.w - 8.0F), cx, this.gui.h - 50.0F, -8355712, true, 1.0F);
+      this.gui.centered(clipText("Or copy a file path, link or username, then Ctrl+V.", this.gui.w - 8.0F), cx, this.gui.h - 40.0F, -8355712, true, 1.0F);
       this.button("Done", cx - 100.0F, this.gui.h - 30.0F, 200.0F, 20.0F, true, () -> {
          this.opt.save();
          this.setScreen(this.skinReturn);
@@ -3639,7 +3695,7 @@ public final class Game {
          this.skins.importUser(this.skinField);
       } else if (key == 258 && action == 1) {
          this.skinFocus = !this.skinFocus;
-      } else if (key == 86 && (mods & 2) != 0) {
+      } else if (key == 86 && action == 1 && (mods & 2) != 0) {
          String text = GLFW.glfwGetClipboardString(this.window);
          File f = this.skins.importFromText(text);
          if (f != null) {
@@ -3654,25 +3710,47 @@ public final class Game {
       }
    }
 
-   /** The system's own file dialog (Windows), on a helper thread so the game keeps drawing; the chosen file arrives through skinDrops. */
+   /**
+    * The system's own file dialog (Windows), on a helper thread so the game keeps drawing; the chosen file arrives through skinDrops.
+    * A fullscreen game window is "topmost" and would hide the dialog, so the game leaves fullscreen while the dialog is open (and
+    * returns to it afterwards); the dialog is always disposed, otherwise AWT would keep the process alive after the game window closes.
+    */
    void browseSkin() {
       if (this.skinBrowsing) {
          return;
       }
 
       this.skinBrowsing = true;
+      final boolean wasFullscreen = this.opt.fullscreen;
+      if (wasFullscreen) {
+         this.setFullscreen(false);
+      }
+
       Thread t = new Thread(() -> {
+         java.awt.FileDialog fd = null;
          try {
-            java.awt.FileDialog fd = new java.awt.FileDialog((java.awt.Frame)null, "Choose a Minecraft skin (a 64x64 PNG)", java.awt.FileDialog.LOAD);
+            fd = new java.awt.FileDialog((java.awt.Frame)null, "Choose a Minecraft skin (a 64x64 PNG)", java.awt.FileDialog.LOAD);
             fd.setFile("*.png");
             fd.setFilenameFilter((d, n) -> n.toLowerCase().endsWith(".png"));
+            System.out.println("[skins] file dialog opened");
             fd.setVisible(true);
             if (fd.getFile() != null) {
                this.skinDrops.add(new File(fd.getDirectory(), fd.getFile()));
             }
+
+            System.out.println("[skins] file dialog closed" + (fd.getFile() != null ? " with a file" : ""));
          } catch (Throwable e) {
+            System.err.println("[skins] no file dialog: " + e);
             this.skinMsg = "No file dialog here - drag the skin .png onto this window instead";
          } finally {
+            if (fd != null) {
+               try {
+                  fd.dispose();
+               } catch (Throwable ignored) {
+               }
+            }
+
+            this.skinRefull = wasFullscreen;
             this.skinBrowsing = false;
          }
       }, "skin-browse");
