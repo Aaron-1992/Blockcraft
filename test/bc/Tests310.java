@@ -24,6 +24,7 @@ final class Tests310 {
       breaking();
       meshing();
       leaves();
+      smooth();
    }
 
    /** A fake click on a face of block (x, y, z) with the hit point fy (fraction of the block's height). */
@@ -491,6 +492,116 @@ final class Tests310 {
          Options bad = new Options(dir);
          bad.load();
          eq(2, bad.leaves, "9 is clamped to the highest mode");
+      });
+   }
+
+   // ------------------------------------------------------------------ smooth animations (To do item 4)
+   static void smooth() {
+      test("falling blocks remember where they were at the start of the tick, so the renderer can interpolate", () -> {
+         Game g = newGame(1);
+         World w = g.world;
+         int y = GROUND + 12;
+         w.setBlock(10, y, 10, Blocks.SAND); // (placing it queues a block update, which makes it fall)
+         for (int i = 0; i < 5 && w.fallers.isEmpty(); i++) {
+            w.tick();
+         }
+
+         check(!w.fallers.isEmpty(), "the sand started to fall");
+         World.Falling f = w.fallers.get(0);
+         double lastY = f.y;
+         for (int t = 0; t < 8 && !f.dead; t++) {
+            w.tick();
+            check(Math.abs(f.py - lastY) < 1e-9, "tick " + t + ": py is where it was before the tick (" + f.py + " vs " + lastY + ")");
+            check(f.y <= f.py, "and it has moved down since");
+            check(Math.abs(f.px - f.x) < 1e-9 && Math.abs(f.pz - f.z) < 1e-9, "no sideways drift");
+            lastY = f.y;
+         }
+
+         // primed TNT too
+         w.fallers.clear();
+         w.primeTnt(20, GROUND + 5, 20, 60);
+         World.Falling tnt = w.fallers.get(0);
+         double before = tnt.y;
+         w.tick();
+         check(Math.abs(tnt.py - before) < 1e-9 && tnt.y != before, "TNT: previous position recorded, then moved");
+      });
+      test("animated textures: frames are blended by how far the animation has got (two ticks per frame), alpha included", () -> {
+         int[] a = new int[256];
+         int[] b = new int[256];
+         java.util.Arrays.fill(a, 0xFF102030);
+         java.util.Arrays.fill(b, 0x00F0E0D0);
+         int[] same = Tex.blendFrames(a, b, 0.0F);
+         eq(a[0], same[0], "weight 0 = the first picture");
+         int[] other = Tex.blendFrames(a, b, 1.0F);
+         eq(b[0], other[0], "weight 1 = the second picture");
+         int[] half = Tex.blendFrames(a, b, 0.5F);
+         eq(0x7F, half[0] >>> 24, "alpha is blended too");
+         eq(0x80, half[0] >> 16 & 255, "red half way between 0x10 and 0xF0");
+         eq(0x80, half[0] >> 8 & 255, "green half way between 0x20 and 0xE0");
+         eq(0x80, half[0] & 255, "blue half way between 0x30 and 0xD0");
+         check(Math.abs(Tex.animPos(10, 0.0F) - 5.0F) < 1e-6 && Math.abs(Tex.animPos(10, 0.5F) - 5.25F) < 1e-6 && Math.abs(Tex.animPos(11, 0.0F) - 5.5F) < 1e-6, "two ticks per frame");
+         // consecutive animation frames really are close to each other (that is what makes the mix look like motion)
+         for (int f = 0; f < 16; f++) {
+            int[] w0 = Tex.waterFrame(f);
+            int[] w1 = Tex.waterFrame(f + 1 & 15);
+            long diff = 0;
+            for (int i = 0; i < 256; i++) {
+               diff += Math.abs((w0[i] >> 16 & 255) - (w1[i] >> 16 & 255)) + Math.abs((w0[i] >> 8 & 255) - (w1[i] >> 8 & 255)) + Math.abs((w0[i] & 255) - (w1[i] & 255));
+            }
+
+            check(diff / 256.0 / 3.0 < 12.0, "water frame " + f + " is close to the next one: mean difference " + diff / 768.0);
+         }
+      });
+      test("equip animation: switching slots lowers the item, swaps it out of sight, then raises the new one (0.4 per tick); using an item does not", () -> {
+         Game g = newGame(1);
+         g.inv[0] = new Stack(Blocks.STONE, 64);
+         g.inv[1] = new Stack(Blocks.PLANKS, 64);
+         g.sel = 0;
+         for (int i = 0; i < 10; i++) {
+            g.tickEquip();
+         }
+
+         eq(1.0F, g.equip, "settled: fully raised");
+         eq(Blocks.STONE, g.shownId, "showing the stone");
+         // using it up does not trigger the animation
+         g.inv[0].n = 3;
+         g.tickEquip();
+         eq(1.0F, g.equip, "a smaller stack: no animation");
+         // switch
+         g.sel = 1;
+         g.tickEquip();
+         check(g.equip < 1.0F && g.equip > 0.5F, "tick 1: starts to lower (" + g.equip + ")");
+         eq(Blocks.STONE, g.shownId, "still showing the old item");
+         float lowest = 1.0F;
+         int swappedAt = -1;
+         for (int t = 2; t <= 8; t++) {
+            g.tickEquip();
+            lowest = Math.min(lowest, g.equip);
+            if (swappedAt < 0 && g.shownId == Blocks.PLANKS) {
+               swappedAt = t;
+            }
+         }
+
+         check(swappedAt >= 2 && swappedAt <= 4, "the new item is swapped in after 2-4 ticks: " + swappedAt);
+         check(lowest < 0.1F, "the hand went (almost) out of sight: " + lowest);
+         eq(1.0F, g.equip, "and is back up after a few more ticks");
+         eq(Blocks.PLANKS, g.shownId, "showing the planks");
+         // the item in the selected slot changes its kind (eaten up, replaced): also animated
+         g.inv[1] = null;
+         g.tickEquip();
+         check(g.equip < 1.0F, "an emptied hand lowers too");
+         for (int t = 0; t < 8; t++) {
+            g.tickEquip();
+         }
+
+         eq(0, g.shownId, "now showing an empty hand");
+         eq(1.0F, g.equip, "raised");
+         // monotonic: never outside 0..1
+         for (int k = 0; k < 40; k++) {
+            g.sel = k % 3;
+            g.tickEquip();
+            check(g.equip >= 0.0F && g.equip <= 1.0F, "equip stays within 0..1: " + g.equip);
+         }
       });
    }
 }

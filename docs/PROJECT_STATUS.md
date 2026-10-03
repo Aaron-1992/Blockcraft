@@ -9,13 +9,13 @@ _Last updated: 2026-10-03 (Update 3.9)._
 | 1 | Weather system with volumetric clouds, storms and rain visible in the distance, working without shaders | **done in Update 3.8** (weather field, clouds in both render paths, rain / snow / lightning, `/weather`) |
 | 2 | Fix LODs and adapt them for the weather system | weather part **done in 3.8** (the LOD follows the weather's fog / sun / brightness); 3.9 makes the fog radial so the world's edge is hidden from every angle; inspected in day / night / shader / top-down scenes (`lod-*`) - no further defect found without a concrete report |
 | 3 | Skins (easy import of Minecraft skins) | **done in Update 3.9** (drag & drop, file dialog, username download, clipboard; legacy / HD skins; slim arms; F5 camera; inventory preview) |
-| 4 | Smooth animations | planned |
+| 4 | Smooth animations | **done in Update 3.9**: water / lava / fire frames are blended (`Tex.animate(tick, partial)`), falling blocks and TNT interpolate (`World.Falling.px/py/pz`), the hand has an equip animation (`Game.tickEquip`); the sneak height and the mobs / player / items / particles were already smooth |
 | 5 | Natural disasters | planned (builds on the weather system: lightning fires, storms) |
 | 6 | Trees fall over when chopped; the fallen trunk can be harvested further | planned (needs sideways log blocks) |
-| 7 | Slabs, stairs etc. on the top half of a block / upside down | planned (needs `Hit` fractions + 25 new block ids) |
+| 7 | Slabs, stairs etc. on the top half of a block / upside down | **done in Update 3.9** (`Hit.fy`, ids 195-219, `Game.placeBlock`, slab merging) |
 | 8 | Make creepers ignitable | **done in Update 3.9** (flint and steel) |
 | 9 | Fire drawn like in Minecraft when attached to a block | **done in Update 3.9** (`Mesher.fire`: wall / ceiling / corner flames) |
-| 10 | Hide interior surfaces (performance) | planned |
+| 10 | Hide interior surfaces (performance) | **done in Update 3.9**: `Mesher.leafMode` (Options > Leaves: Fancy / Smart / Fast) - leaf-to-leaf faces were ~30 % of all faces in a forest |
 | 11 | Fix mobs not being able to jump up a block | **done in Update 3.9** (`Mobs.JUMP`) |
 
 ## What it is
@@ -42,6 +42,11 @@ Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 - **Creepers can be lit** (`Mobs.ignite`, flint and steel in `Game.useOnMob`): the fuse runs by itself, the creeper stands still.
 - **Fire models** (`Mesher.fire`): X on a supporting block (solid top or flammable below), otherwise a flame plane on each flammable
   side neighbour and crossed planes under a flammable ceiling.
+- **Slabs / stairs upside down** (`Blocks.STAIR_TOP0` 195..214, `SLAB_TOP0` 215..219; `Blocks.COUNT` = 220): chosen from where you click (`World.Hit.fy`,
+  `Game.placeBlock`), mirrored mesh in `Mesher.stair`, merging of two slabs (`Game.mergeSlabs`), plain item drops. Stairs and slabs light themselves
+  from the best light around them (`Mesher.neighbourLight`) - they block light, so their own cell and their neighbours' cells are dark.
+- **Interior surfaces**: `Mesher.hiddenLeafFace` / `leafMode` (0 fancy, 1 smart = default, 2 fast); `Options.leaves`; the strict equivalence pass runs with `-Dbc.leaves=0`.
+- **Smooth animations**: see the roadmap table; `Tests310.smooth`.
 - Fog distance in both vertex shaders is radial; `Main` ends the process with `System.exit(0)` after a normal exit.
 
 ## Update 3.8 (still in the game) – "the weather update"

@@ -29,13 +29,30 @@ WHAT'S NEW IN UPDATE 3.9  (the skins update)
     it has not noticed you (a charged creeper still blasts twice as hard). Costs one point of durability.
   * FIRE LOOKS LIKE MINECRAFT'S: on a block it is still the X of flames, but fire that hangs on something flammable (nothing
     under it) now covers the wall it clings to, fills an inside corner, or hangs from a wooden / leafy ceiling.
+  * SLABS AND STAIRS ON THE TOP HALF / UPSIDE DOWN: aim at the upper half of a block's side face, or at the underside of a block,
+    and the slab or stair you place goes into the upper half of the cell (stairs upside down, like in Minecraft); the lower half
+    of a side face or the top of a block gives the usual bottom slab / upright stair. Two slabs of the same kind in one cell make
+    the full block - whichever halves they are: a slab on top of a bottom slab, a slab under a top slab, or one placed into the
+    cell that already holds the other half (not while you stand where the block would be). Breaking them gives the normal item;
+    middle-click in creative picks the normal item. (Wooden ones burn, like the upright ones.)
+  * SMOOTHER MOVEMENT: water, lava and fire used to jump to their next picture ten times a second; the pictures are now blended
+    so they flow at any frame rate. Falling sand, gravel and primed TNT move smoothly instead of stepping twenty times a second
+    (a primed TNT also swells around its own middle now). The item in your hand lowers and the new one rises when you switch
+    slots or when it is used up or replaced, like Minecraft's equip animation.
+  * LESS HIDDEN GEOMETRY (performance): about a third of everything drawn in a forest were faces between two leaf blocks, mostly
+    inside the foliage where nobody can see them. Options -> "Leaves": SMART (default; hides the faces between leaves that are
+    completely enclosed by other leaves or solid blocks - about a tenth of all faces in a forest, and the picture stays the same),
+    FAST (hides every leaf-to-leaf face: about a third fewer faces, the foliage looks a little thinner where the leaf texture has
+    holes) or FANCY (everything, like before). Slabs and stairs next to other blocks are no longer black on their inner faces.
   * Smaller things: fog in the shader pack is measured around you instead of along the view direction (the far edge of the
     world is hidden from every angle); the game now really ends when you close it (a lingering helper could keep a
     "Blockcraft" process alive); the "Inventory" caption is gone from the crafting screen (the player stands there).
   * Honest note: skin handling, the model, the file dialog and the username download are covered by automated tests, and
     the real Blockcraft.exe was started on a Windows test machine to import a real account's skin over the internet and to
-    open the file dialog; everything was checked as pictures from a software renderer. Dragging a file onto the window and
-    how it all looks on a real graphics card have still not been tried on real hardware.
+    open the file dialog; the building / lighting / fire / animation changes were checked as pictures from a software renderer
+    and by automated tests (40,000+ checks). Dragging a file onto the window, the frame rate and how it all looks on a real
+    graphics card have still not been tried on real hardware (so the performance gain of the Leaves option is measured in
+    faces drawn, not in frames per second).
 
 WHAT'S NEW IN UPDATE 3.8  (the weather update)
   * WEATHER YOU CAN SEE COMING. Weather is no longer one switch for the whole world: there are weather systems that drift

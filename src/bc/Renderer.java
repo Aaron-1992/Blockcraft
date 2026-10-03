@@ -1554,18 +1554,23 @@ public final class Renderer {
       MobRender.render(this.g, this, var1);
 
       for (Falling var15 : var2.fallers) {
-         float var16 = this.brightnessAt(var2, var15.x, var15.y + 0.5, var15.z);
+         // Update 3.9: interpolated between the last two ticks (sand and TNT used to step 20 times a second)
+         double fx = Double.isNaN(var15.px) ? var15.x : var15.px + (var15.x - var15.px) * var1;
+         double fy = Double.isNaN(var15.px) ? var15.y : var15.py + (var15.y - var15.py) * var1;
+         double fz = Double.isNaN(var15.px) ? var15.z : var15.pz + (var15.z - var15.pz) * var1;
+         float var16 = this.brightnessAt(var2, fx, fy + 0.5, fz);
          if (var15.fuse > 0 && var15.fuse / 5 % 2 == 0) {
             var16 = 3.0F;
          }
 
          GL11.glPushMatrix();
+         GL11.glTranslated(fx - this.camX, fy - this.camY + 0.5, fz - this.camZ);
          if (var15.fuse > 0 && var15.fuse < 10) {
+            // (the swelling of a TNT about to blow used to be applied before the translation, which also scaled its position)
             float var6 = 1.0F + (10 - var15.fuse) * 0.03F;
             GL11.glScalef(var6, var6, var6);
          }
 
-         GL11.glTranslated(var15.x - this.camX, var15.y - this.camY + 0.5, var15.z - this.camZ);
          GL11.glScalef(0.99F, 0.99F, 0.99F);
          drawBlockModel(var15.id, var16);
          GL11.glPopMatrix();
@@ -1609,7 +1614,7 @@ public final class Renderer {
       }
    }
 
-   public void renderHand(float var1, Stack var2, float var3, float var4, float var5, int var6, int var7) {
+   public void renderHand(float var1, Stack var2, float var3, float var4, float var5, int var6, int var7, float equip) {
       if (var2 != null) {
          int var8 = var2.id;
          GL11.glClear(256);
@@ -1641,6 +1646,7 @@ public final class Renderer {
             var19 += 0.15F * var21;
          }
 
+         var18 -= 0.6F * (1.0F - equip); // Update 3.9: the equip animation
          GL11.glTranslatef(var17, var18, var19);
          if (var8 >= 256) {
             boolean var22 = Items.isTool(var8) || var8 == 268;
@@ -1685,7 +1691,7 @@ public final class Renderer {
          float sw = var3;
          float sq = (float)Math.sqrt(sw);
          float sinS = (float)Math.sin(sq * Math.PI);
-         GL11.glTranslatef(0.64F - 0.34F * sinS, -0.60F - 0.10F * (float)Math.sin(sq * Math.PI * 2.0) + 0.10F * sinS, -0.92F - 0.28F * (float)Math.sin(sw * Math.PI));
+         GL11.glTranslatef(0.64F - 0.34F * sinS, -0.60F - 0.10F * (float)Math.sin(sq * Math.PI * 2.0) + 0.10F * sinS - 0.6F * (1.0F - equip), -0.92F - 0.28F * (float)Math.sin(sw * Math.PI));
          GL11.glRotatef(68.0F + 22.0F * sinS, 1.0F, 0.0F, 0.0F);
          GL11.glRotatef(-12.0F, 0.0F, 0.0F, 1.0F);
          GL11.glRotatef(10.0F - (float)Math.sin(sw * sw * Math.PI) * 18.0F, 0.0F, 1.0F, 0.0F);

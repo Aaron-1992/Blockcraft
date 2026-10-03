@@ -715,6 +715,9 @@ public final class World {
 
       for (int var9 = 0; var9 < this.fallers.size(); var9++) {
          World.Falling var12 = (World.Falling)this.fallers.get(var9);
+         var12.px = var12.x;
+         var12.py = var12.y;
+         var12.pz = var12.z;
          if (var12.fuse > 0) {
             this.tickTnt(var12);
          } else {
@@ -1614,6 +1617,10 @@ public final class World {
       public double y;
       public double z;
       public double vy;
+      /** position at the start of the current tick (the renderer interpolates between it and x / y / z) */
+      public double px = Double.NaN;
+      public double py;
+      public double pz;
       public int id;
       public boolean dead;
       public int fuse;

@@ -807,23 +807,66 @@ public final class Tex {
    }
 
    public static void animate(int var0) {
-      int var1 = var0 / 2 % 16;
-      if (var1 != lastFrame) {
-         lastFrame = var1;
+      animate(var0, 0.0F);
+   }
+
+   /** the last blend that was uploaded: frame * 16 + blend step (-1 = none yet) */
+   static int lastBlendKey = -1;
+
+   /** The animation position for a tick plus the part of the tick that has passed: two ticks per frame, 16 frames, endless loop. */
+   static float animPos(int tick, float partial) {
+      return (tick + partial) / 2.0F;
+   }
+
+   /**
+    * Update 3.9: smooth water / lava / fire. The three animations used to jump to the next of their 16 frames every two ticks (10 times a
+    * second). Now every picture the game draws shows the two neighbouring frames mixed by how far the animation has got, so the flow moves
+    * continuously at any frame rate (the frames are the same pattern shifted a little, so the mix looks like motion, not like a double image).
+    * The atlas tiles are refreshed whenever the mix moves by 1/16 of a frame; mip maps are rebuilt every fourth refresh.
+    */
+   public static void animate(int var0, float partial) {
+      float pos = animPos(var0, partial);
+      int f0 = (int)Math.floor(pos);
+      float w = pos - f0;
+      int step = Math.min(15, (int)(w * 16.0F));
+      int key = (f0 & 15) * 16 + step;
+      if (key != lastBlendKey) {
+         lastBlendKey = key;
+         float mix = step / 16.0F;
+         int a = f0 & 15;
+         int b = a + 1 & 15;
          GL11.glBindTexture(3553, atlas);
-         ByteBuffer var2 = toBuffer(waterFrames[var1]);
-         GL11.glTexSubImage2D(3553, 0, 112, 16, 16, 16, 6408, 5121, var2);
-         MemoryUtil.memFree(var2);
-         ByteBuffer var3 = toBuffer(lavaFrames[var1 * 1 % 16]);
-         GL11.glTexSubImage2D(3553, 0, 128, 16, 16, 16, 6408, 5121, var3);
-         MemoryUtil.memFree(var3);
-         ByteBuffer fire = toBuffer(TexArt37.fireFrames[var1]);
-         GL11.glTexSubImage2D(3553, 0, 235 % 16 * 16, 235 / 16 * 16, 16, 16, 6408, 5121, fire);
-         MemoryUtil.memFree(fire);
-         if ((var1 & 3) == 0) {
+         upload(112, 16, blendFrames(waterFrames[a], waterFrames[b], mix));
+         upload(128, 16, blendFrames(lavaFrames[a], lavaFrames[b], mix));
+         upload(235 % 16 * 16, 235 / 16 * 16, blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix));
+         if ((key & 3) == 0) {
             GL30.glGenerateMipmap(3553);
          }
       }
+   }
+
+   private static void upload(int x, int y, int[] pixels) {
+      ByteBuffer buf = toBuffer(pixels);
+      GL11.glTexSubImage2D(3553, 0, x, y, 16, 16, 6408, 5121, buf);
+      MemoryUtil.memFree(buf);
+   }
+
+   /** The pixel-wise mix of two same-sized ARGB pictures: a at weight 1 - w, b at weight w (every channel, alpha included). */
+   public static int[] blendFrames(int[] a, int[] b, float w) {
+      int[] out = new int[a.length];
+      int wb = Math.round(Math.max(0.0F, Math.min(1.0F, w)) * 256.0F);
+      int wa = 256 - wb;
+      for (int i = 0; i < a.length; i++) {
+         int pa = a[i];
+         int pb = b[i];
+         int al = ((pa >>> 24) * wa + (pb >>> 24) * wb) >> 8;
+         int r = ((pa >> 16 & 255) * wa + (pb >> 16 & 255) * wb) >> 8;
+         int g = ((pa >> 8 & 255) * wa + (pb >> 8 & 255) * wb) >> 8;
+         int bl = ((pa & 255) * wa + (pb & 255) * wb) >> 8;
+         out[i] = al << 24 | r << 16 | g << 8 | bl;
+      }
+
+      return out;
    }
 
    static int[] crackPixels() {

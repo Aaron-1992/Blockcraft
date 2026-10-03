@@ -1,1 +1,1 @@
-title,skin-net,skin-dialog,inv-player,firewall,pause-menu
+title,skin-net,skin-dialog,skin-screen-narrow,inv-player,slabs,firewall,leaves-smart,pause-menu

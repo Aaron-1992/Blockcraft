@@ -106,6 +106,14 @@ public final class Game {
    final ArrayList<String> chatLog = new ArrayList();
    final ArrayList<Long> chatTimes = new ArrayList();
    final ArrayList<Game.Particle> particles = new ArrayList();
+   /**
+    * Update 3.9: the equip animation. The item in the hand lowers and the new one rises when you switch slots or the item in the slot changes;
+    * the hand keeps drawing {@link #shownId} (which lags behind the selected item) until it is out of sight. Rates like Minecraft's: 0.4 per tick.
+    */
+   float equip = 1.0F;
+   float pEquip = 1.0F;
+   int shownSel = -1;
+   int shownId = -1;
    /** Update 3.9: skins, the camera view (0 first person, 1 behind the player, 2 in front of the player) and the body's animation state. */
    Skins skins;
    int view;
@@ -1906,8 +1914,21 @@ public final class Game {
       }
    }
 
+   void tickEquip() {
+      Stack cur = this.inv[this.sel];
+      int curId = cur == null ? 0 : cur.id;
+      this.pEquip = this.equip;
+      float target = this.sel == this.shownSel && curId == this.shownId ? 1.0F : 0.0F;
+      this.equip += Math.max(-0.4F, Math.min(0.4F, target - this.equip));
+      if (this.equip < 0.1F) {
+         this.shownSel = this.sel;
+         this.shownId = curId;
+      }
+   }
+
    void tick() {
       this.tickCount++;
+      this.tickEquip();
       this.world.tick();
       this.world.fire.particles(this);
       this.Tex_tick();
@@ -3317,7 +3338,7 @@ public final class Game {
       if (var2) {
          this.rend.computeSky(this.world.dayTime, this.partial);
          GL13.glActiveTexture(33984);
-         Tex.animate(this.tickCount);
+         Tex.animate(this.tickCount, this.partial);
          boolean var3 = this.rend.shadersOn();
          if (var3) {
             this.rend.sh.beginScene(this.fbW, this.fbH);
@@ -3334,12 +3355,13 @@ public final class Game {
             this.rend
                .renderHand(
                   this.partial,
-                  this.inv[this.sel],
+                  this.shownId > 0 ? new Stack(this.shownId, 1) : null,
                   this.swinging ? var4 : 0.0F,
                   this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F,
                   var5,
                   this.fbW,
-                  this.fbH
+                  this.fbH,
+                  this.pEquip + (this.equip - this.pEquip) * this.partial
                );
          }
 
