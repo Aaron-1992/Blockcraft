@@ -1,2 +1,2 @@
-nether-vista,nether-portal,nether-mobs,end-island,end-island-sh,end-crystal,end-dragon,end-dragon-sh,end-enderman,stronghold,stronghold-portal,stronghold-portal-sh
+nether-vista,nether-portal,nether-mobs,end-island,end-crystal,end-dragon,end-dragon-side,end-enderman,village-day,village-folk,village-folk-sh,village-trade
 jar=build

@@ -499,6 +499,10 @@ public final class MobRender {
    static void drawMob(Mob var0, World var1, Renderer var2, float var3, double var4, double var6, double var8) {
       MobRender.Model var10 = models[var0.type];
       float var11 = var2.brightnessAt(var1, var4, var6 + 0.5, var8);
+      if (var0.type == Mobs.END_CRYSTAL) {
+         var11 = 1.0F; // the crystals glow
+      }
+
       float[] var12 = new float[]{1.0F, 1.0F, 1.0F};
       if (var0.charged) {
          // Update 3.8: struck by lightning - glows a pulsing blue

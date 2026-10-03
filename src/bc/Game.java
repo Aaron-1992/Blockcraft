@@ -667,6 +667,9 @@ public final class Game {
                      double mz = this.player.z + Math.cos(var17) * summonDist + Math.sin(var17) * var8;
                      Mob spawned = babyMob ? this.mobs.spawnBaby(var21, mx, my, mz) : this.mobs.spawn(var21, mx, my, mz);
                      spawned.sheared = shearedMob;
+                     if (spawned.type == Mobs.VILLAGER) {
+                        spawned.color = var20 % 6; // every villager a different profession
+                     }
                      spawned.yaw = this.player.yaw + 180.0F - 30.0F;
                   }
                }
@@ -703,6 +706,11 @@ public final class Game {
                this.openMenu(1, null);
             } else if (var15.equals("player")) {
                this.openMenu(0, null);
+            } else if (var15.equals("trade")) {
+               this.menu = new Menu(this, Menu.TRADE, null, Integer.getInteger("bc.prof", 3));
+               this.addItem(new Stack(Items.EMERALD, 24));
+               this.addItem(new Stack(Items.IRON_INGOT, 16));
+               this.setScreen(Game.S.INV);
             } else if (var15.equals("furnace")) {
                this.openMenu(2, new TileEntity(1, 0, 0, 0));
             } else if (var15.equals("chest")) {

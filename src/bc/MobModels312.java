@@ -77,8 +77,8 @@ final class MobModels312 {
       m.type = Mobs.ENDER_DRAGON;
       m.tw = 256;
       m.th = 256;
-      int dark = 0x26242C;
-      int skin = 0x3C2C4C;
+      int dark = 0x3A3646;
+      int skin = 0x5A3F70;
       m.add(2, dark, 16, 12, 28, -8.0F, -6.0F, -14.0F, 0.0F, 34.0F, 0.0F);
       for (int i = 0; i < 3; i++) {
          m.add(2, dark, 8, 8, 10, -4.0F, -4.0F, 0.0F, 0.0F, 35.0F + 1.5F * i, 12.0F + 9.0F * i);
@@ -115,9 +115,9 @@ final class MobModels312 {
    private static Model crystal() {
       Model m = new Model();
       m.type = Mobs.END_CRYSTAL;
-      m.scale = 1.4F;
-      m.add(18, 0xE08CF0, 12, 12, 12, -6.0F, -6.0F, -6.0F, 0.0F, 9.0F, 0.0F);
-      m.add(19, 0xFF40D0, 6, 6, 6, -3.0F, -3.0F, -3.0F, 0.0F, 9.0F, 0.0F);
+      m.scale = 2.0F;
+      m.add(18, 0xE8A0F8, 12, 12, 12, -6.0F, -6.0F, -6.0F, 0.0F, 6.5F, 0.0F);
+      m.add(19, 0xFF40D0, 6, 6, 6, -3.0F, -3.0F, -3.0F, 0.0F, 6.5F, 0.0F);
       return m;
    }
 
@@ -354,8 +354,8 @@ final class MobModels312 {
             Part frame = model.parts.get(0);
             for (int face = 0; face < 6; face++) {
                int[] f = MobRender.face(frame, face);
-               for (int yy = 1; yy < f[3] - 1; yy++) {
-                  for (int xx = 1; xx < f[2] - 1; xx++) {
+               for (int yy = 2; yy < f[3] - 2; yy++) {
+                  for (int xx = 2; xx < f[2] - 2; xx++) {
                      MobRender.clear(f[0] + xx, f[1] + yy);
                   }
                }

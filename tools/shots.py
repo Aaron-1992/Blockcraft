@@ -336,13 +336,19 @@ SCENES = {
     # ---- Update 3.12: the End (the island is the same in every world: platform at x=62; the tallest pillar at x=42, z=0; pillar 3 (76 high) at x=-13, z=40)
     "end-island":         (END + ["-Dbc.cam=62.5,64,0.5,90,-18"] + PLAIN + ["-Dbc.shot=150"], True),
     "end-island-sh":      (END + ["-Dbc.cam=62.5,64,0.5,90,-18", "-Dbc.shot=150"], True),
-    "end-crystal":        (END + ["-Dbc.cam=-12.5,66,24.5,0,-33"] + PLAIN + ["-Dbc.shot=110"], True),
-    "end-dragon":         (END + ["-Dbc.cam=16.5,67,0.5,90,2", "-Dbc.dragon=perch"] + PLAIN + ["-Dbc.shot=110"], True),
-    "end-dragon-sh":      (END + ["-Dbc.cam=16.5,67,0.5,90,2", "-Dbc.dragon=perch", "-Dbc.shot=110"], True),
+    "end-crystal":        (END + ["-Dbc.cam=-12.5,70,28.5,0,-32"] + PLAIN + ["-Dbc.shot=110"], True),
+    "end-dragon":         (END + ["-Dbc.cam=15.5,73,0.5,90,17", "-Dbc.dragon=perch"] + PLAIN + ["-Dbc.shot=110"], True),
+    "end-dragon-side":    (END + ["-Dbc.cam=0.5,69.5,15.5,180,6", "-Dbc.dragon=perch"] + PLAIN + ["-Dbc.shot=110"], True),
+    "end-dragon-sh":      (END + ["-Dbc.cam=15.5,73,0.5,90,17", "-Dbc.dragon=perch", "-Dbc.shot=110"], True),
     "end-enderman":       (END + ["-Dbc.cam=30.5,65,0.5,90,4", "-Dbc.summon=enderman,enderman,enderman", "-Dbc.summonDist=5", "-Dbc.summonDy=0"] + PLAIN + ["-Dbc.shot=110"], True),
     "stronghold":         (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=150"], True),
     "stronghold-portal":  (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000", sets(stronghold_ring())] + PLAIN + ["-Dbc.shot=150"], True),
     "stronghold-portal-sh": (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000", sets(stronghold_ring()), "-Dbc.shot=150"], True),
+    # ---- Update 3.12: the villages (seed 12345: the village at x=173, z=76; church x 172..176 z 96..104, a farm at x 158..166 z 101..107)
+    "village-day":        (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,8", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
+    "village-folk":       (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,10", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=villager,villager,irongolem,villager,villager", "-Dbc.summonDist=5", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=110"], True),
+    "village-folk-sh":    (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,10", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=villager,villager,irongolem,villager,villager", "-Dbc.summonDist=5", "-Dbc.summonDy=-1.6", "-Dbc.shot=110"], True),
+    "village-trade":      (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,8", "-Dbc.time=6000", "-Dbc.inv=trade", "-Dbc.prof=3"] + PLAIN + ["-Dbc.shot=130"], True),
     "portal-day":         (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
     "portal-day-sh":      (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks()), "-Dbc.shot=170"], True),
 
