@@ -115,6 +115,14 @@ public final class Game {
    float pshake;
    float equip = 1.0F;
    float pEquip = 1.0F;
+   /** Update 3.11: the arm lags behind the camera when you turn (Minecraft's renderArmPitch / renderArmYaw: it follows at half the distance every tick). */
+   /** -Dbc.handswing=0.35 / -Dbc.handeat=0.5 freeze the hand in the middle of a swing / of eating (screenshot scenes). */
+   static final String HAND_SWING = System.getProperty("bc.handswing");
+   static final String HAND_EAT = System.getProperty("bc.handeat");
+   float armPitch;
+   float armYaw;
+   float pArmPitch;
+   float pArmYaw;
    int shownSel = -1;
    int shownId = -1;
    /** Update 3.9: skins, the camera view (0 first person, 1 behind the player, 2 in front of the player) and the body's animation state. */
@@ -2024,6 +2032,23 @@ public final class Game {
       }
    }
 
+   void tickArm() {
+      Player pl = this.player;
+      if (pl == null) {
+         return;
+      }
+
+      if (Math.abs(pl.yaw - this.armYaw) > 180.0F || Math.abs(pl.pitch - this.armPitch) > 120.0F) {
+         this.armYaw = pl.yaw; // teleported / a new world: no swing across half the screen
+         this.armPitch = pl.pitch;
+      }
+
+      this.pArmPitch = this.armPitch;
+      this.pArmYaw = this.armYaw;
+      this.armPitch += (pl.pitch - this.armPitch) * 0.5F;
+      this.armYaw += (pl.yaw - this.armYaw) * 0.5F;
+   }
+
    void addShake(float amount) {
       if (amount > this.shake) {
          this.shake = Math.min(1.5F, amount);
@@ -2035,6 +2060,7 @@ public final class Game {
       this.pshake = this.shake;
       this.shake = this.shake < 0.004F ? 0.0F : this.shake * 0.9F;
       this.tickEquip();
+      this.tickArm();
       this.world.tick();
       this.world.fire.particles(this);
       this.Tex_tick();
@@ -3471,12 +3497,14 @@ public final class Game {
                .renderHand(
                   this.partial,
                   this.shownId > 0 ? new Stack(this.shownId, 1) : null,
-                  this.swinging ? var4 : 0.0F,
-                  this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F,
+                  HAND_SWING != null ? Float.parseFloat(HAND_SWING) : (this.swinging ? var4 : 0.0F),
+                  HAND_EAT != null ? Float.parseFloat(HAND_EAT) : (this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F),
                   var5,
                   this.fbW,
                   this.fbH,
-                  this.pEquip + (this.equip - this.pEquip) * this.partial
+                  this.pEquip + (this.equip - this.pEquip) * this.partial,
+                  (this.player.pitch - (this.pArmPitch + (this.armPitch - this.pArmPitch) * this.partial)) * 0.1F,
+                  (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F
                );
          }
 

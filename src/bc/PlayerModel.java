@@ -226,29 +226,78 @@ final class PlayerModel {
    }
 
    /**
-    * The item in the right hand, in the frame of the arm (origin = shoulder, the arm hangs along -y, its front is +z), in model pixels.
-    * Flat items (tools, food, ...) are held with the handle in the fist and the tip pointing forward and up, like in Minecraft;
-    * blocks are a small cube in front of the fist.
+    * The item in the right hand, in the frame of the arm (origin = shoulder), in model pixels - Minecraft 1.12's LayerHeldItem and the
+    * "thirdperson_righthand" transforms of the item models: the arm's frame turned the way MC's y-down model space is, then
+    * rotate(-90, x) rotate(180, y) translate(1/16, 0.125, -0.625) and the model's own display transform
+    * (flat items: translation [0, 3, 1] scale 0.55; tools and sticks: rotation [0, -90, 55] translation [0, 4, 0.5] scale 0.85;
+    * blocks: rotation [75, 45, 0] translation [0, 2.5, 0] scale 0.375; the bow has its own).
     */
    static void drawHeld(int id, boolean slim, float bright) {
       GL11.glPushMatrix();
-      GL11.glTranslatef(slim ? -0.5F : -1.0F, -9.0F, 0.0F);
-      if (id >= 256) {
-         boolean tool = Items.isTool(id) || id == 268;
-         float size = tool ? 13.0F : 10.0F;
-         GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F); // the sprite plane along the body's side, facing outwards, its right edge forward
-         GL11.glScalef(size, size, size);
-         GL11.glTranslatef(0.28F, 0.28F, 0.0F);      // the handle (bottom left of the sprite) sits in the fist
-         Renderer.drawItemModel(id, bright);
+      GL11.glRotatef(180.0F, 1.0F, 0.0F, 0.0F); // our model hangs along -y and faces +z, Minecraft's raw model space is y down
+      if (slim) {
+         GL11.glTranslatef(0.5F, 0.0F, 0.0F); // (ModelPlayer.postRenderArm moves the pivot half a pixel for slim arms)
+      }
+
+      GL11.glRotatef(-90.0F, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(180.0F, 0.0F, 1.0F, 0.0F);
+      GL11.glTranslatef(1.0F, 2.0F, -10.0F); // 1/16, 0.125, -0.625 blocks
+      if (id >= 256 || Renderer.flatBlock(id)) {
+         boolean handheld = id >= 256 && (Items.isTool(id) || id == 256);
+         if (id == 268) { // the bow
+            GL11.glTranslatef(-1.0F, -2.0F, 2.5F);
+            GL11.glRotatef(-80.0F, 1.0F, 0.0F, 0.0F);
+            GL11.glRotatef(260.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(-40.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glScalef(0.9F * 16.0F, 0.9F * 16.0F, 0.9F * 16.0F);
+         } else if (handheld) {
+            GL11.glTranslatef(0.0F, 4.0F, 0.5F);
+            GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(55.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glScalef(0.85F * 16.0F, 0.85F * 16.0F, 0.85F * 16.0F);
+         } else {
+            GL11.glTranslatef(0.0F, 3.0F, 1.0F);
+            GL11.glScalef(0.55F * 16.0F, 0.55F * 16.0F, 0.55F * 16.0F);
+         }
+
+         if (id >= 256) {
+            Renderer.drawItemModel(id, bright);
+         } else {
+            Renderer.drawFlatBlock(id, bright);
+         }
       } else {
-         float size = Blocks.kind[id] == 0 ? 7.0F : 9.0F;
-         GL11.glTranslatef(0.0F, 1.0F, 4.0F);
+         GL11.glTranslatef(0.0F, 2.5F, 0.0F);
+         GL11.glRotatef(75.0F, 1.0F, 0.0F, 0.0F);
          GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-         GL11.glScalef(size, size, size);
-         Renderer.drawBlockModel(id, Math.max(bright, id == 32 ? 0.9F : 0.0F));
+         GL11.glScalef(0.375F * 16.0F, 0.375F * 16.0F, 0.375F * 16.0F);
+         Renderer.drawBlockModel(id, bright);
       }
 
       GL11.glPopMatrix();
+   }
+
+   /**
+    * The right arm in the first-person view when the hand is empty: ItemRenderer.renderArmFirstPerson with Minecraft 1.12's numbers
+    * (the arm is drawn in MC's raw model space, which is y down, so the model is turned by 180 degrees about x first).
+    *
+    * @param swing    0..1 progress of the swing
+    * @param equipInv 1 - the equip progress (0 = the hand is fully raised)
+    */
+   static void drawArmFirstPerson(int[] px, boolean slim, float bright, float swing, float equipInv) {
+      float f1 = (float)Math.sqrt(swing);
+      GL11.glTranslatef(-0.3F * (float)Math.sin(f1 * Math.PI) + 0.64000005F, 0.4F * (float)Math.sin(f1 * Math.PI * 2.0) - 0.6F + equipInv * -0.6F, -0.4F * (float)Math.sin(swing * Math.PI) - 0.71999997F);
+      GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef((float)Math.sin(f1 * Math.PI) * 70.0F, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef((float)Math.sin(swing * swing * Math.PI) * -20.0F, 0.0F, 0.0F, 1.0F);
+      GL11.glTranslatef(-1.0F, 3.6F, 3.5F);
+      GL11.glRotatef(120.0F, 0.0F, 0.0F, 1.0F);
+      GL11.glRotatef(200.0F, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(-135.0F, 0.0F, 1.0F, 0.0F);
+      GL11.glTranslatef(5.6F, 0.0F, 0.0F);
+      GL11.glTranslatef(-5.0F / 16.0F, (slim ? 2.5F : 2.0F) / 16.0F, 0.0F); // the arm's pivot (the shoulder joint)
+      GL11.glRotatef(5.73F, 0.0F, 0.0F, 1.0F); // its idle lean: 0.1 radian
+      GL11.glRotatef(180.0F, 1.0F, 0.0F, 0.0F);
+      drawArm(px, slim, bright);
    }
 
    /** The right arm alone for the first-person view (empty hand): origin at the shoulder, hanging down along -y. */

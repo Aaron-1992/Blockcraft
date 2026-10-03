@@ -449,6 +449,14 @@ public final class Renderer {
       return true;
    }
 
+   /** Update 3.11: is the camera inside the ground (more than 3 blocks under the top of the terrain)? Only used for spectators, who can fly through it. */
+   static boolean underGround(World w, double x, double y, double z) {
+      int bx = (int)Math.floor(x);
+      int bz = (int)Math.floor(z);
+      Chunk c = w.chunkAt(bx, bz);
+      return c != null && y < c.hm[(bz & 15) * 16 + (bx & 15)] - 3;
+   }
+
    static final boolean NOCULL = Boolean.getBoolean("bc.nocull");
 
    /** Update 3.11: back faces are not drawn (the meshes of Update 3.5 are drawn double-sided, as before). */
@@ -532,6 +540,10 @@ public final class Renderer {
       int var9 = (int)Math.floor(this.camY);
       int var10 = (int)Math.floor(this.camZ);
       float var11 = Math.max(0.0F, var5.getSky(var8, var9, var10) / 15.0F);
+      if (var4.spectator) {
+         var11 = 1.0F; // Update 3.11: the ground is see-through for a spectator: the sky shows through it, no cave darkness
+      }
+
       this.caveF = this.caveF + (var11 - this.caveF) * 0.04F;
       float var12 = 0.04F + 0.96F * this.caveF;
       this.fogR *= var12;
@@ -614,7 +626,7 @@ public final class Renderer {
       float[] var27 = new float[]{this.topR, this.topG, this.topB};
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
       this.sh.sunAtten = this.wfx.sunVis;
-      if (var16 && !var6 && !var7) {
+      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
          GL11.glEnable(2929);
          GL11.glDepthMask(true);
          boolean var29 = this.sh.lodOk;
@@ -1199,12 +1211,16 @@ public final class Renderer {
    }
 
    static float[] itemGeometry(int var0) {
+      return spriteGeometry(Items.tile[var0], var0);
+   }
+
+   /** The atlas tile {@code var2} as a sprite of one pixel's thickness, one block wide, centred on the origin (cached under {@code var0}). */
+   static float[] spriteGeometry(int var2, int var0) {
       float[] var1 = (float[])itemGeo.get(var0);
       if (var1 != null) {
          return var1;
       }
 
-      int var2 = Items.tile[var0];
       int var3 = var2 % 16 * 16;
       int var4 = var2 / 16 * 16;
       ArrayList var5 = new ArrayList();
@@ -1418,7 +1434,20 @@ public final class Renderer {
    }
 
    public static void drawItemModel(int var0, float var1) {
-      float[] var2 = itemGeometry(var0);
+      drawSprite(itemGeometry(var0), var1, null);
+   }
+
+   /** Update 3.11: a torch, flower, ladder ... in the hand is its tile as a sprite, like Minecraft's flat items. */
+   static boolean flatBlock(int id) {
+      int k = Blocks.kind[id];
+      return k == 1 || k == 7 || Blocks.isLadder(id) || id == 32 || Blocks.isWallTorch(id);
+   }
+
+   static void drawFlatBlock(int id, float bright) {
+      drawSprite(spriteGeometry(Blocks.tiles[id][0], 100000 + id), id == 32 ? Math.max(bright, 0.9F) : bright, Gui.tintFor(id));
+   }
+
+   static void drawSprite(float[] var2, float var1, int[] tint) {
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.atlas);
       GL11.glEnable(3008);
@@ -1427,7 +1456,12 @@ public final class Renderer {
 
       for (int var3 = 0; var3 < var2.length; var3 += 6) {
          float var4 = var2[var3 + 5] * var1;
-         GL11.glColor3f(var4, var4, var4);
+         if (tint != null) {
+            GL11.glColor3f(var4 * tint[0] / 255.0F, var4 * tint[1] / 255.0F, var4 * tint[2] / 255.0F);
+         } else {
+            GL11.glColor3f(var4, var4, var4);
+         }
+
          GL11.glTexCoord2f(var2[var3 + 3], var2[var3 + 4]);
          GL11.glVertex3f(var2[var3], var2[var3 + 1], var2[var3 + 2]);
       }
@@ -1712,92 +1746,81 @@ public final class Renderer {
       }
    }
 
-   public void renderHand(float var1, Stack var2, float var3, float var4, float var5, int var6, int var7, float equip) {
-      if (var2 != null) {
-         int var8 = var2.id;
-         GL11.glClear(256);
-         GL11.glMatrixMode(5889);
-         GL11.glLoadIdentity();
-         double var9 = 0.05;
-         double var11 = var9 * Math.tan(Math.toRadians(35.0));
-         double var13 = var11 * var6 / var7;
-         GL11.glFrustum(-var13, var13, -var11, var11, var9, 20.0);
-         GL11.glMatrixMode(5888);
-         GL11.glLoadIdentity();
-         GL11.glDisable(2912);
-         GL11.glEnable(2929);
-         float var15 = var3;
-         float var16 = (float)Math.sqrt(var15);
-         float var17 = 0.62F - 0.4F * (float)Math.sin(var16 * Math.PI);
-         float var18 = -0.56F + 0.2F * (float)Math.sin(var16 * Math.PI * 2.0);
-         if (var8 >= 256) {
-            var17 -= 0.1F;
-            var18 += 0.3F;
-         }
-
-         float var19 = -0.9F - 0.2F * (float)Math.sin(var15 * Math.PI);
-         if (var4 >= 0.0F) {
-            float var20 = (float)Math.abs(Math.cos(var4 * 32.0F / 4.0 * Math.PI)) * 0.1F;
-            float var21 = 1.0F - (float)Math.pow(1.0F - Math.min(1.0F, var4 * 4.0F), 3.0);
-            var17 -= 0.45F * var21;
-            var18 += 0.12F * var21 + (var4 > 0.2F ? var20 : 0.0F);
-            var19 += 0.15F * var21;
-         }
-
-         var18 -= 0.6F * (1.0F - equip); // Update 3.9: the equip animation
-         GL11.glTranslatef(var17, var18, var19);
-         if (var8 >= 256) {
-            boolean var22 = Items.isTool(var8) || var8 == 268;
-            GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef((float)Math.sin(var15 * var15 * Math.PI) * -20.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef((float)Math.sin(var16 * Math.PI) * -20.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glRotatef((float)Math.sin(var16 * Math.PI) * -80.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glScalef(0.7F, 0.7F, 0.7F);
-            GL11.glRotatef(var22 ? 10.0F : 0.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glRotatef(var22 ? 15.0F : 0.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glTranslatef(0.0F, 0.1F, 0.0F);
-            drawItemModel(var8, var5);
-         } else {
-            GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef((float)Math.sin(var15 * var15 * Math.PI) * -20.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef((float)Math.sin(var16 * Math.PI) * -20.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glRotatef((float)Math.sin(var16 * Math.PI) * -80.0F, 1.0F, 0.0F, 0.0F);
-            float var23 = Blocks.kind[var8] == 0 ? 0.4F : 0.5F;
-            GL11.glScalef(var23, var23, var23);
-            if (var8 == 32) {
-               var5 = Math.max(var5, 0.9F);
+   /**
+    * The hand in the first-person view, with Minecraft 1.12's own numbers (ItemRenderer.renderItemInFirstPerson): the empty hand is the arm in
+    * the player's skin, an item sits where Minecraft puts it for that kind of model (flat items, tools, blocks), the swing, the equip
+    * animation (swapping the item) and the eating animation are Minecraft's formulas, and the hand lags a little behind the camera when you turn.
+    *
+    * @param swing     0..1 progress of the swing (attack / dig / place), 0 when not swinging
+    * @param use       0..1 progress of eating, or -1
+    * @param equip     0..1: 1 = the item is fully raised
+    * @param swayPitch the hand's lag behind the camera, degrees (already scaled)
+    */
+   public void renderHand(float partial, Stack item, float swing, float use, float bright, int fbW, int fbH, float equip, float swayPitch, float swayYaw) {
+      GL11.glClear(256);
+      GL11.glMatrixMode(5889);
+      GL11.glLoadIdentity();
+      double near = 0.05;
+      double top = near * Math.tan(Math.toRadians(35.0));
+      double right = top * fbW / fbH;
+      GL11.glFrustum(-right, right, -top, top, near, 20.0);
+      GL11.glMatrixMode(5888);
+      GL11.glLoadIdentity();
+      GL11.glDisable(2912);
+      GL11.glEnable(2929);
+      float p = 1.0F - equip;
+      GL11.glRotatef(swayPitch, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(swayYaw, 0.0F, 1.0F, 0.0F);
+      float s1 = (float)Math.sqrt(swing);
+      if (item == null) {
+         PlayerModel.drawArmFirstPerson(this.g.skinPixels(), this.g.skinSlim(), bright, swing, p);
+      } else {
+         int id = item.id;
+         if (use >= 0.0F) {
+            float f = 32.0F * (1.0F - use) + 1.0F; // ticks left
+            float f1 = f / 32.0F;
+            if (f1 < 0.8F) {
+               GL11.glTranslatef(0.0F, Math.abs((float)Math.cos(f / 4.0F * Math.PI) * 0.1F), 0.0F);
             }
 
-            drawBlockModel(var8, var5);
+            float f3 = 1.0F - (float)Math.pow(f1, 27.0);
+            GL11.glTranslatef(f3 * 0.6F, f3 * -0.5F, 0.0F);
+            GL11.glRotatef(f3 * 90.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(f3 * 10.0F, 1.0F, 0.0F, 0.0F);
+            GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
+         } else {
+            GL11.glTranslatef(-0.4F * (float)Math.sin(s1 * Math.PI), 0.2F * (float)Math.sin(s1 * Math.PI * 2.0), -0.2F * (float)Math.sin(swing * Math.PI));
+            GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
+            float f = (float)Math.sin(swing * swing * Math.PI);
+            GL11.glRotatef(45.0F - f * 20.0F, 0.0F, 1.0F, 0.0F);
+            float f1 = (float)Math.sin(s1 * Math.PI);
+            GL11.glRotatef(f1 * -20.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glRotatef(f1 * -80.0F, 1.0F, 0.0F, 0.0F);
+            GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
          }
 
-         GL11.glMatrixMode(5888);
-         GL11.glLoadIdentity();
-      } else {
-         // Update 3.9: nothing in the hand - your arm, in your skin
-         GL11.glClear(256);
-         GL11.glMatrixMode(5889);
-         GL11.glLoadIdentity();
-         double near = 0.05;
-         double top = near * Math.tan(Math.toRadians(35.0));
-         double right = top * var6 / var7;
-         GL11.glFrustum(-right, right, -top, top, near, 20.0);
-         GL11.glMatrixMode(5888);
-         GL11.glLoadIdentity();
-         GL11.glDisable(2912);
-         GL11.glEnable(2929);
-         float sw = var3;
-         float sq = (float)Math.sqrt(sw);
-         float sinS = (float)Math.sin(sq * Math.PI);
-         GL11.glTranslatef(0.64F - 0.34F * sinS, -0.60F - 0.10F * (float)Math.sin(sq * Math.PI * 2.0) + 0.10F * sinS - 0.6F * (1.0F - equip), -0.92F - 0.28F * (float)Math.sin(sw * Math.PI));
-         GL11.glRotatef(68.0F + 22.0F * sinS, 1.0F, 0.0F, 0.0F);
-         GL11.glRotatef(-12.0F, 0.0F, 0.0F, 1.0F);
-         GL11.glRotatef(10.0F - (float)Math.sin(sw * sw * Math.PI) * 18.0F, 0.0F, 1.0F, 0.0F);
-         GL11.glScalef(1.9F, 1.9F, 1.9F);
-         PlayerModel.drawArm(this.g.skinPixels(), this.g.skinSlim(), var5);
-         GL11.glMatrixMode(5888);
-         GL11.glLoadIdentity();
+         if (id >= 256 || flatBlock(id)) {
+            // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
+            GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
+            GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(25.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glScalef(0.68F, 0.68F, 0.68F);
+            if (id >= 256) {
+               drawItemModel(id, bright);
+            } else {
+               drawFlatBlock(id, bright);
+            }
+         } else {
+            // block/block, "firstperson_righthand": rotation [0, 45, 0], scale 0.4
+            GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glScalef(0.4F, 0.4F, 0.4F);
+            drawBlockModel(id, bright);
+         }
       }
+
+      GL11.glMatrixMode(5888);
+      GL11.glLoadIdentity();
    }
 
    static {

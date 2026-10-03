@@ -311,6 +311,18 @@ SCENES = {
                        "-Dbc.fill=150,60,60,161,140,71,16;166,50,60,178,90,72,0", "-Dbc.tp=110:-60,100,71"] + PLAIN + ["-Dbc.shot=260"], True),
     # the same place without any change: what the generator makes of it (to see what the tower and the pit replaced)
     "lod-changes-ref": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32", "-Dbc.cam=-60,100,71,-90,6", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=160"], True),
+    # ---- Update 3.11: the hand (first person: the empty arm in the skin, a tool, a block, a torch, food; the swing and eating poses frozen half way; third person)
+    "hand-empty":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.skin=demo", "-Dbc.emptyhand=1", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-empty-swing": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.skin=demo", "-Dbc.emptyhand=1", "-Dbc.handswing=0.4", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-sword":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=316", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-sword-swing": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=316", "-Dbc.handswing=0.4", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-block":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=4", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-torch":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=32", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-apple":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=270", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-eat":       (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=270", "-Dbc.handeat=0.5", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "hand-sword-sh":  (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=316", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    "skin-hold-torch": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.skin=demo", "-Dbc.hold=32", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "skin-hold-apple": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.skin=demo", "-Dbc.hold=270", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),

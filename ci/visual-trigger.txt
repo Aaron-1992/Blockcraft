@@ -1,2 +1,2 @@
-under-map,under-map-sh,under-water,doors311,lod-changes,lod-changes-ref,mobs,day-plain
+hand-empty,hand-empty-swing,hand-sword,hand-sword-swing,hand-block,hand-torch,hand-apple,hand-eat,hand-sword-sh,skin-hold-a,skin-hold-block,skin-hold-torch,skin-hold-apple,under-map
 jar=build
