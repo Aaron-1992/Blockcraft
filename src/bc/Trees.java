@@ -372,6 +372,11 @@ public final class Trees {
 
    /** How far the toppled trunk drops until it rests on something, or -1 when this way is blocked (terrain, other trees' trunks, water). */
    int checkDirection(Plan p, int dx, int dz) {
+      return this.checkDirection(p, dx, dz, null);
+   }
+
+   /** As {@link #checkDirection(Plan, int, int)}, but the trunk must not come to lie where {@code avoid} (a bounding box) is: never onto the player who is chopping. */
+   int checkDirection(Plan p, int dx, int dz, double[] avoid) {
       int nl = p.nTrunk; // branches and leaves are not rigid: what does not fit crumbles or is pushed up when it lands
       int[] fx = new int[nl];
       int[] fy = new int[nl];
@@ -406,21 +411,26 @@ public final class Trees {
          }
       }
 
-      if (!this.logsFree(p, fx, fy, fz, 0)) {
+      if (!this.logsFree(p, fx, fy, fz, 0, avoid)) {
          return -1;
       }
 
       int drop = 0;
-      while (drop < MAX_DROP && this.logsFree(p, fx, fy, fz, drop + 1)) {
+      while (drop < MAX_DROP && this.logsFree(p, fx, fy, fz, drop + 1, avoid)) {
          drop++;
       }
 
       return drop >= MAX_DROP ? -1 : drop;
    }
 
-   boolean logsFree(Plan p, int[] fx, int[] fy, int[] fz, int shift) {
+   boolean logsFree(Plan p, int[] fx, int[] fy, int[] fz, int shift, double[] avoid) {
       for (int i = 0; i < p.nTrunk; i++) {
          if (!this.free(fx[i], fy[i] - shift, fz[i], p.cells)) {
+            return false;
+         }
+
+         // (a margin of a third of a block around the player: the log must not land against him either)
+         if (avoid != null && avoid[3] + 0.35 > fx[i] && avoid[0] - 0.35 < fx[i] + 1 && avoid[4] > fy[i] - shift && avoid[1] < fy[i] - shift + 1 && avoid[5] + 0.35 > fz[i] && avoid[2] - 0.35 < fz[i] + 1) {
             return false;
          }
       }
@@ -469,13 +479,18 @@ public final class Trees {
 
       double ax = px + 0.5 - fromX;
       double az = pz + 0.5 - fromZ;
-      return this.start(p, ax, az, null);
+      Player pl = this.w.game == null ? null : this.w.game.player;
+      return this.start(p, ax, az, null, pl == null || pl.dead || pl.spectator ? null : pl.bb);
    }
 
    /** Starts the fall of a collected tree: first free direction in {@link #directionOrder}. */
    boolean start(Plan p, double awayX, double awayZ, Random jitter) {
+      return this.start(p, awayX, awayZ, jitter, null);
+   }
+
+   boolean start(Plan p, double awayX, double awayZ, Random jitter, double[] avoid) {
       for (int[] d : directionOrder(awayX, awayZ, jitter)) {
-         int drop = this.checkDirection(p, d[0], d[1]);
+         int drop = this.checkDirection(p, d[0], d[1], avoid);
          if (drop >= 0) {
             this.launch(p, d[0], d[1], drop);
             return true;

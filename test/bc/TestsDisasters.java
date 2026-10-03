@@ -797,13 +797,19 @@ final class TestsDisasters {
          g.chatLog.clear();
          g.runCommand("/help");
          check(g.chatLog.get(0).contains("/disaster") && g.chatLog.get(0).contains("/treefall"), "the help lists the new commands");
-         // a tornado called while the weather is on also brings the storm
+         // a tornado called while the weather is on also brings a grey, rainy sky (but no lightning)
          Game gw = game(1);
          gw.world.weather.enabled = true;
          gw.player.setPos(CX + 0.5, GROUND + 1, CZ + 0.5);
          int cells = gw.world.weather.cells.size();
          gw.runCommand("/disaster tornado 70");
-         eq(cells + 1, gw.world.weather.cells.size(), "a storm cell forms over it");
+         eq(cells, gw.world.weather.cells.size(), "no storm cell (that would bring lightning)");
+         eq(2, gw.world.weather.forceMode, "rain for a few minutes");
+         Game gt = game(1);
+         gt.world.weather.enabled = true;
+         gt.world.weather.force(3, 600L);
+         gt.runCommand("/disaster tornado 70");
+         eq(3, gt.world.weather.forceMode, "a thunderstorm that is already forced is left alone");
       });
    }
 

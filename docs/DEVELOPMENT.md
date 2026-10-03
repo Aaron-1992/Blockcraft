@@ -7,7 +7,7 @@ Textures, models, terrain generation and physics are all generated in code; the 
 
 | Path | What it is |
 |---|---|
-| `src/bc/*.java` | The game (package `bc`). `Game` = main loop, input, interaction; `World`/`Chunk`/`Gen`/`Structs` = world; `Blocks`/`Items`/`Recipes` = data tables; `Mobs`/`MobRender`; `Renderer`/`Mesher`/`Lod`/`Shaders`/`ShaderSrc`/`Tex`/`TexExtra`/`Gui` = rendering. |
+| `src/bc/*.java` | The game (package `bc`). `Game` = main loop, input, interaction; `World`/`Chunk`/`Gen`/`Structs` = world; `Blocks`/`Items`/`Recipes` = data tables; `Mobs`/`MobRender`; `Renderer`/`Mesher`/`Lod`/`Shaders`/`ShaderSrc`/`Tex`/`TexExtra`/`Gui` = rendering; `Weather`/`WeatherFx` = weather (3.8); `Skins`/`PlayerModel` = skins (3.9); `Trees` = falling trees, `Disasters`/`DisasterFx` = tornadoes, earthquakes, meteors (3.10). |
 | `res/` | Files placed in the jar root (`font.bin`). |
 | `libs/lwjgl-bundle.jar` | LWJGL classes **and** their Windows/Linux natives, extracted unchanged from the 3.5 jar. |
 | `launcher/launch4j-stub.bin` | The 69 KB Launch4j launcher. **`Blockcraft.exe` = this stub + the jar appended** (Java opens the exe as a zip). |
@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.9"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.10"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -40,7 +40,7 @@ python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-wind
 
 ```
 python3 tools/runtests.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation/meshing vs the ORIGINAL 3.5 jar
-python3 tools/runtests.py unit          # test/bc/GameTests.java + Tests37.java: ~11,000 checks of the game logic, no GPU needed
+python3 tools/runtests.py unit          # test/bc/GameTests.java + Tests37 / 38 / 39 / 310 / TestsFall / TestsDisasters: ~41,000 checks of the game logic, no GPU needed
 python3 tools/runtests.py               # both (this is what CI runs)
 ```
 
@@ -100,6 +100,11 @@ away from the camera to see the model from the side), `bc.mouse=x,y` (framebuffe
 (open the pause menu, then screenshot), `bc.title=SKINS` (the Skins screen), `bc.skinuser=<name>` (import a real account's skin over the
 network before the shot - the Windows smoke machine has internet), `bc.skinbrowse=1` (open the file dialog).
 
+Update 3.10 hooks: `bc.fill=x0,y0,z0,x1,y1,z1,id;...` (fill boxes at frame 68, before `bc.set`), `bc.fell=x,y,z,dx,dz` (frame 80: cut the log at x,y,z - the tree above falls
+towards dx,dz) with `bc.fellangle=<degrees>` (freeze every falling tree at that angle: a picture of the fall half way), `bc.disaster=tornado:dx,dz[,size[,speed]]`
+`| quake:dx,dz[,magnitude[,life ticks]] | meteor:dx,dz[,flight ticks]` (several separated by `;`; frame 75; positions relative to the camera; a tornado is fully grown
+and stands still unless a speed in blocks per tick is given), `bc.dfreeze=<ticks>` (everything the disasters do stops that many ticks after it was started).
+
 ## How the source was recovered (2026-10-02)
 
 The 3.5 source did not survive the move away from the first chat, so it was decompiled from `blockcraft.jar`
@@ -115,7 +120,7 @@ The 3.5 source did not survive the move away from the first chat, so it was deco
 
 ## How to add content (what the code expects)
 
-**A block** (ids 195..255 are free - 3.7 used 159-194; keep `Blocks.COUNT` = last id + 1, a block is ONE BYTE and has no metadata, so
+**A block** (ids 226..255 are free - 3.7 used 159-194, 3.9 195-219, 3.10 220-225; keep `Blocks.COUNT` = last id + 1, a block is ONE BYTE and has no metadata, so
 rotations/stages use consecutive ids):
 1. `Blocks`: constant + `def(id, name, hardness, opaque, tile)` in the static initialiser; then `kind[id]`
    (0 cube, 1 cross, 2 box, 3 fluid, 4 stair, 5 wall torch, 6 fence, 7 crop), `box`/`coll`, `drop`, `mineClass`/`needTool`,
@@ -123,7 +128,7 @@ rotations/stages use consecutive ids):
 2. Art: a function returning `int[256]` (ARGB, 16x16) in `TexExtra` and `Tex.blit(tile, pixels)` in `TexExtra.blocks()`.
    The atlas is 16x16 tiles; tiles 0..245 are taken (3.6 uses 203 wet farmland, 204-207 carrots, 208-211 potatoes,
    212-213 hay, 214-218 item icons 336-340; 3.7 uses 219-245, all drawn in `TexArt37`: cane, bookshelf, pumpkin/melon faces,
-   4 stem groups, cake, the animated fire tile 235, item icons 236-245). **Next free tile: 246.** Preview art with
+   4 stem groups, cake, the animated fire tile 235, item icons 236-245). **Next free tile: 249** (3.10 uses 246-248 for the turned bark of logs on their side, `TexArt310`). Preview art with
    `bc.TexSheet out.png` (add `37` as 2nd argument for only the 3.7 art).
 3. Behaviour: `World.blockUpdate` (reacts to neighbour changes), `World.tickCrops` (random ticks within 32 blocks of the
    player), `Game.useBlock` (right-click), `Game.placeBlock`, `Game.breakBlock` / `Game.blockDrops`.
@@ -172,12 +177,55 @@ so old lines still load).
 * Windows specifics that CI cannot click through: dropping a file on the window, the dialog being visible. Keep `browseSkin` leaving
   fullscreen and disposing the `FileDialog` - an undisposed AWT dialog keeps the JVM alive after the window closes (hence `System.exit(0)`
   in `Main`). `java.awt.headless` is set to `false` on Windows only.
-* `Blocks.COUNT` is 220 (3.10); ids 220..255 are free. Update 3.10 adds 195..214 upside-down stairs (`Blocks.STAIR_TOP0`, material * 4 + facing; use `Blocks.stairFacing`), 215..219 top slabs
-  (`SLAB_TOP0`); planned next: 220..225 sideways logs.
+* `Blocks.COUNT` is 226; ids 226..255 are free. 3.9 added 195..214 upside-down stairs (`Blocks.STAIR_TOP0`, material * 4 + facing; use `Blocks.stairFacing`) and 215..219 top slabs
+  (`SLAB_TOP0`); 3.10 added 220..225 logs on their side (`LOG_X0` 220..222 along x, `LOG_Z0` 223..225 along z; oak / birch / spruce).
+
+## Falling trees (Update 3.10)
+
+`Trees.java`, one instance per world (`World.trees`, ticked from `World.tick`, landed by `World.saveAll`). `Game.breakBlock` calls `Trees.fell` after a log
+(9..11) was broken; `Disasters.uproot` (tornado, earthquake) uses `Trees.collect` / `start` directly.
+
+* **What falls** (`collect`): the logs connected (6 neighbours) to the cut cell, going up, that are not held up by anything else (a solid non-leaf block under one of them
+  = nothing falls) - the *trunk* is the part in the cut's own column, the rest are *branches* - plus the leaves within 4 steps (26 neighbours: the generated crowns have
+  leaves that only touch at an edge) of them that no other tree's log is closer to. Fewer than 4 leaves = not a tree (a log pillar or a cabin). Caps: 160 logs, 700 leaves.
+* **Where** (`checkDirection`): the directions in the order of how well they point away from the player (`directionOrder`); a direction is free when the cells the trunk's
+  log centres pass at 15 / 30 ... 75 degrees and the cells it lies in are free (air, plants, leaves; not solid blocks, not water) - only the trunk is checked, branches and
+  leaves are not rigid: what does not fit when it lands is pushed up (at most 2) or snaps off (a branch drops as a log item, a leaf like a broken leaf). The trunk then drops
+  until it rests (cut higher up). `Trees.rotated` is the exact 90 degree turn that puts every block in a cell (`TestsFall.geometry` proves it is a bijection).
+* **How it looks**: the blocks are taken out of the world when the fall starts and live in `Trees.Fall`; `Renderer.drawFallingTrees` draws them as one rigid piece
+  (`glRotatef(angle, dz, 0, -dx)` about the cut cell, the angle follows `90 * (t / T)^2`, T = 20..44 ticks by height) and `emitCube` draws a cube in immediate mode.
+  Landing: side logs (`Blocks.sideLog(id, axis)`), `squash` hurts and lifts mobs / the player (7 half hearts), particles, camera shake (`Game.addShake`).
+* Logs on their side are ids 220..225 (tiles: rings on the two ends, `TexArt310` bark transposed on the other faces so the grain runs along the log). `Game.placeBlock`
+  turns a log put against a side face into one (clicked axis); `Blocks.drop` / `pickItem` give the upright log; `Fire` treats them like logs.
+* Tests: `TestsFall` (detection, geometry, falls in all directions, blocked ways, cutting higher, neighbours, 36 generated trees, landing, harvesting, placing, meshing, saving).
+
+## Natural disasters (Update 3.10)
+
+`Disasters.java` (rules, one instance per world: `World.disasters`, ticked from `World.tick`), `DisasterFx.java` (drawing), `Options.disasters` + `Disasters.enabled`
+(`/disaster on|off`, saved as `disasters`, `dclock`, `dquake`, `dtornado`, `dshower` in level.properties). Nothing here uses OpenGL except `DisasterFx`.
+
+* **Tornado** (`Tornado`, up to 2): the funnel forms over 12 s (`strength` 0..1), moves 0.075-0.12 blocks per tick with a wandering heading and ropes out after 2-4 minutes.
+  `pull` is the force field (swirl, inward pull, lift that fades 14 blocks above the ground; `reach` grows with height); `tornadoEntities` applies it to the player (not when
+  flying), mobs and items and hurts what is in the core; `tornadoTrees` uproots trees within 5.5 blocks (every 4 ticks, one tree per look, before the leaves are gone);
+  `tornadoBlocks` picks random columns in a 7-block radius and lifts what `fragility(id)` allows (terrain, stone, chests, furnaces, TNT, fire, hard blocks never) as `Debris`.
+  `Debris` circles the funnel (`tickDebris`), is flung off along the tangent, hits entities (3 damage) and lands as a `World.Falling` block (60 %) or splinters.
+* **Earthquake** (`Quake`, one at a time): `tickQuake` shakes the camera by distance (`Game.addShake`), and every tick picks columns in the radius (14 + 7 * magnitude) for
+  `shakeColumn`: topple a tree (`uproot`), shake loose plants / torches / ladders / glass, or let an unstable block of `crumbles(id)` terrain fall (a block with air under it falls
+  where it is, one at a cliff edge slides off into the open column next to it as a `World.Falling`).
+* **Meteor** (`Meteor`): a straight flight in steps of < 1 block (a thin roof cannot be flown through), `impact` = `Mobs.blast` (power 4-6) + fires (`Fire.ignite`) + 1-3 obsidian blocks
+  + shake. A shower is `showerLeft` meteors launched 3-10 s apart at loaded spots 40-130 blocks from the player.
+* **Natural starts** (`tickNatural`, every 2 s, only while `active()` = world switch and Options): quake 20-45 minutes apart (the first one 10-30 minutes in), a tornado when a point 90-180
+  blocks away has `Snap.storm > 0.3` (needs weather on; 17-33 minutes apart, the first one after 7.5-15 minutes), a meteor shower at night 30-70 minutes apart. All use the world's own
+  `Random` (seeded from the world seed), so tests are deterministic. `GameTests.newGame` switches disasters off; `TestsDisasters.game` switches them on.
+* **Drawing** (`DisasterFx`): `drawDebris` with the entities; `drawSky` after the clouds (before the rain curtains): two translucent shells of rings (inner dense, outer a soft veil turning
+  the other way), a dust skirt, a wall cloud of stacked soft discs, tinted by `WeatherFx.cloudTint` (night / sunset / lightning flashes, never darker than 0.27); meteors are additive
+  ribbons with three soft glow discs. Camera shake is in `Renderer.renderWorld` (position + a little rotation, `Game.shake` fades by itself).
+* Tests: `TestsDisasters` (rule tables, ground height, the life of a tornado, what it tears and what it leaves, uprooting, the force field with a real `Player` and a cow, debris flight and landing,
+  quakes, meteors, natural starts and their switches, commands, saving).
 
 ## Conventions / gotchas
 
-* Blocks are one **byte** per cell (IDs 0..255, `Blocks.COUNT` = 195 so far) and there is **no metadata**: rotated/staged
+* Blocks are one **byte** per cell (IDs 0..255, `Blocks.COUNT` = 226 so far) and there is **no metadata**: rotated/staged
   blocks use consecutive IDs (beds 133–140, wheat stages 124–131, ladders 119–122, doors 73–81, stairs 93–112 ...).
   Items live in the same id space as blocks below 256; non-block items start at 256.
 * **Fire** (`Fire.java`, one block id 194): blocks have no metadata, so the fire's age lives in `World.fire.cells`

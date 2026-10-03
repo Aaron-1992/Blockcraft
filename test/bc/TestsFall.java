@@ -411,6 +411,26 @@ final class TestsFall {
             w.setBlock(TX + k, GROUND + 1, TZ, 0);
          }
 
+         // never onto the player who is chopping: the only free way leads over him, so the tree stays
+         clear(g);
+         plant(w, TX, TZ, 6, 9, 12);
+         w.setBlock(TX - 1, GROUND + 1, TZ, Blocks.STONE);
+         w.setBlock(TX, GROUND + 1, TZ + 1, Blocks.STONE);
+         w.setBlock(TX, GROUND + 1, TZ - 1, Blocks.STONE);
+         cut(g, TX, GROUND + 1, TZ, TX + 3.5, TZ + 0.5);
+         eq(0, w.trees.falling().size(), "the one free way (east) is over the player standing 3 blocks away: nothing falls");
+         eq(5, count(w, id -> Blocks.isLog(id)), "(the logs are where they were)");
+         // ... and it falls there when he stands somewhere else
+         clear(g);
+         plant(w, TX, TZ, 6, 9, 12);
+         w.setBlock(TX - 1, GROUND + 1, TZ, Blocks.STONE);
+         w.setBlock(TX, GROUND + 1, TZ + 1, Blocks.STONE);
+         w.setBlock(TX, GROUND + 1, TZ - 1, Blocks.STONE);
+         cut(g, TX, GROUND + 1, TZ, TX + 0.5, TZ + 8.5);
+         eq(1, w.trees.falling().size(), "with the player out of the way it falls east");
+         eq(1, w.trees.falling().get(0).dx(), "east");
+         settle(w);
+
          // the setting
          clear(g);
          plant(w, TX, TZ, 6, 9, 12);

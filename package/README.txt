@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.9)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.10)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,42 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.10  (natural disasters and falling trees)
+  * TREES FALL OVER. Chop through a tree's trunk (usually the bottom log) and the whole tree above the cut tips over like a felled
+    tree: trunk, branches and crown fall away from you as one piece (the other way if something is in the way, and not at all
+    if the tree is walled in), and lie on the ground. The log you cut drops as usual; the rest of the trunk stays in the world as
+    LOGS ON THEIR SIDE that you harvest piece by piece (each gives a normal log, an axe is faster, they burn like logs). Cut
+    higher up and the stump stays while the top falls and drops onto the ground. The crown comes down with the tree: leaves
+    that land are still leaves (the ones that get squashed drop apples and sticks like broken leaves). Mobs - and you - under
+    a landing trunk are hurt (3.5 hearts) and put on top of it. Only trees count: a log pillar, a cabin or anything without
+    leaves does not fall. Switch: /treefall on|off (saved with the world).
+  * LOGS PLACED AGAINST THE SIDE OF A BLOCK NOW LIE DOWN along that direction, like in Minecraft (on top of a block, or in tall
+    grass, they still stand upright). The bark runs along a log on its side, the rings are on the ends.
+  * NATURAL DISASTERS (they only start some minutes into a world and are rare; Options -> "Disasters: ON/OFF" switches them off
+    in every world, /disaster off|on in one world - saved with it; the /disaster commands below still work when they are off).
+    You are told in the chat when one starts by itself.
+      TORNADOES form in thunderstorms 90-180 blocks away and head for your neighbourhood at about 2 blocks a second (you can walk
+      away from one). A dark wall cloud with a grey funnel hanging from it, a dust skirt on the ground. Close to the funnel
+      you are swirled around, drawn in and LIFTED (up to about 7-14 blocks), thrown out again, and hurt a little; animals and
+      dropped items are carried too. It tears leaves, plants, torches, ladders, glass, wool, pumpkins, melons, cakes, hay bales and
+      wooden furniture (planks, fences, doors, beds, crafting tables, bookshelves, wooden stairs and slabs) out of the ground and spins them around as flying
+      debris that crashes down again further on (a lot of it as blocks again, some as splinters, and a flying plank hurts).
+      TREES close to the funnel are uprooted and topple away from it. It never touches terrain, stone, bricks, ores, chests,
+      furnaces or logs lying on the ground. It lives 2-4 minutes and ropes out.
+      EARTHQUAKES shake the screen (stronger the nearer the middle), crumble loose terrain off cliffs and overhangs as falling
+      blocks (dirt, grass, stone, sand, gravel, ores - never what you built), shake plants, torches, ladders and glass loose
+      and topple trees. Radius 20-35 blocks, about 10-15 seconds; flat ground stays flat.
+      METEORS streak across the night sky (some nights a whole shower) and hit with a blast the size of TNT or bigger, set fires around
+      the crater and leave a few blocks of OBSIDIAN (mine it with a diamond pickaxe).
+    COMMANDS: /disaster tornado [distance]  (a tornado forms that many blocks ahead of you, default 80, and heads your way, under
+    a grey rainy sky),  /disaster quake [1-3],  /disaster meteor [count],  /disaster stop,  /disaster on|off,  /disaster (status).
+  * The camera shakes when the ground does: earthquakes, a tree hitting the ground close to you, a meteor striking.
+  * Honest note: everything is covered by automated tests (43,000+ checks: the rules, the numbers, save / load) and was looked
+    at as pictures from a software renderer and through the real Blockcraft.exe on a Windows test machine. How it FEELS - the
+    tornado's pull, the shaking, the frame rate with a big forest being shredded - has not been tried on real hardware, and
+    the game has no sound at all (no thunder, no rumble, no crash of a falling tree). If a disaster is too much for your taste,
+    Options -> Disasters: OFF.
 
 WHAT'S NEW IN UPDATE 3.9  (the skins update)
   * SKINS: wear your own Minecraft skin. Title screen or pause menu -> "Skins...". Four easy ways to get a skin into the game:
@@ -227,6 +263,6 @@ CONTROLS
   Q             drop item       T or /      chat / commands           Esc  pause
   F1 hide HUD   F2 screenshot   F3 debug    F5 camera: first person / behind you / in front of you    F11 fullscreen
 COMMANDS: /gamemode <survival|creative|adventure|spectator>  /time  /tp  /seed  /give <item> [n]
-          /kill  /heal  /fly  /summon <mob>  /help
+          /kill  /heal  /fly  /summon <mob>  /weather  /firespread  /treefall  /disaster  /help
 
 Worlds, options and screenshots are stored in  %USERPROFILE%\.blockcraft112

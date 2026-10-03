@@ -1081,8 +1081,8 @@ public final class Disasters {
             double hx = p.x - x - fz * 25.0;
             double hz = p.z - z + fx * 25.0;
             Weather wx = this.w.weather;
-            if (wx.enabled && !wx.suppressed) {
-               wx.placeStorm(x, z, 520.0F);
+            if (wx.enabled && !wx.suppressed && wx.forceMode == 0) {
+               wx.force(2, 300L); // a grey, rainy sky for the occasion (a thunderstorm would also strike you with lightning)
             }
 
             this.spawnTornado(x, z, hx, hz, 1.0F + this.rnd.nextFloat() * 0.3F, false);

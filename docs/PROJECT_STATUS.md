@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-03 (Update 3.9)._
+_Last updated: 2026-10-03 (Update 3.10)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
@@ -10,8 +10,8 @@ _Last updated: 2026-10-03 (Update 3.9)._
 | 2 | Fix LODs and adapt them for the weather system | weather part **done in 3.8** (the LOD follows the weather's fog / sun / brightness); 3.9 makes the fog radial so the world's edge is hidden from every angle; inspected in day / night / shader / top-down scenes (`lod-*`) - no further defect found without a concrete report |
 | 3 | Skins (easy import of Minecraft skins) | **done in Update 3.9** (drag & drop, file dialog, username download, clipboard; legacy / HD skins; slim arms; F5 camera; inventory preview) |
 | 4 | Smooth animations | **done in Update 3.9**: water / lava / fire frames are blended (`Tex.animate(tick, partial)`), falling blocks and TNT interpolate (`World.Falling.px/py/pz`), the hand has an equip animation (`Game.tickEquip`); the sneak height and the mobs / player / items / particles were already smooth |
-| 5 | Natural disasters | planned (builds on the weather system: lightning fires, storms) |
-| 6 | Trees fall over when chopped; the fallen trunk can be harvested further | planned (needs sideways log blocks) |
+| 5 | Natural disasters | **done in Update 3.10**: tornadoes (born in thunderstorms), earthquakes, meteors (`Disasters`, `DisasterFx`; `/disaster`, Options > Disasters) |
+| 6 | Trees fall over when chopped; the fallen trunk can be harvested further | **done in Update 3.10** (`Trees`; logs on their side = ids 220-225; the felled trunk is harvested piece by piece) |
 | 7 | Slabs, stairs etc. on the top half of a block / upside down | **done in Update 3.9** (`Hit.fy`, ids 195-219, `Game.placeBlock`, slab merging) |
 | 8 | Make creepers ignitable | **done in Update 3.9** (flint and steel) |
 | 9 | Fire drawn like in Minecraft when attached to a block | **done in Update 3.9** (`Mesher.fire`: wall / ceiling / corner flames) |
@@ -25,7 +25,21 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.9 – "the skins update"
+## Current state: Update 3.10 – "natural disasters and falling trees"
+
+- **Falling trees** (`Trees.java`): breaking a log of a tree with leaves makes everything above the cut tip over as one rigid piece (90 degrees about the cut cell,
+  away from the player, else the best free direction; none when walled in). The trunk lands as **logs on their side** (`Blocks.LOG_X0` 220-222 / `LOG_Z0` 223-225, bark turned
+  by `TexArt310`), branches and leaves land around the tip (pushed up or crumbling), a cut higher up leaves a stump and the top drops until it rests. Mobs / the player under a
+  trunk take 7 half hearts and are lifted. Log pillars and cabins (no leaves) do not fall. Logs placed against a side face now lie along that axis. `/treefall on|off`.
+- **Natural disasters** (`Disasters.java`, `DisasterFx.java`): *tornadoes* (wall cloud, two-shell funnel, dust skirt; a force field that swirls, draws in and lifts the player, animals and
+  items, hurts in the core; tears leaves / plants / glass / wool / wooden furniture out as flying debris, uproots trees; never touches terrain, stone, ores, chests, furnaces),
+  *earthquakes* (camera shake by distance, crumbling cliffs and overhangs, plants / torches / glass shaken loose, toppling trees) and *meteors* (additive streaks, a blast, fires,
+  obsidian; showers at night). They start by themselves (rare, after a grace period of 7.5-30 minutes; tornadoes only under thunderstorms), `Options > Disasters`, `/disaster on|off|stop|tornado|quake|meteor`.
+- Camera shake (`Game.shake`, `Renderer.renderWorld`) for quakes, landing trees and impacts.
+- Under the hood: `Blocks.COUNT` 226, tiles 246-248, ~1,800 lines of new rules (`Trees`, `Disasters`) + ~300 of drawing (`DisasterFx`), `TestsFall` (~1,000 checks) and `TestsDisasters` (~300 checks), screenshot hooks `bc.fill`,
+  `bc.fell`, `bc.fellangle`, `bc.disaster`, `bc.dfreeze`.
+
+## Update 3.9 (still in the game) – "the skins update"
 
 - **Skins** (`Skins.java`, `PlayerModel.java`): any Minecraft skin PNG - 64x64, the old 64x32 (left limbs mirrored from the right ones), HD (a
   multiple of 64, scaled down) - is copied into `%USERPROFILE%\.blockcraft112\skins`. Ways in: drag & drop onto the window (GLFW drop callback,
@@ -108,7 +122,7 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 |---|---|---|
 | The recovered source equals the shipped 3.5 jar | `tools/runtests.py equivalence`: 437 fingerprints (terrain of 4 seeds, threaded world + lighting, spawn search, 6000 collision trials, crafting, a 600-tick fluid/sand/TNT simulation, chunk meshing of terrain and of *every* block id, every old texture, every static table) | identical |
 | …including the OpenGL classes that cannot run headless | `tools/classcompare.py`: per-method comparison of what the original bytecode calls/reads/writes/loads vs the recompiled classes (718 methods) | 21 differences, all compiler codegen / dead code / a shared lambda |
-| Game logic of 3.5 - 3.9 | `test/bc/GameTests.java` + `Tests37.java`: 11,458 checks on a real `Game`/`World`/`Player` without OpenGL: every recipe, hoe/seeds/growth/harvest rates, buckets, flint & steel + TNT blasts/chains/damage, ladders (placement, climbing, falling), beds (placement, sleeping rules, respawn), hydration, drying, trampling (also through real player physics), hay landing, carrots/potatoes/bone meal, shears, breeding, growing up, save/load, atlas tiles; 3.7: cane rules/growth, stems/fruit, carving, cake, milk, eggs, following food, fire (ignite, age, spread, burn out, TNT, lava, water, `/firespread`, burning player and animals), shore/pumpkin worldgen, meshing of every new block | all pass |
+| Game logic of 3.5 - 3.10 | `test/bc/GameTests.java` + `Tests37` / `38` / `39` / `310` / `TestsFall` / `TestsDisasters`: 41,000+ checks (3.10: see the two rows below; the rest as before): 11,458 checks on a real `Game`/`World`/`Player` without OpenGL: every recipe, hoe/seeds/growth/harvest rates, buckets, flint & steel + TNT blasts/chains/damage, ladders (placement, climbing, falling), beds (placement, sleeping rules, respawn), hydration, drying, trampling (also through real player physics), hay landing, carrots/potatoes/bone meal, shears, breeding, growing up, save/load, atlas tiles; 3.7: cane rules/growth, stems/fruit, carving, cake, milk, eggs, following food, fire (ignite, age, spread, burn out, TNT, lava, water, `/firespread`, burning player and animals), shore/pumpkin worldgen, meshing of every new block | all pass |
 | Builds with a real JDK | GitHub Actions `CI` (javac, JDK 21) on every push | green |
 | Rendering (Linux, headless OpenGL) | GitHub Actions `Visual`: the real game under Xvfb + Mesa llvmpipe; the ORIGINAL 3.5 jar and the new jar render the same scenes (`ci-results/shots/*.jpg`, left = 3.5, right = new) | 7 scenes (world by day/night, mobs, inventory pages, ...) differ by 0.00 - 0.21 % of the pixels; the shader pack looks identical (its animated water/clouds make 9.6 % of the pixels differ) |
 | Terrain generation is unchanged by 3.7 | `runtests.py equivalence` strict pass: with the worldgen extras off (`-Dbc.noextras=true`) `gen`/`world`/`tick`/`mesh terrain` fingerprints are identical to the 3.5 jar | identical |
@@ -117,6 +131,10 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 | **The real Windows build** | GitHub Actions `Windows smoke test`: a Windows Server machine installs the 3.5 base zip + the committed update pack exactly like a player (`tools/win_smoke.py`), Mesa software OpenGL next to `javaw.exe`, then starts the real `Blockcraft.exe` (Launch4j stub -> bundled JRE -> jar -> LWJGL Windows natives -> OpenGL) | title screen, world, farm scene, baby animals, inventory and the 3.7 kitchen / fire scene all start, render and exit cleanly with the 3.7 update pack (`ci-results/windows/`) |
 | 3.9 skins on screen | `Visual` scenes `skin-front/back/first/hold-a/b/hold-block`, `skin-screen(-def)`, `inv-player(-def)`, `pause-menu`, `title`, `firewall(-night)` | render correctly (`ci-results/shots/`) |
 | 3.9 skins on the real Windows build | `Windows smoke test` scenes `skin-net` (the real `Blockcraft.exe` downloads a real account's skin from Mojang over the internet and shows it) and `skin-dialog` (the AWT file dialog opens, the game still exits cleanly with it open) | see `ci-results/windows/` |
+| 3.10 falling trees | `TestsFall`: what hangs on a cut log (trunk, branches, leaves, other trees' leaves, held-up logs, bare pillars), the exact 90 degree turn (a bijection that keeps distances), falls in all four directions, blocked ways, cutting higher up, 36 generated trees (oak with branches, birch, spruce, big oaks: every log and leaf accounted for, nothing left hanging), landing on mobs / the player, harvesting, placing logs sideways, meshing of every face, saving mid-fall | all pass |
+| 3.10 disasters | `TestsDisasters`: what a tornado takes and what never (every block class), a tornado's life cycle and speed, 900 ticks over a yard of every block class, uprooting, the force field on a real `Player` + a cow, debris flight and landing, quakes (shake by distance, plants, plateau crumbling, flat ground stays flat, trees topple), meteors (straight flight, crater, fires, obsidian, unloaded ground), natural starts and their switches, `/disaster`, saving | all pass |
+| 3.10 on screen | `Visual` scenes `treefall-30`, `treefall-65`, `treefall-down`, `logs310`, `tornado-mid`, `tornado-close`, `tornado-night`, `quake`, `meteors`, `meteor-crater`, `options310` | render correctly (`ci-results/shots/`) |
+| 3.10 on the real Windows build | `Windows smoke test` scenes with the committed 3.10 update pack | see `ci-results/windows/` |
 | A physical GPU / real hardware | - | never run. Software OpenGL is slow but behaves like the real thing for these features; GPU-driver quirks cannot be ruled out. |
 
 The 3.5 features that the first chat could not test (hoe, seeds, bucket, flint & steel right-clicks; sleeping; ladder climbing) were
@@ -124,7 +142,7 @@ exercised through the same code paths the mouse/keyboard use and **work as desig
 
 ## Known gaps / ideas
 
-- Not implemented: egg throwing, mobs trampling crops, animals following their parents, boats/minecarts, signs, fishing, enchanting, naturally generated melons (seeds come from dungeon chests), sound of any kind (thunder and rain are silent)…
+- Not implemented: disasters that are not weather / ground / sky (floods, volcanoes, sandstorms, blizzards with damage, wildfires beyond lightning), sound of any kind (so thunder, rain, rumbling and crashing trees are silent), the disasters' numbers (pull, lift, damage, frequency) were set from tests and pictures, not by playing; egg throwing, mobs trampling crops, animals following their parents, boats/minecarts, signs, fishing, enchanting, naturally generated melons (seeds come from dungeon chests), sound of any kind (thunder and rain are silent)…
 - The sheep model has no separate "sheared" geometry: a sheared sheep is the same box tinted skin-pink with the head tuft hidden.
 - Hearts for breeding are plain red particles.
 

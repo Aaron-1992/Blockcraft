@@ -88,7 +88,7 @@ final class DisasterFx {
 
    /** The shade of a funnel / cloud: the weather clouds' tint, but never quite black (a tornado at night is a darker shape in the dark). */
    static float shade(float[] tint, int c) {
-      return Math.max(0.20F, tint[c]);
+      return Math.max(0.27F, tint[c]);
    }
 
    static void drawTornado(Renderer r, Disasters.Tornado t, float partial, float[] tint) {
@@ -126,7 +126,7 @@ final class DisasterFx {
          double f = k / (double)rings;
          double y = bottom + (top - bottom) * f;
          double hf = Math.max(0.0, Math.min(1.0, (y - gy) / height));
-         double rad = t.radiusAt(hf);
+         double rad = t.radiusAt(hf) * 1.2;
          rad *= (0.30 + 0.70 * smooth((float)(f * 2.2))) * (0.55 + 0.45 * formed);
          double sway = t.size * (0.6 + 5.0 * Math.pow(hf, 1.5));
          ry[k] = y;
@@ -165,7 +165,7 @@ final class DisasterFx {
                   float cr = (gray + (0.55F - gray) * dust) * streak * lighten * lr;
                   float cg = (gray + (0.45F - gray) * dust) * streak * lighten * lg;
                   float cb = (gray * 1.04F + (0.32F - gray * 1.04F) * dust) * streak * lighten * lb;
-                  float al = (0.80F - 0.20F * hf) * (0.55F + 0.45F * smooth(kk / (float)rings * 3.0F)) * smooth(formed * 1.4F + 0.15F) * alphaMul;
+                  float al = Math.min(0.92F, (0.88F - 0.20F * hf) * (0.55F + 0.45F * smooth(kk / (float)rings * 3.0F)) * smooth(formed * 1.4F + 0.15F) * alphaMul);
                   GL11.glColor4f(cr, cg, cb, al);
                   GL11.glVertex3d(rcx[kk] + Math.cos(a) * rr[kk] * grow - r.camX, ry[kk] - r.camY, rcz[kk] + Math.sin(a) * rr[kk] * grow - r.camZ);
                }
