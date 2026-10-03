@@ -46,6 +46,11 @@ WHAT'S NEW IN UPDATE 3.12  (the Nether, the End, villages, a world of colour)
   * PARROTS: five colours (red, blue, green, cyan, grey) that flutter from tree to tree in forests and sit down now and then. Right click with SEEDS (wheat seeds, pumpkin or melon seeds; one in three works) to tame
     a parrot: it follows you, and a right click with an empty hand puts it on your SHOULDER (two at most; sneak + right click with an empty hand sends it off).
   * STORM CLOUDS without shaders now rise as domes with cauliflower tops instead of flat slabs.
+  * TO TRY IT ALL QUICKLY (press T, type the command, Enter): /gamemode creative, then /dim nether (the same command with overworld takes you back), /dim end (the dragon
+    is waiting; from the End the command takes you home), /give ender pearl 16 (right click throws one), /summon villager, /summon parrot, /summon enderman, /give red dye (and
+    /give concrete, /give glazed ...: the creative inventory, key E, has every new block on its last pages), L opens the advancements (/advancement grant all gives you all of them).
+    Villages stand on flat plains and deserts (at most one in every 320 x 320 block region of the map), nether fortresses are in about seven of ten regions of 256 x 256 blocks:
+    in creative fly about (double-tap Space) and look for them.
   * Under the hood: block numbers are 12 bits wide (4096 blocks instead of 226), the texture atlas is 32 x 32 tiles, every dimension has its own folder in the world (DIM-1, DIM1), strongholds and fortresses are
     planned from the seed alone. Worlds from 3.5 - 3.11 open as before. Chunk files only get the new format when they contain a new block, but an older game cannot show the new blocks, so
     keep a copy of a world you want to open in an older version.
@@ -347,9 +352,10 @@ CONTROLS
   Ctrl / W x2   sprint          Shift       sneak (won't fall off edges) / fly down
   Mouse         look            Left click  break (hold) / attack     Right click  place / use / eat / bow / feed or shear animals
   Middle click  pick block (creative)       1-9 / wheel hotbar        E  inventory
-  Q             drop item       T or /      chat / commands           Esc  pause
+  Q             drop item       T or /      chat / commands           Esc  pause              L  advancements
   F1 hide HUD   F2 screenshot   F3 debug    F5 camera: first person / behind you / in front of you    F11 fullscreen
 COMMANDS: /gamemode <survival|creative|adventure|spectator>  /time  /tp  /seed  /give <item> [n]
-          /kill  /heal  /fly  /summon <mob>  /weather  /firespread  /treefall  /disaster  /help
+          /kill  /heal  /fly  /summon <mob>  /weather  /firespread  /treefall  /disaster  /bobbing
+          /dim <overworld|nether|end>  /advancement  /help
 
 Worlds, options and screenshots are stored in  %USERPROFILE%\.blockcraft112

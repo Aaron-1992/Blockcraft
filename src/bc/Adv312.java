@@ -394,7 +394,8 @@ final class Adv312 {
       }
 
       Gui gui = g.gui;
-      float w = 164.0F;
+      // wide enough for the title ("We Need to Go Deeper", "Cover Me with Diamonds" were cut off at 164)
+      float w = Math.max(164.0F, Math.min(gui.w - 8.0F, Gui.textWidth(adv.title) + 44.0F));
       float h = 32.0F;
       float slide = 0.0F;
       float t = this.shownTicks + g.partial;

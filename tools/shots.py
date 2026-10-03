@@ -398,6 +398,7 @@ SCENES = {
     # ---- Update 3.12: advancements (the screen on the L key, and the toast in the corner)
     "adv-screen":         (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=screen", "-Dbc.advdone=9", "-Dbc.advtab=0"] + PLAIN + ["-Dbc.shot=130"], True),
     "adv-adventure":      (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=screen", "-Dbc.advdone=40", "-Dbc.advtab=3"] + PLAIN + ["-Dbc.shot=130"], True),
+    "adv-toast-long":     (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=toast", "-Dbc.advdone=0", "-Dbc.advid=story/diamond_armor"] + PLAIN + ["-Dbc.shot=108"], True),
     "adv-toast":          (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=toast", "-Dbc.advdone=0"] + PLAIN + ["-Dbc.shot=108"], True),
     # ---- Update 3.12: parrots (five colours sitting on the grass strip; two on the shoulders of the player seen from the front)
     "parrots":            (COMMON + ["-Dbc.cam=143.5,68.6,68.5,0,12", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.parrot=land", "-Dbc.summon=parrot,parrot,parrot,parrot,parrot", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=110"], True),

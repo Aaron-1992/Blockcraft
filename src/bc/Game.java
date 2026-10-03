@@ -747,7 +747,7 @@ public final class Game {
             }
 
             if (System.getProperty("bc.adv").equals("toast")) {
-               this.adv.award(this, "end/kill_dragon");
+               this.adv.award(this, System.getProperty("bc.advid", "end/kill_dragon"));
             } else {
                this.adv.tab = Integer.getInteger("bc.advtab", 0);
                this.setScreen(Game.S.ADV);

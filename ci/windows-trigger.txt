@@ -1,1 +1,1 @@
-title,nether-portal,nether-fortress,end-dragon-side,village-trade,adv-screen
+title,nether-fortress,adv-toast-long,end-island
