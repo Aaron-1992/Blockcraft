@@ -1,21 +1,29 @@
-# Visual run 2026-10-03 19:19:40 UTC
+# Visual run 2026-10-03 19:54:20 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| colors-wall | new | n/a |
-| colors-wall-sh | new | n/a |
 | colors-misc | new | n/a |
-| village-day | new | n/a |
-| village-aerial | new | n/a |
-| village-folk | new | n/a |
+| adv-screen | NOTHING | n/a |
+| adv-adventure | NOTHING | n/a |
+| adv-toast | new | n/a |
+| wx-fair | new | n/a |
+| wx-storm | new | n/a |
+| wx-storm-bolt | new | n/a |
+| wx-rain | new | n/a |
+| wx-overcast | new | n/a |
+| wx-snow | new | n/a |
 | village-trade | new | n/a |
 
 ## timings
 
-- colors-wall/new: exit 0 in 36s
-- colors-wall-sh/new: exit 0 in 55s
-- colors-misc/new: exit 0 in 33s
-- village-day/new: exit 0 in 23s
-- village-aerial/new: exit 0 in 36s
-- village-folk/new: exit 0 in 15s
-- village-trade/new: exit 0 in 17s
+- colors-misc/new: exit 0 in 47s
+- adv-screen/new: TIMEOUT in 240s
+- adv-adventure/new: TIMEOUT in 240s
+- adv-toast/new: exit 0 in 74s
+- wx-fair/new: exit 0 in 116s
+- wx-storm/new: exit 0 in 124s
+- wx-storm-bolt/new: exit 0 in 130s
+- wx-rain/new: exit 0 in 229s
+- wx-overcast/new: exit 0 in 239s
+- wx-snow/new: exit 0 in 225s
+- village-trade/new: exit 0 in 66s
