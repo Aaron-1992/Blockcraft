@@ -24,6 +24,18 @@ public final class Shaders {
    int pCloud;
    int pBlit;
    int pRay;
+   int pEntity;
+   /** Update 3.11: the water program (ShaderSrc.WATER_FS), a copy of the scene taken before the water is drawn (colour + depth) for refraction,
+    *  the depth of the water and the reflections of the terrain in it. */
+   int pWater;
+   public boolean waterOk;
+   int copyFbo;
+   int copyTex;
+   int copyDepth;
+   /** Update 3.11: the entity program compiled (see ShaderSrc.ENTITY_FS). */
+   public boolean entityOk;
+   /** The entity program is the current one: Renderer.brightnessAt sends the light level of each entity to it. */
+   public boolean entityOn;
    int rayFbo;
    int rayTex;
    int depthCopyDummy;
@@ -170,6 +182,22 @@ public final class Shaders {
 
          this.pWorld = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WORLD_FS);
          this.pDepth = this.program(DEPTH_VS, DEPTH_FS);
+         try {
+            this.pEntity = this.program(ShaderSrc.ENTITY_VS, ShaderSrc.ENTITY_FS);
+            this.entityOk = true;
+         } catch (Throwable var6) {
+            this.entityOk = false;
+            System.err.println("Entity shader disabled: " + var6.getMessage());
+         }
+
+         try {
+            this.pWater = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
+            this.waterOk = true;
+         } catch (Throwable var7) {
+            this.waterOk = false;
+            System.err.println("Water shader disabled (the plain one is used): " + var7.getMessage());
+         }
+
          this.pBright = this.program(QUAD_VS, BRIGHT_FS);
          this.pBlur = this.program(QUAD_VS, BLUR_FS);
          this.pComp = this.program(QUAD_VS, ShaderSrc.COMP_FS);
@@ -252,6 +280,13 @@ public final class Shaders {
                GL30.glDeleteFramebuffers(this.cloudFbo);
                GL11.glDeleteTextures(this.cloudTex);
             }
+
+            if (this.copyFbo != 0) {
+               GL30.glDeleteFramebuffers(this.copyFbo);
+               GL11.glDeleteTextures(this.copyTex);
+               GL11.glDeleteTextures(this.copyDepth);
+               this.copyFbo = 0;
+            }
          }
 
          this.fw = var1;
@@ -279,6 +314,24 @@ public final class Shaders {
          this.rayFbo = this.fbo(this.rayTex);
          this.cloudTex = this.tex2d(this.cw, this.ch);
          this.cloudFbo = this.fbo(this.cloudTex);
+         if (this.waterOk) {
+            // the copy of the scene (colour + depth) that the water shader reads while the water is drawn into the scene itself
+            this.copyTex = this.tex2d(var1, var2);
+            this.copyFbo = this.fbo(this.copyTex);
+            this.copyDepth = GL11.glGenTextures();
+            GL11.glBindTexture(3553, this.copyDepth);
+            GL11.glTexImage2D(3553, 0, 33190, var1, var2, 0, 6402, 5126, (ByteBuffer)null);
+            GL11.glTexParameteri(3553, 10241, 9728);
+            GL11.glTexParameteri(3553, 10240, 9728);
+            GL11.glTexParameteri(3553, 10242, 33071);
+            GL11.glTexParameteri(3553, 10243, 33071);
+            GL30.glFramebufferTexture2D(36160, 36096, 3553, this.copyDepth, 0);
+            if (GL30.glCheckFramebufferStatus(36160) != 36053) {
+               System.err.println("Water copy FBO incomplete; the plain water is used");
+               this.waterOk = false;
+            }
+         }
+
          GL30.glBindFramebuffer(36160, 0);
          if (var3 != 36053) {
             System.err.println("Scene FBO incomplete; shaders disabled");
@@ -441,13 +494,73 @@ public final class Shaders {
       int var19,
       int var20
    ) {
-      GL20.glUseProgram(this.pWorld);
+      this.useWorldProg(this.pWorld, var1, var2, var4, var6, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19, var20);
+   }
+
+   /**
+    * Update 3.11: the translucent pass with the water program: the same inputs as {@link #useWorld} plus the copy of the scene. Call
+    * {@link #copyScene} first. {@code near} / {@code far} are the planes of the projection (to turn the depth values back into distances).
+    */
+   public void useWater(
+      float[] mv, double camX, double camY, double camZ, float fogNear, float fogFar, float[] fogCol, float[] skyTop, float[] skyHor, float dayF, boolean shadowOn,
+      int leafTile, int grassTile, int flower0, int flower1, int waterTile, int width, int height, float near, float far
+   ) {
+      this.useWorldProg(this.pWater, mv, camX, camY, camZ, true, fogNear, fogFar, fogCol, skyTop, skyHor, dayF, shadowOn, leafTile, grassTile, flower0, flower1, waterTile);
+      this.u1i(this.pWater, "sceneColor", 3);
+      this.u1i(this.pWater, "sceneDepth", 4);
+      GL20.glUniform2f(this.loc(this.pWater, "invRes"), 1.0F / width, 1.0F / height);
+      GL20.glUniform2f(this.loc(this.pWater, "zNF"), near, far);
+      GL13.glActiveTexture(33987);
+      GL11.glBindTexture(3553, this.copyTex);
+      GL13.glActiveTexture(33988);
+      GL11.glBindTexture(3553, this.copyDepth);
+      GL13.glActiveTexture(33984);
+   }
+
+   /** Takes the copy of the scene (colour and depth) that {@link #useWater} reads; the scene framebuffer is the draw target again afterwards. */
+   public void copyScene(int width, int height) {
+      GL30.glBindFramebuffer(36008, this.sceneFbo);
+      GL30.glBindFramebuffer(36009, this.copyFbo);
+      GL30.glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, 16640, 9728);
+      GL30.glBindFramebuffer(36160, this.sceneFbo);
+   }
+
+   public void stopWater() {
+      GL13.glActiveTexture(33987);
+      GL11.glBindTexture(3553, 0);
+      GL13.glActiveTexture(33988);
+      GL11.glBindTexture(3553, 0);
+      GL13.glActiveTexture(33984);
+      this.stopWorld();
+   }
+
+   void useWorldProg(
+      int prog,
+      float[] var1,
+      double var2,
+      double var4,
+      double var6,
+      boolean var8,
+      float var9,
+      float var10,
+      float[] var11,
+      float[] var12,
+      float[] var13,
+      float var14,
+      boolean var15,
+      int var16,
+      int var17,
+      int var18,
+      int var19,
+      int var20
+   ) {
+      GL20.glUseProgram(prog);
       this.projBuf.clear();
       GL11.glGetFloatv(2983, this.projBuf);
       this.projBuf.get(this.projM);
       this.calcView(var1);
-      GL20.glUniformMatrix4fv(this.loc(this.pWorld, "view"), false, this.viewM);
-      GL20.glUniformMatrix4fv(this.loc(this.pWorld, "invView"), false, this.invViewM);
+      GL20.glUniformMatrix4fv(this.loc(prog, "view"), false, this.viewM);
+      GL20.glUniformMatrix4fv(this.loc(prog, "invView"), false, this.invViewM);
       float[] var21 = new float[16];
 
       for (int var22 = 0; var22 < 4; var22++) {
@@ -456,33 +569,83 @@ public final class Shaders {
          }
       }
 
-      GL20.glUniformMatrix4fv(this.loc(this.pWorld, "shadowMat"), false, var21);
-      GL20.glUniform3f(this.loc(this.pWorld, "shOff"), (float)(var2 - this.mapX), (float)(var4 - this.mapY), (float)(var6 - this.mapZ));
-      this.u1f(this.pWorld, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
-      GL20.glUniform3f(this.loc(this.pWorld, "camPos"), (float)(var2 % 100000.0), (float)var4, (float)(var6 % 100000.0));
-      this.u1f(this.pWorld, "leafTile", var16);
-      this.u1f(this.pWorld, "grassTile", var17);
-      GL20.glUniform2f(this.loc(this.pWorld, "flowerTiles"), var18, var19);
-      this.u1f(this.pWorld, "waterTile", var20);
-      this.u1f(this.pWorld, "waves", 1.0F);
-      this.u1i(this.pWorld, "tex", 0);
-      this.u1i(this.pWorld, "lightmap", 1);
-      this.u1i(this.pWorld, "shadowMap", 2);
-      GL20.glUniform3f(this.loc(this.pWorld, "fogColor"), var11[0], var11[1], var11[2]);
-      GL20.glUniform2f(this.loc(this.pWorld, "fogRange"), var9, var10);
-      GL20.glUniform3f(this.loc(this.pWorld, "sunDir"), this.sunX, this.sunY, this.sunZ);
+      GL20.glUniformMatrix4fv(this.loc(prog, "shadowMat"), false, var21);
+      GL20.glUniform3f(this.loc(prog, "shOff"), (float)(var2 - this.mapX), (float)(var4 - this.mapY), (float)(var6 - this.mapZ));
+      this.u1f(prog, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
+      GL20.glUniform3f(this.loc(prog, "camPos"), (float)(var2 % 100000.0), (float)var4, (float)(var6 % 100000.0));
+      this.u1f(prog, "leafTile", var16);
+      this.u1f(prog, "grassTile", var17);
+      GL20.glUniform2f(this.loc(prog, "flowerTiles"), var18, var19);
+      this.u1f(prog, "waterTile", var20);
+      this.u1f(prog, "waves", 1.0F);
+      this.u1i(prog, "tex", 0);
+      this.u1i(prog, "lightmap", 1);
+      this.u1i(prog, "shadowMap", 2);
+      GL20.glUniform3f(this.loc(prog, "fogColor"), var11[0], var11[1], var11[2]);
+      GL20.glUniform2f(this.loc(prog, "fogRange"), var9, var10);
+      GL20.glUniform3f(this.loc(prog, "sunDir"), this.sunX, this.sunY, this.sunZ);
       float var24 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
       this.sunUp = var24;
-      this.u1f(this.pWorld, "sunUp", var24);
-      this.u1f(this.pWorld, "dayF", var14);
-      this.u1f(this.pWorld, "isTrans", var8 ? 1.0F : 0.0F);
-      GL20.glUniform3f(this.loc(this.pWorld, "skyTop"), var12[0], var12[1], var12[2]);
-      GL20.glUniform3f(this.loc(this.pWorld, "skyHor"), var13[0], var13[1], var13[2]);
-      this.u1f(this.pWorld, "shadowOn", var15 ? 1.0F : 0.0F);
-      GL20.glUniform4fv(this.loc(this.pWorld, "dynL[0]"), this.dynL);
-      GL20.glUniform4fv(this.loc(this.pWorld, "dynC[0]"), this.dynC);
+      this.u1f(prog, "sunUp", var24);
+      this.u1f(prog, "dayF", var14);
+      this.u1f(prog, "isTrans", var8 ? 1.0F : 0.0F);
+      GL20.glUniform3f(this.loc(prog, "skyTop"), var12[0], var12[1], var12[2]);
+      GL20.glUniform3f(this.loc(prog, "skyHor"), var13[0], var13[1], var13[2]);
+      this.u1f(prog, "shadowOn", var15 ? 1.0F : 0.0F);
+      GL20.glUniform4fv(this.loc(prog, "dynL[0]"), this.dynL);
+      GL20.glUniform4fv(this.loc(prog, "dynC[0]"), this.dynC);
       GL13.glActiveTexture(33986);
       GL11.glBindTexture(3553, this.shadowTex);
+      GL13.glActiveTexture(33984);
+   }
+
+   /**
+    * Update 3.11: the program for everything that is not terrain (see ShaderSrc.ENTITY_FS). Same lighting inputs as {@link #useWorld}: the sun,
+    * the terrain's shadow map, the placed lights, the fog. {@code lm} = sky light and block light at the entity (0..1), updated per entity by
+    * {@link #setEntLight}.
+    */
+   public void useEntity(float[] mv, double camX, double camY, double camZ, float fogNear, float fogFar, float[] fogCol, boolean shadowOn, float sky, float blk) {
+      GL20.glUseProgram(this.pEntity);
+      this.calcView(mv);
+      GL20.glUniformMatrix4fv(this.loc(this.pEntity, "invView"), false, this.invViewM);
+      float[] sm = new float[16];
+      for (int i = 0; i < 4; i++) {
+         for (int j = 0; j < 4; j++) {
+            sm[j * 4 + i] = this.shadowM[i * 4 + j];
+         }
+      }
+
+      GL20.glUniformMatrix4fv(this.loc(this.pEntity, "shadowMat"), false, sm);
+      GL20.glUniform3f(this.loc(this.pEntity, "shOff"), (float)(camX - this.mapX), (float)(camY - this.mapY), (float)(camZ - this.mapZ));
+      this.u1i(this.pEntity, "tex", 0);
+      this.u1i(this.pEntity, "shadowMap", 2);
+      GL20.glUniform3f(this.loc(this.pEntity, "fogColor"), fogCol[0], fogCol[1], fogCol[2]);
+      GL20.glUniform2f(this.loc(this.pEntity, "fogRange"), fogNear, fogFar);
+      GL20.glUniform3f(this.loc(this.pEntity, "sunDir"), this.sunX, this.sunY, this.sunZ);
+      float up = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
+      this.u1f(this.pEntity, "sunUp", up);
+      this.u1f(this.pEntity, "shadowOn", shadowOn ? 1.0F : 0.0F);
+      GL20.glUniform4fv(this.loc(this.pEntity, "dynL[0]"), this.dynL);
+      GL20.glUniform4fv(this.loc(this.pEntity, "dynC[0]"), this.dynC);
+      GL20.glUniform2f(this.loc(this.pEntity, "entLm"), sky, blk);
+      GL13.glActiveTexture(33986);
+      GL11.glBindTexture(3553, this.shadowTex);
+      GL13.glActiveTexture(33984);
+      this.entityOn = true;
+   }
+
+   /** The light level (0..1 each) of the entity that is drawn next. */
+   public void setEntLight(float sky, float blk) {
+      if (this.entityOn) {
+         GL20.glUniform2f(this.loc(this.pEntity, "entLm"), sky, blk);
+      }
+   }
+
+   public void stopEntity() {
+      this.entityOn = false;
+      GL20.glUseProgram(0);
+      GL13.glActiveTexture(33986);
+      GL11.glBindTexture(3553, 0);
       GL13.glActiveTexture(33984);
    }
 

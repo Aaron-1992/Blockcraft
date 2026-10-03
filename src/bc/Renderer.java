@@ -386,12 +386,27 @@ public final class Renderer {
       }
    }
 
+   /** Update 3.11: sky / block light (0..1) of the last place {@link #brightnessAt} was asked about: the entity shader's light input. */
+   float lastSky = 1.0F;
+   float lastBlk;
+   /** What the entity program needs again for the hand, which is drawn after the world (see renderHand). */
+   float entFogNear;
+   float entFogFar;
+   float[] entFogCol = new float[]{0.5F, 0.6F, 0.8F};
+   boolean entShadow;
+
    public float brightnessAt(World var1, double var2, double var4, double var6) {
       int var8 = (int)Math.floor(var2);
       int var9 = (int)Math.floor(var4);
       int var10 = (int)Math.floor(var6);
       int var11 = var1.getSky(var8, var9, var10);
       int var12 = var1.getBlk(var8, var9, var10);
+      this.lastSky = (var11 + 0.5F) / 16.0F;
+      this.lastBlk = (var12 + 0.5F) / 16.0F;
+      if (this.sh != null && this.sh.entityOn) {
+         this.sh.setEntLight(this.lastSky, this.lastBlk);
+      }
+
       float var13 = Tex.lightCurve(var11) * this.skyLightFactor;
       float var14 = Tex.lightCurve(var12);
       return Math.max(0.08F, Math.min(1.0F, Math.max(var13, var14) + 0.05F));
@@ -746,8 +761,22 @@ public final class Renderer {
       }
 
       lightmapUnit(false);
+      // Update 3.11: with shaders on, animals, monsters, items, falling blocks and your own body are lit like the terrain (sun, shade, shadows, torches, fog)
+      this.entFogNear = var11;
+      this.entFogFar = var12;
+      this.entFogCol = var26;
+      this.entShadow = var51;
+      boolean entShader = var50 && this.sh.entityOk;
+      if (entShader) {
+         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var51, this.lastSky, this.lastBlk);
+      }
+
       this.drawEntities(var1);
       this.drawSelf(var1);
+      if (entShader) {
+         this.sh.stopEntity();
+      }
+
       this.drawParticles(var1);
       if (this.g.target != null && this.g.screenIsPlay()) {
          this.drawCrack();
@@ -764,7 +793,22 @@ public final class Renderer {
       GL11.glBindTexture(3553, Tex.atlas);
       lightmapUnit(true);
       arrays(true);
-      if (var50) {
+      // Update 3.11: water with shaders reads a copy of what is behind it (colour and depth): depth-based colour, refraction, reflections, foam
+      boolean waterShader = false;
+      if (var50 && this.sh.waterOk && this.sh.sceneActive && !var6 && !var7) {
+         for (Renderer.Vis wv : this.vis) {
+            if (wv.c.sections[wv.sy].nT != 0) {
+               waterShader = true;
+               break;
+            }
+         }
+      }
+
+      if (waterShader) {
+         this.sh.copyScene(var2, var3);
+         lightmapUnit(true);
+         this.sh.useWater(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23, var2, var3, (float)var18, (float)var20);
+      } else if (var50) {
          this.sh.useWorld(this.mv, this.camX, this.camY, this.camZ, true, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23);
       }
 
@@ -790,7 +834,9 @@ public final class Renderer {
       }
 
       arrays(false);
-      if (var50) {
+      if (waterShader) {
+         this.sh.stopWater();
+      } else if (var50) {
          this.sh.stopWorld();
       }
 
@@ -1771,6 +1817,11 @@ public final class Renderer {
       float p = 1.0F - equip;
       GL11.glRotatef(swayPitch, 1.0F, 0.0F, 0.0F);
       GL11.glRotatef(swayYaw, 0.0F, 1.0F, 0.0F);
+      boolean entShader = this.shadersOn() && this.sh.entityOk && this.sh.sceneActive;
+      if (entShader) {
+         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, this.entFogNear, this.entFogFar, this.entFogCol, this.entShadow, this.lastSky, this.lastBlk);
+      }
+
       float s1 = (float)Math.sqrt(swing);
       if (item == null) {
          PlayerModel.drawArmFirstPerson(this.g.skinPixels(), this.g.skinSlim(), bright, swing, p);
@@ -1817,6 +1868,10 @@ public final class Renderer {
             GL11.glScalef(0.4F, 0.4F, 0.4F);
             drawBlockModel(id, bright);
          }
+      }
+
+      if (entShader) {
+         this.sh.stopEntity();
       }
 
       GL11.glMatrixMode(5888);

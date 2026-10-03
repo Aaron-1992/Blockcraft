@@ -242,6 +242,34 @@ def doors_blocks():
     return out
 
 
+def roof_blocks():
+    """Update 3.11 (entity lighting): a flat strip cleared of everything, and a roof of leaves 3 blocks over its right half - the mobs below it
+    stand in its shadow, the ones on the left in the sun."""
+    out = []
+    gy = 66
+    for z in range(70, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 7):
+                out.append((x, y, z, 0))
+    for x in range(143, 152):
+        for z in range(70, 80):
+            out.append((x, gy + 4, z, 12))
+    return out
+
+
+def torch_blocks():
+    """Night scene: a cleared strip with torches around where the mobs will stand."""
+    out = []
+    gy = 66
+    for z in range(70, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 5):
+                out.append((x, y, z, 0))
+    out.append((143, gy + 1, 76, 32))
+    out.append((148, gy + 1, 74, 32))
+    return out
+
+
 # name -> (props, only_new)
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
@@ -321,8 +349,19 @@ SCENES = {
     "hand-apple":     (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=270", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "hand-eat":       (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=270", "-Dbc.handeat=0.5", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "hand-sword-sh":  (COMMON + ["-Dbc.cam=140.5,67,74.5,20,25", "-Dbc.hold=316", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
-    "skin-hold-torch": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.skin=demo", "-Dbc.hold=32", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
-    "skin-hold-apple": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.skin=demo", "-Dbc.hold=270", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "skin-hold-torch": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=45", "-Dbc.skin=demo", "-Dbc.hold=32", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "skin-hold-apple": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=45", "-Dbc.skin=demo", "-Dbc.hold=270", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    # ---- Update 3.11: entities lit like the terrain with shaders (the same scenes without shaders for comparison: -plain)
+    "mobs-sh":        (COMMON + ["-Dbc.cam=140,70,60,0,48", "-Dbc.time=6000", "-Dbc.summon=pig,cow,sheep,chicken,creeper", "-Dbc.shot=110"], True),
+    "mobs-shade-sh":  (COMMON + ["-Dbc.cam=145.5,68.6,67.5,0,20", "-Dbc.time=6000", "-Dbc.weather=calm", sets(roof_blocks()), "-Dbc.summon=pig,cow,sheep,chicken,creeper,pig,sheep", "-Dbc.summonDist=5.5", "-Dbc.summonDy=-1.6", "-Dbc.shot=150"], True),
+    "mobs-shade-plain": (COMMON + ["-Dbc.cam=145.5,68.6,67.5,0,20", "-Dbc.time=6000", "-Dbc.weather=calm", sets(roof_blocks()), "-Dbc.summon=pig,cow,sheep,chicken,creeper,pig,sheep", "-Dbc.summonDist=5.5", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=150"], True),
+    "mobs-torch-sh":  (COMMON + ["-Dbc.cam=145.5,68.6,67.5,0,20", "-Dbc.time=18000", "-Dbc.weather=calm", sets(torch_blocks()), "-Dbc.summon=pig,cow,sheep,chicken,creeper,pig,sheep", "-Dbc.summonDist=5.5", "-Dbc.summonDy=-1.6", "-Dbc.shot=150"], True),
+    "mobs-torch-plain": (COMMON + ["-Dbc.cam=145.5,68.6,67.5,0,20", "-Dbc.time=18000", "-Dbc.weather=calm", sets(torch_blocks()), "-Dbc.summon=pig,cow,sheep,chicken,creeper,pig,sheep", "-Dbc.summonDist=5.5", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=150"], True),
+    # ---- Update 3.11: water with shaders (depth colour, refraction, reflections, foam, ripples); the same view without shaders (-plain) for comparison
+    "water-day-sh":   (COMMON + ["-Dbc.cam=133,72,71,45,12", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    "water-day-plain": (COMMON + ["-Dbc.cam=133,72,71,45,12", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "water-low-sh":   (COMMON + ["-Dbc.cam=133,64.4,71,45,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    "water-sunset-sh": (COMMON + ["-Dbc.cam=133,70,71,90,5", "-Dbc.time=11000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),

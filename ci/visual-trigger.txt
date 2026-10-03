@@ -1,2 +1,2 @@
-hand-empty,hand-empty-swing,hand-sword,hand-sword-swing,hand-block,hand-torch,hand-apple,hand-eat,hand-sword-sh,skin-hold-a,skin-hold-block,skin-hold-torch,skin-hold-apple,under-map
+mobs-sh,mobs-shade-sh,mobs-shade-plain,mobs-torch-sh,mobs-torch-plain,water-day-sh,water-day-plain,water-low-sh,water-sunset-sh,hand-sword-sh,skin-hold-torch,skin-hold-apple
 jar=build

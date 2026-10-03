@@ -175,6 +175,263 @@ final class ShaderSrc {
          ""
       }
    );
+   // ------------------------------------------------------------------ Update 3.11: water with shaders
+   /**
+    * The water program is the terrain program with a different water branch ({@link #WATER_MAIN}) and the extra functions of {@link #WATER_DECL}
+    * spliced in, so its lighting, shadows, fog and everything that is not water stay exactly what {@link #WORLD_FS} does. What it adds, per
+    * pixel of water: the depth of the water along the view ray (from a copy of the scene's depth), the bed seen through it with the surface's
+    * ripples bending the view (refraction) and the light absorbed on the way (red first), the terrain, trees and hills mirrored in it (a ray
+    * march through the copy of the scene, with the sky as the fallback), foam where it is shallow, glints of the sun, and ripples made of
+    * four layers of noise that drift in different directions.
+    */
+   static final String WATER_DECL = String.join(
+      "\n",
+      new CharSequence[]{
+         "uniform sampler2D sceneColor;",
+         "uniform sampler2D sceneDepth;",
+         "uniform vec2 invRes;",
+         "uniform vec2 zNF;",
+         "uniform mat4 view;",
+         "float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
+         "vec3 vnoiseD(vec2 p){          // value noise and its slope: x = value, yz = d/dx, d/dz",
+         "  vec2 i = floor(p);",
+         "  vec2 f = fract(p);",
+         "  vec2 u = f*f*f*(f*(f*6.0 - 15.0) + 10.0);",
+         "  vec2 du = 30.0*f*f*(f*(f - 2.0) + 1.0);",
+         "  float a = hash21(i);",
+         "  float b = hash21(i + vec2(1.0, 0.0));",
+         "  float c = hash21(i + vec2(0.0, 1.0));",
+         "  float d = hash21(i + vec2(1.0, 1.0));",
+         "  float k1 = b - a;",
+         "  float k2 = c - a;",
+         "  float k4 = a - b - c + d;",
+         "  return vec3(a + k1*u.x + k2*u.y + k4*u.x*u.y, du * vec2(k1 + k4*u.y, k2 + k4*u.x));",
+         "}",
+         "vec3 waterNormal2(vec3 p, float time, float d){",
+         "  float a1 = 1.0 - smoothstep(60.0, 320.0, d);",
+         "  float a2 = 1.0 - smoothstep(25.0, 140.0, d);",
+         "  float a3 = 1.0 - smoothstep(8.0, 55.0, d);",
+         "  vec3 n1 = vnoiseD(p.xz * 0.30 + vec2(time * 0.035, time * 0.020));",
+         "  vec3 n2 = vnoiseD(p.xz * 0.85 + vec2(-time * 0.060, time * 0.045));",
+         "  vec3 n3 = vnoiseD(p.xz * 2.30 + vec2(time * 0.100, -time * 0.085));",
+         "  vec3 n4 = vnoiseD(p.xz * 5.50 + vec2(-time * 0.150, time * 0.120));",
+         "  vec2 g = n1.yz * 0.16 * a1 + n2.yz * 0.10 * a2 + n3.yz * 0.06 * a3 + n4.yz * 0.03 * a3;",
+         "  float dx = cos(p.x*1.3 + time*1.2)*0.03*a1 + cos((p.x+p.z)*2.3 + time*1.9)*0.02*a2;",
+         "  float dz = cos(p.z*1.1 + time*1.0)*0.03*a1 + cos((p.x-p.z)*2.0 + time*1.6)*0.02*a2;",
+         "  return normalize(vec3(-(g.x + dx), 1.0, -(g.y + dz)));",
+         "}",
+         "float linDepth(float d){          // distance along the view axis of a depth buffer value",
+         "  float zn = 2.0*d - 1.0;",
+         "  return 2.0*zNF.x*zNF.y / (zNF.y + zNF.x - zn*(zNF.y - zNF.x));",
+         "}",
+         "vec4 ssr(vec3 P, vec3 R){          // P, R in eye space (looking down -z): what does the reflected ray hit in the copy of the scene? rgb + how sure",
+         "  if (R.z > -0.02) return vec4(0.0);",
+         "  float t = 0.25;",
+         "  float stp = 0.45;",
+         "  float lastT = 0.0;",
+         "  for (int i = 0; i < 30; i++) {",
+         "    vec3 Q = P + R * t;",
+         "    vec4 pc = gl_ProjectionMatrix * vec4(Q, 1.0);",
+         "    if (pc.w < 0.05) break;",
+         "    vec2 suv = pc.xy / pc.w * 0.5 + 0.5;",
+         "    if (suv.x < 0.01 || suv.x > 0.99 || suv.y < 0.01 || suv.y > 0.99) break;",
+         "    float sd = texture2D(sceneDepth, suv).r;",
+         "    if (sd < 0.99995) {",
+         "      float diff = -Q.z - linDepth(sd);",
+         "      if (diff > 0.0 && diff < 0.7 + t * 0.10) {",
+         "        float lo = lastT;",
+         "        float hi = t;",
+         "        for (int k = 0; k < 5; k++) {",
+         "          float mid = 0.5 * (lo + hi);",
+         "          vec3 Qm = P + R * mid;",
+         "          vec4 pm = gl_ProjectionMatrix * vec4(Qm, 1.0);",
+         "          vec2 uvm = pm.xy / pm.w * 0.5 + 0.5;",
+         "          float dm = texture2D(sceneDepth, uvm).r;",
+         "          if (-Qm.z > linDepth(dm)) hi = mid; else lo = mid;",
+         "        }",
+         "        vec3 Qh = P + R * hi;",
+         "        vec4 ph = gl_ProjectionMatrix * vec4(Qh, 1.0);",
+         "        vec2 uvh = ph.xy / ph.w * 0.5 + 0.5;",
+         "        float edge = smoothstep(0.0, 0.12, min(min(uvh.x, 1.0 - uvh.x), min(uvh.y, 1.0 - uvh.y)));",
+         "        float rayFade = 1.0 - smoothstep(40.0, 150.0, hi);",
+         "        return vec4(texture2D(sceneColor, uvh).rgb, edge * rayFade);",
+         "      }",
+         "    }",
+         "    lastT = t;",
+         "    t += stp;",
+         "    stp *= 1.17;",
+         "  }",
+         "  return vec4(0.0);",
+         "}",
+         ""
+      }
+   );
+   static final String WATER_MAIN = String.join(
+      "\n",
+      new CharSequence[]{
+         "  if (vWater > 0.5) {",
+         "    vec3 N = waterNormal2(vWorld, time, vDepth);",
+         "    vec3 V = normalize(vRel);",
+         "    float cosv = clamp(dot(-V, N), 0.0, 1.0);",
+         "    float F = 0.02 + 0.98 * pow(1.0 - cosv, 5.0);",
+         "    vec3 Ve = (view * vec4(vRel, 0.0)).xyz;          // the point and the normal in eye space",
+         "    vec3 Ne = (view * vec4(N, 0.0)).xyz;",
+         "    vec3 Vn = normalize(Ve);",
+         "    vec2 uv = gl_FragCoord.xy * invRes;",
+         "    float zSurf = -Ve.z;",
+         "    float dB = texture2D(sceneDepth, uv).r;",
+         "    float zB = dB < 0.99995 ? linDepth(dB) : zSurf + 40.0;",
+         "    float thick = min(max(zB - zSurf, 0.0) * length(Ve) / max(zSurf, 0.05), 40.0);      // water along the view ray",
+         "    // refraction: the bed seen through the rippled surface (never through something that stands in front of the water)",
+         "    vec2 off = Ne.xy * (0.035 * clamp(thick * 0.6, 0.0, 1.0)) / max(1.0, zSurf * 0.15);",
+         "    vec2 uv2 = clamp(uv + off, vec2(0.002), vec2(0.998));",
+         "    float d2 = texture2D(sceneDepth, uv2).r;",
+         "    if (d2 < 0.99995 && linDepth(d2) < zSurf - 0.05) uv2 = uv;",
+         "    vec3 bed = texture2D(sceneColor, uv2).rgb;",
+         "    // the light that is absorbed on the way (red first, then green); what is scattered back is the water's own colour",
+         "    vec3 absorb = exp(-thick * vec3(0.50, 0.16, 0.07));",
+         "    float lightAmt = clamp(max(L.r, max(L.g, L.b)), 0.04, 1.0);",
+         "    vec3 body = vec3(0.03, 0.18, 0.28) * lightAmt * mix(0.55, 1.0, sunUp);",
+         "    vec3 through = bed * absorb + body * (1.0 - absorb);",
+         "    // reflections: the sky, and what the reflected ray hits on the screen (terrain, trees, hills)",
+         "    vec3 R = reflect(V, N);",
+         "    R.y = abs(R.y);",
+         "    vec3 sky = mix(skyHor, skyTop, pow(clamp(R.y, 0.0, 1.0), 0.55));",
+         "    float skyExp = smoothstep(0.3, 0.97, vLm.x);",
+         "    vec3 refl = sky * (0.25 + 0.75 * skyExp);",
+         "    vec4 hit = ssr(Ve, reflect(Vn, Ne));",
+         "    refl = mix(refl, hit.rgb, hit.a * (0.35 + 0.65 * skyExp));",
+         "    float sunR = max(dot(R, sunDir), 0.0);",
+         "    float spec = (pow(sunR, 260.0) * 5.0 * (1.0 - smoothstep(30.0, 220.0, vDepth)) + pow(sunR, 36.0) * 0.18) * sunUp * skyExp * mix(0.2, 1.0, lit);",
+         "    // foam where the water is shallow",
+         "    float edgeW = thick + 0.20 * sin(time * 1.3 + vWorld.x * 0.9 + vWorld.z * 0.8);",
+         "    float fn = vnoiseD(vWorld.xz * 2.2 + vec2(time * 0.2, -time * 0.15)).x;",
+         "    float foam = (1.0 - smoothstep(0.05, 0.55, edgeW)) * smoothstep(0.30, 0.75, fn) * (1.0 - smoothstep(20.0, 90.0, vDepth));",
+         "    c = mix(through, refl, clamp(F + 0.04, 0.0, 0.95));",
+         "    c += vec3(1.0, 0.95, 0.8) * spec;",
+         "    c = mix(c, vec3(0.92, 0.96, 1.0) * (0.55 + 0.45 * lightAmt), foam * 0.85);",
+         "    a = 1.0;",
+         "  }",
+         ""
+      }
+   );
+   static final String WATER_FS = deriveWater();
+
+   static String deriveWater() {
+      String s = WORLD_FS;
+      String tail = "varying float vDepth;";
+      int decl = s.indexOf(tail);
+      int from = s.indexOf("  if (vWater > 0.5) {");
+      int to = s.indexOf("  float f = clamp((fogRange.y - vDepth)");
+      if (decl < 0 || from < decl || to < from) {
+         throw new IllegalStateException("WORLD_FS changed: the water shader cannot be derived from it any more");
+      }
+
+      decl += tail.length();
+      return s.substring(0, decl) + "\n" + WATER_DECL + s.substring(decl, from) + WATER_MAIN + s.substring(to);
+   }
+
+   /**
+    * Update 3.11: entities (animals, monsters, dropped items, falling blocks and trees, debris, your own body and your hand) go through the
+    * same lighting as the terrain: the sun tint on what the sun reaches, the cool skylight in shade and under trees (the terrain's shadow
+    * map), the glow of torches and other placed lights, and the same fog. The colour that arrives (gl_Color) already carries the entity's
+    * light level and its own tint; this adds what the terrain shader adds on top of the light level.
+    */
+   static final String ENTITY_VS = String.join(
+      "\n",
+      new CharSequence[]{
+         "#version 120",
+         "uniform mat4 invView;",
+         "varying vec2 vUv;",
+         "varying vec4 vCol;",
+         "varying vec3 vRel;",
+         "varying float vDepth;",
+         "void main(){",
+         "  vec4 eye = gl_ModelViewMatrix * gl_Vertex;",
+         "  vRel = (invView * eye).xyz;",
+         "  vDepth = length(eye.xyz);",
+         "  vUv = gl_MultiTexCoord0.xy;",
+         "  vCol = gl_Color;",
+         "  gl_Position = gl_ProjectionMatrix * eye;",
+         "}",
+         ""
+      }
+   );
+   static final String ENTITY_FS = String.join(
+      "\n",
+      new CharSequence[]{
+         "#version 120",
+         "uniform sampler2D tex;",
+         "uniform sampler2D shadowMap;",
+         "uniform vec3 fogColor;",
+         "uniform vec2 fogRange;",
+         "uniform vec3 sunDir;",
+         "uniform float sunUp;",
+         "uniform mat4 shadowMat;",
+         "uniform vec3 shOff;",
+         "uniform float shadowOn;",
+         "uniform vec4 dynL[12];",
+         "uniform vec4 dynC[12];",
+         "uniform vec2 entLm;            // sky light and block light at the entity, 0..1 (like the terrain's lightmap coordinates)",
+         "varying vec2 vUv;",
+         "varying vec4 vCol;",
+         "varying vec3 vRel;",
+         "varying float vDepth;",
+         "vec3 sunTintOf(float sy){",
+         "  return mix(vec3(1.0, 0.70, 0.46), vec3(1.0, 0.975, 0.93), clamp(sy*3.0, 0.0, 1.0));",
+         "}",
+         "vec3 fogWithSun(vec3 fogColor, vec3 rel, vec3 sunDir, float sunUp){",
+         "  return fogColor + vec3(1.0, 0.8, 0.55) * (0.08 * pow(max(dot(normalize(rel), sunDir), 0.0), 5.0) * sunUp);",
+         "}",
+         "void main(){",
+         "  vec4 t = texture2D(tex, vUv);",
+         "  if (t.a < 0.1) discard;",
+         "  vec3 cr = cross(dFdx(vRel), dFdy(vRel));",
+         "  float cl = length(cr);",
+         "  vec3 Nf = cl > 1e-12 ? cr / cl : vec3(0.0, 1.0, 0.0);",
+         "  if (dot(Nf, vRel) > 0.0) Nf = -Nf;      // always face the viewer",
+         "  float ndl = clamp(dot(Nf, sunDir), 0.0, 1.0);",
+         "  float lit = 1.0;",
+         "  if (shadowOn > 0.5) {",
+         "    vec3 sc = (shadowMat * vec4(vRel + shOff + Nf * 0.11, 1.0)).xyz;",
+         "    float bias = 0.0004 + 0.0014 * (1.0 - ndl);",
+         "    if (sc.x > 0.0 && sc.x < 1.0 && sc.y > 0.0 && sc.y < 1.0 && sc.z < 1.0) {",
+         "      float texel = 1.0/2048.0;",
+         "      float s = 0.0;",
+         "      for (int i = -1; i <= 1; i++) for (int j = -1; j <= 1; j++) {",
+         "        float d = texture2D(shadowMap, sc.xy + vec2(float(i), float(j))*texel*1.2).r;",
+         "        s += (sc.z - bias > d) ? 0.0 : 1.0;",
+         "      }",
+         "      s /= 9.0;",
+         "      float edge = min(min(sc.x, 1.0-sc.x), min(sc.y, 1.0-sc.y));",
+         "      lit = mix(1.0, s, smoothstep(0.0, 0.08, edge));",
+         "    }",
+         "  }",
+         "  lit *= mix(0.55, 1.0, smoothstep(0.0, 0.35, ndl));      // faces turned away from the sun receive less direct light",
+         "  float skyAmt = smoothstep(0.55, 0.97, entLm.x) * sunUp;",
+         "  vec3 sunTint = sunTintOf(sunDir.y);",
+         "  vec3 shTint = vec3(0.45, 0.53, 0.78);                   // cool skylight in the shade",
+         "  vec3 shadeC = mix(vec3(1.0), mix(shTint, sunTint * 1.04, lit), skyAmt);",
+         "  vec3 dyn = vec3(0.0);",
+         "  for (int i = 0; i < 12; i++) {",
+         "    float r = dynL[i].w;",
+         "    if (r > 0.0) {",
+         "      vec3 dv = dynL[i].xyz - vRel;",
+         "      float dist = length(dv);",
+         "      float att = clamp(1.0 - dist / r, 0.0, 1.0);",
+         "      att *= att;",
+         "      float nd = max(dot(Nf, dv / max(dist, 0.001)), 0.0);",
+         "      dyn += dynC[i].rgb * (att * (0.30 + 0.70 * nd));",
+         "    }",
+         "  }",
+         "  vec3 c = t.rgb * (vCol.rgb * shadeC + dyn);",
+         "  float f = clamp((fogRange.y - vDepth) / max(0.001, fogRange.y - fogRange.x), 0.0, 1.0);",
+         "  c = mix(fogWithSun(fogColor, vRel, sunDir, sunUp), c, f);",
+         "  gl_FragColor = vec4(c, t.a * vCol.a);",
+         "}",
+         ""
+      }
+   );
    static final String LOD_VS = String.join(
       "\n",
       new CharSequence[]{
