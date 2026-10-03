@@ -1139,6 +1139,10 @@ public final class World {
 
             if (Color312.isPowder(var4) && Color312.wet(this, var1, var2, var3)) {
                this.setBlock(var1, var2, var3, Color312.hardened(var4)); // Update 3.12: concrete powder sets next to water
+               if (this.game != null) {
+                  this.game.adv.award(this.game, "story/concrete");
+               }
+
                return;
             }
 

@@ -816,6 +816,7 @@ public final class Mobs {
 
       this.g.loveParticles(a);
       this.g.loveParticles(b);
+      this.g.adv.award(this.g, "husbandry/breed_an_animal"); // Update 3.12
    }
 
    public Mobs.Mob spawnBaby(int type, double x, double y, double z) {
@@ -866,6 +867,9 @@ public final class Mobs {
 
          if (var1.health <= 0) {
             this.kill(var1);
+            if (var9) {
+               this.g.adv.killed(this.g, var1); // Update 3.12: advancements
+            }
          }
 
          return true;

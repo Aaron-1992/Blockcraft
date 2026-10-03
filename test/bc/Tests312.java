@@ -23,6 +23,7 @@ final class Tests312 {
       end();
       villages();
       colors();
+      advancements();
    }
 
    static void deleteAll(File f) {
@@ -2256,6 +2257,262 @@ final class Tests312 {
          }
 
          check(pearl, "the priest sells ender pearls: the way to the End is open without a single enderman");
+      });
+   }
+
+   // ------------------------------------------------------------------ advancements
+   static Game gameIn(int dim) throws Exception {
+      Game g = newGame(0);
+      g.world.shutdown();
+      World w = new World(5L, null, dim);
+      g.world = w;
+      w.game = g;
+      g.screen = Game.S.PLAY;
+      load(w, 0, 0, 2);
+      g.player.setMode(0);
+      g.player.setPos(0.5, 80.0, 0.5);
+      return g;
+   }
+
+   static void advancements() {
+      test("advancements: the tree is sound (one root per tab, parents in the same tab, no two on one spot, every icon exists)", () -> {
+         eq(Adv312.LIST.size(), Adv312.BY_ID.size(), "every id once");
+         check(Adv312.LIST.size() >= 28, "a decent number of advancements: " + Adv312.LIST.size());
+         int[] roots = new int[Adv312.TABS.length];
+         java.util.HashSet<String> spots = new java.util.HashSet<>();
+         java.util.HashSet<String> titles = new java.util.HashSet<>();
+         for (Adv312.A a : Adv312.LIST) {
+            check(titles.add(a.title), "title unique: " + a.title);
+            check(a.tab >= 0 && a.tab < Adv312.TABS.length, "tab of " + a.id);
+            check(spots.add(a.tab + ":" + a.col + ":" + a.row), a.id + " has a spot of its own");
+            check(a.col >= 0 && a.col <= 7 && a.row >= 0 && a.row <= 4, a.id + " fits the screen: " + a.col + "," + a.row);
+            check(a.id.startsWith(new String[]{"story/", "nether/", "end/", "adventure/", "husbandry/"}[a.tab]), a.id + " is named after its tab");
+            check(a.icon > 0 && (Blocks.isBlockId(a.icon) ? Blocks.name[a.icon] != null : Items.name(a.icon) != null), a.id + " has an icon");
+            check(a.title.length() <= 28 && a.desc.length() <= 60, a.id + " has short texts");
+            if (a.parent == null) {
+               roots[a.tab]++;
+            } else {
+               Adv312.A p = Adv312.BY_ID.get(a.parent);
+               check(p != null && p.tab == a.tab, a.id + " has a parent in its tab");
+               check(Adv312.LIST.indexOf(p) < Adv312.LIST.indexOf(a), a.id + " comes after its parent");
+               check(p.col < a.col, a.id + " lies right of its parent");
+            }
+         }
+
+         for (int t = 0; t < roots.length; t++) {
+            eq(1, roots[t], "one root in tab " + t);
+         }
+      });
+
+      test("advancements: made by what you carry, where you are and what you do; each only once; remembered in the world folder", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("adv").toFile();
+         try {
+            Game g = newGame(0);
+            g.rootDir = dir;
+            g.adv.poll(g);
+            check(g.adv.has("story/root") && g.adv.has("adventure/root") && g.adv.has("husbandry/root"), "the roots come by themselves");
+            check(!g.adv.has("story/mine_stone") && !g.adv.has("story/mine_diamond"), "and nothing else");
+            eq(3, g.adv.count(), "three so far");
+            // what you carry
+            g.inv[0] = new Stack(Blocks.COBBLE, 3);
+            g.inv[1] = new Stack(Items.IRON_INGOT, 1);
+            g.inv[2] = new Stack(Items.toolId(1, Items.C_PICK), 1);
+            g.adv.poll(g);
+            check(g.adv.has("story/mine_stone") && g.adv.has("story/smelt_iron") && g.adv.has("story/upgrade_tools"), "cobblestone, an iron ingot, a stone pickaxe");
+            check(!g.adv.has("story/iron_tools"), "an iron pickaxe is something else");
+            g.inv[3] = new Stack(Items.toolId(2, Items.C_PICK), 1);
+            g.inv[4] = new Stack(Items.DIAMOND, 2);
+            g.inv[5] = new Stack(Items.LAVA_BUCKET, 1);
+            g.inv[6] = new Stack(Blocks.OBSIDIAN, 4);
+            g.inv[7] = new Stack(Items.BLAZE_ROD, 1);
+            g.inv[8] = new Stack(Items.ENDER_PEARL, 1);
+            g.inv[9] = new Stack(Items.BREAD, 1);
+            g.inv[10] = new Stack(Blocks.DRAGON_EGG, 1);
+            g.adv.poll(g);
+            for (String id : new String[]{"story/iron_tools", "story/mine_diamond", "story/lava_bucket", "story/form_obsidian", "nether/obtain_blaze_rod", "end/pearl", "husbandry/bake_bread", "end/dragon_egg"}) {
+               check(g.adv.has(id), id);
+            }
+
+            // armour: worn counts, iron and diamond are different
+            check(!g.adv.has("story/obtain_armor") && !g.adv.has("story/diamond_armor"), "no armour yet");
+            g.armor[1] = new Stack(Items.armorId(1, 1), 1);
+            g.adv.poll(g);
+            check(g.adv.has("story/obtain_armor") && !g.adv.has("story/diamond_armor"), "an iron chestplate is Suit Up");
+            g.armor[3] = new Stack(Items.armorId(3, 3), 1);
+            g.adv.poll(g);
+            check(g.adv.has("story/diamond_armor"), "diamond boots are Cover Me with Diamonds");
+            // new ones come once
+            int before = g.adv.count();
+            check(!g.adv.award(g, "story/mine_stone"), "a second time: nothing");
+            check(!g.adv.award(g, "no/such"), "an unknown name: nothing");
+            eq(before, g.adv.count(), "the count did not change");
+            // the file
+            File f = Adv312.file(dir);
+            check(f.isFile(), "saved at once");
+            Adv312 again = new Adv312();
+            again.load(dir);
+            check(again.done.equals(g.adv.done), "a new game reads the same advancements back");
+            java.nio.file.Files.write(f.toPath(), "story/root\nnot/an/advancement\n\nend/root\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            again.load(dir);
+            eq(2, again.count(), "unknown names in the file are ignored");
+            again.load(new File(dir, "nothing-here"));
+            eq(0, again.count(), "no file: no advancements");
+            g.adv.revokeAll(g);
+            eq(0, g.adv.count(), "revoked");
+            again.load(dir);
+            eq(0, again.count(), "and the file says so");
+         } finally {
+            deleteAll(dir);
+         }
+      });
+
+      test("advancements: the Nether, the End, a village and a stronghold, and what you kill", () -> {
+         Game n = gameIn(Dim.NETHER);
+         n.adv.poll(n);
+         check(n.adv.has("story/enter_the_nether") && n.adv.has("nether/root"), "entering the Nether");
+         check(!n.adv.has("nether/fortress"), "but not a fortress yet");
+         n.world.setBlock(3, 60, 3, Blocks.NETHER_BRICKS);
+         n.player.setPos(3.5, 61.0, 3.5);
+         n.adv.poll(n);
+         check(n.adv.has("nether/fortress"), "standing on nether bricks");
+         n.mobs.timer = 1;
+         Mobs.Mob ghast = n.mobs.spawn(Mobs.GHAST, 8.5, 62, 8.5);
+         Mobs.Mob zombie = n.mobs.spawn(Mobs.ZOMBIE, 9.5, 61, 8.5);
+         Mobs.Mob cow = n.mobs.spawn(Mobs.COW, 10.5, 61, 8.5);
+         n.adv.killed(n, cow);
+         check(!n.adv.has("adventure/kill_a_mob"), "a cow is no monster");
+         n.adv.killed(n, zombie);
+         check(n.adv.has("adventure/kill_a_mob"), "a zombie is");
+         check(!n.adv.has("nether/ghast"), "no ghast yet");
+         n.adv.killed(n, ghast);
+         check(n.adv.has("nether/ghast"), "a ghast");
+         // hitting a monster to death does it (the real path)
+         Game h = newGame(0);
+         h.mobs.timer = 1;
+         Mobs.Mob z = h.mobs.spawn(Mobs.ZOMBIE, 12.5, GROUND + 1, 12.5);
+         h.mobs.hurtMob(z, 100, 11.0, 12.5, 0.4, true);
+         check(z.dead && h.adv.has("adventure/kill_a_mob"), "killing a zombie by hand");
+         Game e = gameIn(Dim.END);
+         e.adv.poll(e);
+         check(e.adv.has("story/enter_the_end") && e.adv.has("end/root") && e.adv.has("story/follow_ender_eye"), "entering the End");
+         check(!e.adv.has("end/kill_dragon"), "the dragon is alive");
+         e.world.fight.defeated = true;
+         e.adv.poll(e);
+         check(e.adv.has("end/kill_dragon"), "Free the End when the dragon is dead");
+         // a village: stand in it
+         Game v = newGame(0);
+         Structs.Village vil = firstVillage(v.world.gen, 1);
+         check(vil != null, "a village near the origin");
+         v.player.setPos(vil.cx + 0.5, 90.0, vil.cz + 0.5);
+         v.adv.poll(v);
+         check(v.adv.has("adventure/village"), "A Peaceful Place");
+         Game far = newGame(0);
+         far.player.setPos(vil.cx + 100.5, 90.0, vil.cz + 100.5);
+         far.adv.poll(far);
+         check(!far.adv.has("adventure/village"), "not 140 blocks away");
+         // a stronghold
+         Stronghold sh = Stronghold.all(v.world.seed)[0];
+         Stronghold.Plan plan = sh.plan();
+         Game s = newGame(0);
+         s.player.setPos(sh.cx + 0.5, plan.oy + 2.0, sh.cz + 0.5);
+         s.adv.poll(s);
+         check(s.adv.has("adventure/stronghold"), "Buried Castle");
+         Game above = newGame(0);
+         above.player.setPos(sh.cx + 0.5, 70.0, sh.cz + 0.5);
+         above.adv.poll(above);
+         check(!above.adv.has("adventure/stronghold"), "not on the surface above it");
+      });
+
+      test("advancements: trading, breeding, planting, sleeping-free ones, dyeing, setting concrete and the eye of ender are made where they happen", () -> {
+         Game g = newGame(0);
+         g.mobs.timer = 1;
+         // a trade
+         g.inv[0] = new Stack(Items.EMERALD, 5);
+         check(Trades.buy(g, Trades.offers(Trades.SMITH)[2]), "bought");
+         check(g.adv.has("adventure/trade"), "What a Deal!");
+         // breeding
+         Mobs.Mob a = g.mobs.spawn(Mobs.COW, 12.5, GROUND + 1, 12.5);
+         Mobs.Mob b = g.mobs.spawn(Mobs.COW, 13.5, GROUND + 1, 12.5);
+         g.mobs.breed(a, b);
+         check(g.adv.has("husbandry/breed_an_animal"), "two cows have a calf");
+         // planting
+         g.world.setBlock(10, GROUND, 10, Blocks.FARMLAND);
+         GameTests.hold(g, Items.SEEDS, 3);
+         g.target = GameTests.top(10, 10);
+         check(g.placeSeeds(g.inv[g.sel]), "planted");
+         check(g.adv.has("husbandry/plant_seed"), "A Seedy Place");
+         // a sheep gets a dye
+         Mobs.Mob sheep = g.mobs.spawn(Mobs.SHEEP, 14.5, GROUND + 1, 14.5);
+         sheep.color = 0;
+         GameTests.hold(g, Color312.dyeItem(4), 1);
+         check(g.useOnMob(sheep, g.inv[g.sel]) && g.adv.has("husbandry/dye_sheep"), "Color Me Impressed");
+         // concrete powder sets
+         check(!g.adv.has("story/concrete"), "not yet");
+         g.world.setBlock(20, GROUND + 1, 20, Blocks.WATER);
+         g.world.setBlock(21, GROUND + 1, 20, Blocks.POWDER0);
+         for (int i = 0; i < 20; i++) {
+            g.world.tick();
+         }
+
+         check(g.adv.has("story/concrete"), "Setting Concrete");
+         // the eye of ender is thrown
+         check(!g.adv.has("story/follow_ender_eye"), "no eye thrown yet");
+         GameTests.hold(g, Items.EYE_OF_ENDER, 2);
+         g.useSpecial(g.inv[g.sel]);
+         check(g.adv.has("story/follow_ender_eye"), "Eye Spy");
+      });
+
+      test("advancements: the toast waits its turn, the commands grant and take back, the screen opens on L", () -> {
+         Game g = newGame(0);
+         g.adv.award(g, "story/mine_stone");
+         g.adv.award(g, "story/smelt_iron");
+         g.adv.award(g, "end/kill_dragon");
+         check(g.adv.shown == null, "nothing shows before the first tick");
+         g.adv.tick();
+         eq("story/mine_stone", g.adv.shown.id, "the first one shows");
+         for (int i = 0; i < Adv312.TOAST_TICKS; i++) {
+            g.adv.tick();
+         }
+
+         eq("story/smelt_iron", g.adv.shown.id, "then the second");
+         for (int i = 0; i < Adv312.TOAST_TICKS; i++) {
+            g.adv.tick();
+         }
+
+         eq("end/kill_dragon", g.adv.shown.id, "then the third");
+         eq(Adv312.CHALLENGE, g.adv.shown.frame, "a challenge");
+         check(Adv312.header(Adv312.CHALLENGE).startsWith("Challenge") && Adv312.header(Adv312.TASK).startsWith("Advancement"), "headers");
+         for (int i = 0; i < Adv312.TOAST_TICKS + 2; i++) {
+            g.adv.tick();
+         }
+
+         check(g.adv.shown == null, "and the toast is gone");
+         g.runCommand("/advancement grant all");
+         eq(Adv312.LIST.size(), g.adv.count(), "/advancement grant all");
+         g.runCommand("/advancement revoke all");
+         eq(0, g.adv.count(), "/advancement revoke all");
+         g.runCommand("/advancement grant story/mine_stone");
+         check(g.adv.has("story/mine_stone") && g.adv.count() == 1, "/advancement grant <id>");
+         g.runCommand("/advancement grant nonsense");
+         eq(1, g.adv.count(), "a name that does not exist grants nothing");
+         // per tab counts
+         eq(1, g.adv.count(0), "one in the first tab");
+         eq(0, g.adv.count(1), "none in the Nether tab");
+         int sum = 0;
+         for (int t = 0; t < Adv312.TABS.length; t++) {
+            sum += Adv312.total(t);
+         }
+
+         eq(Adv312.LIST.size(), sum, "the tabs add up");
+         // the L key
+         g.screen = Game.S.PLAY;
+         g.onKey(76, 1, 0);
+         eq(Game.S.ADV, g.screen, "L opens the screen");
+         g.onKey(76, 1, 0);
+         eq(Game.S.PLAY, g.screen, "L closes it");
+         g.onKey(76, 1, 0);
+         g.onKey(256, 1, 0);
+         eq(Game.S.PLAY, g.screen, "so does Escape");
       });
    }
 

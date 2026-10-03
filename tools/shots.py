@@ -391,6 +391,10 @@ SCENES = {
     "colors-wall":        (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(color_wall())] + PLAIN + ["-Dbc.shot=170"], True),
     "colors-wall-sh":     (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(color_wall()), "-Dbc.shot=170"], True),
     "colors-misc":        (COMMON + ["-Dbc.cam=143.5,68.6,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(misc_color_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
+    # ---- Update 3.12: advancements (the screen on the L key, and the toast in the corner)
+    "adv-screen":         (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=screen", "-Dbc.advdone=9", "-Dbc.advtab=0"] + PLAIN + ["-Dbc.shot=130"], True),
+    "adv-adventure":      (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=screen", "-Dbc.advdone=40", "-Dbc.advtab=3"] + PLAIN + ["-Dbc.shot=130"], True),
+    "adv-toast":          (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.adv=toast", "-Dbc.advdone=0"] + PLAIN + ["-Dbc.shot=108"], True),
     "portal-day":         (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
     "portal-day-sh":      (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks()), "-Dbc.shot=170"], True),
 

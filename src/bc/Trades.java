@@ -87,6 +87,7 @@ final class Trades {
          g.dropFromPlayer(s.id, s.n, s.dmg);
       }
 
+      g.adv.award(g, "adventure/trade");
       return true;
    }
 }

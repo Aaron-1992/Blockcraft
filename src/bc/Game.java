@@ -54,6 +54,8 @@ public final class Game {
    final Stack[] armor = new Stack[4];
    Stack cursor;
    final Mobs mobs = new Mobs(this);
+   /** Update 3.12: the advancements of the world that is open. */
+   final Adv312 adv = new Adv312();
    Mob targetMob;
    double targetMobT;
    Menu menu;
@@ -724,6 +726,21 @@ public final class Game {
             }
          }
 
+         if (this.autoFrames == 100 && System.getProperty("bc.adv") != null) {
+            // screenshot hook of Update 3.12: bc.adv=screen opens the advancements (bc.advdone = how many of them are made, bc.advtab = the tab), bc.adv=toast shows a toast
+            int made = Integer.getInteger("bc.advdone", 12);
+            for (int i = 0; i < made && i < Adv312.LIST.size(); i++) {
+               this.adv.award(this, Adv312.LIST.get(i).id);
+            }
+
+            if (System.getProperty("bc.adv").equals("toast")) {
+               this.adv.award(this, "end/kill_dragon");
+            } else {
+               this.adv.tab = Integer.getInteger("bc.advtab", 0);
+               this.setScreen(Game.S.ADV);
+            }
+         }
+
          if (this.autoFrames == Integer.getInteger("bc.shot", 120)) {
             this.autoShotNow = true;
          }
@@ -978,6 +995,7 @@ public final class Game {
          this.needSpawn = false;
       }
 
+      this.adv.load(this.rootDir); // Update 3.12: advancements (a new world starts with none)
       this.player.updateBox();
       this.setScreen(Game.S.LOADING);
    }
@@ -1052,6 +1070,8 @@ public final class Game {
          if (this.world.fight != null) {
             this.world.fight.save(this);
          }
+
+         this.adv.save(this.rootDir);
 
          if (this.rootDir == null && this.world.dir == null) {
             return; // a world that only lives in memory (tests)
@@ -1352,9 +1372,11 @@ public final class Game {
       boolean var3 = var1 == Game.S.PLAY;
       if (var3 != this.grabbed) {
          this.grabbed = var3;
-         GLFW.glfwSetInputMode(this.window, 208897, var3 ? 212995 : 212993);
-         if (var3 && GLFW.glfwRawMouseMotionSupported()) {
-            GLFW.glfwSetInputMode(this.window, 208901, 1);
+         if (this.window != 0L) { // (tests have no window)
+            GLFW.glfwSetInputMode(this.window, 208897, var3 ? 212995 : 212993);
+            if (var3 && GLFW.glfwRawMouseMotionSupported()) {
+               GLFW.glfwSetInputMode(this.window, 208901, 1);
+            }
          }
 
          this.firstMouse = true;
@@ -1496,6 +1518,9 @@ public final class Game {
                               }
 
                               return;
+                           case 76:
+                              this.setScreen(Game.S.ADV); // Update 3.12: the advancements
+                              return;
                            case 81:
                               this.dropHeld((var3 & 2) != 0);
                               return;
@@ -1592,6 +1617,12 @@ public final class Game {
                   return;
                case PAUSE:
                   if (var2 == 1 && var1 == 256) {
+                     this.setScreen(Game.S.PLAY);
+                  }
+
+                  return;
+               case ADV:
+                  if (var2 == 1 && (var1 == 256 || var1 == 76)) {
                      this.setScreen(Game.S.PLAY);
                   }
 
@@ -1783,6 +1814,29 @@ public final class Game {
                   break;
                case "seed":
                   this.say("Seed: [" + this.world.seed + "]");
+                  break;
+               case "advancement":
+               case "adv":
+                  String advSub = var2.length > 1 ? var2[1].toLowerCase() : "list";
+                  if (advSub.equals("grant") && var2.length > 2) {
+                     if (var2[2].equals("all") || var2[2].equals("everything")) {
+                        for (Adv312.A a : Adv312.LIST) {
+                           this.adv.award(this, a.id);
+                        }
+
+                        this.say("Granted every advancement");
+                     } else if (Adv312.BY_ID.containsKey(var2[2])) {
+                        this.adv.award(this, var2[2]);
+                        this.say("Granted " + var2[2]);
+                     } else {
+                        this.say("§cNo advancement called " + var2[2]);
+                     }
+                  } else if (advSub.equals("revoke") && var2.length > 2 && var2[2].equals("all")) {
+                     this.adv.revokeAll(this);
+                     this.say("Took back every advancement");
+                  } else {
+                     this.say("Advancements: " + this.adv.count() + " of " + Adv312.LIST.size() + " made (press L).  /advancement grant <id|all>   /advancement revoke all");
+                  }
                   break;
                case "dim":
                case "dimension":
@@ -2408,6 +2462,11 @@ public final class Game {
       if (!this.player.dead) {
          this.player.tick(this.world, var2, var3, var4, var5, var6);
          this.tickPose();
+      }
+
+      this.adv.tick();
+      if (this.tickCount % 10 == 0) {
+         this.adv.poll(this);
       }
 
       if (this.player.dead && this.screen != Game.S.DEAD) {
@@ -3054,6 +3113,7 @@ public final class Game {
 
          this.world.setBlock(this.target.x, var2, this.target.z, var3);
          this.meshNow(this.target.x, var2, this.target.z);
+         this.adv.award(this, "husbandry/plant_seed");
          if (!this.player.creative) {
             var1.n--;
             if (var1.n <= 0) {
@@ -3147,6 +3207,7 @@ public final class Game {
       int dyeColor = Color312.dyeColor(var2.id);
       if (dyeColor >= 0 && var1.type == Mobs.SHEEP && var1.color != dyeColor) {
          var1.color = dyeColor; // Update 3.12: dye a sheep (its next wool has the colour)
+         this.adv.award(this, "husbandry/dye_sheep");
          if (!this.player.creative) {
             var2.n--;
             if (var2.n <= 0) {
@@ -3375,6 +3436,7 @@ public final class Game {
          this.world.weather.calmUntil = this.world.weather.ticks + 7200L;
          this.player.health = Math.max(this.player.health, Math.min(20, this.player.health + 4));
          this.say("Good morning! Respawn point set.");
+         this.adv.award(this, "adventure/sleep_in_bed");
       }
    }
 
@@ -3395,7 +3457,12 @@ public final class Game {
       }
 
       if (var2 == Items.EYE_OF_ENDER) {
-         return !this.player.adventure && EndPortals.throwEye(this, var1);
+         boolean thrown = !this.player.adventure && EndPortals.throwEye(this, var1);
+         if (thrown) {
+            this.adv.award(this, "story/follow_ender_eye");
+         }
+
+         return thrown;
       }
 
       if (var2 == 282) {
@@ -3908,6 +3975,8 @@ public final class Game {
                this.drawPause();
             } else if (this.screen == Game.S.INV) {
                this.drawInventory();
+            } else if (this.screen == Game.S.ADV) {
+               this.adv.drawScreen(this);
             } else if (this.screen == Game.S.DEAD) {
                this.drawDead();
             }
@@ -4549,6 +4618,7 @@ public final class Game {
 
          this.drawHotbar();
          this.drawBossBar();
+         this.adv.drawToast(this);
       }
 
       if (this.debug) {
@@ -4934,6 +5004,7 @@ public final class Game {
       PLAY,
       PAUSE,
       INV,
+      ADV,
       CHAT,
       OPTIONS,
       SKINS,

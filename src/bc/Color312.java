@@ -331,8 +331,9 @@ final class Color312 {
    /** Emerald ore: the stone of the game with green gems. */
    static int[] emeraldOre() {
       int[] p = new int[256];
-      int x0 = Tex.tx(1);
-      int y0 = Tex.ty(1);
+      int stone = Blocks.tiles[Blocks.STONE][0];
+      int x0 = Tex.tx(stone);
+      int y0 = Tex.ty(stone);
       for (int y = 0; y < 16; y++) {
          System.arraycopy(Tex.atlasPixels, (y0 + y) * Tex.PX + x0, p, y * 16, 16);
       }

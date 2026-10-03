@@ -1,2 +1,2 @@
-colors-wall,colors-wall-sh,colors-misc,village-day,village-aerial,village-folk,village-trade
+colors-misc,adv-screen,adv-adventure,adv-toast,wx-fair,wx-storm,wx-storm-bolt,wx-rain,wx-overcast,wx-snow,village-trade
 jar=build
