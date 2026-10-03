@@ -1,3 +1,4 @@
 GL: 4.5 (Compatibility Profile) Mesa 26.2.3 (git-afe29290a0) / llvmpipe (LLVM 23.1.2, 256 bits)
 [skins] file dialog opened
-AUTO screenshot; chunks=0 fps=42
+AUTO screenshot; chunks=0 fps=41
+[skins] file dialog closed
