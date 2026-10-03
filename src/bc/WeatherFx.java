@@ -569,11 +569,11 @@ final class WeatherFx {
             float lump = Weather.samp(NOISE_G, cu * (1.0 / 90.0) + 0.37, cv * (1.0 / 90.0) + 0.11);
             float a = 0.90F * fade;
             float grey = Weather.smooth(0.45F, 1.0F, cover);
-            float tc = (1.0F - 0.22F * grey) * (1.0F - 0.30F * storm) * (0.90F + 0.20F * lump);
+            float tc = (1.0F - 0.22F * grey) * (1.0F - 0.38F * storm) * (0.90F + 0.20F * lump);
             int ct = rgba(tc, tc, tc * 1.02F, a);
-            float bc = (0.66F - 0.50F * storm) * (1.0F - 0.30F * grey * (1.0F - storm)) * (1.0F - 0.30F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
+            float bc = (0.66F - 0.54F * storm) * (1.0F - 0.30F * grey * (1.0F - storm)) * (1.0F - 0.30F * Math.min(1.0F, thk[idx] / 80.0F)) * (0.78F + 0.44F * lump);
             int cbm = rgba(bc, bc, bc * 1.06F, Math.min(1.0F, a * 1.05F));
-            float sideK = (0.84F - 0.50F * storm) * (1.0F - 0.18F * grey * (1.0F - storm)) * (0.92F + 0.16F * lump);
+            float sideK = (0.84F - 0.56F * storm) * (1.0F - 0.18F * grey * (1.0F - storm)) * (0.92F + 0.16F * lump);
             float grad = 0.30F + 0.40F * storm;
             // top and bottom
             cb.v(x0, t, z0, ct);

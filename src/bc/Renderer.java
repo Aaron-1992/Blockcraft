@@ -595,7 +595,7 @@ public final class Renderer {
             this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
          }
 
-         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.daylight);
+         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
          if (var29) {
             this.sh.stopLod();
          }

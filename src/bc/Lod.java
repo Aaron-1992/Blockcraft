@@ -751,7 +751,9 @@ public final class Lod {
       GL11.glTexEnvi(8960, 34177, 34166);
       GL11.glTexEnvi(8960, 34162, 7681);
       GL11.glTexEnvi(8960, 34184, 34168);
-      float var21 = 0.3F + 0.7F * var9;
+      // Update 3.8: the same brightness as the real terrain at full sky light (the lightmap's value for sky 15 is skyLightFactor, which
+      // also contains the weather's dimming): no seam between near terrain and LOD at night or in the rain
+      float var21 = Math.max(0.06F, Math.min(1.0F, var9));
       GL11.glTexEnvfv(8960, 8705, new float[]{var21, var21, var21, 1.0F});
       GL11.glDisable(3008);
       GL11.glDisable(3042);

@@ -476,6 +476,14 @@ public final class MobRender {
       MobRender.Model var10 = models[var0.type];
       float var11 = var2.brightnessAt(var1, var4, var6 + 0.5, var8);
       float[] var12 = new float[]{1.0F, 1.0F, 1.0F};
+      if (var0.charged) {
+         // Update 3.8: struck by lightning - glows a pulsing blue
+         float pulse = 0.5F + 0.5F * (float)Math.sin((var0.age + var3) * 0.3F);
+         var12[0] = 0.40F + 0.18F * pulse;
+         var12[1] = 0.62F + 0.22F * pulse;
+         var12[2] = 1.0F;
+      }
+
       if (var0.hurtTime > 0 || var0.dead) {
          var12[1] = 0.45F;
          var12[2] = 0.45F;

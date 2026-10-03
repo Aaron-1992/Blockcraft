@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.7)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.8)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,35 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.8  (the weather update)
+  * WEATHER YOU CAN SEE COMING. Weather is no longer one switch for the whole world: there are weather systems that drift
+    across the map with the wind. A dark thundercloud on the horizon with a grey curtain of rain hanging under it IS the storm
+    that will reach you in a few minutes (and you may see lightning in it). Cloud cover thickens before it rains, it rains under
+    the dark cloud, and under the tallest part there is thunder. Some stretches are dry, some stormy. A new world starts under a
+    fair sky (no rain for the first 5 minutes); sleeping through the night clears the sky as well.
+  * CLOUDS IN BOTH MODES. With the shader pack the volumetric clouds now follow the weather: thin scattered cloud on fair days,
+    grey sheets in the rain, tall dark thunderheads with a lowered base in storms. Without shaders you now get blocky 3D clouds
+    (flat-bottomed fair-weather cumulus, storm towers that hang low and reach very high) that drift with the wind, instead of one
+    flat sheet, and you can see storms and their rain curtains up to about 3 km away in both modes.
+  * RAIN AND SNOW: streaks around you, but only where nothing is above you (not under a roof or a tree), splashes on the ground
+    and on water; sky and fog turn grey, the haze moves closer and thick cloud hides the sun and moon. Cold biomes (ice plains,
+    high mountains) get snow instead of rain, deserts stay dry.
+  * THUNDERSTORMS: lightning flashes light up the sky and the clouds. A bolt that strikes within about 140 blocks of you sets
+    fires, hurts you and animals (5 damage and burning; creative players are safe) and turns a creeper into a CHARGED CREEPER
+    (glows blue, explodes with twice the power).
+  * RAIN AND THE GAME: rain puts fires out, waters farmland even far from water, zombies and skeletons do not burn in it, and you
+    can sleep through a thunderstorm even in the daytime.
+  * COMMANDS: /weather  (what it is like here and where the nearest thunderstorm is),  /weather clear|rain|thunder [seconds],
+    /weather storm [distance]  (a thunderstorm forms upwind and drifts over you - a good way to watch one arrive),
+    /weather natural  (back to normal),  /weather off|on.  Options screen: "Weather: ON/OFF" (off = fair-weather clouds only).
+    F3 shows the weather at your position. Weather is saved with the world.
+  * Under the hood: one weather field that the game rules, the shader clouds and the blocky clouds all read (the same noise maps
+    on the CPU and the GPU), so what you see in the distance is exactly what will happen.
+  * Honest note: the weather rules and the cloud / rain geometry are covered by automated tests (33,000+ checks, including a proof
+    that the shader's formula and the game's formula give the same weather), and the pictures were checked in automated
+    screenshots on a software renderer in both render paths. The game has still never been played on real Windows hardware, so
+    frame rate with heavy rain and clouds on a real graphics card is unknown. No sound yet (the game has no sound at all).
 
 WHAT'S NEW IN UPDATE 3.7  (the kitchen & fire update)
   * FIRE: right-click with Flint and Steel on the face you are pointing at to light a fire there (it needs a solid block

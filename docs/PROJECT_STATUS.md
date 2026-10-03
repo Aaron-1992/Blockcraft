@@ -1,13 +1,13 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-02 (Update 3.7)._
+_Last updated: 2026-10-03 (Update 3.8)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
 | # | Item | State |
 |---|---|---|
-| 1 | Weather system with volumetric clouds, storms and rain visible in the distance, working without shaders | **Update 3.8 - in progress** (weather field, clouds in both render paths, rain / snow / lightning; see below) |
-| 2 | Fix LODs and adapt them for the weather system | next |
+| 1 | Weather system with volumetric clouds, storms and rain visible in the distance, working without shaders | **done in Update 3.8** (weather field, clouds in both render paths, rain / snow / lightning, `/weather`) |
+| 2 | Fix LODs and adapt them for the weather system | **next** (3.8 already makes the LOD follow the weather's fog / sun / brightness) |
 | 3 | Skins (easy import of Minecraft skins) | planned |
 | 4 | Smooth animations | planned |
 | 5 | Natural disasters | planned (builds on the weather system: lightning fires, storms) |
@@ -25,7 +25,20 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.7 – "the kitchen & fire update"
+## Current state: Update 3.8 – "the weather update"
+
+- **A weather field that drifts with the wind** (`Weather.java`): storm systems you can see coming - a dark thundercloud with a rain curtain under it on the
+  horizon is the storm that will reach you. Cloud cover -> rain -> thunderstorm by thresholds on one field; climate cycle (dry and stormy stretches);
+  `/weather` commands (`clear|rain|thunder [s]`, `storm [distance]`, `natural`, `on|off`, status); saved with the world; new worlds start calm for 5 minutes.
+- **Clouds in both render paths**: with shaders the raymarched clouds follow the field (fair cumulus, grey rain sheets, tall dark thunderheads with an
+  anvil and a lowered base, lit from inside by lightning); without shaders blocky 3D clouds (two levels, out to 3.6 km) plus rain curtains. Rain, snow
+  (ice plains, high mountains), splashes, grey sky / closer fog, hidden sun and moon, lightning bolts and flashes.
+- **Game rules**: rain puts fires out and waters farmland, no sun-burn for zombies / skeletons in rain, thunder lets you sleep by day, lightning ignites,
+  hurts and charges creepers (blue glow, double blast). Options: Weather ON/OFF.
+- The no-shader LOD now has the same brightness as the real terrain (it follows the weather-dimmed sky light).
+- Under the hood: `Weather`, `WeatherFx`, new cloud shader, `Tests38` (160+ checks incl. CPU/GPU parity), screenshot hooks `bc.weather` & co.
+
+## Update 3.7 (still in the game) – "the kitchen & fire update"
 
 - **Fire** (`Fire.java`, Minecraft 1.12 rules): flint & steel lights a fire on the clicked face; it ages, burns out on bare ground after
   ~10-30 s, spreads to planks / logs / leaves / wool / bookshelves / hay / tall grass / flowers and consumes them, sets TNT off, and
@@ -85,8 +98,7 @@ exercised through the same code paths the mouse/keyboard use and **work as desig
 
 ## Known gaps / ideas
 
-- Not implemented: egg throwing, mobs trampling crops, animals following their parents, rain (fire never gets rained out),
-  boats/minecarts, signs, fishing, enchanting, naturally generated melons (seeds come from dungeon chests), fire from lightning…
+- Not implemented: egg throwing, mobs trampling crops, animals following their parents, boats/minecarts, signs, fishing, enchanting, naturally generated melons (seeds come from dungeon chests), sound of any kind (thunder and rain are silent)…
 - The sheep model has no separate "sheared" geometry: a sheared sheep is the same box tinted skin-pink with the head tuft hidden.
 - Hearts for breeding are plain red particles.
 

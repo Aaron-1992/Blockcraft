@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.7"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.8"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -90,6 +90,9 @@ instead (the exe is a jar with a stub in front). Both visual workflows test the 
 `bc.shot=<frame>`, `bc.set=x,y,z,id;...` (place blocks at frame 70), `bc.summon=pig,baby:cow,sheared:sheep,...` (with `bc.summonDist`, `bc.summonDy` for close-ups),
 `bc.inv=creative|craft|player|furnace|chest` with `bc.page`, `bc.tnt=x,y,z`, `bc.kit`, `bc.hold=<id>`, `bc.title=<screen>`,
 `bc.fire=off` (freezes fires: they neither spread nor burn out - for screenshots).
+Weather hooks (3.8): `bc.weather=calm|clear|rain|thunder|cell:dx,dz,radius` (a storm cell placed relative to the player; the sky is otherwise calm),
+`bc.wtime=<weather ticks>`, `bc.lightning=off` (no random lightning), `bc.bolt=dx,dz` (a fresh bolt every frame near the shot, so the screenshot
+catches the first stroke), `bc.biome=<id>` (all loaded chunks get this biome, e.g. 5 = ice plains = snow).
 
 ## How the source was recovered (2026-10-02)
 
@@ -127,6 +130,32 @@ rotations/stages use consecutive ids):
 **A mob** type: parallel arrays in `Mobs` (`NAME`, `HP`, `W`, `H`, `SPD`), AI in `Mobs.tickMob`, model in
 `MobRender.build`/`drawMob`, drops in `Mobs.kill`, persistence in `mobs.dat` (space separated; append fields at the end
 so old lines still load).
+
+## Weather (Update 3.8)
+
+`Weather.java` is the model, `WeatherFx.java` everything that draws it, `Shaders`/`ShaderSrc.CLOUD_FS` the raymarched clouds.
+
+* **The weather is a field over the map, not a global state**: `Weather.Snap.s(x, z)` = `0.62 * mapA + 0.38 * mapB + climate (+ forcing, storm cells)`,
+  where the two tileable noise maps (`Weather.MAP_A` period 9000 blocks, `MAP_B` 4500) drift with the wind at slightly different speeds. Thresholds
+  (`C0..T1`, quantiles of the field, so ~30 % clear, ~16 % rain, ~6 % thunder) turn `s` into cloud cover, rain and a thunderstorm; `core` is the height
+  of the thunderhead. A `Snap` is immutable (thread-safe); the mesher thread and the GPU use the same numbers as the game rules.
+* **CPU == GPU**: the maps are uploaded as a texture (`Shaders.makeWeatherNoise`), the CPU samples the same bytes with the same bilinear/repeat maths,
+  and every noise period divides 9000, so the shader can work on coordinates reduced modulo 9000 (float precision). `Tests38.gpuParity` proves both
+  claims. If you change the formula in `Weather.Snap.s`, change `ShaderSrc.CLOUD_FS` (`wfield`, `weather`, `thickOf`, `dens`) and `WeatherFx.density`
+  /`thickness` together - the tests will tell you if they drift apart.
+* **No-shader path** = blocky clouds: `WeatherFx.build` (worker thread, every ~2.5 s or when the camera moved 40 blocks) makes a fine level (16-block
+  columns out to 1120 blocks) and a coarse level (48-block columns out to 3.6 km) in the drifting frame of weather layer A (so the mesh only needs a
+  translation per frame), plus the rain curtains (3 crossing planes per grid point, a veil texture so they still show from afar). Drawn with a depth
+  pre-pass so overlapping translucent faces blend once. **Shader path** = the raymarch; only the curtains, the rain/snow around the player and the bolts
+  are geometry (drawn after the cloud composite).
+* The cloud shader marches only as tall a slab as the storms in range need (`Weather.scanSky` -> `WeatherFx.slabLo/slabHi`); fair weather uses the thin
+  slab, so the fair-weather look equals 3.5's.
+* **Game rules** live in `Weather` (`rainingAt`, `thunderingAt`, `strike`, `precipKind`) and are called from `Fire.update` (rain puts fires out),
+  `World.hydrated` (rain waters farmland), `Mobs.tickMob` (no sun-burn in rain), `Game.sleepAt` (thunder allows sleeping; sleeping clears the sky).
+  Biomes decide rain / snow (ice plains and mountains above y=112) / dry (desert).
+* Weather is saved in `level.properties` (`wclock`, `wenabled`, `wforce`, `wcells`, `wcalm`). New worlds and worlds from before 3.8 start *calm*
+  (fair-weather clouds only) for 5 minutes (`Weather.startFair`).
+* There is no sound in the game, so thunder and rain are visual only.
 
 ## Conventions / gotchas
 
