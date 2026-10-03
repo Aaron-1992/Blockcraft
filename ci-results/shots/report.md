@@ -1,18 +1,23 @@
-# Visual run 2026-10-03 16:02:13 UTC
+# Visual run 2026-10-03 18:11:38 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| wx-compare-sh | ref, new | 38.09% |
-| wx-storm-sh | new | n/a |
-| wx-sunset-sh | new | n/a |
-| mobs-sh | new | n/a |
-| hand-sword | new | n/a |
+| nether-vista | new | n/a |
+| nether-vista-sh | new | n/a |
+| nether-portal | new | n/a |
+| nether-portal-sh | new | n/a |
+| nether-mobs | new | n/a |
+| nether-ghast | new | n/a |
+| portal-day | new | n/a |
+| portal-day-sh | new | n/a |
 
 ## timings
 
-- wx-compare-sh/ref: exit 0 in 15s
-- wx-compare-sh/new: exit 0 in 15s
-- wx-storm-sh/new: exit 0 in 14s
-- wx-sunset-sh/new: exit 0 in 17s
-- mobs-sh/new: exit 0 in 27s
-- hand-sword/new: exit 0 in 26s
+- nether-vista/new: exit 0 in 9s
+- nether-vista-sh/new: exit 0 in 12s
+- nether-portal/new: exit 0 in 6s
+- nether-portal-sh/new: exit 0 in 16s
+- nether-mobs/new: exit 0 in 6s
+- nether-ghast/new: exit 0 in 4s
+- portal-day/new: exit 0 in 36s
+- portal-day-sh/new: exit 0 in 61s
