@@ -1,2 +1,2 @@
-skin-screen,skin-screen-narrow,skin-screen-tiny,skin-screen-def
+slabs,leaves-fancy,leaves-smart,leaves-fast
 jar=build

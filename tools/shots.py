@@ -139,6 +139,30 @@ def firewall_blocks():
     return out
 
 
+def slabs_blocks():
+    """Update 3.9: stairs and slabs upside down / in the top half. Row z=75: oak stairs right way up (facing 0-3) and upside down;
+    row z=77: cobblestone slab (bottom), top slab, a bottom + a top slab side by side, stone-brick stairs both ways under a roof of top slabs."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 6):
+                out.append((x, y, z, 0))
+    for f in range(4):
+        out.append((138 + f, gy + 1, 75, 93 + f))           # oak stairs, facing 0..3
+        out.append((143 + f, gy + 1, 75, 195 + f))          # the same upside down
+    out.append((138, gy + 1, 77, 114))                      # cobblestone slab, bottom half
+    out.append((140, gy + 2, 77, 216))                      # cobblestone slab, top half, floating one block up
+    out.append((142, gy + 1, 77, 114))                      # a bottom slab ...
+    out.append((143, gy + 1, 77, 216))                      # ... next to a top slab
+    for x in range(145, 150):
+        out.append((x, gy + 3, 77, 217))                    # stone brick top slabs as a ceiling
+    for f in range(4):
+        out.append((145 + f, gy + 1, 77, 93 + 8 + f))       # stone brick stairs under the ceiling
+        out.append((145 + f, gy + 2, 77, 195 + 8 + f))      # and upside down on top of them
+    return out
+
+
 # name -> (props, only_new)
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
@@ -186,6 +210,11 @@ SCENES = {
     "inv-player-def": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=player", "-Dbc.mouse=120,60", "-Dbc.shot=110"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
+    "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),
+    # leaf modes over the same forest: 0 fancy / 1 smart / 2 fast (look from above into the canopy)
+    "leaves-fancy":   (COMMON + ["-Dbc.cam=133,92,71,45,22", "-Dbc.time=6000", "-Dbc.leaves=0"] + PLAIN + ["-Dbc.shot=110"], True),
+    "leaves-smart":   (COMMON + ["-Dbc.cam=133,92,71,45,22", "-Dbc.time=6000", "-Dbc.leaves=1"] + PLAIN + ["-Dbc.shot=110"], True),
+    "leaves-fast":    (COMMON + ["-Dbc.cam=133,92,71,45,22", "-Dbc.time=6000", "-Dbc.leaves=2"] + PLAIN + ["-Dbc.shot=110"], True),
     "pause-menu":     (COMMON + [CAM] + PLAIN + ["-Dbc.pause=1", "-Dbc.shot=110"], True),
     # the Skins screen in a narrow window (1030x720 = what the Windows test machine gave us: 343 GUI units) and at GUI scale 4 (320 x 180)
     "skin-screen-narrow": (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo", "-Dbc.win=1030x720"], True),

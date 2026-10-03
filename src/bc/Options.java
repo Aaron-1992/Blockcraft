@@ -12,6 +12,8 @@ public final class Options {
    public float sensitivity = 0.5F;
    public float gamma = 0.0F;
    public boolean smooth = true;
+   /** Update 3.9: leaf faces inside the foliage - 0 fancy (all), 1 smart (default), 2 fast (none between leaves). */
+   public int leaves = 1;
    public boolean clouds = true;
    public boolean vsync = true;
    public int guiScale = 0;
@@ -41,6 +43,7 @@ public final class Options {
                this.sensitivity = Float.parseFloat(var2.getProperty("sensitivity", "0.5"));
                this.gamma = Float.parseFloat(var2.getProperty("gamma", "0"));
                this.smooth = Boolean.parseBoolean(var2.getProperty("smooth", "true"));
+               this.leaves = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("leaves", "1"))));
                this.clouds = Boolean.parseBoolean(var2.getProperty("clouds", "true"));
                this.vsync = Boolean.parseBoolean(var2.getProperty("vsync", "true"));
                this.guiScale = Integer.parseInt(var2.getProperty("guiScale", "0"));
@@ -73,6 +76,7 @@ public final class Options {
       var1.setProperty("sensitivity", this.sensitivity + "");
       var1.setProperty("gamma", this.gamma + "");
       var1.setProperty("smooth", this.smooth + "");
+      var1.setProperty("leaves", this.leaves + "");
       var1.setProperty("clouds", this.clouds + "");
       var1.setProperty("vsync", this.vsync + "");
       var1.setProperty("guiScale", this.guiScale + "");

@@ -23,6 +23,7 @@ final class Tests310 {
       merging();
       breaking();
       meshing();
+      leaves();
    }
 
    /** A fake click on a face of block (x, y, z) with the hit point fy (fraction of the block's height). */
@@ -364,6 +365,132 @@ final class Tests310 {
          for (float[] v : low) {
             check(v[1] <= 0.5F + 1e-4F, "(and the normal slab's in the lower half)");
          }
+      });
+   }
+
+   // ------------------------------------------------------------------ interior surfaces (To do item 10): faces between leaves
+   /** Quads the mesher emits for the 16x16x16 section of chunk (0,0) that holds y. */
+   static int quads(World w, Chunk c, int y) {
+      Mesher.Result r = Mesher.build(w, c, y >> 4, false);
+      int n = (r.nO + r.nT) / 4;
+      if (r.opaque != null) {
+         org.lwjgl.system.MemoryUtil.memFree(r.opaque);
+      }
+
+      if (r.trans != null) {
+         org.lwjgl.system.MemoryUtil.memFree(r.trans);
+      }
+
+      return n;
+   }
+
+   static void leaves() {
+      test("leaf faces: fancy keeps all, smart drops the faces between two enclosed leaves, fast drops every leaf-to-leaf face", () -> {
+         int saved = Mesher.leafMode;
+         try {
+            Game g = newGame(1);
+            World w = g.world;
+            Chunk c = w.chunk(0, 0);
+            int y0 = GROUND + 5; // 65..69 (section 4 = y 64..79: the cube stays inside one section)
+            int n = 5;
+            for (int dx = 0; dx < n; dx++) {
+               for (int dy = 0; dy < n; dy++) {
+                  for (int dz = 0; dz < n; dz++) {
+                     w.setBlock(4 + dx, y0 + dy, 4 + dz, Blocks.LEAVES_OAK);
+                  }
+               }
+            }
+
+            int outer = 6 * n * n;
+            int innerFaces = 6 * n * n * (n - 1); // two faces for each of the 3 n^2 (n-1) neighbouring pairs
+            int enclosedPairs = 3 * (n - 2) * (n - 2) * (n - 3); // pairs of leaves that both have six leaf neighbours
+            Mesher.leafMode = 0;
+            eq(outer + innerFaces, quads(w, c, y0), "fancy: every face, inside the cube too");
+            Mesher.leafMode = 1;
+            eq(outer + innerFaces - 2 * enclosedPairs, quads(w, c, y0), "smart: not the faces between two enclosed leaves");
+            Mesher.leafMode = 2;
+            eq(outer, quads(w, c, y0), "fast: only the outside of the foliage");
+            // a single leaf next to a log: the log shows all six faces (its neighbour is not opaque), the leaf loses the one towards the log
+            for (int mode = 0; mode < 3; mode++) {
+               Mesher.leafMode = mode;
+               int base = quads(w, c, y0);
+               w.setBlock(10, y0 + 10, 10, Blocks.LEAVES_OAK);
+               eq(base + 6, quads(w, c, y0), "mode " + mode + ": a lone leaf has six faces");
+               w.setBlock(11, y0 + 10, 10, Blocks.LOG_OAK);
+               eq(base + 6 - 1 + 6, quads(w, c, y0), "mode " + mode + ": next to a log the leaf loses the face towards it, the log has six");
+               w.setBlock(11, y0 + 10, 10, 0);
+               w.setBlock(10, y0 + 10, 10, 0);
+            }
+
+            // glass is not affected by the leaf modes: glass-to-glass faces are always hidden, glass-to-leaf faces always drawn
+            for (int mode = 0; mode < 3; mode++) {
+               Mesher.leafMode = mode;
+               int base = quads(w, c, y0);
+               for (int i = 0; i < 2; i++) {
+                  w.setBlock(2 + i, y0 + 10, 2, Blocks.GLASS);
+               }
+
+               eq(base + 10, quads(w, c, y0), "mode " + mode + ": two glass blocks side by side: 10 faces");
+               w.setBlock(4, y0 + 10, 2, Blocks.LEAVES_OAK);
+               eq(base + 10 + 6, quads(w, c, y0), "mode " + mode + ": a leaf next to the glass: its six faces (it shows the one towards the glass), the glass still shows all five of its own");
+               w.setBlock(4, y0 + 10, 2, 0);
+               w.setBlock(2, y0 + 10, 2, 0);
+               w.setBlock(3, y0 + 10, 2, 0);
+            }
+         } finally {
+            Mesher.leafMode = saved;
+         }
+      });
+      test("leaves on a section border: faces towards cells outside the data are kept (no exception, never fewer than fast)", () -> {
+         int saved = Mesher.leafMode;
+         try {
+            Game g = newGame(1);
+            World w = g.world;
+            Chunk c = w.chunk(0, 0);
+            int y0 = GROUND + 5;
+            for (int dx = 0; dx < 4; dx++) {
+               for (int dy = 0; dy < 4; dy++) {
+                  for (int dz = 0; dz < 4; dz++) {
+                     w.setBlock(14 + dx, y0 + dy, 6 + dz, Blocks.LEAVES_OAK); // crosses the chunk border at x=16
+                  }
+               }
+            }
+
+            int[] counts = new int[3];
+            for (int mode = 0; mode < 3; mode++) {
+               Mesher.leafMode = mode;
+               counts[mode] = quads(w, c, y0) + quads(w, w.chunk(1, 0), y0);
+            }
+
+            check(counts[0] >= counts[1] && counts[1] >= counts[2], "fancy >= smart >= fast: " + counts[0] + " / " + counts[1] + " / " + counts[2]);
+            eq(6 * 16, counts[2], "fast: just the outside of the 4x4x4 foliage");
+         } finally {
+            Mesher.leafMode = saved;
+         }
+      });
+      test("the Leaves option is saved with the options and survives a restart; out-of-range values are brought back", () -> {
+         java.io.File dir = java.nio.file.Files.createTempDirectory("bc-opt").toFile();
+         dir.deleteOnExit();
+         Options o = new Options(dir);
+         eq(1, o.leaves, "default: smart");
+         o.leaves = 2;
+         o.save();
+         Options back = new Options(dir);
+         back.load();
+         eq(2, back.leaves, "fast survives a restart");
+         java.util.Properties pr = new java.util.Properties();
+         try (java.io.FileInputStream in = new java.io.FileInputStream(new java.io.File(dir, "options.txt"))) {
+            pr.load(in);
+         }
+
+         pr.setProperty("leaves", "9");
+         try (java.io.FileOutputStream out = new java.io.FileOutputStream(new java.io.File(dir, "options.txt"))) {
+            pr.store(out, null);
+         }
+
+         Options bad = new Options(dir);
+         bad.load();
+         eq(2, bad.leaves, "9 is clamped to the highest mode");
       });
    }
 }

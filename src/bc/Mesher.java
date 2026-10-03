@@ -26,6 +26,40 @@ public final class Mesher {
       return (var1 * 18 + var2) * 18 + var0;
    }
 
+   /**
+    * Update 3.9: faces between two leaf blocks. 0 = fancy (every face, like 3.5), 1 = smart (default: no face between two leaves that are both
+    * enclosed by leaves / solid blocks - nobody can see it, even through the holes in the leaf texture), 2 = fast (no leaf-to-leaf faces
+    * at all). In a forest around 30 % of everything the mesher emitted used to be leaf-to-leaf faces, about 12 % of them between enclosed leaves.
+    * Set from the options (and -Dbc.leaves=0|1|2 for tests).
+    */
+   public static volatile int leafMode = Integer.getInteger("bc.leaves", 1);
+
+   /** True if every face neighbour of the block at padded position (x, y, z) is solid or a leaf (so none of its faces can be seen from outside). */
+   static boolean enclosed(byte[] blocks, int x, int y, int z) {
+      if (x < 1 || x > 16 || y < 1 || y > 16 || z < 1 || z > 16) {
+         return false; // its neighbours are outside the data we have: assume it is exposed
+      }
+
+      for (int f = 0; f < 6; f++) {
+         int id = blocks[ci(x + FN[f][0], y + FN[f][1], z + FN[f][2])] & 255;
+         if (!Blocks.opaque[id] && !Blocks.isLeaves(id)) {
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   /** Whether the face of leaf block (x, y, z) towards face neighbour f is hidden because the neighbour is a leaf too (see {@link #leafMode}). */
+   static boolean hiddenLeafFace(byte[] blocks, int x, int y, int z, int f, int neighbour) {
+      int mode = leafMode;
+      if (mode == 0 || !Blocks.isLeaves(neighbour)) {
+         return false;
+      }
+
+      return mode == 2 || enclosed(blocks, x, y, z) && enclosed(blocks, x + FN[f][0], y + FN[f][1], z + FN[f][2]);
+   }
+
    public static Mesher.Result build(World var0, Chunk var1, int var2, boolean var3) {
       Mesher.Scratch var4 = (Mesher.Scratch)TL.get();
       var4.o.clear();
@@ -222,7 +256,7 @@ public final class Mesher {
          int[] var16 = FN[var15];
          int var17 = ci(var9 + var16[0], var10 + var16[1], var11 + var16[2]);
          int var18 = var7[var17] & 255;
-         if (!Blocks.opaque[var18] && (var5 != 15 || var18 != 15)) {
+         if (!Blocks.opaque[var18] && (var5 != 15 || var18 != 15) && !(Blocks.isLeaves(var5) && hiddenLeafFace(var7, var9, var10, var11, var15, var18))) {
             boolean var19 = Blocks.tint[var5] == 1;
             float var20 = 1.0F;
             float var21 = 1.0F;

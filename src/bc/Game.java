@@ -185,6 +185,11 @@ public final class Game {
          this.opt.renderDistance = Integer.getInteger("bc.rd");
       }
 
+      if (System.getProperty("bc.leaves") != null) {
+         this.opt.leaves = Math.max(0, Math.min(2, Integer.getInteger("bc.leaves")));
+      }
+
+      Mesher.leafMode = this.opt.leaves;
       if (System.getProperty("bc.guiscale") != null) {
          this.opt.guiScale = Integer.getInteger("bc.guiscale"); // test hook: force the GUI scale (screens must cope with narrow windows)
       }
@@ -3963,7 +3968,12 @@ public final class Game {
       });
       this.button("Shaders: " + this.onOff(this.opt.shaders), var3, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.shaders = !this.opt.shaders);
       this.button("Weather: " + this.onOff(this.opt.weather), var4, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.weather = !this.opt.weather);
-      this.button("Done", var1 - 100.0F, var2 + 148.0F, 200.0F, 20.0F, true, () -> {
+      this.button("Leaves: " + new String[]{"Fancy", "Smart", "Fast"}[this.opt.leaves], var3, var2 + 144.0F, var5, 20.0F, true, () -> {
+         this.opt.leaves = (this.opt.leaves + 1) % 3;
+         Mesher.leafMode = this.opt.leaves;
+         this.remeshAll();
+      });
+      this.button("Done", var1 - 100.0F, var2 + 172.0F, 200.0F, 20.0F, true, () -> {
          this.opt.save();
          this.setScreen(this.optionsReturn);
       });
