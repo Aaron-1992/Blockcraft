@@ -1,22 +1,22 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-03 (Update 3.8)._
+_Last updated: 2026-10-03 (Update 3.9)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
 | # | Item | State |
 |---|---|---|
 | 1 | Weather system with volumetric clouds, storms and rain visible in the distance, working without shaders | **done in Update 3.8** (weather field, clouds in both render paths, rain / snow / lightning, `/weather`) |
-| 2 | Fix LODs and adapt them for the weather system | **next** (3.8 already makes the LOD follow the weather's fog / sun / brightness) |
-| 3 | Skins (easy import of Minecraft skins) | planned |
+| 2 | Fix LODs and adapt them for the weather system | weather part **done in 3.8** (the LOD follows the weather's fog / sun / brightness); 3.9 makes the fog radial so the world's edge is hidden from every angle; inspected in day / night / shader / top-down scenes (`lod-*`) - no further defect found without a concrete report |
+| 3 | Skins (easy import of Minecraft skins) | **done in Update 3.9** (drag & drop, file dialog, username download, clipboard; legacy / HD skins; slim arms; F5 camera; inventory preview) |
 | 4 | Smooth animations | planned |
 | 5 | Natural disasters | planned (builds on the weather system: lightning fires, storms) |
-| 6 | Trees fall over when chopped; the fallen trunk can be harvested further | planned |
-| 7 | Slabs, stairs etc. on the top half of a block / upside down | planned |
-| 8 | Make creepers ignitable | planned |
-| 9 | Fire drawn like in Minecraft when attached to a block | planned |
+| 6 | Trees fall over when chopped; the fallen trunk can be harvested further | planned (needs sideways log blocks) |
+| 7 | Slabs, stairs etc. on the top half of a block / upside down | planned (needs `Hit` fractions + 25 new block ids) |
+| 8 | Make creepers ignitable | **done in Update 3.9** (flint and steel) |
+| 9 | Fire drawn like in Minecraft when attached to a block | **done in Update 3.9** (`Mesher.fire`: wall / ceiling / corner flames) |
 | 10 | Hide interior surfaces (performance) | planned |
-| 11 | Fix mobs not being able to jump up a block | planned |
+| 11 | Fix mobs not being able to jump up a block | **done in Update 3.9** (`Mobs.JUMP`) |
 
 ## What it is
 
@@ -25,7 +25,26 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.8 – "the weather update"
+## Current state: Update 3.9 – "the skins update"
+
+- **Skins** (`Skins.java`, `PlayerModel.java`): any Minecraft skin PNG - 64x64, the old 64x32 (left limbs mirrored from the right ones), HD (a
+  multiple of 64, scaled down) - is copied into `%USERPROFILE%\.blockcraft112\skins`. Ways in: drag & drop onto the window (GLFW drop callback,
+  works in menus and in the game), "Import skin file..." (AWT `FileDialog` on a helper thread; the game leaves fullscreen while it is open
+  because a fullscreen GLFW window is topmost and would hide it; the dialog is disposed so no AWT thread outlives the game), a Minecraft
+  username or account id (Mojang's profile + session servers over `java.net.http`, then the texture URL; also takes a link to a PNG), and
+  Ctrl+V (path / link / name). Classic vs slim arms are detected from the unused pixel column and can be switched. The default skin is drawn in
+  code. `Game.skins`, `Options.skin`, screen `S.SKINS` (title screen + pause menu buttons).
+- **You on screen**: F5 = first person / behind / in front (`Renderer.thirdPerson`: 4 blocks along the line of sight, stopped by blocks);
+  `Renderer.drawSelf` draws `PlayerModel` with the walking / sneaking / swinging pose from `Game.tickPose` and the held item in the fist
+  (`PlayerModel.drawHeld`); the first-person arm is drawn when the hand is empty; the survival inventory shows the model looking at the mouse.
+- **Mobs jump up blocks**: the mob loop applies gravity *before* moving, so the old jump speed 0.42 peaked at 0.83 blocks; `Mobs.JUMP` =
+  0.42 / 0.98 + 0.08 gives Minecraft's 1.25 (one block yes, two no). `Tests39.steps` drives all animals, babies and zombies at walls.
+- **Creepers can be lit** (`Mobs.ignite`, flint and steel in `Game.useOnMob`): the fuse runs by itself, the creeper stands still.
+- **Fire models** (`Mesher.fire`): X on a supporting block (solid top or flammable below), otherwise a flame plane on each flammable
+  side neighbour and crossed planes under a flammable ceiling.
+- Fog distance in both vertex shaders is radial; `Main` ends the process with `System.exit(0)` after a normal exit.
+
+## Update 3.8 (still in the game) – "the weather update"
 
 - **A weather field that drifts with the wind** (`Weather.java`): storm systems you can see coming - a dark thundercloud with a rain curtain under it on the
   horizon is the storm that will reach you. Cloud cover -> rain -> thunderstorm by thresholds on one field; climate cycle (dry and stormy stretches);
@@ -84,13 +103,15 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 |---|---|---|
 | The recovered source equals the shipped 3.5 jar | `tools/runtests.py equivalence`: 437 fingerprints (terrain of 4 seeds, threaded world + lighting, spawn search, 6000 collision trials, crafting, a 600-tick fluid/sand/TNT simulation, chunk meshing of terrain and of *every* block id, every old texture, every static table) | identical |
 | …including the OpenGL classes that cannot run headless | `tools/classcompare.py`: per-method comparison of what the original bytecode calls/reads/writes/loads vs the recompiled classes (718 methods) | 21 differences, all compiler codegen / dead code / a shared lambda |
-| Game logic of 3.5, 3.6 *and* 3.7 | `test/bc/GameTests.java` + `Tests37.java`: 11,458 checks on a real `Game`/`World`/`Player` without OpenGL: every recipe, hoe/seeds/growth/harvest rates, buckets, flint & steel + TNT blasts/chains/damage, ladders (placement, climbing, falling), beds (placement, sleeping rules, respawn), hydration, drying, trampling (also through real player physics), hay landing, carrots/potatoes/bone meal, shears, breeding, growing up, save/load, atlas tiles; 3.7: cane rules/growth, stems/fruit, carving, cake, milk, eggs, following food, fire (ignite, age, spread, burn out, TNT, lava, water, `/firespread`, burning player and animals), shore/pumpkin worldgen, meshing of every new block | all pass |
+| Game logic of 3.5 - 3.9 | `test/bc/GameTests.java` + `Tests37.java`: 11,458 checks on a real `Game`/`World`/`Player` without OpenGL: every recipe, hoe/seeds/growth/harvest rates, buckets, flint & steel + TNT blasts/chains/damage, ladders (placement, climbing, falling), beds (placement, sleeping rules, respawn), hydration, drying, trampling (also through real player physics), hay landing, carrots/potatoes/bone meal, shears, breeding, growing up, save/load, atlas tiles; 3.7: cane rules/growth, stems/fruit, carving, cake, milk, eggs, following food, fire (ignite, age, spread, burn out, TNT, lava, water, `/firespread`, burning player and animals), shore/pumpkin worldgen, meshing of every new block | all pass |
 | Builds with a real JDK | GitHub Actions `CI` (javac, JDK 21) on every push | green |
 | Rendering (Linux, headless OpenGL) | GitHub Actions `Visual`: the real game under Xvfb + Mesa llvmpipe; the ORIGINAL 3.5 jar and the new jar render the same scenes (`ci-results/shots/*.jpg`, left = 3.5, right = new) | 7 scenes (world by day/night, mobs, inventory pages, ...) differ by 0.00 - 0.21 % of the pixels; the shader pack looks identical (its animated water/clouds make 9.6 % of the pixels differ) |
 | Terrain generation is unchanged by 3.7 | `runtests.py equivalence` strict pass: with the worldgen extras off (`-Dbc.noextras=true`) `gen`/`world`/`tick`/`mesh terrain` fingerprints are identical to the 3.5 jar | identical |
 | 3.7 content on screen | same workflow, committed 3.7 jar: stems in 8 stages + fruit on wet farmland, cake with 0-6 bites, carved pumpkins / jack o'lanterns in 4 facings (lit at night), melons, bookshelves, sugar cane beside water, animated fires on wood / wool / grass, natural shore cane in the normal world, creative inventory page with all new icons | renders correctly (`ci-results/shots/kitchen37.jpg`, `night37.jpg`, `inv-creative-2.jpg`, `day-plain.jpg`) |
 | 3.6 content on screen | same workflow: farm field with all growth stages on wet and dry farmland, irrigation ditch, hay bales, baby animals, sheared sheep, creative inventory page with the new icons | renders correctly (`ci-results/shots/farm*.jpg`, `mobs36*.jpg`, `inv-creative-2.jpg`) |
 | **The real Windows build** | GitHub Actions `Windows smoke test`: a Windows Server machine installs the 3.5 base zip + the committed update pack exactly like a player (`tools/win_smoke.py`), Mesa software OpenGL next to `javaw.exe`, then starts the real `Blockcraft.exe` (Launch4j stub -> bundled JRE -> jar -> LWJGL Windows natives -> OpenGL) | title screen, world, farm scene, baby animals, inventory and the 3.7 kitchen / fire scene all start, render and exit cleanly with the 3.7 update pack (`ci-results/windows/`) |
+| 3.9 skins on screen | `Visual` scenes `skin-front/back/first/hold-a/b/hold-block`, `skin-screen(-def)`, `inv-player(-def)`, `pause-menu`, `title`, `firewall(-night)` | render correctly (`ci-results/shots/`) |
+| 3.9 skins on the real Windows build | `Windows smoke test` scenes `skin-net` (the real `Blockcraft.exe` downloads a real account's skin from Mojang over the internet and shows it) and `skin-dialog` (the AWT file dialog opens, the game still exits cleanly with it open) | see `ci-results/windows/` |
 | A physical GPU / real hardware | - | never run. Software OpenGL is slow but behaves like the real thing for these features; GPU-driver quirks cannot be ruled out. |
 
 The 3.5 features that the first chat could not test (hoe, seeds, bucket, flint & steel right-clicks; sleeping; ladder climbing) were

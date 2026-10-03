@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.8)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.9)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,34 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.9  (the skins update)
+  * SKINS: wear your own Minecraft skin. Title screen or pause menu -> "Skins...". Four easy ways to get a skin into the game:
+      1. DRAG a skin .png from a folder onto the game window - anywhere, in a menu or while you play - and you wear it at once.
+      2. "Import skin file..." opens the normal Windows file dialog.
+      3. Type your Minecraft USERNAME (or paste an account id) and press "Import": the game downloads your skin from
+         Mojang's servers (needs internet; an account without a custom skin has nothing to download).
+      4. Copy a file path, a link to a skin .png or a username and press Ctrl+V on the Skins screen.
+    Normal 64x64 skins, old 64x32 skins and HD skins (128x128 ...) all work. Classic (4 px) and slim "Alex" (3 px) arms are
+    detected by themselves and can be switched by hand ("Arms: ..."). Imported skins are copied into
+    %USERPROFILE%\.blockcraft112\skins  ("Open skins folder" shows it), so you can also just drop .png files there;
+    the skin you picked is remembered. Without a skin you wear the game's own default skin (drawn in code - no Mojang files).
+  * YOU CAN SEE YOURSELF: F5 switches the camera between first person, behind you and in front of you. The body walks,
+    sneaks, swings when you hit and holds the item from your hand; the camera stops at walls. In first person your own arm
+    (in your skin) shows when your hand is empty. The survival inventory (E) now shows your character, looking at your mouse.
+  * MOBS JUMP UP BLOCKS: pigs, cows, sheep, chickens, babies, zombies and creepers used to hop against a one-block ledge
+    forever (their jump only reached 0.8 blocks). They now get up one block, but still not two - like in Minecraft.
+  * CREEPERS CAN BE LIT: right-click a creeper with Flint and Steel - it stops, swells and explodes after 1.5 seconds, even if
+    it has not noticed you (a charged creeper still blasts twice as hard). Costs one point of durability.
+  * FIRE LOOKS LIKE MINECRAFT'S: on a block it is still the X of flames, but fire that hangs on something flammable (nothing
+    under it) now covers the wall it clings to, fills an inside corner, or hangs from a wooden / leafy ceiling.
+  * Smaller things: fog in the shader pack is measured around you instead of along the view direction (the far edge of the
+    world is hidden from every angle); the game now really ends when you close it (a lingering helper could keep a
+    "Blockcraft" process alive); the "Inventory" caption is gone from the crafting screen (the player stands there).
+  * Honest note: skin handling, the model, the file dialog and the username download are covered by automated tests, and
+    the real Blockcraft.exe was started on a Windows test machine to import a real account's skin over the internet and to
+    open the file dialog; everything was checked as pictures from a software renderer. Dragging a file onto the window and
+    how it all looks on a real graphics card have still not been tried on real hardware.
 
 WHAT'S NEW IN UPDATE 3.8  (the weather update)
   * WEATHER YOU CAN SEE COMING. Weather is no longer one switch for the whole world: there are weather systems that drift
@@ -180,7 +208,7 @@ CONTROLS
   Mouse         look            Left click  break (hold) / attack     Right click  place / use / eat / bow / feed or shear animals
   Middle click  pick block (creative)       1-9 / wheel hotbar        E  inventory
   Q             drop item       T or /      chat / commands           Esc  pause
-  F1 hide HUD   F2 screenshot   F3 debug    F11 fullscreen
+  F1 hide HUD   F2 screenshot   F3 debug    F5 camera: first person / behind you / in front of you    F11 fullscreen
 COMMANDS: /gamemode <survival|creative|adventure|spectator>  /time  /tp  /seed  /give <item> [n]
           /kill  /heal  /fly  /summon <mob>  /help
 

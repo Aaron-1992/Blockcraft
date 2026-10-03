@@ -1,1 +1,1 @@
-title,day-plain,wx-rain,wx-storm,kitchen37
+title,skin-net,skin-dialog,inv-player,firewall,pause-menu

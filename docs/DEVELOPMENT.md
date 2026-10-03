@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.8"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.9"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -94,6 +94,12 @@ Weather hooks (3.8): `bc.weather=calm|clear|rain|thunder|cell:dx,dz,radius` (a s
 `bc.wtime=<weather ticks>`, `bc.lightning=off` (no random lightning), `bc.bolt=dx,dz` (a fresh bolt every frame near the shot, so the screenshot
 catches the first stroke), `bc.biome=<id>` (all loaded chunks get this biome, e.g. 5 = ice plains = snow).
 
+Skin hooks (3.9): `bc.view=0|1|2` (first person / behind / in front), `bc.skin=demo|<file in the skins folder>` (`demo` = a built-in
+slim-armed test skin), `bc.emptyhand=1` (first-person arm), `bc.hold=<id>` also feeds the third-person hand, `bc.bodyyaw=<deg>` (turn the body
+away from the camera to see the model from the side), `bc.mouse=x,y` (framebuffer pixels; the inventory model looks at it), `bc.pause=1`
+(open the pause menu, then screenshot), `bc.title=SKINS` (the Skins screen), `bc.skinuser=<name>` (import a real account's skin over the
+network before the shot - the Windows smoke machine has internet), `bc.skinbrowse=1` (open the file dialog).
+
 ## How the source was recovered (2026-10-02)
 
 The 3.5 source did not survive the move away from the first chat, so it was decompiled from `blockcraft.jar`
@@ -156,6 +162,18 @@ so old lines still load).
 * Weather is saved in `level.properties` (`wclock`, `wenabled`, `wforce`, `wcells`, `wcalm`). New worlds and worlds from before 3.8 start *calm*
   (fair-weather clouds only) for 5 minutes (`Weather.startFair`).
 * There is no sound in the game, so thunder and rain are visual only.
+
+## Skins (Update 3.9)
+
+* `Skins` has no OpenGL in it (so `Tests39` runs it headless): listing / loading / importing files, legacy and HD conversion, slim detection,
+  Mojang JSON extraction (`profileId`, `textureInfo`, `profileName`, `uuidOf` - plain regexes, no JSON library), the code-drawn default skin.
+  `PlayerModel` is the OpenGL side: the UV layout of a 64x64 skin (`faceRects`), the body with its second layer (inflated boxes), poses.
+* The skin texture is uploaded again whenever the pixel array changes identity (`Skins.pixels` caches per file stamp).
+* Windows specifics that CI cannot click through: dropping a file on the window, the dialog being visible. Keep `browseSkin` leaving
+  fullscreen and disposing the `FileDialog` - an undisposed AWT dialog keeps the JVM alive after the window closes (hence `System.exit(0)`
+  in `Main`). `java.awt.headless` is set to `false` on Windows only.
+* `Blocks.COUNT` is 195 still; ids 195..255 are free. Planned for the slab / stair update: 197..216 upside-down stairs (same `(id - 93) & 3`
+  facing arithmetic), 217..221 top slabs, 222..227 sideways logs.
 
 ## Conventions / gotchas
 

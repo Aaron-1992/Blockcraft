@@ -1,7 +1,8 @@
 # Blockcraft
 
-An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.7**
-("the farm update": wet/dry farmland, trampling, carrots, potatoes, bone meal, hay bales, shears, animal breeding).
+An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.9**
+("the skins update": wear any Minecraft skin, third-person camera, fire like Minecraft's, creepers you can light, mobs that
+jump up blocks). Earlier updates added weather (3.8), kitchen & fire (3.7) and farming (3.6) - see `package/README.txt`.
 
 ## Download and play (the easy way)
 
