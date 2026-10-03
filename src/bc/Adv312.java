@@ -151,6 +151,16 @@ final class Adv312 {
       return true;
    }
 
+   /** Makes an advancement without a toast (the three roots every new world starts with: three toasts in the first five seconds were just noise). */
+   boolean grantQuietly(Game g, String id) {
+      if (!BY_ID.containsKey(id) || !this.done.add(id)) {
+         return false;
+      }
+
+      this.save(g == null ? null : g.rootDir);
+      return true;
+   }
+
    void revokeAll(Game g) {
       this.done.clear();
       this.queue.clear();
@@ -208,9 +218,9 @@ final class Adv312 {
          return;
       }
 
-      this.award(g, "story/root");
-      this.award(g, "adventure/root");
-      this.award(g, "husbandry/root");
+      this.grantQuietly(g, "story/root");
+      this.grantQuietly(g, "adventure/root");
+      this.grantQuietly(g, "husbandry/root");
       if (has(g, Blocks.COBBLE)) {
          this.award(g, "story/mine_stone");
       }

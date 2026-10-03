@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-03 (Update 3.11)._
+_Last updated: 2026-10-03 (Update 3.12)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
@@ -24,11 +24,11 @@ _Last updated: 2026-10-03 (Update 3.11)._
 |---|---|---|
 | 1 | Fix hand models | **done in 3.11**: Minecraft 1.12's own transforms for the empty arm, flat items, tools, blocks, flat blocks (torch, flowers), swing, swap, eating, sway; third-person held items (`Renderer.renderHand`, `PlayerModel.drawArmFirstPerson` / `drawHeld`) |
 | 2 | Make entities react to shader lighting | **done in 3.11**: `ShaderSrc.ENTITY_FS` (sun tint, shade + terrain shadows, placed lights, fog) for mobs, items, falling blocks, debris, your body and your hand |
-| 3 | Make clouds and weather more realistic | **partly done in 3.11**: the shader sky (billows that lean with height, eroded edges, silver lining, height-dependent ambient, a cirrus layer, steeper storm towers). The blocky no-shader clouds only got the same tower walls; rain, snow and lightning are unchanged |
+| 3 | Make clouds and weather more realistic | **done in 3.11 (shader sky) and 3.12 (no-shader storm towers are domes with cauliflower tops, `WeatherFx.thickness`)**: the shader sky (billows that lean with height, eroded edges, silver lining, height-dependent ambient, a cirrus layer, steeper storm towers). The blocky no-shader clouds only got the same tower walls; rain, snow and lightning are unchanged |
 | 4 | Make water look better with shader | **done in 3.11**: `ShaderSrc.WATER_FS` (depth colour, refraction, foam, layered ripples, glitter, mirrored terrain with "FANCY") |
-| 5 | Add more 1.12 features | open (only ideas so far) |
-| 6 | Upgrade the villages | open |
-| 7 | Dimensions | open |
+| 5 | Add more 1.12 features | **done in 3.12**: the World of Colour (15 dyes, dyed wool and sheep, concrete + powder, terracotta, stained / glazed terracotta, stained glass, clay, storage blocks, emerald ore: `Color312`), 34 advancements (`Adv312`, L), parrots, ender pearls you can throw, soul sand / magma / netherrack fire rules, and everything of the two dimensions |
+| 6 | Upgrade the villages | **done in 3.12**: farms, smithies, lamp posts (`Structs.upgrade / farm / lamp`), villagers with six professions who trade for emeralds (`Trades`, `Menu` kind 5), iron golems, villagers flee from monsters |
+| 7 | Dimensions | **done in 3.12**: the Nether (`Dim`, `Portals`, `NetherGen`, `NetherFortress`, five new mobs) and the End (`Stronghold`, `EndPortals`, `EndGen`, `EndFight`, `Dragon`, endermen); one `World` per dimension, 12-bit block ids |
 | 8 | Fix door culling | **done in 3.11**: `Mesher.boxBB` tested the wrong side for the two z faces (a bug since 3.5) |
 | 9 | Make textures only render from one side | **done in 3.11**: GL back-face culling for terrain and LOD, back quads for plants / crops / flames / water surfaces |
 | 10 | Better animations (Fresh Animations style) | **done in 3.11** for mobs, the player body and the first-person hand (`Anim`); no new models, no sound |
@@ -42,7 +42,28 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.11 – "hands, water, distant terrain, animation"
+## Current state: Update 3.12 - "the Nether, the End, villages, a world of colour"
+
+- **Foundation**: block ids are 12 bits (`Chunk.blocks` is a `short[]`; ids 0..255 and 1024..4095 are blocks, 256..1023 items, new items from 352), chunk files keep the old byte array and add the high
+  nibbles behind the `BCX1` magic only when a chunk holds a new block (old worlds load unchanged), the atlas is 32 x 32 tiles (`TexArt312`, `Color312` tiles from 400).
+- **Dimensions** (`Dim`, `World(seed, dir, dim)`, `Game.switchDimension`, `/dim nether|end|overworld`): one world per dimension in `DIM-1` / `DIM1`, no sky / weather / LOD / disasters outside the Overworld.
+  - *Nether*: `Portals` (obsidian frames 2..21 x 3..21 inside, flint and steel, 80 ticks, coordinates 1:8, portal film = mesher kind 8, exit portal found or built), `NetherGen` (bedrock floor and ceiling, lava sea to
+    y 31, netherrack, glowstone, soul sand, gravel, quartz ore, magma), `NetherFortress` (`BoxPlan`: bridges, corridors, halls, throne room with a blaze spawner, chests; 70 % of the 256 x 256 regions),
+    mobs zombie pigman / ghast / blaze / magma cube (`Mobs312`), items quartz, nether brick, blaze rod / powder, ghast tear, gold nugget, emerald. Rules: fire on netherrack never burns out (`Fire`), soul sand drags
+    (`Player.travel`), magma burns the feet unless sneaking (`Player.tick`).
+  - *Strongholds* (`Stronghold`, `BoxPlan`): 3 / 6 / 10 in rings at 640-960 / 1500-2100 / 2800-3400 blocks, portal room with 12 frames round a lava pit, libraries, closets, a spawner; `EndPortals`: eyes of ender
+    (craft: pearl + blaze powder) fly towards the nearest stronghold, 1 in 5 breaks, frames take eyes, the pit fills with portal.
+  - *The End* (`EndGen`, `EndFight`, `Dragon`): one island, ten obsidian pillars with crystals, the dragon (200 HP; circle, swoop with breath, perch on the fountain, 200 ticks of dying), exit portal + egg, boss bar,
+    endermen (teleport, water hurts, look-aggro, drop pearls), void kills below y -12, a neutral light (`Dim.ambientTint`). **Thrown ender pearls** (`Mobs312.throwPearl`: a `Fireball` with `pearl`, gravity 0.03,
+    drag 0.99; you land at the last free spot, 5 damage that armour does not stop).
+- **Villages** (`Structs`, `Mobs312`, `Trades`): farms (9 x 7, fenced, water channel, four rows of crops), smithy, lamp posts; villagers (farmer, librarian, priest, blacksmith, butcher, nitwit; `Mob.color` = profession)
+  and iron golems (`keepsForever`), trading screen (`Menu` kind 5, emeralds).
+- **World of Colour, advancements, parrots** (`Color312`, `Adv312`, `Mobs312`, written by a second run of the project): see the roadmap row 5.
+- **Weather**: storm towers without shaders rise as domes (`WeatherFx.thickness`).
+- Under the hood: tests grew to ~879,000 checks (`Tests312`: foundation, nether, netherMobs, fortress, stronghold, end, villages, colors, parrots, advancements, pearls, netherRules), `tools/ci_annotate.py` (reads the
+  results of a CI run without log access), screenshot hooks `bc.dim`, `bc.dragon`, `bc.inv=trade`, `bc.summon`, `bc.set`, `bc.adv`, `bc.parrot`.
+
+## Update 3.11 (still in the game) – "hands, water, distant terrain, animation"
 
 - **Single-sided faces** (`Renderer.cullFaces`, `Mesher.emitBack`): terrain and LOD are drawn with back-face culling (every block's mesh and every LOD quad winds counter-clockwise
   seen from outside - `Tests311` checks all of them); plants, crops, flames and the top of water / lava get a second quad facing the other way. `-Dbc.legacymesh=true` gives the
@@ -169,6 +190,8 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 | 3.10 on the real Windows build | `Windows smoke test` (the committed 3.10 update pack installed over the 3.5 base zip, the real `Blockcraft.exe` under Mesa software OpenGL): `title`, `options310` (the new Disasters button), `tornado-close`, `meteors`, `quake` in the first run; `treefall-65`, `treefall-down` (the tree half way down and landed) and `logs310` in the second (the first run's `treefall-65` hung because the Launch4j stub cannot take 888 characters of `JAVA_TOOL_OPTIONS` - a harness limit, `win_smoke.py` now starts such scenes with java.exe directly) | all start, render and exit cleanly (`ci-results/windows/`; the first run's pictures are in the history of that folder) |
 | 3.11 faces, doors, LOD, animation maths | `Tests311`: the winding of every block's mesh, a back quad for every plant / crop / flame / water surface, all 16 door blocks x 64 combinations of solid neighbours, the LOD summaries (flat ground, tower, pit, water, trees, cabin pillars), `lod.dat` round trip, the scan of old chunk files, the LOD tile built from a summary, trees validated against trunks, every LOD quad's winding against its face code, tile invalidation and the swap, `Chunk.everMeshed`, the animation functions | all pass |
 | 3.11 on screen | `Visual` scenes `under-map(-sh)`, `doors311`, `lod-changes` (+ `-ref`), `hand-*`, `skin-hold-*`, `skin-run`, `mobs-sh`, `mobs-shade-*`, `mobs-torch-*`, `water-*`, `wx-*` | render correctly (`ci-results/shots/`); the cloud changes are subtle in fair weather |
+| 3.12 game logic | `Tests312` (and the older suites): 12-bit ids and the chunk file format, portals and the Nether, fortress and stronghold plans (a breadth-first search proves that every room can be reached on foot), the End fight from the first hit to the exit portal, villages and trades, dye / concrete / terracotta recipes, advancements, parrots, ender pearls, soul sand / magma / netherrack fire | 879,000+ checks, 0 failures; the equivalence pass still finds the 3.5 terrain, world and tick fingerprints identical (400 identical, 61 changed on purpose, 127 new) |
+| 3.12 on screen | `Visual` scenes `nether-*` (vista, portal, mobs, ghast, three fortress views), `end-*` (island, crystal, dragon, enderman), `stronghold*`, `village-*`, `colors-*`, `adv-*`, `parrot*`, `wx-storm*` | render correctly (`ci-results/shots/`, every picture looked at); the Nether and the End are dark by design |
 | A physical GPU / real hardware | - | never run. Software OpenGL is slow but behaves like the real thing for these features; GPU-driver quirks cannot be ruled out. |
 
 The 3.5 features that the first chat could not test (hoe, seeds, bucket, flint & steel right-clicks; sleeping; ladder climbing) were
@@ -177,6 +200,9 @@ exercised through the same code paths the mouse/keyboard use and **work as desig
 ## Known gaps / ideas
 
 - Not implemented: disasters that are not weather / ground / sky (floods, volcanoes, sandstorms, blizzards with damage, wildfires beyond lightning), sound of any kind (so thunder, rain, rumbling and crashing trees are silent), the disasters' numbers (pull, lift, damage, frequency) were set from tests and pictures, not by playing; egg throwing, mobs trampling crops, animals following their parents, boats/minecarts, signs, fishing, enchanting, naturally generated melons (seeds come from dungeon chests), sound of any kind (thunder and rain are silent)…
+- 3.12 gaps: no brewing, enchanting, redstone wiring (redstone ore exists), banners, coloured beds (the bed is still red), End cities / gateways / elytra, endermites, shulkers, witches, the Nether's other biomes
+  (one cave world), blaze / ghast / dragon sounds (the game has no sound at all). Villagers do not breed, have no beds / jobs / night routine and their trade lists are fixed (no restocking, no levels). The
+  dragon, the ghasts and the fortresses were balanced by tests and pictures, never by playing. Eyes of ender need the stronghold ring (3 / 6 / 10 strongholds); `/dim` is the shortcut.
 - The sheep model has no separate "sheared" geometry: a sheared sheep is the same box tinted skin-pink with the head tuft hidden.
 - Hearts for breeding are plain red particles.
 

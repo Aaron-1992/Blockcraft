@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.11";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.12";
    /** "3.8": the version without the words, for the title screen and the F3 screen. */
    public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
    public Options opt;

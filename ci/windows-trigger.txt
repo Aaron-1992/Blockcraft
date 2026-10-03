@@ -1,1 +1,1 @@
-title,hand-sword,water-sunset-sh,mobs-torch-sh,lod-changes,doors311,under-map
+title,nether-portal,nether-fortress,end-dragon-side,village-trade,adv-screen

@@ -2617,6 +2617,8 @@ final class Tests312 {
             check(g.adv.has("story/root") && g.adv.has("adventure/root") && g.adv.has("husbandry/root"), "the roots come by themselves");
             check(!g.adv.has("story/mine_stone") && !g.adv.has("story/mine_diamond"), "and nothing else");
             eq(3, g.adv.count(), "three so far");
+            g.adv.tick();
+            check(g.adv.shown == null, "the roots come without a toast");
             // what you carry
             g.inv[0] = new Stack(Blocks.COBBLE, 3);
             g.inv[1] = new Stack(Items.IRON_INGOT, 1);
