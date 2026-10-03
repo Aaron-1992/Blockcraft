@@ -1,19 +1,15 @@
-# Visual run 2026-10-03 12:11:54 UTC
+# Visual run 2026-10-03 13:10:26 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| slabs | new | n/a |
-| slabs-sh | new | n/a |
-| skin-hold-sh | new | n/a |
-| leaves-fancy | new | n/a |
-| leaves-smart | new | n/a |
-| leaves-fast | new | n/a |
+| treefall-30 | new | n/a |
+| treefall-65 | new | n/a |
+| treefall-down | new | n/a |
+| logs310 | new | n/a |
 
 ## timings
 
-- slabs/new: exit 0 in 84s
-- slabs-sh/new: exit 0 in 109s
-- skin-hold-sh/new: exit 0 in 48s
-- leaves-fancy/new: exit 0 in 39s
-- leaves-smart/new: exit 0 in 38s
-- leaves-fast/new: exit 0 in 36s
+- treefall-30/new: exit 0 in 51s
+- treefall-65/new: exit 0 in 49s
+- treefall-down/new: exit 0 in 86s
+- logs310/new: exit 0 in 56s
