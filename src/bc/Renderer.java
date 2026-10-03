@@ -1802,7 +1802,7 @@ public final class Renderer {
     * @param equip     0..1: 1 = the item is fully raised
     * @param swayPitch the hand's lag behind the camera, degrees (already scaled)
     */
-   public void renderHand(float partial, Stack item, float swing, float use, float bright, int fbW, int fbH, float equip, float swayPitch, float swayYaw) {
+   public void renderHand(float partial, Stack item, float swing, float use, float bright, int fbW, int fbH, float equip, float swayPitch, float swayYaw, float bobDist, float bobAmp) {
       GL11.glClear(256);
       GL11.glMatrixMode(5889);
       GL11.glLoadIdentity();
@@ -1815,6 +1815,13 @@ public final class Renderer {
       GL11.glDisable(2912);
       GL11.glEnable(2929);
       float p = 1.0F - equip;
+      if (bobAmp > 0.0F) {
+         // Minecraft's EntityRenderer.applyBobbing: the view (here only the hand) rocks and dips with every step
+         GL11.glTranslatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 0.5F, -Math.abs((float)Math.cos(bobDist * Math.PI) * bobAmp), 0.0F);
+         GL11.glRotatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 3.0F, 0.0F, 0.0F, 1.0F);
+         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.0F, 1.0F, 0.0F, 0.0F);
+      }
+
       GL11.glRotatef(swayPitch, 1.0F, 0.0F, 0.0F);
       GL11.glRotatef(swayYaw, 0.0F, 1.0F, 0.0F);
       boolean entShader = this.shadersOn() && this.sh.entityOk && this.sh.sceneActive;

@@ -21,6 +21,7 @@ final class Tests311 {
       lodSummaries();
       lodTiles();
       lodWorld();
+      animations();
    }
 
    // ------------------------------------------------------------------ helpers
@@ -794,6 +795,165 @@ final class Tests311 {
          } finally {
             deleteAll(dir);
          }
+      });
+   }
+
+   // ------------------------------------------------------------------ animations (Anim)
+   static Mobs.Mob mob(int type) {
+      Mobs.Mob m = new Mobs.Mob();
+      m.type = type;
+      m.health = 10;
+      m.onGround = true;
+      m.setPos(10.5, 61, 10.5);
+      return m;
+   }
+
+   static void animations() {
+      test("animation: the step's bounce and roll are bounded, smooth, and absent where they do not belong (air, creeper, spider)", () -> {
+         for (int type = 0; type < Mobs.N; type++) {
+            float last = Float.NaN;
+            float lastRoll = Float.NaN;
+            for (float walk = 0.0F; walk < 60.0F; walk += 0.02F) {
+               for (float amp : new float[]{0.0F, 0.3F, 1.0F}) {
+                  float b = Anim.bounce(type, walk, amp, true);
+                  float r = Anim.roll(type, walk, amp);
+                  check(b >= 0.0F && b <= 0.0501F, "type " + type + ": bounce within 0..0.05 blocks: " + b);
+                  check(Math.abs(r) <= 5.001F, "type " + type + ": roll within 5 degrees: " + r);
+                  check(Anim.bounce(type, walk, amp, false) == 0.0F, "no bounce in the air");
+                  if (amp == 1.0F) {
+                     if (!Float.isNaN(last)) {
+                        check(Math.abs(b - last) < 0.004F, "bounce is smooth: " + last + " -> " + b);
+                        check(Math.abs(r - lastRoll) < 0.4F, "roll is smooth: " + lastRoll + " -> " + r);
+                     }
+
+                     last = b;
+                     lastRoll = r;
+                  }
+               }
+            }
+         }
+
+         check(Anim.bounce(Mobs.CREEPER, 1.0F, 1.0F, true) == 0.0F && Anim.bounce(Mobs.SPIDER, 1.0F, 1.0F, true) == 0.0F, "creepers and spiders glide");
+         check(Anim.bounce(Mobs.PIG, 0.98F, 0.0F, true) == 0.0F, "a standing animal does not bounce");
+      });
+
+      test("animation: breathing stays within 2 %, a hit throws the body back and is over after 10 ticks", () -> {
+         Mobs.Mob m = mob(Mobs.COW);
+         float lo = 9;
+         float hi = -9;
+         for (int age = 0; age < 2000; age++) {
+            m.age = age;
+            float b = Anim.breathe(m, 0.5F);
+            lo = Math.min(lo, b);
+            hi = Math.max(hi, b);
+         }
+
+         check(lo > 0.98F && hi < 1.02F && hi - lo > 0.01F, "breathing between " + lo + " and " + hi);
+         eq(0.0F, Anim.hurtTilt(m, 0.0F), "not hurt: no tilt");
+         float worst = 0;
+         for (int t = 10; t >= 1; t--) {
+            m.hurtTime = t;
+            for (float partial = 0.0F; partial < 1.0F; partial += 0.1F) {
+               float tilt = Anim.hurtTilt(m, partial);
+               check(tilt <= 0.0F && tilt >= -14.001F, "tilt is backwards and at most 14 degrees: " + tilt);
+               worst = Math.min(worst, tilt);
+            }
+         }
+
+         check(worst < -12.0F, "the worst tilt is close to 14 degrees: " + worst);
+         m.hurtTime = 0;
+         eq(0.0F, Anim.hurtTilt(m, 0.9F), "over");
+      });
+
+      test("animation: animals graze (head down, chewing) now and then while they stand still - never when walking, hunted, in love, dead or of another kind", () -> {
+         for (int type : new int[]{Mobs.PIG, Mobs.COW, Mobs.SHEEP}) {
+            Mobs.Mob m = mob(type);
+            float max = 0;
+            float prev = Float.NaN;
+            float biggestStep = 0;
+            int grazing = 0;
+            for (int age = 0; age < 4000; age++) {
+               for (float partial = 0.0F; partial < 1.0F; partial += 0.25F) {
+                  m.age = age;
+                  float g = Anim.graze(m, partial);
+                  check(g >= 0.0F && g <= 1.0F, "graze within 0..1: " + g);
+                  max = Math.max(max, g);
+                  if (!Float.isNaN(prev)) {
+                     biggestStep = Math.max(biggestStep, Math.abs(g - prev));
+                  }
+
+                  prev = g;
+                  if (g > 0.5F) {
+                     grazing++;
+                  }
+
+                  float pitch = Anim.headPitch(m, partial, 0.0F, 0.0F);
+                  check(pitch >= -0.001F && pitch <= 64.5F, "head pitch within 0..64.5: " + pitch);
+               }
+            }
+
+            check(max > 0.99F, "type " + type + " reaches a full graze");
+            check(biggestStep < 0.04F, "type " + type + ": the head moves smoothly (largest step per quarter tick " + biggestStep + ")");
+            check(grazing > 4 * 4000 / 400 * 30 / 2 && grazing < 4 * 4000 * 0.3, "about 15 % of the time: " + grazing + " of " + 4 * 4000);
+            m.age = 0;
+            for (int age = 0; age < 400; age++) {
+               m.age = age;
+               m.moving = true;
+               check(Anim.graze(m, 0.0F) == 0.0F, "no grazing while walking");
+               m.moving = false;
+               m.walkAmp = 0.5F;
+               check(Anim.graze(m, 0.0F) == 0.0F, "no grazing while the legs still move");
+               m.walkAmp = 0.0F;
+               m.hasTarget = true;
+               check(Anim.graze(m, 0.0F) == 0.0F, "no grazing while hunted");
+               m.hasTarget = false;
+               m.love = 5;
+               check(Anim.graze(m, 0.0F) == 0.0F, "no grazing in love");
+               m.love = 0;
+               m.dead = true;
+               check(Anim.graze(m, 0.0F) == 0.0F, "no grazing when dead");
+               m.dead = false;
+            }
+         }
+
+         for (int type : new int[]{Mobs.CHICKEN, Mobs.ZOMBIE, Mobs.SKELETON, Mobs.CREEPER, Mobs.SPIDER}) {
+            Mobs.Mob m = mob(type);
+            for (int age = 0; age < 800; age++) {
+               m.age = age;
+               check(Anim.graze(m, 0.3F) == 0.0F, "type " + type + " never grazes");
+            }
+         }
+      });
+
+      test("animation: legs in the air spread (front forward, back backward), babies get bigger heads, chickens peck", () -> {
+         Mobs.Mob pig = mob(Mobs.PIG);
+         eq(0.0F, Anim.air(pig), "on the ground: no spread");
+         eq(0.0F, Anim.spread(pig, 5.0F), "(neither of the legs)");
+         pig.onGround = false;
+         pig.vy = 0.4;
+         float front = Anim.spread(pig, 5.0F);
+         float back = Anim.spread(pig, -5.0F);
+         check(front < -10.0F && back > 10.0F && Math.abs(front + back) < 1e-4F, "front legs forward, back legs backward: " + front + " / " + back);
+         check(Anim.air(pig) <= 1.0F, "at most 1");
+         pig.inWater = true;
+         eq(0.0F, Anim.air(pig), "swimming: no spread");
+         Mobs.Mob zombie = mob(Mobs.ZOMBIE);
+         zombie.onGround = false;
+         eq(0.0F, Anim.spread(zombie, 5.0F), "a zombie's legs are left alone");
+         eq(1.0F, Anim.babyHead(pig), "an adult");
+         pig.babyAge = 100;
+         check(Anim.babyHead(pig) > 1.2F, "a baby's head is bigger");
+         Mobs.Mob hen = mob(Mobs.CHICKEN);
+         float lo = 9;
+         float hi = -9;
+         for (float walk = 0; walk < 20; walk += 0.01F) {
+            float p = Anim.peck(hen, walk, 1.0F);
+            lo = Math.min(lo, p);
+            hi = Math.max(hi, p);
+         }
+
+         check(lo < -0.04F && hi > 0.04F, "the head goes back and forth: " + lo + " .. " + hi);
+         eq(0.0F, Anim.peck(pig, 1.0F, 1.0F), "pigs do not peck");
       });
    }
 }

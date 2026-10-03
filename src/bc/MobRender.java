@@ -516,6 +516,14 @@ public final class MobRender {
          GL11.glTranslatef(0.0F, -0.3F * var21, 0.0F);
       }
 
+      if (!var0.dead) {
+         // Update 3.11: the secondary motion (see Anim): the step bounces and rolls the body, it breathes, a hit throws it back
+         GL11.glTranslatef(0.0F, Anim.bounce(var0.type, var16, var17, var0.onGround), 0.0F);
+         GL11.glRotatef(Anim.roll(var0.type, var16, var17), 0.0F, 0.0F, 1.0F);
+         GL11.glRotatef(Anim.hurtTilt(var0, var3), 1.0F, 0.0F, 0.0F);
+         GL11.glScalef(1.0F, Anim.breathe(var0, var3), 1.0F);
+      }
+
       if (var19 > 0.0F) {
          float var26 = 1.0F + (float)Math.sin(var19 * 100.0F) * var19 * 0.01F;
          float var22 = (1.0F + var19 * var19 * 0.4F) * var26;
@@ -536,16 +544,21 @@ public final class MobRender {
          switch (var28.kind) {
             case 1:
                GL11.glRotatef(-Math.max(-50.0F, Math.min(50.0F, var14)), 0.0F, 1.0F, 0.0F);
-               GL11.glRotatef(var15, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(var15 + Anim.headPitch(var0, var3, var16, var17), 1.0F, 0.0F, 0.0F);
+               GL11.glTranslatef(0.0F, 0.0F, Anim.peck(var0, var16, var17));
+               float bh = Anim.babyHead(var0);
+               if (bh != 1.0F) {
+                  GL11.glScalef(bh, bh, bh);
+               }
             case 2:
             case 9:
             default:
                break;
             case 3:
-               GL11.glRotatef(var18, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(var18 + Anim.spread(var0, var28.pz), 1.0F, 0.0F, 0.0F);
                break;
             case 4:
-               GL11.glRotatef(-var18, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(-var18 + Anim.spread(var0, var28.pz), 1.0F, 0.0F, 0.0F);
                break;
             case 5:
             case 6:

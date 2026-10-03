@@ -28,6 +28,9 @@ final class PlayerModel {
       /** attack / mining swing progress 0..1, or < 0 for none */
       float swing = -1.0F;
       boolean sneak;
+      /** Update 3.11: running (the upper body leans forward) / in the air (the arms go out). */
+      boolean sprint;
+      boolean air;
       float age;
       /** id of the item in the right hand (0 = empty hand) */
       int held;
@@ -142,6 +145,9 @@ final class PlayerModel {
       float legA = (float)Math.sin(p.limb * 1.6F) * swingAmt;
       float armA = -legA * 0.9F;
       float sneakDrop = p.sneak ? 1.6F : 0.0F;
+      float twist = (float)Math.sin(p.limb * 1.6F) * p.amp * 6.0F; // the shoulders turn against the hips with every stride (Update 3.11)
+      float lean = p.sprint ? 12.0F * p.amp : 0.0F; // running: the upper body leans forward
+      float airArms = p.air ? 28.0F : 0.0F; // in the air the arms go out
       // idle sway of the arms (and a little breathing)
       float idle = (float)Math.sin(p.age * 0.067F) * 2.5F + 2.5F;
       GL11.glTranslatef(0.0F, -sneakDrop, 0.0F);
@@ -171,6 +177,8 @@ final class PlayerModel {
          GL11.glRotatef(26.0F, 1.0F, 0.0F, 0.0F); // positive about +x tips the upper body forward
       }
 
+      GL11.glRotatef(lean, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(twist, 0.0F, 1.0F, 0.0F);
       GL11.glTranslatef(0.0F, -12.0F, 0.0F);
       layered(-4.0F, 12.0F, -2.0F, 8, 12, 4, 16, 16, 16, 32, 0.25F, bright);
       // arms: pivot at the shoulders (the body's tilt carries them)
@@ -196,7 +204,7 @@ final class PlayerModel {
          }
 
          GL11.glRotatef(back, 1.0F, 0.0F, 0.0F);
-         GL11.glRotatef(side == 0 ? -3.0F : 3.0F, 0.0F, 0.0F, 1.0F); // hang a little outwards
+         GL11.glRotatef(side == 0 ? -3.0F - airArms : 3.0F + airArms, 0.0F, 0.0F, 1.0F); // hang a little outwards
          if (side == 0) {
             layered(slim ? -2.0F : -3.0F, -10.0F, -2.0F, aw, 12, 4, 40, 16, 40, 32, 0.25F, bright);
             if (p.held > 0) {
@@ -215,8 +223,9 @@ final class PlayerModel {
       // head: carried by the torso, but it looks where the player looks, so the torso's tilt is taken out of the pitch
       GL11.glPushMatrix();
       GL11.glTranslatef(0.0F, 24.0F, 0.0F);
+      GL11.glRotatef(-twist, 0.0F, 1.0F, 0.0F); // the head looks where you look, whatever the shoulders do
       GL11.glRotatef(-p.headYaw, 0.0F, 1.0F, 0.0F);
-      GL11.glRotatef(p.headPitch - (p.sneak ? 26.0F : 0.0F), 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(p.headPitch - (p.sneak ? 26.0F : 0.0F) - lean, 1.0F, 0.0F, 0.0F);
       layered(-4.0F, 0.0F, -4.0F, 8, 8, 8, 0, 0, 32, 0, 0.5F, bright);
       GL11.glPopMatrix();
       GL11.glPopMatrix();

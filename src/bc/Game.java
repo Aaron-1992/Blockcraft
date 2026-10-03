@@ -135,6 +135,11 @@ public final class Game {
    float pWalkPhase;
    float walkAmp;
    float pWalkAmp;
+   /** Update 3.11: Minecraft's view bobbing numbers (distanceWalkedModified, cameraYaw): the first-person hand bobs with every step. */
+   float bobDist;
+   float pBobDist;
+   float bobAmp;
+   float pBobAmp;
    int skinSel = -1;
    int skinScroll;
    String skinField = "";
@@ -566,6 +571,23 @@ public final class Game {
             if (plan == null || !this.world.trees.start(plan, Double.parseDouble(f[3]) * 10.0, Double.parseDouble(f[4]) * 10.0, null)) {
                System.out.println("[trees] bc.fell: no tree falls at " + fx + "," + fy + "," + fz);
             }
+         }
+
+         if (this.autoFrames >= 12 && System.getProperty("bc.walkphase") != null) {
+            // bc.walkphase=phase,amplitude: every mob caught in the middle of a stride (screenshot scenes)
+            String[] wp = System.getProperty("bc.walkphase").split(",");
+            for (Mobs.Mob mm : this.mobs.list) {
+               mm.walk = mm.pwalk = Float.parseFloat(wp[0]);
+               mm.walkAmp = mm.pwalkAmp = Float.parseFloat(wp[1]);
+            }
+         }
+
+         if (this.autoFrames >= 12 && System.getProperty("bc.posewalk") != null) {
+            // bc.posewalk=phase,amplitude,sprint(0/1): the player's body caught in the middle of a stride (third-person scenes)
+            String[] pw = System.getProperty("bc.posewalk").split(",");
+            this.walkPhase = this.pWalkPhase = Float.parseFloat(pw[0]);
+            this.walkAmp = this.pWalkAmp = Float.parseFloat(pw[1]);
+            this.player.sprinting = pw.length > 2 && pw[2].equals("1");
          }
 
          if (System.getProperty("bc.tp") != null) {
@@ -1614,8 +1636,16 @@ public final class Game {
 
                   this.say("Falling trees are " + (this.world.trees.enabled ? "on" : "off") + "  (/treefall on|off)");
                   break;
+               case "bobbing":
+                  if (var2.length > 1 && (var2[1].equalsIgnoreCase("on") || var2[1].equalsIgnoreCase("off"))) {
+                     this.opt.bobbing = var2[1].equalsIgnoreCase("on");
+                     this.opt.save();
+                  }
+
+                  this.say("The hand bobs when you walk: " + (this.opt.bobbing ? "on" : "off") + "  (/bobbing on|off)");
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather /treefall /disaster");
+                  this.say("Commands: /gamemode /time set /tp /seed /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
@@ -1968,6 +1998,10 @@ public final class Game {
       this.pWalkPhase = this.walkPhase;
       this.pWalkAmp = this.walkAmp;
       this.pBodyYaw = this.bodyYaw;
+      this.pBobDist = this.bobDist;
+      this.pBobAmp = this.bobAmp;
+      this.bobAmp += ((pl.onGround && !pl.flying && !pl.dead ? Math.min(0.1F, speed) : 0.0F) - this.bobAmp) * 0.4F;
+      this.bobDist += speed * 0.6F;
       float target = pl.flying ? Math.min(0.3F, speed * 1.5F) : Math.min(1.0F, speed * 4.0F);
       this.walkAmp += (target - this.walkAmp) * 0.4F;
       this.walkPhase += speed * 2.45F * (pl.sprinting ? 1.2F : 1.0F);
@@ -1990,6 +2024,8 @@ public final class Game {
       p.amp = this.pWalkAmp + (this.walkAmp - this.pWalkAmp) * partial;
       p.swing = this.swinging ? this.swingPrev + (this.swing - this.swingPrev) * partial : -1.0F;
       p.sneak = pl.sneaking && !pl.flying;
+      p.sprint = pl.sprinting && !pl.flying && !pl.sneaking;
+      p.air = !pl.onGround && !pl.flying && !pl.eyeInWater;
       p.age = this.tickCount + partial;
       Stack held = this.inv[this.sel];
       p.held = held == null ? 0 : held.id;
@@ -3508,7 +3544,9 @@ public final class Game {
                   this.fbH,
                   this.pEquip + (this.equip - this.pEquip) * this.partial,
                   (this.player.pitch - (this.pArmPitch + (this.armPitch - this.pArmPitch) * this.partial)) * 0.1F,
-                  (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F
+                  (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F,
+                  this.opt.bobbing ? -(this.pBobDist + (this.bobDist - this.pBobDist) * this.partial) : 0.0F,
+                  this.opt.bobbing ? this.pBobAmp + (this.bobAmp - this.pBobAmp) * this.partial : 0.0F
                );
          }
 

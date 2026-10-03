@@ -1,2 +1,2 @@
-water-day-sh,water-low-sh,water-low-plain,water-fast-sh,wx-compare-sh,wx-storm-sh,wx-rain-sh,wx-storm-far-sh,wx-fair,wx-storm,wx-overcast
+wx-compare-sh,wx-storm-sh,wx-storm-far-sh,wx-sunset-sh,mobs-walk,mobs-graze,skin-run,water-day-sh
 jar=build
