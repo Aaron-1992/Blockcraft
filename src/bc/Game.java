@@ -41,7 +41,11 @@ public final class Game {
    public World world;
    public Player player;
    public Renderer rend;
-   final Gui gui = new Gui();
+   Gui gui = new Gui();
+   /** Update 3.13: the widgets and state of the menu screens (see Screens). */
+   final Ui ui = new Ui(this);
+   /** Update 3.13: the turning world behind the title and the menus (null while a real world is open). */
+   Panorama pano;
    long window;
    int winW = 1280;
    int winH = 720;
@@ -329,6 +333,8 @@ public final class Game {
 
       if (System.getProperty("bc.auto") != null && System.getProperty("bc.title") == null) {
          this.startWorld(true, System.getProperty("bc.seed", "12345"), Integer.parseInt(System.getProperty("bc.mode", "1")));
+      } else if (System.getProperty("bc.auto") == null || "on".equals(System.getProperty("bc.pano"))) {
+         Panorama.start(this); // Update 3.13: the title screen turns over a real landscape
       }
    }
 
@@ -826,6 +832,14 @@ public final class Game {
                      }
 
                      var7.mode = (int)d(var8, "mode", Boolean.parseBoolean(var8.getProperty("creative", "true")) ? 1.0 : 0.0);
+                     var7.seed = (long)d(var8, "seed", 0.0);
+                     try {
+                        var7.seed = Long.parseLong(var8.getProperty("seed", "0").trim());
+                     } catch (NumberFormatException seedEx) {
+                        // keep the rounded value
+                     }
+
+                     var7.settings = WorldSettings.load(var8);
                   } catch (Throwable var13) {
                      try {
                         var9.close();
@@ -895,6 +909,7 @@ public final class Game {
    WorldSettings worldSettings = WorldSettings.classic();
 
    void startWorld(boolean var1, String var2, int var3) {
+      Panorama.stop(this); // Update 3.13: the turning world behind the menus makes room for the real one
       Properties var4 = new Properties();
       String var5 = this.newName;
       if (var1) {
@@ -1096,7 +1111,7 @@ public final class Game {
    }
 
    void saveWorld() {
-      if (this.world != null) {
+      if (this.world != null && this.pano == null) {
          this.world.saveAll();
          this.mobs.save(this.world.dir);
          if (this.world.fight != null) {
@@ -1318,6 +1333,7 @@ public final class Game {
       this.player = null;
       this.target = null;
       this.setScreen(Game.S.TITLE);
+      Panorama.start(this);
    }
 
    double[] findStand(int var1, int var2) {
@@ -1451,7 +1467,7 @@ public final class Game {
          float var9 = (this.opt.sensitivity * 0.6F + 0.2F) / this.zoomDiv();
          float var10 = var9 * var9 * var9 * 8.0F;
          this.player.yaw = (float)(this.player.yaw + var5 * var10 * 0.15);
-         this.player.pitch = (float)(this.player.pitch + var7 * var10 * 0.15);
+         this.player.pitch = (float)(this.player.pitch + (this.opt.invertY ? -var7 : var7) * var10 * 0.15);
          if (this.player.pitch > 90.0F) {
             this.player.pitch = 90.0F;
          }
@@ -1463,6 +1479,10 @@ public final class Game {
    }
 
    void onScroll(double var1) {
+      if (this.ui.onWheel(var1)) {
+         return;
+      }
+
       if (this.screen == Game.S.SKINS) {
          this.skinScroll = Math.max(0, this.skinScroll - (int)Math.signum(var1));
       } else if (this.screen == Game.S.WORLDS) {
@@ -1622,7 +1642,7 @@ public final class Game {
                   }
 
                   if (var1 == 257 && var2 == 1) {
-                     this.startWorld(true, this.seedField, this.newMode);
+                     Screens.createWorld(this);
                   }
 
                   return;
@@ -2248,6 +2268,10 @@ public final class Game {
          this.skins.imported = null;
       }
 
+      if (this.pano != null) {
+         this.pano.update(var1); // Update 3.13: the turning world behind the title and the menus
+      }
+
       if (this.world != null) {
          int var3 = (int)Math.floor(this.player.x) >> 4;
          int var4 = (int)Math.floor(this.player.z) >> 4;
@@ -2321,7 +2345,10 @@ public final class Game {
                }
             }
 
-            this.partial = (float)this.acc;
+            if (this.pano == null) {
+               this.partial = (float)this.acc;
+            }
+
             if (this.dragging >= 0 && this.dragging < this.activeBtns.size() && GLFW.glfwGetMouseButton(this.window, 0) == 1) {
                Game.Btn var17 = (Game.Btn)this.activeBtns.get(this.dragging);
                float var8 = (float)(this.mouseX / this.gui.scale);
@@ -4059,7 +4086,7 @@ public final class Game {
       this.activeBtnsSwap();
       boolean var2 = this.world != null && this.screen != Game.S.LOADING;
       if (var2) {
-         this.rend.computeSky(this.world.dayTime, this.partial);
+         this.rend.computeSky(this.pano != null ? this.pano.skyTime() : this.world.dayTime, this.partial);
          GL13.glActiveTexture(33984);
          Tex.animate(this.tickCount, this.partial);
          boolean var3 = this.rend.shadersOn();
@@ -4103,16 +4130,16 @@ public final class Game {
       this.gui.begin(this.fbW, this.fbH, var1);
       switch (this.screen) {
          case TITLE:
-            this.drawTitle();
+            Screens.title(this);
             break;
          case WORLDS:
-            this.drawWorlds();
+            Screens.worlds(this);
             break;
          case NEWWORLD:
-            this.drawNewWorld();
+            Screens.newWorld(this);
             break;
          case LOADING:
-            this.drawLoading();
+            Screens.loading(this);
             break;
          case CHAT:
          case INV:
@@ -4120,7 +4147,7 @@ public final class Game {
          default:
             this.drawHud();
             if (this.screen == Game.S.PAUSE) {
-               this.drawPause();
+               Screens.pause(this);
             } else if (this.screen == Game.S.INV) {
                this.drawInventory();
             } else if (this.screen == Game.S.ADV) {
@@ -4130,22 +4157,11 @@ public final class Game {
             }
             break;
          case SKINS:
-            if (this.world != null) {
-               this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, -1879048192);
-            } else {
-               this.gui.dirtBackground(0.25F);
-            }
-
+            this.ui.backdrop(0.5F);
             this.drawSkins();
             break;
          case OPTIONS:
-            if (this.world != null) {
-               this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, -1879048192);
-            } else {
-               this.gui.dirtBackground(0.25F);
-            }
-
-            this.drawOptions();
+            Screens.options(this);
       }
 
       this.activeBtns = this.btns;
@@ -4183,62 +4199,6 @@ public final class Game {
       this.btns.add(var8);
    }
 
-   void drawTitle() {
-      this.gui.dirtBackground(0.3F);
-      this.gui.gradient(0.0F, 0.0F, this.gui.w, this.gui.h, 1073741824, -1610612736);
-      float var1 = this.gui.w / 2.0F;
-      float var2 = Math.max(20.0F, this.gui.h * 0.14F);
-      String var3 = "BLOCKCRAFT";
-      float var4 = 4.0F;
-      float var5 = Gui.textWidth(var3) * var4;
-      this.gui.text(var3, var1 - var5 / 2.0F + 3.0F, var2 + 3.0F, -14013910, false, var4);
-      this.gui.text(var3, var1 - var5 / 2.0F, var2, -1118482, false, var4);
-      this.gui.text(var3, var1 - var5 / 2.0F + 1.0F, var2 + 1.0F, -5197648, false, var4);
-      this.gui.text(var3, var1 - var5 / 2.0F, var2, -1, false, var4);
-      this.gui.centered("JAVA EDITION  1.12  -  UPDATE " + VERSION_STR, var1, var2 + 8.0F * var4 + 4.0F, -5592406, true, 1.0F);
-      GL11.glPushMatrix();
-      GL11.glTranslatef(var1 + var5 / 2.0F - 20.0F, var2 + 8.0F * var4 + 4.0F, 0.0F);
-      GL11.glRotatef(-20.0F, 0.0F, 0.0F, 1.0F);
-      float var6 = 1.0F + 0.06F * (float)Math.sin(GLFW.glfwGetTime() * 6.0);
-      GL11.glScalef(var6, var6, 1.0F);
-      this.gui.centered(this.splash, 0.0F, 0.0F, -256, true, 1.0F);
-      GL11.glPopMatrix();
-      float var7 = 200.0F;
-      float var8 = 20.0F;
-      float var9 = Math.max(var2 + 8.0F * var4 + 40.0F, this.gui.h * 0.42F);
-      this.button("Singleplayer", var1 - var7 / 2.0F, var9, var7, var8, true, () -> {
-         this.scanWorlds();
-         this.worldScroll = 0;
-         this.confirmDelete = false;
-         if (this.worldList.isEmpty()) {
-            this.seedField = "";
-            this.newName = "";
-            this.focusField = 0;
-            this.setScreen(Game.S.NEWWORLD);
-         } else {
-            this.setScreen(Game.S.WORLDS);
-         }
-      });
-      this.button("Create New World", var1 - var7 / 2.0F, var9 + 24.0F, var7, var8, true, () -> {
-         this.seedField = "";
-         this.newName = "";
-         this.focusField = 0;
-         this.setScreen(Game.S.NEWWORLD);
-      });
-      this.button("Options...", var1 - var7 / 2.0F, var9 + 52.0F, 98.0F, var8, true, () -> {
-         this.optionsReturn = Game.S.TITLE;
-         this.setScreen(Game.S.OPTIONS);
-      });
-      this.button("Quit Game", var1 + 2.0F, var9 + 52.0F, 98.0F, var8, true, () -> GLFW.glfwSetWindowShouldClose(this.window, true));
-      this.button("Skins...", var1 - var7 / 2.0F, var9 + 76.0F, var7, var8, true, () -> {
-         this.skinReturn = Game.S.TITLE;
-         this.setScreen(Game.S.SKINS);
-      });
-      this.gui.text("Update " + VERSION_STR, 2.0F, this.gui.h - 10.0F, -1, true);
-      String var10 = "Not affiliated with Mojang";
-      this.gui.text(var10, this.gui.w - Gui.textWidth(var10) - 2.0F, this.gui.h - 10.0F, -1, true);
-   }
-
    void hitbox(float var1, float var2, float var3, float var4, Runnable var5) {
       Game.Btn var6 = new Game.Btn();
       var6.x = var1;
@@ -4247,150 +4207,6 @@ public final class Game {
       var6.h = var4;
       var6.action = var5;
       this.btns.add(var6);
-   }
-
-   void drawWorlds() {
-      this.gui.dirtBackground(0.25F);
-      float var1 = this.gui.w / 2.0F;
-      this.gui.centered("Select World", var1, 14.0F, -1, true, 1.0F);
-      float var2 = var1 - 130.0F;
-      float var3 = 32.0F;
-      float var4 = 260.0F;
-      float var5 = 34.0F;
-      int var6 = Math.max(2, Math.min(5, (int)((this.gui.h - 32.0F - 90.0F) / var5)));
-      this.worldScroll = Math.max(0, Math.min(Math.max(0, this.worldList.size() - var6), this.worldScroll));
-      this.gui.rect(var2 - 2.0F, var3 - 2.0F, var4 + 4.0F, var6 * var5 + 4.0F, -16777216);
-      String[] var7 = new String[]{"Survival", "Creative", "Adventure", "Spectator"};
-
-      for (int var8 = 0; var8 < var6; var8++) {
-         int var9 = this.worldScroll + var8;
-         if (var9 >= this.worldList.size()) {
-            break;
-         }
-
-         Game.WInfo var10 = (Game.WInfo)this.worldList.get(var9);
-         float var11 = var3 + var8 * var5;
-         boolean var12 = var10.dir.equals(this.worldName);
-         boolean var13 = this.hover(var2, var11, var4, var5 - 2.0F);
-         this.gui.rect(var2, var11, var4, var5 - 2.0F, var12 ? -1 : (var13 ? -7303024 : -11513776));
-         this.gui.rect(var2 + 1.0F, var11 + 1.0F, var4 - 2.0F, var5 - 4.0F, -14671840);
-         this.gui.text(var10.name, var2 + 6.0F, var11 + 5.0F, -1, true);
-         String var14 = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date(var10.mod));
-         this.gui.text(var7[Math.max(0, Math.min(3, var10.mode))] + "   " + var14, var2 + 6.0F, var11 + 18.0F, -7303024, true);
-         String var15 = var10.dir;
-         this.hitbox(var2, var11, var4, var5 - 2.0F, () -> {
-            if (var15.equals(this.worldName) && System.currentTimeMillis() - this.lastWorldClick < 400L) {
-               this.startWorld(false, null, 1);
-            }
-
-            this.worldName = var15;
-            this.confirmDelete = false;
-            this.lastWorldClick = System.currentTimeMillis();
-         });
-      }
-
-      if (this.worldList.size() > var6) {
-         float var16 = var6 * var5;
-         float var18 = var16 * var6 / this.worldList.size();
-         float var19 = var3 + (var16 - var18) * this.worldScroll / Math.max(1, this.worldList.size() - var6);
-         this.gui.rect(var2 + var4 + 4.0F, var3, 4.0F, var16, -13619152);
-         this.gui.rect(var2 + var4 + 4.0F, var19, 4.0F, var18, -5197648);
-      }
-
-      float var17 = var3 + var6 * var5 + 10.0F;
-      this.button("Play Selected World", var1 - 130.0F, var17, 260.0F, 20.0F, !this.worldList.isEmpty(), () -> this.startWorld(false, null, 1));
-      this.button("Create New World", var1 - 130.0F, var17 + 24.0F, 127.0F, 20.0F, true, () -> {
-         this.seedField = "";
-         this.newName = "";
-         this.focusField = 0;
-         this.setScreen(Game.S.NEWWORLD);
-      });
-      this.button(this.confirmDelete ? "Really delete?" : "Delete", var1 + 3.0F, var17 + 24.0F, 127.0F, 20.0F, !this.worldList.isEmpty(), () -> {
-         if (!this.confirmDelete) {
-            this.confirmDelete = true;
-         } else {
-            deleteDir(new File(this.root, "saves/" + this.worldName));
-            this.confirmDelete = false;
-            this.scanWorlds();
-            if (this.worldList.isEmpty()) {
-               this.setScreen(Game.S.TITLE);
-            }
-         }
-      });
-      this.button("Cancel", var1 - 130.0F, var17 + 48.0F, 260.0F, 20.0F, true, () -> this.setScreen(Game.S.TITLE));
-   }
-
-   void drawNewWorld() {
-      this.gui.dirtBackground(0.25F);
-      float var1 = this.gui.w / 2.0F;
-      this.gui.centered("Create New World", var1, 20.0F, -1, true, 1.0F);
-      this.gui.text("World Name", var1 - 100.0F, 36.0F, -6250336, true);
-      this.gui.rect(var1 - 100.0F, 47.0F, 200.0F, 20.0F, this.focusField == 0 ? -1 : -6250336);
-      this.gui.rect(var1 - 99.0F, 48.0F, 198.0F, 18.0F, -16777216);
-      this.gui
-         .text(
-            this.newName.isEmpty() && this.focusField != 0
-               ? "New World"
-               : this.newName + (this.focusField == 0 && (int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : ""),
-            var1 - 95.0F,
-            53.0F,
-            this.newName.isEmpty() ? -9408400 : -1,
-            true
-         );
-      this.hitbox(var1 - 100.0F, 47.0F, 200.0F, 20.0F, () -> this.focusField = 0);
-      this.gui.text("Seed for the World Generator", var1 - 100.0F, 74.0F, -6250336, true);
-      this.gui.rect(var1 - 100.0F, 85.0F, 200.0F, 20.0F, this.focusField == 1 ? -1 : -6250336);
-      this.gui.rect(var1 - 99.0F, 86.0F, 198.0F, 18.0F, -16777216);
-      String var2 = this.seedField + (this.focusField == 1 && (int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : "");
-      this.gui.text(var2, var1 - 95.0F, 91.0F, -1, true);
-      this.hitbox(var1 - 100.0F, 85.0F, 200.0F, 20.0F, () -> this.focusField = 1);
-      this.gui.text("Blank = random seed  (Tab = next field)", var1 - 100.0F, 108.0F, -8355712, true);
-      String[] var3 = new String[]{"Survival", "Creative", "Adventure", "Spectator"};
-      String[] var4 = new String[]{
-         "Gather, craft, eat. Hostile mobs.", "Unlimited blocks, flying (tap Space x2)", "Cannot break or place blocks.", "Fly through walls, invisible."
-      };
-      this.button("Game Mode: " + var3[this.newMode], var1 - 100.0F, 126.0F, 200.0F, 20.0F, true, () -> this.newMode = (this.newMode + 1) % 4);
-      this.gui.text(var4[this.newMode], var1 - 100.0F, 149.0F, -8355712, true);
-      this.button("Create New World", var1 - 100.0F, this.gui.h - 56.0F, 200.0F, 20.0F, true, () -> this.startWorld(true, this.seedField, this.newMode));
-      this.button("Cancel", var1 - 100.0F, this.gui.h - 32.0F, 200.0F, 20.0F, true, () -> {
-         this.scanWorlds();
-         this.setScreen(this.worldList.isEmpty() ? Game.S.TITLE : Game.S.WORLDS);
-      });
-   }
-
-   void drawLoading() {
-      this.gui.dirtBackground(0.25F);
-      float var1 = this.gui.w / 2.0F;
-      float var2 = this.gui.h / 2.0F;
-      this.gui.centered("Loading level", var1, var2 - 20.0F, -1, true, 1.5F);
-      this.gui.centered("Building terrain... " + this.loadingMsg, var1, var2, -5592406, true, 1.0F);
-      int var3 = (int)(GLFW.glfwGetTime() * 3.0) % 4;
-      float var4 = 0.0F;
-      if (this.world != null) {
-         int var5 = (int)Math.floor(this.player.x) >> 4;
-         int var6 = (int)Math.floor(this.player.z) >> 4;
-         var4 = this.world.loadedAround(var5, var6, 2) / 25.0F;
-      }
-
-      this.gui.rect(var1 - 50.0F, var2 + 16.0F, 100.0F, 4.0F, -16777216);
-      this.gui.rect(var1 - 50.0F, var2 + 16.0F, 100.0F * var4, 4.0F, -8323296);
-   }
-
-   void drawPause() {
-      this.gui.gradient(0.0F, 0.0F, this.gui.w, this.gui.h, 1611665424, -1877995504);
-      float var1 = this.gui.w / 2.0F;
-      float var2 = this.gui.h / 4.0F;
-      this.gui.centered("Game menu", var1, var2 - 16.0F, -1, true, 1.0F);
-      this.button("Back to Game", var1 - 100.0F, var2, 200.0F, 20.0F, true, () -> this.setScreen(Game.S.PLAY));
-      this.button("Options...", var1 - 100.0F, var2 + 28.0F, 200.0F, 20.0F, true, () -> {
-         this.optionsReturn = Game.S.PAUSE;
-         this.setScreen(Game.S.OPTIONS);
-      });
-      this.button("Skins...", var1 - 100.0F, var2 + 56.0F, 200.0F, 20.0F, true, () -> {
-         this.skinReturn = Game.S.PAUSE;
-         this.setScreen(Game.S.SKINS);
-      });
-      this.button("Save and Quit to Title", var1 - 100.0F, var2 + 84.0F, 200.0F, 20.0F, true, this::quitToTitle);
    }
 
    void drawDead() {
@@ -4649,96 +4465,6 @@ public final class Game {
       } catch (Exception e) {
          this.skinMsg = "Skins folder: " + this.skins.dir.getAbsolutePath();
       }
-   }
-
-   void drawOptions() {
-      float var1 = this.gui.w / 2.0F;
-      float var2 = Math.max(24.0F, this.gui.h / 2.0F - 90.0F);
-      this.gui.centered("Options", var1, 10.0F, -1, true, 1.0F);
-      float var3 = var1 - 155.0F;
-      float var4 = var1 + 5.0F;
-      float var5 = 150.0F;
-      this.slider(
-         "Render Dist: " + this.opt.renderDistance,
-         var3,
-         var2,
-         var5,
-         20.0F,
-         (this.opt.renderDistance - 2) / 30.0F,
-         var1x -> this.opt.renderDistance = 2 + Math.round(var1x * 30.0F)
-      );
-      this.slider("FOV: " + this.opt.fov, var4, var2, var5, 20.0F, (this.opt.fov - 30) / 80.0F, var1x -> this.opt.fov = 30 + Math.round(var1x * 80.0F));
-      this.slider(
-         "Sensitivity: " + (int)(this.opt.sensitivity * 200.0F) + "%",
-         var3,
-         var2 + 24.0F,
-         var5,
-         20.0F,
-         this.opt.sensitivity,
-         var1x -> this.opt.sensitivity = var1x
-      );
-      this.slider(
-         "Brightness: " + (this.opt.gamma <= 0.0F ? "Moody" : (this.opt.gamma >= 1.0F ? "Bright" : (int)(this.opt.gamma * 100.0F) + "%")),
-         var4,
-         var2 + 24.0F,
-         var5,
-         20.0F,
-         this.opt.gamma,
-         var1x -> this.opt.gamma = var1x
-      );
-      this.button("Smooth Lighting: " + this.onOff(this.opt.smooth), var3, var2 + 48.0F, var5, 20.0F, true, () -> {
-         this.opt.smooth = !this.opt.smooth;
-         this.remeshAll();
-      });
-      this.button("Clouds: " + this.onOff(this.opt.clouds), var4, var2 + 48.0F, var5, 20.0F, true, () -> this.opt.clouds = !this.opt.clouds);
-      this.button("VSync: " + this.onOff(this.opt.vsync), var3, var2 + 72.0F, var5, 20.0F, true, () -> {
-         this.opt.vsync = !this.opt.vsync;
-         GLFW.glfwSwapInterval(this.opt.vsync ? 1 : 0);
-      });
-      this.button(
-         "GUI Scale: " + (this.opt.guiScale == 0 ? "Auto" : this.opt.guiScale + ""),
-         var4,
-         var2 + 72.0F,
-         var5,
-         20.0F,
-         true,
-         () -> this.opt.guiScale = (this.opt.guiScale + 1) % 5
-      );
-      this.button("Fullscreen: " + this.onOff(this.opt.fullscreen), var3, var2 + 96.0F, var5, 20.0F, true, () -> this.setFullscreen(!this.opt.fullscreen));
-      int[] var6 = new int[]{0, 32, 64, 128, 256};
-      this.button("LOD Distance: " + (this.opt.lodDistance == 0 ? "OFF" : this.opt.lodDistance + " chunks"), var4, var2 + 96.0F, var5, 20.0F, true, () -> {
-         int var2x = 0;
-
-         for (int var3x = 0; var3x < var6.length; var3x++) {
-            if (var6[var3x] == this.opt.lodDistance) {
-               var2x = var3x;
-            }
-         }
-
-         this.opt.lodDistance = var6[(var2x + 1) % var6.length];
-      });
-      this.button("Shaders: " + (!this.opt.shaders ? "OFF" : (this.opt.waterQ >= 2 ? "FANCY" : "ON")), var3, var2 + 120.0F, var5, 20.0F, true, () -> {
-         // OFF -> ON (water with depth colour and refraction) -> FANCY (water that also mirrors the terrain) -> OFF
-         if (!this.opt.shaders) {
-            this.opt.shaders = true;
-            this.opt.waterQ = 1;
-         } else if (this.opt.waterQ < 2) {
-            this.opt.waterQ = 2;
-         } else {
-            this.opt.shaders = false;
-         }
-      });
-      this.button("Weather: " + this.onOff(this.opt.weather), var4, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.weather = !this.opt.weather);
-      this.button("Leaves: " + new String[]{"Fancy", "Smart", "Fast"}[this.opt.leaves], var3, var2 + 144.0F, var5, 20.0F, true, () -> {
-         this.opt.leaves = (this.opt.leaves + 1) % 3;
-         Mesher.leafMode = this.opt.leaves;
-         this.remeshAll();
-      });
-      this.button("Disasters: " + this.onOff(this.opt.disasters), var4, var2 + 144.0F, var5, 20.0F, true, () -> this.opt.disasters = !this.opt.disasters);
-      this.button("Done", var1 - 100.0F, var2 + 172.0F, 200.0F, 20.0F, true, () -> {
-         this.opt.save();
-         this.setScreen(this.optionsReturn);
-      });
    }
 
    void remeshAll() {
@@ -5123,6 +4849,8 @@ public final class Game {
       float h;
       Runnable action;
       Consumer<Float> slider;
+      /** The text on the widget (the tests check that it fits). */
+      String label;
    }
 
    public static final class Particle {
@@ -5164,5 +4892,8 @@ public final class Game {
       String name;
       long mod;
       int mode;
+      long seed;
+      WorldSettings settings = WorldSettings.classic();
+      WorldPreview thumb;
    }
 }

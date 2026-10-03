@@ -3,7 +3,7 @@ package bc;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 
-public final class Gui {
+public class Gui {
    public int scale = 2;
    public float w;
    public float h;
@@ -137,7 +137,7 @@ public final class Gui {
       return var1;
    }
 
-   private void rawText(String var1, float var2, float var3, int var4, float var5) {
+   protected void rawText(String var1, float var2, float var3, int var4, float var5) {
       int var6 = Tex.fontCellW;
       int var7 = Tex.fontCellH;
       int var8 = Tex.fontCols;
@@ -239,13 +239,52 @@ public final class Gui {
       this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, var11, true, 1.0F);
    }
 
+   /** Update 3.13: a track that fills up to the handle (so the setting can be read at a glance); the text sits on top. */
    public void slider(float var1, float var2, float var3, float var4, String var5, float var6, boolean var7) {
       this.rect(var1, var2, var3, var4, -16777216);
-      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, -12829636);
-      float var8 = var1 + 1.0F + (var3 - 10.0F) * var6;
-      this.rect(var8, var2 + 1.0F, 8.0F, var4 - 2.0F, -16777216);
-      this.rect(var8 + 1.0F, var2 + 2.0F, 6.0F, var4 - 4.0F, var7 ? -8485187 : -7303024);
+      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, -13750738);
+      float var8 = var1 + 1.0F + (var3 - 8.0F) * var6;
+      float fill = var8 - (var1 + 1.0F);
+      if (fill > 1.0F) {
+         this.gradient(var1 + 1.0F, var2 + 1.0F, fill, var4 - 2.0F, var7 ? -10646691 : -11700672, var7 ? -12624064 : -13489606);
+      }
+
+      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, 1.0F, 553648127);
+      this.rect(var8 + 1.5F, var2 + 1.0F, 3.0F, var4 - 2.0F, -16777216);
+      this.rect(var8 + 2.0F, var2 + 2.0F, 2.0F, var4 - 4.0F, var7 ? -5195536 : -1);
       this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, -1, true, 1.0F);
+   }
+
+   /** A picture made of pixels that the program computes (the world preview): uploaded to the graphics card when it changes. */
+   public static final class Image {
+      public final int w;
+      public final int h;
+      public final int[] px;
+      public boolean dirty = true;
+      int tex;
+
+      public Image(int w, int h) {
+         this.w = w;
+         this.h = h;
+         this.px = new int[w * h];
+      }
+   }
+
+   /** Draws the picture into the rectangle (nearest-neighbour: every sample stays a sharp little square). */
+   public void image(Image img, float x, float y, float w, float h) {
+      if (img.tex == 0) {
+         img.tex = Tex.upload(img.w, img.h, img.px, false, false);
+         img.dirty = false;
+      } else if (img.dirty) {
+         GL11.glBindTexture(3553, img.tex);
+         java.nio.ByteBuffer buf = Tex.toBuffer(img.px);
+         GL11.glPixelStorei(3317, 1);
+         GL11.glTexSubImage2D(3553, 0, 0, 0, img.w, img.h, 6408, 5121, buf);
+         org.lwjgl.system.MemoryUtil.memFree(buf);
+         img.dirty = false;
+      }
+
+      this.tex(img.tex, x, y, w, h, 0.0F, 0.0F, 1.0F, 1.0F, -1);
    }
 
    /** A sunken rectangle with the inventory's slot colours (the box behind the player model). */
@@ -349,7 +388,7 @@ public final class Gui {
       }
    }
 
-   private void v(float var1, float var2, float var3, float var4, float var5, float var6, float var7, float var8, float var9, float var10) {
+   protected void v(float var1, float var2, float var3, float var4, float var5, float var6, float var7, float var8, float var9, float var10) {
       GL11.glColor4f(var5, var6, var7, var8);
       GL11.glTexCoord2f(var9 + var3 * Tex.TS, var10 + var4 * Tex.TS);
       GL11.glVertex2f(var1, var2);
@@ -376,25 +415,82 @@ public final class Gui {
    }
 
    public void itemIcon(int var1, float var2, float var3, float var4) {
-      int var5 = Items.tile[var1];
-      float var6 = Tex.tu(var5);
-      float var7 = Tex.tv(var5);
+      this.atlasTile(Items.tile[var1], var2, var3, var4);
+   }
+
+   /** One picture of the atlas (alpha-tested) as a square; a hook so that the menu screens can be drawn without OpenGL (the UI preview of the tests). */
+   protected void atlasTile(int tile, float x, float y, float size) {
+      this.atlasTile(tile, x, y, size, 0xFFFFFF);
+   }
+
+   /** The same, multiplied with a colour (the grass of the title logo is green because of it). */
+   protected void atlasTile(int tile, float x, float y, float size, int rgb) {
+      float var6 = Tex.tu(tile);
+      float var7 = Tex.tv(tile);
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.atlas);
       GL11.glEnable(3008);
       GL11.glAlphaFunc(516, 0.1F);
-      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      GL11.glColor4f((rgb >> 16 & 0xFF) / 255.0F, (rgb >> 8 & 0xFF) / 255.0F, (rgb & 0xFF) / 255.0F, 1.0F);
       GL11.glBegin(7);
       GL11.glTexCoord2f(var6, var7);
-      GL11.glVertex2f(var2, var3);
+      GL11.glVertex2f(x, y);
       GL11.glTexCoord2f(var6 + Tex.TS, var7);
-      GL11.glVertex2f(var2 + var4, var3);
+      GL11.glVertex2f(x + size, y);
       GL11.glTexCoord2f(var6 + Tex.TS, var7 + Tex.TS);
-      GL11.glVertex2f(var2 + var4, var3 + var4);
+      GL11.glVertex2f(x + size, y + size);
       GL11.glTexCoord2f(var6, var7 + Tex.TS);
-      GL11.glVertex2f(var2, var3 + var4);
+      GL11.glVertex2f(x, y + size);
       GL11.glEnd();
       GL11.glDisable(3008);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   /** Starts / ends a batch of textured atlas quads (the faces of a block icon). */
+   protected void quadsBegin() {
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, Tex.atlas);
+      GL11.glEnable(3008);
+      GL11.glAlphaFunc(516, 0.1F);
+      GL11.glBegin(7);
+   }
+
+   protected void quadsEnd() {
+      GL11.glEnd();
+      GL11.glDisable(3008);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   public void push() {
+      GL11.glPushMatrix();
+   }
+
+   public void pop() {
+      GL11.glPopMatrix();
+   }
+
+   public void translate(float x, float y) {
+      GL11.glTranslatef(x, y, 0.0F);
+   }
+
+   public void rotate(float degrees) {
+      GL11.glRotatef(degrees, 0.0F, 0.0F, 1.0F);
+   }
+
+   public void scaleBy(float s) {
+      GL11.glScalef(s, s, 1.0F);
+   }
+
+   /** Everything is cut off outside this rectangle (GUI units) until {@link #unclip()}: the lists that scroll. */
+   public void clip(float x, float y, float w, float h) {
+      int s = this.scale;
+      int fbH = Math.round(this.h * s);
+      GL11.glEnable(3089);
+      GL11.glScissor(Math.round(x * s), fbH - Math.round((y + h) * s), Math.max(0, Math.round(w * s)), Math.max(0, Math.round(h * s)));
+   }
+
+   public void unclip() {
+      GL11.glDisable(3089);
    }
 
    public void hunger(float var1, float var2, int var3) {
@@ -486,12 +582,8 @@ public final class Gui {
          if (Items.isItem(var1)) {
             this.itemIcon(var1, var2, var3, var4);
          } else {
-            GL11.glEnable(3553);
-            GL11.glBindTexture(3553, Tex.atlas);
-            GL11.glEnable(3008);
-            GL11.glAlphaFunc(516, 0.1F);
             int var5 = Blocks.kind[var1];
-            GL11.glBegin(7);
+            this.quadsBegin();
             if (var5 == 1 || var5 == 7 || Blocks.isLadder(var1) || var1 == 32 || Blocks.isWallTorch(var1) || Blocks313.flatItem(var1)) {
                int[] var24 = tintFor(var1);
                float[] var26 = new float[]{var2, var2 + var4, var2 + var4, var2};
@@ -558,9 +650,7 @@ public final class Gui {
                }
             }
 
-            GL11.glEnd();
-            GL11.glDisable(3008);
-            GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+            this.quadsEnd();
          }
       }
    }

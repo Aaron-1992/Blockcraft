@@ -21,6 +21,8 @@ public final class Options {
    public int lodDistance = 64;
    /** Update 3.11: the first-person hand bobs with every step (Minecraft's view bobbing); /bobbing on|off. */
    public boolean bobbing = true;
+   /** Update 3.13: moving the mouse up looks down. */
+   public boolean invertY = false;
    public boolean shaders = true;
    /** Update 3.11: water with shaders - 1 = depth colour, refraction, foam; 2 = also the terrain mirrored in it (the "FANCY" setting, default). */
    public int waterQ = 2;
@@ -56,6 +58,7 @@ public final class Options {
                this.fullscreen = Boolean.parseBoolean(var2.getProperty("fullscreen", "false"));
                this.lodDistance = Integer.parseInt(var2.getProperty("lodDistance", "64"));
                this.bobbing = Boolean.parseBoolean(var2.getProperty("bobbing", "true"));
+               this.invertY = Boolean.parseBoolean(var2.getProperty("invertY", "false"));
                this.shaders = Boolean.parseBoolean(var2.getProperty("shaders", "true"));
                this.waterQ = Math.max(1, Math.min(2, Integer.parseInt(var2.getProperty("waterQ", "2"))));
                this.weather = Boolean.parseBoolean(var2.getProperty("weather", "true"));
@@ -92,6 +95,7 @@ public final class Options {
       var1.setProperty("fullscreen", this.fullscreen + "");
       var1.setProperty("lodDistance", this.lodDistance + "");
       var1.setProperty("bobbing", this.bobbing + "");
+      var1.setProperty("invertY", this.invertY + "");
       var1.setProperty("shaders", this.shaders + "");
       var1.setProperty("waterQ", this.waterQ + "");
       var1.setProperty("weather", this.weather + "");
