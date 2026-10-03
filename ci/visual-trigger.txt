@@ -1,1 +1,1 @@
-wx-storm,wx-rain,wx-fair,wx-snow,wx-storm-sh,wx-rain-sh,day-plain,night37,day-shaders
+lod-top,lod-edge,lod-night,lod-edge-sh
