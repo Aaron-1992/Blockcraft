@@ -429,7 +429,10 @@ final class WeatherFx {
    /** Vertical size of the cloud above its base: thin sheets in fair weather, towers where the thunderhead (core) is, with lumpy tops. */
    static float thickness(float cover, float core, double u, double v) {
       float lump = Weather.samp(NOISE_R, u * (1.0 / 600.0), v * (1.0 / 600.0));
-      return 46.0F + 28.0F * cover + 150.0F * Weather.smooth(0.22F, 0.58F, core) * (0.65F + 0.35F * lump);
+      // Update 3.12: the tower keeps rising all the way to the core (a dome: the old smooth(0.22, 0.58) flattened out into a plateau), its top is cauliflower
+      float cauli = Weather.samp(NOISE_G, u * (1.0 / 130.0) + 0.21, v * (1.0 / 130.0) + 0.67);
+      float dome = (float)Math.pow(Weather.smooth(0.10F, 0.98F, core), 1.2);
+      return 46.0F + 28.0F * cover + 190.0F * dome * (0.70F + 0.30F * lump) * (0.88F + 0.24F * cauli);
    }
 
    static float groundAt(World w, int x, int z) {

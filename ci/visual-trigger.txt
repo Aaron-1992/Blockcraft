@@ -1,2 +1,2 @@
-adv-screen,adv-adventure,parrots,parrot-shoulder,colors-misc
+nether-fortress,nether-fortress-b,nether-fortress-air,end-island,end-dragon,wx-storm,wx-storm-bolt,wx-fair
 jar=build
