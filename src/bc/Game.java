@@ -169,6 +169,10 @@ public final class Game {
          this.opt.shaders = Boolean.getBoolean("bc.shaders");
       }
 
+      if ("off".equals(System.getProperty("bc.clouds"))) {
+         this.opt.clouds = false; // screenshots of the terrain from above the cloud layer
+      }
+
       this.init();
 
       try {

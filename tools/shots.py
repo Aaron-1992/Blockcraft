@@ -142,7 +142,8 @@ SCENES = {
     "wx-storm-far-sh": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,95,71,-90,0", "-Dbc.weather=cell:2400,-100,720", "-Dbc.lightning=off", "-Dbc.time=6000", "-Dbc.shot=26"], True),
     "wx-rain-sh":     (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,69,71,-70,2", "-Dbc.weather=rain", "-Dbc.lightning=off", "-Dbc.time=6000", "-Dbc.shot=26"], True),
     # ---- LOD inspection (Update 3.9 / roadmap step 2): rd = 4 chunks of real terrain, LOD beyond. Top-down shows the ring, the ground view shows the seam.
-    "lod-top":        (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=24", "-Dbc.cam=133,190,71,0,90", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=150"], True),
+    "lod-top":        (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=16", "-Dbc.clouds=off", "-Dbc.cam=133,260,71,0,90", "-Dbc.weather=clear", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=150"], True),
+    "lod-top-sh":     (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=16", "-Dbc.clouds=off", "-Dbc.cam=133,260,71,0,90", "-Dbc.weather=clear", "-Dbc.time=6000", "-Dbc.shot=30"], True),
     "lod-edge":       (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=150"], True),
     "lod-night":      (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=18000"] + PLAIN + ["-Dbc.shot=150"], True),
     "lod-edge-sh":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=6000", "-Dbc.shot=30"], True),

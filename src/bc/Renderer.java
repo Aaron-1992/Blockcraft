@@ -358,6 +358,11 @@ public final class Renderer {
          this.skyLightFactor *= 1.0F - 0.32F * ov - 0.14F * st;
       }
 
+      // wet ground is darker; going through the (shared) lightmap keeps real terrain and LOD identical in both render paths
+      if (this.g.world != null) {
+         this.skyLightFactor *= 1.0F - 0.10F * this.g.world.weather.wet;
+      }
+
       float fl = this.wfx.flash;
       if (fl > 0.001F) {
          this.topR = lerp(this.topR, 0.62F, fl * 0.55F);
