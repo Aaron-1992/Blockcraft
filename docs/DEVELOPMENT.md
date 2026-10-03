@@ -80,7 +80,7 @@ Logs cannot be downloaded in the assistant sandbox, so workflows copy what matte
 `windows-smoke.yml` (trigger: edit `ci/windows-trigger.txt`) takes the committed `releases/*-patch.zip`, installs it over the 3.5 base
 zip like a player, adds Mesa's `opengl32.dll`/`libgallium_wgl.dll` next to the bundled `javaw.exe` (GitHub's Windows machines have no GPU)
 and runs the real `Blockcraft.exe`; screenshots and logs land in `ci-results/windows/`. Gotcha: the Launch4j stub probes `java -version`
-and **hangs on a huge `JAVA_TOOL_OPTIONS`** (> ~1 KB), so scenes with long `-Dbc.*` values are started with `jre\bin\java.exe -jar Blockcraft.exe`
+and **hangs on a long `JAVA_TOOL_OPTIONS`** (888 characters already did; `win_smoke.py` switches at 600), so scenes with long `-Dbc.*` values are started with `jre\bin\java.exe -jar Blockcraft.exe`
 instead (the exe is a jar with a stub in front). Both visual workflows test the *committed* release zip, not a fresh build.
 
 ### Built-in test hooks (`Game.autoTest`, system properties)

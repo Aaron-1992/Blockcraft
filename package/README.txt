@@ -11,8 +11,8 @@ generator and the physics are written from scratch to feel like Java Edition 1.1
 
 WHAT'S NEW IN UPDATE 3.10  (natural disasters and falling trees)
   * TREES FALL OVER. Chop through a tree's trunk (usually the bottom log) and the whole tree above the cut tips over like a felled
-    tree: trunk, branches and crown fall away from you as one piece (the other way if something is in the way, and not at all
-    if the tree is walled in), and lie on the ground. The log you cut drops as usual; the rest of the trunk stays in the world as
+    tree: trunk, branches and crown fall away from you as one piece (another way if something is in the way - never onto you -
+    and not at all if the tree is walled in), and lie on the ground. The log you cut drops as usual; the rest of the trunk stays in the world as
     LOGS ON THEIR SIDE that you harvest piece by piece (each gives a normal log, an axe is faster, they burn like logs). Cut
     higher up and the stump stays while the top falls and drops onto the ground. The crown comes down with the tree: leaves
     that land are still leaves (the ones that get squashed drop apples and sticks like broken leaves). Mobs - and you - under
@@ -39,7 +39,7 @@ WHAT'S NEW IN UPDATE 3.10  (natural disasters and falling trees)
     COMMANDS: /disaster tornado [distance]  (a tornado forms that many blocks ahead of you, default 80, and heads your way, under
     a grey rainy sky),  /disaster quake [1-3],  /disaster meteor [count],  /disaster stop,  /disaster on|off,  /disaster (status).
   * The camera shakes when the ground does: earthquakes, a tree hitting the ground close to you, a meteor striking.
-  * Honest note: everything is covered by automated tests (43,000+ checks: the rules, the numbers, save / load) and was looked
+  * Honest note: everything is covered by automated tests (41,000+ checks: the rules, the numbers, save / load) and was looked
     at as pictures from a software renderer and through the real Blockcraft.exe on a Windows test machine. How it FEELS - the
     tornado's pull, the shaking, the frame rate with a big forest being shredded - has not been tried on real hardware, and
     the game has no sound at all (no thunder, no rumble, no crash of a falling tree). If a disaster is too much for your taste,

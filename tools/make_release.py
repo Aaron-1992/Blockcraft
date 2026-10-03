@@ -66,7 +66,7 @@ def notes(version, full_name, patch_name):
         "If Windows SmartScreen warns about an unknown publisher: *More info -> Run anyway* (the game is not code-signed).\n"
         "If it doesn't start, run `Blockcraft-debug.bat` and read the messages (or open `%%USERPROFILE%%\\.blockcraft112\\crash.log`).\n\n"
         "*Small download instead?* `%(patch)s` (about 6 MB) only contains the changed files - extract it and copy the "
-        "`Blockcraft` folder over an existing Update 3.5 / 3.6 install (\"Replace files\").\n\n"
+        "`Blockcraft` folder over an existing Blockcraft install of Update 3.5 or newer (\"Replace files\").\n\n"
         "### What's new\n\n```\n%(new)s\n```\n"
     ) % {"v": version, "full": full_name, "patch": patch_name, "new": whats_new(version)}
 
