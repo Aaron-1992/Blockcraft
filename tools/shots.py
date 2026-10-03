@@ -305,6 +305,23 @@ def overworld_portal_blocks():
 
 
 NETHER = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.dim=-1"]
+END = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.dim=1"]
+# seed 12345: stronghold #0 has its portal room (11 x 11, floor y=25) centred on x=-688, z=-611
+SH_CX, SH_CZ, SH_Y = -688, -611, 25
+
+
+def stronghold_ring(eyes=True, portal=True):
+    """Update 3.12: all twelve frames of the first stronghold's portal room with their eyes, and the portal in the pit."""
+    out = []
+    for k in (-1, 0, 1):
+        for fx, fz in ((SH_CX - 2, SH_CZ + k), (SH_CX + 2, SH_CZ + k), (SH_CX + k, SH_CZ - 2), (SH_CX + k, SH_CZ + 2)):
+            out.append((fx, SH_Y, fz, 1042 if eyes else 1041))
+    if portal:
+        for dx in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                out.append((SH_CX + dx, SH_Y, SH_CZ + dz, 1043))
+    return out
+
 
 # Software OpenGL is slow, so scenes use the plain renderer, few frames and a short render distance.
 SCENES = {
@@ -316,6 +333,16 @@ SCENES = {
     "nether-portal-sh":   (NETHER + ["-Dbc.cam=23,43,-111,180,8", sets(portal_blocks(22, 41, -116)), "-Dbc.shot=150"], True),
     "nether-mobs":        (NETHER + ["-Dbc.cam=23,43,-111,180,6", "-Dbc.summon=pigman,magmacube,blaze,pigman", "-Dbc.summonDist=6", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=150"], True),
     "nether-ghast":       (NETHER + ["-Dbc.cam=30,48,-96,-90,2", "-Dbc.summon=ghast", "-Dbc.summonDist=14", "-Dbc.summonDy=0"] + PLAIN + ["-Dbc.shot=110"], True),
+    # ---- Update 3.12: the End (the island is the same in every world: platform at x=62; the tallest pillar at x=42, z=0; pillar 3 (76 high) at x=-13, z=40)
+    "end-island":         (END + ["-Dbc.cam=62.5,64,0.5,90,-18"] + PLAIN + ["-Dbc.shot=150"], True),
+    "end-island-sh":      (END + ["-Dbc.cam=62.5,64,0.5,90,-18", "-Dbc.shot=150"], True),
+    "end-crystal":        (END + ["-Dbc.cam=-12.5,66,24.5,0,-33"] + PLAIN + ["-Dbc.shot=110"], True),
+    "end-dragon":         (END + ["-Dbc.cam=16.5,67,0.5,90,2", "-Dbc.dragon=perch"] + PLAIN + ["-Dbc.shot=110"], True),
+    "end-dragon-sh":      (END + ["-Dbc.cam=16.5,67,0.5,90,2", "-Dbc.dragon=perch", "-Dbc.shot=110"], True),
+    "end-enderman":       (END + ["-Dbc.cam=30.5,65,0.5,90,4", "-Dbc.summon=enderman,enderman,enderman", "-Dbc.summonDist=5", "-Dbc.summonDy=0"] + PLAIN + ["-Dbc.shot=110"], True),
+    "stronghold":         (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=150"], True),
+    "stronghold-portal":  (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000", sets(stronghold_ring())] + PLAIN + ["-Dbc.shot=150"], True),
+    "stronghold-portal-sh": (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000", sets(stronghold_ring()), "-Dbc.shot=150"], True),
     "portal-day":         (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
     "portal-day-sh":      (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks()), "-Dbc.shot=170"], True),
 

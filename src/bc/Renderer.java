@@ -658,6 +658,8 @@ public final class Renderer {
       GL11.glDisable(2912);
       if (!var6 && !var7 && skyOn) {
          this.drawSky(var41, var42, var43);
+      } else if (!var6 && !var7 && var5.dim == Dim.END) {
+         this.drawEndSky();
       }
 
       GL11.glEnable(2912);
@@ -1081,6 +1083,32 @@ public final class Renderer {
 
       arrays(false);
       this.sh.endShadow(var1, var2, true);
+   }
+
+   /** Update 3.12: the sky of the End - no sun, no moon: stars on the deep purple, turning very slowly. */
+   void drawEndSky() {
+      GL11.glDisable(2929);
+      GL11.glDisable(3553);
+      GL11.glDisable(3008);
+      GL11.glEnable(3042);
+      GL11.glBlendFunc(770, 771);
+      GL11.glPushMatrix();
+      GL11.glRotatef((float)(this.g.tickCount * 0.004), 0.3F, 1.0F, 0.2F);
+      for (int pass = 0; pass < 2; pass++) {
+         GL11.glPointSize(pass == 0 ? 2.0F : 3.0F);
+         GL11.glBegin(0);
+         for (int i = pass; i < 700; i += pass == 0 ? 1 : 7) {
+            float k = 0.55F + 0.45F * (float)Math.sin(i * 12.9898);
+            GL11.glColor4f(0.75F + 0.2F * k, 0.6F + 0.2F * k, 1.0F, pass == 0 ? 0.65F : 0.95F);
+            GL11.glVertex3f(this.stars[i * 3], this.stars[i * 3 + 1], this.stars[i * 3 + 2]);
+         }
+
+         GL11.glEnd();
+      }
+
+      GL11.glPopMatrix();
+      GL11.glDisable(3042);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
    void drawSky(float var1, float var2, float var3) {

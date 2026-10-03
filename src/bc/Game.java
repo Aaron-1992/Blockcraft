@@ -673,6 +673,26 @@ public final class Game {
             }
          }
 
+         if (this.autoFrames == 62 && System.getProperty("bc.dragon") != null) {
+            // Update 3.12 test hook: the dragon sits on the fountain (bc.dragon=perch) for a screenshot
+            for (Mob dm : this.mobs.list) {
+               if (dm.type == Mobs.ENDER_DRAGON) {
+                  dm.hx = 0.5;
+                  dm.hz = 0.5;
+                  dm.hy = 84.0;
+                  if ("perch".equals(System.getProperty("bc.dragon"))) {
+                     dm.phase = Dragon.PERCH;
+                     dm.phaseT = -10000000;
+                     dm.yaw = dm.pyaw = dm.headYaw = dm.pheadYaw = -90.0F;
+                     Dragon.setPos(dm, 0.5, EndGen.TOP + 2.0, 0.5);
+                     dm.px = dm.x;
+                     dm.py = dm.y;
+                     dm.pz = dm.z;
+                  }
+               }
+            }
+         }
+
          if (this.autoFrames == 100 && System.getProperty("bc.pause") != null) {
             this.setScreen(Game.S.PAUSE);
          }

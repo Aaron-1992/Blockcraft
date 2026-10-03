@@ -1,2 +1,2 @@
-nether-vista,nether-vista-sh,nether-portal,nether-portal-sh,nether-mobs,nether-ghast,portal-day,portal-day-sh
+nether-vista,nether-portal,nether-mobs,end-island,end-island-sh,end-crystal,end-dragon,end-dragon-sh,end-enderman,stronghold,stronghold-portal,stronghold-portal-sh
 jar=build
