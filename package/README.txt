@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.11)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.12)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,51 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.12  (the Nether, the End, villages, a world of colour)
+  * THE NETHER. Build a frame of obsidian (at least 4 wide and 5 high, up to 23 x 23, the four corners may be left out) and light it from the
+    inside with Flint and Steel: the inside turns into a purple portal. Stand in it for four seconds (in creative you go at once) and you
+    arrive in the Nether, where one block is eight blocks of the Overworld; a portal that is not there yet is built for you, and the way
+    back works the same. The Nether is a cave world between a bedrock floor and a bedrock ceiling: a sea of lava, netherrack islands
+    and cliffs, glowstone hanging from the ceiling, soul sand and gravel on the shores, nether quartz ore in the walls, magma blocks
+    where the rock meets the lava. NETHER FORTRESSES (seven out of ten regions of 256 x 256 blocks have one) are dark castles of nether brick over the lava: bridges
+    with railings, covered corridors with windows, pillared halls, closets with chests and a throne room with a blaze spawner. Mobs: ZOMBIE PIGMEN
+    (calm until you hit one - then the whole group comes), GHASTS (float about and throw big fireballs that blow holes in the ground and start fires),
+    BLAZES (hover and shoot bursts of small fireballs; they drop blaze rods) and MAGMA CUBES (hop at you and split into smaller ones when killed).
+    Small rules like Minecraft's: fire on netherrack never goes out, soul sand slows you down, a magma block burns your feet unless you sneak. New items: nether quartz (and a block of it), nether brick (and the fence), blaze rod / powder, ghast tear, gold nugget
+    (9 to an ingot), ender pearl, eye of ender, emerald. The command /dim nether|end|overworld takes you there at once.
+  * THE END. Strongholds - buried castles of stone brick with libraries, closets with chests and a portal room - wait underground in
+    three rings round the middle of the map (3 at 640 to 960 blocks, 6 at 1500 to 2100, 10 at 2800 to 3400). Craft EYES OF ENDER (ender pearl +
+    blaze powder; pearls come from endermen), throw one (right click): it flies towards the nearest stronghold for a dozen blocks, hovers and drops
+    (now and then it breaks). In the portal room twelve End portal frames stand round a pit of lava - put an eye into every frame (some hold one
+    already) and the pit fills with the END PORTAL. The End is one island of end stone, about 110 blocks across, floating in the void, with TEN OBSIDIAN
+    PILLARS (an End crystal on top of each: it heals the dragon, hit it and it blows up) and THE ENDER DRAGON (200 health, boss bar at the top of the
+    screen): it circles over the island, swoops at you and breathes purple fireballs that leave a cloud that hurts, and now and then lands on the
+    bedrock fountain in the middle where you can hit it. Kill it and an exit portal opens (back to the Overworld) and a dragon egg is laid. ENDERMEN
+    teleport, get angry when you look at them and are hurt by water. Falling into the void kills you. ENDER PEARLS can be thrown (right click): they fly in
+    an arc and you appear where they land - for 5 half hearts of damage that no armour stops.
+  * VILLAGES: besides the houses, wells and churches there are now smithies (two furnaces and a chest), FARMS (fenced, with a water channel and four rows of
+    wheat, carrots and potatoes) and lamp posts along the paths. VILLAGERS (farmer, librarian, priest, blacksmith, butcher, and the green nitwit; each in a robe of his
+    colour) wander around the village and run from monsters, IRON GOLEMS keep watch and beat up monsters. Right click a villager to TRADE: emeralds are the money.
+    The farmer buys wheat, potatoes and carrots and sells bread, apples and cake; the librarian trades paper, books, bookshelves and glass; the priest sells bone meal, glowstone, ender pearls and
+    blaze powder; the blacksmith buys coal and iron ingots and sells an iron axe, sword and chestplate and a diamond pickaxe; the butcher trades raw and cooked meat. Trades can be repeated as often as you like.
+  * THE WORLD OF COLOUR (Minecraft 1.12). 15 DYES: red from roses, yellow from dandelions, black from coal, green from smelted cactus, blue from lapis lazuli ore (4 to 8 per ore),
+    bone meal is the white one; mixing two dyes makes two of the next colour (orange, magenta, light blue, lime, pink, grey, light grey, cyan, purple, brown). Dye wool (one dye + one wool), SHEEP (right click with a dye: the
+    wool that grows back has that colour), CONCRETE POWDER (4 sand + 4 gravel + a dye = 8; it falls like sand and turns into CONCRETE the moment water touches it), STAINED TERRACOTTA (8 terracotta
+    around a dye; terracotta is smelted clay), GLAZED TERRACOTTA (smelt stained terracotta: four patterns, each in the colour of its dye) and STAINED GLASS (8 glass around a dye - it is translucent).
+    Also: clay (in the beds of lakes and the sea), blocks of iron, gold, diamond, emerald, coal and lapis lazuli (9 ingots, and back), emerald ore (deep under mountains).
+  * ADVANCEMENTS: press L. 34 advancements in five tabs (Minecraft, Nether, The End, Adventure, Husbandry) as a tree with the Minecraft 1.12 titles ("Stone Age", "Isn't It Iron Pick", "We Need to Go Deeper",
+    "Free the End" ...), a toast in the corner when you make one, saved with the world. /advancement shows how many you have, /advancement grant <id|all> and revoke all are for testing.
+  * PARROTS: five colours (red, blue, green, cyan, grey) that flutter from tree to tree in forests and sit down now and then. Right click with SEEDS (wheat seeds, pumpkin or melon seeds; one in three works) to tame
+    a parrot: it follows you, and a right click with an empty hand puts it on your SHOULDER (two at most; sneak + right click with an empty hand sends it off).
+  * STORM CLOUDS without shaders now rise as domes with cauliflower tops instead of flat slabs.
+  * Under the hood: block numbers are 12 bits wide (4096 blocks instead of 226), the texture atlas is 32 x 32 tiles, every dimension has its own folder in the world (DIM-1, DIM1), strongholds and fortresses are
+    planned from the seed alone. Worlds from 3.5 - 3.11 open as before. Chunk files only get the new format when they contain a new block, but an older game cannot show the new blocks, so
+    keep a copy of a world you want to open in an older version.
+  * Honest notes. Everything that can be tested without a screen is: 879,000+ checks (every nether / End / village / colour rule, saving and loading, that every room of every fortress and stronghold can be reached on foot,
+    the dragon fight from first hit to the portal), and the pictures of the Nether, the End, the strongholds, the villages, the new blocks and the weather were looked at in a software renderer. NOTHING has been played on
+    a real graphics card or by a person: how hard the dragon is, whether the Nether is too dark or the fortresses too easy to find, how the villagers' trades feel, how fast the game runs with a big fortress in view - all of that
+    is a first guess. The game still has no sound at all (no ghast cries, no dragon roar, no portal hum). Not in the game (yet): brewing, enchanting, redstone wiring, beds in colours, banners, End cities, endermites.
 
 WHAT'S NEW IN UPDATE 3.11  (hands, water, distant terrain, animation)
   * FACES ARE SINGLE-SIDED, like in Minecraft. Go under the map in spectator mode (/gamemode spectator, F to fly): the ground is see-through

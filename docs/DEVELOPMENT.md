@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.11"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.12"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -40,7 +40,7 @@ python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-wind
 
 ```
 python3 tools/runtests.py equivalence   # fingerprints terrain/lighting/physics/crafting/simulation/meshing vs the ORIGINAL 3.5 jar
-python3 tools/runtests.py unit          # test/bc/GameTests.java + Tests37 / 38 / 39 / 310 / TestsFall / TestsDisasters: ~41,000 checks of the game logic, no GPU needed
+python3 tools/runtests.py unit          # test/bc/GameTests.java + Tests37 .. 312 / TestsFall / TestsDisasters: ~880,000 checks of the game logic, no GPU needed
 python3 tools/runtests.py               # both (this is what CI runs)
 ```
 
@@ -236,11 +236,44 @@ so old lines still load).
   A program that fails to compile only costs its own effect (`waterOk`, `entityOk`, `lodOk`, `cloudsOk`). Run `python3 tools/glsl_check.py` after touching any shader string.
 * **Test hooks** (3.11): `bc.tp=frame:x,y,z`, `bc.lodage`, `bc.handswing`, `bc.handeat`, `bc.graze`, `bc.walkphase=phase,amp`, `bc.posewalk=phase,amp,sprint`, `bc.waterq`, `bc.nocull`, `bc.legacymesh`.
 
+## Update 3.12 notes (dimensions, villages, colour)
+
+* **Block ids are 12 bits wide.** `Chunk.blocks` is a `short[]`. Block ids are 0..255 (the old ones) and 1024..4095 (new: Nether 1024-1032, End 1040-1044, colour blocks from `Blocks.CONCRETE0` on);
+  256..1023 are items (new items start at 352: `Items.defTile(id, name, tile)`, icon tile `TexArt312.ITEM0 + id - 352`). `Blocks.isBlockId` tells them apart. **A leftover `& 255` silently
+  truncates a new id** - read blocks with `Chunk.get` / `World.getBlock` (the equivalence test had to be fixed for this). Chunk files keep the old byte array (the low 8 bits of every id) and
+  append the high 4 bits behind the magic `BCX1` only when some id is above 255, so old chunk files read as before and an old game still reads the blocks it knows.
+  The atlas is 32 x 32 tiles (`Tex.PX`): 256-269 blocks, 272+ items, colour tiles from 400; animated: water 23, lava 24, fire 235, portal 263; tile 64 is the white particle.
+* **Dimensions.** `Dim` has the ids (Overworld 0, Nether -1, End 1), the ambient light (`Dim.ambient`: Nether 0.27, End 0.46) and its tint (`Dim.ambientTint`, used by `Renderer.updateLightmap`: the End is neutral,
+  the rest warm). One `World(seed, dir, dim)` per dimension (the Overworld lives in the world folder, the others in `DIM-1` / `DIM1` inside it), `Game.switchDimension(dim, x, [y], z, kind)` and
+  `Game.finishArrival` (kind 0 = come out of a portal, 1 = spawn, 2 = exact position). Dimensions other than the Overworld have no sky, weather, LOD or disasters. Villagers and golems are kept
+  forever (`Mobs312.keepsForever`), everything else far away goes as before.
+* **Nether**: `NetherGen` (a function of seed and position only: a chunk can always be generated again and still matches saved neighbours), `Portals` (frame detection, the 80-tick wait, 1:8 coordinates,
+  `Portals.arrive` finds or builds the exit portal; portal blocks 1030 / 1031 are drawn as mesher kind 8 = a film in the blended buffer), fortresses (`NetherFortress`, `REG` 256, `CHANCE` 70 %).
+* **Plans** (`BoxPlan`): a structure is a list of boxes in three layers - shell, then the air cut out of it (so crossing pieces always leave their passages open), then decor (`soft` decor never fills a passage
+  another piece cut) - plus pillars that grow down to the rock. `NetherFortress` and `Stronghold` extend it. Rules that took effort to find: rooms never overlap (`roomFree`), a plan without a throne room
+  / a chest is thrown away and drawn again (up to 12 attempts), and `Tests312` walks every plan with a breadth-first search (`Reach`) to prove that every room can be reached - keep those tests.
+* **Everything new in worldgen is behind `Gen.extras`** (a static: restore it in `finally` in tests). With `-Dbc.noextras=true` the terrain is still bit-identical to 3.5 (the strict equivalence pass).
+  Strongholds (3 / 6 / 10 in rings), emerald ore, clay and the village upgrades only exist with extras.
+* **The End**: `EndGen` is the same island for every seed (top y 64, platform at (62, 63, 0), ten pillars on a ring of radius 42), `EndFight` holds the state of the fight (`fight.properties` in the End's folder),
+  `Dragon` is a state machine (CIRCLE, STRAFE, LAND, PERCH, TAKEOFF; 200 ticks of dying) that simply sets its position, `EndPortals` has the frames, the eyes and the portal. Below y -12 the void kills.
+* **Mobs 8..17**: pigman, ghast, blaze, magma cube, enderman, dragon, end crystal (`persistent`), villager, iron golem, parrot. Their minds are in `Mobs312.think`, their boxes in `MobModels312`, their drops in
+  `Mobs312.kill`. `Mobs312.Fireball` is the one projectile: flags `big` (ghast), `dragon` (breath) and `pearl` (a thrown ender pearl: gravity 0.03, drag 0.99, lands the player at the last free position).
+* **Colour** (`Color312`, by another run of the project): 16 colours x (wool, concrete, concrete powder, stained and glazed terracotta, stained glass) as consecutive ids; `dyeRecipe` is hooked into `Recipes.find`
+  (dye + wool, 8 around a dye, 4 sand + 4 gravel + a dye), `wet` hardens powder next to water. **Advancements** (`Adv312`, 34 of them): polled twice a second plus `Game.adv.award` calls; screen `Game.S.ADV` (key L).
+* **GL traps**: the blended pass must switch `GL_TEXTURE_2D` back on (`drawSelection` turns it off) or the portal film is flat. The End's ambient light is low, so crystals and the dragon are drawn bright / full-bright.
+  The lightmap's ambient colour is warm (`Tex.ambG` / `Tex.ambB`, 0.80 / 0.78 of red) - in the End that made end stone brown, hence the neutral tint there.
+* **Test traps**: `World.updateChunks` only loads chunks within a radius and unloads the ones outside the last centre (use a radius <= 3 and reload the centre before reading blocks); the flat test world covers chunks
+  -2..2; an unseeded `Mobs.rnd` makes tests flaky (`g.mobs.rnd.setSeed(..)`; `World.rnd` is private); in End tests the world folder is the test folder itself (the game uses `<root>/DIM1`); water must hurt an enderman
+  before it teleports; the dragon's circle can reach radius ~62 after a swoop.
+* **Test hooks** (3.12): `bc.dim=-1|1` (`bc.cam` is then a position in that dimension), `bc.dragon=perch`, `bc.inv=trade` with `bc.prof`, `bc.summon=type,type..` (`bc.summonDist`, `bc.summonDy`), `bc.set=x,y,z,id;..`,
+  `bc.adv=screen|toast` (`bc.advdone`, `bc.advtab`), `bc.parrot=land|shoulder`. All scenes are in `tools/shots.py`; yaw 0 looks towards +z, -90 east, 180 -z, a positive pitch looks down.
+* Tests: `Tests312` (foundation, nether, netherMobs, fortress, stronghold, end, villages, colors, parrots, advancements, pearls, netherRules).
+
 ## Conventions / gotchas
 
-* Blocks are one **byte** per cell (IDs 0..255, `Blocks.COUNT` = 226 so far) and there is **no metadata**: rotated/staged
+* Blocks are 12 bits per cell since 3.12 (`short[]`; IDs 0..255 and 1024..4095, see the 3.12 notes) and there is **no metadata**: rotated/staged
   blocks use consecutive IDs (beds 133–140, wheat stages 124–131, ladders 119–122, doors 73–81, stairs 93–112 ...).
-  Items live in the same id space as blocks below 256; non-block items start at 256.
+  Items live in the same id space as blocks below 256; non-block items start at 256 (new ones at 352).
 * **Fire** (`Fire.java`, one block id 194): blocks have no metadata, so the fire's age lives in `World.fire.cells`
   (position -> {age, next update tick}); `World.setBlock` keeps it in sync and `World.updateChunks` refills it from chunk data
   (`Fire.scanChunk`), so ages restart after a reload. The rules are Minecraft 1.12's `BlockFire` (see the class comment);

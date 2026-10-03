@@ -1,2 +1,2 @@
-nether-fortress,nether-fortress-b,nether-fortress-air,end-island,end-dragon,wx-storm,wx-storm-bolt,wx-fair
+nether-fortress,nether-fortress-b,nether-fortress-air
 jar=build

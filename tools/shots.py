@@ -368,10 +368,10 @@ SCENES = {
     "nether-portal":      (NETHER + ["-Dbc.cam=23,43,-111,180,8", sets(portal_blocks(22, 41, -116))] + PLAIN + ["-Dbc.shot=150"], True),
     "nether-portal-sh":   (NETHER + ["-Dbc.cam=23,43,-111,180,8", sets(portal_blocks(22, 41, -116)), "-Dbc.shot=150"], True),
     "nether-mobs":        (NETHER + ["-Dbc.cam=23,43,-111,180,6", "-Dbc.summon=pigman,magmacube,blaze,pigman", "-Dbc.summonDist=6", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=150"], True),
-    # the fortress of seed 12345 nearest to the spawn: its hall is at (-119, 54, -128), a long corridor runs east and west from it
-    "nether-fortress":     (NETHER + ["-Dbc.cam=-124,55,-128.5,90,2"] + PLAIN + ["-Dbc.shot=150"], True),
-    "nether-fortress-b":   (NETHER + ["-Dbc.cam=-114,55,-128.5,-90,2"] + PLAIN + ["-Dbc.shot=150"], True),
-    "nether-fortress-air": (NETHER + ["-Dbc.cam=-119,84,-96,180,38"] + PLAIN + ["-Dbc.shot=170"], True),
+    # a fortress of seed 12345 (NetherGen's own seed, not 12345): its hall (7 x 7, floor y 62) is centred on x=121, z=99; corridors run north, south and east/west from it
+    "nether-fortress":     (NETHER + ["-Dbc.cam=121.5,63,102,180,3", "-Dbc.rd=4"] + PLAIN + ["-Dbc.shot=220"], True),
+    "nether-fortress-b":   (NETHER + ["-Dbc.cam=116,63,99.5,-90,3", "-Dbc.rd=4"] + PLAIN + ["-Dbc.shot=220"], True),
+    "nether-fortress-air": (NETHER + ["-Dbc.cam=121.5,84,70,0,38", "-Dbc.rd=4"] + PLAIN + ["-Dbc.shot=240"], True),
     "nether-ghast":       (NETHER + ["-Dbc.cam=30,48,-96,-90,2", "-Dbc.summon=ghast", "-Dbc.summonDist=14", "-Dbc.summonDy=0"] + PLAIN + ["-Dbc.shot=110"], True),
     # ---- Update 3.12: the End (the island is the same in every world: platform at x=62; the tallest pillar at x=42, z=0; pillar 3 (76 high) at x=-13, z=40)
     "end-island":         (END + ["-Dbc.cam=62.5,64,0.5,90,-18"] + PLAIN + ["-Dbc.shot=150"], True),
