@@ -1,20 +1,23 @@
 extracted base zip: Blockcraft-1.12-UPDATE3.5-windows.zip
-extracted update pack: Blockcraft-UPDATE3.8-patch.zip
+extracted update pack: Blockcraft-UPDATE3.9-patch.zip
 installed to C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft
 Mesa: mesa3d-26.2.3-release-msvc.7z (71 MB)
 copied next to javaw.exe: opengl32.dll, libgallium_wgl.dll
 title: starting via Blockcraft.exe (Launch4j stub)
 title            exit code 0                      3s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=TITLE
-day-plain: starting via Blockcraft.exe (Launch4j stub)
-day-plain        exit code 0                     17s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.time=6000 -Dbc.shaders=false -Dbc.shot=100
-wx-rain: starting via Blockcraft.exe (Launch4j stub)
-wx-rain          exit code 0                     69s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=48 -Dbc.cam=133,69,71,-70,2 -Dbc.weather=rain -Dbc.lightning=off -Dbc.time=6000 -Dbc.shaders=false -Dbc.shot=190
-wx-storm: starting via Blockcraft.exe (Launch4j stub)
-wx-storm         exit code 0                     38s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=48 -Dbc.cam=133,95,71,-90,0 -Dbc.weather=cell:1150,-60,620 -Dbc.lightning=off -Dbc.time=6000 -Dbc.shaders=false 
-kitchen37: starting via java.exe -jar Blockcraft.exe
-kitchen37        exit code 0                     19s  screenshot=yes
-RESULT: {"title": true, "day-plain": true, "wx-rain": true, "wx-storm": true, "kitchen37": true}
+skin-net: starting via Blockcraft.exe (Launch4j stub)
+skin-net         exit code 0                      5s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=SKINS -Dbc.skinuser=jeb_
+skin-dialog: starting via Blockcraft.exe (Launch4j stub)
+skin-dialog      exit code 0                      4s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=SKINS -Dbc.skinbrowse=1
+inv-player: starting via Blockcraft.exe (Launch4j stub)
+inv-player       exit code 0                     32s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.inv=player -Dbc.skin=demo -Dbc.mouse=560,160 -Dbc.shot=110
+firewall: starting via java.exe -jar Blockcraft.exe
+firewall         exit code 0                     79s  screenshot=yes
+pause-menu: starting via Blockcraft.exe (Launch4j stub)
+pause-menu       exit code 0                     31s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.pause=1 -Dbc.shot=110
+RESULT: {"title": true, "skin-net": true, "skin-dialog": true, "inv-player": true, "firewall": true, "pause-menu": true}
