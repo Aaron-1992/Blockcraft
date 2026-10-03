@@ -21,3 +21,6 @@ statics World.LOOT
 
 # ---- Update 3.8 (weather): the cloud shader was rewritten on purpose (weather field, storm clouds, lightning glow)
 statics ShaderSrc.CLOUD_FS
+# Update 3.9 (LOD / fog): both vertex shaders now measure fog distance radially instead of along the view axis
+statics ShaderSrc.WORLD_VS
+statics ShaderSrc.LOD_VS

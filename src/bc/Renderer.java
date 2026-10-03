@@ -30,6 +30,9 @@ public final class Renderer {
    public double camX;
    public double camY;
    public double camZ;
+   /** the direction the camera looks (the player's, or turned around for the camera in front of the player) */
+   float viewYaw;
+   float viewPitch;
    public Lod lod;
    public Shaders sh;
    /** Update 3.8: weather rendering (clouds without shaders, rain, snow, lightning). */
@@ -497,6 +500,17 @@ public final class Renderer {
       this.camX = var4.ix(var1);
       this.camY = var4.iy(var1) + var4.ieye(var1);
       this.camZ = var4.iz(var1);
+      this.viewYaw = var4.yaw;
+      this.viewPitch = var4.pitch;
+      if (this.g.view != 0 && !var4.spectator) {
+         double[] cv = thirdPerson(var5, this.camX, this.camY, this.camZ, var4.yaw, var4.pitch, this.g.view);
+         this.camX = cv[0];
+         this.camY = cv[1];
+         this.camZ = cv[2];
+         this.viewYaw = (float)cv[3];
+         this.viewPitch = (float)cv[4];
+      }
+
       boolean var6 = var4.eyeInWater;
       boolean var7 = Blocks.isLava(var5.getBlock((int)Math.floor(this.camX), (int)Math.floor(this.camY), (int)Math.floor(this.camZ)));
       int var8 = (int)Math.floor(this.camX);
@@ -566,8 +580,8 @@ public final class Renderer {
       GL11.glFrustum(-var24, var24, -var22, var22, var18, var20);
       GL11.glMatrixMode(5888);
       GL11.glLoadIdentity();
-      GL11.glRotatef(var4.pitch, 1.0F, 0.0F, 0.0F);
-      GL11.glRotatef(var4.yaw + 180.0F, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef(this.viewPitch, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(this.viewYaw + 180.0F, 0.0F, 1.0F, 0.0F);
       GL11.glGetFloatv(2983, this.proj);
       GL11.glGetFloatv(2982, this.mv);
       this.extractFrustum();
@@ -696,6 +710,7 @@ public final class Renderer {
 
       lightmapUnit(false);
       this.drawEntities(var1);
+      this.drawSelf(var1);
       this.drawParticles(var1);
       if (this.g.target != null && this.g.screenIsPlay()) {
          this.drawCrack();
@@ -1470,6 +1485,47 @@ public final class Renderer {
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
+   /**
+    * Update 3.9: the camera of the third-person views. mode 1 = behind the player, 2 = in front of the player looking back. The camera
+    * moves 4 blocks along the line of sight from the eye and stops short of any block in the way. Returns {x, y, z, yaw, pitch}.
+    */
+   static double[] thirdPerson(World w, double ex, double ey, double ez, float yaw, float pitch, int mode) {
+      double yr = Math.toRadians(yaw);
+      double pr = Math.toRadians(pitch);
+      double sgn = mode == 1 ? -1.0 : 1.0;
+      double dx = sgn * -Math.sin(yr) * Math.cos(pr);
+      double dy = sgn * -Math.sin(pr);
+      double dz = sgn * Math.cos(yr) * Math.cos(pr);
+      double dist = 4.0;
+      Hit hh = w.raycast(ex, ey, ez, dx, dy, dz, dist + 0.35);
+      if (hh != null) {
+         dist = Math.max(0.25, hh.t - 0.35);
+      }
+
+      return new double[]{ex + dx * dist, ey + dy * dist, ez + dz * dist, mode == 2 ? yaw + 180.0F : yaw, mode == 2 ? -pitch : pitch};
+   }
+
+   /** Update 3.9: the player's own body (skin, walking, hitting, sneaking) in the third-person views. */
+   void drawSelf(float partial) {
+      Game g = this.g;
+      Player pl = g.player;
+      if (g.view == 0 || pl.spectator || pl.dead) {
+         return;
+      }
+
+      double x = pl.ix(partial);
+      double y = pl.iy(partial);
+      double z = pl.iz(partial);
+      float bright = this.brightnessAt(g.world, x, y + 1.0, z);
+      GL11.glEnable(2929);
+      GL11.glDisable(2884);
+      GL11.glPushMatrix();
+      GL11.glTranslated(x - this.camX, y - this.camY, z - this.camZ);
+      PlayerModel.draw(g.skinPixels(), g.skinSlim(), g.pose(partial), bright);
+      GL11.glPopMatrix();
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
    void drawEntities(float var1) {
       World var2 = this.g.world;
       GL11.glEnable(2929);
@@ -1611,6 +1667,30 @@ public final class Renderer {
             drawBlockModel(var8, var5);
          }
 
+         GL11.glMatrixMode(5888);
+         GL11.glLoadIdentity();
+      } else {
+         // Update 3.9: nothing in the hand - your arm, in your skin
+         GL11.glClear(256);
+         GL11.glMatrixMode(5889);
+         GL11.glLoadIdentity();
+         double near = 0.05;
+         double top = near * Math.tan(Math.toRadians(35.0));
+         double right = top * var6 / var7;
+         GL11.glFrustum(-right, right, -top, top, near, 20.0);
+         GL11.glMatrixMode(5888);
+         GL11.glLoadIdentity();
+         GL11.glDisable(2912);
+         GL11.glEnable(2929);
+         float sw = var3;
+         float sq = (float)Math.sqrt(sw);
+         float sinS = (float)Math.sin(sq * Math.PI);
+         GL11.glTranslatef(0.64F - 0.34F * sinS, -0.60F - 0.10F * (float)Math.sin(sq * Math.PI * 2.0) + 0.10F * sinS, -0.92F - 0.28F * (float)Math.sin(sw * Math.PI));
+         GL11.glRotatef(68.0F + 22.0F * sinS, 1.0F, 0.0F, 0.0F);
+         GL11.glRotatef(-12.0F, 0.0F, 0.0F, 1.0F);
+         GL11.glRotatef(10.0F - (float)Math.sin(sw * sw * Math.PI) * 18.0F, 0.0F, 1.0F, 0.0F);
+         GL11.glScalef(1.9F, 1.9F, 1.9F);
+         PlayerModel.drawArm(this.g.skinPixels(), this.g.skinSlim(), var5);
          GL11.glMatrixMode(5888);
          GL11.glLoadIdentity();
       }

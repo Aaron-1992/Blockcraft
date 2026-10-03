@@ -1,2 +1,2 @@
-lod-top,lod-top-sh
+skin-front,skin-back,skin-first,skin-screen,skin-screen-def
 jar=build

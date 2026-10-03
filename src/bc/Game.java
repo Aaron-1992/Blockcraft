@@ -25,6 +25,7 @@ import java.util.function.Consumer;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.glfw.GLFWDropCallback;
 import org.lwjgl.glfw.GLFWErrorCallback;
 import org.lwjgl.glfw.GLFWVidMode;
 import org.lwjgl.opengl.GL;
@@ -33,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.8";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.9";
    /** "3.8": the version without the words, for the title screen and the F3 screen. */
    public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
    public Options opt;
@@ -105,6 +106,24 @@ public final class Game {
    final ArrayList<String> chatLog = new ArrayList();
    final ArrayList<Long> chatTimes = new ArrayList();
    final ArrayList<Game.Particle> particles = new ArrayList();
+   /** Update 3.9: skins, the camera view (0 first person, 1 behind the player, 2 in front of the player) and the body's animation state. */
+   Skins skins;
+   int view;
+   boolean poseInit;
+   float pBodyYaw;
+   float bodyYaw;
+   float walkPhase;
+   float pWalkPhase;
+   float walkAmp;
+   float pWalkAmp;
+   int skinSel = -1;
+   int skinScroll;
+   String skinField = "";
+   boolean skinFocus;
+   String skinMsg = "";
+   Game.S skinReturn = Game.S.TITLE;
+   volatile boolean skinBrowsing;
+   final java.util.concurrent.ConcurrentLinkedQueue<File> skinDrops = new java.util.concurrent.ConcurrentLinkedQueue<>();
    final Random rnd = new Random();
    String splash;
    static final String[] SPLASHES = new String[]{
@@ -154,9 +173,11 @@ public final class Game {
       } catch (Exception var6) {
       }
 
-      System.setProperty("java.awt.headless", "true");
+      // the skin screen's "Import skin file..." opens a native file dialog (AWT) on Windows
+      System.setProperty("java.awt.headless", System.getProperty("os.name", "").startsWith("Windows") ? "false" : "true");
       this.opt = new Options(this.root);
       this.opt.load();
+      this.skins = new Skins(this.root);
       if (System.getProperty("bc.rd") != null) {
          this.opt.renderDistance = Integer.getInteger("bc.rd");
       }
@@ -207,6 +228,11 @@ public final class Game {
       GL.createCapabilities();
       GLFW.glfwShowWindow(this.window);
       System.out.println("GL: " + GL11.glGetString(7938) + " / " + GL11.glGetString(7937));
+      GLFW.glfwSetDropCallback(this.window, (win, count, names) -> {
+         for (int i = 0; i < count; i++) {
+            this.skinDrops.add(new File(GLFWDropCallback.getName(names, i)));
+         }
+      });
       GLFW.glfwSetKeyCallback(this.window, (var1x, var3x, var4, var5, var6) -> this.onKey(var3x, var5, var6));
       GLFW.glfwSetCharCallback(this.window, (var1x, var3x) -> this.onChar(var3x));
       GLFW.glfwSetMouseButtonCallback(this.window, (var1x, var3x, var4, var5) -> this.onMouse(var3x, var4));
@@ -292,9 +318,30 @@ public final class Game {
       }
    }
 
+   /** bc.skin=demo | <file name>: a skin for screenshots ("demo" is a built-in slim-armed test skin that is stored in the skins folder). */
+   void autoSkin(String name) {
+      if (name.equals("demo")) {
+         try {
+            java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            img.setRGB(0, 0, 64, 64, Skins.demoSkin(), 0, 64);
+            javax.imageio.ImageIO.write(img, "png", new File(this.skins.dir, "demo.png"));
+            this.skins.setSlim("demo.png", true);
+            name = "demo.png";
+         } catch (Exception e) {
+            System.err.println("bc.skin=demo: " + e);
+         }
+      }
+
+      this.opt.skin = name;
+   }
+
    void autoTest() {
       String var1 = System.getProperty("bc.title");
       if (var1 != null) {
+         if (this.autoFrames == 0 && System.getProperty("bc.skin") != null) {
+            this.autoSkin(System.getProperty("bc.skin"));
+         }
+
          if (++this.autoFrames == 40) {
             this.setScreen(Game.S.valueOf(var1));
          }
@@ -330,6 +377,14 @@ public final class Game {
             if (System.getProperty("bc.weather") != null || System.getProperty("bc.wtime") != null || System.getProperty("bc.biome") != null) {
                this.autoWeather();
             }
+
+            if (System.getProperty("bc.view") != null) {
+               this.view = Integer.parseInt(System.getProperty("bc.view"));
+            }
+
+            if (System.getProperty("bc.skin") != null) {
+               this.autoSkin(System.getProperty("bc.skin"));
+            }
          }
 
          if (this.autoFrames % 15 == 0 && System.getProperty("bc.biome") != null) {
@@ -341,6 +396,10 @@ public final class Game {
             String[] b = System.getProperty("bc.bolt").split(",");
             this.world.weather.bolts.clear();
             this.world.weather.strike(this.player.x + Double.parseDouble(b[0]), this.player.z + Double.parseDouble(b[1]), false);
+         }
+
+         if (this.autoFrames == 12 && System.getProperty("bc.emptyhand") != null) {
+            this.inv[this.sel] = null; // screenshots of the arm in the first-person view
          }
 
          if (this.autoFrames == 12 && System.getProperty("bc.hold") != null) {
@@ -923,7 +982,9 @@ public final class Game {
    }
 
    void onScroll(double var1) {
-      if (this.screen == Game.S.WORLDS) {
+      if (this.screen == Game.S.SKINS) {
+         this.skinScroll = Math.max(0, this.skinScroll - (int)Math.signum(var1));
+      } else if (this.screen == Game.S.WORLDS) {
          this.worldScroll = Math.max(0, Math.min(Math.max(0, this.worldList.size() - 5), this.worldScroll - (int)Math.signum(var1)));
       } else {
          if (this.screen == Game.S.PLAY && this.key(67)) {
@@ -950,6 +1011,10 @@ public final class Game {
 
          if (var1 >= 32 && var1 < 127 && this.chat.length() < 100) {
             this.chat.append((char)var1);
+         }
+      } else if (this.screen == Game.S.SKINS) {
+         if (this.skinFocus && this.skinField.length() < 16 && (var1 >= 48 && var1 <= 57 || var1 >= 65 && var1 <= 90 || var1 >= 97 && var1 <= 122 || var1 == 95)) {
+            this.skinField = this.skinField + (char)var1;
          }
       } else if (this.screen == Game.S.NEWWORLD) {
          if (var1 >= 32 && var1 < 127) {
@@ -1031,6 +1096,10 @@ public final class Game {
                            case 292:
                               this.debug = !this.debug;
                               return;
+                           case 294:
+                              this.view = (this.view + 1) % 3;
+                              this.say("Camera: " + new String[]{"first person", "behind you", "in front of you"}[this.view]);
+                              return;
                            default:
                               if (var1 >= 49 && var1 <= 57) {
                                  this.sel = var1 - 49;
@@ -1041,6 +1110,9 @@ public final class Game {
 
                      return;
                   }
+               case SKINS:
+                  this.skinKey(var1, var2, var3);
+                  return;
                case WORLDS:
                   if (var1 == 256 && var2 == 1) {
                      this.setScreen(Game.S.TITLE);
@@ -1606,6 +1678,19 @@ public final class Game {
    }
 
    void update(double var1) {
+      File dropped;
+      while (this.skins != null && (dropped = this.skinDrops.poll()) != null) {
+         this.importSkin(dropped);
+      }
+
+      if (this.skins != null && this.skins.imported != null) {
+         this.opt.skin = this.skins.imported;
+         this.opt.save();
+         this.skinSel = -1;
+         this.skinMsg = "Imported " + this.skins.imported;
+         this.skins.imported = null;
+      }
+
       if (this.world != null) {
          int var3 = (int)Math.floor(this.player.x) >> 4;
          int var4 = (int)Math.floor(this.player.z) >> 4;
@@ -1688,6 +1773,74 @@ public final class Game {
       return GLFW.glfwGetKey(this.window, var1) == 1;
    }
 
+   /** Update 3.9: the walking / turning state of the body that the third-person view and the skin preview draw. */
+   void tickPose() {
+      Player pl = this.player;
+      if (!this.poseInit) {
+         this.bodyYaw = this.pBodyYaw = pl.yaw;
+         this.poseInit = true;
+      }
+
+      double dx = pl.x - pl.px;
+      double dz = pl.z - pl.pz;
+      float speed = (float)Math.sqrt(dx * dx + dz * dz);
+      this.pWalkPhase = this.walkPhase;
+      this.pWalkAmp = this.walkAmp;
+      this.pBodyYaw = this.bodyYaw;
+      float target = pl.flying ? Math.min(0.3F, speed * 1.5F) : Math.min(1.0F, speed * 4.0F);
+      this.walkAmp += (target - this.walkAmp) * 0.4F;
+      this.walkPhase += speed * 2.45F * (pl.sprinting ? 1.2F : 1.0F);
+      float diff = Mobs.wrap(pl.yaw - this.bodyYaw);
+      if (speed > 0.03F || this.swinging) {
+         this.bodyYaw += diff * 0.5F; // walking or hitting: the body turns to where you look
+      } else if (Math.abs(diff) > 50.0F) {
+         this.bodyYaw = pl.yaw - Math.signum(diff) * 50.0F; // standing: the head turns up to 50 degrees before the body follows
+      }
+   }
+
+   /** The pose of the player's body for this frame (interpolated between ticks). */
+   PlayerModel.Pose pose(float partial) {
+      PlayerModel.Pose p = new PlayerModel.Pose();
+      Player pl = this.player;
+      p.bodyYaw = MobRender.lerpAngle(this.pBodyYaw, this.bodyYaw, partial);
+      p.headYaw = Math.max(-70.0F, Math.min(70.0F, Mobs.wrap(pl.yaw - p.bodyYaw)));
+      p.headPitch = pl.pitch;
+      p.limb = this.pWalkPhase + (this.walkPhase - this.pWalkPhase) * partial;
+      p.amp = this.pWalkAmp + (this.walkAmp - this.pWalkAmp) * partial;
+      p.swing = this.swinging ? this.swingPrev + (this.swing - this.swingPrev) * partial : -1.0F;
+      p.sneak = pl.sneaking && !pl.flying;
+      p.age = this.tickCount + partial;
+      return p;
+   }
+
+   /** The 64x64 pixels of the skin the player has chosen (never null). */
+   int[] skinPixels() {
+      return this.skins == null ? Skins.defaultPixels() : this.skins.pixels(this.opt.skin);
+   }
+
+   boolean skinSlim() {
+      return this.skins != null && this.skins.slim(this.opt.skin);
+   }
+
+   /** A skin file arrived (dropped on the window, from the dialog or the clipboard): import it and wear it. */
+   void importSkin(File f) {
+      try {
+         String name = this.skins.importFile(f);
+         this.opt.skin = name;
+         this.opt.save();
+         this.skinSel = -1;
+         this.skinMsg = "Imported " + name;
+         if (this.world != null && this.screen != Game.S.SKINS) {
+            this.say("Skin imported: " + name + "  (change it under Game menu > Skins)");
+         }
+      } catch (Exception e) {
+         this.skinMsg = "Not a usable skin: " + e.getMessage();
+         if (this.world != null && this.screen != Game.S.SKINS) {
+            this.say("§cNot a usable skin: " + e.getMessage());
+         }
+      }
+   }
+
    void tick() {
       this.tickCount++;
       this.world.tick();
@@ -1731,6 +1884,7 @@ public final class Game {
 
       if (!this.player.dead) {
          this.player.tick(this.world, var2, var3, var4, var5, var6);
+         this.tickPose();
       }
 
       if (this.player.dead && this.screen != Game.S.DEAD) {
@@ -3055,7 +3209,7 @@ public final class Game {
             this.rend.sh.skyMask(this.fbW, this.fbH);
          }
 
-         if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator) {
+         if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {
             float var4 = this.swingPrev + (this.swing - this.swingPrev) * this.partial;
             float var5 = this.rend.brightnessAt(this.world, this.player.x, this.player.y + 1.0, this.player.z);
             this.rend
@@ -3104,6 +3258,15 @@ public final class Game {
             } else if (this.screen == Game.S.DEAD) {
                this.drawDead();
             }
+            break;
+         case SKINS:
+            if (this.world != null) {
+               this.gui.rect(0.0F, 0.0F, this.gui.w, this.gui.h, -1879048192);
+            } else {
+               this.gui.dirtBackground(0.25F);
+            }
+
+            this.drawSkins();
             break;
          case OPTIONS:
             if (this.world != null) {
@@ -3197,6 +3360,10 @@ public final class Game {
          this.setScreen(Game.S.OPTIONS);
       });
       this.button("Quit Game", var1 + 2.0F, var9 + 52.0F, 98.0F, var8, true, () -> GLFW.glfwSetWindowShouldClose(this.window, true));
+      this.button("Skins...", var1 - var7 / 2.0F, var9 + 76.0F, var7, var8, true, () -> {
+         this.skinReturn = Game.S.TITLE;
+         this.setScreen(Game.S.SKINS);
+      });
       this.gui.text("Update " + VERSION_STR, 2.0F, this.gui.h - 10.0F, -1, true);
       String var10 = "Not affiliated with Mojang";
       this.gui.text(var10, this.gui.w - Gui.textWidth(var10) - 2.0F, this.gui.h - 10.0F, -1, true);
@@ -3349,7 +3516,11 @@ public final class Game {
          this.optionsReturn = Game.S.PAUSE;
          this.setScreen(Game.S.OPTIONS);
       });
-      this.button("Save and Quit to Title", var1 - 100.0F, var2 + 56.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      this.button("Skins...", var1 - 100.0F, var2 + 56.0F, 200.0F, 20.0F, true, () -> {
+         this.skinReturn = Game.S.PAUSE;
+         this.setScreen(Game.S.SKINS);
+      });
+      this.button("Save and Quit to Title", var1 - 100.0F, var2 + 84.0F, 200.0F, 20.0F, true, this::quitToTitle);
    }
 
    void drawDead() {
@@ -3365,6 +3536,159 @@ public final class Game {
 
    String onOff(boolean var1) {
       return var1 ? "ON" : "OFF";
+   }
+
+   // ------------------------------------------------------------------ Update 3.9: the Skins screen
+   void drawSkins() {
+      float cx = this.gui.w / 2.0F;
+      this.gui.centered("Skins", cx, 8.0F, -1, true, 1.0F);
+      java.util.List<String> names = this.skins.choices();
+      int cur = Math.max(0, names.indexOf(this.opt.skin));
+      if (this.skinSel < 0 || this.skinSel >= names.size()) {
+         this.skinSel = cur;
+      }
+
+      float left = cx - 204.0F;
+      float top = 24.0F;
+      float rowH = 15.0F;
+      int rows = Math.max(3, Math.min(8, (int)((this.gui.h - 150.0F) / rowH)));
+      this.skinScroll = Math.max(0, Math.min(Math.max(0, names.size() - rows), this.skinScroll));
+      this.gui.rect(left - 1.0F, top - 1.0F, 184.0F, rows * rowH + 2.0F, -8355712);
+      this.gui.rect(left, top, 182.0F, rows * rowH, -1442840576);
+      for (int i = 0; i < rows; i++) {
+         int idx = this.skinScroll + i;
+         if (idx >= names.size()) {
+            break;
+         }
+
+         final String n = names.get(idx);
+         float y = top + i * rowH;
+         boolean wearing = n.equals(this.opt.skin);
+         if (this.hover(left, y, 182.0F, rowH)) {
+            this.gui.rect(left, y, 182.0F, rowH, 1090519039);
+         }
+
+         if (idx == this.skinSel) {
+            this.gui.rect(left, y, 182.0F, rowH, 1627389951);
+         }
+
+         String label = n.equals(Skins.DEFAULT) ? "Default skin" : n.substring(0, n.length() - 4);
+         if (label.length() > 24) {
+            label = label.substring(0, 23) + "~";
+         }
+
+         this.gui.text((wearing ? "> " : "  ") + label, left + 3.0F, y + 4.0F, wearing ? -256 : -1, true);
+         final int fi = idx;
+         this.hitbox(left, y, 182.0F, rowH, () -> {
+            this.skinSel = fi;
+            this.opt.skin = n;
+            this.opt.save();
+            this.skinMsg = "";
+         });
+      }
+
+      this.button("^", left + 186.0F, top, 14.0F, 14.0F, true, () -> this.skinScroll = Math.max(0, this.skinScroll - 1));
+      this.button("v", left + 186.0F, top + rows * rowH - 14.0F, 14.0F, 14.0F, true, () -> this.skinScroll++);
+      // the preview: your skin, slowly turning
+      float pcx = cx + 105.0F;
+      float feetY = top + rows * rowH - 16.0F;
+      float scale = Math.min(60.0F, (rows * rowH - 26.0F) / 1.9F);
+      this.gui.rect(pcx - 70.0F, top - 1.0F, 140.0F, rows * rowH + 2.0F, 1073741824);
+      PlayerModel.drawPreview(this.skinPixels(), this.skinSlim(), pcx, feetY, scale, 25.0F + (float)(GLFW.glfwGetTime() * 28.0 % 360.0), (float)GLFW.glfwGetTime());
+      String shown = this.opt.skin.equals(Skins.DEFAULT) ? "Default skin" : this.opt.skin;
+      this.gui.centered(shown.length() > 26 ? shown.substring(0, 25) + "~" : shown, pcx, top + rows * rowH + 3.0F, -5592406, true, 1.0F);
+      float by = top + rows * rowH + 14.0F;
+      boolean custom = !this.opt.skin.equals(Skins.DEFAULT);
+      this.button("Arms: " + (this.skinSlim() ? "Slim (3 px)" : "Classic (4 px)"), pcx - 70.0F, by, 140.0F, 18.0F, custom, () -> {
+         this.skins.setSlim(this.opt.skin, !this.skinSlim());
+      });
+      // username / link / path field + buttons
+      float fy = by;
+      this.gui.text("Minecraft username:", left, fy - 10.0F, -6250336, true);
+      this.gui.rect(left, fy, 124.0F, 18.0F, this.skinFocus ? -1 : -6250336);
+      this.gui.rect(left + 1.0F, fy + 1.0F, 122.0F, 16.0F, -16777216);
+      this.gui.text(this.skinField + (this.skinFocus && (int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : ""), left + 4.0F, fy + 5.0F, -1, true);
+      this.hitbox(left, fy, 124.0F, 18.0F, () -> this.skinFocus = true);
+      this.button("Import", left + 128.0F, fy, 54.0F, 18.0F, !this.skins.busy && !this.skinField.isEmpty(), () -> this.skins.importUser(this.skinField));
+      this.button("Import skin file...", left, fy + 22.0F, 182.0F, 18.0F, !this.skinBrowsing, this::browseSkin);
+      this.button("Open skins folder", pcx - 70.0F, fy + 22.0F, 140.0F, 18.0F, true, this::openSkinsFolder);
+      String st = this.skins.busy || this.skins.status.length() > 0 && this.skinMsg.isEmpty() ? this.skins.status : this.skinMsg;
+      if (!st.isEmpty()) {
+         this.gui.centered(st.length() > 70 ? st.substring(0, 69) + "~" : st, cx, this.gui.h - 52.0F, st.startsWith("Imported") ? -8323200 : (st.startsWith("Could not") || st.startsWith("Not a") ? -43691 : -5592406), true, 1.0F);
+      }
+
+      this.gui.centered("Tip: drag a skin .png onto this window - or copy its file path, a link or a name and press Ctrl+V", cx, this.gui.h - 40.0F, -8355712, true, 1.0F);
+      this.button("Done", cx - 100.0F, this.gui.h - 30.0F, 200.0F, 20.0F, true, () -> {
+         this.opt.save();
+         this.setScreen(this.skinReturn);
+      });
+   }
+
+   void skinKey(int key, int action, int mods) {
+      java.util.List<String> names = this.skins.choices();
+      if (key == 256 && action == 1) {
+         if (this.skinFocus) {
+            this.skinFocus = false;
+         } else {
+            this.opt.save();
+            this.setScreen(this.skinReturn);
+         }
+      } else if (key == 259 && !this.skinField.isEmpty() && this.skinFocus) {
+         this.skinField = this.skinField.substring(0, this.skinField.length() - 1);
+      } else if ((key == 257 || key == 335) && action == 1 && this.skinFocus && !this.skinField.isEmpty()) {
+         this.skins.importUser(this.skinField);
+      } else if (key == 258 && action == 1) {
+         this.skinFocus = !this.skinFocus;
+      } else if (key == 86 && (mods & 2) != 0) {
+         String text = GLFW.glfwGetClipboardString(this.window);
+         File f = this.skins.importFromText(text);
+         if (f != null) {
+            this.importSkin(f);
+         }
+      } else if ((key == 265 || key == 264) && !this.skinFocus) {
+         int i = Math.max(0, Math.min(names.size() - 1, (this.skinSel < 0 ? 0 : this.skinSel) + (key == 264 ? 1 : -1)));
+         this.skinSel = i;
+         this.opt.skin = names.get(i);
+         this.opt.save();
+         this.skinScroll = Math.max(0, Math.min(i, this.skinScroll > i ? i : this.skinScroll));
+      }
+   }
+
+   /** The system's own file dialog (Windows), on a helper thread so the game keeps drawing; the chosen file arrives through skinDrops. */
+   void browseSkin() {
+      if (this.skinBrowsing) {
+         return;
+      }
+
+      this.skinBrowsing = true;
+      Thread t = new Thread(() -> {
+         try {
+            java.awt.FileDialog fd = new java.awt.FileDialog((java.awt.Frame)null, "Choose a Minecraft skin (a 64x64 PNG)", java.awt.FileDialog.LOAD);
+            fd.setFile("*.png");
+            fd.setFilenameFilter((d, n) -> n.toLowerCase().endsWith(".png"));
+            fd.setVisible(true);
+            if (fd.getFile() != null) {
+               this.skinDrops.add(new File(fd.getDirectory(), fd.getFile()));
+            }
+         } catch (Throwable e) {
+            this.skinMsg = "No file dialog here - drag the skin .png onto this window instead";
+         } finally {
+            this.skinBrowsing = false;
+         }
+      }, "skin-browse");
+      t.setDaemon(true);
+      t.start();
+   }
+
+   void openSkinsFolder() {
+      try {
+         this.skins.dir.mkdirs();
+         String os = System.getProperty("os.name", "").toLowerCase();
+         String[] cmd = os.startsWith("windows") ? new String[]{"explorer", this.skins.dir.getAbsolutePath()} : new String[]{os.contains("mac") ? "open" : "xdg-open", this.skins.dir.getAbsolutePath()};
+         new ProcessBuilder(cmd).start();
+      } catch (Exception e) {
+         this.skinMsg = "Skins folder: " + this.skins.dir.getAbsolutePath();
+      }
    }
 
    void drawOptions() {
@@ -3454,7 +3778,7 @@ public final class Game {
    void drawHud() {
       if (!this.hideGui) {
          this.drawOverlays();
-         if (this.screen == Game.S.PLAY || this.screen == Game.S.CHAT) {
+         if ((this.screen == Game.S.PLAY || this.screen == Game.S.CHAT) && this.view == 0) {
             GL11.glBlendFunc(775, 769);
             float var1 = (float)Math.floor(this.gui.w / 2.0F);
             float var2 = (float)Math.floor(this.gui.h / 2.0F);
@@ -3845,6 +4169,7 @@ public final class Game {
       INV,
       CHAT,
       OPTIONS,
+      SKINS,
       DEAD;
    }
 
