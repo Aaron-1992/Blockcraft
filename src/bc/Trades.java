@@ -55,7 +55,7 @@ final class Trades {
          case PRIEST:
             return new Trade[]{t(Items.ROTTEN_FLESH, 32, e, 1), t(Items.GOLD_INGOT, 3, e, 1), t(e, 1, Items.BONE_MEAL, 4), t(e, 4, Blocks.GLOWSTONE, 2), t(e, 5, Items.ENDER_PEARL, 1), t(e, 3, Items.BLAZE_POWDER, 2)};
          case SMITH:
-            return new Trade[]{t(Items.COAL, 16, e, 1), t(Items.IRON_INGOT, 4, e, 1), t(e, 5, Items.toolId(1, 2), 1), t(e, 7, Items.toolId(4, 2), 1), t(e, 9, Items.armorId(1, 1), 1), t(e, 13, Items.toolId(1, 4), 1)};
+            return new Trade[]{t(Items.COAL, 16, e, 1), t(Items.IRON_INGOT, 4, e, 1), t(e, 5, Items.toolId(2, Items.C_AXE), 1), t(e, 7, Items.toolId(2, Items.C_SWORD), 1), t(e, 9, Items.armorId(1, 1), 1), t(e, 13, Items.toolId(4, Items.C_PICK), 1)};
          case BUTCHER:
             return new Trade[]{t(Items.RAW_PORK, 14, e, 1), t(Items.RAW_CHICKEN, 14, e, 1), t(Items.RAW_BEEF, 10, e, 1), t(e, 1, Items.COOKED_PORK, 5), t(e, 1, Items.COOKED_CHICKEN, 4), t(e, 2, Items.STEAK, 4)};
          default:

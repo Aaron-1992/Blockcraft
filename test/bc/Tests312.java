@@ -22,6 +22,7 @@ final class Tests312 {
       stronghold();
       end();
       villages();
+      colors();
    }
 
    static void deleteAll(File f) {
@@ -2242,7 +2243,7 @@ final class Tests312 {
          int e0 = g.countItem(Items.EMERALD);
          m.click(sword, 0, false);
          eq(e0 - 7, g.countItem(Items.EMERALD), "an iron sword costs seven");
-         check(g.countItem(Items.toolId(4, 2)) == 1, "and there it is");
+         check(g.countItem(Items.toolId(2, Items.C_SWORD)) == 1 && Items.name(Items.toolId(2, Items.C_SWORD)).equals("Iron Sword"), "and there it is: an iron sword");
          // creative: free
          g.player.setMode(1);
          int emeralds = g.countItem(Items.EMERALD);
@@ -2256,5 +2257,546 @@ final class Tests312 {
 
          check(pearl, "the priest sells ender pearls: the way to the End is open without a single enderman");
       });
+   }
+
+   // ------------------------------------------------------------------ the World of Color
+   static Stack craft(int w, int h, Stack... cells) {
+      Stack[] g = new Stack[w * h];
+      for (int i = 0; i < cells.length; i++) {
+         g[i] = cells[i];
+      }
+
+      return Recipes.find(g, w, h);
+   }
+
+   static Stack s(int id) {
+      return new Stack(id, 1);
+   }
+
+   static void colors() {
+      test("colours: 16 colours of concrete, powder, terracotta, glazed terracotta and stained glass, 15 dyes, 6 blocks of metal and gem, emerald ore - registered, named, tiled", () -> {
+         for (int c = 0; c < 16; c++) {
+            int[] ids = {Blocks.CONCRETE0 + c, Blocks.POWDER0 + c, Blocks.STAINED0 + c, Blocks.GLAZED0 + c, Blocks.GLASS0 + c};
+            for (int id : ids) {
+               check(Blocks.isBlockId(id) && Blocks.name[id] != null && Blocks.name[id].startsWith(Color312.NAME[c]), "name of block " + id + ": " + Blocks.name[id]);
+               check(Blocks.tiles[id][0] >= 400 && Blocks.tiles[id][0] < Tex.COLS * Tex.COLS, "tile of block " + id);
+               check(Blocks.solid[id], "solid " + id);
+            }
+
+            check(!Blocks.opaque[Blocks.GLASS0 + c] && Blocks.opacity[Blocks.GLASS0 + c] == 0, "stained glass lets the light through");
+            eq(0, Blocks.drop[Blocks.GLASS0 + c], "stained glass drops nothing");
+            check(Blocks.opaque[Blocks.CONCRETE0 + c] && Blocks.opaque[Blocks.GLAZED0 + c], "concrete and terracotta are opaque");
+         }
+
+         for (int c = 1; c < 16; c++) {
+            int id = Items.DYE1 + c - 1;
+            check(Items.isItem(id) && Items.name[id] != null && Items.name[id].equals(Color312.NAME[c] + " Dye"), "dye " + c + ": " + Items.name[id]);
+            eq(TexArt312.ITEM0 + id - Items.QUARTZ, Items.tile[id], "tile of dye " + c);
+            check(TexArt312.sprite(id) != null && TexArt312.sprite(id).length == 256, "a picture for dye " + c);
+            eq(c, Color312.dyeColor(id), "colour of dye " + c);
+            eq(id, Color312.dyeItem(c), "item of colour " + c);
+         }
+
+         eq(0, Color312.dyeColor(Items.BONE_MEAL), "bone meal is the white dye");
+         eq(-1, Color312.dyeColor(Items.COAL), "coal is no dye");
+         eq(-1, Color312.dyeColor(Items.DYE1 + 15), "one past the last dye");
+         // all tiles are distinct from one another and in the atlas
+         java.util.HashSet<Integer> tiles = new java.util.HashSet<>();
+         for (int id = Blocks.CONCRETE0; id <= Blocks.EMERALD_ORE; id++) {
+            if (Blocks.name[id] != null) {
+               check(tiles.add(Blocks.tiles[id][0]), "block " + id + " has a tile of its own");
+            }
+         }
+
+         for (int id : new int[]{Blocks.TERRACOTTA, Blocks.CLAY, Blocks.IRON_BLOCK, Blocks.GOLD_BLOCK, Blocks.DIAMOND_BLOCK, Blocks.EMERALD_BLOCK, Blocks.COAL_BLOCK, Blocks.LAPIS_BLOCK, Blocks.EMERALD_ORE}) {
+            check(Blocks.name[id] != null, "block " + id + " is named");
+         }
+
+         eq(Items.EMERALD, Blocks.drop[Blocks.EMERALD_ORE], "emerald ore drops emeralds");
+         // the creative inventory offers all of them
+         java.util.HashSet<Integer> offered = new java.util.HashSet<>();
+         for (int id : Blocks.creativeList()) {
+            offered.add(id);
+         }
+
+         for (int c = 0; c < 16; c++) {
+            check(offered.contains(Blocks.CONCRETE0 + c) && offered.contains(Blocks.POWDER0 + c) && offered.contains(Blocks.STAINED0 + c)
+               && offered.contains(Blocks.GLAZED0 + c) && offered.contains(Blocks.GLASS0 + c), "creative: colour " + c);
+         }
+
+         for (int c = 1; c < 16; c++) {
+            check(offered.contains(Items.DYE1 + c - 1), "creative: dye " + c);
+         }
+
+         check(offered.contains(Blocks.CLAY) && offered.contains(Blocks.TERRACOTTA) && offered.contains(Blocks.EMERALD_ORE) && offered.contains(Blocks.LAPIS_BLOCK), "creative: the rest");
+      });
+
+      test("colours: the tiles have the colours they are named after", () -> {
+         Color312.tiles();
+         for (int c = 0; c < 16; c++) {
+            int[] want = {Color312.CONCRETE[c] >> 16 & 255, Color312.CONCRETE[c] >> 8 & 255, Color312.CONCRETE[c] & 255};
+            int[] got = avg(Color312.T_CONCRETE0 + c);
+            for (int k = 0; k < 3; k++) {
+               check(Math.abs(want[k] - got[k]) <= 6, "concrete " + Color312.NAME[c] + " channel " + k + ": want " + want[k] + " got " + got[k]);
+            }
+
+            int[] pow = avg(Color312.T_POWDER0 + c);
+            check(Math.abs(pow[0] - got[0]) + Math.abs(pow[1] - got[1]) + Math.abs(pow[2] - got[2]) > 6 || c == 0, "powder differs from concrete: " + Color312.NAME[c]);
+            int[] ter = avg(Color312.T_STAINED0 + c);
+            int[] want2 = {Color312.TERRA[c] >> 16 & 255, Color312.TERRA[c] >> 8 & 255, Color312.TERRA[c] & 255};
+            for (int k = 0; k < 3; k++) {
+               check(Math.abs(want2[k] - ter[k]) <= 8, "terracotta " + Color312.NAME[c] + " channel " + k);
+            }
+
+            // every pixel of every tile is opaque (the translucency of glass comes from the mesher)
+            for (int tile : new int[]{Color312.T_CONCRETE0 + c, Color312.T_POWDER0 + c, Color312.T_STAINED0 + c, Color312.T_GLAZED0 + c, Color312.T_GLASS0 + c}) {
+               int x0 = Tex.tx(tile);
+               int y0 = Tex.ty(tile);
+               for (int y = 0; y < 16; y++) {
+                  for (int x = 0; x < 16; x++) {
+                     eq(255, Tex.atlasPixels[(y0 + y) * Tex.PX + x0 + x] >>> 24, "tile " + tile + " is opaque at " + x + "," + y);
+                  }
+               }
+            }
+         }
+
+         // the 16 glazed patterns are all different from each other
+         java.util.HashSet<String> seen = new java.util.HashSet<>();
+         for (int c = 0; c < 16; c++) {
+            check(seen.add(java.util.Arrays.toString(Color312.glazed(c))), "glazed pattern " + c + " is unique");
+         }
+
+         // a tile must have been painted where the dye sprite goes (the game blits every item that has a picture)
+         int[] dye = Color312.dyeSprite(Items.DYE1);
+         int solid = 0;
+         for (int px : dye) {
+            if (px >>> 24 != 0) {
+               solid++;
+            }
+         }
+
+         check(solid >= 40 && solid <= 200, "the dye sprite is a small heap: " + solid + " pixels");
+      });
+
+      test("colours: dye recipes (wool, terracotta, glass, concrete powder), mixing, sources of dye, metal blocks, the furnace", () -> {
+         // wool
+         Stack r = craft(2, 2, s(Blocks.WOOL0), s(Color312.dyeItem(14)));
+         check(r != null && r.id == Blocks.WOOL0 + 14 && r.n == 1, "white wool + red dye = red wool");
+         r = craft(3, 3, null, null, null, null, s(Blocks.WOOL0 + 3), null, null, s(Color312.dyeItem(5)), null);
+         check(r != null && r.id == Blocks.WOOL0 + 5, "anywhere on the grid: light blue wool + lime dye = lime wool");
+         r = craft(2, 2, s(Blocks.WOOL0), s(Items.BONE_MEAL));
+         check(r == null, "white wool + bone meal (white dye): nothing happens");
+         check(craft(2, 2, s(Blocks.WOOL0), s(Blocks.WOOL0 + 1)) == null, "two wools make nothing");
+         check(craft(3, 3, s(Blocks.WOOL0), s(Color312.dyeItem(2)), s(Color312.dyeItem(3))) == null, "wool + two dyes make nothing");
+         // terracotta: eight of any colour and a dye
+         Stack[] ring = new Stack[9];
+         for (int i = 0; i < 9; i++) {
+            ring[i] = s(Blocks.TERRACOTTA);
+         }
+
+         ring[4] = s(Color312.dyeItem(11));
+         r = Recipes.find(ring, 3, 3);
+         check(r != null && r.id == Blocks.STAINED0 + 11 && r.n == 8, "8 terracotta + blue dye = 8 blue terracotta");
+         ring[0] = s(Blocks.STAINED0 + 2);
+         r = Recipes.find(ring, 3, 3);
+         check(r != null && r.id == Blocks.STAINED0 + 11 && r.n == 8, "stained terracotta can be dyed again");
+         // glass
+         for (int i = 0; i < 9; i++) {
+            ring[i] = s(Blocks.GLASS);
+         }
+
+         ring[4] = s(Color312.dyeItem(1));
+         r = Recipes.find(ring, 3, 3);
+         check(r != null && r.id == Blocks.GLASS0 + 1 && r.n == 8, "8 glass + orange dye = 8 orange stained glass");
+         // concrete powder
+         for (int i = 0; i < 9; i++) {
+            ring[i] = s(i % 2 == 0 ? 7 : 8);
+         }
+
+         ring[4] = s(Color312.dyeItem(13));
+         eq(5, craft(3, 3, ring[0], ring[1], ring[2], ring[3], null, ring[5], ring[6], ring[7], ring[8]) == null ? 5 : 6, "only 8 around a dye: 4 + 4 needed");
+         for (int i = 0; i < 9; i++) {
+            ring[i] = s(i < 4 ? 7 : 8);
+         }
+
+         ring[8] = s(Color312.dyeItem(13));
+         r = Recipes.find(ring, 3, 3);
+         check(r != null && r.id == Blocks.POWDER0 + 13 && r.n == 8, "4 sand + 4 gravel + green dye = 8 green concrete powder");
+         ring[7] = s(7);
+         check(Recipes.find(ring, 3, 3) == null, "5 sand + 3 gravel + a dye: nothing");
+         // mixing
+         r = craft(2, 2, s(Color312.dyeItem(14)), s(Color312.dyeItem(4)));
+         check(r != null && r.id == Color312.dyeItem(1) && r.n == 2, "red + yellow = 2 orange");
+         r = craft(2, 2, s(Color312.dyeItem(11)), s(Items.BONE_MEAL));
+         check(r != null && r.id == Color312.dyeItem(3) && r.n == 2, "blue + bone meal = 2 light blue");
+         r = craft(2, 2, s(Color312.dyeItem(11)), s(Color312.dyeItem(13)));
+         check(r != null && r.id == Color312.dyeItem(9) && r.n == 2, "blue + green = 2 cyan");
+         r = craft(2, 2, s(Color312.dyeItem(7)), s(Items.BONE_MEAL));
+         check(r != null && r.id == Color312.dyeItem(8), "gray + white = light gray");
+         // sources
+         r = craft(1, 1, s(30));
+         check(r != null && r.id == Color312.dyeItem(14) && r.n == 1, "poppy = red dye");
+         r = craft(1, 1, s(31));
+         check(r != null && r.id == Color312.dyeItem(4), "dandelion = yellow dye");
+         r = craft(1, 1, s(Items.COAL));
+         check(r != null && r.id == Color312.dyeItem(15), "coal = black dye");
+         check(Recipes.smeltResult(s(28)) != null && Recipes.smeltResult(s(28)).id == Color312.dyeItem(13), "a cactus smelts to green dye");
+         // metal blocks, and back
+         Stack[] nine = new Stack[9];
+         for (int i = 0; i < 9; i++) {
+            nine[i] = s(Items.IRON_INGOT);
+         }
+
+         r = Recipes.find(nine, 3, 3);
+         check(r != null && r.id == Blocks.IRON_BLOCK && r.n == 1, "9 iron ingots = a block of iron");
+         r = craft(1, 1, s(Blocks.IRON_BLOCK));
+         check(r != null && r.id == Items.IRON_INGOT && r.n == 9, "a block of iron = 9 ingots");
+         for (int i = 0; i < 9; i++) {
+            nine[i] = s(Color312.dyeItem(11));
+         }
+
+         r = Recipes.find(nine, 3, 3);
+         check(r != null && r.id == Blocks.LAPIS_BLOCK, "9 blue dye = a lapis block");
+         for (int i = 0; i < 9; i++) {
+            nine[i] = s(Items.EMERALD);
+         }
+
+         r = Recipes.find(nine, 3, 3);
+         check(r != null && r.id == Blocks.EMERALD_BLOCK, "9 emeralds = a block of emerald");
+         // the furnace
+         check(Recipes.smeltResult(s(Blocks.CLAY)).id == Blocks.TERRACOTTA, "clay smelts to terracotta");
+         for (int c = 0; c < 16; c++) {
+            check(Recipes.smeltResult(s(Blocks.STAINED0 + c)).id == Blocks.GLAZED0 + c, "stained terracotta smelts to glazed: " + c);
+         }
+
+         // the old recipes did not change
+         r = craft(2, 2, s(5), s(5), s(5), s(5));
+         check(r != null && r.id == 66, "4 planks still make a crafting table");
+         r = craft(1, 1, s(Items.BONE));
+         check(r != null && r.id == Items.BONE_MEAL, "a bone still makes bone meal");
+      });
+
+      test("concrete powder falls like sand and sets to concrete next to water, on its side, on top and after falling into water; plain sand does not", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         int y = GROUND + 1;
+         // 1. falls
+         w.setBlock(5, y + 4, 5, Blocks.POWDER0 + 3);
+         for (int i = 0; i < 60; i++) {
+            w.tick();
+         }
+
+         eq(0, w.getBlock(5, y + 4, 5), "the powder left its place");
+         eq(Blocks.POWDER0 + 3, w.getBlock(5, y, 5), "and lies on the ground, still powder");
+         // 2. water arrives next to it: sets
+         w.setBlock(6, y, 5, Blocks.WATER);
+         for (int i = 0; i < 40; i++) {
+            w.tick();
+         }
+
+         eq(Blocks.CONCRETE0 + 3, w.getBlock(5, y, 5), "water at its side: light blue concrete");
+         // 3. placed next to water: sets at once (after one update)
+         w.setBlock(10, y, 10, Blocks.WATER);
+         w.setBlock(10, y, 11, Blocks.POWDER0 + 12);
+         for (int i = 0; i < 10; i++) {
+            w.tick();
+         }
+
+         eq(Blocks.CONCRETE0 + 12, w.getBlock(10, y, 11), "placed next to water: brown concrete");
+         // 4. water above
+         w.setBlock(12, y + 1, 12, Blocks.WATER);
+         w.setBlock(12, y, 12, Blocks.POWDER0 + 15);
+         for (int i = 0; i < 20; i++) {
+            w.tick();
+         }
+
+         eq(Blocks.CONCRETE0 + 15, w.getBlock(12, y, 12), "water on top: black concrete");
+         // 5. falls into a pool and sets
+         for (int x = 14; x <= 16; x++) {
+            for (int z = 14; z <= 16; z++) {
+               w.setBlock(x, y, z, Blocks.WATER);
+            }
+         }
+
+         w.setBlock(15, y + 6, 15, Blocks.POWDER0 + 1);
+         for (int i = 0; i < 120; i++) {
+            w.tick();
+         }
+
+         int concrete = count(w, 14, y - 1, 14, 16, y + 1, 16, Blocks.CONCRETE0 + 1);
+         eq(1, concrete, "the powder that fell into the pool is orange concrete now");
+         eq(0, count(w, 14, y - 1, 14, 16, y + 8, 16, Blocks.POWDER0 + 1), "and nothing is left of the powder");
+         // 6. no water: it stays powder for as long as you like
+         w.setBlock(-28, y, -28, Blocks.POWDER0 + 5);
+         for (int i = 0; i < 400; i++) {
+            w.tick();
+         }
+
+         eq(Blocks.POWDER0 + 5, w.getBlock(-28, y, -28), "dry powder stays powder");
+         // 7. hard concrete does not fall
+         w.setBlock(3, y + 5, 3, Blocks.CONCRETE0);
+         for (int i = 0; i < 30; i++) {
+            w.tick();
+         }
+
+         eq(Blocks.CONCRETE0, w.getBlock(3, y + 5, 3), "concrete hangs in the air like stone");
+      });
+
+      test("lapis ore gives 4 - 8 blue dye, emerald ore an emerald, stained glass nothing; a sheep takes a dye (and keeps it when it is sheared)", () -> {
+         Game g = newGame(0);
+         g.world.tick();
+         int y = GROUND + 1;
+         GameTests.hold(g, Items.toolId(2, Items.C_PICK), 1);
+         int most = 0;
+         int least = 99;
+         for (int i = 0; i < 60; i++) {
+            g.world.items.clear();
+            g.world.setBlock(10, y, 10, 24);
+            g.breakBlock(10, y, 10);
+            int n = GameTests.countItems(g.world, Color312.dyeItem(11));
+            most = Math.max(most, n);
+            least = Math.min(least, n);
+         }
+
+         check(least >= 4 && most <= 8 && most > least, "lapis ore: " + least + ".." + most + " blue dye");
+         g.world.items.clear();
+         g.world.setBlock(10, y, 10, Blocks.EMERALD_ORE);
+         g.breakBlock(10, y, 10);
+         eq(1, GameTests.countItems(g.world, Items.EMERALD), "emerald ore: an emerald (with an iron pickaxe)");
+         g.world.items.clear();
+         g.world.setBlock(10, y, 10, Blocks.EMERALD_ORE);
+         GameTests.hold(g, 0, 0);
+         g.inv[g.sel] = null;
+         g.breakBlock(10, y, 10);
+         eq(0, GameTests.countItems(g.world, Items.EMERALD), "emerald ore: nothing by hand");
+         g.world.items.clear();
+         g.world.setBlock(10, y, 10, Blocks.GLASS0 + 4);
+         g.breakBlock(10, y, 10);
+         eq(0, g.world.items.size(), "stained glass drops nothing");
+         // the sheep
+         g.mobs.timer = 1;
+         Mobs.Mob sheep = g.mobs.spawn(Mobs.SHEEP, 12.5, y, 12.5);
+         sheep.color = 0;
+         GameTests.hold(g, Color312.dyeItem(14), 3);
+         check(g.useOnMob(sheep, g.inv[g.sel]), "the dye is used on the sheep");
+         eq(14, sheep.color, "it is red now");
+         eq(2, g.inv[g.sel].n, "one dye used");
+         check(!g.useOnMob(sheep, g.inv[g.sel]), "a red sheep takes no red dye");
+         eq(2, g.inv[g.sel].n, "so nothing is used");
+         GameTests.hold(g, Items.BONE_MEAL, 1);
+         check(g.useOnMob(sheep, g.inv[g.sel]) && sheep.color == 0, "bone meal is the white dye");
+         GameTests.hold(g, Color312.dyeItem(9), 1);
+         g.useOnMob(sheep, g.inv[g.sel]);
+         eq(null, g.inv[g.sel], "the last dye is gone from the hand");
+         eq(9, sheep.color, "cyan");
+         GameTests.hold(g, Items.SHEARS, 1);
+         g.world.items.clear();
+         check(g.useOnMob(sheep, g.inv[g.sel]), "shears");
+         check(GameTests.countItems(g.world, Blocks.WOOL0 + 9) >= 1, "cyan wool");
+         // creative: the dye is not used up
+         Game c = newGame(1);
+         c.mobs.timer = 1;
+         Mobs.Mob s2 = c.mobs.spawn(Mobs.SHEEP, 12.5, y, 12.5);
+         GameTests.hold(c, Color312.dyeItem(2), 5);
+         s2.color = 0;
+         check(c.useOnMob(s2, c.inv[c.sel]) && s2.color == 2, "dyed in creative");
+         eq(5, c.inv[c.sel].n, "creative keeps the dye");
+         // every colour has a fleece
+         for (int k = 0; k < 16; k++) {
+            check(MobRender.SHEEP_RGB[k] != 0, "a fleece colour for " + k);
+         }
+      });
+
+      test("emerald ore sits in the stone under mountains (and only there), clay in the beds of shallow water - decided by a stream of its own", () -> {
+         int[] heights = new int[256];
+         int[] biomes = new int[256];
+         java.util.Arrays.fill(heights, 70);
+         java.util.Arrays.fill(biomes, 6);
+         int total = 0;
+         for (int k = 0; k < 20; k++) {
+            Chunk c = new Chunk(k, 4);
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  for (int y = 1; y <= 70; y++) {
+                     c.set(x, y, z, 1);
+                  }
+               }
+            }
+
+            Color312.decorate(777L, c, heights, biomes);
+            int n = 0;
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  for (int y = 0; y < 100; y++) {
+                     if (c.get(x, y, z) == Blocks.EMERALD_ORE) {
+                        n++;
+                        check(y >= 4 && y < 32, "emerald ore deep down: y=" + y);
+                     }
+                  }
+               }
+            }
+
+            check(n >= 1 && n <= 6, "a few emerald ores per mountain chunk: " + n);
+            total += n;
+            // the same chunk again: the same ore (no randomness from outside)
+            Chunk again = new Chunk(k, 4);
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  for (int y = 1; y <= 70; y++) {
+                     again.set(x, y, z, 1);
+                  }
+               }
+            }
+
+            Color312.decorate(777L, again, heights, biomes);
+            check(java.util.Arrays.equals(c.blocks, again.blocks), "the same chunk twice: the same blocks");
+            // other biomes: none
+            Chunk plain = new Chunk(k, 4);
+            for (int y = 1; y <= 70; y++) {
+               for (int x = 0; x < 16; x++) {
+                  for (int z = 0; z < 16; z++) {
+                     plain.set(x, y, z, 1);
+                  }
+               }
+            }
+
+            java.util.Arrays.fill(biomes, 2);
+            Color312.decorate(777L, plain, heights, biomes);
+            java.util.Arrays.fill(biomes, 6);
+            boolean any = false;
+            for (int i = 0; i < plain.blocks.length; i++) {
+               any |= plain.blocks[i] == Blocks.EMERALD_ORE;
+            }
+
+            check(!any, "no emerald ore outside the mountains");
+         }
+
+         check(total >= 40, "emerald ore in the end: " + total);
+         // clay: a lake of depth 6 over sand
+         int claySeen = 0;
+         int[] bed = new int[256];
+         java.util.Arrays.fill(bed, 56);
+         java.util.Arrays.fill(biomes, 0);
+         for (int k = 0; k < 60; k++) {
+            Chunk c = new Chunk(k, -7);
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  for (int y = 1; y <= 56; y++) {
+                     c.set(x, y, z, y > 53 ? 7 : 1);
+                  }
+
+                  for (int y = 57; y < 63; y++) {
+                     c.set(x, y, z, Blocks.WATER);
+                  }
+               }
+            }
+
+            Color312.decorate(777L, c, bed, biomes);
+            int n = 0;
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  for (int y = 0; y < 100; y++) {
+                     if (c.get(x, y, z) == Blocks.CLAY) {
+                        n++;
+                        check(y >= 55 && y <= 56, "clay in the top layers of the bed: y=" + y);
+                        check(c.get(x, y + 1, z) == Blocks.CLAY || Blocks.isWater(c.get(x, y + 1, z)), "water (or more clay) above the clay");
+                     }
+                  }
+               }
+            }
+
+            check(n == 0 || n >= 6, "a patch, not a single block: " + n);
+            claySeen += n > 0 ? 1 : 0;
+         }
+
+         check(claySeen >= 5 && claySeen <= 30, "about a quarter of the chunks with a lake bed get a patch: " + claySeen + " of 60");
+         // dry land gets no clay
+         Chunk dry = new Chunk(1, 1);
+         int[] hills = new int[256];
+         java.util.Arrays.fill(hills, 80);
+         for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+               for (int y = 1; y <= 80; y++) {
+                  dry.set(x, y, z, y > 77 ? 3 : 1);
+               }
+            }
+         }
+
+         for (int k = 0; k < 40; k++) {
+            Chunk c = new Chunk(k, 9);
+            for (int x = 0; x < 16; x++) {
+               for (int z = 0; z < 16; z++) {
+                  for (int y = 1; y <= 80; y++) {
+                     c.set(x, y, z, y > 77 ? 3 : 1);
+                  }
+               }
+            }
+
+            Color312.decorate(777L, c, hills, biomes);
+            boolean any = false;
+            for (int i = 0; i < c.blocks.length; i++) {
+               any |= c.blocks[i] == Blocks.CLAY;
+            }
+
+            check(!any, "no clay on dry land");
+         }
+      });
+
+      test("stained glass is drawn translucent (blended pass), hides the faces between panes of one kind and shows the faces between two kinds", () -> {
+         Game g = newGame(0);
+         int y = GROUND + 1;
+         Chunk c = g.world.chunk(0, 0);
+         g.world.setBlock(5, y, 5, Blocks.GLASS0 + 2);
+         Mesher.Result one = Mesher.build(g.world, c, y >> 4, false);
+         int nT1 = one.nT;
+         int nO1 = one.nO;
+         free(one);
+         g.world.setBlock(6, y, 5, Blocks.GLASS0 + 2);
+         Mesher.Result two = Mesher.build(g.world, c, y >> 4, false);
+         int nT2 = two.nT;
+         free(two);
+         g.world.setBlock(6, y, 5, Blocks.GLASS0 + 9);
+         Mesher.Result mixed = Mesher.build(g.world, c, y >> 4, false);
+         int nTm = mixed.nT;
+         free(mixed);
+         // the same section without the glass
+         g.world.setBlock(5, y, 5, 0);
+         g.world.setBlock(6, y, 5, 0);
+         Mesher.Result none = Mesher.build(g.world, c, y >> 4, false);
+         int nO0 = none.nO;
+         free(none);
+         eq(5, nT1 / 4, "one pane on the ground: five faces in the blended buffer");
+         eq(8, nT2 / 4, "two panes of one kind: the faces between them are not drawn");
+         eq(10, nTm / 4, "two kinds: the faces between them are drawn");
+         eq(nO0, nO1, "glass adds nothing to the opaque buffer");
+      });
+   }
+
+   static int[] avg(int tile) {
+      int x0 = Tex.tx(tile);
+      int y0 = Tex.ty(tile);
+      long r = 0;
+      long g = 0;
+      long b = 0;
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            int p = Tex.atlasPixels[(y0 + y) * Tex.PX + x0 + x];
+            r += p >> 16 & 255;
+            g += p >> 8 & 255;
+            b += p & 255;
+         }
+      }
+
+      return new int[]{(int)(r / 256), (int)(g / 256), (int)(b / 256)};
+   }
+
+   static void free(Mesher.Result r) {
+      if (r.opaque != null) {
+         org.lwjgl.system.MemoryUtil.memFree(r.opaque);
+      }
+
+      if (r.trans != null) {
+         org.lwjgl.system.MemoryUtil.memFree(r.trans);
+      }
    }
 }

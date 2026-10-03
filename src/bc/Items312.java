@@ -44,6 +44,7 @@ final class Items312 {
       Items.maxStack[Items.ENDER_PEARL] = 16;
       item(Items.EYE_OF_ENDER, "Eye of Ender");
       item(Items.EMERALD, "Emerald");
+      Color312.items();
       Blocks.drop[Blocks.QUARTZ_ORE] = Items.QUARTZ;
    }
 
@@ -58,5 +59,6 @@ final class Items312 {
       Recipes.smelt.put(Blocks.NETHERRACK, new Stack(Items.NETHER_BRICK, 1));
       Recipes.smelt.put(Blocks.QUARTZ_ORE, new Stack(Items.QUARTZ, 1));
       Recipes.fuel.put(Items.BLAZE_ROD, 2400);
+      Color312.recipes();
    }
 }

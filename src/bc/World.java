@@ -771,6 +771,7 @@ public final class World {
                this.scheduleFluid(var5, var6, var7, Blocks.isWater(var8) ? 5 : 30);
             } else if (var8 == 7
                || var8 == 8
+               || Color312.isPowder(var8)
                || Blocks.kind[var8] == 1
                || Blocks.isLadder(var8)
                || Blocks.isBed(var8)
@@ -1091,7 +1092,7 @@ public final class World {
             this.setBlock(var1, var2, var3, 0);
          }
       } else {
-         if (var4 != 7 && var4 != 8) {
+         if (var4 != 7 && var4 != 8 && !Color312.isPowder(var4)) {
             if (Blocks.kind[var4] == 1 || var4 == 32) {
                int var15 = this.getBlock(var1, var2 - 1, var3);
                if (!Blocks.solid[var15] || var15 == 28) {
@@ -1133,6 +1134,11 @@ public final class World {
             }
          } else {
             if (var2 <= 0) {
+               return;
+            }
+
+            if (Color312.isPowder(var4) && Color312.wet(this, var1, var2, var3)) {
+               this.setBlock(var1, var2, var3, Color312.hardened(var4)); // Update 3.12: concrete powder sets next to water
                return;
             }
 

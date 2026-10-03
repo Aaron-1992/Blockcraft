@@ -103,6 +103,21 @@ public final class Blocks {
    public static final int END_FRAME_EYE = 1042;
    public static final int END_PORTAL = 1043;
    public static final int DRAGON_EGG = 1044;
+   // ---- Update 3.12: the colours of 1.12 (16 colours each, in the order of the wool: white, orange, ... black) ----
+   public static final int CONCRETE0 = 1050;
+   public static final int POWDER0 = 1066;
+   public static final int TERRACOTTA = 1082;
+   public static final int STAINED0 = 1083;
+   public static final int GLAZED0 = 1099;
+   public static final int CLAY = 1115;
+   public static final int GLASS0 = 1116;
+   public static final int IRON_BLOCK = 1132;
+   public static final int GOLD_BLOCK = 1133;
+   public static final int DIAMOND_BLOCK = 1134;
+   public static final int EMERALD_BLOCK = 1135;
+   public static final int COAL_BLOCK = 1136;
+   public static final int LAPIS_BLOCK = 1137;
+   public static final int EMERALD_ORE = 1138;
 
    /** True for every id that can be a block (0..255 and EXT0..MAX-1); the ids in between are items. */
    public static boolean isBlockId(int id) {

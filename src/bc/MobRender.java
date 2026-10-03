@@ -879,6 +879,12 @@ public final class MobRender {
       SHEEP_RGB[8] = 10526880;
       SHEEP_RGB[12] = 7030056;
       SHEEP_RGB[15] = 2763306;
+
+      for (int c = 0; c < 16; c++) {
+         if (SHEEP_RGB[c] == 0) {
+            SHEEP_RGB[c] = Color312.fleece(c); // Update 3.12: a sheep can be dyed any colour
+         }
+      }
    }
 
    static final class Model {

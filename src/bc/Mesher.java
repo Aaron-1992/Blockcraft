@@ -303,6 +303,17 @@ public final class Mesher {
          int var17 = ci(var9 + var16[0], var10 + var16[1], var11 + var16[2]);
          int var18 = var7[var17] & 0xFFFF;
          if (!Blocks.opaque[var18] && (var5 != 15 || var18 != 15) && !(Blocks.isLeaves(var5) && hiddenLeafFace(var7, var9, var10, var11, var15, var18))) {
+            if (Color312.isStainedGlass(var5)) {
+               // Update 3.12: stained glass is translucent (blended pass); the faces between two panes of the same kind are not drawn
+               if (var18 != var5) {
+                  int tile = Blocks.tiles[var5][var15];
+                  quad(var0, var15, var2, var3, var4, var17, var12, tile, 1.0F, 1.0F, 1.0F, Color312.GLASS_ALPHA, var6, 0.0F, var14);
+                  emit(var0, var0.t, tile, flipFor(var0));
+               }
+
+               continue;
+            }
+
             boolean var19 = Blocks.tint[var5] == 1;
             float var20 = 1.0F;
             float var21 = 1.0F;

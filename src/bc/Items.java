@@ -63,6 +63,8 @@ public final class Items {
    public static final int ENDER_PEARL = 358;
    public static final int EYE_OF_ENDER = 359;
    public static final int EMERALD = 360;
+   /** The 15 dyes besides bone meal (white): DYE1 = orange ... DYE1 + 14 = black, in the order of the wool. */
+   public static final int DYE1 = 361;
    public static final int ITEM_TILE_BASE = 65;
    public static final int C_NONE = 0;
    public static final int C_PICK = 1;

@@ -1173,7 +1173,10 @@ final class Tests37 {
                for (int i = 0; i < ref.blocks.length; i++) {
                   int a = ref.blocks[i] & 0xFFFF;
                   int b = now.blocks[i] & 0xFFFF;
-                  if (a != b) {
+                  if (a != b && (b == Blocks.CLAY || b == Blocks.EMERALD_ORE)) {
+                     // Update 3.12: clay in the beds of lakes (replacing sand, gravel or dirt) and emerald ore in the mountains (replacing stone)
+                     check(a == 7 || a == 8 || a == 3 || a == 1, "clay / emerald ore replace sand, gravel, dirt or stone (" + a + ")");
+                  } else if (a != b) {
                      diff++;
                      check(b == Blocks.SUGAR_CANE || b == Blocks.PUMPKIN, "only cane / pumpkins were added (" + b + " replaced " + a + ")");
                      check(a == 0 || a == Blocks.TALLGRASS, "...into empty air (or tall grass), never replacing a solid block (" + a + ")");

@@ -30,11 +30,14 @@ final class Blocks312 {
       for (int id = Items.QUARTZ; id <= Items.EMERALD; id++) {
          list.add(id);
       }
+
+      Color312.addToCreative(list);
    }
 
    static void register() {
       nether();
       end();
+      Color312.blocks();
    }
 
    static void nether() {

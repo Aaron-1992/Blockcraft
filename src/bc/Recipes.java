@@ -106,6 +106,11 @@ public final class Recipes {
          return null;
       }
 
+      Stack colored = Color312.dyeRecipe(grid, gw, gh); // Update 3.12: the recipes that work for every dye colour
+      if (colored != null) {
+         return colored;
+      }
+
       int w = maxX - minX + 1;
       int h = maxY - minY + 1;
 

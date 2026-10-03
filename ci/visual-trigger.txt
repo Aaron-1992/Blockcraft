@@ -1,2 +1,2 @@
-nether-vista,nether-portal,nether-mobs,end-island,end-crystal,end-dragon,end-dragon-side,end-enderman,village-day,village-folk,village-folk-sh,village-trade
+colors-wall,colors-wall-sh,colors-misc,village-day,village-aerial,village-folk,village-trade
 jar=build

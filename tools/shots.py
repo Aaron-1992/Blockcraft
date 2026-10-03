@@ -304,6 +304,42 @@ def overworld_portal_blocks():
     return out
 
 
+def color_wall():
+    """Update 3.12: a wall of 16 colours x 5 kinds (concrete, concrete powder, terracotta, glazed terracotta, stained glass in front of a black / white checker) on the flat grass strip."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(134, 154):
+            for y in range(gy + 1, gy + 9):
+                out.append((x, y, z, 0))
+    for c in range(16):
+        x = 136 + c
+        out.append((x, gy + 1, 77, 1050 + c))
+        out.append((x, gy + 2, 77, 1066 + c))
+        out.append((x, gy + 3, 77, 1083 + c))
+        out.append((x, gy + 4, 77, 1099 + c))
+        out.append((x, gy + 5, 78, 1050 if c % 2 == 0 else 1065))
+        out.append((x, gy + 6, 78, 1065 if c % 2 == 0 else 1050))
+        out.append((x, gy + 5, 77, 1116 + c))
+        out.append((x, gy + 6, 77, 1116 + (c + 8) % 16))
+    return out
+
+
+def misc_color_blocks():
+    """Clay, terracotta, the six blocks of metal and gem, emerald ore next to lapis ore, diamond ore and plain stone."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(134, 154):
+            for y in range(gy + 1, gy + 9):
+                out.append((x, y, z, 0))
+    ids = [1115, 1082, 1132, 1133, 1134, 1135, 1136, 1137, 1138, 24, 22, 1]
+    for i, bid in enumerate(ids):
+        out.append((138 + i, gy + 1, 77, bid))
+        out.append((138 + i, gy + 2, 77, bid))
+    return out
+
+
 NETHER = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.dim=-1"]
 END = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.dim=1"]
 # seed 12345: stronghold #0 has its portal room (11 x 11, floor y=25) centred on x=-688, z=-611
@@ -344,11 +380,17 @@ SCENES = {
     "stronghold":         (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000"] + PLAIN + ["-Dbc.shot=150"], True),
     "stronghold-portal":  (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000", sets(stronghold_ring())] + PLAIN + ["-Dbc.shot=150"], True),
     "stronghold-portal-sh": (COMMON + ["-Dbc.cam=%.1f,%d,%.1f,90,28" % (SH_CX + 4.5, SH_Y + 1, SH_CZ + 0.5), "-Dbc.time=6000", sets(stronghold_ring()), "-Dbc.shot=150"], True),
-    # ---- Update 3.12: the villages (seed 12345: the village at x=173, z=76; church x 172..176 z 96..104, a farm at x 158..166 z 101..107)
-    "village-day":        (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,8", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
-    "village-folk":       (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,10", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=villager,villager,irongolem,villager,villager", "-Dbc.summonDist=5", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=110"], True),
-    "village-folk-sh":    (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,10", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=villager,villager,irongolem,villager,villager", "-Dbc.summonDist=5", "-Dbc.summonDy=-1.6", "-Dbc.shot=110"], True),
-    "village-trade":      (COMMON + ["-Dbc.cam=176.5,72.5,86.5,40,8", "-Dbc.time=6000", "-Dbc.inv=trade", "-Dbc.prof=3"] + PLAIN + ["-Dbc.shot=130"], True),
+    # ---- Update 3.12: the villages (seed 12345: the village at x=173, z=76; well 172..174 z 75..77, smithy x 184..190 z 71..75, church x 172..176 z 96..104)
+    # (the first cameras sat inside an oak: the south of the village is forest - these ones were checked with a ray caster over the generated chunks)
+    "village-day":        (COMMON + ["-Dbc.cam=182.5,71.6,83.5,128,6", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
+    "village-aerial":     (COMMON + ["-Dbc.cam=205.5,88,60.5,64,34", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
+    "village-folk":       (COMMON + ["-Dbc.cam=182.5,71.6,83.5,128,8", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=villager,villager,irongolem,villager,villager", "-Dbc.summonDist=5", "-Dbc.summonDy=-1.6"] + PLAIN + ["-Dbc.shot=110"], True),
+    "village-folk-sh":    (COMMON + ["-Dbc.cam=182.5,71.6,83.5,128,8", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=villager,villager,irongolem,villager,villager", "-Dbc.summonDist=5", "-Dbc.summonDy=-1.6", "-Dbc.shot=110"], True),
+    "village-trade":      (COMMON + ["-Dbc.cam=182.5,71.6,83.5,128,8", "-Dbc.time=6000", "-Dbc.inv=trade", "-Dbc.prof=3"] + PLAIN + ["-Dbc.shot=130"], True),
+    # ---- Update 3.12: the World of Color (flat grass strip: wall at z=77, camera looks +z)
+    "colors-wall":        (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(color_wall())] + PLAIN + ["-Dbc.shot=170"], True),
+    "colors-wall-sh":     (COMMON + ["-Dbc.cam=143.5,70.2,66.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(color_wall()), "-Dbc.shot=170"], True),
+    "colors-misc":        (COMMON + ["-Dbc.cam=143.5,68.6,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(misc_color_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
     "portal-day":         (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks())] + PLAIN + ["-Dbc.shot=170"], True),
     "portal-day-sh":      (COMMON + ["-Dbc.cam=143.5,69,70.5,0,6", "-Dbc.time=6000", "-Dbc.weather=calm", sets(overworld_portal_blocks()), "-Dbc.shot=170"], True),
 

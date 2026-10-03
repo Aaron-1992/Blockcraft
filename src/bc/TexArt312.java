@@ -328,6 +328,7 @@ final class TexArt312 {
       Tex.blit(FRAME_SIDE, frameSide());
       Tex.blit(END_PORTAL, endPortal());
       Tex.blit(DRAGON_EGG, dragonEgg());
+      Color312.tiles();
    }
 
    // ------------------------------------------------------------------ item pictures
@@ -434,7 +435,7 @@ final class TexArt312 {
             return cv.p;
          }
          default:
-            return null;
+            return id >= Items.DYE1 && id < Items.DYE1 + 15 ? Color312.dyeSprite(id) : null;
       }
    }
 }

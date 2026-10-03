@@ -2790,6 +2790,10 @@ public final class Game {
                case 22:
                   var6 = 260;
                   break;
+               case 24:
+                  var6 = Color312.dyeItem(11); // Update 3.12: lapis lazuli ore gives 4 - 8 blue dye
+                  var7 = 4 + this.rnd.nextInt(5);
+                  break;
                case 29:
                   var6 = var5 == 340 ? 29 : (this.rnd.nextInt(8) == 0 ? 285 : 0);
                   break;
@@ -3135,6 +3139,19 @@ public final class Game {
       if (var2.id == Items.SHEARS && this.mobs.shear(var1)) {
          if (!this.player.creative) {
             this.damageHeld(1);
+         }
+
+         return true;
+      }
+
+      int dyeColor = Color312.dyeColor(var2.id);
+      if (dyeColor >= 0 && var1.type == Mobs.SHEEP && var1.color != dyeColor) {
+         var1.color = dyeColor; // Update 3.12: dye a sheep (its next wool has the colour)
+         if (!this.player.creative) {
+            var2.n--;
+            if (var2.n <= 0) {
+               this.inv[this.sel] = null;
+            }
          }
 
          return true;
