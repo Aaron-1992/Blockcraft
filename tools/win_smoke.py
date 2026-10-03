@@ -13,6 +13,7 @@ ci-results/windows/.
 import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -33,9 +34,21 @@ def log(msg):
         f.write(msg + "\n")
 
 
+
+def newest_patch():
+    """The update pack with the highest version number (3.10 is newer than 3.9, which plain sorting gets wrong)."""
+    packs = glob.glob(os.path.join(ROOT, "releases", "Blockcraft-UPDATE*-patch.zip"))
+
+    def key(path):
+        m = re.search(r"UPDATE([0-9.]+)-patch\.zip$", path)
+        return tuple(int(x) for x in m.group(1).split(".")) if m else (0,)
+
+    return sorted(packs, key=key)[-1]
+
+
 def install_game():
     base = os.path.join(ROOT, "Blockcraft-1.12-UPDATE3.5-windows.zip")
-    patch = sorted(glob.glob(os.path.join(ROOT, "releases", "Blockcraft-UPDATE*-patch.zip")))[-1]
+    patch = newest_patch()
     tmp = os.path.join(tempfile.gettempdir(), "bc-win-smoke")
     shutil.rmtree(tmp, ignore_errors=True)
     os.makedirs(tmp)

@@ -51,6 +51,9 @@ public final class Blocks {
    public static final int WALL_TORCH = 89;
    public static final int STAIR0 = 93;
    public static final int SLAB0 = 113;
+   /** Update 3.10: upside-down stairs (20 ids: material * 4 + facing, like 93..112) and top-half slabs (5 ids). */
+   public static final int STAIR_TOP0 = 195;
+   public static final int SLAB_TOP0 = 215;
    public static final int FENCE = 118;
    public static final int LADDER = 119;
    public static final int FARMLAND = 123;
@@ -72,7 +75,7 @@ public final class Blocks {
    public static final int MELON_STEM = 179;
    public static final int CAKE = 187;
    public static final int FIRE = 194;
-   public static final int COUNT = 195;
+   public static final int COUNT = 220;
    public static final int[] STAIR_MAT = new int[]{5, 4, 27, 16, 17};
    public static final String[] STAIR_NAME = new String[]{"Oak Wood", "Cobblestone", "Stone Brick", "Brick", "Sandstone"};
    public static final int K_CUBE = 0;
@@ -174,12 +177,40 @@ public final class Blocks {
       return var0 >= 89 && var0 < 93;
    }
 
+   /** Any stair, right way up (93..112) or upside down (195..214). */
    public static boolean isStair(int var0) {
-      return var0 >= 93 && var0 < 113;
+      return var0 >= 93 && var0 < 113 || var0 >= STAIR_TOP0 && var0 < STAIR_TOP0 + 20;
    }
 
+   /** Any slab, bottom half (113..117) or top half (215..219). */
    public static boolean isSlab(int var0) {
-      return var0 >= 113 && var0 < 118;
+      return var0 >= 113 && var0 < 118 || var0 >= SLAB_TOP0 && var0 < SLAB_TOP0 + 5;
+   }
+
+   /** Which way a stair faces (0..3), either way up. */
+   public static int stairFacing(int var0) {
+      return var0 - (isTopStair(var0) ? STAIR_TOP0 : STAIR0) & 3;
+   }
+
+   public static boolean isTopStair(int var0) {
+      return var0 >= STAIR_TOP0 && var0 < STAIR_TOP0 + 20;
+   }
+
+   public static boolean isTopSlab(int var0) {
+      return var0 >= SLAB_TOP0 && var0 < SLAB_TOP0 + 5;
+   }
+
+   /** The material (0..4: oak wood, cobblestone, stone brick, brick, sandstone) of a stair or slab block, either way up. */
+   public static int stairSlabMaterial(int var0) {
+      if (isTopSlab(var0)) {
+         return var0 - SLAB_TOP0;
+      } else if (isSlab(var0)) {
+         return var0 - 113;
+      } else if (isTopStair(var0)) {
+         return (var0 - STAIR_TOP0) / 4;
+      } else {
+         return (var0 - 93) / 4;
+      }
    }
 
    public static boolean isLadder(int var0) {
@@ -261,7 +292,11 @@ public final class Blocks {
 
    /** The item you get for a block that is placed in a facing/age variant: what pick-block and drops use. 0 = nothing. */
    public static int pickItem(int var0) {
-      if (isCarvedPumpkin(var0)) {
+      if (isStair(var0)) {
+         return 93 + stairSlabMaterial(var0) * 4;
+      } else if (isSlab(var0)) {
+         return 113 + stairSlabMaterial(var0);
+      } else if (isCarvedPumpkin(var0)) {
          return 163;
       } else if (isJackOLantern(var0)) {
          return 167;
@@ -546,6 +581,33 @@ public final class Blocks {
          coll[var41] = box[var41];
       }
 
+      // Update 3.10: the same stairs and slabs upside down / in the top half of the cell
+      for (int mat = 0; mat < 5; mat++) {
+         int base = STAIR_MAT[mat];
+         float hard = hardness[base] > 0.0F ? hardness[base] : 2.0F;
+         for (int face = 0; face < 4; face++) {
+            int id = STAIR_TOP0 + mat * 4 + face;
+            def(id, STAIR_NAME[mat] + " Stairs", hard, false, tiles[base][2]);
+            tiles[id] = (int[])tiles[base].clone();
+            kind[id] = 4;
+            opacity[id] = 15;
+            drop[id] = 93 + mat * 4;
+            box[id] = new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
+            double[] step = collMulti[93 + mat * 4 + face][1];
+            // mirrored top to bottom: the full slab is the upper half, the step sits in the lower half
+            collMulti[id] = new double[][]{{0.0, 0.5, 0.0, 1.0, 1.0, 1.0}, {step[0], 0.0, step[2], step[3], 0.5, step[5]}};
+         }
+
+         int sid = SLAB_TOP0 + mat;
+         def(sid, STAIR_NAME[mat] + " Slab", hard, false, tiles[base][2]);
+         tiles[sid] = (int[])tiles[base].clone();
+         kind[sid] = 2;
+         opacity[sid] = 15;
+         drop[sid] = 113 + mat;
+         box[sid] = new double[]{0.0, 0.5, 0.0, 1.0, 1.0, 1.0};
+         coll[sid] = box[sid];
+      }
+
       def(118, "Fence", 2.0F, false, 10);
       kind[118] = 6;
       mineClass[118] = 2;
@@ -658,6 +720,13 @@ public final class Blocks {
 
          mineClass[113 + var22] = mineClass[var34];
          needTool[113 + var22] = needTool[var34];
+         for (int var47 = 0; var47 < 4; var47++) {
+            mineClass[STAIR_TOP0 + var22 * 4 + var47] = mineClass[var34];
+            needTool[STAIR_TOP0 + var22 * 4 + var47] = needTool[var34];
+         }
+
+         mineClass[SLAB_TOP0 + var22] = mineClass[var34];
+         needTool[SLAB_TOP0 + var22] = needTool[var34];
       }
 
       String[] var23 = new String[]{

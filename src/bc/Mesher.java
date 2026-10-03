@@ -502,9 +502,24 @@ public final class Mesher {
    }
 
    static void stair(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
-      int var6 = var5 - 93 & 3;
+      int var6 = Blocks.stairFacing(var5);
+      boolean upsideDown = Blocks.isTopStair(var5);
       double[][] var7 = new double[][]{{0.0, 0.0, 0.0, 1.0, 0.5, 0.5}, {0.0, 0.5, 0.0, 1.0, 1.0, 0.5}, {0.0, 0.0, 0.5, 1.0, 0.5, 1.0}};
       int[][][] var8 = new int[][][]{{{0, 0, 1}, {0, 1, 0}}, {{0, -1, 0}}, {{0, 0, -1}}};
+      if (upsideDown) {
+         // Update 3.10: the same three boxes mirrored top to bottom (and the neighbours they hide each other's faces against)
+         for (double[] box : var7) {
+            double lo = 1.0 - box[4];
+            box[4] = 1.0 - box[1];
+            box[1] = lo;
+         }
+
+         for (int[][] hidden : var8) {
+            for (int[] off : hidden) {
+               off[1] = -off[1];
+            }
+         }
+      }
 
       for (int var9 = 0; var9 < 3; var9++) {
          double[] var10 = var7[var9];

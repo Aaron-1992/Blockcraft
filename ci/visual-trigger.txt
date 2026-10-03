@@ -1,2 +1,2 @@
-firewall,firewall-night,pause-menu,inv-player
+skin-screen,skin-screen-narrow,skin-screen-tiny,skin-screen-def
 jar=build

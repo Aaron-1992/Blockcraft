@@ -1228,7 +1228,7 @@ final class Tests37 {
          Game g = newGame(1);
          World w = g.world;
          Chunk c = w.chunk(0, 0);
-         for (int id = Blocks.SUGAR_CANE; id < Blocks.COUNT; id++) {
+         for (int id = Blocks.SUGAR_CANE; id < Blocks.STAIR_TOP0; id++) { // (3.10 added the upside-down stairs and top slabs after these)
             w.setBlock(5, GROUND + 1, 5, id);
             Mesher.Result r = Mesher.build(w, c, 3, false);
             int verts = r.nO;

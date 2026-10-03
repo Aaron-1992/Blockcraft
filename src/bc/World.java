@@ -1542,6 +1542,9 @@ public final class World {
       var36.y = var13;
       var36.z = var14;
       var36.t = Math.max(var18, 0.0);
+      var36.fx = Math.max(0.0, Math.min(1.0, var16[0] + var17[0] * var36.t));
+      var36.fy = Math.max(0.0, Math.min(1.0, var16[1] + var17[1] * var36.t));
+      var36.fz = Math.max(0.0, Math.min(1.0, var16[2] + var17[2] * var36.t));
       var36.nx = var36.ny = var36.nz = 0;
       if (var18 < 0.0) {
          var36.ny = 1;
@@ -1625,6 +1628,10 @@ public final class World {
       public int nx;
       public int ny;
       public int nz;
+      /** where the ray hit, as a fraction of the block (0..1 in each direction) - decides top / bottom half when placing slabs and stairs */
+      public double fx = 0.5;
+      public double fy = 0.5;
+      public double fz = 0.5;
    }
 
    public static final class Item {

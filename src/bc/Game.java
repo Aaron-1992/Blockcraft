@@ -185,6 +185,16 @@ public final class Game {
          this.opt.renderDistance = Integer.getInteger("bc.rd");
       }
 
+      if (System.getProperty("bc.guiscale") != null) {
+         this.opt.guiScale = Integer.getInteger("bc.guiscale"); // test hook: force the GUI scale (screens must cope with narrow windows)
+      }
+
+      if (System.getProperty("bc.win") != null) {
+         String[] wh = System.getProperty("bc.win").split("x"); // test hook: window size, e.g. 1030x720
+         this.winW = this.fbW = Integer.parseInt(wh[0]);
+         this.winH = this.fbH = Integer.parseInt(wh[1]);
+      }
+
       if (System.getProperty("bc.lod") != null) {
          this.opt.lodDistance = Integer.getInteger("bc.lod");
       }
@@ -3051,9 +3061,15 @@ public final class Game {
          int var4 = this.target.y;
          int var5 = this.target.z;
          int var6 = this.world.getBlock(var3, var4, var5);
-         if (Blocks.isSlab(var2) && var6 == var2 && this.target.ny == 1) {
-            this.world.setBlock(var3, var4, var5, Blocks.STAIR_MAT[var2 - 113]);
-            this.meshNow(var3, var4, var5);
+         int slabMat = Blocks.isSlab(var2) ? Blocks.stairSlabMaterial(var2) : -1;
+         // Update 3.10: a slab on the matching face of a slab of the same kind (the top of a bottom slab, the underside of a top slab) = the full block
+         boolean mergeClicked = slabMat >= 0 && Blocks.isSlab(var6) && Blocks.stairSlabMaterial(var6) == slabMat
+            && (Blocks.isTopSlab(var6) ? this.target.ny == -1 : this.target.ny == 1);
+         if (mergeClicked) {
+            if (!this.mergeSlabs(var3, var4, var5, slabMat)) {
+               return false; // the player is standing where the full block would be
+            }
+
             if (!this.player.creative) {
                var1.n--;
                if (var1.n <= 0) {
@@ -3073,10 +3089,32 @@ public final class Game {
                var5 += this.target.nz;
             }
 
+            // Update 3.10: slabs and stairs go into the upper half of the cell when you click the underside of a block or the upper half of a side face
+            boolean upper = !var7 && (this.target.ny == -1 || this.target.ny == 0 && this.target.fy > 0.5);
             if (var4 >= 0 && var4 <= 255) {
                int var11 = this.world.getBlock(var3, var4, var5);
+               if (slabMat >= 0 && Blocks.isSlab(var11) && Blocks.stairSlabMaterial(var11) == slabMat) {
+                  // the cell next to the clicked face already has such a slab (in either half): both together are the full block
+                  if (!this.mergeSlabs(var3, var4, var5, slabMat)) {
+                     return false;
+                  }
+
+                  if (!this.player.creative) {
+                     var1.n--;
+                     if (var1.n <= 0) {
+                        this.inv[this.sel] = null;
+                     }
+                  }
+
+                  return true;
+               }
+
                if (!Blocks.replaceable[var11]) {
                   return false;
+               }
+
+               if (slabMat >= 0 && upper) {
+                  var2 = Blocks.SLAB_TOP0 + slabMat;
                }
 
                if (Blocks.coll[var2] != null) {
@@ -3132,6 +3170,9 @@ public final class Game {
                   double var15 = Math.cos(Math.toRadians(this.player.yaw));
                   int var17 = Math.abs(var15) >= Math.abs(var21) ? (var15 > 0.0 ? 1 : 0) : (var21 > 0.0 ? 2 : 3);
                   var2 = var2 - (var2 - 93 & 3) + var17;
+                  if (upper) {
+                     var2 = Blocks.STAIR_TOP0 + (var2 - 93);
+                  }
                }
 
                if (Blocks.isCarvedPumpkin(var2) || Blocks.isJackOLantern(var2)) {
@@ -3166,6 +3207,21 @@ public final class Game {
       } else {
          return false;
       }
+   }
+
+   /** Two single slabs of one material in one cell make the full block - unless the player is standing where it would be. */
+   boolean mergeSlabs(int x, int y, int z, int mat) {
+      double[] bb = this.player.bb;
+      if (bb[3] > x && bb[0] < x + 1 && bb[4] > y && bb[1] < y + 1 && bb[5] > z && bb[2] < z + 1) {
+         return false;
+      }
+
+      if (!this.world.setBlock(x, y, z, Blocks.STAIR_MAT[mat])) {
+         return false;
+      }
+
+      this.meshNow(x, y, z);
+      return true;
    }
 
    void pickupItems() {
@@ -3611,22 +3667,75 @@ public final class Game {
       return t + "~";
    }
 
+   /** Word-wraps a line of text to at most maxW GUI units per line (a single word that is too long keeps its own line). */
+   static java.util.List<String> wrapText(String s, float maxW) {
+      java.util.ArrayList<String> out = new java.util.ArrayList<>();
+      String line = "";
+      for (String word : s.split(" ")) {
+         String attempt = line.isEmpty() ? word : line + " " + word;
+         if (line.isEmpty() || Gui.textWidth(attempt) <= maxW) {
+            line = attempt;
+         } else {
+            out.add(line);
+            line = word;
+         }
+      }
+
+      if (!line.isEmpty()) {
+         out.add(line);
+      }
+
+      return out;
+   }
+
+   /** The first of the labels (longest first) that fits in maxW GUI units, or the last one. */
+   static String fitLabel(float maxW, String... options) {
+      for (String o : options) {
+         if (Gui.textWidth(o) <= maxW) {
+            return o;
+         }
+      }
+
+      return options[options.length - 1];
+   }
+
+   /**
+    * The Skins screen. The layout follows the window: widths are clamped to what is available (a narrow window or a big GUI scale
+    * gives a narrower list and shorter button labels), the hint text wraps, and everything is stacked from the bottom up so nothing
+    * overlaps on a short window.
+    */
    void drawSkins() {
-      float cx = this.gui.w / 2.0F;
-      this.gui.centered("Skins", cx, 8.0F, -1, true, 1.0F);
+      float W = this.gui.w;
+      float H = this.gui.h;
+      float cx = W / 2.0F;
+      this.gui.centered("Skins", cx, 7.0F, -1, true, 1.0F);
       java.util.List<String> names = this.skins.choices();
       int cur = Math.max(0, names.indexOf(this.opt.skin));
       if (this.skinSel < 0 || this.skinSel >= names.size()) {
          this.skinSel = cur;
       }
 
-      float left = cx - 204.0F;
-      float top = 24.0F;
+      // ---- horizontal layout: [list 4 scroll buttons 10 | right column]
+      final float rw = Math.max(100.0F, Math.min(140.0F, W * 0.36F));
+      final float lw = Math.max(110.0F, Math.min(182.0F, W - rw - 40.0F));
+      float total = lw + 4.0F + 14.0F + 10.0F + rw;
+      final float left = Math.max(3.0F, (W - total) / 2.0F);
+      final float rx = left + lw + 4.0F + 14.0F + 10.0F;
+      final float pcx = rx + rw / 2.0F;
+      // ---- vertical layout, bottom up: Done, hint lines, status line, then the controls block above them
       float rowH = 15.0F;
-      int rows = Math.max(3, Math.min(8, (int)((this.gui.h - 150.0F) / rowH)));
+      float top = 20.0F;
+      float doneY = H - 26.0F;
+      java.util.List<String> tip = H >= 200.0F
+         ? wrapText("Drag a skin .png onto this window to wear it. Or copy a file path, link or username, then press Ctrl+V.", W - 12.0F)
+         : new java.util.ArrayList<String>();
+      float tipTop = doneY - 4.0F - tip.size() * 10.0F;
+      float statusY = tipTop - 11.0F;
+      int rows = Math.max(3, Math.min(8, (int)((statusY - 2.0F - top - 62.0F) / rowH)));
       this.skinScroll = Math.max(0, Math.min(Math.max(0, names.size() - rows), this.skinScroll));
-      this.gui.rect(left - 1.0F, top - 1.0F, 184.0F, rows * rowH + 2.0F, -8355712);
-      this.gui.rect(left, top, 182.0F, rows * rowH, -1442840576);
+      float listH = rows * rowH;
+      this.gui.rect(left - 1.0F, top - 1.0F, lw + 2.0F, listH + 2.0F, -8355712);
+      this.gui.rect(left, top, lw, listH, -1442840576);
       for (int i = 0; i < rows; i++) {
          int idx = this.skinScroll + i;
          if (idx >= names.size()) {
@@ -3636,22 +3745,18 @@ public final class Game {
          final String n = names.get(idx);
          float y = top + i * rowH;
          boolean wearing = n.equals(this.opt.skin);
-         if (this.hover(left, y, 182.0F, rowH)) {
-            this.gui.rect(left, y, 182.0F, rowH, 1090519039);
+         if (this.hover(left, y, lw, rowH)) {
+            this.gui.rect(left, y, lw, rowH, 1090519039);
          }
 
          if (idx == this.skinSel) {
-            this.gui.rect(left, y, 182.0F, rowH, 1627389951);
+            this.gui.rect(left, y, lw, rowH, 1627389951);
          }
 
          String label = n.equals(Skins.DEFAULT) ? "Default skin" : n.substring(0, n.length() - 4);
-         if (label.length() > 24) {
-            label = label.substring(0, 23) + "~";
-         }
-
-         this.gui.text((wearing ? "> " : "  ") + label, left + 3.0F, y + 4.0F, wearing ? -256 : -1, true);
+         this.gui.text((wearing ? "> " : "  ") + clipText(label, lw - 14.0F), left + 3.0F, y + 4.0F, wearing ? -256 : -1, true);
          final int fi = idx;
-         this.hitbox(left, y, 182.0F, rowH, () -> {
+         this.hitbox(left, y, lw, rowH, () -> {
             this.skinSel = fi;
             this.opt.skin = n;
             this.opt.save();
@@ -3659,39 +3764,43 @@ public final class Game {
          });
       }
 
-      this.button("^", left + 186.0F, top, 14.0F, 14.0F, true, () -> this.skinScroll = Math.max(0, this.skinScroll - 1));
-      this.button("v", left + 186.0F, top + rows * rowH - 14.0F, 14.0F, 14.0F, true, () -> this.skinScroll++);
-      // the preview: your skin, slowly turning
-      float pcx = cx + 105.0F;
-      float feetY = top + rows * rowH - 16.0F;
-      float scale = Math.min(60.0F, (rows * rowH - 26.0F) / 1.9F);
-      this.gui.rect(pcx - 70.0F, top - 1.0F, 140.0F, rows * rowH + 2.0F, 1073741824);
+      this.button("^", left + lw + 4.0F, top, 14.0F, 14.0F, true, () -> this.skinScroll = Math.max(0, this.skinScroll - 1));
+      this.button("v", left + lw + 4.0F, top + listH - 14.0F, 14.0F, 14.0F, true, () -> this.skinScroll++);
+      // ---- the preview: your skin, slowly turning
+      float feetY = top + listH - 16.0F;
+      float scale = Math.min(60.0F, (listH - 26.0F) / 1.9F);
+      this.gui.rect(rx, top - 1.0F, rw, listH + 2.0F, 1073741824);
       PlayerModel.drawPreview(this.skinPixels(), this.skinSlim(), pcx, feetY, scale, 25.0F + (float)(GLFW.glfwGetTime() * 28.0 % 360.0), (float)GLFW.glfwGetTime());
       String shown = this.opt.skin.equals(Skins.DEFAULT) ? "Default skin" : this.opt.skin;
-      this.gui.centered(shown.length() > 26 ? shown.substring(0, 25) + "~" : shown, pcx, top + rows * rowH + 3.0F, -5592406, true, 1.0F);
-      float by = top + rows * rowH + 14.0F;
+      this.gui.centered(clipText(shown, rw), pcx, top + listH + 3.0F, -5592406, true, 1.0F);
+      float by = top + listH + 14.0F;
       boolean custom = !this.opt.skin.equals(Skins.DEFAULT);
-      this.button("Arms: " + (this.skinSlim() ? "Slim (3 px)" : "Classic (4 px)"), pcx - 70.0F, by, 140.0F, 18.0F, custom, () -> {
+      String arms = this.skinSlim() ? "Slim" : "Classic";
+      this.button(fitLabel(rw - 6.0F, "Arms: " + arms + (this.skinSlim() ? " (3 px)" : " (4 px)"), "Arms: " + arms, arms), rx, by, rw, 18.0F, custom, () -> {
          this.skins.setSlim(this.opt.skin, !this.skinSlim());
       });
-      // username / link / path field + buttons
-      float fy = by;
-      this.gui.text("Minecraft username:", left, fy - 10.0F, -6250336, true);
-      this.gui.rect(left, fy, 124.0F, 18.0F, this.skinFocus ? -1 : -6250336);
-      this.gui.rect(left + 1.0F, fy + 1.0F, 122.0F, 16.0F, -16777216);
-      this.gui.text(this.skinField + (this.skinFocus && (int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : ""), left + 4.0F, fy + 5.0F, -1, true);
-      this.hitbox(left, fy, 124.0F, 18.0F, () -> this.skinFocus = true);
-      this.button("Import", left + 128.0F, fy, 54.0F, 18.0F, !this.skins.busy && !this.skinField.isEmpty(), () -> this.skins.importUser(this.skinField));
-      this.button("Import skin file...", left, fy + 22.0F, 182.0F, 18.0F, !this.skinBrowsing, this::browseSkin);
-      this.button("Open skins folder", pcx - 70.0F, fy + 22.0F, 140.0F, 18.0F, true, this::openSkinsFolder);
+      // ---- username / link / path field + buttons
+      this.gui.text(fitLabel(lw, "Minecraft username:", "Username:"), left, by - 10.0F, -6250336, true);
+      float fieldW = lw - 58.0F;
+      this.gui.rect(left, by, fieldW, 18.0F, this.skinFocus ? -1 : -6250336);
+      this.gui.rect(left + 1.0F, by + 1.0F, fieldW - 2.0F, 16.0F, -16777216);
+      this.gui.text(this.skinField + (this.skinFocus && (int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : ""), left + 4.0F, by + 5.0F, -1, true);
+      this.hitbox(left, by, fieldW, 18.0F, () -> this.skinFocus = true);
+      this.button("Import", left + lw - 54.0F, by, 54.0F, 18.0F, !this.skins.busy && !this.skinField.isEmpty(), () -> this.skins.importUser(this.skinField));
+      this.button(fitLabel(lw - 6.0F, "Import skin file...", "Import file...", "File..."), left, by + 22.0F, lw, 18.0F, !this.skinBrowsing, this::browseSkin);
+      this.button(fitLabel(rw - 6.0F, "Open skins folder", "Skins folder", "Folder"), rx, by + 22.0F, rw, 18.0F, true, this::openSkinsFolder);
+      // ---- status, hint, Done
       String st = this.skins.busy || this.skins.status.length() > 0 && this.skinMsg.isEmpty() ? this.skins.status : this.skinMsg;
       if (!st.isEmpty()) {
-         this.gui.centered(clipText(st, this.gui.w - 8.0F), cx, this.gui.h - 62.0F, st.startsWith("Imported") ? -8323200 : (st.startsWith("Could not") || st.startsWith("Not a") ? -43691 : -5592406), true, 1.0F);
+         this.gui.centered(clipText(st, W - 8.0F), cx, statusY, st.startsWith("Imported") ? -8323200 : (st.startsWith("Could not") || st.startsWith("Not a") ? -43691 : -5592406), true, 1.0F);
       }
 
-      this.gui.centered(clipText("Drag a skin .png onto this window to wear it.", this.gui.w - 8.0F), cx, this.gui.h - 50.0F, -8355712, true, 1.0F);
-      this.gui.centered(clipText("Or copy a file path, link or username, then Ctrl+V.", this.gui.w - 8.0F), cx, this.gui.h - 40.0F, -8355712, true, 1.0F);
-      this.button("Done", cx - 100.0F, this.gui.h - 30.0F, 200.0F, 20.0F, true, () -> {
+      for (int i = 0; i < tip.size(); i++) {
+         this.gui.centered(tip.get(i), cx, tipTop + i * 10.0F, -8355712, true, 1.0F);
+      }
+
+      float doneW = Math.min(200.0F, W - 20.0F);
+      this.button("Done", cx - doneW / 2.0F, doneY, doneW, 20.0F, true, () -> {
          this.opt.save();
          this.setScreen(this.skinReturn);
       });

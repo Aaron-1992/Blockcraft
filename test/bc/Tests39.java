@@ -429,7 +429,7 @@ final class Tests39 {
          sk.importUser("bad name!");
          check(sk.status.contains("1-16") && !sk.busy, "a name with a space is still refused: " + sk.status);
       });
-      test("the Skins screen's text lines fit a window that is 400 GUI units wide, and clipText shortens long lines to fit", () -> {
+      test("the Skins screen adapts to narrow windows: the hint wraps, labels fall back to shorter ones, long lines are clipped", () -> {
          // the font's glyph widths normally come from res/font.bin through OpenGL: read them directly so the widths are real here
          try (java.io.DataInputStream in = new java.io.DataInputStream(new java.io.FileInputStream("res/font.bin"))) {
             for (int i = 0; i < 4; i++) {
@@ -442,10 +442,24 @@ final class Tests39 {
          }
 
          check(Gui.textWidth("Hello world") > 30, "the font widths are loaded: " + Gui.textWidth("Hello world"));
-         for (String line : new String[]{"Drag a skin .png onto this window to wear it.", "Or copy a file path, link or username, then Ctrl+V.",
-            "Choose a Minecraft skin (a 64x64 PNG)", "Minecraft username:", "Arms: Classic (4 px)", "Import skin file...", "Open skins folder"}) {
-            check(Gui.textWidth(line) <= 380, "fits: '" + line + "' = " + Gui.textWidth(line));
+         String tip = "Drag a skin .png onto this window to wear it. Or copy a file path, link or username, then press Ctrl+V.";
+         int previous = 0;
+         for (float w : new float[]{700, 430, 343, 300, 240}) {
+            List<String> lines = Game.wrapText(tip, w - 12);
+            for (String line : lines) {
+               check(Gui.textWidth(line) <= w - 12, "a line fits a window " + w + " units wide: " + Gui.textWidth(line) + " '" + line + "'");
+            }
+
+            eq(tip, String.join(" ", lines), "no word is lost when wrapping to " + w);
+            check(lines.size() >= previous, "a narrower window never gives fewer lines (" + lines.size() + " at " + w + ")");
+            previous = lines.size();
          }
+
+         check(Game.wrapText(tip, 700 - 12).size() <= 2, "a wide window needs at most two lines");
+         eq(1, Game.wrapText("Supercalifragilisticexpialidocious", 20).size(), "a single long word keeps its own line");
+         eq("Import skin file...", Game.fitLabel(500, "Import skin file...", "Import file...", "File..."), "wide button: the full label");
+         eq("Import file...", Game.fitLabel(Gui.textWidth("Import file...") + 1, "Import skin file...", "Import file...", "File..."), "narrower: the shorter label");
+         eq("File...", Game.fitLabel(5, "Import skin file...", "Import file...", "File..."), "very narrow: the last one");
          String longLine = "Could not import: the server answered 429 and then something else that is far too long to show";
          String clipped = Game.clipText(longLine, 300.0F);
          check(Gui.textWidth(clipped) <= 300, "clipped width " + Gui.textWidth(clipped));

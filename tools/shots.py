@@ -187,6 +187,9 @@ SCENES = {
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "pause-menu":     (COMMON + [CAM] + PLAIN + ["-Dbc.pause=1", "-Dbc.shot=110"], True),
+    # the Skins screen in a narrow window (1030x720 = what the Windows test machine gave us: 343 GUI units) and at GUI scale 4 (320 x 180)
+    "skin-screen-narrow": (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo", "-Dbc.win=1030x720"], True),
+    "skin-screen-tiny":   (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo", "-Dbc.guiscale=4"], True),
     "skin-screen":    (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo"], True),
     # real network import of an account's skin (needs internet: the Windows smoke test machine has it) and the file dialog opening
     "skin-net":       (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skinuser=jeb_"], True),
@@ -258,7 +261,8 @@ def release_jar():
     """The blockcraft.jar inside the newest committed update pack (the exact artifact players get), if there is one."""
     if os.environ.get("BC_NEW_JAR") == "build":
         return None  # test the freshly built jar instead (ci/visual-trigger.txt, line 2: jar=build)
-    packs = sorted(glob.glob(os.path.join(ROOT, "releases", "Blockcraft-UPDATE*-patch.zip")))
+    packs = sorted(glob.glob(os.path.join(ROOT, "releases", "Blockcraft-UPDATE*-patch.zip")),
+                   key=lambda pth: tuple(int(x) for x in re.search(r"UPDATE([0-9.]+)-patch", pth).group(1).split(".")))  # 3.10 > 3.9
     if not packs:
         return None
     import zipfile

@@ -34,7 +34,7 @@ final class Fire {
 
    /** How eagerly fire jumps to a block next to this one (Minecraft's "encouragement"). */
    static int encouragement(int id) {
-      if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96) {
+      if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96 || id == Blocks.SLAB_TOP0 || id >= Blocks.STAIR_TOP0 && id <= Blocks.STAIR_TOP0 + 3) {
          return 5; // oak planks, slab, fence, stairs
       } else if (id >= 9 && id <= 11) {
          return 5; // logs
@@ -49,7 +49,7 @@ final class Fire {
 
    /** How likely a block is to be consumed by neighbouring fire (Minecraft's "flammability"); 0 = does not burn. */
    static int flammability(int id) {
-      if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96) {
+      if (id == 5 || id == 113 || id == 118 || id >= 93 && id <= 96 || id == Blocks.SLAB_TOP0 || id >= Blocks.STAIR_TOP0 && id <= Blocks.STAIR_TOP0 + 3) {
          return 20;
       } else if (id >= 9 && id <= 11) {
          return 5;

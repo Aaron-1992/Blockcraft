@@ -172,8 +172,8 @@ so old lines still load).
 * Windows specifics that CI cannot click through: dropping a file on the window, the dialog being visible. Keep `browseSkin` leaving
   fullscreen and disposing the `FileDialog` - an undisposed AWT dialog keeps the JVM alive after the window closes (hence `System.exit(0)`
   in `Main`). `java.awt.headless` is set to `false` on Windows only.
-* `Blocks.COUNT` is 195 still; ids 195..255 are free. Planned for the slab / stair update: 197..216 upside-down stairs (same `(id - 93) & 3`
-  facing arithmetic), 217..221 top slabs, 222..227 sideways logs.
+* `Blocks.COUNT` is 220 (3.10); ids 220..255 are free. Update 3.10 adds 195..214 upside-down stairs (`Blocks.STAIR_TOP0`, material * 4 + facing; use `Blocks.stairFacing`), 215..219 top slabs
+  (`SLAB_TOP0`); planned next: 220..225 sideways logs.
 
 ## Conventions / gotchas
 
