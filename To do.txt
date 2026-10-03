@@ -1,21 +1,23 @@
-Weather system with volumetric clouds so you can see bad weather, storms, rain, etc., in the distance (needs to look cool and work without shaders)
+Fix Hand models
 
-Fix LODs and adapt them for the weather system
+make entities react to shader lighting
 
-Skins (make it easy to import Minecraft skins)
+make Clouds and weather more realistic
 
-Smooth animations
+Make water look better with shader
 
-Natural disasters
+add more 1.12 features
 
-Trees fall over when chopped down; allow for further harvesting after they fall
+Upgrade the villages
 
-Allow slabs, stairs, etc., to be placed on the top half of a block, upside down, etc.
+Dimensions
 
-Make Creepers ignitable
+Fix door culling (can some times be missing a side when open or closed)
 
-Display fire like in Minecraft when it is attached to a block
+Make textures only render from one side (go under map with spectator to see what i mean)
 
-Hide interior surfaces to improve performance
+Better animations (like minecraft with Fresh animations)
 
-Fix Mobs not beeing able to jump up a block
+Make LODS actually resemble what is in that chunk when something gets broken or built
+
+Also fix LODS popping up in fully rendered chunks when Burning trees etc
