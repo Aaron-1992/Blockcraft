@@ -23,6 +23,13 @@ public final class Mobs {
    public static final int N = 8;
    public static final String[] NAME = new String[]{"pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider"};
    static final int[] HP = new int[]{10, 10, 8, 4, 20, 20, 20, 16};
+   /**
+    * Jump speed of a mob that walks into something. A mob's tick applies gravity BEFORE it moves, so it needs 0.42 / 0.98 + 0.08 to move
+    * up by Minecraft's 0.42 in the first tick and reach the same height (1.25 blocks, enough for one block but not for two). With the old
+    * value 0.42 the first tick only moved 0.33 and the jump peaked at 0.83 blocks: mobs hopped against every full block without ever
+    * getting on top of it.
+    */
+   static final double JUMP = 0.42 / 0.98 + 0.08;
    static final float[] W = new float[]{0.9F, 0.9F, 0.9F, 0.4F, 0.6F, 0.6F, 0.6F, 1.4F};
    static final float[] H = new float[]{0.9F, 1.4F, 1.3F, 0.7F, 1.95F, 1.99F, 1.7F, 0.9F};
    static final float[] SPD = new float[]{0.1F, 0.1F, 0.1F, 0.1F, 0.13F, 0.125F, 0.125F, 0.17F};
@@ -518,7 +525,7 @@ public final class Mobs {
          var1.y = var1.bb[1];
          var1.z = (var1.bb[2] + var1.bb[5]) / 2.0;
          if (var37 && var12 && var1.onGround) {
-            var1.vy = 0.42;
+            var1.vy = JUMP;
          }
 
          double var38 = Math.hypot(var1.x - var1.px, var1.z - var1.pz);

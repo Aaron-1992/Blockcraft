@@ -32,6 +32,7 @@ final class Tests39 {
       camera();
       options();
       polish();
+      steps();
    }
 
    static File tmpDir() throws IOException {
@@ -463,6 +464,93 @@ final class Tests39 {
          check(!g.skinBrowsing, "not browsing");
          check(!g.skinRefull, "no pending return to fullscreen");
          check(g.skinDrops.isEmpty(), "no pending drops");
+      });
+   }
+
+   // ------------------------------------------------------------------ mobs and one-block steps (To do: "mobs not being able to jump up a block")
+   /** Walls of the given height at x 14..24 (all z of the test world); the player stands on top of them far away. */
+   static Game stepWorld(int height) throws Exception {
+      Game g = newGame(0);
+      for (int x = 14; x <= 24; x++) {
+         for (int z = -30; z <= 45; z++) {
+            for (int h = 1; h <= height; h++) {
+               g.world.setBlock(x, GROUND + h, z, Blocks.STONE);
+            }
+         }
+      }
+
+      return g;
+   }
+
+   /** Drives the mobs toward the wall (animals flee from a point behind them, hostile mobs chase the player); true = it stood on top of the wall. */
+   static boolean[] walkAtWall(Game g, int height, List<Mobs.Mob> mobs) {
+      boolean[] up = new boolean[mobs.size()];
+      for (int t = 0; t < 300; t++) {
+         g.player.setPos(30.5, GROUND + height + 1, 12.5);
+         for (int i = 0; i < mobs.size(); i++) {
+            Mobs.Mob m = mobs.get(i);
+            if (up[i]) {
+               continue;
+            }
+
+            if (m.type < 4) {
+               m.flee = 100;
+               m.fleeX = 0;
+               m.fleeZ = m.z;
+            }
+
+            g.mobs.tickMob(m, g.world, g.player, 1.0f);
+            up[i] = m.onGround && m.y > GROUND + height + 0.9 && m.x > 13.0;
+         }
+      }
+
+      return up;
+   }
+
+   static void steps() {
+      test("mobs jump up one block: pigs, cows, sheep, chickens, babies and zombies get on top of a full block in their way", () -> {
+         Game g = stepWorld(1);
+         java.util.ArrayList<Mobs.Mob> mobs = new java.util.ArrayList<>();
+         for (int type = 0; type <= 3; type++) {
+            mobs.add(g.mobs.spawn(type, 10.5, GROUND + 1, 2.5 + type * 2));
+         }
+
+         mobs.add(g.mobs.spawn(Mobs.ZOMBIE, 10.5, GROUND + 1, 12.5));
+         mobs.add(g.mobs.spawnBaby(Mobs.PIG, 10.5, GROUND + 1, 16.5));
+         mobs.add(g.mobs.spawnBaby(Mobs.COW, 10.5, GROUND + 1, 18.5));
+         boolean[] up = walkAtWall(g, 1, mobs);
+         for (int i = 0; i < mobs.size(); i++) {
+            Mobs.Mob m = mobs.get(i);
+            check(up[i], Mobs.NAME[m.type] + (m.babyAge > 0 ? " (baby)" : "") + " got on top of the block: x=" + m.x + " y=" + m.y);
+         }
+      });
+      test("... but not up two blocks (a jump reaches 1.25 blocks, like in Minecraft)", () -> {
+         Game g = stepWorld(2);
+         java.util.ArrayList<Mobs.Mob> mobs = new java.util.ArrayList<>();
+         mobs.add(g.mobs.spawn(Mobs.PIG, 10.5, GROUND + 1, 4.5));
+         mobs.add(g.mobs.spawn(Mobs.COW, 10.5, GROUND + 1, 8.5));
+         mobs.add(g.mobs.spawn(Mobs.ZOMBIE, 10.5, GROUND + 1, 12.5));
+         double[] peak = new double[mobs.size()];
+         for (int t = 0; t < 300; t++) {
+            g.player.setPos(30.5, GROUND + 3, 12.5);
+            for (int i = 0; i < mobs.size(); i++) {
+               Mobs.Mob m = mobs.get(i);
+               if (m.type < 4) {
+                  m.flee = 100;
+                  m.fleeX = 0;
+                  m.fleeZ = m.z;
+               }
+
+               g.mobs.tickMob(m, g.world, g.player, 1.0f);
+               peak[i] = Math.max(peak[i], m.y - (GROUND + 1));
+            }
+         }
+
+         for (int i = 0; i < mobs.size(); i++) {
+            Mobs.Mob m = mobs.get(i);
+            check(m.x < 14.0, Mobs.NAME[m.type] + " stays in front of a two-block wall: x=" + m.x);
+            check(peak[i] > 1.15 && peak[i] < 1.35, Mobs.NAME[m.type] + " jumps 1.25 blocks high: " + peak[i]);
+         }
       });
    }
 }

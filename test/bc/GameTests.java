@@ -72,6 +72,7 @@ public final class GameTests {
       w.saveEnabled = false;
       setField(w, "rnd", new Random(1));
       setField(g, "rnd", new Random(2));
+      setField(w.fire, "rnd", new Random(3)); // fire ages / spread / burn-out use their own generator: seed it too, or the statistical fire tests flake
       for (int cz = -2; cz <= 2; cz++) {
          for (int cx = -2; cx <= 2; cx++) {
             Chunk c = new Chunk(cx, cz);

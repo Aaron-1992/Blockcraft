@@ -511,6 +511,10 @@ public final class Game {
             }
          }
 
+         if (this.autoFrames == 100 && System.getProperty("bc.pause") != null) {
+            this.setScreen(Game.S.PAUSE);
+         }
+
          if (this.autoFrames == 100 && System.getProperty("bc.inv") != null) {
             String var15 = System.getProperty("bc.inv");
             if (var15.equals("craft")) {

@@ -447,8 +447,8 @@ final class Menu {
       if (this.kind == 4) {
          var1.text(this.title, var4 + 8.0F, var5 + 6.0F, -12566464, false);
       } else if (this.kind == 0) {
+         // (no "Inventory" label here: it used to sit between the armor slots and the crafting grid, where the player is drawn now - Minecraft has none either)
          var1.text(this.title, var4 + 97.0F, var5 + 6.0F, -12566464, false);
-         var1.text("Inventory", var4 + 8.0F, var5 + 72.0F, -12566464, false);
       } else {
          var1.text(this.title, var4 + 8.0F, var5 + 6.0F, -12566464, false);
          var1.text("Inventory", var4 + 8.0F, var5 + 72.0F, -12566464, false);
