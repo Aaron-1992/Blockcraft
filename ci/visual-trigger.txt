@@ -1,2 +1,2 @@
-slabs,leaves-fancy,leaves-smart,leaves-fast
+slabs,slabs-sh,skin-hold-sh,leaves-fancy,leaves-smart,leaves-fast
 jar=build

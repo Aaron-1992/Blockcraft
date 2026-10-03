@@ -212,9 +212,12 @@ SCENES = {
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "slabs":          (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000"] + PLAIN + [sets(slabs_blocks()), "-Dbc.shot=170"], True),
     # leaf modes over the same forest: 0 fancy / 1 smart / 2 fast (look from above into the canopy)
-    "leaves-fancy":   (COMMON + ["-Dbc.cam=133,92,71,45,22", "-Dbc.time=6000", "-Dbc.leaves=0"] + PLAIN + ["-Dbc.shot=110"], True),
-    "leaves-smart":   (COMMON + ["-Dbc.cam=133,92,71,45,22", "-Dbc.time=6000", "-Dbc.leaves=1"] + PLAIN + ["-Dbc.shot=110"], True),
-    "leaves-fast":    (COMMON + ["-Dbc.cam=133,92,71,45,22", "-Dbc.time=6000", "-Dbc.leaves=2"] + PLAIN + ["-Dbc.shot=110"], True),
+    "leaves-fancy": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=6000", "-Dbc.leaves=0"] + PLAIN + ["-Dbc.shot=110"], True),
+    "leaves-smart": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=6000", "-Dbc.leaves=1"] + PLAIN + ["-Dbc.shot=110"], True),
+    "leaves-fast": (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=6000", "-Dbc.leaves=2"] + PLAIN + ["-Dbc.shot=110"], True),
+    # the same scenes through the shader pipeline (the model, held items and the new stairs must look right there too)
+    "skin-hold-sh":   (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-45", "-Dbc.skin=demo", "-Dbc.hold=316", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    "slabs-sh":       (COMMON + ["-Dbc.cam=144,70.2,70.2,0,22", "-Dbc.time=6000", sets(slabs_blocks()), "-Dbc.shot=170"], True),
     "pause-menu":     (COMMON + [CAM] + PLAIN + ["-Dbc.pause=1", "-Dbc.shot=110"], True),
     # the Skins screen in a narrow window (1030x720 = what the Windows test machine gave us: 343 GUI units) and at GUI scale 4 (320 x 180)
     "skin-screen-narrow": (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skin=demo", "-Dbc.win=1030x720"], True),

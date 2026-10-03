@@ -687,12 +687,42 @@ public final class Mesher {
       }
    }
 
+   /** Stairs and slabs: not opaque, yet they block light completely (so their own cell and the cells of neighbouring ones are pitch dark). */
+   static boolean isPartial(int id) {
+      return Blocks.opacity[id] == 15 && !Blocks.opaque[id];
+   }
+
+   /**
+    * Update 3.9: like Minecraft's "use neighbour brightness" for slabs and stairs: the light of such a block is the best light around it.
+    * Without this the faces of an upside-down stair or of a slab that look into the ground or into another stair were black.
+    */
+   static int neighbourLight(Mesher.Scratch var0, int x, int y, int z) {
+      int sky = 0;
+      int blk = 0;
+      for (int f = 0; f < 6; f++) {
+         int q = ci(x + FN[f][0], y + FN[f][1], z + FN[f][2]);
+         int id = var0.B[q] & 255;
+         if (!Blocks.opaque[id] && !isPartial(id)) {
+            int l = var0.L[q] & 255;
+            sky = Math.max(sky, l >> 4 & 15);
+            blk = Math.max(blk, l & 15);
+         }
+      }
+
+      return sky << 4 | blk;
+   }
+
    static void boxBB(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5, double[] var6, int[][] var7) {
       int var8 = var2 + 1;
       int var9 = var3 + 1;
       int var10 = var4 + 1;
       int var11 = ci(var8, var9, var10);
       int var12 = var0.L[var11] & 255;
+      boolean partial = isPartial(var5);
+      if (partial) {
+         var12 = neighbourLight(var0, var8, var9, var10);
+      }
+
       float[] var13 = (float[])UVT.get();
 
       for (int var14 = 0; var14 < 6; var14++) {
@@ -723,7 +753,7 @@ public final class Mesher {
 
          int var35 = var12;
          int var21 = ci(var8 + var15[0], var9 + var15[1], var10 + var15[2]);
-         if (!Blocks.opaque[var0.B[var21] & 0xFF]) {
+         if (!Blocks.opaque[var0.B[var21] & 0xFF] && !isPartial(var0.B[var21] & 0xFF)) {
             var35 = var0.L[var21] & 255;
          }
 
