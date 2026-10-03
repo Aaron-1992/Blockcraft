@@ -503,9 +503,10 @@ public final class Shaders {
     */
    public void useWater(
       float[] mv, double camX, double camY, double camZ, float fogNear, float fogFar, float[] fogCol, float[] skyTop, float[] skyHor, float dayF, boolean shadowOn,
-      int leafTile, int grassTile, int flower0, int flower1, int waterTile, int width, int height, float near, float far
+      int leafTile, int grassTile, int flower0, int flower1, int waterTile, int width, int height, float near, float far, int quality
    ) {
       this.useWorldProg(this.pWater, mv, camX, camY, camZ, true, fogNear, fogFar, fogCol, skyTop, skyHor, dayF, shadowOn, leafTile, grassTile, flower0, flower1, waterTile);
+      this.u1f(this.pWater, "wq", quality);
       this.u1i(this.pWater, "sceneColor", 3);
       this.u1i(this.pWater, "sceneDepth", 4);
       GL20.glUniform2f(this.loc(this.pWater, "invRes"), 1.0F / width, 1.0F / height);

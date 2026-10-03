@@ -360,7 +360,9 @@ SCENES = {
     # ---- Update 3.11: water with shaders (depth colour, refraction, reflections, foam, ripples); the same view without shaders (-plain) for comparison
     "water-day-sh":   (COMMON + ["-Dbc.cam=133,72,71,45,12", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
     "water-day-plain": (COMMON + ["-Dbc.cam=133,72,71,45,12", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
-    "water-low-sh":   (COMMON + ["-Dbc.cam=133,64.4,71,45,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    "water-low-sh":   (COMMON + ["-Dbc.cam=-60,66,71,-90,4", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
+    "water-low-plain": (COMMON + ["-Dbc.cam=-60,66,71,-90,4", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
+    "water-fast-sh":  (COMMON + ["-Dbc.waterq=1", "-Dbc.cam=-60,66,71,-90,4", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
     "water-sunset-sh": (COMMON + ["-Dbc.cam=133,70,71,90,5", "-Dbc.time=11000", "-Dbc.weather=calm", "-Dbc.shot=110"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),
     "firewall-night": (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=18000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),

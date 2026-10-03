@@ -1,2 +1,2 @@
-mobs-sh,mobs-shade-sh,mobs-shade-plain,mobs-torch-sh,mobs-torch-plain,water-day-sh,water-day-plain,water-low-sh,water-sunset-sh,hand-sword-sh,skin-hold-torch,skin-hold-apple
+water-day-sh,water-low-sh,water-low-plain,water-fast-sh,wx-compare-sh,wx-storm-sh,wx-rain-sh,wx-storm-far-sh,wx-fair,wx-storm,wx-overcast
 jar=build

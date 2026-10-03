@@ -807,7 +807,7 @@ public final class Renderer {
       if (waterShader) {
          this.sh.copyScene(var2, var3);
          lightmapUnit(true);
-         this.sh.useWater(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23, var2, var3, (float)var18, (float)var20);
+         this.sh.useWater(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23, var2, var3, (float)var18, (float)var20, this.g.opt.waterQ);
       } else if (var50) {
          this.sh.useWorld(this.mv, this.camX, this.camY, this.camZ, true, var11, var12, var26, var27, var28, this.daylight, var51, 9, 25, 26, 27, 23);
       }

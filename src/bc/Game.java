@@ -219,6 +219,10 @@ public final class Game {
          this.winH = this.fbH = Integer.parseInt(wh[1]);
       }
 
+      if (System.getProperty("bc.waterq") != null) {
+         this.opt.waterQ = Integer.getInteger("bc.waterq"); // 1 = no reflections of the terrain in the water (cheaper)
+      }
+
       if (System.getProperty("bc.lod") != null) {
          this.opt.lodDistance = Integer.getInteger("bc.lod");
       }
@@ -4131,7 +4135,17 @@ public final class Game {
 
          this.opt.lodDistance = var6[(var2x + 1) % var6.length];
       });
-      this.button("Shaders: " + this.onOff(this.opt.shaders), var3, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.shaders = !this.opt.shaders);
+      this.button("Shaders: " + (!this.opt.shaders ? "OFF" : (this.opt.waterQ >= 2 ? "FANCY" : "ON")), var3, var2 + 120.0F, var5, 20.0F, true, () -> {
+         // OFF -> ON (water with depth colour and refraction) -> FANCY (water that also mirrors the terrain) -> OFF
+         if (!this.opt.shaders) {
+            this.opt.shaders = true;
+            this.opt.waterQ = 1;
+         } else if (this.opt.waterQ < 2) {
+            this.opt.waterQ = 2;
+         } else {
+            this.opt.shaders = false;
+         }
+      });
       this.button("Weather: " + this.onOff(this.opt.weather), var4, var2 + 120.0F, var5, 20.0F, true, () -> this.opt.weather = !this.opt.weather);
       this.button("Leaves: " + new String[]{"Fancy", "Smart", "Fast"}[this.opt.leaves], var3, var2 + 144.0F, var5, 20.0F, true, () -> {
          this.opt.leaves = (this.opt.leaves + 1) % 3;

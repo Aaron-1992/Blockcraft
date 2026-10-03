@@ -20,6 +20,8 @@ public final class Options {
    public boolean fullscreen = false;
    public int lodDistance = 64;
    public boolean shaders = true;
+   /** Update 3.11: water with shaders - 1 = depth colour, refraction, foam; 2 = also the terrain mirrored in it (the "FANCY" setting, default). */
+   public int waterQ = 2;
    /** Update 3.8: rain, snow, thunderstorms and storm clouds (off = fair-weather clouds only). */
    public boolean weather = true;
    /** Update 3.10: natural disasters (tornadoes, earthquakes, meteors); /disaster on|off switches them per world as well. */
@@ -52,6 +54,7 @@ public final class Options {
                this.fullscreen = Boolean.parseBoolean(var2.getProperty("fullscreen", "false"));
                this.lodDistance = Integer.parseInt(var2.getProperty("lodDistance", "64"));
                this.shaders = Boolean.parseBoolean(var2.getProperty("shaders", "true"));
+               this.waterQ = Math.max(1, Math.min(2, Integer.parseInt(var2.getProperty("waterQ", "2"))));
                this.weather = Boolean.parseBoolean(var2.getProperty("weather", "true"));
                this.disasters = Boolean.parseBoolean(var2.getProperty("disasters", "true"));
                this.skin = var2.getProperty("skin", Skins.DEFAULT);
@@ -86,6 +89,7 @@ public final class Options {
       var1.setProperty("fullscreen", this.fullscreen + "");
       var1.setProperty("lodDistance", this.lodDistance + "");
       var1.setProperty("shaders", this.shaders + "");
+      var1.setProperty("waterQ", this.waterQ + "");
       var1.setProperty("weather", this.weather + "");
       var1.setProperty("disasters", this.disasters + "");
       var1.setProperty("skin", this.skin);
