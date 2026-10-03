@@ -28,11 +28,11 @@ public final class Mobs {
    public static final int ENDERMAN = 12;
    public static final int ENDER_DRAGON = 13;
    public static final int END_CRYSTAL = 14;
-   /** The ids from here on are reserved for the villages and the parrots (no models yet: N stops before them). */
+   /** The villages (villager, iron golem) and the parrots. */
    public static final int VILLAGER = 15;
    public static final int IRON_GOLEM = 16;
    public static final int PARROT = 17;
-   public static final int N = 17;
+   public static final int N = 18;
    public static final String[] NAME = new String[]{
       "pig", "cow", "sheep", "chicken", "zombie", "skeleton", "creeper", "spider", "pigman", "ghast", "blaze", "magmacube", "enderman", "enderdragon", "endcrystal", "villager", "irongolem", "parrot"
    };
@@ -144,7 +144,7 @@ public final class Mobs {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;
                double var10 = var6 * var6 + var8 * var8;
-               if (Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
+               if (Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || var5.tamed || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
                   if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
                      this.tickMob(var5, var1, var2, var3);
                      if (var5.y < -20.0) {
@@ -179,6 +179,7 @@ public final class Mobs {
          if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD) {
             this.spawnPassive(var1, var2);
             Mobs312.spawnVillagers(this, var1, var2);
+            Mobs312.spawnParrots(this, var1, var2);
          }
 
          Mobs312.tickFireballs(this, var1, var2);
@@ -471,7 +472,8 @@ public final class Mobs {
             case 12:
             case 15:
             case 16:
-               // Update 3.12: the mobs of the Nether, the Enderman, the villagers and the iron golems (Mobs312)
+            case 17:
+               // Update 3.12: the mobs of the Nether, the Enderman, the villagers and the iron golems, the parrots (Mobs312)
                Mobs312.Intent intent312 = Mobs312.think(this, var1, var2, var3, var4);
                var12 = intent312.moving;
                var13 *= intent312.speed;
@@ -1000,7 +1002,7 @@ public final class Mobs {
       double var17 = var13;
 
       for (Mobs.Mob var20 : this.list) {
-         if (!var20.dead) {
+         if (!var20.dead && !Mobs312.onShoulder(var20)) {
             double[] var21 = var20.bb;
             double var22 = 0.0;
             double var24 = var17;
@@ -1233,8 +1235,8 @@ public final class Mobs {
 
          try {
             for (Mobs.Mob var4 : this.list) {
-               if (!var4.dead && (Mobs312.keepsForever(var4.type) || !hostile(var4.type) && Math.abs(var4.x - this.g.player.x) < 120.0 && Math.abs(var4.z - this.g.player.z) < 120.0)) {
-                  var2.println(var4.type + " " + var4.x + " " + var4.y + " " + var4.z + " " + var4.health + " " + var4.color + " " + var4.babyAge + " " + (var4.sheared ? 1 : 0) + " " + var4.woolTimer + " " + var4.breedCd);
+               if (!var4.dead && (Mobs312.keepsForever(var4.type) || var4.tamed || !hostile(var4.type) && Math.abs(var4.x - this.g.player.x) < 120.0 && Math.abs(var4.z - this.g.player.z) < 120.0)) {
+                  var2.println(var4.type + " " + var4.x + " " + var4.y + " " + var4.z + " " + var4.health + " " + var4.color + " " + var4.babyAge + " " + (var4.sheared ? 1 : 0) + " " + var4.woolTimer + " " + var4.breedCd + " " + (var4.tamed ? 1 : 0));
                }
             }
          } catch (Throwable var6) {
@@ -1279,6 +1281,10 @@ public final class Mobs {
                         var6.woolTimer = Integer.parseInt(var5[8]);
                         var6.breedCd = Integer.parseInt(var5[9]);
                         var6.setPos(var6.x, var6.y, var6.z);
+                     }
+
+                     if (var5.length >= 11) {
+                        var6.tamed = Integer.parseInt(var5[10]) != 0;
                      }
                   }
                }
@@ -1386,6 +1392,8 @@ public final class Mobs {
       /** > 0: cannot breed yet. */
       public int breedCd;
       public boolean sheared;
+      /** Update 3.12: a parrot that has been tamed (it stays with you, sits on your shoulder, and is never lost). */
+      public boolean tamed;
       /** Ticks until a sheared sheep has regrown its wool. */
       public int woolTimer;
       /** Ticks until a (grown-up) chicken lays its next egg; 0 = not started yet. */

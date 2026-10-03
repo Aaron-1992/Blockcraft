@@ -672,6 +672,19 @@ public final class Game {
                      if (spawned.type == Mobs.VILLAGER) {
                         spawned.color = var20 % 6; // every villager a different profession
                      }
+
+                     if (spawned.type == Mobs.PARROT) {
+                        spawned.color = var20 % Mobs312.PARROT_COLORS; // every parrot another colour
+                        if ("land".equals(System.getProperty("bc.parrot"))) {
+                           spawned.phase = Mobs312.P_LAND; // sitting still for the picture
+                           spawned.phaseT = 1000000;
+                        } else if ("shoulder".equals(System.getProperty("bc.parrot")) && var20 < 2) {
+                           spawned.tamed = true;
+                           spawned.phase = Mobs312.P_SHOULDER;
+                           spawned.aux = var20 == 0 ? 1.0F : -1.0F;
+                           spawned.tx = this.player.health;
+                        }
+                     }
                      spawned.yaw = this.player.yaw + 180.0F - 30.0F;
                   }
                }
@@ -2676,6 +2689,10 @@ public final class Game {
          }
 
          boolean var19 = var2 && this.targetMob != null && this.useOnMob(this.targetMob, var3);
+         if (!var19 && var2 && var3 == null && this.player.sneaking && Mobs312.shoulderOff(this)) {
+            var19 = true; // Update 3.12: sneak + right click with an empty hand sends the parrot on your shoulder away
+         }
+
          if (var19) {
             this.swinging = true;
             this.swing = 1.0E-4F;
@@ -3188,6 +3205,10 @@ public final class Game {
    }
 
    boolean useOnMob(Mob var1, Stack var2) {
+      if (var1.type == Mobs.PARROT && !var1.dead && !this.player.spectator && !this.player.adventure && Mobs312.useParrot(this, var1, var2)) {
+         return true;
+      }
+
       if (var1.type == Mobs.VILLAGER && !var1.dead && !this.player.spectator && !this.player.adventure) {
          return this.openTrade(var1);
       }

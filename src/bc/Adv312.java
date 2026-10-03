@@ -96,6 +96,7 @@ final class Adv312 {
       a("husbandry/breed_an_animal", "The Parrots and the Bats", "Breed two animals together", Items.WHEAT, "husbandry/root", 4, 1, 1, TASK);
       a("husbandry/bake_bread", "Bake Bread", "Turn wheat into bread", Items.BREAD, "husbandry/root", 4, 1, 2, TASK);
       a("husbandry/dye_sheep", "Color Me Impressed", "Dye a sheep", Color312.dyeItem(14), "husbandry/root", 4, 1, 3, TASK);
+      a("husbandry/tame_an_animal", "Best Friends Forever", "Tame a parrot with seeds", Items.FEATHER, "husbandry/root", 4, 1, 4, TASK);
    }
 
    /** The advancements made in this world. */

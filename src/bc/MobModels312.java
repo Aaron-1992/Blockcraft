@@ -21,10 +21,32 @@ final class MobModels312 {
       models[Mobs.END_CRYSTAL] = crystal();
       models[Mobs.VILLAGER] = villager();
       models[Mobs.IRON_GOLEM] = golem();
+      models[Mobs.PARROT] = parrot();
    }
 
    /** The colour that marks the robe of a villager in its texture: the renderer tints it with the colour of the profession. */
    static final int ROBE_MARK = 0xE6E6E6;
+   /** The colour that marks the feathers of a parrot: tinted with the colour of the bird (red, blue, green, cyan, grey). */
+   static final int PARROT_MARK = 0xE4E4E2;
+   static final int[] PARROT_RGB = {0xD42A22, 0x2A5ED4, 0x2EB43C, 0x22B8CC, 0x9EA2A8};
+
+   /** A small bird: a round body, a tail, two wings that beat when it flies, a head with a crest and a hooked beak. */
+   private static Model parrot() {
+      Model m = new Model();
+      m.type = Mobs.PARROT;
+      Part leg = m.add(3, 0x7C7C80, 1, 3, 1, -0.5F, -3.0F, -0.5F, 1.2F, 3.0F, 0.0F);
+      m.addLike(leg, 4, -1.2F, 3.0F, 0.0F);
+      m.add(2, PARROT_MARK, 4, 6, 3, -2.0F, 0.0F, -1.5F, 0.0F, 3.0F, 0.0F);
+      m.add(2, PARROT_MARK, 3, 7, 1, -1.5F, -7.0F, -1.0F, 0.0F, 7.0F, -1.5F);
+      m.add(1, PARROT_MARK, 3, 3, 3, -1.5F, 0.0F, -1.5F, 0.0F, 9.0F, 0.3F);
+      m.add(1, 0xE49A2A, 1, 2, 2, -0.5F, 0.6F, 1.5F, 0.0F, 9.0F, 0.3F);
+      m.add(1, PARROT_MARK, 1, 2, 2, -0.5F, 3.0F, -1.5F, 0.0F, 9.0F, 0.3F);
+      m.add(7, PARROT_MARK, 1, 5, 3, -0.5F, -5.0F, -1.5F, 2.4F, 8.6F, 0.0F);
+      m.add(8, PARROT_MARK, 1, 5, 3, -0.5F, -5.0F, -1.5F, -2.4F, 8.6F, 0.0F);
+      m.add(7, 0x2C8AD8, 1, 2, 3, -0.5F, -7.0F, -1.5F, 2.4F, 8.6F, 0.0F);
+      m.add(8, 0x2C8AD8, 1, 2, 3, -0.5F, -7.0F, -1.5F, -2.4F, 8.6F, 0.0F);
+      return m;
+   }
 
    /** A big nose, a unibrow, a long robe with the arms crossed in front of it. */
    private static Model villager() {
@@ -193,6 +215,8 @@ final class MobModels312 {
             return new float[]{part.color, 0.85F + MobRender.hash(x, y, 61) * 0.3F};
          case Mobs.VILLAGER:
             return new float[]{part.color, 0.9F + MobRender.hash(x, y, 41) * 0.16F + (part.color == ROBE_MARK && y % 5 == 0 ? -0.1F : 0.0F)};
+         case Mobs.PARROT:
+            return new float[]{part.color, 0.9F + MobRender.hash(x, y, 77) * 0.2F + (part.kind >= 7 && part.color == PARROT_MARK && y % 2 == 0 ? -0.08F : 0.0F)};
          case Mobs.IRON_GOLEM: {
             float v = MobRender.vnoise(x * 0.3F, y * 0.3F, 29);
             int vine = v > 0.72F ? 0x4C7A3C : part.color;
@@ -283,6 +307,14 @@ final class MobModels312 {
 
             MobRender.put(f[0] + 3, f[1] + 8, 0x6A4A38);
             MobRender.put(f[0] + 4, f[1] + 8, 0x6A4A38);
+            break;
+         }
+         case Mobs.PARROT: {
+            // the head is the fifth part: a black eye on each side of the face, a pale patch round it
+            Part head = model.parts.get(4);
+            int[] f = MobRender.face(head, 3);
+            MobRender.put(f[0], f[1] + 1, 0x141414);
+            MobRender.put(f[0] + 2, f[1] + 1, 0x141414);
             break;
          }
          case Mobs.IRON_GOLEM: {

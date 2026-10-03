@@ -23,6 +23,7 @@ final class Tests312 {
       end();
       villages();
       colors();
+      parrots();
       advancements();
    }
 
@@ -648,12 +649,12 @@ final class Tests312 {
    // ------------------------------------------------------------------ the mobs of the Nether
    static void netherMobs() {
       test("mob table: the new kinds are in every table, hostile / peaceful are told apart", () -> {
-         eq(17, Mobs.N, "seventeen mobs so far (the parrots come later)");
+         eq(18, Mobs.N, "eighteen mobs (the parrots are the last ones)");
          for (int t = 0; t < Mobs.NAME.length; t++) {
             check(Mobs.NAME[t] != null && Mobs.HP[t] > 0 && Mobs.W[t] > 0 && Mobs.H[t] > 0 && (Mobs.SPD[t] > 0 || t == Mobs.END_CRYSTAL), "mob " + t + " has name, health, size and speed");
          }
 
-         eq(18, Mobs.NAME.length, "names for the mobs that are still to come as well");
+         eq(18, Mobs.NAME.length, "a name for every mob");
          eq(18, Mobs.HP.length, "health");
          eq(18, Mobs.W.length, "width");
          eq(18, Mobs.H.length, "height");
@@ -2257,6 +2258,307 @@ final class Tests312 {
          }
 
          check(pearl, "the priest sells ender pearls: the way to the End is open without a single enderman");
+      });
+   }
+
+   // ------------------------------------------------------------------ parrots
+   static void parrots() {
+      test("parrots: id 17 is alive (N = 18), six hit points, five colours, a model of eleven boxes with a tinted body", () -> {
+         eq(18, Mobs.N, "eighteen kinds of mob");
+         eq("parrot", Mobs.NAME[Mobs.PARROT], "its name");
+         eq(6, Mobs.HP[Mobs.PARROT], "six hit points");
+         check(Mobs312.flies(Mobs.PARROT) && Mobs312.peaceful(Mobs.PARROT) && !Mobs.hostile(Mobs.PARROT), "it flies and is peaceful");
+         MobRender.Model[] models = new MobRender.Model[Mobs.N];
+         MobModels312.build(models);
+         check(models[Mobs.PARROT] != null && models[Mobs.PARROT].parts.size() == 11, "a model with eleven parts");
+         int tinted = 0;
+         for (MobRender.Part p : models[Mobs.PARROT].parts) {
+            if (p.color == MobModels312.PARROT_MARK) {
+               tinted++;
+            }
+         }
+
+         check(tinted >= 5, "feathers are tinted: " + tinted);
+         eq(Mobs312.PARROT_COLORS, MobModels312.PARROT_RGB.length, "a colour for every kind");
+         Game g = newGame(0);
+         g.mobs.timer = 1;
+         boolean[] seen = new boolean[5];
+         for (int i = 0; i < 60; i++) {
+            Mobs.Mob m = g.mobs.spawn(Mobs.PARROT, 8.5, GROUND + 3, 8.5);
+            check(m.color >= 0 && m.color < 5, "a colour from 0 to 4");
+            seen[m.color] = true;
+            eq(6, m.health, "health");
+            check(!m.tamed, "wild");
+            g.mobs.list.remove(m);
+         }
+
+         for (int c = 0; c < 5; c++) {
+            check(seen[c], "colour " + c + " turns up");
+         }
+      });
+
+      test("parrots: a wild one flutters about in the air, never inside a block, sits down now and then and takes off again", () -> {
+         Game g = newGame(0);
+         g.mobs.timer = 1;
+         g.player.setPos(30.5, GROUND + 1, 30.5);
+         // a few trees to fly round: columns of logs with leaves on top
+         for (int k = 0; k < 6; k++) {
+            int x = 10 + k * 3;
+            int z = 4 + k % 2 * 5;
+            for (int y = 1; y <= 4; y++) {
+               g.world.setBlock(x, GROUND + y, z, Blocks.LOG_OAK);
+            }
+
+            for (int dx = -1; dx <= 1; dx++) {
+               for (int dz = -1; dz <= 1; dz++) {
+                  g.world.setBlock(x + dx, GROUND + 5, z + dz, Blocks.LEAVES_OAK);
+               }
+            }
+         }
+
+         Mobs.Mob m = g.mobs.spawn(Mobs.PARROT, 12.5, GROUND + 4, 6.5);
+         double travelled = 0.0;
+         int landed = 0;
+         int tookOff = 0;
+         int last = Mobs312.P_FLY;
+         double minY = 999;
+         double maxY = -999;
+         boolean inside = false;
+         for (int i = 0; i < 6000; i++) {
+            g.mobs.tickMob(m, g.world, g.player, 1.0f);
+            travelled += Math.hypot(m.x - m.px, m.z - m.pz);
+            minY = Math.min(minY, m.y);
+            maxY = Math.max(maxY, m.y);
+            inside |= Phys.collides(g.world, m.bb);
+            if (m.phase == Mobs312.P_LAND && last != Mobs312.P_LAND) {
+               landed++;
+            } else if (m.phase == Mobs312.P_FLY && last == Mobs312.P_LAND) {
+               tookOff++;
+            }
+
+            last = m.phase;
+         }
+
+         check(!inside, "never inside a block");
+         check(travelled > 150.0, "it flew about: " + (int)travelled + " blocks in 5 minutes");
+         check(minY >= GROUND + 0.9 && maxY < GROUND + 30, "between the ground and the sky: " + minY + " .. " + maxY);
+         check(landed >= 2, "it sat down: " + landed + " times");
+         check(tookOff >= 1, "and took off again: " + tookOff);
+         check(!m.dead && m.health == 6, "alive and well");
+      });
+
+      test("parrots: seeds tame one in three (a seed is used up each time), then it stays with you, follows you and comes to you when you are far away", () -> {
+         Game g = newGame(0);
+         g.mobs.timer = 1;
+         Mobs.Mob m = g.mobs.spawn(Mobs.PARROT, 12.5, GROUND + 2, 12.5);
+         g.mobs.rnd.setSeed(7L);
+         GameTests.hold(g, Items.SEEDS, 30);
+         int used = 0;
+         while (!m.tamed && used < 30) {
+            check(g.useOnMob(m, g.inv[g.sel]), "a seed is taken");
+            used++;
+         }
+
+         check(m.tamed && used >= 1 && used <= 15, "tamed after " + used + " seeds");
+         eq(30 - used, g.inv[g.sel].n, "every seed was used");
+         check(g.adv.has("husbandry/tame_an_animal"), "Best Friends Forever");
+         int before = g.inv[g.sel].n;
+         check(!g.useOnMob(m, g.inv[g.sel]) || !m.tamed, "(a tame parrot takes no more seeds)");
+         eq(before, g.inv[g.sel].n, "so none are used");
+         // a creative player keeps the seeds
+         Game c = newGame(1);
+         c.mobs.timer = 1;
+         Mobs.Mob cm = c.mobs.spawn(Mobs.PARROT, 12.5, GROUND + 2, 12.5);
+         c.mobs.rnd.setSeed(3L);
+         GameTests.hold(c, Items.MELON_SEEDS, 5);
+         for (int i = 0; i < 30 && !cm.tamed; i++) {
+            c.useOnMob(cm, c.inv[c.sel]);
+         }
+
+         check(cm.tamed && c.inv[c.sel].n == 5, "creative: tamed, seeds kept");
+         // following: 15 blocks away it comes closer and stays about
+         g.player.setPos(8.5, GROUND + 1, 8.5);
+         m.setPos(23.5, GROUND + 4, 8.5);
+         m.px = m.x;
+         m.pz = m.z;
+         m.phase = Mobs312.P_FLY;
+         double closest = 99;
+         for (int i = 0; i < 300; i++) {
+            g.mobs.tickMob(m, g.world, g.player, 1.0f);
+            closest = Math.min(closest, Math.hypot(m.x - g.player.x, m.z - g.player.z));
+         }
+
+         check(closest < 6.0, "it came to me: " + closest);
+         check(Math.hypot(m.x - g.player.x, m.z - g.player.z) < 9.0, "and stayed: " + Math.hypot(m.x - g.player.x, m.z - g.player.z));
+         // far away: it is brought to the player at once
+         m.setPos(g.player.x + 40.0, GROUND + 5, g.player.z);
+         g.mobs.tickMob(m, g.world, g.player, 1.0f);
+         check(Math.hypot(m.x - g.player.x, m.z - g.player.z) < 4.0, "40 blocks away: here again: " + Math.hypot(m.x - g.player.x, m.z - g.player.z));
+         // a wild one is not tamed by an empty hand and does not sit on the shoulder
+         Mobs.Mob wild = g.mobs.spawn(Mobs.PARROT, 14.5, GROUND + 2, 14.5);
+         g.inv[g.sel] = null;
+         check(!g.useOnMob(wild, null), "an empty hand does nothing to a wild parrot");
+         check(wild.phase != Mobs312.P_SHOULDER, "it stays where it is");
+      });
+
+      test("parrots: a tame one sits on your shoulder (two fit), is not seen in first person, cannot be hit by you, and flies away when you sneak and click, when you are hurt and when you swim", () -> {
+         Game g = newGame(0);
+         g.mobs.timer = 1;
+         Mobs.Mob a = g.mobs.spawn(Mobs.PARROT, 9.5, GROUND + 2, 8.5);
+         Mobs.Mob b = g.mobs.spawn(Mobs.PARROT, 7.5, GROUND + 2, 8.5);
+         Mobs.Mob c = g.mobs.spawn(Mobs.PARROT, 8.5, GROUND + 2, 10.5);
+         a.tamed = true;
+         b.tamed = true;
+         c.tamed = true;
+         g.inv[g.sel] = null;
+         g.player.yaw = 0.0F;
+         check(g.useOnMob(a, null), "the first goes up");
+         check(g.useOnMob(b, null), "the second goes up");
+         check(!g.useOnMob(c, null), "a third has no place");
+         check(Mobs312.onShoulder(a) && Mobs312.onShoulder(b) && !Mobs312.onShoulder(c), "two on the shoulders");
+         check(a.aux * b.aux < 0, "one on each side");
+         for (int i = 0; i < 3; i++) {
+            g.mobs.tickMob(a, g.world, g.player, 1.0f);
+            g.mobs.tickMob(b, g.world, g.player, 1.0f);
+         }
+
+         for (Mobs.Mob m : new Mobs.Mob[]{a, b}) {
+            double d = Math.hypot(m.x - g.player.x, m.z - g.player.z);
+            check(Math.abs(d - 0.36) < 0.02, "on the shoulder: " + d + " blocks from the middle");
+            check(Math.abs(m.y - (g.player.y + 1.4)) < 0.01, "at shoulder height: " + (m.y - g.player.y));
+         }
+
+         // the right one is on the right: yaw 0 looks +z, the right hand is on the -x side
+         Mobs.Mob right = a.aux > 0 ? a : b;
+         Mobs.Mob left = a.aux > 0 ? b : a;
+         check(right.x < g.player.x - 0.3 && left.x > g.player.x + 0.3, "left and right: " + right.x + " / " + left.x);
+         // turn east (yaw -90): the right shoulder is on the south side (+z)
+         g.player.yaw = -90.0F;
+         g.mobs.tickMob(right, g.world, g.player, 1.0f);
+         check(right.z > g.player.z + 0.3 && Math.abs(right.x - g.player.x) < 0.05, "turned east: the right shoulder is on the south side");
+         // you cannot aim at them
+         g.player.yaw = 0.0F;
+         g.mobs.tickMob(left, g.world, g.player, 1.0f);
+         double[] t = new double[1];
+         Mobs.Mob picked = g.mobs.pick(left.x, left.y + 0.4, left.z - 3.0, 0.0, 0.0, 1.0, 6.0, t);
+         check(picked != left, "a parrot on a shoulder is not picked");
+         // sneak + right click with an empty hand: the last one flies off
+         g.player.sneaking = true;
+         check(Mobs312.shoulderOff(g), "sneaking: one flies off");
+         check(!Mobs312.onShoulder(b) || !Mobs312.onShoulder(a), "only one is left");
+         g.player.sneaking = false;
+         // hurt: the other falls off
+         Mobs.Mob stay = Mobs312.onShoulder(a) ? a : b;
+         g.mobs.tickMob(stay, g.world, g.player, 1.0f);
+         check(Mobs312.onShoulder(stay), "still there");
+         g.player.health -= 3;
+         g.mobs.tickMob(stay, g.world, g.player, 1.0f);
+         check(!Mobs312.onShoulder(stay), "you were hurt: it flies up");
+         check(!Mobs312.shoulderOff(g), "none left on a shoulder");
+         // swimming
+         g.useOnMob(stay, null);
+         check(Mobs312.onShoulder(stay), "back again");
+         g.player.inWater = true;
+         g.mobs.tickMob(stay, g.world, g.player, 1.0f);
+         check(!Mobs312.onShoulder(stay), "in the water it flies off");
+         g.player.inWater = false;
+         // a sneaking player does not pick one up
+         g.player.sneaking = true;
+         check(!g.useOnMob(stay, null), "sneaking: it does not go on the shoulder");
+         g.player.sneaking = false;
+         // dying: all fall
+         g.useOnMob(stay, null);
+         g.player.dead = true;
+         g.mobs.tickMob(stay, g.world, g.player, 1.0f);
+         check(!Mobs312.onShoulder(stay), "dead players carry nothing");
+      });
+
+      test("parrots: tamed ones are saved and are never lost; wild ones leave with distance; a killed one drops feathers; they appear in forests only", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("parrot").toFile();
+         try {
+            Game g = newGame(0);
+            g.mobs.timer = 1;
+            Mobs.Mob a = g.mobs.spawn(Mobs.PARROT, 12.5, GROUND + 2, 12.5);
+            a.tamed = true;
+            a.color = 3;
+            Mobs.Mob w = g.mobs.spawn(Mobs.PARROT, 14.5, GROUND + 2, 12.5);
+            w.color = 1;
+            g.mobs.save(dir);
+            g.mobs.list.clear();
+            g.mobs.load(dir);
+            int tame = 0;
+            int wild = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.PARROT) {
+                  if (m.tamed) {
+                     tame++;
+                     eq(3, m.color, "the colour of the tame one");
+                  } else {
+                     wild++;
+                     eq(1, m.color, "the colour of the wild one");
+                  }
+               }
+            }
+
+            check(tame == 1 && wild == 1, "both are back: tame " + tame + " wild " + wild);
+            // far away
+            for (Mobs.Mob m : g.mobs.list) {
+               m.x += 300.0;
+               m.setPos(m.x, m.y, m.z);
+            }
+
+            g.mobs.tick();
+            int left = 0;
+            boolean tameLeft = false;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.PARROT) {
+                  left++;
+                  tameLeft |= m.tamed;
+               }
+            }
+
+            check(left == 1 && tameLeft, "300 blocks away only the tame one is kept: " + left);
+            // feathers
+            g.mobs.list.clear();
+            g.world.items.clear();
+            Mobs.Mob k = g.mobs.spawn(Mobs.PARROT, 12.5, GROUND + 1, 12.5);
+            g.mobs.hurtMob(k, 50, 11.0, 12.5, 0.4, true);
+            int feathers = GameTests.countItems(g.world, Items.FEATHER);
+            check(k.dead && feathers >= 1 && feathers <= 2, "feathers: " + feathers);
+            // forests
+            g.mobs.list.clear();
+            g.mobs.rnd.setSeed(11L);
+            int spawned = 0;
+            for (int i = 0; i < 400; i++) {
+               Mobs312.spawnParrots(g.mobs, g.world, g.player);
+            }
+
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.PARROT) {
+                  spawned++;
+               }
+            }
+
+            eq(0, spawned, "no parrots on a plain (biome 0 in the test world)");
+            for (Chunk ch : g.world.chunks.values()) {
+               java.util.Arrays.fill(ch.biome, (byte)3);
+            }
+
+            for (int i = 0; i < 400; i++) {
+               Mobs312.spawnParrots(g.mobs, g.world, g.player);
+            }
+
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m.type == Mobs.PARROT) {
+                  spawned++;
+                  check(!Phys.collides(g.world, m.bb), "not inside a block");
+               }
+            }
+
+            check(spawned >= 1 && spawned <= 4, "in a forest they come, but few: " + spawned);
+         } finally {
+            deleteAll(dir);
+         }
       });
    }
 

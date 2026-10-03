@@ -472,6 +472,10 @@ public final class MobRender {
             continue; // blown up
          }
 
+         if (Mobs312.onShoulder(var7) && var0.view == 0) {
+            continue; // the parrot on your shoulder is not seen from your own eyes
+         }
+
          double var8 = var7.px + (var7.x - var7.px) * var2;
          double var10 = var7.py + (var7.y - var7.py) * var2;
          double var12 = var7.pz + (var7.z - var7.pz) * var2;
@@ -718,6 +722,10 @@ public final class MobRender {
                float[] skin = new float[]{var12[0] * 244.0F / 230.0F, var12[1] * 190.0F / 230.0F, var12[2] * 175.0F / 230.0F};
                drawBox(var10, var28, var11, skin);
             }
+         } else if (var0.type == Mobs.PARROT && var28.color == MobModels312.PARROT_MARK) {
+            int rgb = MobModels312.PARROT_RGB[Math.max(0, Math.min(MobModels312.PARROT_RGB.length - 1, var0.color))];
+            float[] feathers = new float[]{var12[0] * (rgb >> 16 & 0xFF) / 230.0F, var12[1] * (rgb >> 8 & 0xFF) / 230.0F, var12[2] * (rgb & 0xFF) / 230.0F};
+            drawBox(var10, var28, var11, feathers);
          } else if (var0.type == Mobs.VILLAGER && var28.color == MobModels312.ROBE_MARK) {
             int rgb = Trades.ROBE[Math.max(0, Math.min(Trades.ROBE.length - 1, var0.color))];
             float[] robe = new float[]{var12[0] * (rgb >> 16 & 0xFF) / 230.0F, var12[1] * (rgb >> 8 & 0xFF) / 230.0F, var12[2] * (rgb & 0xFF) / 230.0F};

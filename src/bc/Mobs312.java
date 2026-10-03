@@ -77,6 +77,10 @@ final class Mobs312 {
       if (m.type == Mobs.MAGMA_CUBE) {
          setSize(m, 3);
       }
+
+      if (m.type == Mobs.PARROT) {
+         m.color = r.nextInt(PARROT_COLORS);
+      }
    }
 
    // ------------------------------------------------------------------ thinking
@@ -109,6 +113,9 @@ final class Mobs312 {
             break;
          case Mobs.IRON_GOLEM:
             golem(ms, m, in);
+            break;
+         case Mobs.PARROT:
+            parrot(ms, m, w, p, dx, dz, dy, d2, d3, in);
             break;
          default:
             break;
@@ -289,6 +296,11 @@ final class Mobs312 {
 
       if (m.type == Mobs.END_CRYSTAL) {
          Dragon.crystalTick(ms, m, w);
+         return true;
+      }
+
+      if (m.type == Mobs.PARROT && m.phase == P_SHOULDER) {
+         shoulder(ms, m, w, p);
          return true;
       }
 
@@ -490,6 +502,296 @@ final class Mobs312 {
                break;
             }
          }
+      }
+   }
+
+   // ------------------------------------------------------------------ parrots
+   static final int P_FLY = 0;
+   static final int P_LAND = 1;
+   static final int P_SHOULDER = 2;
+   /** Red, blue, green, cyan, grey. */
+   static final int PARROT_COLORS = 5;
+
+   static boolean onShoulder(Mob m) {
+      return m.type == Mobs.PARROT && m.phase == P_SHOULDER && !m.dead;
+   }
+
+   static boolean isSeed(int id) {
+      return id == Items.SEEDS || id == Items.PUMPKIN_SEEDS || id == Items.MELON_SEEDS;
+   }
+
+   /** The y of the first solid block (leaves too: parrots sit in the trees) under (x, z), scanning down from y0; the cell above it. */
+   static int surfaceAbove(World w, int x, int z, int y0) {
+      for (int y = Math.min(y0, 250); y > 30; y--) {
+         int b = w.getBlock(x, y, z);
+         if (b != 0 && Blocks.solid[b]) {
+            return y + 1;
+         }
+      }
+
+      return 40;
+   }
+
+   private static void takeOff(Mobs ms, Mob m) {
+      m.phase = P_FLY;
+      m.phaseT = 0;
+      m.fuse = 0;
+      ms.flyVy = 0.1;
+      m.vy = 0.2;
+   }
+
+   /** A wild parrot flutters from tree to tree and sits down now and then; a tame one stays near you. */
+   private static void parrot(Mobs ms, Mob m, World w, Player p, double dx, double dz, double dy, double d2, double d3, Intent in) {
+      Random r = ms.rnd;
+      if (m.tamed && !p.dead && d3 > 24.0 && !p.spectator) {
+         // too far behind: it catches up at once (the way pets do)
+         double a = r.nextDouble() * Math.PI * 2.0;
+         double ox = m.x;
+         double oy = m.y;
+         double oz = m.z;
+         m.setPos(p.x + Math.cos(a) * 2.0, p.y + 1.6, p.z + Math.sin(a) * 2.0);
+         if (Phys.collides(w, m.bb)) {
+            m.setPos(ox, oy, oz);
+         } else {
+            m.px = m.x;
+            m.py = m.y;
+            m.pz = m.z;
+            m.phase = P_FLY;
+         }
+      }
+
+      if (m.phase == P_LAND) {
+         in.moving = false;
+         ms.flyVy = m.onGround ? 0.0 : -0.1;
+         m.phaseT--;
+         boolean frightened = !m.tamed && d2 < 4.0 && !p.sneaking;
+         boolean ownerGone = m.tamed && (d2 > 7.0 || d3 > 10.0);
+         if (m.phaseT <= 0 || frightened || ownerGone) {
+            takeOff(ms, m);
+         }
+
+         if (m.tamed && d2 < 8.0) {
+            in.headYaw = Mobs.angleTo(dx, dz);
+            in.headPitch = pitchTo(dy, d2);
+         }
+
+         return;
+      }
+
+      double lastMove = Math.hypot(m.x - m.px, m.z - m.pz);
+      if (m.tamed) {
+         double want = p.y + 1.9 + Math.sin((m.age + m.hashCode() % 50) * 0.09) * 0.5;
+         if (d2 > 4.5) {
+            m.dirYaw = Mobs.angleTo(dx, dz);
+            in.moving = true;
+            in.speed = d2 > 12.0 ? 1.9 : 1.3;
+         } else {
+            ms.wanderAI(m);
+            in.moving = m.moving;
+            in.speed = 0.6;
+            if (d2 < 1.3) {
+               m.dirYaw = Mobs.angleTo(-dx, -dz);
+               in.moving = true;
+            }
+         }
+
+         ms.flyVy = Math.max(-0.1, Math.min(0.11, (want - m.y) * 0.09));
+         if (d2 < 5.0) {
+            in.headYaw = Mobs.angleTo(dx, dz);
+            in.headPitch = pitchTo(dy, d2);
+            if (r.nextInt(700) == 0) {
+               m.phase = P_LAND;
+               m.phaseT = 300 + r.nextInt(300);
+            }
+         }
+      } else {
+         double ddx = m.tx - m.x;
+         double ddz = m.tz - m.z;
+         if (m.phaseT <= 0 || Math.hypot(ddx, ddz) < 1.6 || m.tx == 0.0 && m.tz == 0.0) {
+            double a = r.nextDouble() * Math.PI * 2.0;
+            double dist = 6.0 + r.nextDouble() * 10.0;
+            m.tx = m.x + Math.cos(a) * dist;
+            m.tz = m.z + Math.sin(a) * dist;
+            int ground = surfaceAbove(w, (int)Math.floor(m.tx), (int)Math.floor(m.tz), (int)m.y + 14);
+            m.ty = ground + 2.0 + r.nextDouble() * 4.0;
+            m.phaseT = 80 + r.nextInt(120);
+            ddx = m.tx - m.x;
+            ddz = m.tz - m.z;
+         }
+
+         m.phaseT--;
+         m.dirYaw = Mobs.angleTo(ddx, ddz);
+         in.moving = true;
+         in.speed = 1.0;
+         ms.flyVy = Math.max(-0.09, Math.min(0.11, (m.ty - m.y) * 0.1));
+         if (lastMove < 0.02) {
+            m.fuse++;
+         } else {
+            m.fuse = 0;
+         }
+
+         if (m.fuse > 6) {
+            // flew into a branch: up and somewhere else
+            m.fuse = 0;
+            m.phaseT = 0;
+            m.ty = m.y + 3.0;
+            ms.flyVy = 0.11;
+         }
+
+         if (r.nextInt(500) == 0 && m.y - surfaceAbove(w, (int)Math.floor(m.x), (int)Math.floor(m.z), (int)m.y + 1) < 5.0) {
+            m.phase = P_LAND;
+            m.phaseT = 120 + r.nextInt(240);
+         }
+      }
+
+      if (m.phase != P_LAND) {
+         keepOffTerrain(ms, w, m);
+      }
+   }
+
+   /** On a shoulder: it follows the player's body; it flies up when the player is hurt, swims or dies. */
+   private static void shoulder(Mobs ms, Mob m, World w, Player p) {
+      boolean off = p.dead || p.spectator || p.inWater || p.health < m.tx;
+      m.tx = p.health;
+      m.onGround = true;
+      if (off) {
+         takeOff(ms, m);
+         m.phase = P_FLY;
+         return;
+      }
+
+      double yaw = Math.toRadians(p.yaw);
+      double side = m.aux >= 0.0F ? 1.0 : -1.0;
+      double right = 0.36 * side;
+      double x = p.x - Math.cos(yaw) * right;
+      double z = p.z - Math.sin(yaw) * right;
+      double y = p.y + (p.sneaking ? 1.15 : 1.4);
+      m.vx = m.vy = m.vz = 0.0;
+      m.setPos(x, y, z);
+      m.yaw = p.yaw;
+      m.headYaw = p.yaw;
+      m.dirYaw = p.yaw;
+      m.moving = false;
+   }
+
+   /** Which shoulder is free: +1 (right), -1 (left), 0 (none: two parrots are enough). */
+   static float freeShoulder(Mobs ms) {
+      boolean right = false;
+      boolean left = false;
+      for (Mob o : ms.list) {
+         if (onShoulder(o)) {
+            if (o.aux >= 0.0F) {
+               right = true;
+            } else {
+               left = true;
+            }
+         }
+      }
+
+      return !right ? 1.0F : (!left ? -1.0F : 0.0F);
+   }
+
+   /** Sneak and right click with an empty hand: the parrot on your shoulder flies off. True if there was one. */
+   static boolean shoulderOff(Game g) {
+      Mob last = null;
+      for (Mob o : g.mobs.list) {
+         if (onShoulder(o)) {
+            last = o;
+         }
+      }
+
+      if (last == null) {
+         return false;
+      }
+
+      takeOff(g.mobs, last);
+      return true;
+   }
+
+   /** Right click on a parrot: seeds tame it (one in three), then an empty hand puts it on your shoulder. True if something happened. */
+   static boolean useParrot(Game g, Mob m, Stack s) {
+      if (m.dead) {
+         return false;
+      }
+
+      if (s != null && isSeed(s.id)) {
+         if (m.tamed) {
+            return false;
+         }
+
+         if (!g.player.creative) {
+            s.n--;
+            if (s.n <= 0) {
+               g.inv[g.sel] = null;
+            }
+         }
+
+         if (g.mobs.rnd.nextInt(3) == 0) {
+            m.tamed = true;
+            m.phase = P_FLY;
+            g.loveParticles(m);
+            g.adv.award(g, "husbandry/tame_an_animal");
+         }
+
+         return true;
+      }
+
+      if (m.tamed && !g.player.sneaking && (s == null || !isSeed(s.id))) {
+         float side = freeShoulder(g.mobs);
+         if (side == 0.0F || m.phase == P_SHOULDER) {
+            return false;
+         }
+
+         m.phase = P_SHOULDER;
+         m.aux = side;
+         m.tx = g.player.health;
+         return true;
+      }
+
+      return false;
+   }
+
+   /** Now and then a pair of wild parrots appears in a forest, somewhere in the trees. */
+   static void spawnParrots(Mobs ms, World w, Player p) {
+      if (w.dim != Dim.OVERWORLD || ms.rnd.nextInt(8) != 0) {
+         return;
+      }
+
+      int wild = 0;
+      for (Mob o : ms.list) {
+         if (o.type == Mobs.PARROT && !o.dead && !o.tamed) {
+            wild++;
+         }
+      }
+
+      if (wild >= 4) {
+         return;
+      }
+
+      for (int tries = 0; tries < 6; tries++) {
+         double a = ms.rnd.nextDouble() * Math.PI * 2.0;
+         double d = 16.0 + ms.rnd.nextDouble() * 34.0;
+         int x = (int)Math.floor(p.x + Math.cos(a) * d);
+         int z = (int)Math.floor(p.z + Math.sin(a) * d);
+         if (!w.isLoaded(x, z)) {
+            continue;
+         }
+
+         Chunk c = w.chunk(Math.floorDiv(x, 16), Math.floorDiv(z, 16));
+         if (c == null || c.biome[(z & 15) * 16 + (x & 15)] != 3) {
+            continue;
+         }
+
+         int y = surfaceAbove(w, x, z, 200);
+         int n = 1 + ms.rnd.nextInt(2);
+         for (int i = 0; i < n; i++) {
+            Mob m = ms.spawn(Mobs.PARROT, x + 0.5 + i * 0.7, y + 0.3, z + 0.5);
+            if (Phys.collides(w, m.bb)) {
+               ms.list.remove(m);
+            }
+         }
+
+         return;
       }
    }
 
@@ -843,6 +1145,9 @@ final class Mobs312 {
             break;
          case Mobs.BLAZE:
             ms.drop(w, m, Items.BLAZE_ROD, ms.rnd.nextInt(2));
+            break;
+         case Mobs.PARROT:
+            ms.drop(w, m, Items.FEATHER, 1 + ms.rnd.nextInt(2));
             break;
          case Mobs.ENDERMAN:
             ms.drop(w, m, Items.ENDER_PEARL, ms.rnd.nextInt(2) + (ms.rnd.nextInt(5) == 0 ? 1 : 0));
