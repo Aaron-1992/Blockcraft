@@ -1,27 +1,22 @@
 extracted base zip: Blockcraft-1.12-UPDATE3.5-windows.zip
-extracted update pack: Blockcraft-UPDATE3.13-patch.zip
+extracted update pack: Blockcraft-UPDATE3.17-patch.zip
 installed to C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft
 Mesa: mesa3d-26.2.4-release-msvc.7z (70 MB)
 copied next to javaw.exe: opengl32.dll, libgallium_wgl.dll
 title313: starting via Blockcraft.exe (Launch4j stub)
-title313         exit code 0                     17s  screenshot=yes
+title313         exit code 0                     29s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.pano=on -Dbc.rd=6 -Dbc.lod=96 -Dbc.title=TITLE
-worlds313: starting via Blockcraft.exe (Launch4j stub)
-worlds313        exit code 0                     15s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.pano=on -Dbc.rd=4 -Dbc.fakeworlds=1 -Dbc.title=WORLDS
-newworld313: starting via Blockcraft.exe (Launch4j stub)
-newworld313      exit code 0                     16s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.pano=on -Dbc.rd=4 -Dbc.title=NEWWORLD
-options313-0: starting via Blockcraft.exe (Launch4j stub)
-options313-0     exit code 0                     16s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.pano=on -Dbc.rd=4 -Dbc.title=OPTIONS -Dbc.opttab=0
-inv313-creative: starting via Blockcraft.exe (Launch4j stub)
-inv313-creative  exit code 0                     15s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.inv=creative -Dbc.shot=110
 terra-mount: starting via Blockcraft.exe (Launch4j stub)
-terra-mount      exit code 0                     35s  screenshot=yes
+terra-mount      exit code 0                     64s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.gen=1 -Dbc.mode=1 -Dbc.rd=4 -Dbc.lod=64 -Dbc.time=6000 -Dbc.weather=calm -Dbc.cam=392.5,150,-303.5,200,8 -Dbc.shaders=false -Dbc.shot=260
-nether-fortress: starting via Blockcraft.exe (Launch4j stub)
-nether-fortress  exit code 0                      9s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.dim=-1 -Dbc.cam=121.5,63,102,180,3 -Dbc.rd=4 -Dbc.shaders=false -Dbc.shot=220
-RESULT: {"title313": true, "worlds313": true, "newworld313": true, "options313-0": true, "inv313-creative": true, "terra-mount": true, "nether-fortress": true}
+village314-street: starting via Blockcraft.exe (Launch4j stub)
+village314-street exit code 0                     68s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.gen=1 -Dbc.mode=1 -Dbc.rd=4 -Dbc.lod=64 -Dbc.time=6000 -Dbc.weather=calm -Dbc.cam=178.5,84.2,84.5,0,6 -Dbc.rd=5 -Dbc.shaders=false -Dbc.sh
+shapes315: starting via java.exe -jar Blockcraft.exe
+shapes315        exit code 0                     49s  screenshot=yes
+decor315: starting via java.exe -jar Blockcraft.exe
+decor315         exit code 0                     48s  screenshot=yes
+mobs317-villagers: starting via Blockcraft.exe (Launch4j stub)
+mobs317-villagers exit code 0                     26s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=140,65.9,60,0,14 -Dbc.time=6000 -Dbc.weather=calm -Dbc.summon=villager,villager,villager,villager,vi
+RESULT: {"title313": true, "terra-mount": true, "village314-street": true, "shapes315": true, "decor315": true, "mobs317-villagers": true}
