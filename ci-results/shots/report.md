@@ -1,23 +1,21 @@
-# Visual run 2026-10-04 19:43:31 UTC
+# Visual run 2026-10-04 19:59:46 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| mobs317-farm | new | n/a |
-| mobs317-farm-walk | new | n/a |
-| mobs317-monsters | new | n/a |
-| mobs317-monsters-walk | new | n/a |
-| mobs317-monsters-fight | new | n/a |
-| mobs317-nether | new | n/a |
-| mobs317-ghast | new | n/a |
-| mobs317-enderman | new | n/a |
+| mobs317-folk | new | n/a |
+| mobs317-golem | new | n/a |
+| mobs317-villagers | new | n/a |
+| mobs317-parrots | new | n/a |
+| end-dragon | new | n/a |
+| end-dragon-side | new | n/a |
+| end-crystal | new | n/a |
 
 ## timings
 
-- mobs317-farm/new: exit 0 in 26s
-- mobs317-farm-walk/new: exit 0 in 21s
-- mobs317-monsters/new: exit 0 in 21s
-- mobs317-monsters-walk/new: exit 0 in 21s
-- mobs317-monsters-fight/new: exit 0 in 21s
-- mobs317-nether/new: exit 0 in 7s
-- mobs317-ghast/new: exit 0 in 7s
-- mobs317-enderman/new: exit 0 in 4s
+- mobs317-folk/new: exit 0 in 21s
+- mobs317-golem/new: exit 0 in 19s
+- mobs317-villagers/new: exit 0 in 26s
+- mobs317-parrots/new: exit 0 in 27s
+- end-dragon/new: exit 0 in 6s
+- end-dragon-side/new: exit 0 in 6s
+- end-crystal/new: exit 0 in 5s
