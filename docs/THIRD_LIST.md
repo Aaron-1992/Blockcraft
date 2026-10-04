@@ -20,3 +20,12 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 
 Where the screens live: the new screens are drawn by the new class `Screens` (title, singleplayer list, create world, options, pause); `Game.render()` only calls it.
 `WorldSettings` (type, structures, bonus chest, flat preset) stays the data model of the Create New World screen.
+
+## Ranges that run 5 uses (please stay out of them)
+
+| What | Range |
+|---|---|
+| Block ids | 1500-2999: `Shapes` 1500-1899 (panes 1500, bars 1517, walls 1520, fences 1530, gates 1540, trapdoors 1600, carpets 1720), `Redstone` 1900-2199, beds 2200-2327 (`Decor315`), banners 2330-2463 (`Decor315`), brewing / enchanting 2500-2599 |
+| Item ids | 400-999 (beds 400-415, banners 420-435) |
+| Atlas tiles | 600-999 (`TexArt315`); free below that: 296-399, 489-519, 588-599 |
+| Tests / tools | `Tests315`, `MeshView` (software view of the real chunk meshes: `bc.MeshView out.png scene`), `IconSheet`, `Scenes315` |
