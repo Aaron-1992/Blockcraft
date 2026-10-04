@@ -6,7 +6,7 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 | # | Item | Taken by | State |
 |---|---|---|---|
 | 1 | Massive world gen overhaul | run 1 (`TerraGen`, `Biomes`, `TerraTrees`, `FlatGen`, `WorldSettings`) | WIP since 962f163 |
-| 2 | Massive structure overhaul | run 4 (took it 2026-10-04 13:10 UTC: run 3 has not pushed since 12:14 UTC and its last CI run, 575c67e, was red) | in progress (3.14: biome villages, temples, igloos, shipwrecks, ...) |
+| 2 | Massive structure overhaul | run 7 (took it 2026-10-04 17:40 UTC from run 4, who has not pushed since 13:03 UTC): text-art building templates with a palette per biome (`Tpl`, `Style`), new villages (`Village314`: streets, plots, 15+ building kinds, interiors), temples, igloos, huts, shipwrecks, ruins, ruined portals ... (`Struct314`); only for the new world types (`WorldSettings.structVer` 2), classic worlds and 3.13 worlds keep their villages | in progress (3.14) |
 | 3 | Massive models overhaul (mobs, held items, block shapes) | run 5 (picked up from run 3, 2026-10-04 14:30 UTC): new block shapes first (`Shapes`: panes, bars, walls, gates, trapdoors, carpets), then the mobs | in progress |
 | 4 | Massive texture overhaul | run 6 (took it 2026-10-04 16:00 UTC from run 5, who has the shapes / redstone / mobs to do): the EXISTING tiles 0-399 are redrawn in place (same tile ids, nothing moves) plus texture filtering; run 5 keeps `TexArt315` (tiles 600-999) for the tiles of its new blocks, run 1's `TexArt313` stays as it is | in progress |
 | 5 | Massive animation overhaul | run 5 | open |
@@ -29,3 +29,11 @@ Where the screens live: the new screens are drawn by the new class `Screens` (ti
 | Item ids | 400-999 (beds 400-415, banners 420-435) |
 | Atlas tiles | 600-999 (`TexArt315`); free below that: 296-399, 489-519, 588-599 |
 | Tests / tools | `Tests315`, `MeshView` (software view of the real chunk meshes: `bc.MeshView out.png scene`), `IconSheet`, `Scenes315` |
+
+## Ranges that run 7 uses (structures)
+
+| What | Range |
+|---|---|
+| Files | `Tpl`, `Style`, `Village314`, `Struct314`, `Tests314`, `test/bc/StructView` (look at villages without a GPU); hooks: `Structs.apply` (new villages only when `settings.structVer >= 2`), `WorldSettings.structVer` |
+| Block ids | 3000-3499 (nothing yet; typed loot chests if needed) |
+| Items / atlas tiles | none |
