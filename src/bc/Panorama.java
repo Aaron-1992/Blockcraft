@@ -134,6 +134,11 @@ public final class Panorama {
       }
    }
 
+   /** The landscape is there and fully visible (the screenshot hooks wait for it). */
+   boolean ready() {
+      return this.installed && this.shown >= 1.0F;
+   }
+
    boolean meshed(int cx, int cz, int r) {
       for (int dz = -r; dz <= r; dz++) {
          for (int dx = -r; dx <= r; dx++) {
@@ -247,7 +252,7 @@ public final class Panorama {
          return null;
       }
 
-      // stand on the highest ground near the middle, 20 blocks above it
+      // stand on the highest ground near the middle, 26 blocks above it (higher than the trees)
       int ground = centre;
       for (int j = n / 2 - 1; j <= n / 2 + 1; j++) {
          for (int i = n / 2 - 1; i <= n / 2 + 1; i++) {

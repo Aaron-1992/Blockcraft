@@ -35,6 +35,7 @@ final class Scenes {
             Screens.title(g);
             break;
          case "worlds":
+         case "worlds-long":
          case "worlds-empty": {
             g.screen = Game.S.WORLDS;
             g.worldList = new ArrayList<>();
@@ -47,17 +48,31 @@ final class Scenes {
                g.worldName = "b";
             }
 
+            if (name.equals("worlds-long")) {
+               g.worldList.add(world("a", "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW", 3, Long.MIN_VALUE, 4, 86400_000L * 400));
+               g.worldList.add(world("b", "A very long name that just goes on and on and on", 2, 1234567890123456789L, 3, 1000L));
+               g.worldName = "a";
+            }
+
             Screens.worlds(g);
             break;
          }
          case "newworld":
          case "newworld-flat":
          case "newworld-seed":
+         case "newworld-long":
             g.screen = Game.S.NEWWORLD;
             g.newSettings = new WorldSettings();
             if (name.equals("newworld-flat")) {
                g.newSettings.type = WorldSettings.FLAT;
                g.newSettings.flat = 1;
+            }
+
+            if (name.equals("newworld-long")) {
+               g.newName = "WWWWWWWWWWWWWWWWWWWWWWWW";
+               g.seedField = "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWW";
+               g.newMode = 2;
+               g.newSettings.type = WorldSettings.LARGE;
             }
 
             if (name.equals("newworld-seed")) {
@@ -87,6 +102,7 @@ final class Scenes {
             g.worldDisplayName = "My Survival World";
             g.worldName = "My Survival World";
             g.loadingMsg = "Chunks: 14/25";
+            g.loadFrac = 14 / 25.0F * 0.92F;
             Screens.loading(g);
             break;
          default:

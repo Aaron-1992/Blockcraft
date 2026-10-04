@@ -35,6 +35,8 @@ public class GuiRaster extends Gui {
    float qb;
    float qa;
    int qn;
+   /** Where text was drawn (GUI units: minX, minY, maxX, maxY), text inside a clipped area (scroll lists) is not counted. */
+   public final float[] textExtent = {1e9F, 1e9F, -1e9F, -1e9F};
 
    public GuiRaster(int w, int h) {
       this.W = w;
@@ -294,6 +296,13 @@ public class GuiRaster extends Gui {
       int ch = Tex.fontCellH;
       int color = argb;
       float cx = x;
+      if (this.clip == null && !s.isEmpty()) {
+         this.textExtent[0] = Math.min(this.textExtent[0], this.dx(x) / this.scale);
+         this.textExtent[1] = Math.min(this.textExtent[1], this.dy(y) / this.scale);
+         this.textExtent[2] = Math.max(this.textExtent[2], this.dx(x + textWidth(s) * size) / this.scale);
+         this.textExtent[3] = Math.max(this.textExtent[3], this.dy(y + 8 * size) / this.scale);
+      }
+
       for (int n = 0; n < s.length(); n++) {
          char c = s.charAt(n);
          if (c == 167 && n + 1 < s.length()) {

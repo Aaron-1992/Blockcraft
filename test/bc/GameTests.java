@@ -1710,6 +1710,7 @@ public final class GameTests {
       Tests312.run();
       TestsFall.run();
       TestsDisasters.run();
+      TestsUi.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

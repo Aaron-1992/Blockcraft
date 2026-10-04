@@ -184,6 +184,8 @@ public final class Game {
       "Torches are great!"
    };
    String loadingMsg = "";
+   /** How far the loading screen is (0..1): the chunks around the player, then the meshes. */
+   float loadFrac;
    ArrayList<Game.Btn> btns = new ArrayList();
    ArrayList<Game.Btn> activeBtns = new ArrayList();
    int dragging = -1;
@@ -331,7 +333,7 @@ public final class Game {
          this.setFullscreen(true);
       }
 
-      if (System.getProperty("bc.auto") != null && System.getProperty("bc.title") == null) {
+      if (System.getProperty("bc.auto") != null && (System.getProperty("bc.title") == null || System.getProperty("bc.world") != null)) {
          this.startWorld(true, System.getProperty("bc.seed", "12345"), Integer.parseInt(System.getProperty("bc.mode", "1")));
       } else if (System.getProperty("bc.auto") == null || "on".equals(System.getProperty("bc.pano"))) {
          Panorama.start(this); // Update 3.13: the title screen turns over a real landscape
@@ -436,8 +438,14 @@ public final class Game {
       this.opt.skin = name;
    }
 
+   long autoT0;
+
    void autoTest() {
       String var1 = System.getProperty("bc.title");
+      if (this.autoT0 == 0L) {
+         this.autoT0 = System.nanoTime();
+      }
+
       if (var1 != null) {
          if (this.autoFrames == 0 && System.getProperty("bc.skin") != null) {
             this.autoSkin(System.getProperty("bc.skin"));
@@ -445,6 +453,7 @@ public final class Game {
 
          if (++this.autoFrames == 40) {
             this.setScreen(Game.S.valueOf(var1));
+            this.ui.optTab = Math.max(0, Math.min(3, Integer.getInteger("bc.opttab", 0)));
          }
 
          String netUser = System.getProperty("bc.skinuser");
@@ -462,8 +471,8 @@ public final class Game {
                System.out.println("[skins] import of " + netUser + " still busy after 90 s: " + this.skins.status);
                this.autoShotNow = true;
             }
-         } else if (this.autoFrames == 60) {
-            this.autoShotNow = true;
+         } else if (this.autoFrames >= 60 && !this.autoShotNow && (this.pano == null || this.pano.ready() || System.nanoTime() - this.autoT0 > 150_000_000_000L)) {
+            this.autoShotNow = true; // (with the panorama behind the menu: wait until it has faded in, 150 s at most)
          }
 
          if (this.autoFrames == 50 && System.getProperty("bc.skinbrowse") != null) {
@@ -870,6 +879,28 @@ public final class Game {
          if (!var15 && !this.worldList.isEmpty()) {
             this.worldName = ((Game.WInfo)this.worldList.get(0)).dir;
          }
+      }
+
+      if (System.getProperty("bc.fakeworlds") != null && this.worldList.isEmpty()) {
+         // screenshot hook: a list of worlds that are not on the disk (the world list screen, with its maps)
+         String[][] fake = {
+            {"Survival Island", "0", "12345", "1"}, {"Creative Castle", "1", "-987654321", "1"}, {"Old World from Update 3.5", "0", "424242", "0"},
+            {"Flat Test", "1", "7", "2"}, {"Mountain Home", "0", "99", "4"}
+         };
+         long now = System.currentTimeMillis();
+         for (int i = 0; i < fake.length; i++) {
+            Game.WInfo w = new Game.WInfo();
+            w.dir = fake[i][0];
+            w.name = fake[i][0];
+            w.mode = Integer.parseInt(fake[i][1]);
+            w.seed = Long.parseLong(fake[i][2]);
+            w.settings = new WorldSettings();
+            w.settings.type = Integer.parseInt(fake[i][3]);
+            w.mod = now - (i * i * 7L + 1L) * 3600_000L;
+            this.worldList.add(w);
+         }
+
+         this.worldName = fake[1][0];
       }
    }
 
@@ -1414,6 +1445,10 @@ public final class Game {
    void setScreen(Game.S var1) {
       Game.S var2 = this.screen;
       this.screen = var1;
+      if (var1 == Game.S.LOADING && var2 != Game.S.LOADING) {
+         this.loadFrac = 0.0F;
+      }
+
       if (var1 == Game.S.WORLDS && var2 != Game.S.WORLDS) {
          this.scanWorlds();
       }
@@ -2305,6 +2340,7 @@ public final class Game {
             }
 
             this.loadingMsg = "Chunks: " + var18 + "/" + var16;
+            this.loadFrac = Math.min(1.0F, var18 / (float)var16) * 0.92F + (var19 ? 0.08F : 0.0F);
             if (var19 && this.arrivalAt != null) {
                // Update 3.12: the new dimension is there: put the player in the portal (this may build one, which the next frames mesh before play goes on)
                this.finishArrival();
@@ -4054,13 +4090,19 @@ public final class Game {
       }
    }
 
-   int guiScaleAuto() {
-      if (this.opt.guiScale > 0) {
-         return this.opt.guiScale;
-      }
-
+   /** The biggest GUI scale that still leaves 320x240 units for the menus (they are made for that much). */
+   int guiScaleMax() {
       int var1 = Math.min(this.fbW / 320, this.fbH / 240);
       return Math.max(1, Math.min(6, var1));
+   }
+
+   int guiScaleAuto() {
+      if (this.opt.guiScale > 0) {
+         // (the test hook bc.guiscale may force a scale that is too big, to see how the screens cope)
+         return System.getProperty("bc.guiscale") != null ? this.opt.guiScale : Math.min(this.opt.guiScale, this.guiScaleMax());
+      }
+
+      return this.guiScaleMax();
    }
 
    void updateZoom() {

@@ -459,6 +459,15 @@ SCENES = {
     "meteors":        (COMMON + ["-Dbc.cam=143.5,70,62,0,-22", "-Dbc.time=18000", "-Dbc.disaster=meteor:30,80,70;meteor:-36,95,64;meteor:5,110,76", "-Dbc.dfreeze=34", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
     "meteor-crater":  (COMMON + ["-Dbc.cam=143.5,92,68,0,52", "-Dbc.time=18000", "-Dbc.disaster=meteor:0,30,30", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=230"], True),
     "options310":     (["-Dbc.auto=1", "-Dbc.title=OPTIONS"], True),
+    # ---- Update 3.13: the new menus. The title turns over a real landscape (bc.pano=on: the panorama is off in the other scenes), the options have tabs,
+    # the create-world screen shows a map of the world, the pause menu lies over the game.
+    "title313":       (["-Dbc.auto=1", "-Dbc.pano=on", "-Dbc.rd=6", "-Dbc.lod=96", "-Dbc.title=TITLE"], True),
+    "worlds313":      (["-Dbc.auto=1", "-Dbc.pano=on", "-Dbc.rd=4", "-Dbc.fakeworlds=1", "-Dbc.title=WORLDS"], True),
+    "newworld313":    (["-Dbc.auto=1", "-Dbc.pano=on", "-Dbc.rd=4", "-Dbc.title=NEWWORLD"], True),
+    "options313-0":   (["-Dbc.auto=1", "-Dbc.pano=on", "-Dbc.rd=4", "-Dbc.title=OPTIONS", "-Dbc.opttab=0"], True),
+    "options313-1":   (["-Dbc.auto=1", "-Dbc.title=OPTIONS", "-Dbc.opttab=1"], True),
+    "options313-3":   (["-Dbc.auto=1", "-Dbc.title=OPTIONS", "-Dbc.opttab=3"], True),
+    "pause313":       (COMMON + [CAM, "-Dbc.world=1", "-Dbc.title=PAUSE"] + PLAIN, True),
     # ---- Update 3.11: single-sided faces. Spectator mode (bc.mode=3, given after COMMON's mode so it wins) with the camera inside the ground looking up:
     # the ground must be see-through from below.
     "under-map":      (COMMON + ["-Dbc.mode=3", "-Dbc.cam=140,45,70,-60,-35", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),

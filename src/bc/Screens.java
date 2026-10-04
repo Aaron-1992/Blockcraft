@@ -265,14 +265,16 @@ final class Screens {
          ui.hint = "The seed makes the world. The same seed (and world type) always gives the same world. Leave it empty for a random one. Words work too.";
       }
 
-      ui.button("Game Mode: " + MODE_NAME[g.newMode], x0, y + 68.0F, colW, 20.0F, true, null, () -> g.newMode = (g.newMode + 1) % 4);
-      ui.toggle("Structures", ws.structures, x0, y + 92.0F, colW, 20.0F,
+      float shift = Math.max(0.0F, Math.min(32.0F, (gui.h - 240.0F) * 0.3F)); // taller windows: a bigger map, the buttons move down with it
+      float ry = y + 68.0F + shift; // the first row of buttons (both columns line up)
+      ui.button("Game Mode: " + MODE_NAME[g.newMode], x0, ry, colW, 20.0F, true, null, () -> g.newMode = (g.newMode + 1) % 4);
+      ui.toggle("Structures", ws.structures, x0, ry + 24.0F, colW, 20.0F,
          "Villages, strongholds, ruins, temples and the other buildings that generate on their own. The Nether and the End keep theirs.", () -> ws.structures = !ws.structures);
-      ui.toggle("Bonus Chest", ws.bonusChest, x0, y + 116.0F, colW, 20.0F, "A chest with a few starting supplies next to where you appear.", () -> ws.bonusChest = !ws.bonusChest);
-      float leftEnd = y + 138.0F;
+      ui.toggle("Bonus Chest", ws.bonusChest, x0, ry + 48.0F, colW, 20.0F, "A chest with a few starting supplies next to where you appear.", () -> ws.bonusChest = !ws.bonusChest);
+      float leftEnd = ry + 70.0F;
 
       // ---- right column: the preview, world type, preset
-      float pv = Math.max(56.0F, Math.min(colW * 0.62F, gui.h - 150.0F - y));
+      float pv = 64.0F + shift;
       if (ui.preview == null) {
          ui.preview = new WorldPreview(96, 60, 20, true);
       }
@@ -288,8 +290,8 @@ final class Screens {
          g.hitbox(x1, y, colW, pv, () -> ui.randomSeed = new Random().nextLong());
       }
 
-      float ty = y + pv + 4.0F;
-      ui.button("World Type: " + ws.typeName(), x1, ty, colW, 20.0F, true, WorldSettings.TYPE_INFO[ws.type], () -> {
+      float ty = ry;
+      ui.button("Type: " + ws.typeName(), x1, ty, colW, 20.0F, true, WorldSettings.TYPE_INFO[ws.type], () -> {
          ws.type = WorldSettings.TYPE_ORDER[(ws.typeIndex() + 1) % WorldSettings.TYPE_ORDER.length];
       });
       float iy = ty + 24.0F;
@@ -310,7 +312,7 @@ final class Screens {
       // ---- the bottom
       float by = gui.h - 26.0F;
       float hintH = 24.0F;
-      ui.drawHint(x0, by - hintH - 6.0F, colW * 2 + gap, hintH, MODE_INFO[g.newMode] + " Point at a setting to see what it does.");
+      ui.drawHint(x0, by - hintH - 6.0F, colW * 2 + gap, hintH, MODE_INFO[g.newMode]);
       ui.button("Create New World", x0, by, colW, 20.0F, true, null, () -> createWorld(g));
       ui.button("Cancel", x1, by, colW, 20.0F, true, null, () -> {
          g.scanWorlds();
@@ -384,9 +386,9 @@ final class Screens {
       ui.endScroll(x0, top, pw, viewH, content);
       String[] about = {
          "Resolution, distance and the window.", "Looks: shadows, water, clouds, leaves.", "How the game plays and how the mouse feels.",
-         "The keys of the game (they cannot be changed yet)."
+         "The keys of the game. They cannot be changed yet."
       };
-      ui.drawHint(x0, hintY, pw, hintH, about[ui.optTab] + "  Point at a setting to see what it does.");
+      ui.drawHint(x0, hintY, pw, hintH, about[ui.optTab] + (ui.optTab == 3 ? "" : "  Point at a setting to see what it does."));
       ui.button("Done", cx - 100.0F, doneY, 200.0F, 20.0F, true, null, () -> {
          g.opt.save();
          g.setScreen(g.optionsReturn);
@@ -423,8 +425,8 @@ final class Screens {
 
       oy += row;
       if (shows(oy, row, top, viewH)) {
-         ui.button("GUI Scale: " + (o.guiScale == 0 ? "Auto" : o.guiScale + ""), x0, oy, colW, 20.0F, true,
-            "The size of the menus and the hotbar. Auto picks the biggest that fits your window.", () -> o.guiScale = (o.guiScale + 1) % 5);
+         ui.button("GUI Scale: " + (o.guiScale == 0 ? "Auto" : Math.min(o.guiScale, g.guiScaleMax()) + ""), x0, oy, colW, 20.0F, true,
+            "The size of the menus and the hotbar. Auto picks the biggest that fits your window.", () -> o.guiScale = (Math.min(o.guiScale, g.guiScaleMax()) + 1) % (g.guiScaleMax() + 1));
          ui.toggle("VSync", o.vsync, x1, oy, colW, 20.0F, "Waits for your screen's refresh: smoother and cooler, but can feel a little laggy.", () -> {
             o.vsync = !o.vsync;
             if (g.window != 0L) {
@@ -497,7 +499,7 @@ final class Screens {
          float x = i < half ? x0 : x1;
          float y = oy + 2.0F + (i % half) * 11.0F;
          gui.text(KEYS[i][0], x + 2.0F, y, Ui.GOLD, true);
-         gui.text(Game.clipText(KEYS[i][1], 96.0F), x + 62.0F, y, Ui.TEXT, true);
+         gui.text(Game.clipText(KEYS[i][1], 104.0F), x + 58.0F, y, Ui.TEXT, true);
       }
    }
 
@@ -548,12 +550,7 @@ final class Screens {
       float cy = gui.h / 2.0F;
       gui.centered(Game.clipText(g.worldDisplayName, gui.w - 20.0F), cx, cy - 34.0F, 0xFFFFFFFF, true, 1.0F);
       gui.centered("Building the terrain...", cx, cy - 20.0F, Ui.DIM, true, 1.0F);
-      float frac = 0.0F;
-      if (g.world != null && g.player != null) {
-         int pcx = (int)Math.floor(g.player.x) >> 4;
-         int pcz = (int)Math.floor(g.player.z) >> 4;
-         frac = Math.min(1.0F, g.world.loadedAround(pcx, pcz, 2) / 25.0F);
-      }
+      float frac = Math.max(0.0F, Math.min(1.0F, g.loadFrac));
 
       float bw = 140.0F;
       gui.rect(cx - bw / 2.0F - 1, cy - 4.0F, bw + 2, 8.0F, 0xFF000000);
