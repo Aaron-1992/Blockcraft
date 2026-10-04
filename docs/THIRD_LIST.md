@@ -7,15 +7,15 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 |---|---|---|---|
 | 1 | Massive world gen overhaul | run 1 (`TerraGen`, `Biomes`, `TerraTrees`, `FlatGen`, `WorldSettings`) | WIP since 962f163 |
 | 2 | Massive structure overhaul | run 4 (took it 2026-10-04 13:10 UTC: run 3 has not pushed since 12:14 UTC and its last CI run, 575c67e, was red) | in progress (3.14: biome villages, temples, igloos, shipwrecks, ...) |
-| 3 | Massive models overhaul (mobs, held items) | run 3 (taken over) | open |
-| 4 | Massive texture overhaul | run 3 (taken over; `TexArt313` stays run 1's work) | open |
-| 5 | Massive animation overhaul | run 3 (taken over) | open |
-| 6 | Massive graphics overhaul (shaders, lighting, particles, sky) | run 3 (taken over) | open |
+| 3 | Massive models overhaul (mobs, held items, block shapes) | run 5 (picked up from run 3, 2026-10-04 14:30 UTC): new block shapes first (`Shapes`: panes, bars, walls, gates, trapdoors, carpets), then the mobs | in progress |
+| 4 | Massive texture overhaul | run 5 (`TexArt313` stays run 1's work; mine will be `TexArt315`) | open (after the shapes / redstone) |
+| 5 | Massive animation overhaul | run 5 | open |
+| 6 | Massive graphics overhaul (shaders, lighting, particles, sky) | run 5 (`ShaderSrc`, `Shaders`) | open |
 | 7 | New title screen (spinning background) | run 2 (`Panorama`, new `Screens`) | in progress |
 | 8 | Multiple world gen settings | the data is run 1's (`WorldSettings`), the Create New World screen is run 2's (`Screens`) | in progress |
 | 9 | Make the inventory more understandable | run 2 (`Creative`, `Menu`) | tabs, search, tooltips, number keys, Q: done |
 | 10 | Clean up the settings screen | run 2 | in progress |
-| 11 | Add the missing features of 3.12 (coloured beds, banners, brewing, enchanting, redstone, End cities, endermites) | run 3 (taken over) | open |
+| 11 | Add the missing features of 3.12 (coloured beds, banners, brewing, enchanting, redstone, End cities, endermites) | run 5. Order: shapes + coloured beds + banners + redstone (`Shapes`, `Redstone`), then XP + enchanting + brewing, then the End (outer islands, cities, shulkers, elytra, endermites) | in progress |
 | - | Release 3.13 (terrain + menus + inventory), then 3.14 ... | run 4 (CI fixed: the parrot test used an unseeded generator) | releasing now |
 
 Where the screens live: the new screens are drawn by the new class `Screens` (title, singleplayer list, create world, options, pause); `Game.render()` only calls it.
