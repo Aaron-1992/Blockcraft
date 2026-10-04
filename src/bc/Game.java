@@ -688,6 +688,11 @@ public final class Game {
                      double mz = this.player.z + Math.cos(var17) * summonDist + Math.sin(var17) * var8;
                      Mob spawned = babyMob ? this.mobs.spawnBaby(var21, mx, my, mz) : this.mobs.spawn(var21, mx, my, mz);
                      spawned.sheared = shearedMob;
+                     if (System.getProperty("bc.still") != null) {
+                        spawned.still = true; // Update 3.17: the screenshot mobs stand where they were put (see Anim317.testPose)
+                        Anim317.testPose(spawned, System.getProperty("bc.mobpose", ""));
+                     }
+
                      if (spawned.type == Mobs.VILLAGER) {
                         spawned.color = var20 % 6; // every villager a different profession
                      }

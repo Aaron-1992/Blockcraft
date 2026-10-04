@@ -133,7 +133,20 @@ public final class Mobs {
 
          for (int var4 = this.list.size() - 1; var4 >= 0; var4--) {
             Mobs.Mob var5 = (Mobs.Mob)this.list.get(var4);
-            if (var5.dead) {
+            if (var5.still) {
+               // Update 3.17 test hook (bc.still): a mob that stands still for the screenshot, only its animation clock runs
+               var5.age++;
+               if (var5.dead) {
+                  var5.deathTime = Math.min(var5.deathTime + 1, 19);
+               }
+
+               var5.pyaw = var5.yaw;
+               var5.pheadYaw = var5.headYaw;
+               var5.pheadPitch = var5.headPitch;
+               var5.pwalk = var5.walk;
+               var5.pwalkAmp = var5.walkAmp;
+               var5.pswell = var5.swell;
+            } else if (var5.dead) {
                var5.deathTime++;
                Mobs312.tickDying(this, var5, var1);
                if (var5.deathTime >= (var5.type == ENDER_DRAGON ? Dragon.DEATH_TICKS : 20)) {
@@ -1336,6 +1349,8 @@ public final class Mobs {
       public int cd;
       public int flee;
       public int burn;
+      /** Update 3.17 test hook (bc.still): the mob does not think or move, its clips still play. */
+      public boolean still;
       public int color;
       public int angry;
       public int attackAnim;

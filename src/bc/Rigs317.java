@@ -40,6 +40,22 @@ final class Rigs317 {
             return Monsters317.creeper();
          case Mobs.SPIDER:
             return Monsters317.spider();
+         case Mobs.ZOMBIE_PIGMAN:
+            return Monsters317.pigman();
+         case Mobs.GHAST:
+            return Nether317.ghast();
+         case Mobs.BLAZE:
+            return Nether317.blaze();
+         case Mobs.MAGMA_CUBE:
+            return Nether317.magma();
+         case Mobs.ENDERMAN:
+            return End317.enderman();
+         case Mobs.VILLAGER:
+            return Folk317.villager();
+         case Mobs.IRON_GOLEM:
+            return Folk317.golem();
+         case Mobs.PARROT:
+            return Folk317.parrot();
          default:
             return null;
       }

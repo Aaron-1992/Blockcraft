@@ -343,4 +343,121 @@ final class Monsters317 {
       }, 0.06F);
       return r;
    }
+
+   // ------------------------------------------------------------------ zombie pigman
+   static final int P_SKIN = 0xE3A09C;
+   static final int P_SKIN_D = 0xBC7878;
+
+   static Rig pigman() {
+      Rig r = new Rig(Mobs.ZOMBIE_PIGMAN, 2, 256);
+      Hum h = hum(r, 6.0F, 2.0F);
+      h.body.round(-4, 0, -2, 8, 4.5F, 4, 0.5F);
+      h.chest.round(-4, 0, -2, 8, 7.5F, 4, 0.5F);
+      Cube hc = h.head.round(-4, 0, -4, 8, 8, 8, 0.6F);
+      Cube snout = h.head.box(-2.3F, 1.2F, 4.0F, 4.6F, 3.2F, 1.8F);
+      for (int s = 0; s < 2; s++) {
+         float sx = s == 0 ? 1.0F : -1.0F;
+         Bone ear = r.boneRel(s == 0 ? "earL" : "earR", h.head, sx * 3.8F, 6.2F, -0.4F).rot(0, 0, sx * 14);
+         ear.box(s == 0 ? 0 : -1.5F, -0.2F, -1.3F, 1.5F, 2.6F, 2.6F);
+         Bone arm = s == 0 ? h.armL : h.armR;
+         Bone fore = s == 0 ? h.foreL : h.foreR;
+         Bone leg = s == 0 ? h.legL : h.legR;
+         Bone shin = s == 0 ? h.shinL : h.shinR;
+         arm.box(-2, -4.5F, -2, 4, 6.5F, 4);
+         fore.box(-1.9F, -5.5F, -1.9F, 3.8F, 5.5F, 3.8F);
+         leg.box(-2, -6, -2, 4, 6.5F, 4);
+         shin.box(-1.9F, -6, -1.9F, 3.8F, 6, 3.8F);
+         shin.box(-2.1F, -6, -2.5F, 4.2F, 2.4F, 5.2F);
+      }
+
+      // the gold sword in the right hand: the blade points forward when the arm hangs and up when it is raised
+      Bone sword = r.boneRel("sword", h.foreR, 0, -4.6F, 0).rot(32, 0, 0);
+      sword.box(-0.55F, -0.55F, -2.2F, 1.1F, 1.1F, 3.6F);
+      sword.box(-0.6F, -2.4F, 1.4F, 1.2F, 4.8F, 1.1F);
+      sword.box(-0.45F, -1.2F, 2.5F, 0.9F, 2.4F, 11.0F);
+      sword.box(-0.2F, -0.8F, 13.5F, 0.4F, 1.6F, 1.0F);
+      Rigs317.lids(r, h.head, hc, 2.0F, 2.3F);
+      r.finish();
+      r.paint(c -> {
+         String n = c.bone.name;
+         float g = RigPaint.grain(c, 23) * 0.045F;
+         if (n.equals("sword")) {
+            boolean grip = c.z < 1.4F;
+            float k = RigPaint.noise(c.x * 1.4F, c.y * 1.4F, c.z * 1.4F, 5);
+            if (grip) {
+               return RigPaint.mul(RigPaint.c(0x4C3016), 0.9F + k * 0.3F);
+            }
+
+            return RigPaint.mul(RigPaint.mix(0xE8D050, 0xB8942A, k), c.face == Rig.RIGHT || c.face == Rig.LEFT ? 1.1F - 0.2F * c.edge / 4.0F : 0.9F);
+         }
+
+         float m1 = RigPaint.fbm(c.x * 0.33F, c.y * 0.33F, c.z * 0.33F, 33);
+         int skin = RigPaint.mix(P_SKIN, P_SKIN_D, RigPaint.smooth(0.42F, 0.7F, m1));
+         int base;
+         if (n.equals("head") || n.startsWith("lid") || n.startsWith("ear")) {
+            base = skin;
+            if (n.startsWith("ear")) {
+               base = RigPaint.mix(skin, 0xA85A5A, 0.35F);
+            }
+
+            if (c.y > 31.0F && c.face != Rig.FRONT) {
+               base = RigPaint.mix(skin, 0x7A4A4A, 0.5F);
+            }
+         } else if (n.equals("chest") || n.equals("body")) {
+            base = skin;
+            float strap = c.x * 0.8F + (c.y - 20.0F) * 0.55F;
+            if (n.equals("chest") && Math.abs(strap) < 1.5F && (c.face == Rig.FRONT || c.face == Rig.BACK)) {
+               base = RigPaint.mix(0x6A3E22, 0x8A5632, RigPaint.noise(c.x, c.y, c.z, 3));
+            }
+
+            if (c.y < 16.0F && c.y > 13.4F) {
+               base = RigPaint.mix(0x4E2E18, 0x6A4228, RigPaint.noise(c.x, c.y, c.z, 5));
+               if (Math.abs(c.x) < 1.2F && c.face == Rig.FRONT) {
+                  base = 0xE0B83C;
+               }
+            } else if (c.y <= 13.4F) {
+               base = RigPaint.mix(0x6B4B33, 0x4A3322, RigPaint.fbm(c.x * 0.7F, c.y * 0.7F, c.z * 0.7F, 35));
+            }
+         } else if (n.startsWith("arm")) {
+            base = skin;
+            if (c.y > 20.4F) {
+               base = RigPaint.mix(0x6A3E22, 0x4E2E18, RigPaint.noise(c.x, c.y, c.z, 7));
+            }
+         } else if (n.startsWith("fore")) {
+            base = c.y < 13.6F ? RigPaint.mix(skin, 0xB88080, 0.4F) : skin;
+         } else if (n.startsWith("shin")) {
+            if (c.y < 2.3F) {
+               base = 0x3A2616;
+            } else {
+               base = RigPaint.mix(0x6B4B33, 0x4A3322, RigPaint.fbm(c.x * 0.7F, c.y * 0.7F, c.z * 0.7F, 35));
+               float tear = RigPaint.noise(c.x * 1.2F, c.y * 0.5F, c.z * 1.2F, 9);
+               if (c.y < 5.0F && tear > 0.62F) {
+                  base = skin;
+               }
+            }
+         } else {
+            base = RigPaint.mix(0x6B4B33, 0x4A3322, RigPaint.fbm(c.x * 0.7F, c.y * 0.7F, c.z * 0.7F, 35));
+            if (c.y < 9.0F && RigPaint.fbm(c.x * 0.8F, c.y * 0.8F, c.z * 0.8F, 53) > 0.7F) {
+               base = skin;
+            }
+         }
+
+         return RigPaint.mul(RigPaint.c(base), 1.0F + g);
+      }, 0.06F);
+      // the snout with two nostrils, small angry eyes under a heavy brow, a tusk on each side of the mouth
+      r.patch(snout, Rig.FRONT, 0.9F, 1.0F, 1.0F, 1.3F, RigPaint.c(0x5A2A2C));
+      r.patch(snout, Rig.FRONT, 2.7F, 1.0F, 1.0F, 1.3F, RigPaint.c(0x5A2A2C));
+      for (int s = 0; s < 2; s++) {
+         float cx = s == 0 ? 2.0F : 6.0F;
+         r.patch(hc, Rig.FRONT, cx - 1.1F, 2.1F, 2.2F, 1.4F, RigPaint.c(0x3A1A1A));
+         r.patch(hc, Rig.FRONT, cx - 0.7F, 2.3F, 1.4F, 1.0F, RigPaint.c(0xF4E8D0));
+         r.patch(hc, Rig.FRONT, s == 0 ? cx - 0.1F : cx - 0.7F, 2.3F, 0.8F, 1.0F, RigPaint.c(0x8A1414));
+         r.patch(hc, Rig.FRONT, cx - 1.3F, 1.5F, 2.6F, 0.55F, RigPaint.c(0x7A3C3C));
+      }
+
+      r.patch(hc, Rig.FRONT, 1.8F, 5.4F, 4.4F, 0.9F, RigPaint.c(0x4A2020));
+      r.patch(hc, Rig.FRONT, 2.0F, 4.7F, 0.5F, 0.9F, RigPaint.c(0xEFE6C8));
+      r.patch(hc, Rig.FRONT, 5.5F, 4.7F, 0.5F, 0.9F, RigPaint.c(0xEFE6C8));
+      return r;
+   }
 }

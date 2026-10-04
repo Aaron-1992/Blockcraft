@@ -1,2 +1,2 @@
-mobs317-farm,mobs317-farm-walk,mobs317-monsters,mobs317-monsters-walk,mobs,mobs-graze
+mobs317-farm,mobs317-farm-walk,mobs317-monsters,mobs317-monsters-walk,mobs317-monsters-fight,mobs317-nether,mobs317-ghast,mobs317-enderman
 jar=build

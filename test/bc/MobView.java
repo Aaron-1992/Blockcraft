@@ -92,6 +92,8 @@ public final class MobView {
    }
 
    /** A ground plane with a 1 block grid and a soft shadow, so that the size of the mob can be seen. */
+   double groundY;
+
    void ground(double half, double shadowR) {
       double[] a = new double[3];
       // sample the ground per pixel: intersect the view ray with y = 0
@@ -106,7 +108,7 @@ public final class MobView {
                continue;
             }
 
-            double t = -this.eye[1] / dy;
+            double t = (this.groundY - this.eye[1]) / dy;
             double gx = this.eye[0] + dx * t;
             double gz = this.eye[2] + dz * t;
             if (Math.abs(gx) > half || Math.abs(gz) > half) {
@@ -366,6 +368,7 @@ public final class MobView {
       double cz = (bb[2] + bb[5]) / 32.0;
       double rad = Math.sqrt(Math.pow(bb[3] - bb[0], 2) + Math.pow(bb[4] - bb[1], 2) + Math.pow(bb[5] - bb[2], 2)) / 32.0;
       v.camera(cx, cy, cz, az, el, rad / Math.sin(Math.toRadians(15)) * 1.04 / zoom, 30);
+      v.groundY = Math.min(0.0, bb[1] / 16.0);
       v.ground(7, 0.8 + rad * 0.5);
       v.draw(rig, p, 0, 1.0, 0, 0, s.color);
       return v;

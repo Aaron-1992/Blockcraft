@@ -146,6 +146,7 @@ final class RigDraw {
       s.moving = m.moving;
       s.dead = m.dead;
       s.cd = Math.max(0.0F, m.cd - partial);
+      s.fuse = m.type == Mobs.GHAST || m.type == Mobs.BLAZE ? Math.max(0.0F, m.fuse - partial) : 0.0F;
    }
 
    /** Writes a 3x4 matrix (model units) as a GL matrix in blocks. */

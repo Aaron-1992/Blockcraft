@@ -34,6 +34,8 @@ final class Anim317 {
       boolean moving;
       /** The cooldown of an attack in ticks (a skeleton draws its bow while it runs down). */
       float cd;
+      /** Ticks until a ghast shoots (20 down to 1 while it charges; 0 otherwise). */
+      float fuse;
       boolean target;
       boolean angry;
       boolean baby;
@@ -101,6 +103,30 @@ final class Anim317 {
          case Mobs.SPIDER:
             AnimM317.spider(r, s, p);
             break;
+         case Mobs.ZOMBIE_PIGMAN:
+            AnimW317.pigman(r, s, p);
+            break;
+         case Mobs.GHAST:
+            AnimW317.ghast(r, s, p);
+            break;
+         case Mobs.BLAZE:
+            AnimW317.blaze(r, s, p);
+            break;
+         case Mobs.MAGMA_CUBE:
+            AnimW317.magma(r, s, p);
+            break;
+         case Mobs.ENDERMAN:
+            AnimW317.enderman(r, s, p);
+            break;
+         case Mobs.VILLAGER:
+            AnimF317.villager(r, s, p);
+            break;
+         case Mobs.IRON_GOLEM:
+            AnimF317.golem(r, s, p);
+            break;
+         case Mobs.PARROT:
+            AnimF317.parrot(r, s, p);
+            break;
          default:
             break;
       }
@@ -118,6 +144,60 @@ final class Anim317 {
       }
 
       blink(r, s, p);
+   }
+
+   /**
+    * The test hook behind {@code -Dbc.still=1 -Dbc.mobpose=key=value,...}: puts a summoned mob into a state of its AI for a screenshot. Keys: target, angry,
+    * attack (ticks left of the swing), cd, swell (0..30), fuse, hurt (ticks left), dead (ticks since death), air (the mob is jumping, vy), walk, amp.
+    */
+   static void testPose(Mobs.Mob m, String spec) {
+      for (String kv : spec.split(",")) {
+         String[] p = kv.trim().split("=");
+         if (p[0].isEmpty()) {
+            continue;
+         }
+
+         float v = p.length > 1 ? Float.parseFloat(p[1]) : 1.0F;
+         switch (p[0]) {
+            case "target":
+               m.hasTarget = v > 0;
+               break;
+            case "angry":
+               m.angry = v > 0 ? 600 : 0;
+               break;
+            case "attack":
+               m.attackAnim = (int)v;
+               break;
+            case "cd":
+               m.cd = (int)v;
+               break;
+            case "swell":
+               m.swell = m.pswell = (int)v;
+               break;
+            case "fuse":
+               m.fuse = (int)v;
+               break;
+            case "hurt":
+               m.hurtTime = (int)v;
+               break;
+            case "dead":
+               m.dead = true;
+               m.deathTime = (int)v;
+               break;
+            case "air":
+               m.onGround = false;
+               m.vy = v;
+               break;
+            case "walk":
+               m.walk = m.pwalk = v;
+               break;
+            case "amp":
+               m.walkAmp = m.pwalkAmp = v;
+               break;
+            default:
+               break;
+         }
+      }
    }
 
    // ------------------------------------------------------------------ small things every mob does
