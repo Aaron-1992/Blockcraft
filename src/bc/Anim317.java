@@ -127,6 +127,12 @@ final class Anim317 {
          case Mobs.PARROT:
             AnimF317.parrot(r, s, p);
             break;
+         case Mobs.END_CRYSTAL:
+            AnimE317.crystal(r, s, p);
+            break;
+         case Mobs.ENDER_DRAGON:
+            AnimE317.dragon(r, s, p);
+            break;
          default:
             break;
       }
@@ -208,6 +214,21 @@ final class Anim317 {
       return ph < len ? 1.0F - ph / len : 0.0F;
    }
 
+   /** Like {@link #moment} but the value rises over the first half tick instead of jumping: for twitches that are used as they are (ears, tails, a jaw). */
+   static float momentSoft(MState s, int channel, float every, float len) {
+      float per = every * (0.7F + 0.6F * RigPaint.hash(s.seed, channel, 5, 1));
+      float ph = (s.t + RigPaint.hash(s.seed, channel, 9, 2) * per) % per;
+      return ph < len ? (1.0F - ph / len) * smooth(0.0F, 0.5F, ph) : 0.0F;
+   }
+
+   /** +1 or -1, the same for the whole of one moment of the channel (a mob looks to the left or to the right, never both in one go). */
+   static float momentSign(MState s, int channel, float every) {
+      float per = every * (0.7F + 0.6F * RigPaint.hash(s.seed, channel, 5, 1));
+      float off = RigPaint.hash(s.seed, channel, 9, 2) * per;
+      int cycle = (int)Math.floor((s.t + off) / per);
+      return RigPaint.hash(s.seed, cycle, channel, 4) > 0.5F ? 1.0F : -1.0F;
+   }
+
    /** The eyelids: closed for a few ticks every 2 to 6 seconds (and shut while the mob is dying). */
    static void blink(Rig r, MState s, Pose p) {
       float c = moment(s, 1, 90.0F, 7.0F);
@@ -263,8 +284,8 @@ final class Anim317 {
       p.rot(head, 0.0F, idleLook, 0.0F);
       int earL = r.idx("earL");
       int earR = r.idx("earR");
-      float flick = moment(s, 2, 140.0F, 9.0F);
-      float flick2 = moment(s, 3, 170.0F, 9.0F);
+      float flick = momentSoft(s, 2, 140.0F, 9.0F);
+      float flick2 = momentSoft(s, 3, 170.0F, 9.0F);
       p.rot(earL, sin(2.0F * phi - 0.8F) * 9.0F * a * lag - 22.0F * flick * calm, 0.0F, sin(phi) * 6.0F * a * lag - 10.0F * flick * calm);
       p.rot(earR, sin(2.0F * phi - 1.4F) * 9.0F * a * lag - 22.0F * flick2 * calm, 0.0F, -sin(phi) * 6.0F * a * lag + 10.0F * flick2 * calm);
       for (int i = 1; i <= 3; i++) {
@@ -274,7 +295,7 @@ final class Anim317 {
             p.rot(t, sin(s.t * 0.17F - i) * 4.0F, wag, 0.0F);
          } else {
             float swish = sin(s.t * 0.09F + s.seed * 0.7F) * 7.0F * (0.4F + calm) + sin(phi - i * 0.8F) * 14.0F * a;
-            float tf = moment(s, 4, 160.0F, 12.0F);
+            float tf = momentSoft(s, 4, 160.0F, 12.0F);
             p.rot(t, sin(2.0F * phi - i * 0.9F) * 6.0F * a + tf * 14.0F * sin(s.t * 0.9F), 0.0F, swish * (i == 1 ? 1.0F : 1.6F) + tf * 18.0F);
          }
       }
@@ -307,16 +328,16 @@ final class Anim317 {
       float look = 0.0F;
       float ev = moment(s, 6, 70.0F, 22.0F);
       if (ev > 0.0F) {
-         float dir = RigPaint.hash(s.seed, (int)(s.t / 70.0F), 3, 4) > 0.5F ? 1.0F : -1.0F;
+         float dir = momentSign(s, 6, 70.0F);
          look = dir * 34.0F * smooth(1.0F, 0.85F, ev) * smooth(0.0F, 0.15F, ev);
       }
 
-      float tilt = ev > 0.0F ? 12.0F * sin(s.t * 1.7F) * smooth(0.0F, 0.2F, ev) : 0.0F;
+      float tilt = ev > 0.0F ? 12.0F * sin(s.t * 1.7F) * smooth(0.0F, 0.2F, ev) * smooth(0.0F, 0.1F, 1.0F - ev) : 0.0F;
       float pecking = s.graze * (50.0F + 22.0F * sin(s.t * 0.55F));
       p.move(head, 0.0F, 0.0F, peck * 0.85F * a);
       p.rot(head, peck * 9.0F * a + pecking + s.headPitch - 8.0F * hurtK(s) * 1.0F, -Math.max(-60.0F, Math.min(60.0F, s.headYaw)) + look, tilt);
       int jaw = r.idx("jaw");
-      float cluck = moment(s, 7, 150.0F, 10.0F);
+      float cluck = momentSoft(s, 7, 150.0F, 10.0F);
       p.rot(jaw, 26.0F * cluck * Math.abs(sin(s.t * 1.1F)) + s.attack * 10.0F, 0.0F, 0.0F);
       float flap = s.onGround ? 0.0F : 1.0F;
       float panic = s.flee ? 0.5F : 0.0F;
@@ -325,7 +346,7 @@ final class Anim317 {
          float sg = i == 0 ? 1.0F : -1.0F;
          int w = r.idx(i == 0 ? "wingL" : "wingR");
          float up = flap * (46.0F * sin(ft) + 42.0F) + panic * a * (22.0F * sin(ft * 1.3F) + 16.0F);
-         float shake = moment(s, 8, 210.0F, 14.0F) * calm * sin(s.t * 1.9F) * 12.0F;
+         float shake = momentSoft(s, 8, 210.0F, 14.0F) * calm * sin(s.t * 1.9F) * 12.0F;
          p.rot(w, 0.0F, flap * 8.0F * sin(ft + 1.0F) * 0.0F, -sg * (up + shake));
       }
 

@@ -367,9 +367,18 @@ final class Rig {
       return this.byName.get(name);
    }
 
+   /** Test hook: when this is not null, every name a clip asks for that the rig does not have is added as "type:name" (typos in a clip are otherwise silent). */
+   static java.util.Set<String> missingNames;
+
    /** The index of a bone, or -1. */
    int idx(String name) {
       Bone b = this.byName.get(name);
+      if (b == null && missingNames != null) {
+         synchronized (missingNames) {
+            missingNames.add(this.type + ":" + name);
+         }
+      }
+
       return b == null ? -1 : b.index;
    }
 

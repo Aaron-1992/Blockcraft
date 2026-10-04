@@ -56,6 +56,10 @@ final class Rigs317 {
             return Folk317.golem();
          case Mobs.PARROT:
             return Folk317.parrot();
+         case Mobs.END_CRYSTAL:
+            return End317.crystal();
+         case Mobs.ENDER_DRAGON:
+            return End317.dragon();
          default:
             return null;
       }
@@ -87,6 +91,7 @@ final class Rigs317 {
    // ------------------------------------------------------------------ pig
    private static Rig pig() {
       Rig r = new Rig(Mobs.PIG, 2, 256);
+      r.scale = 0.9F; // the model has to fit its hit box (arrows, targeting)
       Bone root = r.root();
       Bone body = r.bone("body", root, 0, 9.5F, 0);
       body.round(-5, -4, -8, 10, 8, 15, 0.9F);
@@ -153,6 +158,7 @@ final class Rigs317 {
    // ------------------------------------------------------------------ cow
    private static Rig cow() {
       Rig r = new Rig(Mobs.COW, 2, 256);
+      r.scale = 0.88F;
       Bone root = r.root();
       Bone body = r.bone("body", root, 0, 17.5F, 0);
       body.round(-6, -5.5F, -10.5F, 12, 11, 20, 1.0F);
@@ -256,6 +262,7 @@ final class Rigs317 {
    // ------------------------------------------------------------------ sheep
    private static Rig sheep() {
       Rig r = new Rig(Mobs.SHEEP, 2, 256);
+      r.scale = 0.92F;
       r.groupTint[G_WOOL] = Rig.TINT_WOOL;
       Bone root = r.root();
       Bone body = r.bone("body", root, 0, 16.0F, 0);
@@ -326,6 +333,7 @@ final class Rigs317 {
    // ------------------------------------------------------------------ chicken
    private static Rig chicken() {
       Rig r = new Rig(Mobs.CHICKEN, 2, 128);
+      r.scale = 0.72F;
       Bone root = r.root();
       Bone body = r.bone("body", root, 0, 8.6F, 0);
       body.round(-3.0F, -3.0F, -4.2F, 6, 6, 8.4F, 0.8F);

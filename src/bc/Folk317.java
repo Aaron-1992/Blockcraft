@@ -20,19 +20,19 @@ final class Folk317 {
       Rig r = new Rig(Mobs.VILLAGER, 2, 256);
       r.groupTint[Rigs317.G_ROBE] = Rig.TINT_ROBE;
       Bone body = r.bone("body", r.root(), 0, 12, 0);
-      body.box(-4.7F, -10, -2.9F, 9.4F, 10, 5.8F).group(Rigs317.G_ROBE);
-      body.box(-4.75F, -10, -2.95F, 9.5F, 1.4F, 5.9F).group(Rigs317.G_ROBE);
+      body.box(-4.7F, -10, -3.3F, 9.4F, 10, 6.6F).group(Rigs317.G_ROBE);
+      body.box(-4.75F, -10, -3.35F, 9.5F, 1.4F, 6.7F).group(Rigs317.G_ROBE);
       Bone chest = r.bone("chest", body, 0, 12, 0);
-      chest.box(-4.1F, 0, -2.2F, 8.2F, 10, 4.4F).group(Rigs317.G_ROBE);
-      chest.box(-4.2F, 0.4F, -2.3F, 8.4F, 1.3F, 4.6F);
+      chest.box(-4.1F, 0, -2.8F, 8.2F, 10, 5.6F).group(Rigs317.G_ROBE);
+      chest.box(-4.2F, 0.4F, -2.9F, 8.4F, 1.3F, 5.8F);
       Bone head = r.bone("head", chest, 0, 22, 0);
       Cube hc = head.round(-4, 0, -4, 8, 10, 8, 0.6F);
       Bone nose = r.boneRel("nose", head, 0, 4.0F, 4.0F);
       nose.box(-1, -2.0F, -0.1F, 2, 4, 2.4F);
       Bone arms = r.bone("arms", chest, 0, 17.5F, 0);
-      arms.round(-4.8F, -2, 1.8F, 9.6F, 4, 4.4F, 0.5F).group(Rigs317.G_ROBE);
-      arms.box(-5.2F, -1.2F, 5.0F, 2.2F, 2.4F, 1.9F);
-      arms.box(3.0F, -1.2F, 5.0F, 2.2F, 2.4F, 1.9F);
+      arms.round(-4.8F, -2, 2.4F, 9.6F, 4, 4.4F, 0.5F).group(Rigs317.G_ROBE);
+      arms.box(-5.2F, -1.2F, 5.6F, 2.2F, 2.4F, 1.9F);
+      arms.box(3.0F, -1.2F, 5.6F, 2.2F, 2.4F, 1.9F);
       for (int s = 0; s < 2; s++) {
          float sx = s == 0 ? 1.0F : -1.0F;
          Bone leg = r.bone(s == 0 ? "legL" : "legR", body, sx * 2.0F, 12, 0);
@@ -53,10 +53,10 @@ final class Folk317 {
       }
 
       glasses.box(-0.5F, 5.9F, 4.05F, 1.0F, 0.35F, 0.3F).group(V_GLASSES);
-      chest.box(-3.1F, 0.8F, 2.25F, 6.2F, 9.0F, 0.5F).group(V_SMITH);
-      body.box(-3.3F, -9.6F, 2.95F, 6.6F, 9.6F, 0.5F).group(V_SMITH);
-      chest.box(-3.1F, 0.8F, 2.3F, 6.2F, 9.0F, 0.5F).group(V_BUTCHER);
-      body.box(-3.3F, -9.6F, 3.0F, 6.6F, 9.6F, 0.5F).group(V_BUTCHER);
+      chest.box(-3.1F, 0.8F, 2.85F, 6.2F, 9.0F, 0.5F).group(V_SMITH);
+      body.box(-3.3F, -9.6F, 3.35F, 6.6F, 9.6F, 0.5F).group(V_SMITH);
+      chest.box(-3.1F, 0.8F, 2.9F, 6.2F, 9.0F, 0.5F).group(V_BUTCHER);
+      body.box(-3.3F, -9.6F, 3.4F, 6.6F, 9.6F, 0.5F).group(V_BUTCHER);
       Rigs317.lids(r, head, hc, 1.8F, 3.7F);
       r.finish();
       r.paint(c -> {
@@ -238,9 +238,9 @@ final class Folk317 {
       beak.box(-0.45F, -0.8F, 1.4F, 0.9F, 1.0F, 0.8F);
       Bone jaw = r.boneRel("jawP", head, 0, 1.0F, 1.4F);
       jaw.box(-0.45F, -0.7F, 0, 0.9F, 0.8F, 1.3F);
-      Bone tail = r.boneRel("tail", body, 0, -2.0F, -1.5F).rot(16, 0, 0);
-      tail.box(-1.3F, -7.0F, -0.45F, 2.6F, 7.0F, 0.9F).group(Rigs317.G_FEATHER);
-      tail.box(-0.7F, -9.0F, -0.2F, 1.4F, 2.2F, 0.5F);
+      Bone tail = r.boneRel("tail", body, 0, -2.0F, -1.5F).rot(38, 0, 0);
+      tail.box(-1.3F, -5.4F, -0.45F, 2.6F, 5.4F, 0.9F).group(Rigs317.G_FEATHER);
+      tail.box(-0.7F, -7.2F, -0.2F, 1.4F, 2.2F, 0.5F);
       for (int s = 0; s < 2; s++) {
          float sx = s == 0 ? 1.0F : -1.0F;
          String n = s == 0 ? "L" : "R";

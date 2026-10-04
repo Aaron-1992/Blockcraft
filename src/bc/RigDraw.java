@@ -24,6 +24,38 @@ final class RigDraw {
    private RigDraw() {
    }
 
+   static final java.util.concurrent.ConcurrentHashMap<Integer, Rig> BUILT = new java.util.concurrent.ConcurrentHashMap<>();
+   private static boolean warming;
+
+   /** True if the rig of this type was painted in the background and has been handed out already (test hook). */
+   static boolean warmedAndTaken(int type) {
+      return type >= 0 && type < TRIED.length && TRIED[type];
+   }
+
+   /** Paints every rig on a background thread (once), so the first dragon on screen does not stall a frame; the upload to the GPU is still done by the render thread. */
+   static synchronized void warm() {
+      if (CLASSIC || warming) {
+         return;
+      }
+
+      warming = true;
+      Thread t = new Thread(() -> {
+         for (int type = 0; type < RIGS.length; type++) {
+            try {
+               Rig r = Rigs317.build(type);
+               if (r != null) {
+                  BUILT.put(type, r);
+               }
+            } catch (RuntimeException e) {
+               System.err.println("rig " + type + ": " + e);
+            }
+         }
+      }, "rig-warm");
+      t.setDaemon(true);
+      t.setPriority(Thread.MIN_PRIORITY);
+      t.start();
+   }
+
    /** The rig of a mob type (built and uploaded on first use), or null if the mob still has its old model. */
    static Rig rig(int type) {
       if (type < 0 || type >= RIGS.length) {
@@ -32,7 +64,11 @@ final class RigDraw {
 
       if (!TRIED[type]) {
          TRIED[type] = true;
-         Rig r = CLASSIC ? null : Rigs317.build(type);
+         Rig r = CLASSIC ? null : BUILT.remove(type);
+         if (r == null && !CLASSIC) {
+            r = Rigs317.build(type);
+         }
+
          if (r != null) {
             upload(r);
          }

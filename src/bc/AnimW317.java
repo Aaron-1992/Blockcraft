@@ -36,7 +36,10 @@ final class AnimW317 {
       float armLx = mad ? -74.0F + sin(s.t * 0.2F) * 3.0F : -8.0F + sin(phi + 3.1416F) * 22.0F * a + sway * 2.0F;
       float armRx = mad ? -96.0F + 3.0F * sin(s.t * 0.17F) : -8.0F + sin(phi) * 22.0F * a - sway * 2.0F;
       if (s.attackT > 0.0F) {
-         armRx = -150.0F + 128.0F * swing;
+         // raised, brought down, back to the way it stood: blended in and out so that the arm does not jump
+         float env = Anim317.smooth(0.0F, 0.15F, k) * (1.0F - Anim317.smooth(0.8F, 1.0F, k));
+         float down = Anim317.smooth(0.2F, 0.75F, k);
+         armRx = armRx * (1.0F - env) + (-150.0F + 128.0F * down) * env;
          armLx -= 14.0F * chop;
       }
 
@@ -47,7 +50,7 @@ final class AnimW317 {
       AnimM317.head(r, s, p, mad ? -4.0F : 3.0F + 3.0F * calm * sin(s.t * 0.05F + s.seed), 3.0F, 0.04F);
       float twitch = Anim317.moment(s, 11, 150.0F, 12.0F);
       p.rot(r.idx("earL"), 0.0F, 0.0F, 14.0F * sin(twitch * 3.1416F * 3.0F) * (twitch > 0.0F ? 1.0F : 0.0F) + (mad ? 10.0F : 0.0F));
-      p.rot(r.idx("earR"), 0.0F, 0.0F, -14.0F * sin(twitch * 3.1416F * 3.0F + 1.0F) * (twitch > 0.0F ? 1.0F : 0.0F) - (mad ? 10.0F : 0.0F));
+      p.rot(r.idx("earR"), 0.0F, 0.0F, -14.0F * sin(twitch * 3.1416F * 3.0F + 1.0F) * (twitch > 0.0F ? 1.0F : 0.0F) * Anim317.smooth(0.0F, 0.1F, 1.0F - twitch) * Anim317.smooth(0.0F, 0.1F, twitch) - (mad ? 10.0F : 0.0F));
    }
 
    // ------------------------------------------------------------------ ghast
@@ -79,18 +82,19 @@ final class AnimW317 {
    // ------------------------------------------------------------------ blaze
    static void blaze(Rig r, MState s, Pose p) {
       float t = s.t;
-      boolean fire = s.attackT > 0.0F;
+      // the burst: the AI keeps the fuse at 18 down to 1 while it fires; it swells and dies away over a few ticks instead of switching on and off
+      float fireK = Math.max(Anim317.smooth(0.0F, 4.0F, s.fuse) * Anim317.smooth(18.0F, 14.0F, s.fuse), Anim317.smooth(0.0F, 1.5F, s.attackT) * Anim317.smooth(10.0F, 8.5F, s.attackT));
       int head = r.idx("head");
       p.move(head, 0.0F, sin(t * 0.1F + s.seed) * 0.9F, 0.0F);
-      p.rot(head, s.headPitch + (fire ? -6.0F : 0.0F), -clamp(s.headYaw, -60.0F, 60.0F) + (fire ? sin(t * 3.0F) * 4.0F : 0.0F), sin(t * 0.07F) * 3.0F);
+      p.rot(head, s.headPitch - 6.0F * fireK, -clamp(s.headYaw, -60.0F, 60.0F) + sin(t * 3.0F) * 4.0F * fireK, sin(t * 0.07F) * 3.0F);
       float[] speed = {3.0F, -4.4F, 5.6F};
       for (int ring = 0; ring < 3; ring++) {
-         p.rot(r.idx("ring" + ring), 0.0F, t * speed[ring] * (fire ? 1.0F : 1.0F) + ring * 20.0F, 0.0F);
+         p.rot(r.idx("ring" + ring), 0.0F, (t * speed[ring] + ring * 20.0F) % 360.0F, 0.0F); // wrapped: after hours the angle would lose its fraction
          for (int k = 0; k < 4; k++) {
             double a = k * Math.PI / 2.0 + ring * 0.5;
-            float out = fire ? 2.6F : 0.0F;
+            float out = 2.6F * fireK;
             int rod = r.idx("rod" + ring + k);
-            p.move(rod, (float)Math.cos(a) * out, sin(t * 0.17F + k * 1.7F + ring * 0.9F) * 0.9F + (fire ? 1.5F : 0.0F), (float)Math.sin(a) * out);
+            p.move(rod, (float)Math.cos(a) * out, sin(t * 0.17F + k * 1.7F + ring * 0.9F) * 0.9F + 1.5F * fireK, (float)Math.sin(a) * out);
             p.rot(rod, sin(t * 0.13F + k + ring) * 4.0F, 0.0F, cos(t * 0.11F + k * 2.0F) * 4.0F);
          }
       }

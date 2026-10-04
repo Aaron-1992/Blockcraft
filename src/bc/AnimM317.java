@@ -120,7 +120,7 @@ final class AnimM317 {
       p.rot(r.idx("bowL1"), flex * 0.5F, 0.0F, 0.0F);
       p.rot(r.idx("bowL2"), flex, 0.0F, 0.0F);
       head(r, s, p, 2.0F - 4.0F * draw, 3.0F * calm, 0.04F);
-      float rattle = Math.max(Anim317.moment(s, 9, 200.0F, 26.0F), shot);
+      float rattle = Math.max(Anim317.momentSoft(s, 9, 200.0F, 26.0F), shot);
       p.rot(r.idx("jaw"), rattle > 0.0F ? 12.0F * Math.abs(sin(s.t * 1.7F)) * Math.min(1.0F, rattle * 2.0F) : 0.0F, 0.0F, 0.0F);
       p.rot(r.idx("chest"), 2.0F + sin(s.t * 0.1F + s.seed) * 0.8F, 0.0F, 0.0F);
    }
@@ -140,10 +140,10 @@ final class AnimM317 {
 
       int body = r.idx("body");
       p.move(body, 0.0F, 0.35F * a * (0.5F + 0.5F * cos(2.0F * phi * 1.15F)), 0.0F);
-      p.rot(body, sin(2.0F * phi + 0.4F) * 2.0F * a, sin(phi * 1.15F) * 3.0F * a, sin(phi * 1.15F) * 2.0F * a);
+      p.rot(body, sin(2.3F * phi + 0.4F) * 2.0F * a, sin(phi * 1.15F) * 3.0F * a, sin(phi * 1.15F) * 2.0F * a);
       p.scale(body, 1.0F, 1.0F + sin(s.t * 0.11F + s.seed) * 0.014F * (1.0F + (1.0F - Math.min(1.0F, a * 2.0F))), 1.0F);
       float look = clamp(s.headYaw, -60.0F, 60.0F);
-      p.rot(r.idx("head"), s.headPitch + sin(2.0F * phi + 0.2F) * 3.0F * a - 6.0F * k - 8.0F * Anim317.hurtK(s), -look + sin(s.t * 0.021F + s.seed) * 8.0F * (1.0F - Math.min(1.0F, a * 2.0F)) * (1.0F - k), sin(s.t * 2.7F) * 4.0F * k);
+      p.rot(r.idx("head"), s.headPitch + sin(2.3F * phi + 0.2F) * 3.0F * a - 6.0F * k - 8.0F * Anim317.hurtK(s), -look + sin(s.t * 0.021F + s.seed) * 8.0F * (1.0F - Math.min(1.0F, a * 2.0F)) * (1.0F - k), sin(s.t * 2.7F) * 4.0F * k);
       if (k > 0.0F) {
          float wob = 1.0F + sin(k * 100.0F) * k * 0.01F;
          float wide = (1.0F + k * k * 0.4F) * wob;

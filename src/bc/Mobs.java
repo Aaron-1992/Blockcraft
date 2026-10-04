@@ -76,6 +76,7 @@ public final class Mobs {
 
    public Mobs(Game var1) {
       this.g = var1;
+      RigDraw.warm(); // Update 3.17: paint the mob skins in the background while the title screen is up
    }
 
    public void clear() {

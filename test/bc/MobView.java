@@ -254,6 +254,9 @@ public final class MobView {
       return s;
    }
 
+   /** The mob that the scene is made for (a few clips run at different lengths). */
+   static int curType = -1;
+
    /** Frames of a named scene: a state per frame. */
    static ArrayList<Anim317.MState> scene(String name, int frames) {
       ArrayList<Anim317.MState> list = new ArrayList<>();
@@ -288,7 +291,7 @@ public final class MobView {
             case "attack": {
                s = walking(3, 0, 1.0F);
                s.attack = 1.0F - k;
-               s.attackT = 8.0F * (1.0F - k);
+               s.attackT = (curType == Mobs.IRON_GOLEM || curType == Mobs.ENDER_DRAGON ? 10.0F : 8.0F) * (1.0F - k);
                s.target = true;
                s.walk = i * 0.9F;
                s.t = 60 + i * 1.5F;
@@ -319,7 +322,44 @@ public final class MobView {
             case "death": {
                s = calm(3);
                s.death = k;
+               s.dead = true;
+               s.deathT = k * (curType == Mobs.ENDER_DRAGON ? Dragon.DEATH_TICKS : 20.0F);
                s.t = 60 + i;
+               break;
+            }
+            case "fly": {
+               s = calm(3);
+               s.phase = 0;
+               s.onGround = false;
+               s.walk = i * 1.57F;
+               s.t = 60 + i * 0.58F;
+               s.amp = 1.0F;
+               break;
+            }
+            case "perch": {
+               s = calm(3);
+               s.phase = Dragon.PERCH;
+               s.t = 60 + i * 22.0F;
+               break;
+            }
+            case "land": {
+               s = calm(3);
+               s.phase = Dragon.LAND;
+               s.walk = i * 0.8F;
+               s.t = 60 + i * 3.0F;
+               break;
+            }
+            case "flee": {
+               s = walking(3, 0, 1.0F);
+               s.flee = true;
+               s.walk = i / (float)frames * (float)(Math.PI * 2 / 1.6);
+               s.t = 60 + i * 2.5F;
+               break;
+            }
+            case "sit": {
+               s = calm(3);
+               s.phase = 1;
+               s.t = 60 + i * 37.0F;
                break;
             }
             case "air": {
@@ -431,7 +471,7 @@ public final class MobView {
          return;
       }
 
-      int tile = 300;
+      int tile = a.length > 3 ? Integer.parseInt(a[3]) : 300;
       if (sceneName.equals("turn")) {
          BufferedImage sheet = new BufferedImage(tile * 4, tile, BufferedImage.TYPE_INT_ARGB);
          double[] az = {30, 90, 180, -60};
@@ -446,8 +486,13 @@ public final class MobView {
       }
 
       int frames = 8;
+      curType = type;
       ArrayList<Anim317.MState> list = scene(sceneName, frames);
       double az = sceneName.equals("attack") || sceneName.equals("hurt") || sceneName.equals("swell") ? 40 : 90;
+      if (a.length > 4) {
+         az = Double.parseDouble(a[4]);
+      }
+
       BufferedImage sheet = new BufferedImage(tile * 4, tile * 2, BufferedImage.TYPE_INT_ARGB);
       for (int i = 0; i < frames; i++) {
          blit(sheet, tile(rig, list.get(i), az, 8, tile, 1.0), i % 4 * tile, i / 4 * tile);
