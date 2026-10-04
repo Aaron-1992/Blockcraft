@@ -1322,6 +1322,9 @@ public final class Mobs {
    }
 
    public static final class Mob {
+      private static int seedCounter;
+      /** Update 3.17: a number of its own for the little random things the animation does (blinking, ear flicks ...). */
+      public final int seed = (seedCounter++ * 40503 + 17) & 0x7FFFFFFF;
       public int type;
       public int health;
       public int hurtTime;

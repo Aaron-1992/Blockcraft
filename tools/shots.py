@@ -525,6 +525,11 @@ SCENES = {
     # ---- Update 3.11: animation (mobs caught mid-stride / grazing, the player running) and the new clouds
     "mobs-walk":      (COMMON + ["-Dbc.cam=140,65.5,60,0,22", "-Dbc.time=6000", "-Dbc.summon=pig,cow,sheep,baby:pig", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.3", "-Dbc.walkphase=0.6,1.0"] + PLAIN + ["-Dbc.shot=100"], True),
     "mobs-graze":     (COMMON + ["-Dbc.cam=140,65.5,60,0,22", "-Dbc.time=6000", "-Dbc.summon=pig,cow,sheep,baby:cow", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.3", "-Dbc.graze=1"] + PLAIN + ["-Dbc.shot=100"], True),
+    # ---- Update 3.17: the jointed mobs (Rigs317 / Monsters317), standing and caught in mid-stride
+    "mobs317-farm":   (COMMON + ["-Dbc.cam=140,65.9,60,0,18", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=pig,cow,sheared:sheep,sheep,chicken,baby:cow", "-Dbc.summonDist=4.2", "-Dbc.summonDy=-1.3"] + PLAIN + ["-Dbc.shot=100"], True),
+    "mobs317-farm-walk": (COMMON + ["-Dbc.cam=140,65.9,60,0,18", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=pig,cow,sheep,chicken,baby:pig", "-Dbc.summonDist=4.2", "-Dbc.summonDy=-1.3", "-Dbc.walkphase=0.9,1.0"] + PLAIN + ["-Dbc.shot=100"], True),
+    "mobs317-monsters": (COMMON + ["-Dbc.cam=140,66.4,60,0,14", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=zombie,skeleton,creeper,spider", "-Dbc.summonDist=4.6", "-Dbc.summonDy=-1.3"] + PLAIN + ["-Dbc.shot=100"], True),
+    "mobs317-monsters-walk": (COMMON + ["-Dbc.cam=140,66.4,60,0,14", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=zombie,skeleton,creeper,spider", "-Dbc.summonDist=4.6", "-Dbc.summonDy=-1.3", "-Dbc.walkphase=0.9,1.0"] + PLAIN + ["-Dbc.shot=100"], True),
     "skin-run":       (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=60", "-Dbc.skin=demo", "-Dbc.hold=316", "-Dbc.posewalk=0.6,1.0,1", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),
     "wx-sunset-sh":   (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=24", "-Dbc.cam=133,95,71,90,4", "-Dbc.weather=calm", "-Dbc.time=11800", "-Dbc.shot=26"], True),
     "firewall":       (COMMON + ["-Dbc.cam=144,70,68.5,0,12", "-Dbc.time=6000"] + PLAIN + [sets(firewall_blocks()), "-Dbc.fire=off", "-Dbc.shot=170"], True),

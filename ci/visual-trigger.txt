@@ -1,2 +1,2 @@
-sky-sunrise-sh,sky-sunset-sh,sky-sunset-plain,sky-dusk-anti-sh,sky-noon-sh,sky-moon-sh,sky-stars-plain,fx-leaves,fx-embers,fx-torches,fx-bubbles,fx-underwater-sh
+mobs317-farm,mobs317-farm-walk,mobs317-monsters,mobs317-monsters-walk,mobs,mobs-graze
 jar=build
