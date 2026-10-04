@@ -39,6 +39,64 @@ def sets(blocks):
     return "-Dbc.set=" + ";".join("%d,%d,%d,%d" % b for b in blocks)
 
 
+def _clear_strip(out, gy=66):
+    """Air above the flat strip of the first village (x 136..151, z 72..79) so a gallery stands on bare grass."""
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 6):
+                out.append((x, y, z, 0))
+
+
+def shapes315_blocks():
+    """Update 3.15 gallery: panes (clear, red), iron bars, walls, fences and gates of three woods, trapdoors (shut, open, iron, top half), carpets."""
+    out = []
+    gy = 66
+    _clear_strip(out, gy)
+    for i in range(3):
+        out.append((137 + i, gy + 1, 78, 1500))           # glass panes
+        out.append((141 + i, gy + 1, 78, 1501 + 14))      # red stained panes
+        out.append((145 + i, gy + 1, 78, 1517))           # iron bars
+    for y in (1, 2):
+        out.append((149, gy + y, 78, 1500))               # a tall window
+        out.append((150, gy + y, 78, 1500))
+    for x in (137, 138, 139, 141, 142, 143, 145, 146, 147):
+        out.append((x, gy + 1, 76, 1520 + (x - 137) // 4))  # walls of three kinds (they join)
+    for y in (1, 2):
+        out.append((149, gy + y, 76, 1520))
+    for kind, x0 in ((0, 137), (1, 141), (2, 145)):
+        for i in range(3):
+            out.append((x0 + i, gy + 1, 74, 1530 + kind))   # fences
+        out.append((x0 + 1, gy + 1, 74, 1540 + kind * 8 + 0 * 4 + 2))  # a closed gate in the middle (facing east - west)
+    out.append((149, gy + 1, 74, 1540 + 3 * 8 + 4 + 2))     # an open gate of jungle wood
+    out.append((148, gy + 1, 74, 1533))
+    out.append((150, gy + 1, 74, 1533))
+    out.append((137, gy + 1, 72, 1600 + 0 * 16 + 0 + 0 + 1))   # trapdoors: shut on the ground
+    out.append((139, gy + 1, 72, 1600 + 1 * 16 + 0 + 4 + 1))   # birch, open, standing up
+    out.append((141, gy + 1, 72, 1600 + 6 * 16 + 0 + 0 + 1))   # iron
+    out.append((143, gy + 1, 72, 1600 + 2 * 16 + 8 + 0 + 1))   # spruce, top half
+    for c in range(4):
+        out.append((145 + c, gy + 1, 72, 1720 + c))         # carpets: white, orange, magenta, light blue
+    return out
+
+
+def decor315_blocks():
+    """Update 3.15 gallery: beds in eight colours (foot at z=75, head at z=76, facing south) and banners standing and on a brick wall."""
+    out = []
+    gy = 66
+    _clear_strip(out, gy)
+    for c in range(8):
+        out.append((137 + c * 2, gy + 1, 75, 2200 + c * 8 + 0 + 1))   # foot
+        out.append((137 + c * 2, gy + 1, 76, 2200 + c * 8 + 4 + 1))   # head
+    for c in range(8):
+        out.append((137 + c * 2, gy + 1, 73, 2330 + (c + 8) * 4 + 0))  # standing banners, looking north (towards the camera)
+    for x in range(137, 152):
+        for y in (1, 2, 3):
+            out.append((x, gy + y, 79, 16))                          # a brick wall at the back
+    for c in range(0, 16, 2):
+        out.append((137 + c // 2 * 2, gy + 2, 78, 2400 + c * 4 + 0))  # banners on the wall
+    return out
+
+
 def farm_blocks():
     """3 rows of crops in all 8 growth stages on wet farmland, a dry plot, an irrigation ditch and hay bales."""
     out = []
@@ -533,6 +591,12 @@ SCENES = {
     "mobs-walk":      (COMMON + ["-Dbc.cam=140,65.5,60,0,22", "-Dbc.time=6000", "-Dbc.summon=pig,cow,sheep,baby:pig", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.3", "-Dbc.walkphase=0.6,1.0"] + PLAIN + ["-Dbc.shot=100"], True),
     "mobs-graze":     (COMMON + ["-Dbc.cam=140,65.5,60,0,22", "-Dbc.time=6000", "-Dbc.summon=pig,cow,sheep,baby:cow", "-Dbc.summonDist=3.2", "-Dbc.summonDy=-1.3", "-Dbc.graze=1"] + PLAIN + ["-Dbc.shot=100"], True),
     # ---- Update 3.17: the jointed mobs (Rigs317 and friends); bc.still keeps them where they are put, bc.mobpose puts them into a state of their AI
+    # ---- the unreleased updates 3.14 - 3.17 (run 9 looked at them in the real renderer before the release)
+    # seed 12345, world type 1 (the new terrain): village 0 is at (178, 101), y 83, spruce style, a main street along z at x = 178
+    "village314-air":    (TERRA + ["-Dbc.cam=190.4,114.3,67.0,20,38", "-Dbc.rd=5"] + PLAIN + ["-Dbc.shot=320"], True),
+    "village314-street": (TERRA + ["-Dbc.cam=178.5,84.2,84.5,0,6", "-Dbc.rd=5"] + PLAIN + ["-Dbc.shot=320"], True),
+    "shapes315":       (COMMON + ["-Dbc.cam=143.5,71.0,68.5,0,32", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + [sets(shapes315_blocks()), "-Dbc.shot=170"], True),
+    "decor315":        (COMMON + ["-Dbc.cam=143.5,71.0,69.5,0,30", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + [sets(decor315_blocks()), "-Dbc.shot=170"], True),
     "mobs317-farm":   (COMMON + ["-Dbc.cam=140,65.9,60,0,18", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=pig,cow,sheared:sheep,sheep,chicken,baby:cow", "-Dbc.summonDist=4.6", "-Dbc.summonDy=-1.3", "-Dbc.still=1"] + PLAIN + ["-Dbc.shot=100"], True),
     "mobs317-farm-walk": (COMMON + ["-Dbc.cam=140,65.9,60,0,18", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=pig,cow,sheep,chicken,baby:pig", "-Dbc.summonDist=4.6", "-Dbc.summonDy=-1.3", "-Dbc.still=1", "-Dbc.walkphase=0.9,1.0"] + PLAIN + ["-Dbc.shot=100"], True),
     "mobs317-monsters": (COMMON + ["-Dbc.cam=140,66.4,60,0,14", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=zombie,skeleton,creeper,spider", "-Dbc.summonDist=4.8", "-Dbc.summonDy=-1.3", "-Dbc.still=1"] + PLAIN + ["-Dbc.shot=100"], True),
