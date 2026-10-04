@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-03 (Update 3.12)._
+_Last updated: 2026-10-04 (Update 3.13)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
@@ -35,6 +35,22 @@ _Last updated: 2026-10-03 (Update 3.12)._
 | 11 | Make LODs resemble what is in the chunk when something is broken or built | **done in 3.11**: `LodMap` summaries of changed chunks (saved in `lod.dat`, old saves scanned in the background), tiles rebuilt and swapped without a gap |
 | 12 | Fix LODs popping up in fully rendered chunks when trees burn | **done in 3.11**: `Chunk.everMeshed` (a chunk stays covered while a section is re-meshed), tiles that may reach the real chunks are always split to 32 |
 
+## Third to-do list (the owner's "To do.txt" of 2026-10-03 22:17 UTC, commit 13db49b)
+
+| # | Item | State |
+|---|---|---|
+| 1 | Massive world gen overhaul | **done in 3.13**: `TerraGen` (28 biomes from five climate fields, oceans, rivers, ravines, caves, mountains with a snow line, 17 kinds of plants and trees, biome tints, structures on top), `Biomes`, `TerraTrees`, 70 new blocks (`Blocks313`, `TexArt313`) |
+| 2 | Massive structure overhaul | open (planned for 3.14: biome villages, temples, igloos, shipwrecks, ocean ruins, ruined portals, better mineshafts) |
+| 3 | Massive models overhaul | open |
+| 4 | Massive texture overhaul | open (the textures of the new blocks are done: `TexArt313`) |
+| 5 | Massive animation overhaul | open |
+| 6 | Massive graphics overhaul | open |
+| 7 | New title screen (spinning background) | **done in 3.13**: `Panorama` (a camera turning over real terrain in a throw-away world), `Logo`, `Screens.title` |
+| 8 | Multiple world gen settings | **done in 3.13**: `WorldSettings` (Default / Large Biomes / Amplified / Superflat with 4 presets / Classic, structures on / off, bonus chest; saved in `level.properties`), `Screens.newWorld` with a map preview (`WorldPreview`) |
+| 9 | Make the inventory more understandable | **done in 3.13**: `Creative` (tabs, search), `Menu` tooltips (durability, damage, armour, food, fuel, smelts into), number keys, Q |
+| 10 | Clean up the Settings screen | **done in 3.13**: `Screens.options` with four tabs (Video / Graphics / Gameplay / Controls) and a help line (`Ui.hint`); the keys cannot be changed yet |
+| 11 | Add the missing features of the last update | open (coloured beds, banners, brewing, enchanting + XP, redstone, End cities with shulkers and elytra, endermites) |
+
 ## What it is
 
 Blockcraft is an original Minecraft-Java-1.12-style block sandbox for Windows ("an original clone": no Mojang code or
@@ -42,7 +58,21 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.12 - "the Nether, the End, villages, a world of colour"
+## Current state: Update 3.13 - "a new world, new menus, a new inventory"
+
+- **World generator** (`TerraGen`, `Biomes`, `TerraTrees`, `FlatGen`, `WorldSettings`, `Dim.makeGen(dim, seed, settings)`): the type is chosen on the Create New World screen and stored in `level.properties`
+  (`gentype`, `structures`, `bonus`, `flat`); a world without `gentype` is CLASSIC (`Gen`, unchanged - the strict `Equivalence` test still compares it block by block). `TerraGen.sample` computes one `Cl` per column
+  (continentalness, erosion, peaks, temperature, humidity -> height, biome, river factor); `generate` builds stone, the surface (`surface()` rules per biome), water, ice, caves (`Gen.carve`), ravines, ores, then
+  `decorate` (grass, ferns, flowers, mushrooms, cacti, snow layers, lily pads), `treesFor` (`TerraTrees`: plants are drawn into a buffer round their root and clipped to the chunk, so trees that cross a chunk
+  border come out the same in both chunks), `Structs.apply` (villages, dungeons, mineshafts) and `Stronghold.apply` when the world has structures. `findSpawn` rings out to 4000 blocks; `Game.findStand` looks through
+  snow and plants for the ground. `Bonus` puts the bonus chest next to the first step.
+- **Menus** (`Ui`, `Screens`, `Panorama`, `Logo`, `WorldPreview`, `Creative`, `Menu`): immediate-mode widgets drawn through `Gui` only (so `GuiRaster` can draw every screen without OpenGL), help line, tabs, scrolling
+  lists, world thumbnails drawn from the generator, a live panorama. Layout of every screen is tested at seven window sizes (`TestsUi`).
+- **Tests**: `Tests313` (terrain: determinism, valid ids, `column()` agrees with the real ground, no air pockets under the sea, 28 biomes and a believable land share for six seeds, spawn on land for 25 seeds x 4 types,
+  Superflat / Large / Amplified, saved settings, every block has a picture, structures only when asked; a soak test that walks a player through 16 biomes day and night; the bonus chest; the stand position), `TestsUi`, `TestsInv`.
+  Dev tools in `test/bc/`: `VoxView` (software ray caster: `bc.VoxView out.png seed type x y z yaw pitch [dist] [w] [h] [fov]`), `MapDump`, `AtlasSheet`, `GuiRaster`, `UiShots`, `PanoView`.
+
+## Update 3.12 (still in the game) - "the Nether, the End, villages, a world of colour"
 
 - **Foundation**: block ids are 12 bits (`Chunk.blocks` is a `short[]`; ids 0..255 and 1024..4095 are blocks, 256..1023 items, new items from 352), chunk files keep the old byte array and add the high
   nibbles behind the `BCX1` magic only when a chunk holds a new block (old worlds load unchanged), the atlas is 32 x 32 tiles (`TexArt312`, `Color312` tiles from 400).

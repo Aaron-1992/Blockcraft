@@ -29,6 +29,7 @@ TIMES = []
 # Seed 12345: spawn is around x=133,z=71; there is a flat grass strip (surface y=66) around x=138..150, z=73..76.
 COMMON = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=32"]
 CAM = "-Dbc.cam=133,92,71,45,22"
+TERRA = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=64", "-Dbc.time=6000", "-Dbc.weather=calm"]
 WXC = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=3", "-Dbc.lod=48"]
 PLAIN = ["-Dbc.shaders=false"]
 
@@ -459,6 +460,15 @@ SCENES = {
     "meteors":        (COMMON + ["-Dbc.cam=143.5,70,62,0,-22", "-Dbc.time=18000", "-Dbc.disaster=meteor:30,80,70;meteor:-36,95,64;meteor:5,110,76", "-Dbc.dfreeze=34", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=170"], True),
     "meteor-crater":  (COMMON + ["-Dbc.cam=143.5,92,68,0,52", "-Dbc.time=18000", "-Dbc.disaster=meteor:0,30,30", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=230"], True),
     "options310":     (["-Dbc.auto=1", "-Dbc.title=OPTIONS"], True),
+    # ---- Update 3.13: the new terrain (seed 12345, world type 1 = Default; the cameras were placed with test/bc/VoxView, which draws the same columns)
+    "terra-badlands":    (TERRA + ["-Dbc.cam=704.5,90,149.5,150,14"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-mount":       (TERRA + ["-Dbc.cam=392.5,150,-303.5,200,8"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-snowtaiga":   (TERRA + ["-Dbc.cam=-291.5,96,273.5,90,14"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-mushroom":    (TERRA + ["-Dbc.cam=633.5,92,633.5,300,14"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-savanna":     (TERRA + ["-Dbc.cam=351.5,92,-25.5,0,14"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-jungle":      (TERRA + ["-Dbc.cam=24.5,118,-59.5,270,16"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-darkforest":  (TERRA + ["-Dbc.cam=190.5,96,-25.5,90,16"] + PLAIN + ["-Dbc.shot=260"], True),
+    "terra-swamp":       (TERRA + ["-Dbc.cam=75.5,84,-490.5,90,14"] + PLAIN + ["-Dbc.shot=260"], True),
     # ---- Update 3.13: the new menus. The title turns over a real landscape (bc.pano=on: the panorama is off in the other scenes), the options have tabs,
     # the create-world screen shows a map of the world, the pause menu lies over the game.
     "title313":       (["-Dbc.auto=1", "-Dbc.pano=on", "-Dbc.rd=6", "-Dbc.lod=96", "-Dbc.title=TITLE"], True),

@@ -269,6 +269,21 @@ so old lines still load).
   `bc.adv=screen|toast` (`bc.advdone`, `bc.advtab`), `bc.parrot=land|shoulder`. All scenes are in `tools/shots.py`; yaw 0 looks towards +z, -90 east, 180 -z, a positive pitch looks down.
 * Tests: `Tests312` (foundation, nether, netherMobs, fortress, stronghold, end, villages, colors, parrots, advancements, pearls, netherRules).
 
+## Update 3.13 notes (terrain, menus, inventory)
+
+- **Generators**: `Dim.makeGen(dim, seed, WorldSettings)` returns `Gen` (CLASSIC; the Nether / End ignore the settings), `FlatGen` or `TerraGen`. `World.settings` is final and is read from
+  `level.properties` by `Game.load`; a world without `gentype` is CLASSIC, so saved terrain never changes under a player. Biome ids 0..6 keep the meaning they had in 3.5 (`Biomes`), 7..27 are new, and everything
+  that only knows the old ids (LOD colours, weather, parrots) goes through `Biomes`.
+- **`TerraGen`**: `sample(x, z, Cl)` is the single source of truth for height + biome (`column()` and `generate()` both use it, a test keeps them consistent); a chunk is built from an 18 x 18 grid of samples
+  (the border is needed for slopes). Everything random inside a chunk is seeded from the seed and the chunk, so generation is order independent. Add a biome: a constant in `Biomes` (+ `NAME`, tint, LOD colour,
+  `WorldPreview.COL`), a case in `TerraGen.pick`, `surface`, `treePlan`, and a row in the soak test's list.
+- **Menus**: a screen is a method in `Screens` that lays widgets out with `Ui` (`button`, `toggle`, `slider`, tabs, text fields, lists) in GUI units; `Ui.hint` carries the help text of the widget under the mouse.
+  Never call OpenGL from a screen - `GuiRaster` replaces `Gui` in tests and in `UiShots`. New screens belong in `TestsUi.SCENES` (they are then checked at seven sizes).
+- **Panorama** (`Panorama`): a second `World` with a fixed seed (6120) is installed as `g.world` while a menu is open; `Game.quitToTitle` brings it back, a real world replaces it. The place is searched by
+  looking at the generator's columns and scoring relief, water, trees and variety.
+- **Bonus chest**: `Game.bonusPending` is set for a new world with the switch on; the first frame after the spawn is known calls `Bonus.place`.
+- **Testing the terrain without a screen**: `bc.VoxView` draws the real generator's columns with a software ray caster (works for every type), `bc.MapDump` writes a biome map.
+
 ## Conventions / gotchas
 
 * Blocks are 12 bits per cell since 3.12 (`short[]`; IDs 0..255 and 1024..4095, see the 3.12 notes) and there is **no metadata**: rotated/staged

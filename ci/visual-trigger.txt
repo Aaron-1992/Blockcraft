@@ -1,2 +1,2 @@
-inv313-creative,inv313-search,inv313-tip,inv313-furnace,inv313-craft
+terra-badlands,terra-mount,terra-snowtaiga,terra-mushroom,terra-savanna,terra-jungle,terra-darkforest,terra-swamp
 jar=build

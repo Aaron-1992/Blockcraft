@@ -455,7 +455,9 @@ public final class TerraGen extends Gen {
                snowline = Math.min(snowline, 128.0);
             }
 
-            if (slope >= 4) {
+            // bare rock on the steep faces; above the snow line only the really steep ones and, in patches, the steep ones (not a speckle of stone in the snow)
+            boolean above = h >= snowline || b == Biomes.FROZEN_PEAKS;
+            if (above ? (slope >= 6 || slope >= 4 && n2 > 0.15) : slope >= 4) {
                rule[0] = Blocks.STONE;
                rule[1] = Blocks.STONE;
                rule[2] = 3;
@@ -1087,9 +1089,11 @@ public final class TerraGen extends Gen {
    // ------------------------------------------------------------------------------------------------ the world's spawn
    @Override
    public int[] findSpawn() {
-      for (int ring = 0; ring < 900; ring += 8) {
-         for (int k = 0; k < (ring == 0 ? 1 : 16); k++) {
-            double a = k * Math.PI * 2.0 / 16.0;
+      // rings round the middle, 8 blocks apart; Large Biomes can have a sea that wide, so in 1 of 20 worlds the search goes on (to 4000 blocks)
+      for (int ring = 0; ring < 4000; ring += ring < 900 ? 8 : 16) {
+         int n = ring == 0 ? 1 : (ring < 900 ? 16 : 48);
+         for (int k = 0; k < n; k++) {
+            double a = k * Math.PI * 2.0 / n;
             int x = (int)(Math.cos(a) * ring);
             int z = (int)(Math.sin(a) * ring);
             Gen.Col c = this.column(x, z);
@@ -1099,6 +1103,6 @@ public final class TerraGen extends Gen {
          }
       }
 
-      return new int[]{0, 90, 0};
+      return new int[]{0, Math.max(65, this.column(0, 0).h) + 1, 0};
    }
 }

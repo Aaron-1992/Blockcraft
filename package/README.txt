@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.12)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.13)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,34 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.13  (a new world, new menus, a new inventory)
+  * A NEW WORLD GENERATOR. Five climate maps (warmth, wetness, how far inland, how rugged, how weird) decide among 28 BIOMES: plains, meadows, forests (oak, birch, dark oak with giant mushrooms, flower forests),
+    taigas (spruce, snowy, giant two-by-two spruces on podzol), swamps (lily pads, vines, dark water), savannas (acacia), jungles (giant trees, vines, bushes), deserts, BADLANDS (bands of red, orange and yellow
+    terracotta on red sand), snowy plains, ICE SPIKES, frozen peaks, mountains, MUSHROOM FIELDS (giant mushrooms, mycelium), beaches (sand, snow, stone shores), oceans (cold, warm, frozen, DEEP with a sea floor of
+    gravel and clay) and RIVERS that cut through the land. Mountains are real mountains with snow on the top, the land has hills and valleys, caves open to the surface, and CANYONS (ravines) cut down
+    to the lava. The tint of the grass, the leaves and the water follows the biome, rain falls only where it rains (deserts and badlands are dry, snow falls in the cold), and the distant terrain (LOD) shows it all.
+  * WORLD TYPES (choose them when you create a world): DEFAULT (the new terrain), LARGE BIOMES (the same, four times as big), AMPLIFIED (towering mountains, deep valleys), SUPERFLAT (four presets: grassland,
+    desert, snow, sandstone) and CLASSIC (the terrain of Update 3.5 - 3.12). Every world you made before 3.13 stays CLASSIC, so nothing you built moves. The type is saved with the world.
+  * 70 NEW BLOCKS the new world needs: granite, diorite, andesite (also craftable), red sand and red sandstone, podzol, mycelium, coarse dirt, ice and packed ice, a thin cover of snow, planks of every wood, logs and
+    leaves of jungle, acacia and dark oak, ferns, dead bushes, ten more flowers, brown and red mushrooms, tall grass, large ferns, sunflowers, lilacs, rose bushes and peonies (two blocks high), lily pads (they float on
+    water), vines (they cling to walls and trees; shears) and the blocks of the giant mushrooms. Every recipe takes every kind of planks; a log gives the planks of its own wood.
+  * THE TITLE SCREEN has a live background: a camera turns slowly over a landscape (a real piece of the world generator, always the same place), the logo, a splash text, Singleplayer, Options, Quit.
+  * SINGLEPLAYER lists your worlds as in Minecraft: a little map of each world's spawn, the name, the mode, the world type, the seed and how long ago you played. CREATE NEW WORLD has the name, the seed
+    (empty = random), the game mode, the world type with a one-line description, the superflat preset, a switch for STRUCTURES (villages, strongholds, dungeons, mineshafts) and one for a BONUS CHEST (a chest
+    next to your first steps with an axe, a pickaxe, wood, bread, apples and torches), and a MAP PREVIEW of the terrain the seed makes (it follows the type: try a few seeds before you start).
+  * OPTIONS are sorted into four tabs - VIDEO (render distance, FOV, distant terrain, brightness, GUI scale, VSync, fullscreen), GRAPHICS (shaders, smooth lighting, clouds, leaves, weather), GAMEPLAY (mouse
+    sensitivity, invert mouse, view bobbing, disasters) and CONTROLS (the keys, for reading) - each with a line of help for the button you point at. The pause menu shows the world and its mode, and the loading screen
+    shows what it is doing.
+  * THE CREATIVE INVENTORY has TABS with pictures (Building Blocks, Colors, Nature, Decoration and Utility, Tools and Combat, Food and Farming, Materials) and a SEARCH tab (type, it filters as you type); new blocks
+    land in the right tab by themselves. TOOLTIPS tell more: the name, durability, attack damage, armour points, food value, fuel time and what an item smelts into. Number keys put a picked item in the hotbar; Q drops.
+    The menus are laid out for every window size (they were checked at seven sizes) and the GUI scale never goes above what fits.
+  * Spawn: the first step in a snowy or grassy place no longer puts you ten blocks away from the spawn point (snow and tall grass were taken for a wall); in a world with Large Biomes the search for dry land goes on
+    for up to 4000 blocks (it used to give up after 900 and drop you into the sea).
+  * Honest notes. 1,240,000+ checks run without a screen (the terrain of every type for many seeds, that every column of the distant terrain is solid ground, that you always spawn on land, every menu at seven window sizes,
+    the inventory, the bonus chest), and pictures of the terrain and every new menu were looked at in a software renderer. NOTHING has been played on a real graphics card or by a person: how the new terrain feels,
+    whether the panorama is smooth, how fast big oceans and jungles draw - all of that is a first guess. The keys cannot be changed yet. Still no sound. Villages stand in plains, deserts, savannas and taigas but still
+    look the same everywhere - that, temples, shipwrecks and more are the next update.
 
 WHAT'S NEW IN UPDATE 3.12  (the Nether, the End, villages, a world of colour)
   * THE NETHER. Build a frame of obsidian (at least 4 wide and 5 high, up to 23 x 23, the four corners may be left out) and light it from the

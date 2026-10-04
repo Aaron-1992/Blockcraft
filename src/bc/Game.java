@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.12";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.13";
    /** "3.8": the version without the words, for the title screen and the F3 screen. */
    public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
    public Options opt;
@@ -104,6 +104,8 @@ public final class Game {
    String seedField = "";
    int newMode = 1;
    boolean needSpawn;
+   /** Update 3.13: the new world was made with "Bonus Chest": the chest is put next to the player once the spawn is known. */
+   boolean bonusPending;
    // ---- Update 3.12: dimensions ----
    /** The world's folder: the Overworld's chunks live in it, the Nether's in DIM-1 and the End's in DIM1. */
    File rootDir;
@@ -1025,6 +1027,7 @@ public final class Game {
       }
 
       this.worldSettings = ws;
+      this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD;
       this.world = new World(var6, Dim.dir(var8, startDim), startDim, ws);
       this.world.game = this;
       this.rend.setLod(this.world);
@@ -1392,6 +1395,11 @@ public final class Game {
                            if (Blocks.solid[var9] && !Blocks.isLeaves(var9) && !Blocks.isAnyLog(var9) && var9 != 28) {
                               return new double[]{var6 + 0.5, var8 + 1, var7 + 0.5};
                            }
+
+                           if (!Blocks.isFluid(var9) && Blocks.coll[var9] == null && !Blocks.isLeaves(var9)) {
+                              continue; // Update 3.13: grass, flowers, ferns and a cover of snow do not stop you: look for the ground below them
+                           }
+
                            break;
                         }
                      }
@@ -2438,6 +2446,10 @@ public final class Game {
                      this.spawnXZ = new int[]{(int)Math.floor(var21[0]), (int)Math.floor(var21[2])};
                      this.player.setPos(var21[0], var21[1], var21[2]);
                      this.needSpawn = false;
+                     if (this.bonusPending) {
+                        this.bonusPending = false;
+                        Bonus.place(this.world, (int)Math.floor(var21[0]), (int)Math.floor(var21[1]), (int)Math.floor(var21[2]), this.world.seed);
+                     }
                   }
                }
 
