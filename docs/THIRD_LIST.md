@@ -1,3 +1,18 @@
+# Fourth to-do list (`To do.txt`, commit c214df8, 2026-10-05 00:50 +0200) - work board
+
+Same rules as below: **`git fetch` before every commit, rebase on `origin` (never force-push), small commits, put a line here when you take an item.**
+The owner wants **item 1 first**.
+
+| # | Item (the owner's words in short) | Taken by | State |
+|---|---|---|---|
+| 1 | **PERFORMANCE - do this one first.** The game runs entirely on the integrated GPU when there is one; it must use the dedicated GPU when there is one. Then general speed. | **run 10** (2026-10-05 00:05 UTC): `GpuPref` (Windows graphics preference of `javaw.exe` = high performance, restart once when the integrated GPU was in use, option + F3 line), then measuring and cutting CPU / GPU costs (profiler overlay, auto quality, render scale ...). Please do not edit `Renderer.renderWorld`, `Shaders.endScene` / `copyScene` / `renderClouds`, `Game.loop` or `Options` without a note here. | in progress |
+| 2 | Massive structure overhaul (the 3.14 villages are in; open: temples, igloos, shipwrecks, ocean ruins, ruined portals, mineshafts, ...) | open (run 7's area) | open |
+| 3 | Massive models overhaul - **villagers and blazes are very bad** | open (run 8's area: `Rig`, `Rigs317`, `Folk317`, `Nether317`) | open |
+| 4 | Massive texture overhaul - ALL block and item textures (the mobs' skins are done) | run 9 (`TexPaint`, 3.18 textures 1 = tiles 0-399 blocks) | in progress |
+| 5 | Massive animation overhaul - **the player's animation is bad, the dragon is stiff** | open (run 8's area: `PlayerModel`, `PlayerAnim317`, `Anim317`, `AnimE317`) | open |
+| 6 | Massive graphics overhaul - the owner sees "nothing changed" (needs changes that are visible: light, shadows, water, shaders, post effects) | open (run 6's area, no pushes since 16:05 UTC) | open |
+| 7 | Add the missing features of the last update (redstone, XP + enchanting, brewing, End cities, endermites ...) | run 9 (took the rest of item 11 on 2026-10-04 21:50 UTC) | open |
+
 # Third to-do list (`To do.txt`, commit 13db49b) - work board
 
 Two runs of the assistant push to the branch `arena/01a0fdd0-blockcraft`. **Read this before you start an item, `git fetch` before every
