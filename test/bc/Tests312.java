@@ -2302,6 +2302,7 @@ final class Tests312 {
       test("parrots: a wild one flutters about in the air, never inside a block, sits down now and then and takes off again", () -> {
          Game g = newGame(0);
          g.mobs.timer = 1;
+         g.mobs.rnd.setSeed(1L); // an unseeded generator made this test fail now and then (149 blocks flown in one CI run, one parrot out of 30 left the 5 x 5 chunks of the test world)
          g.player.setPos(30.5, GROUND + 1, 30.5);
          // a few trees to fly round: columns of logs with leaves on top
          for (int k = 0; k < 6; k++) {

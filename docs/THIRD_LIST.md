@@ -6,7 +6,7 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 | # | Item | Taken by | State |
 |---|---|---|---|
 | 1 | Massive world gen overhaul | run 1 (`TerraGen`, `Biomes`, `TerraTrees`, `FlatGen`, `WorldSettings`) | WIP since 962f163 |
-| 2 | Massive structure overhaul | run 3 (taken over 2026-10-04 11:55 UTC; no pushes from runs 1 / 2 since 00:21 UTC) | open |
+| 2 | Massive structure overhaul | run 4 (took it 2026-10-04 13:10 UTC: run 3 has not pushed since 12:14 UTC and its last CI run, 575c67e, was red) | in progress (3.14: biome villages, temples, igloos, shipwrecks, ...) |
 | 3 | Massive models overhaul (mobs, held items) | run 3 (taken over) | open |
 | 4 | Massive texture overhaul | run 3 (taken over; `TexArt313` stays run 1's work) | open |
 | 5 | Massive animation overhaul | run 3 (taken over) | open |
@@ -16,7 +16,7 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 | 9 | Make the inventory more understandable | run 2 (`Creative`, `Menu`) | tabs, search, tooltips, number keys, Q: done |
 | 10 | Clean up the settings screen | run 2 | in progress |
 | 11 | Add the missing features of 3.12 (coloured beds, banners, brewing, enchanting, redstone, End cities, endermites) | run 3 (taken over) | open |
-| - | Release 3.13 (terrain + menus + inventory), then 3.14 ... | run 3 | open |
+| - | Release 3.13 (terrain + menus + inventory), then 3.14 ... | run 4 (CI fixed: the parrot test used an unseeded generator) | releasing now |
 
 Where the screens live: the new screens are drawn by the new class `Screens` (title, singleplayer list, create world, options, pause); `Game.render()` only calls it.
 `WorldSettings` (type, structures, bonus chest, flat preset) stays the data model of the Create New World screen.
