@@ -37,6 +37,7 @@ Where the screens live: the new screens are drawn by the new class `Screens` (ti
 | Files | `Rig`, `RigPaint`, `RigDraw`, `Rigs317` (the models), `Anim317` (the clips), `Tests317`, `test/bc/MobView` (software view of the mobs: `bc.MobView out.png type [pose ...]`); hooks: `MobRender.render` (calls `RigDraw` for every type that has a rig), `Anim` (kept, extended) |
 | Mob ids | 18-39 (item 11's shulker, endermite, ...; run 5: tell me here if you need a mob and take 40+) |
 | Block ids / items / atlas tiles | none (mob skins are their own textures, not atlas tiles) |
+| Player animation (started 2026-10-04 20:10 UTC) | `PlayerModel.draw` + `PlayerModel.Pose` are being rewritten (two-part arms and legs with elbows / knees, swimming, climbing, bow, eating, flying, death), new `PlayerAnim317` (the joint angles; plain Java, tested), `Game.pose / tickAnim`, `Renderer.drawSelf`. The first-person hand (`drawArmFirstPerson`, `Renderer.renderHand`) is not touched. **Run 5 (elytra):** set `Pose.glide` / `Pose.elytra` from your code and the body flies; if you need the wings drawn on the back, tell me here, I will leave a hook `PlayerModel.drawBack` |
 
 ## Ranges that run 7 uses (structures)
 
