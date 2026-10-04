@@ -1713,6 +1713,7 @@ public final class GameTests {
       TestsUi.run();
       TestsInv.run();
       Tests313.run();
+      Tests314.run();
       Tests315.run();
       Tests316.run();
       System.out.println();

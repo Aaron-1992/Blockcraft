@@ -34,7 +34,7 @@ public final class VoxView {
       long k = (long)cx << 32 ^ cz & 0xFFFFFFFFL;
       Chunk c = this.chunks.get(k);
       if (c == null) {
-         c = this.gen.generate(cx, cz);
+         c = this.gen == null ? new Chunk(cx, cz) : this.gen.generate(cx, cz); // (no generator: the chunks were put into the map by the caller, the rest is air)
          this.chunks.put(k, c);
       }
 
@@ -96,6 +96,14 @@ public final class VoxView {
          cy = y + 1.0 - cy;
       }
 
+      long t0 = System.nanoTime();
+      BufferedImage img = render(v, cx, cy, cz, yaw, pitch, dist, w, h, fov);
+      ImageIO.write(img, "png", new File(a[0]));
+      System.out.printf("%dx%d in %d ms, %d chunks%n", w, h, (System.nanoTime() - t0) / 1000000, v.chunks.size());
+   }
+
+   /** Draws what is seen from (cx, cy, cz) looking along yaw / pitch (radians) with the field of view fov. */
+   static BufferedImage render(VoxView v, double cx, double cy, double cz, double yaw, double pitch, int dist, int w, int h, double fov) {
       BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
       double fwdX = -Math.sin(yaw) * Math.cos(pitch);
       double fwdY = -Math.sin(pitch);
@@ -107,7 +115,6 @@ public final class VoxView {
       double upZ = -Math.cos(yaw) * Math.sin(pitch);
       double tanH = Math.tan(fov / 2.0);
       double aspect = (double)w / h;
-      long t0 = System.nanoTime();
       for (int py = 0; py < h; py++) {
          for (int px = 0; px < w; px++) {
             double sx = ((px + 0.5) / w * 2.0 - 1.0) * tanH * aspect;
@@ -120,8 +127,7 @@ public final class VoxView {
          }
       }
 
-      ImageIO.write(img, "png", new File(a[0]));
-      System.out.printf("%dx%d in %d ms, %d chunks%n", w, h, (System.nanoTime() - t0) / 1000000, v.chunks.size());
+      return img;
    }
 
    int sky(double dy) {

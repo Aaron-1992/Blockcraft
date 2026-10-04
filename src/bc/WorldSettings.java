@@ -28,10 +28,16 @@ public final class WorldSettings {
    public boolean structures = true;
    public boolean bonusChest = false;
    public int flat = 0;
+   /**
+    * Update 3.14: 1 = the villages and structures of 3.13 (worlds made before 3.14 keep them: what is built must not move), 2 = the new ones (streets,
+    * buildings in the style of the biome, temples, igloos, ships ...). A world without the key in level.properties has 1; new worlds get 2.
+    */
+   public int structVer = 2;
 
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
       s.type = CLASSIC;
+      s.structVer = 1;
       return s;
    }
 
@@ -41,6 +47,7 @@ public final class WorldSettings {
       s.structures = this.structures;
       s.bonusChest = this.bonusChest;
       s.flat = this.flat;
+      s.structVer = this.structVer;
       return s;
    }
 
@@ -58,6 +65,7 @@ public final class WorldSettings {
       p.setProperty("structures", Boolean.toString(this.structures));
       p.setProperty("bonus", Boolean.toString(this.bonusChest));
       p.setProperty("flat", Integer.toString(this.flat));
+      p.setProperty("structver", Integer.toString(this.structVer));
    }
 
    public static WorldSettings load(Properties p) {
@@ -71,6 +79,13 @@ public final class WorldSettings {
          s.flat = Math.max(0, Math.min(FLAT_PRESETS - 1, Integer.parseInt(p.getProperty("flat", "0").trim())));
       } catch (NumberFormatException e) {
          return classic();
+      }
+
+      s.structVer = 1;
+      try {
+         s.structVer = Math.max(1, Math.min(2, Integer.parseInt(p.getProperty("structver", "1").trim())));
+      } catch (NumberFormatException e) {
+         s.structVer = 1;
       }
 
       s.structures = Boolean.parseBoolean(p.getProperty("structures", "true"));

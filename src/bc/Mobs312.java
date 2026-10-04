@@ -244,7 +244,8 @@ final class Mobs312 {
             }
 
             long key = (long)(rx + dx) << 32 ^ (rz + dz) & 4294967295L;
-            if (w.populated.contains(key) || Math.hypot(p.x - v.cx, p.z - v.cz) > 70.0 || !w.isLoaded(v.cx, v.cz)) {
+            boolean near = v.style >= 0 ? p.x >= v.minX - 50 && p.x <= v.maxX + 50 && p.z >= v.minZ - 50 && p.z <= v.maxZ + 50 : Math.hypot(p.x - v.cx, p.z - v.cz) <= 70.0;
+            if (w.populated.contains(key) || !near || !w.isLoaded(v.cx, v.cz)) {
                continue;
             }
 
@@ -255,18 +256,30 @@ final class Mobs312 {
                }
             }
 
-            int n = Math.max(2, Math.min(6, houses / 2 + 1));
+            int n = Math.max(2, Math.min(v.style >= 0 ? 9 : 6, houses / 2 + 1));
             int placed = 0;
             for (int tries = 0; tries < 60 && placed < n + (houses >= 5 ? 1 : 0); tries++) {
-               double a = ms.rnd.nextDouble() * Math.PI * 2.0;
-               double d = 3.0 + ms.rnd.nextDouble() * 16.0;
-               int x = v.cx + (int)Math.round(Math.cos(a) * d);
-               int z = v.cz + (int)Math.round(Math.sin(a) * d);
+               int x;
+               int z;
+               int baseY = v.cy;
+               if (v.style >= 0 && !v.spawn.isEmpty()) {
+                  // Update 3.14: the villagers start at the doors and in the streets of the village, not in a ring round the well
+                  int[] sp = v.spawn.get(ms.rnd.nextInt(v.spawn.size()));
+                  x = sp[0];
+                  z = sp[1];
+                  baseY = sp[2];
+               } else {
+                  double a = ms.rnd.nextDouble() * Math.PI * 2.0;
+                  double d = 3.0 + ms.rnd.nextDouble() * 16.0;
+                  x = v.cx + (int)Math.round(Math.cos(a) * d);
+                  z = v.cz + (int)Math.round(Math.sin(a) * d);
+               }
+
                if (!w.isLoaded(x, z)) {
                   continue;
                }
 
-               for (int y = v.cy + 6; y > v.cy - 6; y--) {
+               for (int y = baseY + 6; y > baseY - 6; y--) {
                   int below = w.getBlock(x, y - 1, z);
                   if (Blocks.solid[below] && !Blocks.isFluid(below) && !Blocks.isLeaves(below) && free(w, x, y, z) && free(w, x, y + 1, z)) {
                      boolean golem = placed == n;
@@ -276,8 +289,8 @@ final class Mobs312 {
                         m.color = jobs[ms.rnd.nextInt(jobs.length)];
                      }
 
-                     m.hx = v.cx;
-                     m.hz = v.cz;
+                     m.hx = v.style >= 0 ? x + 0.5 : v.cx;
+                     m.hz = v.style >= 0 ? z + 0.5 : v.cz;
                      m.hy = 1.0;
                      placed++;
                      break;

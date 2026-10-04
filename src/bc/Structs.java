@@ -79,6 +79,10 @@ public final class Structs {
    }
 
    Structs.Village planVillage(int var1, int var2) {
+      if (Gen.extras && this.gen.settings.structVer >= 2 && this.gen.settings.terra()) {
+         return Village314.plan(this, var1, var2); // Update 3.14: streets, plots, buildings from templates, a palette per biome
+      }
+
       Structs.Village var3 = new Structs.Village();
       Random var4 = new Random(this.seed * 6364136223846793005L + var1 * 1442695040888963407L + var2 * 987654321L + 12345L);
       if (var4.nextFloat() > 0.7F) {
@@ -395,7 +399,9 @@ public final class Structs {
       for (int var7 = var3; var7 <= var4; var7++) {
          for (int var8 = var5; var8 <= var6; var8++) {
             Structs.Village var9 = this.village(var7, var8);
-            if (var9.valid && overlaps(var1, var9.minX - 1, var9.minZ - 1, var9.maxX + 1, var9.maxZ + 1)) {
+            if (var9.valid && var9.style >= 0 && overlaps(var1, var9.minX - 1, var9.minZ - 1, var9.maxX + 1, var9.maxZ + 1)) {
+               Village314.apply(this, var1, var9);
+            } else if (var9.valid && overlaps(var1, var9.minX - 1, var9.minZ - 1, var9.maxX + 1, var9.maxZ + 1)) {
                for (Structs.Path var11 : var9.paths) {
                   if (overlaps(var1, var11.x0, var11.z0, var11.x1, var11.z1)) {
                      this.drawPath(var1, var11, var9);
@@ -1128,6 +1134,11 @@ public final class Structs {
       ArrayList<Structs.Path> paths = new ArrayList();
       /** Update 3.12: lamp posts {x, z} beside the paths. */
       ArrayList<int[]> lamps = new ArrayList();
+      /** Update 3.14: the village of the new generator (-1: one of the old kind): its palette ({@link Style}), the buildings, streets and the places where villagers start {x, z, y}. */
+      int style = -1;
+      ArrayList<Village314.Placed> placed = new ArrayList();
+      ArrayList<Village314.Street> streets = new ArrayList();
+      ArrayList<int[]> spawn = new ArrayList();
       int minX;
       int minZ;
       int maxX;

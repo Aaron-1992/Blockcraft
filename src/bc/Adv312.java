@@ -296,7 +296,7 @@ final class Adv312 {
             for (int dx = -1; dx <= 1; dx++) {
                for (int dz = -1; dz <= 1; dz++) {
                   Structs.Village v = w.gen.structs.village(rx + dx, rz + dz);
-                  if (v != null && v.valid && Math.hypot(p.x - v.cx, p.z - v.cz) < 44.0) {
+                  if (v != null && v.valid && (Math.hypot(p.x - v.cx, p.z - v.cz) < 44.0 || v.style >= 0 && p.x >= v.minX - 6 && p.x <= v.maxX + 6 && p.z >= v.minZ - 6 && p.z <= v.maxZ + 6)) {
                      this.award(g, "adventure/village");
                   }
                }
