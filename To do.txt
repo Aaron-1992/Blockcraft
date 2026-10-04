@@ -1,21 +1,13 @@
-Massive world gen overhaul
+DO THIS ONE FIRST --> Performance optimisation (one Thing that has to be changed is that it entirely runs on the igpu if one is present should use gpu if one is there)
 
 Massive structure overhaul
 
-Massive Models overhaul 
+Massive Models overhaul (villagers and blazes to be exact very bad)
 
-Massive Texture overhaul
+Massive Texture overhaul (ALL textures but not the already redone models but blocks and items 100 %
 
-Massive Animation overhaul
+Massive Animation overhaul (Player animations are still ass and Dragon is Pretty stiff)
 
-Massive graphics overhaul
-
-New title screen (Maybe like in minecraft with the Spinning backround?)
-
-Multiple world gen Settings
-
-Make inventory more understandable
-
-Clean up Settings screen
+Massive graphics overhaul (Nothing changed)
 
 and add missing Features from last update
