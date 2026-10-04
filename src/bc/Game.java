@@ -2956,6 +2956,10 @@ public final class Game {
 
    boolean useBlock() {
       int var1 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+      if (Shapes.use(this, this.target.x, this.target.y, this.target.z, var1)) {
+         return true;
+      }
+
       if (Blocks.isDoor(var1)) {
          this.toggleDoor(this.target.x, this.target.y, this.target.z);
          return true;
@@ -3934,6 +3938,10 @@ public final class Game {
 
       if (var1 != null && var1.id == 289) {
          return this.placeBed(var1);
+      }
+
+      if (var1 != null && Blocks.isBlockId(var1.id) && Shapes.placesSpecially(var1.id)) {
+         return Shapes.place(this, var1);
       }
 
       if (var1 != null && var1.id == Items.CAKE) {

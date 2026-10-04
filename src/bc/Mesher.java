@@ -161,6 +161,9 @@ public final class Mesher {
                         break;
                      case 9:
                         vine(var4, var1, var29, var26, var28, var30);
+                        break;
+                     case Shapes.K_SHAPE:
+                        Shapes.mesh(var4, var29, var26, var28, var30);
                   }
                }
             }
@@ -766,9 +769,9 @@ public final class Mesher {
       }
    }
 
-   static boolean fenceLink(Mesher.Scratch var0, int var1, int var2, int var3) {
+   static boolean fenceLink(Mesher.Scratch var0, int var1, int var2, int var3, int dir) {
       int var4 = var0.B[ci(var1, var2, var3)] & 0xFFFF;
-      return Blocks.isFence(var4) || Blocks.opaque[var4];
+      return Blocks.isFence(var4) || Blocks.opaque[var4] || Shapes.fenceLinks(var4, dir);
    }
 
    static void fence(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
@@ -777,10 +780,10 @@ public final class Mesher {
       int var7 = var3 + 1;
       int var8 = var4 + 1;
       boolean[] var9 = new boolean[]{
-         fenceLink(var0, var6, var7, var8 - 1),
-         fenceLink(var0, var6, var7, var8 + 1),
-         fenceLink(var0, var6 + 1, var7, var8),
-         fenceLink(var0, var6 - 1, var7, var8)
+         fenceLink(var0, var6, var7, var8 - 1, 0),
+         fenceLink(var0, var6, var7, var8 + 1, 1),
+         fenceLink(var0, var6 + 1, var7, var8, 2),
+         fenceLink(var0, var6 - 1, var7, var8, 3)
       };
       double[][] var10 = new double[][]{
          {0.4375, 0.0, 0.0, 0.5625, 0.0, 0.375},

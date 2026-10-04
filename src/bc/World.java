@@ -780,6 +780,7 @@ public final class World {
             } else if (var8 == 7
                || var8 == 8
                || Blocks313.needsUpdate(var8)
+               || Shapes.handlesUpdate(var8)
                || Color312.isPowder(var8)
                || Blocks.kind[var8] == 1
                || Blocks.isLadder(var8)
@@ -1048,6 +1049,11 @@ public final class World {
 
    private void blockUpdate(int var1, int var2, int var3) {
       int var4 = this.getBlock(var1, var2, var3);
+      if (Shapes.handlesUpdate(var4)) {
+         Shapes.update(this, var1, var2, var3, var4);
+         return;
+      }
+
       if (Blocks313.isDouble(var4)) {
          // Update 3.13: tall plants are two blocks: the upper half needs the lower one, the lower one needs ground and the upper half
          if (Blocks313.isDoubleUpper(var4)) {
@@ -1668,7 +1674,9 @@ public final class World {
       for (int var33 = 0; var33 < 128; var33++) {
          int var34 = this.getBlock(var15, var16, var17);
          if (Blocks.targetable(var34) || this.rayFluids && Blocks.isFluid(var34)) {
-            World.Hit var35 = rayBox(var1, var3, var5, var7, var9, var11, var15, var16, var17, this.selectionBox(var34));
+            World.Hit var35 = Shapes.isDyn(var34)
+               ? this.rayShape(var1, var3, var5, var7, var9, var11, var15, var16, var17, var34)
+               : rayBox(var1, var3, var5, var7, var9, var11, var15, var16, var17, this.selectionBox(var34));
             if (var35 != null && var35.t <= var13) {
                return var35;
             }
@@ -1692,6 +1700,19 @@ public final class World {
       }
 
       return null;
+   }
+
+   /** Update 3.15: a ray against a block made of several boxes (panes, walls: they depend on what stands next to them); the nearest box wins. */
+   private World.Hit rayShape(double ox, double oy, double oz, double dx, double dy, double dz, int x, int y, int z, int id) {
+      World.Hit best = null;
+      for (double[] box : Shapes.selectionBoxes(this, x, y, z, id)) {
+         World.Hit h = rayBox(ox, oy, oz, dx, dy, dz, x, y, z, box);
+         if (h != null && (best == null || h.t < best.t)) {
+            best = h;
+         }
+      }
+
+      return best;
    }
 
    static World.Hit rayBox(double var0, double var2, double var4, double var6, double var8, double var10, int var12, int var13, int var14, double[] var15) {

@@ -1713,6 +1713,7 @@ public final class GameTests {
       TestsUi.run();
       TestsInv.run();
       Tests313.run();
+      Tests315.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

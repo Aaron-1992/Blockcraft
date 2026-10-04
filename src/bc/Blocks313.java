@@ -96,7 +96,7 @@ final class Blocks313 {
 
    /** Items that are drawn as a flat picture (not as a little block) in the hotbar and in the hand. */
    static boolean flatItem(int id) {
-      return id == LILY_PAD || isVine(id) || id == SNOW_LAYER && false;
+      return id == LILY_PAD || isVine(id) || id == SNOW_LAYER && false || Shapes.flatItem(id);
    }
 
    private static void box(int id, double x0, double y0, double z0, double x1, double y1, double z1) {

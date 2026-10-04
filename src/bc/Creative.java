@@ -69,6 +69,14 @@ final class Creative {
          return 6;
       }
 
+      if (n.endsWith(" carpet")) {
+         return 7;
+      }
+
+      if (n.endsWith("stained glass pane")) {
+         return 8;
+      }
+
       return -1;
    }
 

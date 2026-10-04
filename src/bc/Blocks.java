@@ -399,7 +399,7 @@ public final class Blocks {
 
    /** Fences link to each other (the oak fence and the nether brick fence do too). */
    public static boolean isFence(int var0) {
-      return var0 == FENCE || var0 == NETHER_BRICK_FENCE;
+      return var0 == FENCE || var0 == NETHER_BRICK_FENCE || Shapes.isWoodFence(var0);
    }
 
    public static boolean isEndFrame(int var0) {
@@ -497,6 +497,7 @@ public final class Blocks {
 
       Blocks312.addToCreative(var1);
       Blocks313.addToCreative(var1);
+      Shapes.addToCreative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -981,5 +982,6 @@ public final class Blocks {
       // ---- Update 3.12: everything new lives in Blocks312 (ids from EXT0 up) ----
       Blocks312.register();
       Blocks313.register();
+      Shapes.register();
    }
 }

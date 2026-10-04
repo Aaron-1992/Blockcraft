@@ -157,10 +157,11 @@ final class TestsInv {
       Menu m = new Menu(g, Menu.CREATIVE, null);
       eq(0, m.tab, "opens on the first tab");
       check(Arrays.equals(Creative.tab(0), m.palette), "... showing its items");
-      eq(1, m.pages(), "forty blocks fit one page");
+      eq(Math.max(1, (Creative.tab(0).length + 44) / 45), m.pages(), "a page holds 45 blocks (the first tab has " + Creative.tab(0).length + ")");
       m.setTab(Creative.COLORS);
       eq(Creative.COLORS, g.creativeTab, "the tab is remembered");
-      eq(3, m.pages(), "112 colour blocks need three pages");
+      check(Creative.tab(Creative.COLORS).length > 90, "the colour tab has more than two pages of blocks");
+      eq((Creative.tab(Creative.COLORS).length + 44) / 45, m.pages(), "the colour blocks need as many pages as they fill (" + Creative.tab(Creative.COLORS).length + ")");
       m.page = 2;
       m.setTab(Creative.NATURE);
       eq(0, m.page, "a new tab starts on its first page");

@@ -113,6 +113,11 @@ public final class Recipes {
          return colored;
       }
 
+      Stack wooden = Shapes.special(grid, gw, gh); // Update 3.15: fences, gates and trapdoors of the wood the planks are
+      if (wooden != null) {
+         return wooden;
+      }
+
       int w = maxX - minX + 1;
       int h = maxY - minY + 1;
 
@@ -290,6 +295,7 @@ public final class Recipes {
 
       // ---- Update 3.12 ----
       Items312.recipes();
+      Shapes.recipes();
    }
 
    static final class Recipe {

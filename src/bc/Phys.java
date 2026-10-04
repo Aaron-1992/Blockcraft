@@ -17,7 +17,7 @@ public final class Phys {
       double var19 = var1[5] + Math.max(var6, 0.0);
       int var21 = (int)Math.floor(var9);
       int var22 = (int)Math.floor(var11);
-      int var23 = (int)Math.floor(var13);
+      int var23 = (int)Math.floor(var13) - 1; // Update 3.15: one cell lower, a fence, wall or gate is 1.5 high and reaches into the cell above its own
       int var24 = (int)Math.floor(var15);
       int var25 = (int)Math.floor(var17);
       int var26 = (int)Math.floor(var19);
@@ -30,7 +30,7 @@ public final class Phys {
                int var32 = var0.getBlock(var31, var29, var30);
                double[] var33 = Blocks.coll[var32];
                if (var33 != null && var32 != 0) {
-                  double[][] var34 = Blocks.collMulti[var32];
+                  double[][] var34 = Shapes.isDyn(var32) ? Shapes.collisionBoxes(var0, var31, var29, var30, var32) : Blocks.collMulti[var32];
 
                   for (int var35 = 0; var35 < (var34 == null ? 1 : var34.length); var35++) {
                      if (var34 != null) {
@@ -108,7 +108,7 @@ public final class Phys {
    public static boolean collides(World var0, double[] var1) {
       int var2 = (int)Math.floor(var1[0]);
       int var3 = (int)Math.floor(var1[3]);
-      int var4 = (int)Math.floor(var1[1]);
+      int var4 = (int)Math.floor(var1[1]) - 1;
       int var5 = (int)Math.floor(var1[4]);
       int var6 = (int)Math.floor(var1[2]);
       int var7 = (int)Math.floor(var1[5]);
@@ -119,7 +119,7 @@ public final class Phys {
                int var11 = var0.getBlock(var10, var8, var9);
                double[] var12 = Blocks.coll[var11];
                if (var12 != null && var11 != 0) {
-                  double[][] var13 = Blocks.collMulti[var11];
+                  double[][] var13 = Shapes.isDyn(var11) ? Shapes.collisionBoxes(var0, var10, var8, var9, var11) : Blocks.collMulti[var11];
 
                   for (int var14 = 0; var14 < (var13 == null ? 1 : var13.length); var14++) {
                      if (var13 != null) {

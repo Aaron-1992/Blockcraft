@@ -630,6 +630,8 @@ public class Gui {
    public static double[][] iconBoxes(int var0) {
       if (!Blocks.isBlockId(var0)) {
          return null;
+      } else if (Shapes.iconBoxes(var0) != null) {
+         return Shapes.iconBoxes(var0);
       } else if (Blocks.isStair(var0)) {
          return new double[][]{{0.0, 0.0, 0.0, 1.0, 0.5, 1.0}, {0.0, 0.5, 0.0, 1.0, 1.0, 0.5}};
       } else if (Blocks.isSlab(var0)) {
