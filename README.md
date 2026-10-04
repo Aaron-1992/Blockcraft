@@ -1,9 +1,9 @@
 # Blockcraft
 
-An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.12**
-("the Nether, the End, villages, a world of colour": nether portals, nether fortresses and their mobs, strongholds, the End with the
-Ender Dragon, ender pearls, bigger villages with trading villagers and iron golems, 15 dyes, concrete, terracotta, stained glass,
-advancements, parrots).
+An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL). Current version: **Update 3.17**
+("new villages, new block shapes, beds and banners in 16 colours, a new sky, mobs with jointed bodies"; before it 3.13 brought a new
+world generator with 28 biomes, a new title screen, world types, a new inventory and options screens, and 3.12 the Nether, the End,
+villages with trading villagers, 15 dyes, advancements and parrots).
 Earlier updates added hands, water, distant terrain and animation (3.11), natural disasters and falling trees (3.10), skins and fire
 like Minecraft's (3.9), weather (3.8), kitchen & fire (3.7) and farming (3.6) - see `package/README.txt`.
 
@@ -38,6 +38,6 @@ See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) (build, tests, layout, how to a
 
 ```
 python3 tools/build.py --patch     # build the game and the small update pack  (finds/downloads a compiler by itself)
-python3 tools/runtests.py          # headless tests: ~880,000 game-logic checks + "unchanged vs 3.5" fingerprints
+python3 tools/runtests.py          # headless tests: ~1,600,000 game-logic checks + "unchanged vs 3.5" fingerprints
 python3 tools/make_release.py      # assemble the release files (full zip + patch + notes) into build/release/
 ```

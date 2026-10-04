@@ -26,7 +26,7 @@ python3 tools/build.py --patch     # + releases/Blockcraft-UPDATE<ver>-patch.zip
 python3 tools/build.py --full      # + releases/Blockcraft-1.12-UPDATE<ver>-windows.zip (~55 MB, with JRE)
 ```
 
-* The version comes from `Game.TITLE_STR` ("... Update 3.12"). Bump it, update `package/README.txt`, build.
+* The version comes from `Game.TITLE_STR` ("... Update 3.17"). Bump it, update `package/README.txt`, build.
 * No JDK needed: `tools/bootstrap.py` fetches a Java runtime (PyPI `jdk4py`) and the Eclipse compiler ECJ (npm
   `@vscjava/java-language-server`) and compiles against the *Windows JRE's own class library*, so you cannot
   accidentally use an API newer than Java 21. If `javac` (JDK 21+) is on PATH it is used instead.
@@ -283,6 +283,24 @@ so old lines still load).
   looking at the generator's columns and scoring relief, water, trees and variety.
 - **Bonus chest**: `Game.bonusPending` is set for a new world with the switch on; the first frame after the spawn is known calls `Bonus.place`.
 - **Testing the terrain without a screen**: `bc.VoxView` draws the real generator's columns with a software ray caster (works for every type), `bc.MapDump` writes a biome map.
+
+## Update 3.14 - 3.17 notes (structures, shapes, sky, mobs)
+
+* **Templates** (`Tpl`): one character per cell (the legend is in the class comment); a template looks north at the street, the door is in the row z = 1, `Tpl.paste` turns it by quarter turns and clips it to a chunk. `Style` maps the
+  generic characters (wall, planks, roof stairs, path ...) to blocks for a village style and a variant 0..3. `Buildings314` builds the templates with `Tpl.B` (`box`, `walls`, `gableX` ...); look at one with
+  `bc.StructView out.png name style variant turns yaw pitch distance`, a whole village with `bc.VillageView out.png seed type index yaw pitch distance`. New villages only exist when `WorldSettings.structVer >= 2` and the type is
+  not CLASSIC (`Structs.apply`); the old generator is untouched, so old worlds keep their villages.
+* **Shapes** (`Shapes`, ids 1500-1735): a block with `Blocks.kind == K_SHAPE` is meshed and collided by `Shapes` from the blocks around it (panes, bars, walls, fences: nothing is stored in the world); gates and trapdoors keep
+  their state in the id (`GATE0 + kind * 8 + open * 4 + facing`, `TRAP0 + kind * 16 + top * 8 + open * 4 + facing`). Beds and banners (`Decor315`) are boxes tinted with the colour of the wool (`Shapes.tint`), the colour and the
+  facing are in the id too. `bc.MeshView out.png scene` draws the real chunk meshes without a GPU (`Scenes315` has galleries); Visual scenes `shapes315` and `decor315` do the same in the real game.
+* **Sky** (`Sky`, `Fx316`): `Sky.base` / `Sky.color` are pure functions, so `SkyView` can draw them; the fog colour of the terrain and the LOD is `Sky.color` of the direction of the fragment (`ShaderSrc.WORLD_FS`, `LOD_FS`, `COMP_FS`
+  changed on purpose: they are in `equivalence-allowed.txt`). Particles are `Game.Particle` with fade, shrink and glow; `Fx316` adds the ambient ones with a ceiling on the count.
+* **Rigs** (`Rig`, `Rigs317` ...): bones with a pivot in absolute rest coordinates, cuboids with their own net in the skin (`ts` texels per model unit), a `Shader` that paints every texel knowing its position on the body; clips in
+  `Anim317` (+ `AnimM / AnimF / AnimE / AnimW`) write into `Pose`. `RigDraw` turns every bone into display lists and sets the colour per bone (brightness, hurt flash, dye, glow); the skins are painted on a background thread
+  (`RigDraw.warm`) and uploaded on first use. Add a mob: a `Rig` builder in one of the `*317` classes, a case in `Rigs317.build`, clips (or reuse a family), a row in `Tests317`. `bc.MobView out.png type [pose ...]` draws it.
+  Hooks for pictures: `bc.still=1` (mobs stand still), `bc.mobpose=target=1,attack=6,cd=20`.
+* **Ranges** (see `docs/THIRD_LIST.md`): block ids 1500-1899 Shapes, 1900-2199 reserved for redstone, 2200-2463 beds / banners, 2500-2599 reserved for brewing / enchanting, 3000-3499 structures; items 400-999; tiles 600-999;
+  mob ids 18-39 are free for the rigs.
 
 ## Conventions / gotchas
 

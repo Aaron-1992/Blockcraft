@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.13)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.17)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,32 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.17  (new villages, new block shapes, beds and banners in 16 colours, a new sky, mobs with jointed bodies)
+  * NEW VILLAGES (worlds you create with any world type except CLASSIC - older worlds keep their villages, so nothing you built moves). A village is planned on a grid of streets now: a main street with
+    side streets laid over the ground wherever it goes, a well in the square and, on both sides of the streets with their fronts to the road, more than a dozen kinds of buildings - huts, cottages in three sizes (with flat roofs
+    in the desert), a library, a smithy, a butcher's, a long house, a barn, farms with crops, a market stall, an animal pen, a watchtower, a church, a shed and a garden - on a foundation, with timber
+    frames, windows, doors, beds, tables, furnaces and chests inside, lamp posts along the streets. The wood and the stone follow the biome: oak and cobblestone in the plains, sandstone in the desert, acacia in the savanna,
+    spruce in the taiga, spruce with snow on the roofs in the cold. No two houses of a village look alike (every building has variants of its roof and its colours), and a village is a function of the seed, so a chunk
+    you walk into can always be drawn again.
+  * NEW BLOCK SHAPES like Minecraft 1.12's: GLASS PANES (clear and in the 16 colours: 6 glass make 16 panes) and IRON BARS (6 iron ingots make 16) that grow arms towards their neighbours, WALLS (cobblestone, mossy cobblestone,
+    stone brick, brick, sandstone, red sandstone, nether brick; 6 blocks make 6 walls) that join their neighbours, the FENCES of every wood (not only oak), FENCE GATES and TRAPDOORS of every wood and an IRON TRAPDOOR
+    (no redstone yet: the iron one cannot be opened), and CARPETS in 16 colours (2 wool make 3). Gates and trapdoors open with a right click; trapdoors can sit in the top half of a block; the wooden ones are fuel in a furnace.
+  * BEDS IN 16 COLOURS: three wool of one colour over three planks make a bed of that colour - a wooden frame, a blanket in the colour and a pillow at the head (the old red beds in your worlds are the red ones).
+    BANNERS in 16 colours: six wool of one colour over a stick; they stand on the ground or hang on a wall (patterns are not in yet).
+  * A NEW SKY. The colours of the sky are worked out from the height of the sun and the direction you look in: a deep blue zenith, a pale horizon, an orange belt on the sun's side and a pink arch with the blue shadow of the earth on the
+    other side at dusk and dawn, and a glow round the sun that the fog of the terrain and of the distant terrain wears as well, so the far hills melt into the sky without a seam. At night 1,800 stars of different brightness and colour
+    twinkle with a band of the Milky Way and the MOON goes through its eight PHASES and lights the sky a little. Under water the picture turns blue and murky.
+  * THINGS THAT MAKE A PLACE FEEL ALIVE: leaves that come off the trees and drift down (in the colour of the biome), fireflies over the grass on warm nights, embers rising from the lava of the Nether, flame and smoke on torches,
+    dust under a sprinting player on dirt, sand, gravel and snow, a splash when you jump into water and bubbles when you are under it. They fade and shrink (and some glow) instead of just disappearing.
+  * MOBS WITH JOINTED BODIES. Every one of the 18 mobs has a new skeleton of bones (legs and arms with elbows and knees, necks, jaws, ears, tails, wings, tentacles) and a new skin with twice the old resolution, painted by
+    the program so that patterns run on over the edges of the boxes: the patches of the cow, the wool of the sheep, the vines of the iron golem, the robes and hats of the villagers (farmer's straw hat,
+    librarian's glasses, the priest's purple cap, the blacksmith's apron and the butcher's), the glowing eyes of the enderman and the blaze, the ghast that opens its face to shoot, the dragon with its jointed wings. They are animated by
+    clips: walking with real steps (the legs bend), breathing and blinking when they stand, grazing, the attack of a zombie, a golem or a ghast, the way a hit throws them back and the way they fall over when they die.
+  * Honest notes. 1,600,000+ checks run without a screen (every building template, that every village is a function of its seed, the shape and collision of every new block, every colour of bed and banner, the colours of the sky, every clip
+    of every mob for finite, smooth numbers), and pictures of all of it were looked at in a software renderer and in the real Blockcraft.exe on a Windows test machine. NOTHING has been played on a real graphics card or by a
+    person: how the villages feel to walk through, whether the stars twinkle nicely at your frame rate, how many mobs with jointed bodies your computer draws at once - all a first guess. Still no sound. Not yet: redstone, brewing,
+    enchanting, banner patterns, temples, igloos and shipwrecks, a new player body with elbows and knees, new textures for the old blocks.
 
 WHAT'S NEW IN UPDATE 3.13  (a new world, new menus, a new inventory)
   * A NEW WORLD GENERATOR. Five climate maps (warmth, wetness, how far inland, how rugged, how weird) decide among 28 BIOMES: plains, meadows, forests (oak, birch, dark oak with giant mushrooms, flower forests),

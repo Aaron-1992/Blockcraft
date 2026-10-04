@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-04 (Update 3.13)._
+_Last updated: 2026-10-04 (Update 3.17)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
@@ -40,16 +40,16 @@ _Last updated: 2026-10-04 (Update 3.13)._
 | # | Item | State |
 |---|---|---|
 | 1 | Massive world gen overhaul | **done in 3.13**: `TerraGen` (28 biomes from five climate fields, oceans, rivers, ravines, caves, mountains with a snow line, 17 kinds of plants and trees, biome tints, structures on top), `Biomes`, `TerraTrees`, 70 new blocks (`Blocks313`, `TexArt313`) |
-| 2 | Massive structure overhaul | open (planned for 3.14: biome villages, temples, igloos, shipwrecks, ocean ruins, ruined portals, better mineshafts) |
-| 3 | Massive models overhaul | open |
+| 2 | Massive structure overhaul | **partly done in 3.14**: templates, biome styles, new villages with streets (`Tpl`, `Style`, `Buildings314`, `Village314`); open: temples, igloos, shipwrecks, ocean ruins, ruined portals, better mineshafts |
+| 3 | Massive models overhaul | **mostly done in 3.15 / 3.17**: block shapes (panes, bars, walls, gates, trapdoors, carpets, beds, banners: `Shapes`, `Decor315`) and jointed models and skins for all 18 mobs (`Rig`, `Rigs317` ...); open: the player's body, held items, chests / furnaces as models |
 | 4 | Massive texture overhaul | open (the textures of the new blocks are done: `TexArt313`) |
-| 5 | Massive animation overhaul | open |
-| 6 | Massive graphics overhaul | open |
+| 5 | Massive animation overhaul | **partly done in 3.17**: clips for all 18 mobs (`Anim317`); open: the player (swimming, climbing, bow ...), moving blocks (doors, chest lids) |
+| 6 | Massive graphics overhaul | **partly done in 3.16**: the sky, the fog's glow, the underwater picture, living particles; open: shader work (ambient occlusion, post effects) |
 | 7 | New title screen (spinning background) | **done in 3.13**: `Panorama` (a camera turning over real terrain in a throw-away world), `Logo`, `Screens.title` |
 | 8 | Multiple world gen settings | **done in 3.13**: `WorldSettings` (Default / Large Biomes / Amplified / Superflat with 4 presets / Classic, structures on / off, bonus chest; saved in `level.properties`), `Screens.newWorld` with a map preview (`WorldPreview`) |
 | 9 | Make the inventory more understandable | **done in 3.13**: `Creative` (tabs, search), `Menu` tooltips (durability, damage, armour, food, fuel, smelts into), number keys, Q |
 | 10 | Clean up the Settings screen | **done in 3.13**: `Screens.options` with four tabs (Video / Graphics / Gameplay / Controls) and a help line (`Ui.hint`); the keys cannot be changed yet |
-| 11 | Add the missing features of the last update | open (coloured beds, banners, brewing, enchanting + XP, redstone, End cities with shulkers and elytra, endermites) |
+| 11 | Add the missing features of the last update | **partly done in 3.15** (coloured beds, banners, panes / bars / walls / gates / trapdoors / carpets); open: redstone, XP + enchanting, brewing, End cities with shulkers and elytra, endermites |
 
 ## What it is
 
@@ -58,7 +58,26 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.13 - "a new world, new menus, a new inventory"
+## Current state: Update 3.17 - "new villages, new block shapes, coloured beds and banners, a new sky, jointed mobs"
+
+Four milestones that were pushed by four runs of the assistant (3.14 - 3.17) and released together (the work board is [`THIRD_LIST.md`](THIRD_LIST.md)).
+
+- **3.14 structures 1** (`Tpl`, `Style`, `Buildings314`, `Village314`; `Structs.apply` chooses it when `WorldSettings.structVer >= 2` and the world type is not CLASSIC): a building is a text-art template (a box of cells, one character per cell,
+  a palette per village style: oak, sandstone, acacia, spruce, snowy spruce) that is turned a quarter at a time and pasted into the chunks it touches. A village is the plan of a 320 x 320 region (a function of the seed):
+  streets laid on the ground, a well, buildings on both sides turned to the street, farms at the street ends, lamp posts, a watchtower now and then; every building has four variants. `StructView` and `VillageView` (software
+  rasteriser `MeshView`) draw one building / one village without a GPU. `Tests314`.
+- **3.15 shapes, beds, banners** (`Shapes` ids 1500-1735, `Decor315` beds 2200-2327 and banners 2330-2463): panes, iron bars, walls (arms worked out from the neighbours when the chunk is meshed and when something collides with them),
+  fences / gates / trapdoors of every wood, carpets; beds in 16 colours (3 wool over 3 planks; the old red bed ids 133-140 are colour 14) and banners (6 wool and a stick), tinted boxes and local texture mapping in `Shapes`. `MeshView`,
+  `Scenes315`, `IconSheet`, `Tests315`.
+- **3.16 graphics 1** (`Sky`, `Fx316`, `Game.Particle`): the sky is a pure function of the sun's height and the view direction (`SkyView` draws it without a GPU), the fog of the terrain and the LOD has the glow of the sun, 1,800 stars,
+  eight moon phases, the underwater picture; living particles (leaves, fireflies, embers, torch flames, dust, splashes, bubbles). `Tests316`.
+- **3.17 mobs** (`Rig`, `RigDraw`, `RigPaint`, `Rigs317`, `Monsters317`, `Nether317`, `End317`, `Folk317`, `Anim317` + `AnimM / AnimF / AnimE / AnimW317`, `Pose`): a mob is a skeleton of bones with cuboids, a skin (2 texels per model unit) painted by a
+  shader that knows where on the body each texel is, and clips that write bone offsets / rotations / scales into a `Pose`; `MobRender.render` calls `RigDraw` for every type that has a rig (`-Dbc.classicmobs=true` brings back the box
+  models of `MobRender`). Everything but the OpenGL upload is plain Java, so `Tests317` checks every clip for finite, bounded, loop-closing numbers and `MobView` draws any mob in any pose. Hooks: `bc.still`, `bc.mobpose`.
+- Under the hood: tests grew to ~1,630,000 checks; new software viewers (`MeshView`, `StructView`, `VillageView`, `SkyView`, `MobView`, `PanoView`, `GuiRaster`, `UiShots`, `VoxView`) make every one of these features reviewable without a graphics card.
+- Not done yet from the third list: the texture overhaul, the shaders of the graphics overhaul, temples / igloos / shipwrecks / ruins, the player's jointed body, moving blocks (doors, chests), redstone, XP, enchanting, brewing, the End's outer islands and cities.
+
+## Update 3.13 (still in the game) - "a new world, new menus, a new inventory"
 
 - **World generator** (`TerraGen`, `Biomes`, `TerraTrees`, `FlatGen`, `WorldSettings`, `Dim.makeGen(dim, seed, settings)`): the type is chosen on the Create New World screen and stored in `level.properties`
   (`gentype`, `structures`, `bonus`, `flat`); a world without `gentype` is CLASSIC (`Gen`, unchanged - the strict `Equivalence` test still compares it block by block). `TerraGen.sample` computes one `Cl` per column
