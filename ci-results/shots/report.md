@@ -1,17 +1,23 @@
-# Visual run 2026-10-04 00:21:51 UTC
+# Visual run 2026-10-04 12:23:59 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| inv313-creative | new | n/a |
-| inv313-search | new | n/a |
-| inv313-tip | new | n/a |
-| inv313-furnace | new | n/a |
-| inv313-craft | new | n/a |
+| terra-badlands | new | n/a |
+| terra-mount | new | n/a |
+| terra-snowtaiga | new | n/a |
+| terra-mushroom | new | n/a |
+| terra-savanna | new | n/a |
+| terra-jungle | new | n/a |
+| terra-darkforest | new | n/a |
+| terra-swamp | new | n/a |
 
 ## timings
 
-- inv313-creative/new: exit 0 in 21s
-- inv313-search/new: exit 0 in 17s
-- inv313-tip/new: exit 0 in 17s
-- inv313-furnace/new: exit 0 in 17s
-- inv313-craft/new: exit 0 in 17s
+- terra-badlands/new: exit 0 in 54s
+- terra-mount/new: exit 0 in 53s
+- terra-snowtaiga/new: exit 0 in 67s
+- terra-mushroom/new: exit 0 in 35s
+- terra-savanna/new: exit 0 in 50s
+- terra-jungle/new: exit 0 in 67s
+- terra-darkforest/new: exit 0 in 75s
+- terra-swamp/new: exit 0 in 58s
