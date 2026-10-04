@@ -87,6 +87,8 @@ public final class Shaders {
    public float sunY;
    public float sunZ;
    public float sunUp;
+   /** Update 3.16: 0..1, how far under water the camera is (the picture wobbles and has light patterns on it); the game eases it in and out. */
+   public float underwater;
    static final String DEPTH_VS = String.join(
       "\n",
       new CharSequence[]{
@@ -588,6 +590,7 @@ public final class Shaders {
       float var24 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
       this.sunUp = var24;
       this.u1f(prog, "sunUp", var24);
+      this.u1f(prog, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
       this.u1f(prog, "dayF", var14);
       this.u1f(prog, "isTrans", var8 ? 1.0F : 0.0F);
       GL20.glUniform3f(this.loc(prog, "skyTop"), var12[0], var12[1], var12[2]);
@@ -625,6 +628,7 @@ public final class Shaders {
       GL20.glUniform3f(this.loc(this.pEntity, "sunDir"), this.sunX, this.sunY, this.sunZ);
       float up = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
       this.u1f(this.pEntity, "sunUp", up);
+      this.u1f(this.pEntity, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
       this.u1f(this.pEntity, "shadowOn", shadowOn ? 1.0F : 0.0F);
       GL20.glUniform4fv(this.loc(this.pEntity, "dynL[0]"), this.dynL);
       GL20.glUniform4fv(this.loc(this.pEntity, "dynC[0]"), this.dynC);
@@ -794,6 +798,8 @@ public final class Shaders {
          this.u1i(this.pComp, "scene", 0);
          this.u1i(this.pComp, "bloom", 1);
          this.u1f(this.pComp, "strength", var3);
+         this.u1f(this.pComp, "uw", this.underwater);
+         this.u1f(this.pComp, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
          this.u1i(this.pComp, "rays", 2);
          this.u1f(this.pComp, "rayAmt", this.rayAmt);
          GL20.glUniform2f(this.loc(this.pComp, "sunUv"), this.sunU, this.sunV);
@@ -848,6 +854,7 @@ public final class Shaders {
          GL20.glUniform3f(this.loc(this.pLod, "sunDir"), this.sunX, this.sunY, this.sunZ);
          float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
          this.u1f(this.pLod, "sunUp", var14);
+         this.u1f(this.pLod, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
          this.u1f(this.pLod, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
          GL20.glUniform3f(this.loc(this.pLod, "skyTop"), var11[0], var11[1], var11[2]);
          GL20.glUniform3f(this.loc(this.pLod, "skyHor"), var12[0], var12[1], var12[2]);

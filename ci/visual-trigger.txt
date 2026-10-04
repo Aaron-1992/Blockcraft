@@ -1,2 +1,2 @@
-terra-badlands,terra-mount,terra-snowtaiga,terra-mushroom,terra-savanna,terra-jungle,terra-darkforest,terra-swamp
+sky-sunrise-sh,sky-sunset-sh,sky-sunset-plain,sky-dusk-anti-sh,sky-noon-sh,sky-moon-sh,sky-stars-plain,fx-leaves,fx-embers,fx-torches,fx-bubbles,fx-underwater-sh
 jar=build

@@ -55,6 +55,7 @@ public final class Renderer {
    float lastGamma = -1.0F;
    float lastAmbient = -1.0F;
    final float[] stars = new float[2100];
+   final float[] skyTmp = new float[8];
    public int visibleSections;
    public int drawCalls;
    static final int STRIDE = 44;
@@ -336,25 +337,16 @@ public final class Renderer {
 
       float var4 = (float)(var1 % 24000L) + var3;
       this.sunAngle = (float)((Math.PI * 2) * (var4 - 6000.0F) / 24000.0);
-      float var5 = (float)Math.cos(this.sunAngle);
-      this.daylight = clamp01(0.5F + var5 * 1.3F);
+      // Update 3.16: the colours of a clear sky come from Sky.base (the same numbers as before by day and by night, a longer and softer dusk)
+      Sky.base(this.sunAngle, this.skyTmp);
+      this.daylight = this.skyTmp[6];
       this.skyLightFactor = 0.2F + 0.8F * this.daylight;
-      float var6 = this.daylight;
-      this.topR = lerp(0.01F, 0.4F, var6);
-      this.topG = lerp(0.015F, 0.6F, var6);
-      this.topB = lerp(0.04F, 0.98F, var6);
-      this.fogR = lerp(0.02F, 0.76F, var6);
-      this.fogG = lerp(0.025F, 0.85F, var6);
-      this.fogB = lerp(0.05F, 1.0F, var6);
-      float var7 = Math.max(0.0F, 1.0F - Math.abs(var5) / 0.2F);
-      if (var7 > 0.0F) {
-         this.fogR = lerp(this.fogR, 1.0F, var7 * 0.55F);
-         this.fogG = lerp(this.fogG, 0.52F, var7 * 0.55F);
-         this.fogB = lerp(this.fogB, 0.3F, var7 * 0.55F);
-         this.topR = lerp(this.topR, 0.45F, var7 * 0.12F);
-         this.topG = lerp(this.topG, 0.35F, var7 * 0.12F);
-         this.topB = lerp(this.topB, 0.55F, var7 * 0.12F);
-      }
+      this.topR = this.skyTmp[0];
+      this.topG = this.skyTmp[1];
+      this.topB = this.skyTmp[2];
+      this.fogR = this.skyTmp[3];
+      this.fogG = this.skyTmp[4];
+      this.fogB = this.skyTmp[5];
 
       // Update 3.8 - weather: overcast skies are grey and dark, storms darker still, lightning lights everything up
       this.wfx.updateLocal(var3);
@@ -1115,6 +1107,12 @@ public final class Renderer {
    }
 
    void drawSky(float var1, float var2, float var3) {
+      if (this.g.world != null) {
+         // Update 3.16: the sky has its own class (Sky): the dusk, the moon's phases, the stars, the glow round the sun
+         Sky.draw(this, var1, var2, var3, this.g.world.dayTime, System.nanoTime() / 1.0E9 % 100000.0);
+         return;
+      }
+
       GL11.glDisable(2929);
       GL11.glDisable(3553);
       GL11.glDisable(3008);
@@ -1826,30 +1824,62 @@ public final class Renderer {
          double var3 = Math.toRadians(this.g.player.yaw);
          double var5 = -Math.cos(var3);
          double var7 = -Math.sin(var3);
-         GL11.glBegin(7);
+         // Update 3.16: two passes - ordinary particles (they may fade out and shrink), then the glowing ones (flames, embers, fireflies, bubbles), added to the picture
+         GL11.glEnable(3042);
+         for (int pass = 0; pass < 2; pass++) {
+            GL11.glBlendFunc(770, pass == 0 ? 771 : 1);
+            if (pass == 1) {
+               GL11.glDepthMask(false);
+            }
 
-         for (Particle var10 : this.g.particles) {
-            double var11 = var10.x + var10.vx * var1 - this.camX;
-            double var13 = var10.y + var10.vy * var1 - this.camY;
-            double var15 = var10.z + var10.vz * var1 - this.camZ;
-            float var17 = this.brightnessAt(var2, var10.x, var10.y, var10.z) * var10.shade;
-            GL11.glColor3f(var17 * var10.r, var17 * var10.g, var17 * var10.b);
-            float var18 = var10.size;
-            float var19 = var10.u;
-            float var20 = var10.v;
-            float var21 = var10.u + 4.0F / Tex.PX;
-            float var22 = var10.v + 4.0F / Tex.PX;
-            GL11.glTexCoord2f(var19, var22);
-            GL11.glVertex3d(var11 - var5 * var18, var13 - var18, var15 - var7 * var18);
-            GL11.glTexCoord2f(var21, var22);
-            GL11.glVertex3d(var11 + var5 * var18, var13 - var18, var15 + var7 * var18);
-            GL11.glTexCoord2f(var21, var20);
-            GL11.glVertex3d(var11 + var5 * var18, var13 + var18, var15 + var7 * var18);
-            GL11.glTexCoord2f(var19, var20);
-            GL11.glVertex3d(var11 - var5 * var18, var13 + var18, var15 - var7 * var18);
+            GL11.glBegin(7);
+
+            for (Particle var10 : this.g.particles) {
+               if (var10.glow != (pass == 1)) {
+                  continue;
+               }
+
+               double var11 = var10.x + var10.vx * var1 - this.camX;
+               double var13 = var10.y + var10.vy * var1 - this.camY;
+               double var15 = var10.z + var10.vz * var1 - this.camZ;
+               float var17 = var10.glow ? var10.shade : this.brightnessAt(var2, var10.x, var10.y, var10.z) * var10.shade;
+               float left = var10.life0 > 0 ? Math.max(0.0F, Math.min(1.0F, (var10.life - var1) / var10.life0)) : 1.0F;
+               float alpha = var10.alpha;
+               float var18 = var10.size;
+               if ((var10.fade & 1) != 0) {
+                  alpha *= Math.min(1.0F, left * 2.5F) * Math.min(1.0F, (1.0F - left) * 10.0F + 0.15F);
+               }
+
+               if ((var10.fade & 2) != 0) {
+                  var18 *= 0.35F + 0.65F * left;
+               }
+
+               if (var10.twinkle != 0) {
+                  alpha *= 0.55F + 0.45F * (float)Math.sin((var10.life0 - var10.life + var1) * 0.35F + var10.phase);
+               }
+
+               GL11.glColor4f(var17 * var10.r, var17 * var10.g, var17 * var10.b, alpha);
+               float var19 = var10.u;
+               float var20 = var10.v;
+               float var21 = var10.u + 4.0F / Tex.PX;
+               float var22 = var10.v + 4.0F / Tex.PX;
+               GL11.glTexCoord2f(var19, var22);
+               GL11.glVertex3d(var11 - var5 * var18, var13 - var18, var15 - var7 * var18);
+               GL11.glTexCoord2f(var21, var22);
+               GL11.glVertex3d(var11 + var5 * var18, var13 - var18, var15 + var7 * var18);
+               GL11.glTexCoord2f(var21, var20);
+               GL11.glVertex3d(var11 + var5 * var18, var13 + var18, var15 + var7 * var18);
+               GL11.glTexCoord2f(var19, var20);
+               GL11.glVertex3d(var11 - var5 * var18, var13 + var18, var15 - var7 * var18);
+            }
+
+            GL11.glEnd();
+            if (pass == 1) {
+               GL11.glDepthMask(true);
+            }
          }
 
-         GL11.glEnd();
+         GL11.glDisable(3042);
          GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
       }
    }

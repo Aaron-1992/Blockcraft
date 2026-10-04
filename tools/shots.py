@@ -546,6 +546,19 @@ SCENES = {
     "skin-net":       (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skinuser=jeb_"], True),
     "skin-dialog":    (["-Dbc.auto=1", "-Dbc.title=SKINS", "-Dbc.skinbrowse=1"], True),
     "skin-screen-def": (["-Dbc.auto=1", "-Dbc.title=SKINS"], True),
+    # ---- Update 3.16: the sky (the camera floats at y=95 over the strip, yaw -90 looks east where the sun rises, 90 west) and the little effects
+    "sky-sunrise-sh":    (WXC + ["-Dbc.cam=133,95,71,-90,3", "-Dbc.weather=calm", "-Dbc.time=300", "-Dbc.shot=150"], True),
+    "sky-sunset-sh":     (WXC + ["-Dbc.cam=133,95,71,90,3", "-Dbc.weather=calm", "-Dbc.time=11700", "-Dbc.shot=150"], True),
+    "sky-sunset-plain":  (WXC + ["-Dbc.cam=133,95,71,90,3", "-Dbc.weather=calm", "-Dbc.time=11700"] + PLAIN + ["-Dbc.shot=150"], True),
+    "sky-dusk-anti-sh":  (WXC + ["-Dbc.cam=133,95,71,-90,6", "-Dbc.weather=calm", "-Dbc.time=12200", "-Dbc.shot=150"], True),
+    "sky-noon-sh":       (WXC + ["-Dbc.cam=133,95,71,90,-8", "-Dbc.weather=calm", "-Dbc.time=5000", "-Dbc.shot=150"], True),
+    "sky-moon-sh":       (WXC + ["-Dbc.cam=133,95,71,-90,-25", "-Dbc.weather=calm", "-Dbc.time=15200", "-Dbc.shot=150"], True),
+    "sky-stars-plain":   (WXC + ["-Dbc.cam=133,95,71,0,-55", "-Dbc.weather=calm", "-Dbc.time=18500"] + PLAIN + ["-Dbc.shot=150"], True),
+    "fx-leaves":         (TERRA + ["-Dbc.cam=190.5,96,-25.5,90,16"] + PLAIN + ["-Dbc.shot=420"], True),
+    "fx-embers":         (NETHER + ["-Dbc.cam=30,48,-96,-90,4"] + PLAIN + ["-Dbc.shot=260"], True),
+    "fx-torches":        (COMMON + ["-Dbc.cam=145.5,70.0,71.0,0,34", "-Dbc.time=18000"] + PLAIN + [sets(kitchen_blocks() + [(141, 67, 77, 32), (143, 67, 77, 32), (145, 67, 77, 32), (147, 67, 77, 32)]), "-Dbc.fire=off", "-Dbc.shot=200"], True),
+    "fx-underwater-sh":  (COMMON + ["-Dbc.cam=144.5,67.6,74.5,0,-35", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.fill=140,66,70,148,70,78,50", "-Dbc.shot=200"], True),
+    "fx-bubbles":        (COMMON + ["-Dbc.cam=144.5,67.6,74.5,0,-55", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.fill=140,66,70,148,70,78,50"] + PLAIN + ["-Dbc.shot=230"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]

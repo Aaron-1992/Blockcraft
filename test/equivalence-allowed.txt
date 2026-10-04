@@ -30,3 +30,9 @@ mesh terrain
 
 # ---- Update 3.12 (dimensions, villages, 1.12 content): more mobs (the mob tables grew), new blocks / items / recipes (already allowed above) ----
 statics Mobs.
+
+# ---- Update 3.16 (graphics): the fog of the terrain and of the distant terrain has the glow of the sun that the sky has (a longer, orange dusk), the final picture
+# has the underwater effect
+statics ShaderSrc.WORLD_FS
+statics ShaderSrc.LOD_FS
+statics ShaderSrc.COMP_FS

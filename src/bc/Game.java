@@ -2707,11 +2707,21 @@ public final class Game {
 
       while (var13.hasNext()) {
          Game.Particle var8 = (Game.Particle)var13.next();
+         if (var8.life0 == 0) {
+            var8.life0 = var8.life;
+         }
+
          var8.life--;
          if (var8.life <= 0) {
             var13.remove();
          } else {
             var8.vy -= var8.grav;
+            if (var8.sway != 0.0F) {
+               float age = var8.life0 - var8.life;
+               var8.vx += (float)Math.cos(var8.phase + age * 0.22F) * var8.sway;
+               var8.vz += (float)Math.sin(var8.phase * 1.7F + age * 0.17F) * var8.sway;
+            }
+
             float var9 = var8.x + var8.vx;
             float var10 = var8.y + var8.vy;
             float var11 = var8.z + var8.vz;
@@ -2738,6 +2748,7 @@ public final class Game {
          }
       }
 
+      Fx316.tick(this); // Update 3.16: falling leaves, fireflies, embers, torch flames, dust, splashes, bubbles
       if (!var1) {
          this.leftDown = false;
       }
@@ -3192,6 +3203,10 @@ public final class Game {
          p.r = g;
          p.g = g;
          p.b = g;
+         p.fade = 3; // Update 3.16: smoke thins out and shrinks
+         p.alpha = 0.85F;
+         p.sway = 0.0012F;
+         p.phase = this.rnd.nextFloat() * 6.28F;
       } else {
          p.vy = 0.04F + this.rnd.nextFloat() * 0.03F;
          p.size = 0.07F + this.rnd.nextFloat() * 0.05F;
@@ -3199,6 +3214,8 @@ public final class Game {
          p.r = 1.0F;
          p.g = 0.45F + this.rnd.nextFloat() * 0.4F;
          p.b = 0.08F;
+         p.glow = true; // Update 3.16: flames glow (additive) and die down
+         p.fade = 3;
       }
 
       this.particles.add(p);
@@ -4270,6 +4287,12 @@ public final class Game {
          }
 
          if (var3) {
+            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
+            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
+            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
+               this.rend.sh.underwater = uwTarget;
+            }
+
             this.rend.sh.endScene(this.fbW, this.fbH, 0.45F);
          }
       } else {
@@ -5029,6 +5052,20 @@ public final class Game {
       /** downward acceleration per tick (smoke and sparks use a tiny or negative value so they rise) */
       public float grav = 0.04F;
       int life;
+      /** Update 3.16: the life it started with (set by the first tick), for fading and shrinking. */
+      int life0;
+      /** Update 3.16: bit 0: fades out over the last part of its life (and in at the start), bit 1: shrinks. */
+      int fade;
+      /** Update 3.16: drawn additively (light: embers, fireflies, bubbles, flames) and not darkened by the place it is in. */
+      boolean glow;
+      /** Update 3.16: 1 = firefly (counted, so there are never too many). */
+      int kind;
+      /** Update 3.16: pulses (fireflies). */
+      int twinkle;
+      /** Update 3.16: sways from side to side (leaves, embers, bubbles): the strength of the push per tick and where in the sway it starts. */
+      float sway;
+      float phase;
+      float alpha = 1.0F;
    }
 
    enum S {
