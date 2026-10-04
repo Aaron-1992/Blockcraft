@@ -184,6 +184,8 @@ public final class Game {
       "Torches are great!"
    };
    String loadingMsg = "";
+   /** The tab of the creative inventory that was open last (it opens there again). */
+   int creativeTab;
    /** How far the loading screen is (0..1): the chunks around the player, then the meshes. */
    float loadFrac;
    ArrayList<Game.Btn> btns = new ArrayList();
@@ -750,6 +752,15 @@ public final class Game {
             }
 
             if (this.menu != null) {
+               if (this.menu.kind == 4) {
+                  // screenshot hooks of Update 3.13: bc.tab = the creative tab, bc.search = the text typed into the search tab
+                  this.menu.setTab(Integer.getInteger("bc.tab", this.menu.tab));
+                  String typedText = System.getProperty("bc.search", "");
+                  for (int i = 0; i < typedText.length(); i++) {
+                     this.menu.typed(typedText.charAt(i));
+                  }
+               }
+
                this.menu.page = Math.min(this.menu.pages() - 1, Integer.getInteger("bc.page", 0));
             }
          }
@@ -1560,6 +1571,10 @@ public final class Game {
                this.seedField = this.seedField + (char)var1;
             }
          }
+      } else if (this.screen == Game.S.INV && this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
+         if (System.currentTimeMillis() - this.menu.openedAt > 100L) {
+            this.menu.typed((char)var1);
+         }
       } else if (this.screen == Game.S.PLAY && var1 == 47) {
          this.openChat("/");
       }
@@ -1698,8 +1713,23 @@ public final class Game {
 
                   return;
                case INV:
+                  if (this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
+                     // the search tab: letters are for the search field, only Esc closes
+                     if (var2 != 0 && var1 == 259) {
+                        this.menu.backspace();
+                     } else if (var2 == 1 && var1 == 256) {
+                        this.setScreen(Game.S.PLAY);
+                     }
+
+                     return;
+                  }
+
                   if (var2 == 1 && (var1 == 256 || var1 == 69)) {
                      this.setScreen(Game.S.PLAY);
+                  } else if (var2 == 1 && this.menu != null && var1 >= 49 && var1 <= 57) {
+                     this.menu.hotbarKey(var1 - 49, (float)(this.mouseX / this.gui.scale), (float)(this.mouseY / this.gui.scale), this.menuOx(), this.menuOy());
+                  } else if (var2 == 1 && this.menu != null && var1 == 81) {
+                     this.menu.dropKey((float)(this.mouseX / this.gui.scale), (float)(this.mouseY / this.gui.scale), this.menuOx(), this.menuOy(), (var3 & 2) != 0);
                   }
 
                   return;
@@ -2129,13 +2159,23 @@ public final class Game {
    }
 
    float menuOy() {
-      return (float)Math.floor((this.gui.h - this.menu.h) / 2.0F);
+      float tabs = this.menu.kind == 4 ? Menu.TAB_H + 2.0F : 0.0F; // (the tabs of the creative inventory stick out above the panel)
+      return (float)Math.floor((this.gui.h - this.menu.h - tabs) / 2.0F + tabs);
    }
 
    void menuClick(float var1, float var2, int var3) {
       if (this.menu != null) {
          float var4 = this.menuOx();
          float var5 = this.menuOy();
+         int tabHit = this.menu.tabAt(var1, var2, var4, var5);
+         if (tabHit >= 0) {
+            if (var3 == 0) {
+               this.menu.setTab(tabHit);
+            }
+
+            return;
+         }
+
          Slot var6 = this.menu.at(var1, var2, var4, var5);
          boolean var7 = this.key(340) || this.key(344);
          if (var6 != null) {
@@ -2206,27 +2246,65 @@ public final class Game {
       }
    }
 
+   static final String[] ARMOR_PLACE = {"Head", "Chest", "Legs", "Feet"};
+   static final String[] TOOL_USE = {"", "Mines stone and ores", "Chops wood fast", "Digs dirt, sand and gravel", "Hits harder than a fist"};
+
    void tooltip(Stack var1, float var2, float var3) {
+      this.tooltipLines(this.tooltipText(var1), var2, var3);
+   }
+
+   /** The lines of the tooltip of an item: name, kind and what is worth knowing (durability, damage, armor, food, fuel, what it smelts into). */
+   ArrayList<String> tooltipText(Stack var1) {
       ArrayList<String> var4 = new ArrayList<>();
-      String var5 = Items.name(var1.id);
-      var4.add(var5);
-      int var6 = Items.maxDamage(var1.id);
+      int id = var1.id;
+      var4.add(Items.name(id));
+      var4.add("§7" + Creative.kind(id));
+      int var6 = Items.maxDamage(id);
       if (var6 > 0) {
-         var4.add("§7Durability: " + (var6 - var1.dmg) + " / " + var6);
+         int left = var6 - var1.dmg;
+         var4.add((left * 4 < var6 ? "§c" : "§7") + "Durability: " + left + " / " + var6);
       }
 
-      if (Items.isArmor(var1.id)) {
-         var4.add("§9+" + Items.armorPoints(var1.id) + " Armor");
+      if (Items.isArmor(id)) {
+         var4.add("§9+" + Items.armorPoints(id) + " Armor  §7(" + ARMOR_PLACE[Items.armorSlot(id)] + ")");
       }
 
-      if (Items.isTool(var1.id)) {
-         var4.add("§9" + String.format("%.1f", new Object[]{Items.attackDamage(var1.id)}) + " Attack Damage");
+      if (Items.isTool(id)) {
+         var4.add("§9" + String.format("%.1f", new Object[]{Items.attackDamage(id)}) + " Attack Damage");
+         var4.add("§7" + TOOL_USE[Items.toolClass(id)]);
+      } else if (Items.isHoe(id)) {
+         var4.add("§7Turns dirt into farmland");
       }
 
-      if (Items.isFood(var1.id)) {
-         var4.add("§7Restores " + Items.foodPts[var1.id] / 2.0F + " hunger");
+      if (Items.isFood(id)) {
+         var4.add("§6Restores " + Items.foodPts[id] / 2.0F + " hunger");
       }
 
+      int fuel = Recipes.fuelTime(new Stack(id, 1));
+      if (fuel > 0) {
+         int items = fuel / 200;
+         var4.add("§eFuel: smelts " + (items >= 1 ? items + (items == 1 ? " item" : " items") : "less than one item"));
+      }
+
+      Stack smelt = Recipes.smeltResult(new Stack(id, 1));
+      if (smelt != null) {
+         var4.add("§aSmelts into " + Items.name(smelt.id));
+      }
+
+      int max = Items.maxStack(id);
+      if (max != 64) {
+         var4.add("§7Stacks to " + max);
+      }
+
+      if (this.debug) {
+         var4.add("§7id " + id + (var1.dmg != 0 ? ", damage " + var1.dmg : ""));
+      }
+
+      return var4;
+   }
+
+   /** A box with some lines of text next to the mouse. */
+   void tooltipLines(java.util.List<String> var4, float var2, float var3) {
       float var7 = 0.0F;
 
       for (String var9 : var4) {
@@ -2240,6 +2318,11 @@ public final class Game {
       }
 
       float var10 = 4 + var4.size() * 10;
+      if (var13 + var10 + 3.0F > this.gui.h) {
+         var13 = Math.max(3.0F, this.gui.h - var10 - 3.0F); // (near the bottom of the window the box goes up)
+      }
+
+      var12 = Math.max(3.0F, var12);
       this.gui.rect(var12 - 1.0F, var13 - 1.0F, var7 + 8.0F, var10 + 2.0F, -267386864);
       this.gui.rect(var12, var13, var7 + 6.0F, var10, -266338256);
 
@@ -4227,6 +4310,7 @@ public final class Game {
       var8.w = var4;
       var8.h = var5;
       var8.action = var6 ? var7 : null;
+      var8.label = var1;
       this.btns.add(var8);
    }
 
@@ -4795,11 +4879,19 @@ public final class Game {
          this.menu.draw(this.gui, var1, var2, var3, var4);
          if (this.menu.kind == 4) {
             int var5 = this.menu.pages();
-            String var6 = this.menu.page + 1 + "/" + var5;
-            this.gui.text(var6, var3 + this.menu.w - 8.0F - Gui.textWidth(var6), var4 + 6.0F, -12566464, false);
-            Menu var7 = this.menu;
-            this.button("<", var3 + this.menu.w - 60.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page > 0, () -> var7.page--);
-            this.button(">", var3 + this.menu.w - 46.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page < var5 - 1, () -> var7.page++);
+            if (var5 > 1) {
+               String var6 = this.menu.page + 1 + "/" + var5;
+               this.gui.text(var6, var3 + this.menu.w - 8.0F - Gui.textWidth(var6), var4 + 6.0F, -12566464, false);
+               Menu var7 = this.menu;
+               this.button("<", var3 + this.menu.w - 70.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page > 0, () -> var7.page--);
+               this.button(">", var3 + this.menu.w - 56.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page < var5 - 1, () -> var7.page++);
+            }
+
+            if (this.menu.palette.length == 0) {
+               this.gui.centered("Nothing found", var3 + this.menu.w / 2.0F, var4 + 52.0F, -9408400, false, 1.0F);
+            }
+
+            this.gui.centered("Drop an item on the list to delete it.", this.gui.w / 2.0F, var4 + this.menu.h + 5.0F, -1426063361, true, 1.0F);
          }
       }
    }

@@ -13,7 +13,7 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 | 6 | Massive graphics overhaul (shaders, lighting, particles, sky) | run 2 | open |
 | 7 | New title screen (spinning background) | run 2 (`Panorama`, new `Screens`) | in progress |
 | 8 | Multiple world gen settings | the data is run 1's (`WorldSettings`), the Create New World screen is run 2's (`Screens`) | in progress |
-| 9 | Make the inventory more understandable | run 2 | open |
+| 9 | Make the inventory more understandable | run 2 (`Creative`, `Menu`) | tabs, search, tooltips, number keys, Q: done |
 | 10 | Clean up the settings screen | run 2 | in progress |
 | 11 | Add the missing features of 3.12 (coloured beds, banners, ...) | run 2 | open |
 

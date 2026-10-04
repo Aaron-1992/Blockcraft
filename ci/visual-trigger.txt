@@ -1,2 +1,2 @@
-title313,worlds313,newworld313,options313-0,options313-1,options313-3,pause313
+inv313-creative,inv313-search,inv313-tip,inv313-furnace,inv313-craft
 jar=build

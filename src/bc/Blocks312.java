@@ -79,7 +79,7 @@ final class Blocks312 {
       pick(Blocks.END_STONE, true, 0);
       for (int eye = 0; eye < 2; eye++) {
          int id = Blocks.END_FRAME + eye;
-         Blocks.def(id, "End Portal Frame", -1.0F, false, TexArt312.FRAME_SIDE);
+         Blocks.def(id, eye == 0 ? "End Portal Frame" : "End Portal Frame with Eye", -1.0F, false, TexArt312.FRAME_SIDE);
          Blocks.tiles[id][0] = eye == 0 ? TexArt312.FRAME_TOP : TexArt312.FRAME_TOP_EYE;
          Blocks.tiles[id][1] = TexArt312.END_STONE;
          box(id, 0.0, 0.0, 0.0, 1.0, 0.8125, 1.0);

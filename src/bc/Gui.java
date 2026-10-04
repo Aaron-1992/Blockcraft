@@ -304,6 +304,70 @@ public class Gui {
       this.rect(var1, var2, 1.0F, var3 - 1.0F, -13158601);
    }
 
+   static final String[] ARROW = {
+      "..........X.....", "..........XX....", "..........XXX...", "..........XXXX..", "XXXXXXXXXXXXXXX.", "XXXXXXXXXXXXXXXX", "XXXXXXXXXXXXXXX.", "..........XXXX..",
+      "..........XXX...", "..........XX....", "..........X....."
+   };
+
+   /** A pixel arrow pointing right (from the crafting grid to the result), 16 x 11 units, the top left corner at x, y. */
+   public void arrow(float x, float y, int argb) {
+      this.arrow(x, y, argb, 0.0F, 0);
+   }
+
+   /** The same arrow, filled with another colour from the left up to the fraction (the progress of the furnace). */
+   public void arrow(float x, float y, int argb, float fraction, int fillArgb) {
+      int cut = Math.round(16.0F * Math.max(0.0F, Math.min(1.0F, fraction)));
+      for (int r = 0; r < ARROW.length; r++) {
+         int c = 0;
+         while (c < 16) {
+            if (ARROW[r].charAt(c) == 'X') {
+               int e = c;
+               while (e < 16 && ARROW[r].charAt(e) == 'X') {
+                  e++;
+               }
+
+               int mid = Math.max(c, Math.min(e, cut));
+               if (mid > c) {
+                  this.rect(x + c, y + r, mid - c, 1.0F, fillArgb);
+               }
+
+               if (e > mid) {
+                  this.rect(x + mid, y + r, e - mid, 1.0F, argb);
+               }
+
+               c = e;
+            } else {
+               c++;
+            }
+         }
+      }
+   }
+
+   static final String[] FLAME = {
+      ".......X......", "......XX......", "......XXX.....", ".....XXXXX.X..", "..X..XXXXXXX..", "..XX.XXXXXXXX.", "..XXXXXXXXXXX.", ".XXXXXXXXXXXXX", ".XXXXXXXXXXXXX", ".XXXXXXXXXXXXX",
+      ".XXXXXXXXXXXXX", "..XXXXXXXXXXX.", "...XXXXXXXXX..", ".....XXXXX...."
+   };
+
+   /** The flame of the furnace, 14 x 14 units: the lower part (lit = 0..1 of its height) glows, the rest is grey. */
+   public void flame(float x, float y, float lit) {
+      int from = 14 - Math.round(14.0F * Math.max(0.0F, Math.min(1.0F, lit)));
+      for (int r = 0; r < 14; r++) {
+         for (int c = 0; c < 14; c++) {
+            if (FLAME[r].charAt(c) == 'X') {
+               int col;
+               if (r < from) {
+                  col = -6710887;
+               } else {
+                  boolean core = r >= 8 && c >= 4 && c <= 9 && r <= 12 || r >= 5 && c >= 5 && c <= 8 && r <= 7;
+                  col = core ? -12224 : -32768;
+               }
+
+               this.rect(x + c, y + r, 1.0F, 1.0F, col);
+            }
+         }
+      }
+   }
+
    public void panel(float var1, float var2, float var3, float var4) {
       this.rect(var1, var2, var3, var4, -16777216);
       this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, -3750202);

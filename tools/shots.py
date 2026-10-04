@@ -468,6 +468,12 @@ SCENES = {
     "options313-1":   (["-Dbc.auto=1", "-Dbc.title=OPTIONS", "-Dbc.opttab=1"], True),
     "options313-3":   (["-Dbc.auto=1", "-Dbc.title=OPTIONS", "-Dbc.opttab=3"], True),
     "pause313":       (COMMON + [CAM, "-Dbc.world=1", "-Dbc.title=PAUSE"] + PLAIN, True),
+    # the inventories of Update 3.13: creative tabs and search, a tooltip, the furnace and the crafting table with their drawn arrows
+    "inv313-creative": (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.shot=110"], True),
+    "inv313-search":   (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.tab=7", "-Dbc.search=pick", "-Dbc.shot=110"], True),
+    "inv313-tip":      (COMMON + [CAM] + PLAIN + ["-Dbc.inv=creative", "-Dbc.tab=4", "-Dbc.mouse=489,381", "-Dbc.shot=110"], True),
+    "inv313-furnace":  (COMMON + [CAM] + PLAIN + ["-Dbc.inv=furnace", "-Dbc.shot=110"], True),
+    "inv313-craft":    (COMMON + [CAM] + PLAIN + ["-Dbc.inv=craft", "-Dbc.shot=110"], True),
     # ---- Update 3.11: single-sided faces. Spectator mode (bc.mode=3, given after COMMON's mode so it wins) with the camera inside the ground looking up:
     # the ground must be see-through from below.
     "under-map":      (COMMON + ["-Dbc.mode=3", "-Dbc.cam=140,45,70,-60,-35", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),

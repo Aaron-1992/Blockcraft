@@ -34,6 +34,13 @@ final class Menu {
    int invSlotCount;
    int profession;
    Trades.Trade[] trades = new Trades.Trade[0];
+   /** Creative: the tab (Creative.BUILDING ...) and the text typed in the search tab. */
+   int tab;
+   final StringBuilder search = new StringBuilder();
+   /** The tab under the mouse in the last frame (for its tooltip). */
+   int hoverTab = -1;
+   /** When the menu was opened: the letter of the key that opened it (E) must not end up in the search field. */
+   final long openedAt = System.currentTimeMillis();
 
    Menu(Game var1, int var2, TileEntity var3) {
       this(var1, var2, var3, 0);
@@ -144,7 +151,8 @@ final class Menu {
             this.title = "Creative";
             this.w = 195.0F;
             this.h = 136.0F;
-            this.palette = Blocks.creativeList();
+            this.tab = Math.max(0, Math.min(Creative.SEARCH, g.creativeTab));
+            this.palette = this.tab == Creative.SEARCH ? Creative.search("") : Creative.tab(this.tab);
             this.firstInvSlot = this.slots.size();
 
             for (int var1 = 0; var1 < 9; var1++) {
@@ -163,7 +171,107 @@ final class Menu {
    }
 
    int pages() {
-      return this.palette == null ? 1 : (this.palette.length + 44) / 45;
+      return this.palette == null ? 1 : Math.max(1, (this.palette.length + 44) / 45);
+   }
+
+   /** Creative: switches to a tab (the search tab shows everything that matches the text typed). */
+   void setTab(int t) {
+      this.tab = Math.max(0, Math.min(Creative.SEARCH, t));
+      if (this.tab != Creative.SEARCH) {
+         this.g.creativeTab = this.tab; // (the search tab is not remembered: E must close the inventory when it opens)
+      }
+
+      this.page = 0;
+      this.refill();
+   }
+
+   void refill() {
+      this.palette = this.tab == Creative.SEARCH ? Creative.search(this.search.toString()) : Creative.tab(this.tab);
+      this.page = Math.max(0, Math.min(this.pages() - 1, this.page));
+   }
+
+   /** Creative, search tab: a typed character. */
+   void typed(char c) {
+      if (this.kind == 4 && this.tab == Creative.SEARCH && c >= ' ' && c < 127 && this.search.length() < 24) {
+         this.search.append(c);
+         this.page = 0;
+         this.refill();
+      }
+   }
+
+   void backspace() {
+      if (this.kind == 4 && this.tab == Creative.SEARCH && this.search.length() > 0) {
+         this.search.setLength(this.search.length() - 1);
+         this.page = 0;
+         this.refill();
+      }
+   }
+
+   /** The number keys 1-9 over a slot: that slot and hotbar slot n swap places (creative: the item goes into the hotbar slot). */
+   void hotbarKey(int n, float mx, float my, float ox, float oy) {
+      Menu.Slot s = this.at(mx, my, ox, oy);
+      if (s == null || n < 0 || n > 8) {
+         return;
+      }
+
+      if (s.type == 5) {
+         int idx = this.page * 45 + s.idx;
+         if (idx < this.palette.length) {
+            this.g.inv[n] = new Stack(this.palette[idx], Items.maxStack(this.palette[idx]));
+         }
+
+         return;
+      }
+
+      if (s.type != 0 || s.arr == this.g.inv && s.idx == n) {
+         return;
+      }
+
+      Stack a = s.arr[s.idx];
+      Stack b = this.g.inv[n];
+      if (b != null && !this.accepts(s, b)) {
+         return;
+      }
+
+      s.arr[s.idx] = b;
+      this.g.inv[n] = a;
+      this.changed();
+   }
+
+   /** The Q key over a slot: drops one item of it (Ctrl: the whole stack). */
+   void dropKey(float mx, float my, float ox, float oy, boolean all) {
+      Menu.Slot s = this.at(mx, my, ox, oy);
+      if (s == null || s.type != 0 && s.type != 4 || s.arr == null) {
+         return;
+      }
+
+      Stack st = s.arr[s.idx];
+      if (st == null) {
+         return;
+      }
+
+      int cnt = all ? st.n : 1;
+      this.g.dropFromPlayer(st.id, cnt, st.dmg);
+      st.n -= cnt;
+      if (st.n <= 0) {
+         s.arr[s.idx] = null;
+      }
+
+      this.changed();
+   }
+
+   /** The width of one tab (creative). */
+   static final float TAB_W = 24.0F;
+   static final float TAB_H = 22.0F;
+
+   /** Creative: which tab is at the mouse (panel at ox, oy), or -1. */
+   int tabAt(float mx, float my, float ox, float oy) {
+      if (this.kind != 4 || my < oy - TAB_H - 1.0F || my >= oy + 2.0F) {
+         return -1;
+      }
+
+      int i = (int)Math.floor((mx - ox) / TAB_W);
+      return i >= 0 && i < Creative.TABS && mx >= ox ? i : -1;
    }
 
    void changed() {
@@ -481,10 +589,70 @@ final class Menu {
       }
    }
 
+   static final String[] MAGNIFIER = {
+      "..XXXX.....", ".X....X....", "X......X...", "X......X...", "X......X...", ".X....X....", "..XXXXX....", ".......XX..", "........XX.", ".........XX"
+   };
+
+   /** Creative: the tabs above the panel (the picture of each, the selected one is joined to the panel). */
+   void drawTabs(Gui gui, float mx, float my, float ox, float oy) {
+      this.hoverTab = this.tabAt(mx, my, ox, oy);
+      for (int pass = 0; pass < 2; pass++) {
+         for (int i = 0; i < Creative.TABS; i++) {
+            boolean sel = i == this.tab;
+            if (sel != (pass == 1)) {
+               continue; // the selected tab last, on top of its neighbours
+            }
+
+            float x = ox + i * TAB_W;
+            float y = sel ? oy - TAB_H - 2.0F : oy - TAB_H;
+            int fill = sel ? -3750202 : (i == this.hoverTab ? -5855578 : -7631989);
+            gui.rect(x, y, TAB_W, oy - y, -16777216);
+            gui.rect(x + 1.0F, y + 1.0F, TAB_W - 2.0F, oy + (sel ? 2.0F : 0.0F) - y - 1.0F, fill);
+            gui.rect(x + 1.0F, y + 1.0F, TAB_W - 3.0F, 1.0F, -1);
+            gui.rect(x + 1.0F, y + 1.0F, 1.0F, oy - y - 2.0F, -1);
+            if (sel) {
+               gui.rect(x + TAB_W - 2.0F, y + 2.0F, 1.0F, oy - y - 2.0F, -11184811);
+            }
+
+            float iy = y + (sel ? 5.0F : 4.0F);
+            if (i == Creative.SEARCH) {
+               for (int r = 0; r < MAGNIFIER.length; r++) {
+                  for (int c = 0; c < MAGNIFIER[r].length(); c++) {
+                     if (MAGNIFIER[r].charAt(c) == 'X') {
+                        gui.rect(x + 6.0F + c, iy + 3.0F + r, 1.0F, 1.0F, r >= 7 ? -12566464 : -14013910);
+                     }
+                  }
+               }
+            } else {
+               gui.icon(Creative.ICON[i], x + 4.0F, iy, 16.0F);
+            }
+         }
+      }
+   }
+
    void draw(Gui var1, float var2, float var3, float var4, float var5) {
       var1.panel(var4, var5, this.w, this.h);
       if (this.kind == 4) {
-         var1.text(this.title, var4 + 8.0F, var5 + 6.0F, -12566464, false);
+         this.drawTabs(var1, var2, var3, var4, var5);
+         if (this.tab == Creative.SEARCH) {
+            // the search field (what is typed shows the items whose names contain it)
+            float fx = var4 + 8.0F;
+            float fy = var5 + 4.0F;
+            var1.rect(fx - 1.0F, fy - 1.0F, 114.0F, 13.0F, -6250336);
+            var1.rect(fx, fy, 112.0F, 11.0F, -16777216);
+            String typed = this.search.toString();
+            if (typed.isEmpty()) {
+               var1.text("Type to search...", fx + 3.0F, fy + 2.0F, -9211021, false);
+            } else {
+               var1.text(Game.clipText(typed, 104.0F), fx + 3.0F, fy + 2.0F, -1, false);
+            }
+
+            if (System.currentTimeMillis() / 500L % 2L == 0L) {
+               var1.rect(fx + 3.0F + Math.min(104, Gui.textWidth(typed)), fy + 9.0F, 5.0F, 1.0F, -1);
+            }
+         } else {
+            var1.text(Creative.NAME[this.tab], var4 + 8.0F, var5 + 6.0F, -12566464, false);
+         }
       } else if (this.kind == 0) {
          // (no "Inventory" label here: it used to sit between the armor slots and the crafting grid, where the player is drawn now - Minecraft has none either)
          var1.text(this.title, var4 + 97.0F, var5 + 6.0F, -12566464, false);
@@ -502,20 +670,22 @@ final class Menu {
       if (this.kind == 0) {
          // Update 3.9: you, in your skin, looking at the mouse
          var1.inset(var4 + 29.0F, var5 + 8.0F, 66.0F, 72.0F);
-         PlayerModel.drawLooking(this.g.skinPixels(), this.g.skinSlim(), var4 + 62.0F, var5 + 75.0F, 30.0F, var2, var3, (float)(System.nanoTime() / 1.0E9 % 100000.0));
-         var1.rect(var4 + 136.0F, var5 + 33.0F, 12.0F, 3.0F, -7631989);
-         var1.rect(var4 + 144.0F, var5 + 30.0F, 3.0F, 9.0F, -7631989);
+         if (this.g.window != 0L) { // (the menu tests draw without a window)
+            PlayerModel.drawLooking(this.g.skinPixels(), this.g.skinSlim(), var4 + 62.0F, var5 + 75.0F, 30.0F, var2, var3, (float)(System.nanoTime() / 1.0E9 % 100000.0));
+         }
+         var1.arrow(var4 + 136.0F, var5 + 32.0F, -7631989);
 
          for (int var9 = 0; var9 < 4; var9++) {
             if (this.g.armor[var9] == null) {
+               // a faded picture of what goes in (helmet, chestplate, leggings, boots)
                float var13 = var4 + 8.0F + 1.0F;
                float var8 = var5 + 8.0F + var9 * 18 + 1.0F;
-               var1.rect(var13 + 4.0F, var8 + 4.0F, 8.0F, 8.0F, 805306368);
+               var1.icon(324 + var9, var13, var8, 16.0F);
+               var1.rect(var13, var8, 16.0F, 16.0F, -1333032053);
             }
          }
       } else if (this.kind == 1) {
-         var1.rect(var4 + 90.0F, var5 + 41.0F, 22.0F, 3.0F, -7631989);
-         var1.rect(var4 + 104.0F, var5 + 37.0F, 3.0F, 11.0F, -7631989);
+         var1.arrow(var4 + 94.0F, var5 + 39.0F, -7631989);
       } else if (this.kind == 5) {
          for (int i = 0; i < this.trades.length; i++) {
             float x0 = i < 3 ? 8.0F : 92.0F;
@@ -530,14 +700,8 @@ final class Menu {
          }
       } else if (this.kind == 2) {
          float var10 = this.tile.cook / 200.0F;
-         var1.rect(var4 + 79.0F, var5 + 35.0F, 24.0F, 16.0F, -7631989);
-         var1.rect(var4 + 79.0F, var5 + 35.0F, 24.0F * var10, 16.0F, -13730510);
-         if (this.tile.burnMax > 0 && this.tile.burn > 0) {
-            int var14 = (int)(14.0F * this.tile.burn / this.tile.burnMax);
-            var1.rect(var4 + 57.0F, var5 + 37.0F + (14 - var14), 14.0F, var14 + 1, -30208);
-         } else {
-            var1.rect(var4 + 57.0F, var5 + 37.0F, 14.0F, 14.0F, -9737365);
-         }
+         var1.arrow(var4 + 84.0F, var5 + 37.0F, -7631989, var10, -13730510);
+         var1.flame(var4 + 57.0F, var5 + 36.0F, this.tile.burnMax > 0 && this.tile.burn > 0 ? (float)this.tile.burn / this.tile.burnMax : 0.0F);
       }
 
       for (Menu.Slot var15 : this.slots) {
@@ -559,6 +723,8 @@ final class Menu {
          if (var16 != null) {
             this.g.tooltip(var16, var2, var3);
          }
+      } else if (this.kind == 4 && this.hoverTab >= 0) {
+         this.g.tooltipLines(java.util.Arrays.asList(Creative.NAME[this.hoverTab]), var2, var3);
       }
    }
 
