@@ -4,6 +4,8 @@ import java.io.DataInputStream;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Random;
+import org.lwjgl.opengl.EXTTextureFilterAnisotropic;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
@@ -755,6 +757,12 @@ public final class Tex {
       GL11.glTexParameteri(3553, 10241, 9986);
       GL11.glTexParameteri(3553, 33085, 4);
       GL30.glGenerateMipmap(3553);
+      // Update 3.18: anisotropic filtering keeps the ground sharp where you look along it (the mip levels alone blur it)
+      if (GL.getCapabilities().GL_EXT_texture_filter_anisotropic) {
+         float maxAniso = GL11.glGetFloat(EXTTextureFilterAnisotropic.GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+         GL11.glTexParameterf(3553, EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8.0F, maxAniso));
+      }
+
       crack = upload(160, 16, crackPixels(), false, false);
       clouds = upload(256, 256, cloudPixels(), false, true);
       sun = upload(32, 32, sunPixels(), true, false);
@@ -765,33 +773,34 @@ public final class Tex {
 
    /** Update 3.11: paints every tile into {@link #atlasPixels} without touching OpenGL (the LOD colours and the tests read them). */
    static void initPixels() {
-      blit(0, tGrassTop());
-      blit(1, dirt());
-      blit(2, tGrassOverlay());
-      blit(3, tStone(1L, 125));
-      blit(4, tVoronoi(5L, new int[]{118, 118, 118}, -45, 22));
-      blit(5, tNoise(7L, 219, 207, 163, 8));
-      blit(6, tGravel());
-      blit(7, tLogSide(8L, 104, 83, 50));
-      blit(8, tLogTop(9L, new int[]{104, 83, 50}, new int[]{176, 145, 89}, new int[]{150, 120, 70}));
-      blit(9, tLeaves());
-      blit(10, tPlanks());
+      // Update 3.18: the texture overhaul - the tiles of the old blocks are painted by TexPaint (the old painters below stay: the equivalence test still runs them)
+      blit(0, TexPaint.grassTop());
+      blit(1, TexPaint.dirt());
+      blit(2, TexPaint.grassSide());
+      blit(3, TexPaint.stone());
+      blit(4, TexPaint.cobble());
+      blit(5, TexPaint.sand());
+      blit(6, TexPaint.gravel());
+      blit(7, TexPaint.oakSide());
+      blit(8, TexPaint.oakTop());
+      blit(9, TexPaint.leaves());
+      blit(10, TexPaint.oakPlanks());
       blit(11, tBedrock());
-      blit(12, tOre(12L, 22, 22, 22));
-      blit(13, tOre(13L, 216, 175, 147));
-      blit(14, tOre(14L, 250, 238, 77));
-      blit(15, tOre(15L, 92, 219, 213));
-      blit(16, tOre(16L, 220, 20, 20));
-      blit(17, tOre(17L, 30, 60, 200));
-      blit(18, tNoise(18L, 246, 250, 252, 3));
+      blit(12, TexPaint.coalOre());
+      blit(13, TexPaint.ironOre());
+      blit(14, TexPaint.goldOre());
+      blit(15, TexPaint.diamondOre());
+      blit(16, TexPaint.redstoneOre());
+      blit(17, TexPaint.lapisOre());
+      blit(18, TexPaint.snow());
       blit(19, tGlass());
       blit(20, tBricks());
-      blit(21, tSandstoneSide());
-      blit(22, tNoise(22L, 219, 207, 163, 5));
+      blit(21, TexPaint.sandstoneSide());
+      blit(22, TexPaint.sand());
 
       for (int var0 = 0; var0 < 16; var0++) {
-         waterFrames[var0] = waterFrame(var0);
-         lavaFrames[var0] = lavaFrame(var0);
+         waterFrames[var0] = TexPaint.waterFrame(var0);
+         lavaFrames[var0] = TexPaint.lavaFrame(var0);
       }
 
       blit(23, waterFrames[0]);
@@ -801,16 +810,16 @@ public final class Tex {
       blit(27, tFlower(252, 232, 44));
       blit(28, tCactusSide());
       blit(29, tCactusTop());
-      blit(30, tGlowstone());
-      blit(31, tLogSide(32L, 59, 42, 22));
-      blit(32, tLogTop(33L, new int[]{59, 42, 22}, new int[]{128, 98, 58}, new int[]{108, 80, 46}));
-      blit(33, tBirchSide());
-      blit(34, tObsidian());
-      blit(35, tStoneBrick());
+      blit(30, TexPaint.glowstone());
+      blit(31, TexPaint.spruceSide());
+      blit(32, TexPaint.spruceTop());
+      blit(33, TexPaint.birchSide());
+      blit(34, TexPaint.obsidian());
+      blit(35, TexPaint.stoneBrick());
       blit(36, tTorch());
 
       for (int var1 = 0; var1 < 16; var1++) {
-         blit(48 + var1, tWool(var1));
+         blit(48 + var1, TexPaint.wool(var1));
       }
 
       TexExtra.blocks();
