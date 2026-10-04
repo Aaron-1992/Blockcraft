@@ -324,11 +324,11 @@ public final class Blocks {
    }
 
    public static boolean isBed(int var0) {
-      return var0 >= 133 && var0 < 141;
+      return Decor315.isBed(var0);
    }
 
    public static boolean isBedHead(int var0) {
-      return var0 >= 137 && var0 < 141;
+      return Decor315.isBedHead(var0);
    }
 
    /** Pumpkin stems 171-178 and melon stems 179-186 (8 growth stages each, stage 7 = fully grown). */
@@ -498,6 +498,7 @@ public final class Blocks {
       Blocks312.addToCreative(var1);
       Blocks313.addToCreative(var1);
       Shapes.addToCreative(var1);
+      Decor315.addToCreative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -983,5 +984,6 @@ public final class Blocks {
       Blocks312.register();
       Blocks313.register();
       Shapes.register();
+      Decor315.register();
    }
 }

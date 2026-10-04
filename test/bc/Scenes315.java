@@ -166,6 +166,31 @@ final class Scenes315 {
          }
       });
 
+      put("beds", new double[]{10, 62, 3, 25, 35, 15}, w -> {
+         int[][] dir = {{0, -1}, {0, 1}, {1, 0}, {-1, 0}};
+         for (int f = 0; f < 4; f++) {
+            for (int i = 0; i < 6; i++) {
+               int c = (f * 5 + i * 3) % 16;
+               int x = 3 + i * 3 + (f >= 2 ? 0 : 0);
+               int z = 3 + f * 4;
+               set(w, x, Y, z, Decor315.foot(c, f));
+               set(w, x + dir[f][0], Y, z + dir[f][1], Decor315.head(c, f));
+            }
+         }
+      });
+
+      put("banners", new double[]{10, 62, 6, 20, 25, 18}, w -> {
+         for (int c = 0; c < 16; c++) {
+            set(w, c * 2, Y, 2, Decor315.STAND0 + c * 4 + (c % 4));
+         }
+
+         for (int c = 0; c < 16; c++) {
+            set(w, c * 2, Y, 6, Blocks.STONE);
+            set(w, c * 2, Y + 1, 6, Blocks.STONE);
+            set(w, c * 2, Y + 1, 5, Decor315.WALL0 + c * 4 + 0);
+         }
+      });
+
       put("carpets", new double[]{8, 61, 3, 15, 40, 14}, w -> {
          for (int c = 0; c < 16; c++) {
             set(w, c, Y, 0, Shapes.CARPET0 + c);

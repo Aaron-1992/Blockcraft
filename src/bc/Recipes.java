@@ -118,6 +118,11 @@ public final class Recipes {
          return wooden;
       }
 
+      Stack decor = Decor315.special(grid, gw, gh); // beds and banners in the colour of the wool
+      if (decor != null) {
+         return decor;
+      }
+
       int w = maxX - minX + 1;
       int h = maxY - minY + 1;
 
@@ -296,6 +301,7 @@ public final class Recipes {
       // ---- Update 3.12 ----
       Items312.recipes();
       Shapes.recipes();
+      Decor315.recipes();
    }
 
    static final class Recipe {

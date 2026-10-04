@@ -1130,16 +1130,16 @@ public final class World {
          }
       } else if (Blocks.isBed(var4)) {
          boolean var17 = Blocks.isBedHead(var4);
-         int var22 = var4 - 133 & 3;
+         int var22 = Decor315.bedFacing(var4);
          int var24 = var22 == 2 ? 1 : (var22 == 3 ? -1 : 0);
          int var8 = var22 == 0 ? -1 : (var22 == 1 ? 1 : 0);
          int var9 = var17 ? var1 - var24 : var1 + var24;
          int var10 = var17 ? var3 - var8 : var3 + var8;
-         int var11 = var17 ? 133 + var22 : 137 + var22;
+         int var11 = var17 ? Decor315.foot(Decor315.bedColor(var4), var22) : Decor315.head(Decor315.bedColor(var4), var22);
          if (this.getBlock(var9, var2, var10) != var11) {
             this.setBlock(var1, var2, var3, 0);
             if (!var17) {
-               this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 289, 1);
+               this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }
       } else if (Blocks.isFarmland(var4)) {

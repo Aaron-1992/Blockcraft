@@ -15,6 +15,7 @@ import static bc.GameTests.tick;
 final class Tests315 {
    static void run() {
       shapes();
+      decor();
    }
 
    private static void setAll(World w, int x0, int y0, int z0, int x1, int y1, int z1, int id) {
@@ -365,6 +366,156 @@ final class Tests315 {
             double[] b = Shapes.trapBox(id);
             check(b[3] > b[0] && b[4] > b[1] && b[5] > b[2] && b[0] >= 0 && b[3] <= 1 && b[1] >= 0 && b[4] <= 1 && b[2] >= 0 && b[5] <= 1, "trapdoor box " + id);
          }
+      });
+   }
+
+   static void decor() {
+      test("beds: ids of all sixteen colours tell colour, half and facing; the old red bed is colour 14", () -> {
+         for (int c = 0; c < 16; c++) {
+            for (int f = 0; f < 4; f++) {
+               int foot = Decor315.foot(c, f);
+               int head = Decor315.head(c, f);
+               check(Decor315.isBed(foot) && Decor315.isBed(head) && !Decor315.isBedHead(foot) && Decor315.isBedHead(head), "bed ids " + foot + " / " + head);
+               eq(c, Decor315.bedColor(foot), "colour of the foot");
+               eq(c, Decor315.bedColor(head), "colour of the head");
+               eq(f, Decor315.bedFacing(foot), "facing of the foot");
+               eq(f, Decor315.bedFacing(head), "facing of the head");
+               check(Blocks.isBed(foot) && Blocks.isBedHead(head), "Blocks knows them");
+               eq(Decor315.bedItem(c), Blocks.drop[foot], "the foot drops the bed of its colour");
+               eq(0, Blocks.drop[head], "the head drops nothing by itself");
+               check(Shapes.isModel(foot) && Shapes.isModel(head) && Blocks.kind[foot] == Shapes.K_SHAPE, "a bed is a model");
+            }
+         }
+
+         eq(133, Decor315.foot(14, 0), "the old red foot");
+         eq(140, Decor315.head(14, 3), "the old red head");
+         eq(289, Decor315.bedItem(14), "the red bed is item 289");
+         check(Decor315.isBedItem(289) && Decor315.isBedItem(Decor315.bedItem(3)) && !Decor315.isBedItem(Decor315.BED_ITEM0 + 14), "bed items");
+         eq("Cyan Bed", Items.name(Decor315.bedItem(9)), "item name");
+         eq("Red Bed", Items.name(289), "the old bed is the red one");
+         eq("Lime Bed", Blocks.name[Decor315.head(5, 2)], "block name");
+      });
+
+      test("beds: you put one down with the colour of the item, the head lies in the direction you look; breaking a half takes both", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         int y = GROUND + 1;
+         g.player.setPos(8.5, y, 8.5);
+         g.player.yaw = 0.0F; // looks south (+z)
+         int item = Decor315.bedItem(9);
+         hold(g, item, 2);
+         g.target = hit(12, GROUND, 12, 0, 1, 0);
+         check(g.placeBlock(), "place a cyan bed");
+         eq(Decor315.foot(9, 1), w.getBlock(12, y, 12), "the foot");
+         eq(Decor315.head(9, 1), w.getBlock(12, y, 13), "the head is one block south");
+         eq(1, g.inv[g.sel].n, "one bed is used up");
+         g.player.yaw = -90.0F; // east
+         g.target = hit(20, GROUND, 20, 0, 1, 0);
+         check(g.placeBlock(), "another one, facing east");
+         eq(Decor315.foot(9, 2), w.getBlock(20, y, 20), "foot (east)");
+         eq(Decor315.head(9, 2), w.getBlock(21, y, 20), "head east");
+         // a red bed from the old item
+         hold(g, 289, 1);
+         g.player.yaw = 180.0F; // north
+         g.target = hit(30, GROUND, 30, 0, 1, 0);
+         check(g.placeBlock(), "the old bed item");
+         eq(133, w.getBlock(30, y, 30), "old red foot id (north)");
+         eq(137, w.getBlock(30, y, 29), "old red head id");
+         // taking the head away takes the foot with it and drops a single bed
+         w.setBlock(12, y, 13, 0);
+         tick(w, 2);
+         eq(0, w.getBlock(12, y, 12), "the foot goes when the head is gone");
+         check(GameTests.countItems(w, item) == 1, "one cyan bed lies there (" + GameTests.countItems(w, item) + ")");
+         // breaking the head by hand
+         g.player.setMode(0);
+         g.target = hit(21, y, 20, 0, 1, 0);
+         g.breakBlock(21, y, 20);
+         eq(0, w.getBlock(20, y, 20), "the foot is gone too");
+         eq(0, w.getBlock(21, y, 20), "and the head");
+         check(GameTests.countItems(w, item) == 2, "and a second bed lies there (" + GameTests.countItems(w, item) + ")");
+      });
+
+      test("beds: crafting - three wool of one colour and three planks; mixed wool still gives the old red bed", () -> {
+         Stack[] grid = new Stack[9];
+         for (int c : new int[]{0, 5, 9, 15}) {
+            for (int sp = 0; sp < 6; sp += 5) {
+               grid = new Stack[9];
+               for (int i = 0; i < 3; i++) {
+                  grid[i] = new Stack(Blocks.WOOL0 + c, 1);
+                  grid[3 + i] = new Stack(Blocks313.plank(sp), 1);
+               }
+
+               Stack out = Recipes.find(grid, 3, 3);
+               check(out != null && out.id == Decor315.bedItem(c) && out.n == 1, "bed of colour " + c + " from planks " + sp);
+            }
+         }
+
+         grid = new Stack[9];
+         grid[0] = new Stack(Blocks.WOOL0 + 2, 1);
+         grid[1] = new Stack(Blocks.WOOL0 + 3, 1);
+         grid[2] = new Stack(Blocks.WOOL0 + 2, 1);
+         for (int i = 0; i < 3; i++) {
+            grid[3 + i] = new Stack(Blocks.PLANKS, 1);
+         }
+
+         Stack mixed = Recipes.find(grid, 3, 3);
+         check(mixed != null && mixed.id == 289, "mixed wool: the old recipe, a red bed");
+         grid = new Stack[9];
+         for (int i = 0; i < 6; i++) {
+            grid[i] = new Stack(Blocks.WOOL0 + 11, 1);
+         }
+
+         grid[7] = new Stack(Items.STICK, 1);
+         Stack banner = Recipes.find(grid, 3, 3);
+         check(banner != null && banner.id == Decor315.BANNER_ITEM0 + 11 && banner.n == 1, "six blue wool and a stick: a blue banner");
+      });
+
+      test("banners: standing on the ground, hanging on a wall, falling off when the support goes", () -> {
+         Game g = newGame(1);
+         World w = g.world;
+         int y = GROUND + 1;
+         g.player.setPos(8.5, y, 8.5);
+         g.player.yaw = 0.0F; // looks south: the flag must look north towards him
+         int item = Decor315.BANNER_ITEM0 + 4;
+         hold(g, item, 3);
+         g.target = hit(12, GROUND, 12, 0, 1, 0);
+         check(g.placeBlock(), "put a yellow banner on the ground");
+         eq(Decor315.STAND0 + 4 * 4 + 0, w.getBlock(12, y, 12), "standing, the flag looks north");
+         // on the side of a block
+         w.setBlock(16, y, 16, Blocks.STONE);
+         g.target = hit(16, y, 16, 1, 0, 0);
+         check(g.placeBlock(), "hang it on the east face of a stone");
+         eq(Decor315.WALL0 + 4 * 4 + 2, w.getBlock(17, y, 16), "the flag looks east");
+         check(!Blocks.solid[w.getBlock(17, y, 16)] && Blocks.coll[w.getBlock(17, y, 16)] == null, "a banner is not an obstacle");
+         // the underside of a block takes none
+         w.setBlock(24, y + 3, 24, Blocks.STONE);
+         g.target = hit(24, y + 3, 24, 0, -1, 0);
+         check(!g.placeBlock(), "not under a block");
+         // take the stone away: the banner on it drops
+         w.setBlock(16, y, 16, 0);
+         tick(w, 2);
+         eq(0, w.getBlock(17, y, 16), "the hanging banner fell off");
+         check(GameTests.countItems(w, item) == 1, "as an item");
+         w.setBlock(12, y - 1, 12, 0);
+         tick(w, 2);
+         eq(0, w.getBlock(12, y, 12), "the standing banner fell too");
+         check(GameTests.countItems(w, item) == 2, "two banners lie there");
+      });
+
+      test("beds and banners: the mesher draws them, in the colour of the wool", () -> {
+         Game g = newGame(0);
+         World w = g.world;
+         int y = GROUND + 1;
+         int base = vertices(w, 0, 0);
+         w.setBlock(5, y, 5, Decor315.foot(3, 1));
+         w.setBlock(5, y, 6, Decor315.head(3, 1));
+         int bed = vertices(w, 0, 0);
+         check(bed > base + 40, "a bed has many faces (" + base + " -> " + bed + ")");
+         w.setBlock(9, y, 9, Decor315.STAND0 + 2);
+         check(vertices(w, 0, 0) > bed + 20, "a banner too");
+         Tex.initPixels();
+         int[] cloth = TexArt315.cloth();
+         check(cloth[15 * 16 + 7] == 0 && cloth[15 * 16 + 8] == 0 && cloth[2 * 16 + 7] != 0, "the cloth has a notch at the bottom and none at the top");
       });
    }
 }

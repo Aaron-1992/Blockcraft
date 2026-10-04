@@ -214,12 +214,12 @@ public final class GameTests {
          check(a != null && a.id == FLINT_STEEL && b != null && b.id == FLINT_STEEL, "flint & steel in any arrangement");
       });
 
-      test("recipe: bed = 3 wool over 3 planks, any wool colour", () -> {
+      test("recipe: bed = 3 wool over 3 planks; the colour of the wool is the colour of the bed (mixed wool: the old red bed)", () -> {
          int w0 = Blocks.WOOL0;
          Stack r = craft(3, 3, w0, w0, w0, PLANKS, PLANKS, PLANKS, 0, 0, 0);
-         check(r != null && r.id == BED, "white bed -> " + (r == null ? "null" : "" + r.id));
+         check(r != null && r.id == Decor315.bedItem(0), "white bed -> " + (r == null ? "null" : "" + r.id));
          Stack mixed = craft(3, 3, w0 + 3, w0 + 3, w0 + 3, PLANKS, PLANKS, PLANKS, 0, 0, 0);
-         check(mixed != null && mixed.id == BED, "light-blue wool bed");
+         check(mixed != null && mixed.id == Decor315.bedItem(3), "light-blue wool bed");
          Stack mixed2 = craft(3, 3, w0, w0 + 5, w0 + 14, PLANKS, PLANKS, PLANKS, 0, 0, 0);
          check(mixed2 != null && mixed2.id == BED, "mixed wool colours bed");
          check(craft(3, 3, w0, w0, w0, PLANKS, PLANKS, COBBLE, 0, 0, 0) == null, "bed needs 3 planks");

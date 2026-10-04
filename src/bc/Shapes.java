@@ -94,7 +94,96 @@ final class Shapes {
 
    /** Blocks that have to be looked at when a neighbour changes. */
    static boolean handlesUpdate(int id) {
-      return isCarpet(id);
+      return isCarpet(id) || Decor315.handlesUpdate(id);
+   }
+
+   // ------------------------------------------------------------------ static models: a fixed list of boxes per id (beds, banners, redstone parts ...)
+   private static final double[][][] MODEL = new double[Blocks.MAX][][];
+
+   static boolean isModel(int id) {
+      return id >= 0 && id < MODEL.length && MODEL[id] != null;
+   }
+
+   /** Makes the block a K_SHAPE block that is drawn as the given boxes (see {@link #px}). */
+   static void model(int id, double[][] boxes) {
+      MODEL[id] = boxes;
+      Blocks.kind[id] = K_SHAPE;
+   }
+
+   static double[][] modelBoxes(int id) {
+      return MODEL[id];
+   }
+
+   /** A box given in sixteenths of a block; the other numbers: 6 faces hidden (bit mask), 7 tint (rgb or -1), 8 sides, 9 top, 10 bottom tile (-1 = the block's own). */
+   static double[] px(double x0, double y0, double z0, double x1, double y1, double z1) {
+      return new double[]{x0 / 16, y0 / 16, z0 / 16, x1 / 16, y1 / 16, z1 / 16, 0, -1, -1, -1, -1, 0};
+   }
+
+   /** The texture is laid over the box itself, not over the block (for boxes that reach out of the block: banners). */
+   static double[] local(double[] b) {
+      b[11] = 1;
+      return b;
+   }
+
+   static double[] hidden(double[] b, int mask) {
+      b[6] = (int)b[6] | mask;
+      return b;
+   }
+
+   static double[] tint(double[] b, int rgb) {
+      b[7] = rgb;
+      return b;
+   }
+
+   static double[] tiles(double[] b, int side, int top, int bottom) {
+      b[8] = side;
+      b[9] = top;
+      b[10] = bottom;
+      return b;
+   }
+
+   /** The face that a face turns into when a block is turned a quarter clockwise (seen from above): north -> east -> south -> west. */
+   private static final int[] FACE_CW = {0, 1, 4, 5, 3, 2};
+
+   /** The box turned about the middle of the block by n quarter turns clockwise (seen from above). */
+   static double[] turn(double[] b, int n) {
+      double[] o = b.clone();
+      for (int i = 0; i < (n & 3); i++) {
+         double x0 = 1.0 - o[5];
+         double x1 = 1.0 - o[2];
+         double z0 = o[0];
+         double z1 = o[3];
+         o[0] = x0;
+         o[2] = z0;
+         o[3] = x1;
+         o[5] = z1;
+         int m = (int)o[6];
+         int r = m & 3;
+         for (int f = 2; f < 6; f++) {
+            if ((m >> f & 1) != 0) {
+               r |= 1 << FACE_CW[f];
+            }
+         }
+
+         o[6] = r;
+      }
+
+      return o;
+   }
+
+   static double[][] turnAll(double[][] boxes, int n) {
+      double[][] out = new double[boxes.length][];
+      for (int i = 0; i < boxes.length; i++) {
+         out[i] = turn(boxes[i], n);
+      }
+
+      return out;
+   }
+
+   /** The quarter turns (clockwise) that take a block that faces canonical to the facing (0 north, 1 south, 2 east, 3 west). */
+   static int turns(int canonical, int facing) {
+      int[] idx = {0, 2, 1, 3};
+      return (idx[facing] - idx[canonical] + 4) & 3;
    }
 
    // ------------------------------------------------------------------ gates and trapdoors: the state is in the id
@@ -399,7 +488,7 @@ final class Shapes {
          return new double[][]{trapBox(trap(trapKind(id), false, false, 0))};
       }
 
-      return null;
+      return isCarpet(id) ? new double[][]{{0.0, 0.0, 0.0, 1.0, 0.0625, 1.0}} : null;
    }
 
    /** Items that are drawn as a flat picture in the hand and in the inventory. */
@@ -426,6 +515,8 @@ final class Shapes {
          boxes = wallBoxes(nbr, false);
       } else if (isGate(id)) {
          boxes = gateBoxes(id);
+      } else if (isModel(id)) {
+         boxes = MODEL[id];
       } else {
          return;
       }
@@ -441,6 +532,16 @@ final class Shapes {
       int cell = Mesher.ci(x + 1, y + 1, z + 1);
       int own = s.L[cell] & 255;
       float[] uv = new float[2];
+      float tr = 1.0F;
+      float tg = 1.0F;
+      float tb = 1.0F;
+      if (b.length > 7 && b[7] >= 0) {
+         int c = (int)b[7];
+         tr = (c >> 16 & 255) / 255.0F;
+         tg = (c >> 8 & 255) / 255.0F;
+         tb = (c & 255) / 255.0F;
+      }
+
       for (int f = 0; f < 6; f++) {
          if ((hide >> f & 1) != 0) {
             continue;
@@ -467,23 +568,36 @@ final class Shapes {
             float px = (float)(corner[0] == 0 ? b[0] : b[3]);
             float py = (float)(corner[1] == 0 ? b[1] : b[4]);
             float pz = (float)(corner[2] == 0 ? b[2] : b[5]);
-            Mesher.uvFor(f, px, py, pz, uv);
+            if (b.length > 11 && b[11] != 0) {
+               Mesher.uvFor(f, (px - (float)b[0]) / (float)(b[3] - b[0]), (py - (float)b[1]) / (float)(b[4] - b[1]), (pz - (float)b[2]) / (float)(b[5] - b[2]), uv);
+            } else {
+               Mesher.uvFor(f, px, py, pz, uv);
+            }
+
             s.qx[i] = x + px;
             s.qy[i] = y + py;
             s.qz[i] = z + pz;
             s.qu[i] = uv[0];
             s.qv[i] = uv[1];
             float shade = Mesher.SHADE[f];
-            s.qr[i] = shade;
-            s.qg[i] = shade;
-            s.qb[i] = shade;
+            s.qr[i] = shade * tr;
+            s.qg[i] = shade * tg;
+            s.qb[i] = shade * tb;
             s.qa[i] = alpha;
             s.qm[i] = Mesher.lu(sky);
             s.ql[i] = Mesher.lu(blk);
          }
 
          s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
-         Mesher.emit(s, buf, tileOf(id, f), false);
+         int tile = tileOf(id, f);
+         if (b.length > 10) {
+            double o = f == 0 ? b[9] : (f == 1 ? b[10] : b[8]);
+            if (o >= 0) {
+               tile = (int)o;
+            }
+         }
+
+         Mesher.emit(s, buf, tile, false);
       }
    }
 
@@ -501,6 +615,11 @@ final class Shapes {
 
    /** What a block does when something next to it changes: a carpet whose floor is gone comes loose. */
    static void update(World w, int x, int y, int z, int id) {
+      if (Decor315.handlesUpdate(id)) {
+         Decor315.update(w, x, y, z, id);
+         return;
+      }
+
       if (isCarpet(id) && !Blocks.solid[w.getBlock(x, y - 1, z)]) {
          w.setBlock(x, y, z, 0);
          w.dropItem(x + 0.5, y + 0.3, z + 0.5, id, 1);

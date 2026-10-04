@@ -110,8 +110,8 @@ final class Tests311 {
          int checked = 0;
          for (int id = 1; id < Blocks.COUNT; id++) {
             int kind = Blocks.kind[id];
-            if (kind == 1 || kind == 7 || kind == 6 || id == Blocks.FIRE) {
-               continue; // plants / crops / flames are two-sided (next test), a fence's bars touch its post
+            if (kind == 1 || kind == 7 || kind == 6 || id == Blocks.FIRE || kind == Shapes.K_SHAPE) {
+               continue; // plants / crops / flames are two-sided (next test), a fence's bars touch its post, a model has legs and arms (Update 3.15: MeshView shows them)
             }
 
             List<float[][]> qs = quads(w, c, 5, y, 5, id);

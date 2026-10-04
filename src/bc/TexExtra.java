@@ -665,6 +665,10 @@ final class TexExtra {
    }
 
    static int[] sprite(int var0) {
+      if (var0 >= Decor315.BED_ITEM0 && var0 < 1000) {
+         return TexArt315.sprite(var0);
+      }
+
       if (var0 >= Items.QUARTZ) {
          return TexArt312.sprite(var0);
       }

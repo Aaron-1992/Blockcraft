@@ -3252,7 +3252,7 @@ public final class Game {
 
          if (Blocks.isBed(var4)) {
             boolean var7 = Blocks.isBedHead(var4);
-            int var8 = var4 - 133 & 3;
+            int var8 = Decor315.bedFacing(var4);
             int var9 = var8 == 2 ? 1 : (var8 == 3 ? -1 : 0);
             int var10 = var8 == 0 ? -1 : (var8 == 1 ? 1 : 0);
             int var11 = var7 ? var1 - var9 : var1 + var9;
@@ -3260,7 +3260,7 @@ public final class Game {
             this.world.setBlock(var11, var2, var12, 0);
             this.meshNow(var11, var2, var12);
             if (var7 && !this.player.creative) {
-               this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 289, 1);
+               this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }
 
@@ -3590,8 +3590,9 @@ public final class Game {
          }
 
          if (Blocks.solid[this.world.getBlock(var2, var3 - 1, var4)] && Blocks.solid[this.world.getBlock(var10, var3 - 1, var11)]) {
-            this.world.setBlock(var2, var3, var4, 133 + var7);
-            this.world.setBlock(var10, var3, var11, 137 + var7);
+            int var12 = Decor315.bedItemColor(var1.id);
+            this.world.setBlock(var2, var3, var4, Decor315.foot(var12, var7));
+            this.world.setBlock(var10, var3, var11, Decor315.head(var12, var7));
             this.meshNow(var2, var3, var4);
             this.meshNow(var10, var3, var11);
             if (!this.player.creative) {
@@ -3619,7 +3620,7 @@ public final class Game {
       }
 
       int var4 = this.world.getBlock(var1, var2, var3);
-      int var5 = var4 - 133 & 3;
+      int var5 = Decor315.bedFacing(var4);
       int var6 = var5 == 2 ? 1 : (var5 == 3 ? -1 : 0);
       int var7 = var5 == 0 ? -1 : (var5 == 1 ? 1 : 0);
       int var8 = Blocks.isBedHead(var4) ? var1 - var6 : var1;
@@ -3936,8 +3937,12 @@ public final class Game {
          return this.placeDoor(var1);
       }
 
-      if (var1 != null && var1.id == 289) {
+      if (var1 != null && Decor315.isBedItem(var1.id)) {
          return this.placeBed(var1);
+      }
+
+      if (var1 != null && Decor315.isBannerItem(var1.id)) {
+         return Decor315.placeBanner(this, var1);
       }
 
       if (var1 != null && Blocks.isBlockId(var1.id) && Shapes.placesSpecially(var1.id)) {
