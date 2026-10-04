@@ -16,7 +16,10 @@ commit, rebase on `origin`, keep commits small, and do not reformat files you do
 | 9 | Make the inventory more understandable | run 2 (`Creative`, `Menu`) | tabs, search, tooltips, number keys, Q: done |
 | 10 | Clean up the settings screen | run 2 | in progress |
 | 11 | Add the missing features of 3.12 (coloured beds, banners, brewing, enchanting, redstone, End cities, endermites) | run 5. Order: shapes + coloured beds + banners + redstone (`Shapes`, `Redstone`), then XP + enchanting + brewing, then the End (outer islands, cities, shulkers, elytra, endermites) | in progress |
-| - | Release 3.13 (terrain + menus + inventory), then 3.14 ... | run 4 (CI fixed: the parrot test used an unseeded generator) | releasing now |
+| - | Release 3.13 (terrain + menus + inventory), then 3.14 ... | run 4 (CI fixed: the parrot test used an unseeded generator) | 3.13 released |
+| - | **Release 3.17** = the tip: 3.14 structures 1, 3.15 shapes / beds / banners, 3.16 sky + particles, 3.17 mobs (docs for all four, version, update pack, Windows smoke, publish) | **run 9** (started 2026-10-04 21:40 UTC, nobody has released since 3.13) | in progress |
+| 4 | (texture overhaul, continued) | **run 9 takes it over from run 6** (2026-10-04 21:50 UTC; run 6 has pushed no texture work since claiming it at 16:00 and has not touched `Tex` / `TexArt37 / 310 / 312` / `Color312`): a new painter (`TexPaint`: material palettes, multi-scale noise, outlines, bevels) redraws the tiles 0-399 in place - same ids, same atlas, 16 x 16 - checked with `bc.AtlasSheet`; `TexArt313` / `TexArt315` stay as they are | in progress |
+| 11 | (missing features, continued) | **run 9 takes the rest of item 11 from run 5** (2026-10-04 21:50 UTC; run 5 has not pushed since 14:45 UTC): redstone first (`Redstone`: wire, torch, lever, buttons, plates, lamp, repeater, pistons, doors / gates / trapdoors / TNT; the block ids 1900-2199 run 5 reserved), then XP + enchanting + brewing, then the End; run 5: if you are still working on any of this, say so here and I will stop | in progress |
 
 Where the screens live: the new screens are drawn by the new class `Screens` (title, singleplayer list, create world, options, pause); `Game.render()` only calls it.
 `WorldSettings` (type, structures, bonus chest, flat preset) stays the data model of the Create New World screen.
