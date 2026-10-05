@@ -610,6 +610,7 @@ SCENES = {
     "dragon-down":    (DRAGON + ["-Dbc.mobpose=walk=3.8,amp=1,air=1"] + PLAIN + ["-Dbc.shot=110"], True),
     "dragon-up":      (DRAGON + ["-Dbc.mobpose=walk=10.0,amp=1,air=1"] + PLAIN + ["-Dbc.shot=110"], True),
     "dragon-side":    (DRAGON + ["-Dbc.summonYaw=90", "-Dbc.mobpose=walk=3.8,amp=1,air=1"] + PLAIN + ["-Dbc.shot=110"], True),
+    "dragon-close":   (COMMON + ["-Dbc.cam=140.5,96,74.5,0,4", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=enderdragon", "-Dbc.summonDist=11", "-Dbc.summonDy=-3", "-Dbc.still=1", "-Dbc.mobpose=walk=3.8,amp=1,air=1"] + PLAIN + ["-Dbc.shot=110"], True),
     "dragon-above":   (COMMON + ["-Dbc.cam=140.5,120,74.5,0,40", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.summon=enderdragon", "-Dbc.summonDist=20", "-Dbc.summonDy=-17", "-Dbc.still=1", "-Dbc.mobpose=walk=3.8,amp=1,air=1"] + PLAIN + ["-Dbc.shot=110"], True),
     # ---- Update 3.18: the body of the player in motion; bc.posestate holds it in a state (see Game.POSE_STATE), bc.bodyyaw turns it to the side
     "pl-walk":        (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=65", "-Dbc.skin=demo", "-Dbc.posestate=phase=0.9,amp=0.86", "-Dbc.time=6000", "-Dbc.weather=calm"] + PLAIN + ["-Dbc.shot=110"], True),

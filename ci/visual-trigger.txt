@@ -1,2 +1,2 @@
-dragon-top,dragon-down,dragon-up,dragon-side,dragon-above
+dragon-close,mobs317-villagers,mobs317-nether,mobs317-folk
 jar=build

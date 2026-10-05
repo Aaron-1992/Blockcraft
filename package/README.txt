@@ -9,7 +9,7 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
 
-WHAT'S NEW IN UPDATE 3.18  (the real graphics card, less work per picture, a frame timer, the first repainted textures)
+WHAT'S NEW IN UPDATE 3.18  (the real graphics card, less work per picture, a frame timer, the first repainted textures, a new villager, blaze, player body and dragon)
   * THE REAL GRAPHICS CARD. A laptop usually has two graphics chips: a weak one inside the processor (Intel UHD / Iris, AMD "Radeon Graphics") and a real graphics card (GeForce, Radeon RX). Windows hands a program
     the weak one unless the program is on its list, and a Java game never is - so the whole game ran on the weak chip. Blockcraft now puts its own Java (javaw.exe, java.exe) on that list - "Settings > System > Display >
     Graphics" - as "High performance" the first time it starts (it writes the same registry entry that page writes; nothing is installed). A program picks its chip when it starts, so if that very first start still lands on the
@@ -31,10 +31,20 @@ WHAT'S NEW IN UPDATE 3.18  (the real graphics card, less work per picture, a fra
     - send it to whoever is making the game faster for you).
   * FIRST REPAINTED TEXTURES. Stone, cobblestone, dirt, sand, gravel, grass, logs, leaves, planks, ores, snow, wool, sandstone, glowstone, obsidian, stone bricks, mossy cobblestone, the crafting table, the furnace, the
     chest and the spawner are painted again (same places in the atlas: nothing in your worlds changes), the water and the lava have new frames, and the ground stays sharp where you look along it (anisotropic filtering).
-  * Honest notes. 1,627,000+ checks run without a screen (the rays above, the connectivity of every kind of tunnel, the registry commands against a pretend registry, the frame timer against a clock that is moved by hand), the
-    culling and the shadow map were compared picture against picture in the real game with a software renderer, and the start of a second process was tried in the real Blockcraft.exe on a Windows test machine. NOBODY has run
-    any of it on a computer with two real graphics chips: whether Windows really hands the game to your graphics card, how many frames the changes bring there, whether the frame timer's numbers agree with your
-    task manager - all a first guess. Press Shift+F3 and F3 and look at "GPU:". Still no sound. Not yet: redstone, brewing, enchanting, banner patterns, temples, igloos and shipwrecks, a new player body with elbows and knees.
+  * A NEW VILLAGER AND A NEW BLAZE (the two that looked worst). The villager has a robe that flares towards the ground, boots, folded arms with elbows and hands, ears, a long hooked nose, a heavy brow and hair, and an outfit for
+    each profession - the farmer's straw hat, the librarian's glasses, the priest's purple cap, the blacksmith's apron, the butcher's apron - painted on a skin with twice the old resolution. The blaze has a crown of flames on its head,
+    flares, a glowing ember core, rods made of segments that circle round it and embers that rise off it; its flames flicker.
+  * A NEW BODY FOR YOU (F5 shows it). Your legs have hips and knees and your arms have shoulders and elbows, and the body leans, twists and rolls about the hips while the head keeps looking where you look. It walks with real steps and
+    swinging arms, runs leaning forward, crouches with bent knees and a rounded back when you sneak, tucks the legs up in a jump and bends them on landing, swims (crawl: the arms go over the head), treads water, climbs a ladder hand over
+    hand, flies with the legs trailing, swings the arm with the shoulder when you hit, raises the food to the mouth when you eat, draws the bow with one arm out and one pulled back, and flinches when it is hurt. One state fades into the next - nothing jumps.
+  * A DRAGON THAT FLIES. Each wing has a shoulder, an elbow, a wrist and three fingers with the membrane between them. The beat is 60 % down and 40 % up, every joint a little behind the one before it, and the wing folds in
+    on the upstroke; the dragon banks into its turns, points its nose up in a climb and down in a dive, its neck of five pieces and its tail of nine wave one after the other, the legs dangle, and on the perch it stretches its wings.
+  * Honest notes. 1,654,000+ checks run without a screen (the rays above, the connectivity of every kind of tunnel, the registry commands against a pretend registry, the frame timer against a clock that is moved by hand, every joint
+    angle of the new body, every clip of the new villager, blaze and dragon for finite, smooth numbers). The culling and the shadow map were compared picture against picture in the real game with a software renderer, the new bodies
+    were drawn by a small software viewer and by the real game, and the start of a second process was tried in the real Blockcraft.exe on a Windows test machine. NOBODY has run any of it on a computer with two real graphics
+    chips: whether Windows really hands the game to your graphics card, how many frames the changes bring there, whether the frame timer's numbers agree with your task manager, how the new walk feels in your hands - all a first
+    guess. Press Shift+F3 and F3 and look at "GPU:". Still no sound. Not yet: redstone, brewing, enchanting, banner patterns, temples, igloos and shipwrecks, new textures for most blocks and items, new bodies for the other mobs
+    (iron golem, ghast, pigman ...).
 
 WHAT'S NEW IN UPDATE 3.17  (new villages, new block shapes, beds and banners in 16 colours, a new sky, mobs with jointed bodies)
   * NEW VILLAGES (worlds you create with any world type except CLASSIC - older worlds keep their villages, so nothing you built moves). A village is planned on a grid of streets now: a main street with
