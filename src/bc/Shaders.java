@@ -78,6 +78,24 @@ public final class Shaders {
    int bloomFbo1;
    int bloomTex0;
    int bloomTex1;
+   /** Update 3.19: the wider levels of the glow: quarter size (2, 3) and eighth size (4, 5), framebuffer and texture of each of the two ping-pong buffers. */
+   int bloomFbo2;
+   int bloomFbo3;
+   int bloomTex2;
+   int bloomTex3;
+   int bloomFbo4;
+   int bloomFbo5;
+   int bloomTex4;
+   int bloomTex5;
+   /** Update 3.19: the extra effects (glow ...) compiled; false = the programs of Update 3.18 run (a graphics driver refused the new ones). */
+   public boolean fxOk;
+   /** Update 3.19: set by the renderer every frame: the scene's alpha channel carries the glow mask of the light sources (Options.fx >= 1). */
+   public boolean glowOn;
+   /** Update 3.19: Options.look (see {@link Look}) and Options.fx (0..2), set by the game every frame. */
+   public int look = Look.DEFAULT;
+   public int fxLevel = 1;
+   float[] emT;
+   static final float[] NO_EMIT = new float[32];
    int fw;
    int fh;
    final HashMap<String, Integer> locs = new HashMap();
@@ -109,9 +127,10 @@ public final class Shaders {
       new CharSequence[]{
          "#version 120",
          "uniform sampler2D scene;",
+         "uniform float emis;               // Update 3.19: 1 = the alpha channel of the scene marks light sources (lava, torches ...): they glow, whatever their brightness",
          "varying vec2 vUv;",
-         "void main(){ vec3 c = texture2D(scene, vUv).rgb; float l = min(c.r, min(c.g, c.b));",
-         "  float k = smoothstep(0.78, 1.0, l); gl_FragColor = vec4(c * k, 1.0); }"
+         "void main(){ vec4 s = texture2D(scene, vUv); vec3 c = s.rgb; float l = min(c.r, min(c.g, c.b));",
+         "  float k = max(smoothstep(0.78, 1.0, l), s.a * emis); gl_FragColor = vec4(c * k, 1.0); }"
       }
    );
    static final String BLUR_FS = String.join(
@@ -182,7 +201,22 @@ public final class Shaders {
             throw new RuntimeException("OpenGL 3.0 required");
          }
 
-         this.pWorld = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WORLD_FS);
+         // Update 3.19: the programs with the extra effects first; a driver that refuses them still gets the programs of Update 3.18
+         this.fxOk = false;
+         if (!Boolean.getBoolean("bc.nofx")) {
+            try {
+               this.pWorld = this.program(ShaderSrc.WORLD_VS_FX, ShaderSrc.WORLD_FS_FX);
+               this.fxOk = true;
+            } catch (Throwable fxErr) {
+               this.fxOk = false;
+               System.err.println("Shader effects disabled (the plain terrain program is used): " + fxErr.getMessage());
+            }
+         }
+
+         if (!this.fxOk) {
+            this.pWorld = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WORLD_FS);
+         }
+
          this.pDepth = this.program(DEPTH_VS, DEPTH_FS);
          try {
             this.pEntity = this.program(ShaderSrc.ENTITY_VS, ShaderSrc.ENTITY_FS);
@@ -193,7 +227,18 @@ public final class Shaders {
          }
 
          try {
-            this.pWater = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
+            try {
+               this.pWater = this.fxOk ? this.program(ShaderSrc.WORLD_VS_FX, ShaderSrc.WATER_FS_FX) : this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
+            } catch (Throwable waterFx) {
+               if (!this.fxOk) {
+                  throw waterFx;
+               }
+
+               // the terrain program takes the effects but the water program does not: the water keeps the picture of Update 3.18 (its glow mask is then simply missing)
+               System.err.println("Water effects disabled: " + waterFx.getMessage());
+               this.pWater = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
+            }
+
             this.waterOk = true;
          } catch (Throwable var7) {
             this.waterOk = false;
@@ -273,6 +318,18 @@ public final class Shaders {
             GL11.glDeleteTextures(this.bloomTex0);
             GL11.glDeleteTextures(this.bloomTex1);
             GL11.glDeleteTextures(this.sceneDepth);
+            if (this.bloomFbo2 != 0) {
+               GL30.glDeleteFramebuffers(this.bloomFbo2);
+               GL30.glDeleteFramebuffers(this.bloomFbo3);
+               GL30.glDeleteFramebuffers(this.bloomFbo4);
+               GL30.glDeleteFramebuffers(this.bloomFbo5);
+               GL11.glDeleteTextures(this.bloomTex2);
+               GL11.glDeleteTextures(this.bloomTex3);
+               GL11.glDeleteTextures(this.bloomTex4);
+               GL11.glDeleteTextures(this.bloomTex5);
+               this.bloomFbo2 = 0;
+            }
+
             if (this.rayFbo != 0) {
                GL30.glDeleteFramebuffers(this.rayFbo);
                GL11.glDeleteTextures(this.rayTex);
@@ -310,6 +367,19 @@ public final class Shaders {
          this.bloomFbo0 = this.fbo(this.bloomTex0);
          this.bloomTex1 = this.tex2d(var4, var5);
          this.bloomFbo1 = this.fbo(this.bloomTex1);
+         // Update 3.19: the wider levels of the glow (quarter and eighth of the scene's size)
+         int q4 = Math.max(1, var4 / 2);
+         int q5 = Math.max(1, var5 / 2);
+         int e4 = Math.max(1, var4 / 4);
+         int e5 = Math.max(1, var5 / 4);
+         this.bloomTex2 = this.tex2d(q4, q5);
+         this.bloomFbo2 = this.fbo(this.bloomTex2);
+         this.bloomTex3 = this.tex2d(q4, q5);
+         this.bloomFbo3 = this.fbo(this.bloomTex3);
+         this.bloomTex4 = this.tex2d(e4, e5);
+         this.bloomFbo4 = this.fbo(this.bloomTex4);
+         this.bloomTex5 = this.tex2d(e4, e5);
+         this.bloomFbo5 = this.fbo(this.bloomTex5);
          this.cw = var4;
          this.ch = var5;
          this.rayTex = this.tex2d(this.cw, this.ch);
@@ -598,6 +668,10 @@ public final class Shaders {
       this.u1f(prog, "shadowOn", var15 ? 1.0F : 0.0F);
       GL20.glUniform4fv(this.loc(prog, "dynL[0]"), this.dynL);
       GL20.glUniform4fv(this.loc(prog, "dynC[0]"), this.dynC);
+      if (this.fxOk) {
+         GL20.glUniform2fv(this.loc(prog, "emT[0]"), this.emissiveTiles());
+      }
+
       GL13.glActiveTexture(33986);
       GL11.glBindTexture(3553, this.shadowTex);
       GL13.glActiveTexture(33984);
@@ -666,6 +740,7 @@ public final class Shaders {
       if (var1 > 0 && var2 > 0) {
          this.resize(var1, var2);
          if (this.ok) {
+            GL11.glColorMask(true, true, true, true);
             this.sceneActive = true;
             GL30.glBindFramebuffer(36160, this.sceneFbo);
             GL11.glViewport(0, 0, var1, var2);
@@ -757,6 +832,82 @@ public final class Shaders {
       this.endScene(var1, var2, var1, var2, var3);
    }
 
+   /** Update 3.19: blurs the picture in texture {@code texA} (framebuffer {@code fboA}) {@code rounds} times, horizontally into B and vertically back into A. */
+   void blurLevel(int fboA, int texA, int fboB, int texB, int w, int h, int rounds) {
+      GL20.glUseProgram(this.pBlur);
+      this.u1i(this.pBlur, "img", 0);
+      for (int i = 0; i < rounds; i++) {
+         GL30.glBindFramebuffer(36160, fboB);
+         GL11.glViewport(0, 0, w, h);
+         GL20.glUniform2f(this.loc(this.pBlur, "dir"), 1.0F / w, 0.0F);
+         GL11.glBindTexture(3553, texA);
+         this.quad();
+         GL30.glBindFramebuffer(36160, fboA);
+         GL20.glUniform2f(this.loc(this.pBlur, "dir"), 0.0F, 1.0F / h);
+         GL11.glBindTexture(3553, texB);
+         this.quad();
+      }
+   }
+
+   /** Update 3.19: draws texture {@code src} (twice the size) into {@code fbo} ({@code w x h}): the blur program with no offset is a plain smooth copy. */
+   void shrink(int fbo, int src, int w, int h) {
+      GL30.glBindFramebuffer(36160, fbo);
+      GL11.glViewport(0, 0, w, h);
+      GL20.glUseProgram(this.pBlur);
+      this.u1i(this.pBlur, "img", 0);
+      GL20.glUniform2f(this.loc(this.pBlur, "dir"), 0.0F, 0.0F);
+      GL11.glBindTexture(3553, src);
+      this.quad();
+   }
+
+   /** Update 3.19: the tiles of the blocks that give light, as (tile, strength) pairs for the terrain shader; all zero while the glow is off. */
+   float[] emissiveTiles() {
+      if (!this.glowOn) {
+         return NO_EMIT;
+      }
+
+      if (this.emT == null) {
+         this.emT = computeEmissive();
+      }
+
+      return this.emT;
+   }
+
+   /** Update 3.19: (tile, strength) x 16 for the tiles that only blocks giving light (emit >= 12) use: the pumpkin's skin is also on the jack o'lantern, the furnace's cobblestone sides too - those do not glow. */
+   static float[] computeEmissive() {
+      int n = Tex.COLS * Tex.COLS;
+      boolean[] lit = new boolean[n];
+      boolean[] plain = new boolean[n];
+      for (int id = 1; id < Blocks.MAX; id++) {
+         if (Blocks.name[id] == null) {
+            continue;
+         }
+
+         for (int f = 0; f < 6; f++) {
+            int t = Blocks.tiles[id][f];
+            if (t >= 0 && t < n) {
+               if (Blocks.emit[id] >= 12) {
+                  lit[t] = true;
+               } else {
+                  plain[t] = true;
+               }
+            }
+         }
+      }
+
+      float[] a = new float[32];
+      int k = 0;
+      for (int t = 0; t < n && k < 16; t++) {
+         if (lit[t] && !plain[t]) {
+            a[k * 2] = t;
+            a[k * 2 + 1] = 1.0F;
+            k++;
+         }
+      }
+
+      return a;
+   }
+
    /**
     * Update 3.18: {@code var1 x var2} is the size of the scene that was drawn (the render scale makes it smaller than the window), {@code outW x outH} the
     * size of the window the finished picture is stretched to.
@@ -780,24 +931,26 @@ public final class Shaders {
          GL13.glActiveTexture(33984);
          GL11.glEnable(3553);
          GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+         // Update 3.19: with the glow on (Options.fx >= 1) the alpha channel of the scene marks the light sources; the glow is blurred at three sizes
+         boolean glow = this.glowOn && this.fxOk && this.bloomFbo2 != 0;
+         GL11.glColorMask(true, true, true, true);
          GL30.glBindFramebuffer(36160, this.bloomFbo0);
          GL11.glViewport(0, 0, var4, var5);
          GL20.glUseProgram(this.pBright);
          this.u1i(this.pBright, "scene", 0);
+         this.u1f(this.pBright, "emis", glow ? 1.0F : 0.0F);
          GL11.glBindTexture(3553, this.sceneTex);
          this.quad();
-
-         for (int var6 = 0; var6 < 2; var6++) {
-            GL30.glBindFramebuffer(36160, this.bloomFbo1);
-            GL20.glUseProgram(this.pBlur);
-            this.u1i(this.pBlur, "img", 0);
-            GL20.glUniform2f(this.loc(this.pBlur, "dir"), 1.0F / var4, 0.0F);
-            GL11.glBindTexture(3553, this.bloomTex0);
-            this.quad();
-            GL30.glBindFramebuffer(36160, this.bloomFbo0);
-            GL20.glUniform2f(this.loc(this.pBlur, "dir"), 0.0F, 1.0F / var5);
-            GL11.glBindTexture(3553, this.bloomTex1);
-            this.quad();
+         this.blurLevel(this.bloomFbo0, this.bloomTex0, this.bloomFbo1, this.bloomTex1, var4, var5, 2);
+         if (glow) {
+            int q4 = Math.max(1, var4 / 2);
+            int q5 = Math.max(1, var5 / 2);
+            int e4 = Math.max(1, var4 / 4);
+            int e5 = Math.max(1, var5 / 4);
+            this.shrink(this.bloomFbo2, this.bloomTex0, q4, q5);
+            this.blurLevel(this.bloomFbo2, this.bloomTex2, this.bloomFbo3, this.bloomTex3, q4, q5, 2);
+            this.shrink(this.bloomFbo4, this.bloomTex2, e4, e5);
+            this.blurLevel(this.bloomFbo4, this.bloomTex4, this.bloomFbo5, this.bloomTex5, e4, e5, 2);
          }
 
          GL30.glBindFramebuffer(36160, 0);
@@ -805,6 +958,14 @@ public final class Shaders {
          GL20.glUseProgram(this.pComp);
          this.u1i(this.pComp, "scene", 0);
          this.u1i(this.pComp, "bloom", 1);
+         this.u1i(this.pComp, "bloom2", 3);
+         this.u1i(this.pComp, "bloom3", 4);
+         int lk = Look.clamp(this.look);
+         GL20.glUniform3f(this.loc(this.pComp, "bloomW"), glow ? 0.55F : 1.0F, glow ? 0.40F : 0.0F, glow ? 0.35F : 0.0F);
+         GL20.glUniform4f(this.loc(this.pComp, "grA"), Look.A[lk][0], Look.A[lk][1], Look.A[lk][2], Look.A[lk][3]);
+         GL20.glUniform4f(this.loc(this.pComp, "grB"), Look.A[lk][4], Look.A[lk][5], Look.A[lk][6], 0.0F);
+         GL20.glUniform3f(this.loc(this.pComp, "grS"), Look.SHADOW[lk][0], Look.SHADOW[lk][1], Look.SHADOW[lk][2]);
+         GL20.glUniform3f(this.loc(this.pComp, "grH"), Look.HIGH[lk][0], Look.HIGH[lk][1], Look.HIGH[lk][2]);
          this.u1f(this.pComp, "strength", var3);
          this.u1f(this.pComp, "uw", this.underwater);
          this.u1f(this.pComp, "time", (float)Perf.seconds(3600.0));
@@ -815,12 +976,20 @@ public final class Shaders {
          GL13.glActiveTexture(33986);
          GL11.glBindTexture(3553, this.rayTex);
          GL20.glUniform2f(this.loc(this.pComp, "invRes"), 1.0F / var1, 1.0F / var2);
+         GL13.glActiveTexture(33987);
+         GL11.glBindTexture(3553, glow ? this.bloomTex2 : this.bloomTex0);
+         GL13.glActiveTexture(33988);
+         GL11.glBindTexture(3553, glow ? this.bloomTex4 : this.bloomTex0);
          GL13.glActiveTexture(33985);
          GL11.glBindTexture(3553, this.bloomTex0);
          GL13.glActiveTexture(33984);
          GL11.glBindTexture(3553, this.sceneTex);
          this.quad();
          GL20.glUseProgram(0);
+         GL13.glActiveTexture(33987);
+         GL11.glBindTexture(3553, 0);
+         GL13.glActiveTexture(33988);
+         GL11.glBindTexture(3553, 0);
          GL13.glActiveTexture(33985);
          GL11.glBindTexture(3553, 0);
          GL13.glActiveTexture(33984);

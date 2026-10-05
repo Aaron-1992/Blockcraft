@@ -1,2 +1,2 @@
-day-shaders,water-day-sh,water-sunset-sh,sky-sunset-sh,mobs-torch-sh,nether-vista-sh,village-folk-sh,under-map-sh
+gfx-glow-night,gfx-glow-night-low,nether-vista-sh,gfx-nether-low,mobs-torch-sh,gfx-look-vivid,gfx-look-classic,gfx-look-cinematic,gfx-look-dreamy
 jar=build

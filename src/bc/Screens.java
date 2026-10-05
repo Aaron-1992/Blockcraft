@@ -357,7 +357,7 @@ final class Screens {
             rows = 5;
             break;
          case 1:
-            rows = 3;
+            rows = 4;
             break;
          case 2:
             rows = 3;
@@ -385,7 +385,7 @@ final class Screens {
 
       ui.endScroll(x0, top, pw, viewH, content);
       String[] about = {
-         "Resolution, distance and the window.", "Looks: shadows, water, clouds, leaves.", "How the game plays and how the mouse feels.",
+         "Resolution, distance and the window.", "Looks: shadows, water, clouds, colours, glow.", "How the game plays and how the mouse feels.",
          "The keys of the game. They cannot be changed yet."
       };
       ui.drawHint(x0, hintY, pw, hintH, about[ui.optTab] + (ui.optTab == 3 ? "" : "  Point at a setting to see what it does."));
@@ -472,8 +472,11 @@ final class Screens {
    static void graphicsTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
       Ui ui = g.ui;
       if (shows(oy, row, top, viewH)) {
-         ui.button("Shaders: " + (!o.shaders ? "\u00a7cOFF" : (o.waterQ >= 2 ? "\u00a7bFANCY" : "\u00a7aON")), x0, oy, colW, 20.0F, true,
-            "ON: sun shadows, glowing light and water with depth. FANCY: the water also mirrors the land. OFF is the fastest.", () -> {
+         String problem = g.shaderProblem();
+         ui.button("Shaders: " + (problem != null ? "\u00a7cUNAVAILABLE" : (!o.shaders ? "\u00a7cOFF" : (o.waterQ >= 2 ? "\u00a7bFANCY" : "\u00a7aON"))), x0, oy, colW, 20.0F, true,
+            problem != null
+               ? "This graphics chip's driver could not start the shader pack, so the game draws the plain picture. Reason: " + problem + " (more in latest.log). F3 shows the same."
+               : "ON: sun shadows, glowing light and water with depth. FANCY: the water also mirrors the land. OFF is the fastest.", () -> {
                if (!o.shaders) {
                   o.shaders = true;
                   o.waterQ = 1;
@@ -503,6 +506,15 @@ final class Screens {
       oy += row;
       if (shows(oy, row, top, viewH)) {
          ui.toggle("Weather", o.weather, x0, oy, colW, 20.0F, "Rain, snow and thunderstorms. Off leaves only fair-weather clouds.", () -> o.weather = !o.weather);
+         ui.button("Look: " + Look.label(o.look), x1, oy, colW, 20.0F, true,
+            Look.info(o.look) + " Click for the next look: Classic, Vivid, Cinematic, Dreamy. Needs Shaders ON.", () -> o.look = Look.next(o.look));
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Effects: " + new String[]{"\u00a77LOW", "\u00a7aMEDIUM", "\u00a7bHIGH"}[Math.max(0, Math.min(2, o.fx))], x0, oy, colW, 20.0F, true,
+            "LOW: the picture of Update 3.18. MEDIUM: lava, fire and torches glow, clouds throw shadows on the land, the ground is wet and shiny in rain. HIGH: also soft shadows in corners and under trees (a little slower). Needs Shaders ON.",
+            () -> o.fx = (o.fx + 1) % 3);
       }
    }
 

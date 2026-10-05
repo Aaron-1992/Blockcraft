@@ -14,6 +14,10 @@ final class ShaderSrc {
          "uniform vec2 flowerTiles;",
          "uniform float waterTile;",
          "uniform float waves;",
+         "#ifdef FX",
+         "uniform vec2 emT[16];                 // Update 3.19: the tiles of the blocks that give light (x = tile, y = how much they glow; 0 = unused)",
+         "varying float vEmis;",
+         "#endif",
          "varying vec2 vUv;",
          "varying vec2 vLm;",
          "varying vec4 vCol;",
@@ -48,6 +52,10 @@ final class ShaderSrc {
          "    }",
          "  }",
          "  if (inTile(uv, waterTile)) vWater = 1.0;",
+         "#ifdef FX",
+         "  vEmis = 0.0;",
+         "  for (int i = 0; i < 16; i++) { if (emT[i].y > 0.0 && inTile(uv, emT[i].x)) vEmis = emT[i].y; }",
+         "#endif",
          "  vRelS = rel;                 // un-waved position: used for the shadow lookup so swaying foliage doesn't shimmer",
          "  rel += disp;",
          "  eye += view * vec4(disp, 0.0);",
@@ -92,6 +100,9 @@ final class ShaderSrc {
          "varying vec3 vWorld;",
          "varying float vWater;",
          "varying float vDepth;",
+         "#ifdef FX",
+         "varying float vEmis;",
+         "#endif",
          "vec3 waterNormal(vec3 p, float time, float d){",
          "  float a1 = 1.0 - smoothstep(40.0, 220.0, d);",
          "  float a2 = 1.0 - smoothstep(20.0, 90.0, d);",
@@ -156,6 +167,11 @@ final class ShaderSrc {
          "  }",
          "  vec3 c = t.rgb * vCol.rgb * (L * shadeC + dyn);",
          "  float a = t.a * vCol.a;",
+         "#ifdef FX",
+         "  // Update 3.19: faces of light sources (lava, fire, torches, glowstone ...) shine by themselves and mark themselves in the alpha channel of the scene: the bloom turns that mask into a glow",
+         "  float glow = vEmis * smoothstep(0.30, 0.62, dot(t.rgb, vec3(0.299, 0.587, 0.114)));",
+         "  c += t.rgb * (glow * 0.22);",
+         "#endif",
          "  if (vWater > 0.5) {",
          "    vec3 N = waterNormal(vWorld, time, vDepth);",
          "    vec3 V = normalize(vRel);",
@@ -173,7 +189,11 @@ final class ShaderSrc {
          "  }",
          "  float f = clamp((fogRange.y - vDepth) / max(0.001, fogRange.y - fogRange.x), 0.0, 1.0);",
          "  c = mix(fogWithSun(fogColor, vRel, sunDir, sunUp), c, f);",
+         "#ifdef FX",
+         "  gl_FragColor = vec4(c, isTrans < 0.5 ? glow * f : a);",
+         "#else",
          "  gl_FragColor = vec4(c, a);",
+         "#endif",
          "}",
          ""
       }
@@ -320,6 +340,24 @@ final class ShaderSrc {
       }
    );
    static final String WATER_FS = deriveWater();
+
+   /**
+    * Update 3.19: the terrain and water programs once more with {@code #define FX}: the extra effects of the shader pack (glowing light sources and what
+    * follows). They are separate programs so that a graphics driver that refuses one of the new effects costs only the new effects: the game then
+    * runs the programs of Update 3.18 (see Shaders.init).
+    */
+   static final String WORLD_VS_FX = fx(WORLD_VS);
+   static final String WORLD_FS_FX = fx(WORLD_FS);
+   static final String WATER_FS_FX = fx(WATER_FS);
+
+   static String fx(String src) {
+      String v = "#version 120\n";
+      if (!src.startsWith(v)) {
+         throw new IllegalStateException("a shader does not start with its version line");
+      }
+
+      return v + "#define FX 1\n" + src.substring(v.length());
+   }
 
    static String deriveWater() {
       String s = WORLD_FS;
@@ -729,6 +767,13 @@ final class ShaderSrc {
          "#version 120",
          "uniform sampler2D scene;",
          "uniform sampler2D bloom;",
+         "uniform sampler2D bloom2;          // Update 3.19: the same glow blurred wider (quarter and eighth of the size)",
+         "uniform sampler2D bloom3;",
+         "uniform vec3 bloomW;               // how much of each of the three levels (y = 0: only the first one)",
+         "uniform vec4 grA;                  // the Look: colour strength, S-curve, exposure, vignette",
+         "uniform vec4 grB;                  // bloom multiplier, film grain, black lift",
+         "uniform vec3 grS;                  // tint of the dark parts",
+         "uniform vec3 grH;                  // tint of the bright parts",
          "uniform float strength;",
          "uniform vec2 invRes;",
          "uniform sampler2D rays;",
@@ -788,18 +833,25 @@ final class ShaderSrc {
          "    float fall = 1.0 - smoothstep(0.05, 0.95, dist);",
          "    c += rayCol * (acc * rayAmt * fall * (1.0 - 0.9 * self));",
          "  }",
-         "  c += texture2D(bloom, vUv).rgb * strength;",
+         "  vec3 bl = texture2D(bloom, vUv).rgb * bloomW.x;",
+         "  if (bloomW.y > 0.0) bl += texture2D(bloom2, vUv).rgb * bloomW.y + texture2D(bloom3, vUv).rgb * bloomW.z;",
+         "  c += bl * (strength * grB.x);",
          "  if (uw > 0.001) {",
          "    // under water: light patterns drift over everything (more at the top, where the light comes from), the colours turn blue-green",
          "    float cau = caustic(vUv * vec2(6.0, 3.4), time);",
          "    c += vec3(0.50, 0.85, 1.0) * cau * 0.09 * (0.35 + 0.65*vUv.y) * uw;",
          "    c = mix(c, c * vec3(0.80, 0.96, 1.04), 0.6 * uw);",
          "  }",
+         "  float mx = max(c.r, max(c.g, c.b));",
+         "  if (mx > 1.0) c = mix(c / mx, vec3(1.0), clamp((mx - 1.0) * 0.5, 0.0, 0.7));   // light that is brighter than the screen can show turns white-hot instead of clipping to one colour",
          "  float l = luma(c);",
-         "  c = mix(vec3(l), c, 1.10);                       // saturation",
-         "  c = mix(c, c*c*(3.0 - 2.0*c), 0.20);             // gentle S-curve",
-         "  c = c * 1.03 - 0.010;",
-         "  vec2 q = vUv - 0.5; c *= 1.0 - dot(q, q) * 0.35;",
+         "  c = mix(vec3(l), c, grA.x);                      // colour strength",
+         "  c *= mix(grS, grH, smoothstep(0.04, 0.80, l));   // the tint of the shadows and of the highlights",
+         "  c = clamp(c, 0.0, 1.0);",
+         "  c = mix(c, c*c*(3.0 - 2.0*c), grA.y);            // S-curve",
+         "  c = c * grA.z - 0.010 + grB.z;",
+         "  vec2 q = vUv - 0.5; c *= 1.0 - dot(q, q) * grA.w;",
+         "  if (grB.y > 0.0) c += (fract(sin(dot(gl_FragCoord.xy + fract(time) * 61.0, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) * grB.y;",
          "  gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);",
          "}",
          ""

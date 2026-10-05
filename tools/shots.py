@@ -332,6 +332,21 @@ def torch_blocks():
 
 
 # name -> (props, only_new)
+def glow_blocks():
+    """Night scene for the glowing light sources (Update 3.19): a lava pond, two glowstone blocks, a jack o'lantern and torches on the cleared strip."""
+    out = []
+    gy = 66
+    for z in range(72, 80):
+        for x in range(136, 152):
+            for y in range(gy + 1, gy + 6):
+                out.append((x, y, z, 0))
+    for z in (74, 75, 76):
+        for x in range(141, 146):
+            out.append((x, gy, z, 58))
+    out += [(147, gy + 1, 75, 25), (147, gy + 2, 75, 25), (148, gy + 1, 75, 166), (139, gy + 1, 75, 32), (150, gy + 1, 77, 32), (140, gy + 1, 78, 32), (146, gy + 1, 78, 32)]
+    return out
+
+
 def portal_blocks(x, y, z, axis=0):
     """Update 3.12: an obsidian frame (4 x 5, corners left out) with the portal film in it; (x, y, z) = bottom corner of the 2 x 3 interior."""
     out = []
@@ -664,8 +679,16 @@ SCENES = {
     "perf-shadow-low": (TERRA + ["-Dbc.cam=190.5,96,-25.5,90,16", "-Dbc.time=2500", "-Dbc.shot=300"], True),
     # Update 3.18: the game starts itself a second time (what it does when Windows gave it the small graphics chip): only meaningful in the Windows smoke test
     "gpu-relaunch":   (COMMON + [CAM, "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.gpuforce=1"] + PLAIN + ["-Dbc.shot=60"], True),
+    # ---- Update 3.19: the graphics overhaul. "-low" = Options effects LOW + look Classic = the picture of Update 3.18 (the same run shows before and after)
+    "gfx-glow-night":     (COMMON + ["-Dbc.cam=143.5,68.4,72.6,0,20", "-Dbc.time=18000", "-Dbc.weather=calm", sets(glow_blocks()), "-Dbc.shot=150"], True),
+    "gfx-glow-night-low": (COMMON + ["-Dbc.cam=143.5,68.4,72.6,0,20", "-Dbc.time=18000", "-Dbc.weather=calm", sets(glow_blocks()), "-Dbc.fx=0", "-Dbc.look=0", "-Dbc.shot=150"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
 }
+# Update 3.19: variants of existing scenes (same camera, other look / effects level)
+for _n, _look in (("classic", 0), ("vivid", 1), ("cinematic", 2), ("dreamy", 3)):
+    SCENES["gfx-look-%s" % _n] = (SCENES["village-folk-sh"][0] + ["-Dbc.look=%d" % _look], True)
+SCENES["gfx-nether-low"] = (SCENES["nether-vista-sh"][0] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
+SCENES["gfx-torch-low"] = (SCENES["mobs-torch-sh"][0] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

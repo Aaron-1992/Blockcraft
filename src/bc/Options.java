@@ -38,6 +38,10 @@ public final class Options {
    public int renderScale = 100;
    /** Update 3.18: frame rate limit (0 = none: the screen's refresh rate with VSync); lets a fast graphics card rest instead of drawing 400 pictures a second. */
    public int maxFps = 0;
+   /** Update 3.19: the colour grading of the shader pack (see {@link Look}). */
+   public int look = Look.DEFAULT;
+   /** Update 3.19: how many of the new shader effects are on - 0 = LOW (none: the picture of 3.18), 1 = MEDIUM (glowing lava and torches, cloud shadows, wet ground in rain), 2 = HIGH (also soft contact shadows in corners). */
+   public int fx = 1;
    final File file;
 
    public Options(File var1) {
@@ -73,6 +77,8 @@ public final class Options {
                this.gpuHigh = Boolean.parseBoolean(var2.getProperty("gpuHigh", "true"));
                this.renderScale = Math.max(50, Math.min(100, Integer.parseInt(var2.getProperty("renderScale", "100"))));
                this.maxFps = Math.max(0, Math.min(1000, Integer.parseInt(var2.getProperty("maxFps", "0"))));
+               this.look = Look.clamp(Integer.parseInt(var2.getProperty("look", Look.DEFAULT + "")));
+               this.fx = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("fx", "1"))));
             } catch (Throwable var5) {
                try {
                   var1.close();
@@ -113,6 +119,8 @@ public final class Options {
       var1.setProperty("gpuHigh", this.gpuHigh + "");
       var1.setProperty("renderScale", this.renderScale + "");
       var1.setProperty("maxFps", this.maxFps + "");
+      var1.setProperty("look", this.look + "");
+      var1.setProperty("fx", this.fx + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

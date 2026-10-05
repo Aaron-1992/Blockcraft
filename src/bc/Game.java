@@ -287,6 +287,14 @@ public final class Game {
          this.opt.shaders = Boolean.getBoolean("bc.shaders");
       }
 
+      if (System.getProperty("bc.look") != null) {
+         this.opt.look = Look.clamp(Integer.getInteger("bc.look")); // test hook: the colour grading of the shader pack (0 Classic, 1 Vivid, 2 Cinematic, 3 Dreamy)
+      }
+
+      if (System.getProperty("bc.fx") != null) {
+         this.opt.fx = Math.max(0, Math.min(2, Integer.getInteger("bc.fx"))); // test hook: the effects level (0 LOW, 1 MEDIUM, 2 HIGH)
+      }
+
       if ("off".equals(System.getProperty("bc.clouds"))) {
          this.opt.clouds = false; // screenshots of the terrain from above the cloud layer
       }
@@ -1111,6 +1119,7 @@ public final class Game {
       this.particles.clear();
       this.chatLog.clear();
       this.chatTimes.clear();
+      this.sayShaderProblems();
       this.bedPos = null;
       if (var1) {
          this.player.setMode(var3);
@@ -4506,6 +4515,7 @@ public final class Game {
             }
 
             Perf.mark(Perf.POST);
+            this.rend.sh.look = this.opt.look;
             this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
       } else {
@@ -5074,6 +5084,66 @@ public final class Game {
       }
 
       return "Shaders: on" + (sh.waterOk ? ", water" : "") + (sh.cloudsOk ? ", clouds" : "") + (sh.entityOn ? ", mobs" : "");
+   }
+
+   /**
+    * Update 3.19: why the shader pack is not running although the options ask for it (null: it runs, or it is switched off on purpose). Players wrote that
+    * "nothing changed" after an update of the shaders: on a graphics chip whose driver cannot compile them the game fell back to the plain picture without a word.
+    */
+   String shaderProblem() {
+      Shaders sh = this.rend == null ? null : this.rend.sh;
+      if (sh == null || !this.opt.shaders || sh.ok) {
+         return null;
+      }
+
+      String why = sh.error == null || sh.error.trim().isEmpty() ? "see latest.log" : sh.error.trim().replace('\n', ' ').replace('\r', ' ');
+      return why.length() > 120 ? why.substring(0, 120) : why;
+   }
+
+   /** Update 3.19: the parts of the shader pack that this graphics chip could not start although the rest runs (empty = none). */
+   String shaderPartial() {
+      Shaders sh = this.rend == null ? null : this.rend.sh;
+      if (sh == null || !this.opt.shaders || !sh.ok) {
+         return "";
+      }
+
+      StringBuilder b = new StringBuilder();
+      if (!sh.waterOk) {
+         b.append("water, ");
+      }
+
+      if (!sh.cloudsOk) {
+         b.append("clouds, ");
+      }
+
+      if (!sh.entityOk) {
+         b.append("mobs, ");
+      }
+
+      if (!sh.lodOk) {
+         b.append("far land, ");
+      }
+
+      if (!sh.fxOk) {
+         b.append("glow and the new effects, ");
+      }
+
+      return b.length() == 0 ? "" : b.substring(0, b.length() - 2);
+   }
+
+   /** Update 3.19: tells the player in the chat, once per world, when the shader pack (or a part of it) is not running on this computer. */
+   void sayShaderProblems() {
+      String p = this.shaderProblem();
+      if (p != null) {
+         this.say("\u00a7cThe shader pack cannot run on this graphics chip, so the plain picture is used.");
+         this.say("\u00a77" + clipText("Reason: " + p, 300.0F) + " (F3 shows it; more in latest.log)");
+         return;
+      }
+
+      String part = this.shaderPartial();
+      if (!part.isEmpty()) {
+         this.say("\u00a7eSome shader effects are off on this graphics chip: " + part + ". (F3 shows the details)");
+      }
    }
 
    void drawDebug() {

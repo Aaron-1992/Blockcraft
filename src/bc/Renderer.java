@@ -669,8 +669,17 @@ public final class Renderer {
       this.updateLightmap();
       Perf.mark(Perf.SKY);
       GL11.glViewport(0, 0, var2, var3);
-      GL11.glClearColor(var41, var42, var43, 1.0F);
+      // Update 3.19: the scene's alpha channel is the glow mask of the light sources (0 everywhere, the terrain pass writes it); nothing else may touch it
+      boolean glow = this.shadersOn() && this.sh.sceneActive && this.sh.fxOk && this.g.opt.fx >= 1;
+      this.sh.glowOn = glow;
+      this.sh.fxLevel = this.g.opt.fx;
+      GL11.glColorMask(true, true, true, true);
+      GL11.glClearColor(var41, var42, var43, glow ? 0.0F : 1.0F);
       GL11.glClear(16640);
+      if (glow) {
+         GL11.glColorMask(true, true, true, false);
+      }
+
       GL11.glDisable(2884);
       GL11.glDepthFunc(515);
       float var46 = this.g.opt.fov * var4.ifov(var1);
@@ -821,6 +830,12 @@ public final class Renderer {
          GL11.glEnable(2884);
       }
 
+      if (glow) {
+         // Update 3.19: the terrain writes the glow mask into the alpha channel; the shader throws the see-through texels away itself, so the fixed alpha test (which would eat the mask) is off
+         GL11.glColorMask(true, true, true, true);
+         GL11.glDisable(3008);
+      }
+
       for (Renderer.Vis var56 : this.vis) {
          Section var59 = var56.c.sections[var56.sy];
          if (var59.nO != 0 && var59.vboO != 0) {
@@ -836,6 +851,11 @@ public final class Renderer {
 
       if (cull) {
          GL11.glDisable(2884);
+      }
+
+      if (glow) {
+         GL11.glColorMask(true, true, true, false);
+         GL11.glEnable(3008);
       }
 
       arrays(false);
@@ -869,6 +889,9 @@ public final class Renderer {
 
       if (skyOn && this.g.opt.clouds && !var6 && !var7 && (!var50 || !this.sh.cloudsOk || !this.sh.sceneActive)) {
          this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
+         if (glow) {
+            GL11.glColorMask(true, true, true, false);   // the plain clouds switch the colour mask back on
+         }
       }
 
       Perf.mark(Perf.WATER);
