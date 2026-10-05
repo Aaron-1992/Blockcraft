@@ -718,6 +718,7 @@ public final class Game {
             double var17 = Math.toRadians(this.player.yaw);
             double summonDist = Double.parseDouble(System.getProperty("bc.summonDist", "3.5"));
             double summonDy = Double.parseDouble(System.getProperty("bc.summonDy", "-3.0"));
+            float summonYaw = Float.parseFloat(System.getProperty("bc.summonYaw", "150")); // how the mobs are turned, relative to the camera (180 = facing it)
 
             for (int var20 = 0; var20 < var14.length; var20++) {
                String mobName = var14[var20];
@@ -760,7 +761,7 @@ public final class Game {
                            spawned.tx = this.player.health;
                         }
                      }
-                     spawned.yaw = this.player.yaw + 180.0F - 30.0F;
+                     spawned.yaw = this.player.yaw + summonYaw;
                   }
                }
             }

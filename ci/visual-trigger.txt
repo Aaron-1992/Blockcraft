@@ -1,2 +1,2 @@
-dragon-top,dragon-down,dragon-up,pl-walk,pl-run,pl-sneak,pl-swing,pl-bow,pl-eat,pl-air,pl-land,pl-fly,pl-tread
+dragon-top,dragon-down,dragon-up,dragon-side,dragon-above
 jar=build
