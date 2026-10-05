@@ -1,6 +1,6 @@
 # Blockcraft – project status
 
-_Last updated: 2026-10-04 (Update 3.17)._
+_Last updated: 2026-10-05 (Update 3.18)._
 
 ## Roadmap: the owner's "To do.txt" (worked through step by step, in this order)
 
@@ -51,6 +51,18 @@ _Last updated: 2026-10-04 (Update 3.17)._
 | 10 | Clean up the Settings screen | **done in 3.13**: `Screens.options` with four tabs (Video / Graphics / Gameplay / Controls) and a help line (`Ui.hint`); the keys cannot be changed yet |
 | 11 | Add the missing features of the last update | **partly done in 3.15** (coloured beds, banners, panes / bars / walls / gates / trapdoors / carpets); open: redstone, XP + enchanting, brewing, End cities with shulkers and elytra, endermites |
 
+## Fourth to-do list (the owner's "To do.txt" of 2026-10-05, commit c214df8)
+
+| # | Item | State |
+|---|---|---|
+| 1 | **Performance** (do this first; the game must use the dedicated GPU when there is one, not the integrated one) | **done in 3.18** (written, tested headless and in a software renderer; **never run on a machine with two real graphics chips**): `GpuPref` (Windows graphics preference of the bundled `javaw.exe` / `java.exe` = high performance, written on every start, one automatic restart when the window still got the chip inside the processor; options switch "Fast GPU"; F3 shows "GPU:"), the frame timer `Perf` (Shift+F3, `perf.log`, GPU timestamp queries) and the benchmark `PerfBench` (+ `tools/perf.py`, workflow `Perf`), `CaveCull` (sections hidden by the ground are not drawn), the shadow pass cut to the map's window and drawn only when needed, render scale, Max FPS (menus 60, background 30, minimised 10) |
+| 2 | Massive structure overhaul | open |
+| 3 | Massive models overhaul (villagers and blazes are very bad) | open |
+| 4 | Massive texture overhaul (all block and item textures) | **started in 3.18** (`TexPaint`: tiles 0-399 partly; see the board) |
+| 5 | Massive animation overhaul (the player, the dragon) | open |
+| 6 | Massive graphics overhaul ("nothing changed") | open |
+| 7 | Add the missing features of the last update | open |
+
 ## What it is
 
 Blockcraft is an original Minecraft-Java-1.12-style block sandbox for Windows ("an original clone": no Mojang code or
@@ -58,7 +70,14 @@ assets, everything - textures, world generator, physics - is written from scratc
 shipped as a zip with a bundled Windows JRE and `Blockcraft.exe` (a Launch4j wrapper around the jar).
 Details for developers: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 
-## Current state: Update 3.17 - "new villages, new block shapes, coloured beds and banners, a new sky, jointed mobs"
+## Current state: Update 3.18 - "the real graphics card, less work per picture, a frame timer"
+
+- **Which chip draws** (`GpuPref`): see `docs/DEVELOPMENT.md` (Update 3.18 notes). Unverified on real hardware with two chips; the registry commands, the pretend-registry tests, the relaunch command and the integrated / dedicated decision are tested headless, the second start of the real `Blockcraft.exe` is exercised by the Windows smoke scene `gpu-relaunch`.
+- **Where the time goes** (`Perf`, `PerfBench`): Shift+F3 in the game, `-Dbc.bench=<frames>` for a scripted run, workflow `Perf` (software OpenGL: relative costs, not frame rates).
+- **Less drawing**: `CaveCull` (hidden sections), the shadow map's window and refresh rules, render scale, Max FPS. Details and the numbers measured with the software renderer are in the 3.18 notes of `docs/DEVELOPMENT.md`.
+- **Textures 1** (`TexPaint`, another run): the first repainted tiles, new water / lava frames, anisotropic filtering.
+
+## Update 3.17 (still in the game) - "new villages, new block shapes, coloured beds and banners, a new sky, jointed mobs"
 
 Four milestones that were pushed by four runs of the assistant (3.14 - 3.17) and released together (the work board is [`THIRD_LIST.md`](THIRD_LIST.md)).
 
@@ -242,6 +261,8 @@ reactions, creeper blasts ignite it), beds (3 wool over 3 planks, sleep at night
 | 3.12 game logic | `Tests312` (and the older suites): 12-bit ids and the chunk file format, portals and the Nether, fortress and stronghold plans (a breadth-first search proves that every room can be reached on foot), the End fight from the first hit to the exit portal, villages and trades, dye / concrete / terracotta recipes, advancements, parrots, ender pearls, soul sand / magma / netherrack fire | 879,000+ checks, 0 failures; the equivalence pass still finds the 3.5 terrain, world and tick fingerprints identical (400 identical, 61 changed on purpose, 127 new) |
 | 3.12 on screen | `Visual` scenes `nether-*` (vista, portal, mobs, ghast, three fortress views), `end-*` (island, crystal, dragon, enderman), `stronghold*`, `village-*`, `colors-*`, `adv-*`, `parrot*`, `wx-storm*` | render correctly (`ci-results/shots/`, every picture looked at); the Nether and the End are dark by design |
 | 3.12 on the real Windows build | `Windows smoke test` (the committed 3.12 update pack installed over the 3.5 base zip, the real `Blockcraft.exe` under Mesa software OpenGL): `title`, `nether-portal`, `nether-fortress`, `end-dragon-side`, `end-island`, `village-trade`, `adv-screen`, `adv-toast-long` | every scene exits with code 0 and a picture (`ci-results/windows/`; looked at: the fortress corridor with a ghast at its end, the blacksmith's trades, the dragon on the fountain, the toast with the long title) |
+| 3.18 performance (logic) | `TestsPerf`: the registry commands and their output against a pretend registry, which renderers are chips inside the processor, the relaunch command, the options round trip, the frame timer against a clock moved by hand (phases add up to the frame, one line per second in `perf.log`), the connectivity of sections (solid, air, tunnels, bends, dead ends, glass, leaves) and **32 000 rays from 8 cameras (ground, air, caves) that never end in a section the walk left out** | all pass |
+| 3.18 performance (picture) | workflow `Perf`: the benchmark under Mesa llvmpipe (`ci-results/perf/*.txt`) and the A/B pictures with / without the culling and with / without the shadow map's window (`ci-results/perf/cull/*.jpg`, `cullcheck.md`) | see the notes in `docs/DEVELOPMENT.md`; **a software renderer is a processor, not a graphics card** |
 | A physical GPU / real hardware | - | never run. Software OpenGL is slow but behaves like the real thing for these features; GPU-driver quirks cannot be ruled out. |
 
 The 3.5 features that the first chat could not test (hoe, seeds, bucket, flint & steel right-clicks; sleeping; ladder climbing) were

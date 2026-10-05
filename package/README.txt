@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.17)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.18)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,33 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.18  (the real graphics card, less work per picture, a frame timer, the first repainted textures)
+  * THE REAL GRAPHICS CARD. A laptop usually has two graphics chips: a weak one inside the processor (Intel UHD / Iris, AMD "Radeon Graphics") and a real graphics card (GeForce, Radeon RX). Windows hands a program
+    the weak one unless the program is on its list, and a Java game never is - so the whole game ran on the weak chip. Blockcraft now puts its own Java (javaw.exe, java.exe) on that list - "Settings > System > Display >
+    Graphics" - as "High performance" the first time it starts (it writes the same registry entry that page writes; nothing is installed). A program picks its chip when it starts, so if that very first start still lands on the
+    weak chip the game starts itself once more (you see nothing of it, the window opens once) and the second start gets the real card. The video options have a switch "Fast GPU" (ON by default); F3 shows
+    "GPU: <the chip that draws>" so you can see which one you got. If your Windows is older than the April 2018 update, or the registry is locked, nothing changes. If you want to do it by hand: Settings > System > Display >
+    Graphics > "Add a desktop app" > Browse to  Blockcraft\jre\bin\javaw.exe  > Options > "High performance" > Save.
+  * LESS WORK FOR EVERY PICTURE (the same picture, less drawing - nothing you will see changes, except the frame rate):
+      - The SHADOW MAP no longer draws the whole neighbourhood of 19 x 19 chunks into a map that only holds 168 m x 168 m (and no sections that lie buried under the ground): about half as many vertices go through the card when
+        it is drawn, and it is drawn when it has to be - the player has walked 12 m, the sun has turned a third of a degree, terrain near you was built or changed, 150 frames have passed - not every 30 frames whatever happened.
+      - HIDDEN SECTIONS ARE NOT DRAWN. Every 16 x 16 x 16 piece of the world knows which of its six faces are joined by open space (air, water, glass, leaves); each frame the game walks outward from you through those
+        openings and draws only what that walk reaches. The caves, tunnels and the rock under a hill stay out of the picture; on a hillside in a test world 46 % fewer pieces were drawn (the same picture: 32 000 test rays from
+        cameras on the ground, in the air and in caves never ended in a piece that was left out). You are inside rock (spectator mode, a camera pushed into a wall): everything is drawn as before.
+      - RENDER SCALE (video options, 50 - 100 %): the world is drawn smaller than the window and stretched to it - the quickest way to more frames on a weak chip, with a softer picture; the menus and the text stay sharp.
+        Needs the shaders (Graphics > Shaders ON). MAX FPS (video options): stops the game from drawing more than 30 / 60 / 90 / 120 / 144 / 165 / 240 pictures a second so that a fast card rests; the menus never draw more than 60,
+        a window in the background 30, a minimised one 10.
+  * A FRAME TIMER. Shift+F3 shows where a frame goes: for every part of the picture (update, sky, distant terrain, hidden-section walk, shadow map, terrain, mobs, water, clouds, effects, hand, post effects, interface,
+    swap) how many milliseconds the game thread and - read from the graphics card's own clock - the card needed, on average and in the worst frame of the last second, plus how many vertices and sections were drawn and how
+    much garbage a frame leaves behind. Ctrl+F3 makes every part wait for the card (exact, slower). While it is open one line a second is written to  %USERPROFILE%\.blockcraft112\perf.log  (a CSV file you can open in Excel
+    - send it to whoever is making the game faster for you).
+  * FIRST REPAINTED TEXTURES. Stone, cobblestone, dirt, sand, gravel, grass, logs, leaves, planks, ores, snow, wool, sandstone, glowstone, obsidian, stone bricks, mossy cobblestone, the crafting table, the furnace, the
+    chest and the spawner are painted again (same places in the atlas: nothing in your worlds changes), the water and the lava have new frames, and the ground stays sharp where you look along it (anisotropic filtering).
+  * Honest notes. 1,627,000+ checks run without a screen (the rays above, the connectivity of every kind of tunnel, the registry commands against a pretend registry, the frame timer against a clock that is moved by hand), the
+    culling and the shadow map were compared picture against picture in the real game with a software renderer, and the start of a second process was tried in the real Blockcraft.exe on a Windows test machine. NOBODY has run
+    any of it on a computer with two real graphics chips: whether Windows really hands the game to your graphics card, how many frames the changes bring there, whether the frame timer's numbers agree with your
+    task manager - all a first guess. Press Shift+F3 and F3 and look at "GPU:". Still no sound. Not yet: redstone, brewing, enchanting, banner patterns, temples, igloos and shipwrecks, a new player body with elbows and knees.
 
 WHAT'S NEW IN UPDATE 3.17  (new villages, new block shapes, beds and banners in 16 colours, a new sky, mobs with jointed bodies)
   * NEW VILLAGES (worlds you create with any world type except CLASSIC - older worlds keep their villages, so nothing you built moves). A village is planned on a grid of streets now: a main street with

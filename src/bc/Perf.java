@@ -109,6 +109,8 @@ final class Perf {
       bFrameSum = 0L;
       bFrameMax = 0L;
       bDraws = bVerts = bSections = bShadowDraws = bShadowVerts = bLodVerts = 0.0;
+      Arrays.fill(lodSizeVerts, 0L);
+      Arrays.fill(lodSizeTiles, 0L);
       bAlloc = 0L;
       Arrays.fill(bAllocPhase, 0L);
       lastPhaseAlloc = 0L;
@@ -123,6 +125,9 @@ final class Perf {
    static int shadowVerts;
    /** The distant terrain (Lod): the vertices of the tiles drawn this frame. */
    static int lodVerts;
+   /** ... by tile size (32 m, 64 m, ... 4096 m): vertices and tiles, summed over the benchmark's frames. */
+   static final long[] lodSizeVerts = new long[8];
+   static final long[] lodSizeTiles = new long[8];
    /** Test / benchmark switches: leave the shadow map out, draw everything into it again (no window test), leave the culling of the main pass out. */
    static boolean noShadow;
    static boolean noShadowCull = Boolean.getBoolean("bc.shadowuncut");

@@ -636,6 +636,9 @@ SCENES = {
     "fx-torches":        (COMMON + ["-Dbc.cam=145.5,70.0,71.0,0,34", "-Dbc.time=18000"] + PLAIN + [sets(kitchen_blocks() + [(141, 67, 77, 32), (143, 67, 77, 32), (145, 67, 77, 32), (147, 67, 77, 32)]), "-Dbc.fire=off", "-Dbc.shot=200"], True),
     "fx-underwater-sh":  (COMMON + ["-Dbc.cam=144.5,67.6,74.5,0,-35", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.fill=140,66,70,148,70,78,50", "-Dbc.shot=200"], True),
     "fx-bubbles":        (COMMON + ["-Dbc.cam=144.5,67.6,74.5,0,-55", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.fill=140,66,70,148,70,78,50"] + PLAIN + ["-Dbc.shot=230"], True),
+    # Update 3.18: performance work seen in the real renderer: the render scale (the world drawn at 60 % and stretched, the interface sharp), the shadow map with a low sun
+    "perf-scale-60":  (TERRA + ["-Dbc.cam=190.5,96,-25.5,90,16", "-Dbc.scale=60", "-Dbc.shot=300"], True),
+    "perf-shadow-low": (TERRA + ["-Dbc.cam=190.5,96,-25.5,90,16", "-Dbc.time=2500", "-Dbc.shot=300"], True),
     # Update 3.18: the game starts itself a second time (what it does when Windows gave it the small graphics chip): only meaningful in the Windows smoke test
     "gpu-relaunch":   (COMMON + [CAM, "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.gpuforce=1"] + PLAIN + ["-Dbc.shot=60"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),

@@ -59,7 +59,7 @@ jobs:
           set -o pipefail
           # line 4 of ci/perf-trigger.txt = scenes for the check (surface, hill, forest, cave1, cave2, cave3), 'all' or 'none'
           CHECK="$(sed -n 4p ci/perf-trigger.txt | tr -d '[:space:]')"
-          case "$CHECK" in ''|*[!a-z0-9,]*) CHECK=none;; esac
+          case "$CHECK" in ''|*[!a-z0-9,-]*) CHECK=none;; esac
           if [ "$CHECK" != none ]; then timeout 30m python3 tools/cullcheck.py --scenes "$CHECK" 2>&1 | tee build/cullcheck.log; fi
 
       - name: Output (readable through the check-run API)

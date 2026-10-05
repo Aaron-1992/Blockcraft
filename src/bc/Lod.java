@@ -814,6 +814,9 @@ public final class Lod {
             GL11.glPopMatrix();
             this.drawn++;
             Perf.lodVerts += var19.count;
+            int lvl = Math.min(7, Integer.numberOfTrailingZeros(Math.max(32, var19.size) >> 5));
+            Perf.lodSizeVerts[lvl] += var19.count;
+            Perf.lodSizeTiles[lvl]++;
          }
       }
 

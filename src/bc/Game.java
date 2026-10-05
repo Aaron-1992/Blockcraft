@@ -2457,7 +2457,10 @@ public final class Game {
       return cap;
    }
 
-   /** Waits until the frame that began at {@code frameStart} has lasted as long as the limit says (sleeps for most of it, then waits busily for the last 1.5 ms). */
+   /** How much longer than asked a sleep took, on average (ns): a coarse timer (15 ms on an old Windows) makes the limiter wait busily instead of oversleeping. */
+   private long sleepOvershoot = 1_000_000L;
+
+   /** Waits until the frame that began at {@code frameStart} has lasted as long as the limit says (sleeps while there is time to spare, waits busily for the rest). */
    void limitFps(long frameStart) {
       int cap = this.fpsCap();
       if (cap <= 0) {
@@ -2471,8 +2474,12 @@ public final class Game {
             return;
          }
 
-         if (left > 2_000_000L) {
-            java.util.concurrent.locks.LockSupport.parkNanos(left - 1_500_000L);
+         long spare = left - this.sleepOvershoot - 500_000L;
+         if (spare > 500_000L) {
+            long t0 = System.nanoTime();
+            java.util.concurrent.locks.LockSupport.parkNanos(spare);
+            long over = Math.max(0L, System.nanoTime() - t0 - spare);
+            this.sleepOvershoot = Math.min(20_000_000L, (this.sleepOvershoot * 7 + over) / 8);
          } else {
             Thread.onSpinWait();
          }
@@ -4959,6 +4966,24 @@ public final class Game {
       }
    }
 
+   /** Update 3.18: is the shader pack running? (a graphics card whose driver cannot compile it falls back to the plain picture: no shadows, no water effects, no clouds - the reason is in latest.log) */
+   String shaderStatus() {
+      Shaders sh = this.rend == null ? null : this.rend.sh;
+      if (sh == null) {
+         return "Shaders: ?";
+      }
+
+      if (!sh.ok) {
+         return "Shaders: UNAVAILABLE (" + (sh.error == null || sh.error.isEmpty() ? "see latest.log" : sh.error.replace('\n', ' ').substring(0, Math.min(60, sh.error.length()))) + ")";
+      }
+
+      if (!this.opt.shaders) {
+         return "Shaders: off (options)";
+      }
+
+      return "Shaders: on" + (sh.waterOk ? ", water" : "") + (sh.cloudsOk ? ", clouds" : "") + (sh.entityOn ? ", mobs" : "");
+   }
+
    void drawDebug() {
       int var1 = (int)Math.floor(this.player.x);
       int var2 = (int)Math.floor(this.player.y);
@@ -4971,7 +4996,7 @@ public final class Game {
       String[] var10 = new String[]{
          "Blockcraft 1.12 Update " + VERSION_STR,
          this.fps + " fps, " + this.rend.visibleSections + " sections, " + this.rend.drawCalls + " draws   GPU: " + GpuPref.shortName(this.gpuName),
-         "C: " + (this.world == null ? 0 : this.world.chunks.size()) + " chunks loaded, mesh queue: " + this.rend.inflight.get(),
+         "C: " + (this.world == null ? 0 : this.world.chunks.size()) + " chunks loaded, mesh queue: " + this.rend.inflight.get() + "   " + this.shaderStatus(),
          "Mem: "
             + var8
             + " MB   Items: "

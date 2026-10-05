@@ -262,6 +262,15 @@ final class PerfBench {
             report.add(gp.toString());
          }
 
+         StringBuilder lv = new StringBuilder("BENCH   distant terrain by tile size (avg per frame):");
+         for (int i = 0; i < 8; i++) {
+            if (Perf.lodSizeTiles[i] > 0) {
+               lv.append("  ").append(32 << i).append(" m: ").append(Math.round(Perf.lodSizeTiles[i] / n)).append(" tiles ").append(Math.round(Perf.lodSizeVerts[i] / n / 1000)).append("k vertices");
+            }
+         }
+
+         System.out.println(lv);
+         report.add(lv.toString());
          StringBuilder al = new StringBuilder("BENCH   garbage KB/frame ");
          for (int p = 0; p < Perf.N; p++) {
             al.append(' ').append(Perf.NAME[p]).append(' ').append(Math.round(Perf.bAllocPhase[p] / n / 1024.0));
