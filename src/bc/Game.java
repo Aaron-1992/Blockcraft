@@ -172,7 +172,7 @@ public final class Game {
    int airTicks;
    boolean lastGround = true;
    double lastVy;
-   /** -Dbc.posestate=swim=1,eat=0.5,... holds the body of the player in a state (screenshot scenes): sneak, sprint, air, swim, tread, climb, fly, land, hurt, vy, eat, bow, swing, phase, amp. */
+   /** -Dbc.posestate=swim=1,eat=0.5,... holds the body of the player in exactly this state (screenshot scenes): sneak, sprint, air, swim, tread, climb, fly, land, hurt, vy, eat, bow, swing, phase, amp. */
    static final String POSE_STATE = System.getProperty("bc.posestate");
    /** Update 3.11: Minecraft's view bobbing numbers (distanceWalkedModified, cameraYaw): the first-person hand bobs with every step. */
    float bobDist;
@@ -2709,6 +2709,10 @@ public final class Game {
       p.eat = this.eatTicks > 0 ? Math.min(1.0F, (this.eatTicks + partial) / 32.0F) : -1.0F;
       p.bow = this.bowCharge > 0 ? this.bowCharge / 20.0F : -1.0F;
       if (POSE_STATE != null) {
+         // the state is exactly what the property names: everything else is switched off (a creative player in a test scene is flying)
+         p.sneakK = p.sprintK = p.airK = p.swim = p.tread = p.climb = p.fly = p.land = p.hurt = p.vy = 0.0F;
+         p.sneak = p.sprint = p.air = false;
+         p.eat = p.bow = -1.0F;
          for (String kv : POSE_STATE.split(",")) {
             String[] e = kv.trim().split("=");
             float v = e.length > 1 ? Float.parseFloat(e[1]) : 1.0F;

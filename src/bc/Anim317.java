@@ -19,6 +19,8 @@ final class Anim317 {
       /** Where the head looks, relative to the body: yaw (positive = to the right of the mob) and pitch (positive = down). */
       float headYaw;
       float headPitch;
+      /** How fast the mob turns (degrees per tick, positive = to the right): a dragon leans into its turns. */
+      float turn;
       boolean onGround = true;
       boolean inWater;
       float vy;

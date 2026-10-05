@@ -336,6 +336,39 @@ public final class MobView {
                s.amp = 1.0F;
                break;
             }
+            case "bank": {
+               // a dragon in a right turn, 4 degrees a tick
+               s = calm(3);
+               s.phase = 0;
+               s.onGround = false;
+               s.walk = i * 1.57F;
+               s.t = 60 + i * 0.58F;
+               s.amp = 1.0F;
+               s.turn = 4.0F;
+               break;
+            }
+            case "climbfly": {
+               s = calm(3);
+               s.phase = 0;
+               s.onGround = false;
+               s.walk = i * 1.57F;
+               s.t = 60 + i * 0.58F;
+               s.amp = 1.0F;
+               s.vy = 0.5F;
+               s.headPitch = -25.0F;
+               break;
+            }
+            case "dive": {
+               s = calm(3);
+               s.phase = 0;
+               s.onGround = false;
+               s.walk = i * 1.57F;
+               s.t = 60 + i * 0.58F;
+               s.amp = 1.0F;
+               s.vy = -0.7F;
+               s.headPitch = 25.0F;
+               break;
+            }
             case "perch": {
                s = calm(3);
                s.phase = Dragon.PERCH;
@@ -526,9 +559,10 @@ public final class MobView {
          az = Double.parseDouble(a[4]);
       }
 
+      double elev = a.length > 5 ? Double.parseDouble(a[5]) : 8;
       BufferedImage sheet = new BufferedImage(tile * 4, tile * 2, BufferedImage.TYPE_INT_ARGB);
       for (int i = 0; i < frames; i++) {
-         blit(sheet, tile(rig, list.get(i), az, 8, tile, 1.0), i % 4 * tile, i / 4 * tile);
+         blit(sheet, tile(rig, list.get(i), az, elev, tile, 1.0), i % 4 * tile, i / 4 * tile);
       }
 
       ImageIO.write(sheet, "png", new File(out));

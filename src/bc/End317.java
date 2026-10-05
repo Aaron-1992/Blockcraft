@@ -118,17 +118,22 @@ final class End317 {
          body.box(-0.7F, 5.6F, -12.0F + i * 4.6F, 1.4F, 2.8F, 1.8F).group(0);
       }
 
-      Bone[] neck = new Bone[3];
+      // Update 3.18: five pieces of neck and nine of tail (the S of the neck and the whip of the tail bend smoothly), a wing with three joints
+      // (shoulder, elbow, wrist) and three fingers with the membrane between them
+      Bone[] neck = new Bone[5];
       neck[0] = r.bone("neck0", body, 0, 35.0F, 12.0F);
-      neck[1] = r.boneRel("neck1", neck[0], 0, 1.5F, 9.5F);
-      neck[2] = r.boneRel("neck2", neck[1], 0, 1.5F, 9.5F);
-      for (int i = 0; i < 3; i++) {
-         neck[i].round(-4, -4, 0, 8, 8, 10.4F, 1.0F);
-         neck[i].box(-0.6F, 3.8F, 2.5F, 1.2F, 2.4F, 1.6F);
-         neck[i].box(-0.6F, 3.8F, 7.0F, 1.2F, 2.0F, 1.4F);
+      for (int i = 1; i < 5; i++) {
+         neck[i] = r.boneRel("neck" + i, neck[i - 1], 0, 0.9F, 6.0F);
       }
 
-      Bone head = r.boneRel("head", neck[2], 0, 1.5F, 9.5F);
+      for (int i = 0; i < 5; i++) {
+         float w = 8.0F - 0.4F * i;
+         neck[i].round(-w / 2, -w / 2, 0, w, w, 6.8F, 0.9F);
+         neck[i].box(-0.6F, w / 2 - 0.2F, 1.2F, 1.2F, 2.4F, 1.6F);
+         neck[i].box(-0.6F, w / 2 - 0.2F, 4.2F, 1.2F, 2.0F, 1.4F);
+      }
+
+      Bone head = r.boneRel("head", neck[4], 0, 0.9F, 6.0F);
       Cube skull = head.round(-5, -4, 0, 10, 8, 8.5F, 1.0F);
       Cube snout = head.round(-3.6F, -3.0F, 8.2F, 7.2F, 4.8F, 7.8F, 0.8F);
       head.box(-2.5F, 1.8F, 14.4F, 1.4F, 1.2F, 1.8F);
@@ -152,17 +157,27 @@ final class End317 {
       horn0.box(-0.9F, 0, -0.9F, 1.8F, 7.0F, 1.8F);
       Bone horn1 = r.boneRel("hornR", head, -3.4F, 3.6F, 1.6F).rot(-38, 0, 10);
       horn1.box(-0.9F, 0, -0.9F, 1.8F, 7.0F, 1.8F);
+      float[] flen = {30.0F, 26.0F, 21.0F};
+      float[] fan = {6.0F, 27.0F, 50.0F};
+      float[] pdepth = {9.5F, 8.5F, 10.0F};
+      float[] plen = {28.0F, 22.0F, 14.0F};
       for (int s = 0; s < 2; s++) {
          float sx = s == 0 ? 1.0F : -1.0F;
          String n = s == 0 ? "L" : "R";
          Bone wing = r.bone("wing" + n, body, sx * 8.0F, 38.0F, 6.0F);
-         wing.box(s == 0 ? 0 : -28, -2.2F, -3, 28, 4.4F, 6);
-         wing.box(s == 0 ? 0 : -28, -0.6F, -17, 28, 1.2F, 14.5F);
-         Bone tip = r.bone("wingTip" + n, wing, sx * 36.0F, 38.0F, 6.0F);
-         tip.box(s == 0 ? 0 : -32, -1.6F, -2.5F, 32, 3.2F, 5);
-         tip.box(s == 0 ? 0 : -32, -0.5F, -15.5F, 32, 1.0F, 13);
+         wing.box(s == 0 ? 0 : -22, -2.2F, -3, 22, 4.4F, 6).role("arm");
+         wing.box(s == 0 ? 0 : -22, -0.6F, -17, 22, 1.2F, 14.5F).role("membrane");
+         Bone mid = r.bone("wingMid" + n, wing, sx * 30.0F, 38.0F, 6.0F);
+         mid.box(s == 0 ? 0 : -24, -1.8F, -2.5F, 24, 3.6F, 5).role("arm");
+         mid.box(s == 0 ? 0 : -24, -0.55F, -17.5F, 24, 1.1F, 15).role("membrane");
+         Bone tip = r.bone("wingTip" + n, mid, sx * 54.0F, 38.0F, 6.0F);
+         tip.box(s == 0 ? 0 : -8, -1.6F, -2.2F, 8, 3.2F, 4.4F).role("arm");
+         tip.box(s == 0 ? 0 : -8, -0.5F, -17, 8, 1.0F, 14.5F).role("membrane");
+         tip.box(s == 0 ? 0.5F : -1.5F, -0.8F, 2.0F, 1.0F, 1.6F, 3.2F).role("claw");
          for (int f = 0; f < 3; f++) {
-            tip.box(s == 0 ? 0 : -32, -1.1F, -5.5F - f * 4.2F, 32, 1.4F, 0.9F);
+            Bone fin = r.boneRel("finger" + f + n, tip, sx * 8.0F, 0, 0).rot(0, sx * fan[f], 0);
+            fin.box(s == 0 ? 0 : -flen[f], -0.7F, -0.7F, flen[f], 1.4F, 1.4F).role("finger");
+            fin.box(s == 0 ? 1.5F : -(1.5F + plen[f]), -0.3F + 0.1F * f, -pdepth[f], plen[f], 0.6F, pdepth[f]).role("membrane");
          }
 
          // legs: thigh, shin, paw with claws
@@ -188,35 +203,38 @@ final class End317 {
       }
 
       Bone prev = r.bone("tail0", body, 0, 34, -14);
-      for (int i = 0; i < 7; i++) {
+      for (int i = 0; i < 9; i++) {
          if (i > 0) {
-            prev = r.boneRel("tail" + i, prev, 0, 0, -9);
+            prev = r.boneRel("tail" + i, prev, 0, 0, -7);
          }
 
-         float w = Math.max(3.0F, 8.0F - i);
-         prev.round(-w / 2, -w / 2, -9, w, w, 9, Math.min(1.0F, w * 0.15F));
-         prev.box(-0.5F, w / 2 - 0.2F, -7, 1.0F, 2.0F, 2.0F);
+         float w = Math.max(2.8F, 8.0F - 0.62F * i);
+         prev.round(-w / 2, -w / 2, -7.4F, w, w, 7.4F, Math.min(1.0F, w * 0.15F));
+         prev.box(-0.5F, w / 2 - 0.2F, -5.6F, 1.0F, 2.0F, 2.0F);
       }
 
       r.finish();
       r.paint(c -> {
          String n = c.bone.name;
+         String role = c.cube.role == null ? "" : c.cube.role;
          float g = RigPaint.grain(c, 151) * 0.05F;
          if (n.equals("eyes")) {
             return RigPaint.mix(0xFF60FF, 0xC030F0, RigPaint.smooth(0.0F, 1.0F, c.fv));
          }
 
-         boolean membrane = c.cube.h < 1.3F && n.startsWith("wing");
-         boolean fingers = c.cube.d < 1.0F && n.startsWith("wingTip");
-         if (n.startsWith("wing") && !membrane && !fingers) {
+         if (role.equals("arm")) {
             return RigPaint.mul(RigPaint.mix(0x16111C, 0x2A2236, RigPaint.noise(c.x * 0.4F, c.y * 0.4F, c.z * 0.4F, 3)), 1.0F + g);
          }
 
-         if (fingers) {
+         if (role.equals("finger")) {
             return RigPaint.mul(RigPaint.c(0x120E18), 1.0F + g);
          }
 
-         if (membrane) {
+         if (role.equals("claw")) {
+            return RigPaint.mul(RigPaint.c(0xC9C0AE), 0.9F + g);
+         }
+
+         if (role.equals("membrane")) {
             float vein = 0.5F + 0.5F * (float)Math.sin(c.x * 0.55F + (float)Math.sin(c.z * 0.4F) * 1.2F);
             float web = RigPaint.fbm(c.x * 0.2F, c.y * 0.2F, c.z * 0.2F, 7);
             int col = RigPaint.mix(0x2E1F44, 0x4A3468, web);

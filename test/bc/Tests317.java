@@ -458,10 +458,21 @@ final class Tests317 {
          check(lag, "the tip of the wing lags behind");
          Anim317.MState perch = new Anim317.MState();
          perch.phase = Dragon.PERCH;
-         perch.t = 100;
-         p.reset();
-         Anim317.pose(d, perch, p);
-         check(p.ry[wing] > 25.0F && p.ry[tip] > 55.0F, "folded back on the perch: " + p.ry[wing] + " " + p.ry[tip]);
+         int mid = d.idx("wingMidL"); // Update 3.18: the wing has an elbow; it is the elbow that folds the wing back along the body
+         int folded = 0;
+         float minMid = 1e9F;
+         for (int t = 0; t < 1200; t += 6) {
+            perch.t = t;
+            p.reset();
+            Anim317.pose(d, perch, p);
+            minMid = Math.min(minMid, p.ry[mid]);
+            if (p.ry[wing] > 25.0F && p.ry[mid] > 55.0F && p.ry[tip] > 25.0F) {
+               folded++;
+            }
+         }
+
+         check(folded > 140, "folded back on the perch (200 samples; now and then it stretches its wings): " + folded);
+         check(minMid > 40.0F, "the elbow stays bent even while it stretches: " + minMid);
          Anim317.MState dying = new Anim317.MState();
          dying.dead = true;
          dying.deathT = 150;

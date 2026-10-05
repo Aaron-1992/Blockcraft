@@ -156,6 +156,7 @@ final class RigDraw {
       float body = MobRender.lerpAngle(m.pyaw, m.yaw, partial);
       s.headYaw = MobRender.lerpAngle(m.pheadYaw, m.headYaw, partial) - body;
       s.headPitch = m.pheadPitch + (m.headPitch - m.pheadPitch) * partial;
+      s.turn = Mobs.wrap(m.yaw - m.pyaw);
       s.onGround = m.onGround;
       s.inWater = m.inWater;
       s.vy = (float)m.vy;
