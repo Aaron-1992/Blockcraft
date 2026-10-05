@@ -22,14 +22,20 @@ ROOT = shots.ROOT
 OUT = os.path.join(ROOT, "ci-results", "perf")
 
 # TerraGen world, seed 12345, noon, calm, "Bright" (caves can be seen); view distance 5
-BASE = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=48", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.gamma=1", "-Dbc.shot=260"]
+BASE = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=48", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.gamma=1", "-Dbc.ambient=0.85", "-Dbc.frozen=1", "-Dbc.shot=260"]
+CULL = "-Dbc.cavecull=false"
+SHADOW = "-Dbc.shadowuncut=1"
+# name -> (properties, the switch of the second picture: the culling of hidden sections off, or the shadow map drawn without its window test)
 SCENES = {
-    "surface": ["-Dbc.cam=133.5,100,71.5,45,10"],
-    "hill":    ["-Dbc.cam=392.5,150,-303.5,200,8"],
-    "forest":  ["-Dbc.cam=190.5,96,-25.5,90,16"],
-    "cave1":   ["-Dbc.cam=81.5,22.5,-76.5,0,0"],
-    "cave2":   ["-Dbc.cam=126.5,24.5,-120.5,90,5"],
-    "cave3":   ["-Dbc.cam=-42.5,41.5,126.5,180,0"],
+    "surface": (["-Dbc.cam=133.5,100,71.5,45,10"], CULL),
+    "hill":    (["-Dbc.cam=392.5,150,-303.5,200,8"], CULL),
+    "forest":  (["-Dbc.cam=190.5,96,-25.5,90,16"], CULL),
+    "cave1":   (["-Dbc.cam=81.5,22.5,-76.5,0,0"], CULL),
+    "cave2":   (["-Dbc.cam=126.5,24.5,-120.5,90,5"], CULL),
+    "cave3":   (["-Dbc.cam=-42.5,41.5,126.5,180,0"], CULL),
+    # the sun low in the sky: long shadows from far away must still be in the map
+    "shadow-forest": (["-Dbc.cam=190.5,96,-25.5,90,16", "-Dbc.time=2500", "-Dbc.shot=330"], SHADOW),
+    "shadow-hill":   (["-Dbc.cam=392.5,150,-303.5,200,8", "-Dbc.time=9800", "-Dbc.shot=330"], SHADOW),
 }
 
 
@@ -48,13 +54,14 @@ def main():
     rows = ["# Culling check %s (window %s)\n\n| scene | differing pixels | verdict |\n|---|---|---|\n" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), a.win)]
     bad = 0
     for n in names:
-        props = BASE + ["-Dbc.win=" + a.win] + SCENES[n]
+        extra, switch = SCENES[n]
+        props = BASE + ["-Dbc.win=" + a.win] + extra
         on = shots.run_scene(java, "on", a.jar, n, props, a.timeout)
-        off = shots.run_scene(java, "off", a.jar, n, props + ["-Dbc.cavecull=false"], a.timeout)
+        off = shots.run_scene(java, "off", a.jar, n, props + [switch], a.timeout)
         pct = None
         if on and off:
             pct = shots.diff_pct(on, off)
-            shots.composite([on, off], ["culling on", "culling off"], os.path.join(shots.OUT, n + ".jpg"))
+            shots.composite([on, off], ["as it is", "without " + ("the shadow map's window" if switch == SHADOW else "culling")], os.path.join(shots.OUT, n + ".jpg"))
         verdict = "NO PICTURE" if pct is None else ("same" if pct < 0.3 else "DIFFERENT")
         if verdict != "same":
             bad += 1

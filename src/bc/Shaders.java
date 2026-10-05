@@ -574,7 +574,7 @@ public final class Shaders {
 
       GL20.glUniformMatrix4fv(this.loc(prog, "shadowMat"), false, var21);
       GL20.glUniform3f(this.loc(prog, "shOff"), (float)(var2 - this.mapX), (float)(var4 - this.mapY), (float)(var6 - this.mapZ));
-      this.u1f(prog, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
+      this.u1f(prog, "time", (float)Perf.seconds(3600.0));
       GL20.glUniform3f(this.loc(prog, "camPos"), (float)(var2 % 100000.0), (float)var4, (float)(var6 % 100000.0));
       this.u1f(prog, "leafTile", var16);
       this.u1f(prog, "grassTile", var17);
@@ -807,7 +807,7 @@ public final class Shaders {
          this.u1i(this.pComp, "bloom", 1);
          this.u1f(this.pComp, "strength", var3);
          this.u1f(this.pComp, "uw", this.underwater);
-         this.u1f(this.pComp, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
+         this.u1f(this.pComp, "time", (float)Perf.seconds(3600.0));
          this.u1i(this.pComp, "rays", 2);
          this.u1f(this.pComp, "rayAmt", this.rayAmt);
          GL20.glUniform2f(this.loc(this.pComp, "sunUv"), this.sunU, this.sunV);
@@ -863,7 +863,7 @@ public final class Shaders {
          float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
          this.u1f(this.pLod, "sunUp", var14);
          this.u1f(this.pLod, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
-         this.u1f(this.pLod, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
+         this.u1f(this.pLod, "time", (float)Perf.seconds(3600.0));
          GL20.glUniform3f(this.loc(this.pLod, "skyTop"), var11[0], var11[1], var11[2]);
          GL20.glUniform3f(this.loc(this.pLod, "skyHor"), var12[0], var12[1], var12[2]);
          this.u1f(this.pLod, "fancy", var13 ? 1.0F : 0.0F);
@@ -1034,7 +1034,7 @@ public final class Shaders {
          GL20.glUniformMatrix4fv(this.loc(this.pCloud, "invView"), false, this.invViewM);
          GL20.glUniform2f(this.loc(this.pCloud, "projScale"), var1[0], var1[5]);
          GL20.glUniform3f(this.loc(this.pCloud, "camPos"), (float)mod9000(var3), (float)var5, (float)mod9000(var7));
-         this.u1f(this.pCloud, "time", (float)(System.nanoTime() / 1.0E9 % 3600.0));
+         this.u1f(this.pCloud, "time", (float)Perf.seconds(3600.0));
          this.u1i(this.pCloud, "wnoise", 2);
          Weather.Snap sn = fx.snap;
          GL20.glUniform4f(this.loc(this.pCloud, "wOff"), (float)mod9000(sn.oax), (float)mod9000(sn.oaz), (float)mod9000(sn.obx), (float)mod9000(sn.obz));

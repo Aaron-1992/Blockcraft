@@ -13,6 +13,7 @@ change saves. Compare two runs of this script, never one with a real graphics ca
 Results: ci-results/perf/<scenario>.txt (the BENCH lines of the game) and ci-results/perf/summary.md.
 """
 import argparse
+import glob
 import os
 import shutil
 import subprocess
@@ -73,8 +74,10 @@ def main():
     ap.add_argument("--timeout", type=int, default=1500)
     a = ap.parse_args()
     names = list(SCENARIOS) if a.scenes == "all" else [x.strip() for x in a.scenes.split(",") if x.strip()]
-    shutil.rmtree(OUT, ignore_errors=True)
+    # (the culling check writes its own files into this folder: only the benchmark's files are replaced)
     os.makedirs(OUT, exist_ok=True)
+    for old_file in glob.glob(os.path.join(OUT, "*.txt")) + glob.glob(os.path.join(OUT, "summary.md")):
+        os.remove(old_file)
     rows = ["# Perf run %s (llvmpipe, window %s, %d frames per setting)\n" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), a.win, a.frames)]
     for n in names:
         status, dt, lines = run(n, SCENARIOS[n], a.win, a.frames, a.jar, a.timeout)

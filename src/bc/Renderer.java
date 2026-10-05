@@ -419,9 +419,15 @@ public final class Renderer {
       }
    }
 
+   static final float AMBIENT_HOOK = Float.parseFloat(System.getProperty("bc.ambient", "0"));
+
    void updateLightmap() {
       float var1 = this.g.opt.gamma;
       float ambient = this.g.world == null ? 0.0F : Dim.ambient(this.g.world.dim);
+      if (AMBIENT_HOOK > 0.0F) {
+         ambient = Math.max(ambient, AMBIENT_HOOK); // test hook -Dbc.ambient=0.8: caves and the night can be photographed
+      }
+
       if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient) {
          float[] tint = Dim.ambientTint(this.g.world == null ? Dim.OVERWORLD : this.g.world.dim);
          Tex.ambG = tint[0];
@@ -1023,7 +1029,7 @@ public final class Renderer {
       Arrays.fill(this.sh.dynL, 0.0F);
       Arrays.fill(this.sh.dynC, 0.0F);
       int var1 = 0;
-      float var2 = (float)(System.nanoTime() / 1.0E9);
+      float var2 = (float)Perf.seconds(1.0E9);
       float var3 = 1.0F + 0.05F * (float)Math.sin(var2 * 11.0F) + 0.04F * (float)Math.sin(var2 * 23.0F + 1.0F);
       int var4 = this.g.heldId();
       int var5 = var4 > 0 && Blocks.isBlockId(var4) ? Blocks.emit[var4] : 0;
@@ -1209,7 +1215,7 @@ public final class Renderer {
    void drawSky(float var1, float var2, float var3) {
       if (this.g.world != null) {
          // Update 3.16: the sky has its own class (Sky): the dusk, the moon's phases, the stars, the glow round the sun
-         Sky.draw(this, var1, var2, var3, this.g.world.dayTime, System.nanoTime() / 1.0E9 % 100000.0);
+         Sky.draw(this, var1, var2, var3, this.g.world.dayTime, Perf.seconds(100000.0));
          return;
       }
 

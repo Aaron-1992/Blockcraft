@@ -121,6 +121,14 @@ def run_scene(game_dir, name, props, timeout):
         p.kill()
         out, _ = p.communicate()
         status = "TIMEOUT after %ds (killed)" % timeout
+    if any("bc.gpuforce" in p for p in props):
+        # Update 3.18: the game started itself a second time (the GPU preference: see GpuPref.relaunch) and the first process is gone: the picture
+        # is taken by the second one, so wait for it
+        deadline = time.time() + timeout
+        while time.time() < deadline and not glob.glob(os.path.join(home, "screenshots", "*.png")):
+            time.sleep(2)
+        time.sleep(3)
+        status += " (+ the second start)"
     dt = time.time() - t0
     for f in ("latest.log", "crash.log"):
         src = os.path.join(home, f)
@@ -158,6 +166,16 @@ def main():
     for name in wanted:
         props, _only_new = sc[name]
         results[name] = run_scene(game_dir, name, props, 300)
+    try:
+        # Update 3.18: the game writes its graphics preference for Windows ("Settings > Display > Graphics") for the javaw.exe of the bundled Java
+        q = subprocess.run(["reg", "query", r"HKCU\Software\Microsoft\DirectX\UserGpuPreferences"], capture_output=True, text=True, timeout=30)
+        lines = [l.strip() for l in (q.stdout or "").splitlines() if "java" in l.lower()]
+        log("GPU preference entries in the registry (%d):" % len(lines))
+        for l in lines:
+            log("    | " + l)
+        results["gpu_pref_in_registry"] = any("GpuPreference=2" in l for l in lines)
+    except Exception as e:
+        log("could not read the registry: %s" % e)
     log("RESULT: " + json.dumps(results))
     sys.exit(0 if any(results.values()) else 1)
 

@@ -302,6 +302,33 @@ so old lines still load).
 * **Ranges** (see `docs/THIRD_LIST.md`): block ids 1500-1899 Shapes, 1900-2199 reserved for redstone, 2200-2463 beds / banners, 2500-2599 reserved for brewing / enchanting, 3000-3499 structures; items 400-999; tiles 600-999;
   mob ids 18-39 are free for the rigs.
 
+## Update 3.18 notes (performance: the graphics card, the frame timer, culling)
+
+* **Which graphics chip** (`GpuPref`): Windows keeps a per-program preference in `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` (value name = full path of the exe, data `GpuPreference=2;` = high performance).
+  The program that draws is the bundled `javaw.exe`; the game writes the entries (for `ProcessHandle.current()`'s exe, `<java.home>\bin\javaw.exe` and `java.exe`) with `reg add` in `Game.init`, before the first window. A process chooses its chip
+  when it first loads the driver, so when an entry was written *this* run and `GL_RENDERER` is a chip inside the processor (`GpuPref.isIntegrated`: Intel except Arc, AMD "Graphics" / `NNNM`), the game starts itself once more
+  (`GpuPref.relaunch`: `javaw.exe` + the JVM's input arguments + `-cp <the .exe> bc.Main`, environment `BLOCKCRAFT_GPU_RETRY` so that the second start never starts a third; the window is only shown after this check, so the
+  player sees nothing of the first process; if the new process is gone after 2.5 s, the first one just goes on). `Options.gpuHigh` (video tab "Fast GPU") switches it; `-Dbc.gpu=off` turns the whole thing off; everything that touches
+  Windows goes through `GpuPref.runner` (tests use a pretend registry, `TestsPerf`). `-Dbc.gpuforce=1` makes the first process behave as if it had got the small chip: the Windows smoke scene `gpu-relaunch` uses it to prove that the
+  second start works with `Blockcraft.exe` as the class path, and `win_smoke.py` reads the registry afterwards. **Never verified on a machine with two real graphics chips.**
+* **Frame timer** (`Perf`): `Perf.mark(phase)` at the boundaries of update / sky / lod / cull / shadow / terrain / mobs / water / clouds / fx / hand / post / gui / swap. CPU time per phase always; GPU time per phase from `GL_TIMESTAMP`
+  queries (`ARB_timer_query`, a ring of 4 frames, results read 3 frames later, no stall). **Shift+F3** shows the panel (average and worst frame of the last second, draws, vertices, shadow draws, garbage per frame) and writes
+  `perf.log` (CSV, one line a second, 10 minutes at most) into `~/.blockcraft112`; **Ctrl+F3** = exact mode (`glFinish` at every mark: the CPU numbers then contain the GPU work; slower). Off, `mark` is one boolean test.
+* **Benchmark** (`PerfBench`, `-Dbc.bench=<frames per setting>` with the usual `bc.auto` hooks): waits until the terrain round the camera is meshed, freezes the sun, turns the camera once round for every setting of a list
+  (as configured, exact phases, no shadows, shadow every frame, shadow map uncut, no section culling, fast water, no clouds, no distant terrain, no shaders, render scale 50 %, view distance 4) and prints `BENCH ...` lines.
+  `tools/perf.py` runs it under Xvfb + llvmpipe (workflow `Perf`, trigger `ci/perf-trigger.txt`: line 1 scenarios `forest, mountain, classic`, line 2 window, line 3 frames per setting, line 4 scenes of the culling check;
+  results in `ci-results/perf/`). **llvmpipe is a processor, not a graphics card**: the numbers say where a frame's work is and what a change saves (vertices, draw calls, passes); they are no frame rates. Compare two runs, never one with a real card.
+* **Culling of hidden sections** (`CaveCull`): `compute` (called by `Mesher.build`, stored in `Section.conn`) flood-fills the open blocks of a section and records which of its six faces are connected; `Walk.run` (every frame in
+  `Renderer.renderWorld`) walks from the camera's section through connected faces, never turning back, inside the pyramid of view; what it does not reach is not drawn. Not for a spectator, not with the camera inside a block, `-Dbc.cavecull=false`
+  switches it off. `TestsPerf` casts 32 000 rays from cameras on the ground, in the air and in caves and fails if one ends in (or passes through) a section the walk did not reach; `tools/cullcheck.py` (workflow `Perf`, line 4 of the trigger)
+  photographs scenes with and without the culling in the real game and compares the pictures.
+* **Shadow map**: `Renderer.renderShadowPass` only draws sections that can land inside the 168 m window of the map (an AABB test in light space; the same picture as the GL clipping gave) and leaves out sections buried under the surface of
+  the chunk and its eight neighbours; the map is drawn again when the player moved 12 m or the sun turned 0.36 degrees (as before: 0.18), when terrain within 110 m was built or changed (at most every 8 frames) and after 150 frames at the latest (it was
+  every 30 frames whatever happened). Frame time with a real graphics card: unknown, see the Shift+F3 numbers of your machine.
+* **Render scale** (`Options.renderScale`, 50-100 %): with the shaders the world goes into the scene buffer, which can be smaller than the window (`Game.render` passes the scene size to `beginScene / renderWorld / skyMask / renderHand`;
+  `Shaders.endScene(sceneW, sceneH, outW, outH, ...)` stretches it); the menus and text stay sharp. **Max FPS** (`Options.maxFps`, `Game.limitFps`): sleeps for the rest of a frame; 60 in the menus, 30 in the background, 10 minimised
+  (not in the test hooks: `bc.auto`). Test hooks `bc.scale`, `bc.gamma`.
+
 ## Conventions / gotchas
 
 * Blocks are 12 bits per cell since 3.12 (`short[]`; IDs 0..255 and 1024..4095, see the 3.12 notes) and there is **no metadata**: rotated/staged

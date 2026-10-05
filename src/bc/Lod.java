@@ -813,6 +813,7 @@ public final class Lod {
             GL11.glDrawArrays(7, 0, var19.count);
             GL11.glPopMatrix();
             this.drawn++;
+            Perf.lodVerts += var19.count;
          }
       }
 

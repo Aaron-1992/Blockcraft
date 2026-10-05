@@ -92,7 +92,11 @@ final class Perf {
    static double bSections;
    static double bShadowDraws;
    static double bShadowVerts;
+   static double bLodVerts;
    static long bAlloc;
+   /** Garbage per phase (bytes): where does the frame's garbage come from? Measured while the benchmark runs. */
+   static final long[] bAllocPhase = new long[N];
+   private static long lastPhaseAlloc;
 
    /** The benchmark starts a new setting: forget its totals. */
    static void benchReset() {
@@ -104,8 +108,10 @@ final class Perf {
       bGpuFrames = 0;
       bFrameSum = 0L;
       bFrameMax = 0L;
-      bDraws = bVerts = bSections = bShadowDraws = bShadowVerts = 0.0;
+      bDraws = bVerts = bSections = bShadowDraws = bShadowVerts = bLodVerts = 0.0;
       bAlloc = 0L;
+      Arrays.fill(bAllocPhase, 0L);
+      lastPhaseAlloc = 0L;
       bench = true;
    }
 
@@ -115,9 +121,11 @@ final class Perf {
    static int sections;
    static int shadowDraws;
    static int shadowVerts;
+   /** The distant terrain (Lod): the vertices of the tiles drawn this frame. */
+   static int lodVerts;
    /** Test / benchmark switches: leave the shadow map out, draw everything into it again (no window test), leave the culling of the main pass out. */
    static boolean noShadow;
-   static boolean noShadowCull;
+   static boolean noShadowCull = Boolean.getBoolean("bc.shadowuncut");
    static boolean noCull;
    /** Benchmark: draw the shadow map in every frame (what a moving sun or a moving player makes happen now and then). */
    static boolean shadowEvery;
@@ -132,6 +140,14 @@ final class Perf {
    private static boolean arb;
 
    private Perf() {
+   }
+
+   /** Test hook {@code -Dbc.frozen=1}: everything that moves on the wall clock (swaying leaves, waves, the twinkling of the stars) stands still, so that two pictures of one scene are one picture. */
+   static final boolean FROZEN = Boolean.getBoolean("bc.frozen");
+
+   /** The wall clock in seconds modulo {@code mod}, for the shaders and the sky. */
+   static double seconds(double mod) {
+      return FROZEN ? 100.0 : System.nanoTime() / 1.0E9 % mod;
    }
 
    /** Called once the GL context exists: finds out whether the chip's own clock can be read. */
@@ -168,6 +184,15 @@ final class Perf {
 
       if (tFrame != 0L) {
          curCpu[phase] += now - tMark;
+         if (bench) {
+            long a = Alloc.bytes();
+            if (lastPhaseAlloc > 0L && a > lastPhaseAlloc) {
+               bAllocPhase[phase] += a - lastPhaseAlloc;
+            }
+
+            lastPhaseAlloc = a;
+         }
+
          collect(now);
       }
 
@@ -180,6 +205,7 @@ final class Perf {
       sections = 0;
       shadowDraws = 0;
       shadowVerts = 0;
+      lodVerts = 0;
       if (queries) {
          ring = (ring + 1) % RING;
          qn[ring] = 0;
@@ -200,6 +226,15 @@ final class Perf {
       long now = clock.getAsLong();
       curCpu[phase] += now - tMark;
       tMark = now;
+      if (bench) {
+         long a = Alloc.bytes();
+         if (lastPhaseAlloc > 0L && a > lastPhaseAlloc) {
+            bAllocPhase[phase] += a - lastPhaseAlloc;
+         }
+
+         lastPhaseAlloc = a;
+      }
+
       phase = p;
       if (queries) {
          stamp(p);
@@ -289,6 +324,7 @@ final class Perf {
          bSections += sections;
          bShadowDraws += shadowDraws;
          bShadowVerts += shadowVerts;
+         bLodVerts += lodVerts;
       }
 
       for (int p = 0; p < N; p++) {

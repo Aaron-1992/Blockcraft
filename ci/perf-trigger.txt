@@ -1,4 +1,4 @@
-forest
+forest,mountain
 640x360
-40
-surface,hill,cave1,cave3
+30
+surface,forest,hill,cave1,cave2,shadow-forest,shadow-hill

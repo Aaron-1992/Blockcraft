@@ -239,9 +239,9 @@ final class PerfBench {
       double p95 = t[Math.min(t.length - 1, (int)(t.length * 0.95))];
       double worst = t[t.length - 1];
       double n = Math.max(1, Perf.bFrames);
-      String line = String.format("BENCH %-20s avg %7.1f ms (%5.1f fps)  95%% %7.1f ms  worst %7.1f ms  draws %d  vertices %dk  sections %d  shadow %d draws %dk",
+      String line = String.format("BENCH %-20s avg %7.1f ms (%5.1f fps)  95%% %7.1f ms  worst %7.1f ms  draws %d  vertices %dk  sections %d  lod %dk  shadow %d draws %dk",
          PRESETS[preset], avg, 1000.0 / avg, p95, worst, Math.round(Perf.bDraws / n), Math.round(Perf.bVerts / n / 1000), Math.round(Perf.bSections / n),
-         Math.round(Perf.bShadowDraws / n), Math.round(Perf.bShadowVerts / n / 1000));
+         Math.round(Perf.bLodVerts / n / 1000), Math.round(Perf.bShadowDraws / n), Math.round(Perf.bShadowVerts / n / 1000));
       System.out.println(line);
       report.add(line);
       if (preset <= 1) {
@@ -262,6 +262,13 @@ final class PerfBench {
             report.add(gp.toString());
          }
 
+         StringBuilder al = new StringBuilder("BENCH   garbage KB/frame ");
+         for (int p = 0; p < Perf.N; p++) {
+            al.append(' ').append(Perf.NAME[p]).append(' ').append(Math.round(Perf.bAllocPhase[p] / n / 1024.0));
+         }
+
+         System.out.println(al);
+         report.add(al.toString());
          StringBuilder pk = new StringBuilder("BENCH   worst ms ");
          for (int p = 0; p < Perf.N; p++) {
             pk.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.bPeakCpu[p] / 1e6));

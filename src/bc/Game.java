@@ -311,7 +311,9 @@ public final class Game {
       this.gpuName = String.valueOf(GL11.glGetString(7937));
       Perf.init();
       System.out.println("GL: " + GL11.glGetString(7938) + " / " + this.gpuName);
-      if (gpuChanged && GpuPref.retryOf() == null && GpuPref.isIntegrated(this.gpuName)) {
+      // (-Dbc.gpuforce=1, a test hook: behave as if the first process had got the small chip - the Windows smoke test proves with it that the second start works)
+      boolean gpuForce = Boolean.getBoolean("bc.gpuforce");
+      if ((gpuChanged || gpuForce) && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
          // the entry for Windows was written just now but this process already got the small chip: start once more, the new process gets the real one
          System.out.println("GPU: " + this.gpuName + " is part of the processor; starting again with the high performance preference");
          if (GpuPref.relaunch(this.gpuName)) {

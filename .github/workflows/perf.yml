@@ -46,11 +46,12 @@ jobs:
           SCENES="$(sed -n 1p ci/perf-trigger.txt | tr -d '[:space:]')"
           WIN="$(sed -n 2p ci/perf-trigger.txt | tr -d '[:space:]')"
           FRAMES="$(sed -n 3p ci/perf-trigger.txt | tr -d '[:space:]')"
-          case "$SCENES" in ''|*[!a-z,]*) SCENES=all;; esac
+          case "$SCENES" in ''|*[!a-z,]*) SCENES=all;; esac   # (a line 1 of 'none' skips the benchmark)
           case "$WIN" in ''|*[!0-9x]*) WIN=640x360;; esac
           case "$FRAMES" in ''|*[!0-9]*) FRAMES=60;; esac
           echo "scenes: $SCENES window: $WIN frames: $FRAMES"
-          timeout 40m python3 tools/perf.py --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" 2>&1 | tee build/perf.log
+          mkdir -p ci-results/perf
+          if [ "$SCENES" != none ]; then timeout 40m python3 tools/perf.py --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" 2>&1 | tee build/perf.log; fi
 
       - name: Culling check (the same scenes with and without the culling of hidden sections must look the same)
         continue-on-error: true
