@@ -98,6 +98,27 @@ final class AnimW317 {
             p.rot(rod, sin(t * 0.13F + k + ring) * 4.0F, 0.0F, cos(t * 0.11F + k * 2.0F) * 4.0F);
          }
       }
+
+      // the crown and the flares flicker (and leap up when it fires), the core pulses and turns, the embers circle the other way
+      int core = r.idx("core");
+      p.move(core, 0.0F, sin(t * 0.1F + s.seed) * 0.7F, 0.0F);
+      p.scale(core, 1.0F + 0.05F * sin(t * 0.31F), 1.0F + 0.09F * sin(t * 0.37F + 1.0F) + 0.12F * fireK, 1.0F + 0.05F * sin(t * 0.31F));
+      p.rot(core, 0.0F, t * 1.5F % 360.0F, 0.0F);
+      p.scale(r.idx("crown"), 1.0F, 0.9F + 0.18F * sin(t * 0.52F) + 0.3F * fireK, 1.0F);
+      for (int k = 0; k < 4; k++) {
+         int f = r.idx("flame" + k);
+         p.scale(f, 1.0F, 0.85F + 0.25F * sin(t * 0.47F + k * 1.9F) + 0.35F * fireK, 1.0F);
+         p.rot(f, 4.0F * sin(t * 0.31F + k * 1.3F), 0.0F, 4.0F * cos(t * 0.27F + k * 2.1F));
+      }
+
+      for (int k = 0; k < 2; k++) {
+         p.scale(r.idx(k == 0 ? "cheekL" : "cheekR"), 1.0F, 0.9F + 0.2F * sin(t * 0.41F + k * 2.0F) + 0.4F * fireK, 1.0F);
+      }
+
+      p.rot(r.idx("embers"), 0.0F, -t * 1.1F % 360.0F, 0.0F);
+      for (int k = 0; k < 6; k++) {
+         p.move(r.idx("ember" + k), 0.0F, sin(t * 0.09F + k * 1.3F) * 1.8F, 0.0F);
+      }
    }
 
    // ------------------------------------------------------------------ magma cube

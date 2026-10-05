@@ -397,6 +397,9 @@ public final class MobView {
    }
 
    /** Renders one tile into a new view. */
+   /** When set (model units): the camera looks at this height instead of the middle of the model (close-ups). */
+   static double focusY = Double.NaN;
+
    static MobView tile(Rig rig, Anim317.MState s, double az, double el, int size, double zoom) {
       MobView v = new MobView(size, size);
       v.clear(0xFFCFE4F5, 0xFFA9C8E4);
@@ -404,7 +407,7 @@ public final class MobView {
       Anim317.pose(rig, s, p);
       float[] bb = rig.bounds();
       double cx = (bb[0] + bb[3]) / 32.0;
-      double cy = (bb[1] + bb[4]) / 32.0;
+      double cy = Double.isNaN(focusY) ? (bb[1] + bb[4]) / 32.0 : focusY / 16.0;
       double cz = (bb[2] + bb[5]) / 32.0;
       double rad = Math.sqrt(Math.pow(bb[3] - bb[0], 2) + Math.pow(bb[4] - bb[1], 2) + Math.pow(bb[5] - bb[2], 2)) / 32.0;
       v.camera(cx, cy, cz, az, el, rad / Math.sin(Math.toRadians(15)) * 1.04 / zoom, 30);
@@ -472,6 +475,36 @@ public final class MobView {
       }
 
       int tile = a.length > 3 ? Integer.parseInt(a[3]) : 300;
+      if (sceneName.equals("face")) {
+         // a close-up of the head from four sides: java bc.MobView out.png villager face [tile] [headY] [zoom]
+         focusY = a.length > 4 ? Double.parseDouble(a[4]) : rig.bounds()[4] - 5.0;
+         double fz = a.length > 5 ? Double.parseDouble(a[5]) : 3.2;
+         BufferedImage sheet = new BufferedImage(tile * 4, tile, BufferedImage.TYPE_INT_ARGB);
+         double[] az4 = {0, 35, 90, -50};
+         for (int i = 0; i < 4; i++) {
+            blit(sheet, tile(rig, calm(2), az4[i], 6, tile, fz), i * tile, 0);
+         }
+
+         ImageIO.write(sheet, "png", new File(out));
+         System.out.println("wrote " + out);
+         return;
+      }
+
+      if (sceneName.equals("profs") || sceneName.equals("colors")) {
+         // one tile per colour number (a villager's profession, a sheep's dye ...): six of them, three a row
+         double paz = a.length > 4 ? Double.parseDouble(a[4]) : 28;
+         BufferedImage sheet = new BufferedImage(tile * 3, tile * 2, BufferedImage.TYPE_INT_ARGB);
+         for (int i = 0; i < 6; i++) {
+            Anim317.MState s = calm(2);
+            s.color = i;
+            blit(sheet, tile(rig, s, paz, 14, tile, 1.0), i % 3 * tile, i / 3 * tile);
+         }
+
+         ImageIO.write(sheet, "png", new File(out));
+         System.out.println("wrote " + out);
+         return;
+      }
+
       if (sceneName.equals("turn")) {
          BufferedImage sheet = new BufferedImage(tile * 4, tile, BufferedImage.TYPE_INT_ARGB);
          double[] az = {30, 90, 180, -60};

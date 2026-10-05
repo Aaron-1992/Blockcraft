@@ -26,7 +26,7 @@ final class Rig {
    static final int LEFT = 4;
    static final int BACK = 5;
    /** Number of groups of boxes a pose can hide (bit n of {@code Pose.hide} hides group n; group 0 is always drawn). */
-   static final int GROUPS = 8;
+   static final int GROUPS = 16;
    /** What a tinted bone is multiplied with: see {@code RigDraw.tintColor}. */
    static final int TINT_WOOL = 1;
    static final int TINT_ROBE = 2;
@@ -84,6 +84,8 @@ final class Rig {
       final int dt;
       /** Part of a group that a pose can hide (sheared wool, a profession's hat ...); 0 = always there. */
       int group;
+      /** What the box is ("belt", "hem" ...): a free name for the painting shader (Update 3.18), null = nothing in particular. */
+      String role;
       private float[] quads;
 
       Cube(Bone bone, float x, float y, float z, float w, float h, float d, float inflate, int ts) {
@@ -108,6 +110,18 @@ final class Rig {
          if (this.mates != null) {
             for (Cube c : this.mates) {
                c.group = g;
+            }
+         }
+
+         return this;
+      }
+
+      /** Names the box (and the boxes made together with it, see {@link Bone#round}) for the painting shader. */
+      Cube role(String name) {
+         this.role = name;
+         if (this.mates != null) {
+            for (Cube c : this.mates) {
+               c.role = name;
             }
          }
 
