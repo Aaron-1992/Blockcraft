@@ -1,23 +1,25 @@
-# Visual run 2026-10-05 15:00:12 UTC
+# Visual run 2026-10-05 15:25:15 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| day-shaders | new | n/a |
-| water-day-sh | new | n/a |
-| water-sunset-sh | new | n/a |
-| sky-sunset-sh | new | n/a |
-| mobs-torch-sh | new | n/a |
+| gfx-glow-night | new | n/a |
+| gfx-glow-night-low | new | n/a |
 | nether-vista-sh | new | n/a |
-| village-folk-sh | new | n/a |
-| under-map-sh | new | n/a |
+| gfx-nether-low | new | n/a |
+| mobs-torch-sh | new | n/a |
+| gfx-look-vivid | new | n/a |
+| gfx-look-classic | new | n/a |
+| gfx-look-cinematic | new | n/a |
+| gfx-look-dreamy | new | n/a |
 
 ## timings
 
-- day-shaders/new: exit 0 in 27s
-- water-day-sh/new: exit 0 in 50s
-- water-sunset-sh/new: exit 0 in 61s
-- sky-sunset-sh/new: exit 0 in 92s
-- mobs-torch-sh/new: exit 0 in 61s
-- nether-vista-sh/new: exit 0 in 17s
-- village-folk-sh/new: exit 0 in 49s
-- under-map-sh/new: exit 0 in 47s
+- gfx-glow-night/new: exit 0 in 68s
+- gfx-glow-night-low/new: exit 0 in 73s
+- nether-vista-sh/new: exit 0 in 20s
+- gfx-nether-low/new: exit 0 in 19s
+- mobs-torch-sh/new: exit 0 in 63s
+- gfx-look-vivid/new: exit 0 in 52s
+- gfx-look-classic/new: exit 0 in 52s
+- gfx-look-cinematic/new: exit 0 in 52s
+- gfx-look-dreamy/new: exit 0 in 52s
