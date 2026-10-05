@@ -34,6 +34,42 @@ final class PlayerModel {
       float age;
       /** id of the item in the right hand (0 = empty hand) */
       int held;
+      /** Update 3.18, all smoothed by the game from tick to tick: how much the player is sneaking / sprinting / in the air (0..1). */
+      float sneakK;
+      float sprintK;
+      float airK;
+      /** Vertical speed (blocks per tick, up is positive). */
+      float vy;
+      /** 0..1: swimming (moving in deep water), treading water, climbing a ladder, flying. */
+      float swim;
+      float tread;
+      float climb;
+      float fly;
+      /** Progress 0..1 of eating, or < 0 for none; how far the bow is drawn (1 = full), or < 0 for none. */
+      float eat = -1.0F;
+      float bow = -1.0F;
+      /** 1 right after a hard landing (the knees give way), fading to 0; 1 right after a hit, fading to 0. */
+      float land;
+      float hurt;
+   }
+
+   /** Where the boxes of the body go: the OpenGL drawer and the software viewer of the tests both are one (see {@link #build}). */
+   interface Sink {
+      void push();
+
+      void pop();
+
+      void translate(float x, float y, float z);
+
+      void rotate(float deg, float x, float y, float z);
+
+      void scale(float x, float y, float z);
+
+      /** A box with the 24 texture coordinates {u0, v0, u1, v1} (skin pixels) of its six faces (top, bottom, right, front, left, back). */
+      void box(float x0, float y0, float z0, float x1, float y1, float z1, float[] rects, float bright);
+
+      /** The item in the right hand, in the frame of the arm with its origin at the shoulder. */
+      void held(int id, boolean slim, float bright);
    }
 
    // ------------------------------------------------------------------ geometry
@@ -52,15 +88,27 @@ final class PlayerModel {
    /** One skin box: model-space bounds (pixels) with the texture layout of the box's own size (w, h, d) at skin position (u, v). */
    static void box(float x0, float y0, float z0, float x1, float y1, float z1, int u, int v, int w, int h, int d, float bright) {
       int[][] r = faceRects(u, v, w, h, d);
+      float[] q = new float[24];
+      for (int f = 0; f < 6; f++) {
+         for (int k = 0; k < 4; k++) {
+            q[f * 4 + k] = r[f][k];
+         }
+      }
+
+      box(x0, y0, z0, x1, y1, z1, q, bright);
+   }
+
+   /** One skin box with the texture rectangles of its faces given (skin pixels, 4 numbers per face: top, bottom, right, front, left, back). */
+   static void box(float x0, float y0, float z0, float x1, float y1, float z1, float[] r, float bright) {
       float k = 1.0F / Skins.SIZE;
       GL11.glBegin(7);
       for (int f = 0; f < 6; f++) {
          float s = bright * SHADE[f];
          GL11.glColor3f(s, s, s);
-         float u0 = r[f][0] * k;
-         float v0 = r[f][1] * k;
-         float u1 = r[f][2] * k;
-         float v1 = r[f][3] * k;
+         float u0 = r[f * 4] * k;
+         float v0 = r[f * 4 + 1] * k;
+         float u1 = r[f * 4 + 2] * k;
+         float v1 = r[f * 4 + 3] * k;
          switch (f) {
             case 0: // top (+y): the image's bottom edge is the front
                vtx(x0, y1, z0, u0, v0);
@@ -138,100 +186,221 @@ final class PlayerModel {
       GL11.glEnable(3008);
       GL11.glAlphaFunc(516, 0.1F);
       GL11.glDisable(3042);
-      GL11.glPushMatrix();
-      GL11.glRotatef(-p.bodyYaw, 0.0F, 1.0F, 0.0F);
-      GL11.glScalef(SCALE, SCALE, SCALE);
-      float swingAmt = p.amp * 55.0F;
-      float legA = (float)Math.sin(p.limb * 1.6F) * swingAmt;
-      float armA = -legA * 0.9F;
-      float sneakDrop = p.sneak ? 1.6F : 0.0F;
-      float twist = (float)Math.sin(p.limb * 1.6F) * p.amp * 6.0F; // the shoulders turn against the hips with every stride (Update 3.11)
-      float lean = p.sprint ? 12.0F * p.amp : 0.0F; // running: the upper body leans forward
-      float airArms = p.air ? 28.0F : 0.0F; // in the air the arms go out
-      // idle sway of the arms (and a little breathing)
-      float idle = (float)Math.sin(p.age * 0.067F) * 2.5F + 2.5F;
-      GL11.glTranslatef(0.0F, -sneakDrop, 0.0F);
-      // legs: pivot at the hips
-      for (int side = 0; side < 2; side++) {
-         GL11.glPushMatrix();
-         float sgn = side == 0 ? 1.0F : -1.0F;
-         GL11.glTranslatef(side == 0 ? -1.9F : 1.9F, 12.0F, p.sneak ? -0.2F : 0.0F);
-         GL11.glRotatef(legA * sgn, 1.0F, 0.0F, 0.0F);
-         if (p.sneak) {
-            GL11.glRotatef(-6.0F, 1.0F, 0.0F, 0.0F);
-         }
-
-         if (side == 0) {
-            layered(-2.0F, -12.0F, -2.0F, 4, 12, 4, 0, 16, 0, 32, 0.25F, bright);
-         } else {
-            layered(-2.0F, -12.0F, -2.0F, 4, 12, 4, 16, 48, 0, 48, 0.25F, bright);
-         }
-
-         GL11.glPopMatrix();
-      }
-
-      // torso (tilts forward when sneaking)
-      GL11.glPushMatrix();
-      GL11.glTranslatef(0.0F, 12.0F, 0.0F);
-      if (p.sneak) {
-         GL11.glRotatef(26.0F, 1.0F, 0.0F, 0.0F); // positive about +x tips the upper body forward
-      }
-
-      GL11.glRotatef(lean, 1.0F, 0.0F, 0.0F);
-      GL11.glRotatef(twist, 0.0F, 1.0F, 0.0F);
-      GL11.glTranslatef(0.0F, -12.0F, 0.0F);
-      layered(-4.0F, 12.0F, -2.0F, 8, 12, 4, 16, 16, 16, 32, 0.25F, bright);
-      // arms: pivot at the shoulders (the body's tilt carries them)
-      int aw = slim ? 3 : 4;
-      for (int side = 0; side < 2; side++) {
-         GL11.glPushMatrix();
-         float sgn = side == 0 ? 1.0F : -1.0F;
-         GL11.glTranslatef(side == 0 ? -5.0F : 5.0F, 22.0F, 0.0F);
-         // angles about +x: positive swings a hanging limb BACKWARDS; an arm moves opposite to the leg on its side
-         float back = -0.9F * legA * sgn + (side == 0 ? idle : -idle);
-         if (side == 0 && p.swing >= 0.0F) {
-            float s = (float)Math.sin(Math.sqrt(p.swing) * Math.PI);
-            back -= 95.0F * s + 20.0F * (float)Math.sin(p.swing * Math.PI);
-            GL11.glRotatef(-s * 12.0F, 0.0F, 1.0F, 0.0F);
-         }
-
-         if (p.sneak) {
-            back -= 22.0F;
-         }
-
-         if (side == 0 && p.held > 0) {
-            back -= 18.0F; // the arm that holds something is lifted a little, like in Minecraft
-         }
-
-         GL11.glRotatef(back, 1.0F, 0.0F, 0.0F);
-         GL11.glRotatef(side == 0 ? -3.0F - airArms : 3.0F + airArms, 0.0F, 0.0F, 1.0F); // hang a little outwards
-         if (side == 0) {
-            layered(slim ? -2.0F : -3.0F, -10.0F, -2.0F, aw, 12, 4, 40, 16, 40, 32, 0.25F, bright);
-            if (p.held > 0) {
-               drawHeld(p.held, slim, bright);
-               GL11.glBindTexture(3553, texture(px)); // the item drew with the block atlas
-               GL11.glEnable(3008);
-               GL11.glAlphaFunc(516, 0.1F);
-            }
-         } else {
-            layered(-1.0F, -10.0F, -2.0F, aw, 12, 4, 32, 48, 48, 48, 0.25F, bright);
-         }
-
-         GL11.glPopMatrix();
-      }
-
-      // head: carried by the torso, but it looks where the player looks, so the torso's tilt is taken out of the pitch
-      GL11.glPushMatrix();
-      GL11.glTranslatef(0.0F, 24.0F, 0.0F);
-      GL11.glRotatef(-twist, 0.0F, 1.0F, 0.0F); // the head looks where you look, whatever the shoulders do
-      GL11.glRotatef(-p.headYaw, 0.0F, 1.0F, 0.0F);
-      GL11.glRotatef(p.headPitch - (p.sneak ? 26.0F : 0.0F) - lean, 1.0F, 0.0F, 0.0F);
-      layered(-4.0F, 0.0F, -4.0F, 8, 8, 8, 0, 0, 32, 0, 0.5F, bright);
-      GL11.glPopMatrix();
-      GL11.glPopMatrix();
-      GL11.glPopMatrix();
+      build(PlayerAnim.solve(p), p, slim, bright, new GlSink(px));
       GL11.glDisable(3008);
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   /** The OpenGL end of {@link Sink}. */
+   private static final class GlSink implements Sink {
+      private final int[] px;
+
+      GlSink(int[] px) {
+         this.px = px;
+      }
+
+      @Override
+      public void push() {
+         GL11.glPushMatrix();
+      }
+
+      @Override
+      public void pop() {
+         GL11.glPopMatrix();
+      }
+
+      @Override
+      public void translate(float x, float y, float z) {
+         GL11.glTranslatef(x, y, z);
+      }
+
+      @Override
+      public void rotate(float deg, float x, float y, float z) {
+         if (deg != 0.0F) {
+            GL11.glRotatef(deg, x, y, z);
+         }
+      }
+
+      @Override
+      public void scale(float x, float y, float z) {
+         GL11.glScalef(x, y, z);
+      }
+
+      @Override
+      public void box(float x0, float y0, float z0, float x1, float y1, float z1, float[] rects, float bright) {
+         PlayerModel.box(x0, y0, z0, x1, y1, z1, rects, bright);
+      }
+
+      @Override
+      public void held(int id, boolean slim, float bright) {
+         drawHeld(id, slim, bright);
+         GL11.glBindTexture(3553, texture(this.px)); // the item drew with the block atlas
+         GL11.glEnable(3008);
+         GL11.glAlphaFunc(516, 0.1F);
+      }
+   }
+
+   /**
+    * The body, joint by joint (Update 3.18): the hips and knees of the legs, the shoulders and elbows of the arms (each limb is two boxes that
+    * share the texture of the one long box of a Minecraft skin, and a cap in the colour of the joint closes the gap that opens on the outside
+    * of a bend), the torso leaning and twisting about the hips, the head looking where the player looks.
+    */
+   static void build(PlayerAnim.Joints j, Pose p, boolean slim, float bright, Sink s) {
+      int aw = slim ? 3 : 4;
+      s.push();
+      s.rotate(-p.bodyYaw, 0.0F, 1.0F, 0.0F);
+      s.scale(SCALE, SCALE, SCALE);
+      s.translate(0.0F, j.dy, j.dz);
+      s.translate(0.0F, 12.0F, 0.0F);
+      s.rotate(j.pitch, 1.0F, 0.0F, 0.0F);
+      s.rotate(j.roll, 0.0F, 0.0F, 1.0F);
+      s.translate(0.0F, -12.0F, 0.0F);
+      // legs: the pivot of the hips, the knee 6 pixels below
+      for (int side = 0; side < 2; side++) {
+         s.push();
+         s.translate(side == 0 ? -1.9F : 1.9F, 12.0F, j.legZ);
+         s.rotate(-j.hip[side], 1.0F, 0.0F, 0.0F);
+         s.rotate((side == 0 ? -1.0F : 1.0F) * j.hipAbd[side], 0.0F, 0.0F, 1.0F);
+         if (side == 0) {
+            limb(s, -2.0F, -2.0F, 4, 4, 0, 16, 0, 32, bright, j.knee[side], null);
+         } else {
+            limb(s, -2.0F, -2.0F, 4, 4, 16, 48, 0, 48, bright, j.knee[side], null);
+         }
+
+         s.pop();
+      }
+
+      // torso: leans, twists and rolls about the hips
+      s.push();
+      s.translate(0.0F, 12.0F, 0.0F);
+      s.rotate(j.tPitch, 1.0F, 0.0F, 0.0F); // positive about +x tips the upper body forward
+      s.rotate(j.tYaw, 0.0F, 1.0F, 0.0F);
+      s.rotate(j.tRoll, 0.0F, 0.0F, 1.0F);
+      s.translate(0.0F, -12.0F, 0.0F);
+      layered(s, -4.0F, 12.0F, -2.0F, 8, 12, 4, 16, 16, 16, 32, 0.25F, bright);
+      s.translate(0.0F, j.chest, 0.0F);
+      // arms: pivot at the shoulders (the body's tilt carries them), the elbow 6 pixels below
+      for (int side = 0; side < 2; side++) {
+         s.push();
+         s.translate(side == 0 ? -5.0F : 5.0F, 22.0F, 0.0F);
+         s.rotate(-j.sh[side], 1.0F, 0.0F, 0.0F); // a forward swing is a negative angle about +x for a hanging limb
+         s.rotate((side == 0 ? -1.0F : 1.0F) * j.abd[side], 0.0F, 0.0F, 1.0F);
+         if (side == 0) {
+            final int held = p.held;
+            limb(s, slim ? -2.0F : -3.0F, -2.0F, aw, 4, 40, 16, 40, 32, bright, -j.el[side], held > 0 ? () -> {
+               s.translate(0.0F, 6.0F, 0.0F); // the item is placed relative to the shoulder
+               s.held(held, slim, bright);
+            } : null);
+         } else {
+            limb(s, -1.0F, -2.0F, aw, 4, 32, 48, 48, 48, bright, -j.el[side], null);
+         }
+
+         s.pop();
+      }
+
+      // head: carried by the torso, but it looks where the player looks, so the lean of the body is taken out of the pitch
+      s.push();
+      s.translate(0.0F, 24.0F, 0.0F);
+      s.rotate(-j.tYaw, 0.0F, 1.0F, 0.0F);
+      s.rotate(-p.headYaw, 0.0F, 1.0F, 0.0F);
+      float local = Math.max(-80.0F, Math.min(80.0F, p.headPitch - j.tPitch - j.pitch)) + j.headPitch;
+      s.rotate(local, 1.0F, 0.0F, 0.0F);
+      s.rotate(j.headRoll, 0.0F, 0.0F, 1.0F);
+      layered(s, -4.0F, 0.0F, -4.0F, 8, 8, 8, 0, 0, 32, 0, 0.5F, bright);
+      s.pop();
+      s.pop();
+      s.pop();
+   }
+
+   /** A base box and its second layer (the same box a fraction of a pixel bigger; transparent in most skins), through a {@link Sink}. */
+   static void layered(Sink s, float x0, float y0, float z0, float w, float h, float d, int u, int v, int u2, int v2, float inflate, float bright) {
+      int iw = Math.round(w);
+      int ih = Math.round(h);
+      int id = Math.round(d);
+      s.box(x0, y0, z0, x0 + w, y0 + h, z0 + d, rects(u, v, iw, ih, id), bright);
+      s.box(x0 - inflate, y0 - inflate, z0 - inflate, x0 + w + inflate, y0 + h + inflate, z0 + d + inflate, rects(u2, v2, iw, ih, id), bright);
+   }
+
+   static float[] rects(int u, int v, int w, int h, int d) {
+      int[][] r = faceRects(u, v, w, h, d);
+      float[] q = new float[24];
+      for (int f = 0; f < 6; f++) {
+         for (int k = 0; k < 4; k++) {
+            q[f * 4 + k] = r[f][k];
+         }
+      }
+
+      return q;
+   }
+
+   /** Texture rectangles of the part of a limb box between {@code from} and {@code to} pixels below its top (the box is 12 tall in the skin). */
+   static float[] partRects(int u, int v, int w, int d, int from, int to) {
+      float[] q = rects(u, v, w, 12, d);
+      float vs = v + d + from;
+      float ve = v + d + to;
+      if (from != 0) {
+         q[1] = q[3] = vs + 0.5F; // the top of the lower part is inside: a row of the skin
+      }
+
+      if (to != 12) {
+         q[5] = q[7] = ve - 0.5F; // the bottom of the upper part likewise
+      }
+
+      for (int f = 2; f < 6; f++) {
+         q[f * 4 + 1] = vs;
+         q[f * 4 + 3] = ve;
+      }
+
+      return q;
+   }
+
+   /** The rectangles of the cap of a joint: the row of the skin at the joint on every face. */
+   static float[] capRects(int u, int v, int w, int d, int row) {
+      float[] q = rects(u, v, w, 12, d);
+      float vr = v + d + row - 0.5F;
+      float fu0 = q[12]; // the horizontal range of the front face
+      float fu1 = q[14];
+      for (int f = 0; f < 6; f++) {
+         q[f * 4 + 1] = vr;
+         q[f * 4 + 3] = vr;
+         if (f < 2) {
+            q[f * 4] = fu0;
+            q[f * 4 + 2] = fu1;
+         }
+      }
+
+      return q;
+   }
+
+   /**
+    * A leg or an arm hanging from its joint at the origin: the upper half, a cap at the joint turned by half the bend, the lower half turned by
+    * {@code bendDeg} about +x. {@code inLower} draws what is held in the lower half's frame. (x0, z0) is the corner of the box, w x 4 its
+    * section; (u, v) the base layer in the skin, (u2, v2) the second layer.
+    */
+   static void limb(Sink s, float x0, float z0, int w, int d, int u, int v, int u2, int v2, float bright, float bendDeg, Runnable inLower) {
+      float e = 0.25F;
+      // the upper half (the second layer is a quarter of a pixel bigger, except where the halves meet)
+      s.box(x0, -6.0F, z0, x0 + w, 0.0F, z0 + d, partRects(u, v, w, d, 0, 6), bright);
+      s.box(x0 - e, -6.0F, z0 - e, x0 + w + e, e, z0 + d + e, partRects(u2, v2, w, d, 0, 6), bright);
+      s.translate(0.0F, -6.0F, 0.0F);
+      float bend = Math.abs(bendDeg);
+      if (bend > 7.0F) {
+         // the cap: a box at the joint, as high as the gap on the outside of the bend is, in the colour of the skin at the joint
+         float h = Math.max(1.4F, Math.min(4.6F, d * (float)Math.tan(Math.toRadians(bend * 0.5)) * 0.95F + 0.9F));
+         s.push();
+         s.rotate(bendDeg * 0.5F, 1.0F, 0.0F, 0.0F);
+         float c = 0.03F;
+         s.box(x0 - c, -h * 0.5F, z0 - c, x0 + w + c, h * 0.5F, z0 + d + c, capRects(u, v, w, d, 6), bright);
+         s.box(x0 - e - c, -h * 0.5F - e, z0 - e - c, x0 + w + e + c, h * 0.5F + e, z0 + d + e + c, capRects(u2, v2, w, d, 6), bright);
+         s.pop();
+      }
+
+      s.rotate(bendDeg, 1.0F, 0.0F, 0.0F);
+      s.box(x0, -6.0F, z0, x0 + w, 0.0F, z0 + d, partRects(u, v, w, d, 6, 12), bright);
+      s.box(x0 - e, -6.0F - e, z0 - e, x0 + w + e, 0.0F, z0 + d + e, partRects(u2, v2, w, d, 6, 12), bright);
+      if (inLower != null) {
+         inLower.run();
+      }
    }
 
    /**

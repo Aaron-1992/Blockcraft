@@ -184,7 +184,7 @@ public final class MobView {
       }
    }
 
-   private void tri(double[] a, float[] ta, double[] b, float[] tb, double[] c, float[] tc, int[] tex, int tw, int th) {
+   void tri(double[] a, float[] ta, double[] b, float[] tb, double[] c, float[] tc, int[] tex, int tw, int th) {
       if (a[2] <= 0.01 || b[2] <= 0.01 || c[2] <= 0.01) {
          return;
       }

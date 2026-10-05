@@ -2,7 +2,9 @@
 """
 A/B check of the culling of hidden sections (CaveCull): every scene is photographed twice by the REAL game under Xvfb + Mesa llvmpipe,
 once as it is and once with -Dbc.cavecull=false. The culling only leaves out what cannot be seen, so the two pictures have to be the
-same (up to the little that moves between two runs: clouds, a fish); a hole where a hill or a cave wall should be shows up as a big difference.
+same - up to the speckles along the edges of blocks that two runs of one scene differ by anyway (the software renderer is not exact: the
+control run, the same scene a second time, shows 1 - 8 % of such pixels). A hole where a hill or a cave wall should be is a BLOB: the
+verdict looks at the part of the picture that differs in blobs of at least 5 x 5 pixels (a morphological opening of the difference mask).
 
     python3 tools/cullcheck.py [--scenes surface,cave1] [--jar build/blockcraft.jar] [--win 640x360]
 
@@ -39,6 +41,22 @@ SCENES = {
 }
 
 
+def blob_pct(a, b):
+    """The part of the picture (percent) where two pictures differ in blobs of at least 5 x 5 pixels: edge noise vanishes, a hole does not."""
+    mask = a + ".mask.png"
+    shots.im("compare", "-fuzz", "6%", "-compose", "src", "-highlight-color", "white", "-lowlight-color", "black", a, b, mask)
+    r = shots.im("convert", mask, "-colorspace", "Gray", "-morphology", "Open", "Square:5", "-format", "%[fx:mean*100]", "info:")
+    if os.path.exists(mask):
+        os.remove(mask)
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        return None
+
+
+BLOB_LIMIT = 0.05  # percent of the picture: 115 solid pixels in a 640 x 360 frame; a missing hill or cave wall is thousands
+
+
 def diff_image(a, b, out):
     """A picture of where two pictures differ: red on a faded copy of the first one."""
     tmp = out + ".png"
@@ -60,7 +78,7 @@ def main():
     shutil.rmtree(shots.OUT, ignore_errors=True)
     os.makedirs(shots.OUT, exist_ok=True)
     java = shutil.which("java") or "java"
-    rows = ["# Culling check %s (window %s)\n\n| scene | differing pixels | same scene twice (noise) | verdict |\n|---|---|---|---|\n" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), a.win)]
+    rows = ["# Culling check %s (window %s)\n\n| scene | differing pixels | of them in blobs (>= 5 x 5) | same scene twice: pixels / in blobs | verdict |\n|---|---|---|---|---|\n" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), a.win)]
     bad = 0
     for n in names:
         extra, switch = SCENES[n]
@@ -69,33 +87,40 @@ def main():
         off = shots.run_scene(java, "off", a.jar, n, props + [switch], a.timeout)
         pct = None
         noise = None
+        blob = None
+        noise_blob = None
         if on and off:
             pct = shots.diff_pct(on, off)
+            blob = blob_pct(on, off)
             shots.composite([on, off], ["as it is", "without " + ("the shadow map's window" if switch == SHADOW else "culling")], os.path.join(shots.OUT, n + ".jpg"))
             if pct is not None and pct >= 0.02:
                 # where do the pictures differ? (red = differs): blocks of red would be a hole in the world, scattered dots are noise
                 diff = os.path.join(shots.OUT, n + "-diff.jpg")
                 diff_image(on, off, diff)
-            if pct is not None and pct >= 0.3:
+            if pct is not None and (pct >= 0.3 or (blob is not None and blob >= BLOB_LIMIT)):
                 # the control: the SAME scene a second time, as it is. What two identical runs differ by is not the culling's fault.
                 on2 = shots.run_scene(java, "on2", a.jar, n, props, a.timeout)
                 if on2:
                     noise = shots.diff_pct(on, on2)
+                    noise_blob = blob_pct(on, on2)
                     if noise is not None and noise >= 0.02:
                         diff_image(on, on2, os.path.join(shots.OUT, n + "-noise.jpg"))
                     if os.path.exists(on2):
                         os.remove(on2)
         if pct is None:
             verdict = "NO PICTURE"
-        elif pct < 0.3:
+        elif blob is not None and blob < BLOB_LIMIT:
+            verdict = "same (no blobs of difference)"
+        elif blob is None and pct < 0.3:
             verdict = "same"
-        elif noise is not None and pct - noise < 0.3:
-            verdict = "same (as much as two identical runs differ)"
+        elif blob is not None and noise_blob is not None and blob - noise_blob < BLOB_LIMIT:
+            verdict = "same (no more blobs than in two identical runs)"
         else:
             verdict = "DIFFERENT"
         if not verdict.startswith("same"):
             bad += 1
-        rows.append("| %s | %s | %s | %s |\n" % (n, "-" if pct is None else "%.3f %%" % pct, "-" if noise is None else "%.3f %%" % noise, verdict))
+        fmt = lambda v: "-" if v is None else "%.3f %%" % v
+        rows.append("| %s | %s | %s | %s / %s | %s |\n" % (n, fmt(pct), fmt(blob), fmt(noise), fmt(noise_blob), verdict))
         for p in (on, off):
             if p and os.path.exists(p):
                 os.remove(p)

@@ -154,6 +154,26 @@ public final class Game {
    float pWalkPhase;
    float walkAmp;
    float pWalkAmp;
+   /**
+    * Update 3.18: how much of the time the body of the player is sneaking, sprinting, in the air, swimming, treading water, climbing, flying (0..1,
+    * smoothed from tick to tick), how hard it has just landed and how long ago it was hit; and the previous tick's values (the frames between are interpolated).
+    */
+   final float[] animK = new float[9];
+   final float[] pAnimK = new float[9];
+   static final int K_SNEAK = 0;
+   static final int K_SPRINT = 1;
+   static final int K_AIR = 2;
+   static final int K_SWIM = 3;
+   static final int K_TREAD = 4;
+   static final int K_CLIMB = 5;
+   static final int K_FLY = 6;
+   static final int K_LAND = 7;
+   static final int K_HURT = 8;
+   int airTicks;
+   boolean lastGround = true;
+   double lastVy;
+   /** -Dbc.posestate=swim=1,eat=0.5,... holds the body of the player in a state (screenshot scenes): sneak, sprint, air, swim, tread, climb, fly, land, hurt, vy, eat, bow, swing, phase, amp. */
+   static final String POSE_STATE = System.getProperty("bc.posestate");
    /** Update 3.11: Minecraft's view bobbing numbers (distanceWalkedModified, cameraYaw): the first-person hand bobs with every step. */
    float bobDist;
    float pBobDist;
@@ -2626,6 +2646,31 @@ public final class Game {
       float target = pl.flying ? Math.min(0.3F, speed * 1.5F) : Math.min(1.0F, speed * 4.0F);
       this.walkAmp += (target - this.walkAmp) * 0.4F;
       this.walkPhase += speed * 2.45F * (pl.sprinting ? 1.2F : 1.0F);
+      // Update 3.18: the other ways of moving
+      System.arraycopy(this.animK, 0, this.pAnimK, 0, this.animK.length);
+      boolean wet = pl.inWater && !pl.onGround && !pl.flying && !pl.dead;
+      boolean ladder = !pl.flying && !pl.onGround && !pl.dead && this.world != null && pl.onLadder(this.world);
+      this.airTicks = pl.onGround || pl.flying || wet || ladder ? 0 : this.airTicks + 1;
+      if (ladder) {
+         this.walkPhase += (float)Math.abs(pl.y - pl.py) * 3.2F; // the hands and knees go up and down with the climb
+      }
+
+      float[] k = this.animK;
+      k[K_SNEAK] += ((pl.sneaking && !pl.flying && !wet ? 1.0F : 0.0F) - k[K_SNEAK]) * 0.35F;
+      k[K_SPRINT] += ((pl.sprinting && !pl.flying && !pl.sneaking ? 1.0F : 0.0F) - k[K_SPRINT]) * 0.3F;
+      k[K_AIR] += ((this.airTicks > 3 ? 1.0F : 0.0F) - k[K_AIR]) * 0.5F;
+      k[K_SWIM] += ((wet && speed > 0.03F ? 1.0F : 0.0F) - k[K_SWIM]) * 0.2F;
+      k[K_TREAD] += ((wet ? 1.0F : 0.0F) - k[K_TREAD]) * 0.2F;
+      k[K_CLIMB] += ((ladder ? 1.0F : 0.0F) - k[K_CLIMB]) * 0.35F;
+      k[K_FLY] += ((pl.flying ? 1.0F : 0.0F) - k[K_FLY]) * 0.15F;
+      k[K_LAND] *= 0.8F;
+      if (pl.onGround && !this.lastGround && this.lastVy < -0.35) {
+         k[K_LAND] = (float)Math.min(1.0, -this.lastVy * 1.5); // a hard landing: the knees give way
+      }
+
+      k[K_HURT] = pl.hurtTime > 0 ? Math.min(1.0F, pl.hurtTime / 10.0F) : 0.0F;
+      this.lastGround = pl.onGround;
+      this.lastVy = pl.vy;
       float diff = Mobs.wrap(pl.yaw - this.bodyYaw);
       if (speed > 0.03F || this.swinging) {
          this.bodyYaw += diff * 0.5F; // walking or hitting: the body turns to where you look
@@ -2650,7 +2695,49 @@ public final class Game {
       p.age = this.tickCount + partial;
       Stack held = this.inv[this.sel];
       p.held = held == null ? 0 : held.id;
+      // Update 3.18
+      p.sneakK = this.animK(K_SNEAK, partial);
+      p.sprintK = this.animK(K_SPRINT, partial);
+      p.airK = this.animK(K_AIR, partial);
+      p.swim = this.animK(K_SWIM, partial);
+      p.tread = this.animK(K_TREAD, partial);
+      p.climb = this.animK(K_CLIMB, partial);
+      p.fly = this.animK(K_FLY, partial);
+      p.land = this.animK(K_LAND, partial);
+      p.hurt = this.animK(K_HURT, partial);
+      p.vy = (float)pl.vy;
+      p.eat = this.eatTicks > 0 ? Math.min(1.0F, (this.eatTicks + partial) / 32.0F) : -1.0F;
+      p.bow = this.bowCharge > 0 ? this.bowCharge / 20.0F : -1.0F;
+      if (POSE_STATE != null) {
+         for (String kv : POSE_STATE.split(",")) {
+            String[] e = kv.trim().split("=");
+            float v = e.length > 1 ? Float.parseFloat(e[1]) : 1.0F;
+            switch (e[0]) {
+               case "sneak": p.sneakK = v; p.sneak = v > 0.5F; break;
+               case "sprint": p.sprintK = v; p.sprint = v > 0.5F; break;
+               case "air": p.airK = v; break;
+               case "swim": p.swim = v; break;
+               case "tread": p.tread = v; break;
+               case "climb": p.climb = v; break;
+               case "fly": p.fly = v; break;
+               case "land": p.land = v; break;
+               case "hurt": p.hurt = v; break;
+               case "vy": p.vy = v; break;
+               case "eat": p.eat = v; break;
+               case "bow": p.bow = v; break;
+               case "swing": p.swing = v; break;
+               case "phase": p.limb = v; break;
+               case "amp": p.amp = v; break;
+               default: break;
+            }
+         }
+      }
+
       return p;
+   }
+
+   private float animK(int i, float partial) {
+      return this.pAnimK[i] + (this.animK[i] - this.pAnimK[i]) * partial;
    }
 
    /** The 64x64 pixels of the skin the player has chosen (never null). */
