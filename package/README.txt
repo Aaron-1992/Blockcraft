@@ -17,11 +17,11 @@ WHAT'S NEW IN UPDATE 3.18  (the real graphics card, less work per picture, a fra
     "GPU: <the chip that draws>" so you can see which one you got. If your Windows is older than the April 2018 update, or the registry is locked, nothing changes. If you want to do it by hand: Settings > System > Display >
     Graphics > "Add a desktop app" > Browse to  Blockcraft\jre\bin\javaw.exe  > Options > "High performance" > Save.
   * LESS WORK FOR EVERY PICTURE (the same picture, less drawing - nothing you will see changes, except the frame rate):
-      - The SHADOW MAP no longer draws the whole neighbourhood of 19 x 19 chunks into a map that only holds 168 m x 168 m (and no sections that lie buried under the ground): about half as many vertices go through the card when
-        it is drawn, and it is drawn when it has to be - the player has walked 12 m, the sun has turned a third of a degree, terrain near you was built or changed, 150 frames have passed - not every 30 frames whatever happened.
+      - The SHADOW MAP no longer draws the whole neighbourhood of 19 x 19 chunks into a map that only holds 168 m x 168 m (and no sections that lie buried under the ground): 43 - 45 % fewer vertices go through the card when
+        it is drawn in the test scenes, and it is drawn when it has to be - the player has walked 12 m, the sun has turned a third of a degree, terrain near you was built or changed, 150 frames have passed - not every 30 frames whatever happened.
       - HIDDEN SECTIONS ARE NOT DRAWN. Every 16 x 16 x 16 piece of the world knows which of its six faces are joined by open space (air, water, glass, leaves); each frame the game walks outward from you through those
-        openings and draws only what that walk reaches. The caves, tunnels and the rock under a hill stay out of the picture; on a hillside in a test world 46 % fewer pieces were drawn (the same picture: 32 000 test rays from
-        cameras on the ground, in the air and in caves never ended in a piece that was left out). You are inside rock (spectator mode, a camera pushed into a wall): everything is drawn as before.
+        openings and draws only what that walk reaches. The caves, tunnels and the rock under a hill stay out of the picture: in a test forest and on a test mountain about 45 % fewer pieces (draw calls) and 10 - 26 % fewer
+        vertices were drawn, with the same picture (32 000 test rays from cameras on the ground, in the air and in caves never ended in a piece that was left out). Spectator mode and a camera inside a block draw everything as before.
       - RENDER SCALE (video options, 50 - 100 %): the world is drawn smaller than the window and stretched to it - the quickest way to more frames on a weak chip, with a softer picture; the menus and the text stay sharp.
         Needs the shaders (Graphics > Shaders ON). MAX FPS (video options): stops the game from drawing more than 30 / 60 / 90 / 120 / 144 / 165 / 240 pictures a second so that a fast card rests; the menus never draw more than 60,
         a window in the background 30, a minimised one 10.

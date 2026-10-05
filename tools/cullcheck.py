@@ -39,6 +39,15 @@ SCENES = {
 }
 
 
+def diff_image(a, b, out):
+    """A picture of where two pictures differ: red on a faded copy of the first one."""
+    tmp = out + ".png"
+    shots.im("compare", "-fuzz", "6%", a, b, tmp)
+    shots.im("convert", tmp, "-resize", "640x", "-quality", "70", out)
+    if os.path.exists(tmp):
+        os.remove(tmp)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenes", default="all")
@@ -51,7 +60,7 @@ def main():
     shutil.rmtree(shots.OUT, ignore_errors=True)
     os.makedirs(shots.OUT, exist_ok=True)
     java = shutil.which("java") or "java"
-    rows = ["# Culling check %s (window %s)\n\n| scene | differing pixels | verdict |\n|---|---|---|\n" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), a.win)]
+    rows = ["# Culling check %s (window %s)\n\n| scene | differing pixels | same scene twice (noise) | verdict |\n|---|---|---|---|\n" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), a.win)]
     bad = 0
     for n in names:
         extra, switch = SCENES[n]
@@ -59,13 +68,34 @@ def main():
         on = shots.run_scene(java, "on", a.jar, n, props, a.timeout)
         off = shots.run_scene(java, "off", a.jar, n, props + [switch], a.timeout)
         pct = None
+        noise = None
         if on and off:
             pct = shots.diff_pct(on, off)
             shots.composite([on, off], ["as it is", "without " + ("the shadow map's window" if switch == SHADOW else "culling")], os.path.join(shots.OUT, n + ".jpg"))
-        verdict = "NO PICTURE" if pct is None else ("same" if pct < 0.3 else "DIFFERENT")
-        if verdict != "same":
+            if pct is not None and pct >= 0.02:
+                # where do the pictures differ? (red = differs): blocks of red would be a hole in the world, scattered dots are noise
+                diff = os.path.join(shots.OUT, n + "-diff.jpg")
+                diff_image(on, off, diff)
+            if pct is not None and pct >= 0.3:
+                # the control: the SAME scene a second time, as it is. What two identical runs differ by is not the culling's fault.
+                on2 = shots.run_scene(java, "on2", a.jar, n, props, a.timeout)
+                if on2:
+                    noise = shots.diff_pct(on, on2)
+                    if noise is not None and noise >= 0.02:
+                        diff_image(on, on2, os.path.join(shots.OUT, n + "-noise.jpg"))
+                    if os.path.exists(on2):
+                        os.remove(on2)
+        if pct is None:
+            verdict = "NO PICTURE"
+        elif pct < 0.3:
+            verdict = "same"
+        elif noise is not None and pct - noise < 0.3:
+            verdict = "same (as much as two identical runs differ)"
+        else:
+            verdict = "DIFFERENT"
+        if not verdict.startswith("same"):
             bad += 1
-        rows.append("| %s | %s | %s |\n" % (n, "-" if pct is None else "%.3f %%" % pct, verdict))
+        rows.append("| %s | %s | %s | %s |\n" % (n, "-" if pct is None else "%.3f %%" % pct, "-" if noise is None else "%.3f %%" % noise, verdict))
         for p in (on, off):
             if p and os.path.exists(p):
                 os.remove(p)

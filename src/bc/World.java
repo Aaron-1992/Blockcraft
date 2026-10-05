@@ -801,7 +801,10 @@ public final class World {
 
    public void tick() {
       this.tickCount++;
-      this.dayTime++;
+      if (!Perf.FROZEN) {
+         this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)
+      }
+
       if (this.tickCount % 20L == 0L && this.dim == Dim.OVERWORLD) {
          this.lodRefresh();
       }
