@@ -609,6 +609,12 @@ public final class GameTests {
          for (int i = 0; i < 5; i++) {
             g.world.setBlock(30 + i, GROUND + 1, 30, Blocks.TNT); // five in a row, 1 block apart
          }
+         // Unbreakable floor under the row. Without it the first blast digs a crater under the TNT it has just primed, the burning
+         // blocks fall into the hole and explode up to 5 blocks lower, out of reach of the last one in the row. That is a real (vanilla-like)
+         // effect, and it made this test fail about once in 80 runs because the outer shell of a blast is random.
+         for (int i = -1; i <= 5; i++) {
+            g.world.setBlock(30 + i, GROUND, 30, Blocks.BEDROCK);
+         }
          g.world.setBlock(44, GROUND + 1, 30, Blocks.TNT); // a lonely one 14 blocks away (the flat test world ends at x=47)
          hold(g, Items.FLINT_STEEL, 1);
          g.target = hit(30, GROUND + 1, 30, 0, 1, 0);
