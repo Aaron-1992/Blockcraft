@@ -1,2 +1,2 @@
-dragon-close,mobs317-villagers,mobs317-nether,mobs317-folk
+day-shaders,water-day-sh,water-sunset-sh,sky-sunset-sh,mobs-torch-sh,nether-vista-sh,village-folk-sh,under-map-sh
 jar=build
