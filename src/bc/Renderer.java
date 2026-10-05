@@ -625,6 +625,7 @@ public final class Renderer {
       }
 
       this.updateLightmap();
+      Perf.mark(Perf.SKY);
       GL11.glViewport(0, 0, var2, var3);
       GL11.glClearColor(var41, var42, var43, 1.0F);
       GL11.glClear(16640);
@@ -666,6 +667,7 @@ public final class Renderer {
       float[] var27 = new float[]{this.topR, this.topG, this.topB};
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
       this.sh.sunAtten = this.wfx.sunVis;
+      Perf.mark(Perf.LOD);
       if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
          GL11.glEnable(2929);
          GL11.glDepthMask(true);
@@ -688,6 +690,7 @@ public final class Renderer {
       }
 
       this.sh.sunAtten = this.wfx.sunVis;
+      Perf.mark(Perf.CULL);
       this.vis.clear();
       int var48 = (int)Math.floor(this.camX) >> 4;
       int var49 = (int)Math.floor(this.camZ) >> 4;
@@ -716,6 +719,8 @@ public final class Renderer {
 
       this.vis.sort((var0, var1x) -> Float.compare(var0.d, var1x.d));
       this.visibleSections = this.vis.size();
+      Perf.sections = this.visibleSections;
+      Perf.mark(Perf.SHADOW);
       boolean var50 = this.shadersOn();
       boolean var51 = false;
       if (var50) {
@@ -723,7 +728,7 @@ public final class Renderer {
          float var55 = (float)(-Math.sin(var52));
          float var58 = (float)Math.cos(var52);
          this.sh.setSun(var55, var58, 0.0F);
-         var51 = skyOn && var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F;
+         var51 = skyOn && var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F && !Perf.noShadow;
          if (var51) {
             if (++this.shFrames >= 30 || this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ)) {
                this.shFrames = 0;
@@ -735,6 +740,7 @@ public final class Renderer {
          }
       }
 
+      Perf.mark(Perf.TERRAIN);
       this.drawCalls = 0;
       GL11.glEnable(2929);
       GL11.glDepthMask(true);
@@ -772,6 +778,7 @@ public final class Renderer {
             bindPointers(var59.vboO);
             GL11.glDrawArrays(7, 0, var59.nO);
             this.drawCalls++;
+            Perf.verts += var59.nO;
             GL11.glPopMatrix();
          }
       }
@@ -786,6 +793,7 @@ public final class Renderer {
       }
 
       lightmapUnit(false);
+      Perf.mark(Perf.ENTITIES);
       // Update 3.11: with shaders on, animals, monsters, items, falling blocks and your own body are lit like the terrain (sun, shade, shadows, torches, fog)
       this.entFogNear = var11;
       this.entFogFar = var12;
@@ -812,6 +820,7 @@ public final class Renderer {
          this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
       }
 
+      Perf.mark(Perf.WATER);
       GL11.glEnable(3042);
       GL11.glBlendFunc(770, 771);
       GL11.glDisable(3008);
@@ -851,6 +860,7 @@ public final class Renderer {
             bindPointers(var60.vboT);
             GL11.glDrawArrays(7, 0, var60.nT);
             this.drawCalls++;
+            Perf.verts += var60.nT;
             GL11.glPopMatrix();
          }
       }
@@ -870,10 +880,12 @@ public final class Renderer {
       GL11.glDisable(3042);
       GL11.glDisable(2912);
       GL11.glDepthMask(true);
+      Perf.mark(Perf.CLOUDS);
       if (skyOn && var50 && this.g.opt.clouds && !var6 && !var7 && this.sh.cloudsOk && this.sh.sceneActive) {
          this.sh.renderClouds(this.proj, this.mv, this.camX, this.camY, this.camZ, var27, var28, var26, var2, var3, this.wfx);
       }
 
+      Perf.mark(Perf.FX);
       if (skyOn && !var6 && !var7) {
          // Update 3.10: tornado funnels and wall clouds, meteors
          DisasterFx.drawSky(this, var1);
@@ -1069,6 +1081,8 @@ public final class Renderer {
                      GL11.glTranslatef((float)(var8.cx * 16 - this.camX), (float)(var9 * 16 - this.camY), (float)(var8.cz * 16 - this.camZ));
                      bindPointers(var10.vboO);
                      GL11.glDrawArrays(7, 0, var10.nO);
+                     Perf.shadowDraws++;
+                     Perf.shadowVerts += var10.nO;
                      GL11.glPopMatrix();
                   }
                }

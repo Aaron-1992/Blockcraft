@@ -1717,6 +1717,7 @@ public final class GameTests {
       Tests315.run();
       Tests316.run();
       Tests317.run();
+      TestsPerf.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

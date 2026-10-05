@@ -272,7 +272,12 @@ public final class Game {
       }
    }
 
+   /** Update 3.19: what the driver calls the chip that draws (GL_RENDERER), e.g. "NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2". */
+   String gpuName = "";
+
    void init() {
+      // Update 3.19: ask Windows for the real graphics card before the first window exists (see GpuPref)
+      boolean gpuChanged = GpuPref.apply(this.opt);
       GLFWErrorCallback.createPrint(System.err).set();
       if (!GLFW.glfwInit()) {
          throw new IllegalStateException("Unable to initialize GLFW");
@@ -295,8 +300,24 @@ public final class Game {
       GLFW.glfwMakeContextCurrent(this.window);
       GLFW.glfwSwapInterval(this.opt.vsync ? 1 : 0);
       GL.createCapabilities();
+      this.gpuName = String.valueOf(GL11.glGetString(7937));
+      Perf.init();
+      System.out.println("GL: " + GL11.glGetString(7938) + " / " + this.gpuName);
+      if (gpuChanged && GpuPref.retryOf() == null && GpuPref.isIntegrated(this.gpuName)) {
+         // the entry for Windows was written just now but this process already got the small chip: start once more, the new process gets the real one
+         System.out.println("GPU: " + this.gpuName + " is part of the processor; starting again with the high performance preference");
+         if (GpuPref.relaunch(this.gpuName)) {
+            GLFW.glfwDestroyWindow(this.window);
+            GLFW.glfwTerminate();
+            System.exit(0);
+         }
+      }
+
+      if (GpuPref.retryOf() != null) {
+         System.out.println("GPU: second start; the first one drew with " + GpuPref.retryOf());
+      }
+
       GLFW.glfwShowWindow(this.window);
-      System.out.println("GL: " + GL11.glGetString(7938) + " / " + GL11.glGetString(7937));
       GLFW.glfwSetDropCallback(this.window, (win, count, names) -> {
          for (int i = 0; i < count; i++) {
             this.skinDrops.add(new File(GLFWDropCallback.getName(names, i)));
@@ -785,6 +806,15 @@ public final class Game {
                this.adv.tab = Integer.getInteger("bc.advtab", 0);
                this.setScreen(Game.S.ADV);
             }
+         }
+
+         if (PerfBench.enabled()) {
+            // Update 3.18: -Dbc.bench=frames - the benchmark runs on its own schedule and takes the last picture when it is done
+            if (PerfBench.step(this)) {
+               this.autoShotNow = true;
+            }
+
+            return;
          }
 
          if (this.autoFrames == Integer.getInteger("bc.shot", 120)) {
@@ -1661,7 +1691,14 @@ public final class Game {
                               this.screenshot();
                               return;
                            case 292:
-                              this.debug = !this.debug;
+                              if ((var3 & 1) != 0) {
+                                 Perf.toggleShow(new File(this.root, "perf.log")); // Update 3.18: Shift+F3 = the frame timer, Ctrl+F3 = exact
+                              } else if ((var3 & 2) != 0) {
+                                 Perf.toggleExact();
+                              } else {
+                                 this.debug = !this.debug;
+                              }
+
                               return;
                            case 294:
                               this.view = (this.view + 1) % 3;
@@ -2349,6 +2386,7 @@ public final class Game {
       this.fpsTimer = GLFW.glfwGetTime();
 
       while (!GLFW.glfwWindowShouldClose(this.window)) {
+         Perf.frame(); // Update 3.18: the frame timer (see Perf)
          long var3 = System.nanoTime();
          double var5 = (var3 - var1) / 1.0E9;
          var1 = var3;
@@ -2369,6 +2407,7 @@ public final class Game {
             GLFW.glfwSetWindowShouldClose(this.window, true);
          }
 
+         Perf.mark(Perf.SWAP);
          GLFW.glfwSwapBuffers(this.window);
          this.frames++;
          double var7 = GLFW.glfwGetTime();
@@ -4267,6 +4306,7 @@ public final class Game {
          }
 
          this.rend.renderWorld(this.partial, this.fbW, this.fbH);
+         Perf.mark(Perf.HAND);
          if (var3) {
             this.rend.sh.skyMask(this.fbW, this.fbH);
          }
@@ -4298,6 +4338,7 @@ public final class Game {
                this.rend.sh.underwater = uwTarget;
             }
 
+            Perf.mark(Perf.POST);
             this.rend.sh.endScene(this.fbW, this.fbH, 0.45F);
          }
       } else {
@@ -4305,6 +4346,7 @@ public final class Game {
          GL11.glClear(16640);
       }
 
+      Perf.mark(Perf.GUI);
       this.gui.begin(this.fbW, this.fbH, var1);
       switch (this.screen) {
          case TITLE:
@@ -4678,6 +4720,10 @@ public final class Game {
          this.drawDebug();
       }
 
+      if (Perf.show) {
+         this.drawPerf();
+      }
+
       this.drawChat();
    }
 
@@ -4835,6 +4881,16 @@ public final class Game {
       }
    }
 
+   /** Update 3.18: the frame timer's panel (Shift+F3), below the F3 text when that is open too. */
+   void drawPerf() {
+      float y = this.debug ? 150.0F : 2.0F;
+      for (String s : Perf.lines(this.gpuName)) {
+         this.gui.rect(1.0F, y - 1.0F, Gui.textWidth(s) + 2, 10.0F, -1873784752);
+         this.gui.text(s, 2.0F, y, -2039584, false);
+         y += 10.0F;
+      }
+   }
+
    void drawDebug() {
       int var1 = (int)Math.floor(this.player.x);
       int var2 = (int)Math.floor(this.player.y);
@@ -4846,7 +4902,7 @@ public final class Game {
       long var8 = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576L;
       String[] var10 = new String[]{
          "Blockcraft 1.12 Update " + VERSION_STR,
-         this.fps + " fps, " + this.rend.visibleSections + " sections, " + this.rend.drawCalls + " draws",
+         this.fps + " fps, " + this.rend.visibleSections + " sections, " + this.rend.drawCalls + " draws   GPU: " + GpuPref.shortName(this.gpuName),
          "C: " + (this.world == null ? 0 : this.world.chunks.size()) + " chunks loaded, mesh queue: " + this.rend.inflight.get(),
          "Mem: "
             + var8

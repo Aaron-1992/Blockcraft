@@ -438,6 +438,13 @@ final class Screens {
       oy += row;
       if (shows(oy, row, top, viewH)) {
          ui.toggle("Fullscreen", o.fullscreen, x0, oy, colW, 20.0F, "Uses your whole screen. F11 does the same at any time.", () -> g.setFullscreen(!o.fullscreen));
+         ui.toggle("Fast GPU", o.gpuHigh, x1, oy, colW, 20.0F,
+            "A laptop often has two graphics chips: a weak one inside the processor and a real graphics card. ON asks Windows to draw the game with the real one (takes effect at the next start). Drawing with now: "
+               + GpuPref.shortName(g.gpuName),
+            () -> {
+               o.gpuHigh = !o.gpuHigh;
+               GpuPref.apply(o);
+            });
       }
    }
 
