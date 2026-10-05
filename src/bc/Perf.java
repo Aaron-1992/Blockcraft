@@ -77,15 +77,50 @@ final class Perf {
    static int fps;
    static boolean haveGpu;
 
+   // the benchmark's own totals (the one-second window is too short for a setting that gives one frame a second)
+   static boolean bench;
+   static final long[] bCpu = new long[N];
+   static final long[] bPeakCpu = new long[N];
+   static final long[] bGpu = new long[N];
+   static final long[] bPeakGpu = new long[N];
+   static int bFrames;
+   static int bGpuFrames;
+   static long bFrameSum;
+   static long bFrameMax;
+   static double bDraws;
+   static double bVerts;
+   static double bSections;
+   static double bShadowDraws;
+   static double bShadowVerts;
+   static long bAlloc;
+
+   /** The benchmark starts a new setting: forget its totals. */
+   static void benchReset() {
+      Arrays.fill(bCpu, 0L);
+      Arrays.fill(bPeakCpu, 0L);
+      Arrays.fill(bGpu, 0L);
+      Arrays.fill(bPeakGpu, 0L);
+      bFrames = 0;
+      bGpuFrames = 0;
+      bFrameSum = 0L;
+      bFrameMax = 0L;
+      bDraws = bVerts = bSections = bShadowDraws = bShadowVerts = 0.0;
+      bAlloc = 0L;
+      bench = true;
+   }
+
    // what the renderer drew in the last frame
    static int draws;
    static int verts;
    static int sections;
    static int shadowDraws;
    static int shadowVerts;
-   /** Test / benchmark switches: leave the shadow map out, leave the underground culling out. */
+   /** Test / benchmark switches: leave the shadow map out, draw everything into it again (no window test), leave the culling of the main pass out. */
    static boolean noShadow;
+   static boolean noShadowCull;
    static boolean noCull;
+   /** Benchmark: draw the shadow map in every frame (what a moving sun or a moving player makes happen now and then). */
+   static boolean shadowEvery;
 
    // GPU timestamps: RING frames in flight, MAXM marks per frame
    private static final int RING = 4;
@@ -222,9 +257,17 @@ final class Perf {
          }
 
          winGpuFrames++;
+         if (bench) {
+            bGpuFrames++;
+         }
+
          for (int p = 0; p < N; p++) {
             sumGpu[p] += curGpu[p];
             maxGpu[p] = Math.max(maxGpu[p], curGpu[p]);
+            if (bench) {
+               bGpu[p] += curGpu[p];
+               bPeakGpu[p] = Math.max(bPeakGpu[p], curGpu[p]);
+            }
          }
       } catch (Throwable t) {
          queries = false;
@@ -237,15 +280,33 @@ final class Perf {
       sumFrame += frame;
       maxFrame = Math.max(maxFrame, frame);
       winFrames++;
+      if (bench) {
+         bFrames++;
+         bFrameSum += frame;
+         bFrameMax = Math.max(bFrameMax, frame);
+         bDraws += draws;
+         bVerts += verts;
+         bSections += sections;
+         bShadowDraws += shadowDraws;
+         bShadowVerts += shadowVerts;
+      }
+
       for (int p = 0; p < N; p++) {
          sumCpu[p] += curCpu[p];
          maxCpu[p] = Math.max(maxCpu[p], curCpu[p]);
+         if (bench) {
+            bCpu[p] += curCpu[p];
+            bPeakCpu[p] = Math.max(bPeakCpu[p], curCpu[p]);
+         }
       }
 
       long a = Alloc.bytes();
       if (a > 0L) {
          if (lastAlloc > 0L) {
             winAlloc += a - lastAlloc;
+            if (bench) {
+               bAlloc += a - lastAlloc;
+            }
          }
 
          lastAlloc = a;

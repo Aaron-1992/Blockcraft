@@ -354,7 +354,7 @@ final class Screens {
       int rows;
       switch (ui.optTab) {
          case 0:
-            rows = 4;
+            rows = 5;
             break;
          case 1:
             rows = 3;
@@ -446,7 +446,28 @@ final class Screens {
                GpuPref.apply(o);
             });
       }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.slider("Render Scale: " + o.renderScale + "%", x0, oy, colW, 20.0F, (o.renderScale - 50) / 50.0F,
+            "Draws the 3D world smaller than the window and stretches it: the fastest way to get more frames out of a weak graphics chip, at the price of a softer picture. The menus and the text stay sharp. Needs Shaders ON.",
+            v -> o.renderScale = 50 + Math.round(v * 10.0F) * 5);
+         ui.button("Max FPS: " + (o.maxFps == 0 ? "Unlimited" : o.maxFps + ""), x1, oy, colW, 20.0F, true,
+            "Stops the game from drawing more pictures per second than this (VSync already does that at your screen's rate). A fast graphics card then rests instead of running flat out. The menus use 60 at most.",
+            () -> {
+               int at = 0;
+               for (int i = 0; i < FPS_STEPS.length; i++) {
+                  if (FPS_STEPS[i] == o.maxFps) {
+                     at = i;
+                  }
+               }
+
+               o.maxFps = FPS_STEPS[(at + 1) % FPS_STEPS.length];
+            });
+      }
    }
+
+   static final int[] FPS_STEPS = {0, 30, 60, 90, 120, 144, 165, 240};
 
    static void graphicsTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
       Ui ui = g.ui;

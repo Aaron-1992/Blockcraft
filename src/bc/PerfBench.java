@@ -37,9 +37,12 @@ final class PerfBench {
    private static int wq0;
    private static boolean clouds0;
    private static boolean shaders0;
+   private static int scale0;
+   private static long time0;
 
    static final String[] PRESETS = {
-      "as configured", "exact phases", "no shadows", "fast water", "no clouds", "no distant terrain", "no shaders", "view distance 4"
+      "as configured", "exact phases", "no shadows", "shadow every frame", "shadow map uncut", "no section culling", "fast water", "no clouds", "no distant terrain",
+      "no shaders", "render scale 50%", "view distance 4"
    };
 
    static boolean running() {
@@ -84,7 +87,11 @@ final class PerfBench {
       o.waterQ = wq0;
       o.clouds = clouds0;
       o.shaders = shaders0;
+      o.renderScale = scale0;
       Perf.noShadow = false;
+      Perf.noShadowCull = false;
+      Perf.noCull = false;
+      Perf.shadowEvery = false;
       Perf.exact = false;
       switch (preset) {
          case 1:
@@ -94,18 +101,31 @@ final class PerfBench {
             Perf.noShadow = true;
             break;
          case 3:
-            o.waterQ = 1;
+            Perf.shadowEvery = true;
             break;
          case 4:
-            o.clouds = false;
+            Perf.shadowEvery = true;
+            Perf.noShadowCull = true;
             break;
          case 5:
-            o.lodDistance = o.renderDistance;
+            Perf.noCull = true;
             break;
          case 6:
-            o.shaders = false;
+            o.waterQ = 1;
             break;
          case 7:
+            o.clouds = false;
+            break;
+         case 8:
+            o.lodDistance = o.renderDistance;
+            break;
+         case 9:
+            o.shaders = false;
+            break;
+         case 10:
+            o.renderScale = 50;
+            break;
+         case 11:
             o.renderDistance = Math.min(4, rd0);
             break;
          default:
@@ -122,6 +142,7 @@ final class PerfBench {
          wq0 = g.opt.waterQ;
          clouds0 = g.opt.clouds;
          shaders0 = g.opt.shaders;
+         scale0 = g.opt.renderScale;
          measure = Math.max(20, Integer.getInteger("bc.bench", 90));
          stage = 0;
          System.out.println("BENCH start: window " + g.fbW + "x" + g.fbH + ", view distance " + rd0 + ", distant terrain " + lod0 + ", " + (g.rend.shadersOn() ? "shaders" : "no shaders")
@@ -150,10 +171,13 @@ final class PerfBench {
          stage = 1;
          settle = 0;
          frame = 0;
+         time0 = g.world.dayTime;
          apply(g, 0);
          last = now;
          return false;
       }
+
+      g.world.dayTime = time0; // the sun stands still: the shadow map is only drawn again when the benchmark asks for it
 
       g.player.flying = true;
       g.player.setPos(baseX, baseY, baseZ);
@@ -163,7 +187,7 @@ final class PerfBench {
          g.player.pitch = basePitch;
          if (settle == SETTLE) {
             times.clear();
-            Perf.resetWindow();
+            Perf.benchReset();
             last = now;
             frame = 0;
          }
@@ -202,7 +226,7 @@ final class PerfBench {
    }
 
    private static void finish(Game g, int preset) {
-      Perf.flush();
+      Perf.bench = false;
       double[] t = new double[times.size()];
       double sum = 0.0;
       for (int i = 0; i < t.length; i++) {
@@ -214,29 +238,33 @@ final class PerfBench {
       double avg = sum / Math.max(1, t.length);
       double p95 = t[Math.min(t.length - 1, (int)(t.length * 0.95))];
       double worst = t[t.length - 1];
+      double n = Math.max(1, Perf.bFrames);
       String line = String.format("BENCH %-20s avg %7.1f ms (%5.1f fps)  95%% %7.1f ms  worst %7.1f ms  draws %d  vertices %dk  sections %d  shadow %d draws %dk",
-         PRESETS[preset], avg, 1000.0 / avg, p95, worst, Perf.draws, Perf.verts / 1000, Perf.sections, Perf.shadowDraws, Perf.shadowVerts / 1000);
+         PRESETS[preset], avg, 1000.0 / avg, p95, worst, Math.round(Perf.bDraws / n), Math.round(Perf.bVerts / n / 1000), Math.round(Perf.bSections / n),
+         Math.round(Perf.bShadowDraws / n), Math.round(Perf.bShadowVerts / n / 1000));
       System.out.println(line);
       report.add(line);
       if (preset <= 1) {
          StringBuilder c = new StringBuilder("BENCH   cpu ms ");
          StringBuilder gp = new StringBuilder("BENCH   gpu ms ");
+         double ng = Math.max(1, Perf.bGpuFrames);
          for (int p = 0; p < Perf.N; p++) {
-            c.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.avgCpu[p]));
-            gp.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.avgGpu[p]));
+            c.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.bCpu[p] / n / 1e6));
+            gp.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.bGpu[p] / ng / 1e6));
          }
 
-         c.append("   (worst frame in the window " + Perf.f1(Perf.peakFrame) + " ms, garbage " + Math.round(Perf.allocKbPerFrame) + " KB/frame)");
+         c.append("   (the frames of the Perf timer: avg " + Perf.f1(Perf.bFrameSum / n / 1e6) + " ms, worst " + Perf.f1(Perf.bFrameMax / 1e6) + " ms; garbage " + Math.round(Perf.bAlloc / n / 1024.0) + " KB/frame)");
          System.out.println(c);
          report.add(c.toString());
-         if (Perf.haveGpu) {
+         if (Perf.bGpuFrames > 0) {
+            gp.append("   (" + Perf.bGpuFrames + " frames)");
             System.out.println(gp);
             report.add(gp.toString());
          }
 
          StringBuilder pk = new StringBuilder("BENCH   worst ms ");
          for (int p = 0; p < Perf.N; p++) {
-            pk.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.peakCpu[p]));
+            pk.append(' ').append(Perf.NAME[p]).append(' ').append(Perf.f1(Perf.bPeakCpu[p] / 1e6));
          }
 
          System.out.println(pk);

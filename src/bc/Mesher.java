@@ -171,6 +171,7 @@ public final class Mesher {
       }
 
       Mesher.Result var27 = new Mesher.Result();
+      var27.conn = CaveCull.compute(var22);
       var27.nO = var4.o.n / 11;
       var27.nT = var4.t.n / 11;
       if (var27.nO > 0) {
@@ -1081,6 +1082,8 @@ public final class Mesher {
       public FloatBuffer trans;
       public int nO;
       public int nT;
+      /** Update 3.18: which faces of the section are connected through open blocks (CaveCull.compute). */
+      public long conn = CaveCull.ALL;
    }
 
    static final class Scratch {

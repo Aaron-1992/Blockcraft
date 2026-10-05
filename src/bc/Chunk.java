@@ -157,5 +157,7 @@ public final class Chunk {
       public boolean empty = true;
       /** Update 3.11: has been meshed (and uploaded) at least once. */
       public boolean meshed;
+      /** Update 3.18: which faces of the section are connected through open blocks (see CaveCull); open on every side until the section has been meshed. */
+      public long conn = CaveCull.ALL;
    }
 }

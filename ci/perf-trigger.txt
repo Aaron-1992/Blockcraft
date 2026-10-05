@@ -1,3 +1,4 @@
 forest
 640x360
-60
+40
+surface,hill,cave1,cave3

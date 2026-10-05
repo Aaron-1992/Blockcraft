@@ -32,8 +32,12 @@ public final class Options {
    public boolean disasters = true;
    /** Update 3.9: the chosen skin (a file name in the skins folder, or Skins.DEFAULT). */
    public String skin = Skins.DEFAULT;
-   /** Update 3.19: ask Windows to draw the game with the high performance graphics chip (the real graphics card, not the one inside the processor); see {@link GpuPref}. */
+   /** Update 3.18: ask Windows to draw the game with the high performance graphics chip (the real graphics card, not the one inside the processor); see {@link GpuPref}. */
    public boolean gpuHigh = true;
+   /** Update 3.18: the 3D world is drawn at this percentage of the window's size and stretched (50..100; needs the shaders: the menus and the text stay sharp). */
+   public int renderScale = 100;
+   /** Update 3.18: frame rate limit (0 = none: the screen's refresh rate with VSync); lets a fast graphics card rest instead of drawing 400 pictures a second. */
+   public int maxFps = 0;
    final File file;
 
    public Options(File var1) {
@@ -67,6 +71,8 @@ public final class Options {
                this.disasters = Boolean.parseBoolean(var2.getProperty("disasters", "true"));
                this.skin = var2.getProperty("skin", Skins.DEFAULT);
                this.gpuHigh = Boolean.parseBoolean(var2.getProperty("gpuHigh", "true"));
+               this.renderScale = Math.max(50, Math.min(100, Integer.parseInt(var2.getProperty("renderScale", "100"))));
+               this.maxFps = Math.max(0, Math.min(1000, Integer.parseInt(var2.getProperty("maxFps", "0"))));
             } catch (Throwable var5) {
                try {
                   var1.close();
@@ -105,6 +111,8 @@ public final class Options {
       var1.setProperty("disasters", this.disasters + "");
       var1.setProperty("skin", this.skin);
       var1.setProperty("gpuHigh", this.gpuHigh + "");
+      var1.setProperty("renderScale", this.renderScale + "");
+      var1.setProperty("maxFps", this.maxFps + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

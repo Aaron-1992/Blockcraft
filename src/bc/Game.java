@@ -255,6 +255,14 @@ public final class Game {
          this.opt.lodDistance = Integer.getInteger("bc.lod");
       }
 
+      if (System.getProperty("bc.gamma") != null) {
+         this.opt.gamma = Float.parseFloat(System.getProperty("bc.gamma")); // test hook: 1 = "Bright" (caves can be photographed)
+      }
+
+      if (System.getProperty("bc.scale") != null) {
+         this.opt.renderScale = Math.max(50, Math.min(100, Integer.getInteger("bc.scale"))); // test hook: the render scale in percent
+      }
+
       if (System.getProperty("bc.shaders") != null) {
          this.opt.shaders = Boolean.getBoolean("bc.shaders");
       }
@@ -272,11 +280,11 @@ public final class Game {
       }
    }
 
-   /** Update 3.19: what the driver calls the chip that draws (GL_RENDERER), e.g. "NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2". */
+   /** Update 3.18: what the driver calls the chip that draws (GL_RENDERER), e.g. "NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2". */
    String gpuName = "";
 
    void init() {
-      // Update 3.19: ask Windows for the real graphics card before the first window exists (see GpuPref)
+      // Update 3.18: ask Windows for the real graphics card before the first window exists (see GpuPref)
       boolean gpuChanged = GpuPref.apply(this.opt);
       GLFWErrorCallback.createPrint(System.err).set();
       if (!GLFW.glfwInit()) {
@@ -2409,12 +2417,62 @@ public final class Game {
 
          Perf.mark(Perf.SWAP);
          GLFW.glfwSwapBuffers(this.window);
+         this.limitFps(var3);
          this.frames++;
          double var7 = GLFW.glfwGetTime();
          if (var7 - this.fpsTimer >= 1.0) {
             this.fps = this.frames;
             this.frames = 0;
             this.fpsTimer = var7;
+         }
+      }
+   }
+
+   /**
+    * Update 3.18: the frame rate limit: the one in the options, 60 in the menus (the turning world behind the title does not need 300 pictures a
+    * second), 30 while the window is in the background, 10 while it is minimised. 0 = no limit (VSync alone decides).
+    */
+   int fpsCap() {
+      if (this.window == 0L || System.getProperty("bc.auto") != null) {
+         return 0;
+      }
+
+      if (GLFW.glfwGetWindowAttrib(this.window, GLFW.GLFW_ICONIFIED) != 0) {
+         return 10;
+      }
+
+      int cap = this.opt.maxFps;
+      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.OPTIONS
+         || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
+      if (menu) {
+         cap = cap > 0 ? Math.min(cap, 60) : 60;
+      }
+
+      if (GLFW.glfwGetWindowAttrib(this.window, GLFW.GLFW_FOCUSED) == 0) {
+         cap = cap > 0 ? Math.min(cap, 30) : 30;
+      }
+
+      return cap;
+   }
+
+   /** Waits until the frame that began at {@code frameStart} has lasted as long as the limit says (sleeps for most of it, then waits busily for the last 1.5 ms). */
+   void limitFps(long frameStart) {
+      int cap = this.fpsCap();
+      if (cap <= 0) {
+         return;
+      }
+
+      long end = frameStart + 1_000_000_000L / cap;
+      while (true) {
+         long left = end - System.nanoTime();
+         if (left <= 0L) {
+            return;
+         }
+
+         if (left > 2_000_000L) {
+            java.util.concurrent.locks.LockSupport.parkNanos(left - 1_500_000L);
+         } else {
+            Thread.onSpinWait();
          }
       }
    }
@@ -4301,14 +4359,22 @@ public final class Game {
          GL13.glActiveTexture(33984);
          Tex.animate(this.tickCount, this.partial);
          boolean var3 = this.rend.shadersOn();
-         if (var3) {
-            this.rend.sh.beginScene(this.fbW, this.fbH);
+         // Update 3.18: the render scale - with the shaders the world is drawn into the scene buffer, which can be smaller than the window
+         int sceneW = this.fbW;
+         int sceneH = this.fbH;
+         if (var3 && this.opt.renderScale < 100) {
+            sceneW = Math.max(64, Math.round(this.fbW * this.opt.renderScale / 100.0F));
+            sceneH = Math.max(36, Math.round(this.fbH * this.opt.renderScale / 100.0F));
          }
 
-         this.rend.renderWorld(this.partial, this.fbW, this.fbH);
+         if (var3) {
+            this.rend.sh.beginScene(sceneW, sceneH);
+         }
+
+         this.rend.renderWorld(this.partial, sceneW, sceneH);
          Perf.mark(Perf.HAND);
          if (var3) {
-            this.rend.sh.skyMask(this.fbW, this.fbH);
+            this.rend.sh.skyMask(sceneW, sceneH);
          }
 
          if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {
@@ -4321,8 +4387,8 @@ public final class Game {
                   HAND_SWING != null ? Float.parseFloat(HAND_SWING) : (this.swinging ? var4 : 0.0F),
                   HAND_EAT != null ? Float.parseFloat(HAND_EAT) : (this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F),
                   var5,
-                  this.fbW,
-                  this.fbH,
+                  sceneW,
+                  sceneH,
                   this.pEquip + (this.equip - this.pEquip) * this.partial,
                   (this.player.pitch - (this.pArmPitch + (this.armPitch - this.pArmPitch) * this.partial)) * 0.1F,
                   (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F,
@@ -4339,7 +4405,7 @@ public final class Game {
             }
 
             Perf.mark(Perf.POST);
-            this.rend.sh.endScene(this.fbW, this.fbH, 0.45F);
+            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
       } else {
          GL11.glClearColor(0.0F, 0.0F, 0.0F, 1.0F);

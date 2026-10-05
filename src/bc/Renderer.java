@@ -38,6 +38,8 @@ public final class Renderer {
    /** Update 3.8: weather rendering (clouds without shaders, rain, snow, lightning). */
    public final WeatherFx wfx = new WeatherFx(this);
    int shFrames;
+   /** Update 3.18: a section near the player was built or changed since the shadow map was drawn. */
+   boolean shadowDirty;
    final float[] proj = new float[16];
    final float[] mv = new float[16];
    final float[][] planes = new float[6][4];
@@ -255,8 +257,42 @@ public final class Renderer {
       }
    }
 
+   /** The sections to draw this frame: one object per section, kept from frame to frame (the frame used to make a thousand of them). */
+   private final ArrayList<Renderer.Vis> visPool = new ArrayList<>();
+   private int visN;
+   private final CaveCull.Walk walk = new CaveCull.Walk();
+   private final CaveCull.Visible frustumTest = (rx, ry, rz) -> this.visible(rx, ry, rz, 14.0F);
+   static final boolean CAVE_CULL = !"false".equals(System.getProperty("bc.cavecull"));
+   static final java.util.Comparator<Renderer.Vis> VIS_NEAR_FIRST = (a, b) -> Float.compare(a.d, b.d);
+
+   /** Adds section {@code sy} of {@code c} to the list of what is drawn, if it has something to draw and is inside the pyramid of view. */
+   private void addVisible(Chunk c, int sy) {
+      Section s = c.sections[sy];
+      if (s.nO != 0 || s.nT != 0) {
+         float rx = (float)(c.cx * 16 + 8 - this.camX);
+         float ry = (float)(sy * 16 + 8 - this.camY);
+         float rz = (float)(c.cz * 16 + 8 - this.camZ);
+         if (this.visible(rx, ry, rz, 14.0F)) {
+            if (this.visN == this.visPool.size()) {
+               this.visPool.add(new Renderer.Vis());
+            }
+
+            Renderer.Vis v = this.visPool.get(this.visN++);
+            v.c = c;
+            v.sy = sy;
+            v.d = rx * rx + ry * ry + rz * rz;
+            this.vis.add(v);
+         }
+      }
+   }
+
    void upload(Chunk var1, int var2, Result var3) {
       Section var4 = var1.sections[var2];
+      var4.conn = var3.conn;
+      if (Math.abs(var1.cx * 16 + 8 - this.camX) < 110.0 && Math.abs(var1.cz * 16 + 8 - this.camZ) < 110.0 && (var3.nO > 0 || var4.nO > 0)) {
+         this.shadowDirty = true;
+      }
+
       var4.nO = var3.nO;
       var4.nT = var3.nT;
       var1.markMeshed(var2);
@@ -692,32 +728,36 @@ public final class Renderer {
       this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.CULL);
       this.vis.clear();
+      this.visN = 0;
       int var48 = (int)Math.floor(this.camX) >> 4;
       int var49 = (int)Math.floor(this.camZ) >> 4;
-
-      for (Chunk var32 : var5.chunks.values()) {
-         int var33 = var32.cx - var48;
-         int var34 = var32.cz - var49;
-         if (var33 * var33 + var34 * var34 <= (var13 + 1) * (var13 + 1)) {
-            for (int var35 = 0; var35 < 16; var35++) {
-               Section var36 = var32.sections[var35];
-               if (var36.nO != 0 || var36.nT != 0) {
-                  float var37 = (float)(var32.cx * 16 + 8 - this.camX);
-                  float var38 = (float)(var35 * 16 + 8 - this.camY);
-                  float var39 = (float)(var32.cz * 16 + 8 - this.camZ);
-                  if (this.visible(var37, var38, var39, 14.0F)) {
-                     Renderer.Vis var40 = new Renderer.Vis();
-                     var40.c = var32;
-                     var40.sy = var35;
-                     var40.d = var37 * var37 + var38 * var38 + var39 * var39;
-                     this.vis.add(var40);
-                  }
+      // Update 3.18: sections that the ground hides are not drawn (CaveCull): the walk from the camera's section through the open faces finds
+      // the ones that can be seen. Not for a spectator (who flies through the rock) and not when the camera is inside a solid block.
+      boolean walked = !Perf.noCull && CAVE_CULL && !var4.spectator
+         && !Blocks.opaque[var5.getBlock((int)Math.floor(this.camX), (int)Math.floor(this.camY), (int)Math.floor(this.camZ))];
+      if (walked) {
+         int camSy = Math.max(0, Math.min(15, (int)Math.floor(this.camY) >> 4));
+         this.walk.run(var5, var48, camSy, var49, var13, this.camX, this.camY, this.camZ, this.frustumTest);
+         for (int i = 0; i < this.walk.count; i++) {
+            int idx = this.walk.order[i];
+            Chunk var32 = this.walk.chunk(idx);
+            if (var32 != null) {
+               this.addVisible(var32, this.walk.sy(idx));
+            }
+         }
+      } else {
+         for (Chunk var32 : var5.chunks.values()) {
+            int var33 = var32.cx - var48;
+            int var34 = var32.cz - var49;
+            if (var33 * var33 + var34 * var34 <= (var13 + 1) * (var13 + 1)) {
+               for (int var35 = 0; var35 < 16; var35++) {
+                  this.addVisible(var32, var35);
                }
             }
          }
       }
 
-      this.vis.sort((var0, var1x) -> Float.compare(var0.d, var1x.d));
+      this.vis.sort(VIS_NEAR_FIRST);
       this.visibleSections = this.vis.size();
       Perf.sections = this.visibleSections;
       Perf.mark(Perf.SHADOW);
@@ -730,8 +770,13 @@ public final class Renderer {
          this.sh.setSun(var55, var58, 0.0F);
          var51 = skyOn && var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F && !Perf.noShadow;
          if (var51) {
-            if (++this.shFrames >= 30 || this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ)) {
+            // Update 3.18: the map is drawn again when the player has moved 12 m or the sun has turned a third of a degree (as before), when terrain near
+            // the player was built or changed (at most every 8 frames) and at the latest after 150 frames; it was every 30 frames whatever had happened
+            this.shFrames++;
+            boolean shStale = this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ);
+            if (shStale || Perf.shadowEvery || this.shadowDirty && this.shFrames >= 8 || this.shFrames >= 150) {
                this.shFrames = 0;
+               this.shadowDirty = false;
                this.sh.computeShadow(var55, var58, 0.0F, this.camX, this.camY, this.camZ);
                this.renderShadowPass(var2, var3);
             }
@@ -1069,14 +1114,55 @@ public final class Renderer {
       int var3 = (int)Math.floor(this.camX) >> 4;
       int var4 = (int)Math.floor(this.camZ) >> 4;
       int var5 = 9;
+      // Update 3.18: only what can land inside the map is drawn into it (the map is a 168 m square of light space: the 19 x 19 chunks round the player were
+      // 90 000 m2, with the vertices of every section, underground ones too, going through the vertex shader to be clipped away) - same picture, a third of the work
+      float[] sm = this.sh.shadowM;
+      float eu = 8.0F * (Math.abs(sm[0]) + Math.abs(sm[1]) + Math.abs(sm[2]));
+      float ev = 8.0F * (Math.abs(sm[4]) + Math.abs(sm[5]) + Math.abs(sm[6]));
+      float ed = 8.0F * (Math.abs(sm[8]) + Math.abs(sm[9]) + Math.abs(sm[10]));
+      int span = 2 * var5 + 3;
+      int[] low = new int[span * span]; // the lowest surface of every chunk of the 21 x 21 chunks round the player
+      for (int var6 = -var5 - 1; var6 <= var5 + 1; var6++) {
+         for (int var7 = -var5 - 1; var7 <= var5 + 1; var7++) {
+            Chunk lc = this.g.world.chunk(var3 + var7, var4 + var6);
+            int m = 0;
+            if (lc != null) {
+               m = 255;
+               for (int i = 0; i < 256; i++) {
+                  m = Math.min(m, lc.hm[i]);
+               }
+            }
+
+            low[(var6 + var5 + 1) * span + var7 + var5 + 1] = m;
+         }
+      }
 
       for (int var6 = -var5; var6 <= var5; var6++) {
          for (int var7 = -var5; var7 <= var5; var7++) {
             Chunk var8 = this.g.world.chunk(var3 + var7, var4 + var6);
             if (var8 != null) {
+               // sections that lie below the surface of the chunk and all eight round it can neither be seen nor throw a shadow on anything that is seen
+               int buried = 255;
+               for (int dz = -1; dz <= 1; dz++) {
+                  for (int dx = -1; dx <= 1; dx++) {
+                     buried = Math.min(buried, low[(var6 + dz + var5 + 1) * span + var7 + dx + var5 + 1]);
+                  }
+               }
+
+               buried -= 4;
                for (int var9 = 0; var9 < 16; var9++) {
                   Section var10 = var8.sections[var9];
-                  if (var10.nO != 0 && var10.vboO != 0) {
+                  if (var10.nO != 0 && var10.vboO != 0 && (Perf.noShadowCull || var9 * 16 + 15 >= buried)) {
+                     float rx = (float)(var8.cx * 16 + 8 - this.camX);
+                     float ry = (float)(var9 * 16 + 8 - this.camY);
+                     float rz = (float)(var8.cz * 16 + 8 - this.camZ);
+                     float u = sm[0] * rx + sm[1] * ry + sm[2] * rz + sm[3];
+                     float v = sm[4] * rx + sm[5] * ry + sm[6] * rz + sm[7];
+                     float d = sm[8] * rx + sm[9] * ry + sm[10] * rz + sm[11];
+                     if (!Perf.noShadowCull && (u + eu < 0.0F || u - eu > 1.0F || v + ev < 0.0F || v - ev > 1.0F || d + ed < 0.0F || d - ed > 1.0F)) {
+                        continue;
+                     }
+
                      GL11.glPushMatrix();
                      GL11.glTranslatef((float)(var8.cx * 16 - this.camX), (float)(var9 * 16 - this.camY), (float)(var8.cz * 16 - this.camZ));
                      bindPointers(var10.vboO);

@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Update 3.19: which graphics chip draws the game.
+ * Update 3.18: which graphics chip draws the game.
  *
  * A laptop (and some desktops) has two: a small one inside the processor (Intel UHD / Iris, AMD "Radeon Graphics") and a real one (GeForce, Radeon RX).
  * Windows gives a program the small one unless it is told otherwise, and a Java game never tells it - the whole game ran on the small chip. Since
@@ -254,7 +254,13 @@ final class GpuPref {
          pb.environment().put(RETRY_ENV, oldRenderer == null || oldRenderer.isEmpty() ? "1" : oldRenderer);
          pb.redirectErrorStream(true);
          pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-         pb.start();
+         Process p = pb.start();
+         // a start that works takes longer than this to get a window: if the new process is gone already, it did not work and this one goes on
+         if (p.waitFor(2500, TimeUnit.MILLISECONDS)) {
+            System.err.println("GPU preference: the second start ended at once (exit " + p.exitValue() + "); going on with this one");
+            return false;
+         }
+
          return true;
       } catch (Throwable t) {
          System.err.println("GPU preference: could not start again: " + t);

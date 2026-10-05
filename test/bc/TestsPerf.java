@@ -12,13 +12,400 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Headless tests of the performance work of Update 3.18 / 3.19: the choice of the graphics chip (GpuPref) and the measuring and adapting
+ * Headless tests of the performance work of Update 3.18: the choice of the graphics chip (GpuPref) and the measuring and adapting
  * code that follows it.   python3 tools/runtests.py unit
  */
 final class TestsPerf {
    static void run() {
       gpu();
       frames();
+      cull();
+   }
+
+   // ------------------------------------------------------------------ the culling of hidden sections
+   /** The padded array of the mesher (18 x 18 x 18) filled with one block id. */
+   static short[] padded(int id) {
+      short[] b = new short[5832];
+      java.util.Arrays.fill(b, (short)id);
+      return b;
+   }
+
+   static void put(short[] b, int x, int y, int z, int id) {
+      b[((y + 1) * 18 + z + 1) * 18 + x + 1] = (short)id;
+   }
+
+   static void cull() {
+      test("cull: connectivity of a section - solid is closed, air is open, a tunnel joins the faces it touches and no others", () -> {
+         eq(0L, CaveCull.compute(padded(Blocks.STONE)), "stone");
+         eq(CaveCull.ALL, CaveCull.compute(padded(0)), "air");
+         short[] b = padded(Blocks.STONE);
+         for (int x = 0; x < 16; x++) {
+            put(b, x, 5, 7, 0); // a tunnel from the west face to the east face
+         }
+
+         long c = CaveCull.compute(b);
+         check(CaveCull.connected(c, 5, 4) && CaveCull.connected(c, 4, 5), "west - east");
+         int pairs = 0;
+         for (int a = 0; a < 6; a++) {
+            for (int d = 0; d < 6; d++) {
+               if (CaveCull.connected(c, a, d)) {
+                  pairs++;
+               }
+            }
+         }
+
+         eq(2, pairs, "nothing else");
+         // an L: from the west face to a shaft that goes up through the top face
+         for (int y = 5; y < 16; y++) {
+            put(b, 3, y, 7, 0);
+         }
+
+         c = CaveCull.compute(b);
+         check(CaveCull.connected(c, 5, 0) && CaveCull.connected(c, 0, 4) && CaveCull.connected(c, 5, 4), "the tunnel and the shaft meet: west, east and the top are all connected");
+         check(!CaveCull.connected(c, 1, 0) && !CaveCull.connected(c, 2, 3), "the floor and the north / south faces are not");
+         // two tunnels that do not meet
+         b = padded(Blocks.STONE);
+         for (int x = 0; x < 16; x++) {
+            put(b, x, 2, 2, 0); // west - east
+            put(b, 8, 12, x, 0); // north - south
+         }
+
+         c = CaveCull.compute(b);
+         check(CaveCull.connected(c, 4, 5) && CaveCull.connected(c, 2, 3), "both tunnels");
+         check(!CaveCull.connected(c, 4, 2) && !CaveCull.connected(c, 5, 3) && !CaveCull.connected(c, 4, 3), "but they do not lead into each other");
+         // a dead end (a cave that opens on one face only) joins nothing
+         b = padded(Blocks.STONE);
+         for (int x = 0; x < 10; x++) {
+            put(b, x, 8, 8, 0);
+         }
+
+         eq(0L, CaveCull.compute(b), "a dead end");
+         // glass and leaves do not stop the view
+         b = padded(Blocks.STONE);
+         for (int x = 0; x < 16; x++) {
+            put(b, x, 4, 4, x % 2 == 0 ? Blocks.GLASS : Blocks.LEAVES_OAK);
+         }
+
+         check(!Blocks.opaque[Blocks.GLASS] && !Blocks.opaque[Blocks.LEAVES_OAK] && CaveCull.connected(CaveCull.compute(b), 4, 5), "glass and leaves are see-through");
+      });
+
+      test("cull: the walk goes through connected faces, not through rock, and never turns back", () -> {
+         World w = new World(1, null);
+         w.saveEnabled = false;
+         for (int cz = -4; cz <= 4; cz++) {
+            for (int cx = -4; cx <= 4; cx++) {
+               Chunk c = new Chunk(cx, cz);
+               w.chunks.put(World.key(cx, cz), c); // sections are open on every side (conn = ALL)
+            }
+         }
+
+         CaveCull.Walk walk = new CaveCull.Walk();
+         walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
+         int open = walk.count;
+         int expected = 0;
+         for (int dz = -4; dz <= 4; dz++) {
+            for (int dx = -4; dx <= 4; dx++) {
+               if (dx * dx + dz * dz <= 16) {
+                  expected += 16;
+               }
+            }
+         }
+
+         eq(expected, open, "everything inside the ring of 4 chunks is reached when it is all open");
+         // a wall of rock one chunk east of the camera: a whole chunk column of closed sections
+         for (int sy = 0; sy < 16; sy++) {
+            w.chunk(1, 0).sections[sy].conn = 0L;
+         }
+
+         walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
+         boolean behind = false;
+         boolean aside = false;
+         boolean straight = false;
+         for (int i = 0; i < walk.count; i++) {
+            int idx = walk.order[i];
+            if (walk.dx(idx) == 1 && walk.dz(idx) == 0) {
+               behind = true; // the wall itself is reached (its faces are visible) ...
+            }
+
+            if (walk.dx(idx) == 2 && walk.dz(idx) == 1 && walk.sy(idx) == 8) {
+               aside = true; // ... and what is behind it, but to the side, is reached through the open chunk beside the wall (a steep ray gets past its corner)
+            }
+
+            if (walk.dx(idx) == 2 && walk.dz(idx) == 0 && walk.sy(idx) == 8) {
+               straight = true;
+            }
+         }
+
+         check(behind && aside, "the wall is seen and what is behind it to the side is reached round the corner");
+         check(!straight, "but not what is straight behind it: no ray gets through a wall of rock a chunk wide");
+         // a rock ring round the camera: nothing outside is reached; one tunnel through it opens exactly that direction
+         for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+               if (dx != 0 || dz != 0) {
+                  for (int sy = 0; sy < 16; sy++) {
+                     w.chunk(dx, dz).sections[sy].conn = 0L;
+                  }
+               }
+            }
+         }
+
+         for (int sy = 0; sy < 16; sy++) {
+            w.chunk(1, 0).sections[sy].conn = 0L;
+         }
+
+         walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
+         boolean outside = false;
+         for (int i = 0; i < walk.count; i++) {
+            int idx = walk.order[i];
+            if (Math.abs(walk.dx(idx)) >= 2 || Math.abs(walk.dz(idx)) >= 2) {
+               outside = true;
+            }
+         }
+
+         check(!outside, "a ring of rock round the camera's chunk (all heights): nothing outside it is reached");
+         // a world of rock with the camera's chunk open and a tunnel along x at the camera's height through the three chunks east of it
+         for (int cz = -4; cz <= 4; cz++) {
+            for (int cx = -4; cx <= 4; cx++) {
+               for (int sy = 0; sy < 16; sy++) {
+                  w.chunk(cx, cz).sections[sy].conn = 0L;
+               }
+            }
+         }
+
+         for (int sy = 0; sy < 16; sy++) {
+            w.chunk(0, 0).sections[sy].conn = CaveCull.ALL;
+         }
+
+         long tunnel = CaveCull.bit(5, 4) | CaveCull.bit(4, 5);
+         w.chunk(1, 0).sections[8].conn = tunnel;
+         w.chunk(2, 0).sections[8].conn = tunnel;
+         w.chunk(3, 0).sections[8].conn = tunnel;
+         walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
+         boolean east2 = false;
+         boolean east3 = false;
+         boolean east4 = false;
+         boolean wrong = false;
+         for (int i = 0; i < walk.count; i++) {
+            int idx = walk.order[i];
+            int dx = walk.dx(idx);
+            int dz = walk.dz(idx);
+            if (dx == 2 && dz == 0 && walk.sy(idx) == 8) {
+               east2 = true;
+            }
+
+            if (dx == 3 && dz == 0 && walk.sy(idx) == 8) {
+               east3 = true;
+            }
+
+            if (dx == 4 && dz == 0 && walk.sy(idx) == 8) {
+               east4 = true; // the rock at the end of the tunnel is seen, and that is where it stops
+            }
+
+            if (dx >= 2 && !(dz == 0 && walk.sy(idx) == 8)) {
+               wrong = true;
+            }
+
+            if (dx <= -2 || Math.abs(dz) >= 2) {
+               wrong = true;
+            }
+         }
+
+         check(east2 && east3 && east4, "the tunnel is followed to its end: " + east2 + east3 + east4);
+         check(!wrong, "nothing is reached but the tunnel and the camera's 27 sections");
+         // a bend: west -> north is connected, west -> east is not: from the west the walk turns north and does not go on east
+         w.chunk(2, 0).sections[8].conn = CaveCull.bit(5, 2) | CaveCull.bit(2, 5);
+         for (int sy = 0; sy < 16; sy++) {
+            w.chunk(2, -1).sections[sy].conn = sy == 8 ? CaveCull.ALL : 0L;
+         }
+
+         walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
+         boolean north = false;
+         boolean beyond = false;
+         for (int i = 0; i < walk.count; i++) {
+            int idx = walk.order[i];
+            if (walk.dx(idx) == 2 && walk.dz(idx) == -1 && walk.sy(idx) == 8) {
+               north = true;
+            }
+
+            if (walk.dx(idx) >= 3 && walk.dz(idx) == 0 && walk.sy(idx) == 8) {
+               beyond = true;
+            }
+         }
+
+         check(north, "round the bend to the north");
+         check(!beyond, "and not straight on");
+      });
+
+      test("cull: a walk with a pyramid of view takes only sections in it", () -> {
+         World w = new World(1, null);
+         w.saveEnabled = false;
+         for (int cz = -4; cz <= 4; cz++) {
+            for (int cx = -4; cx <= 4; cx++) {
+               w.chunks.put(World.key(cx, cz), new Chunk(cx, cz));
+            }
+         }
+
+         CaveCull.Walk walk = new CaveCull.Walk();
+         // looking east: only sections with a larger x than the camera (plus the 27 round the camera)
+         walk.run(w, 0, 8, 0, 3, 8, 136, 8, (rx, ry, rz) -> rx > -20.0F);
+         for (int i = 0; i < walk.count; i++) {
+            int idx = walk.order[i];
+            check(walk.dx(idx) >= -1, "no section behind the camera: dx " + walk.dx(idx));
+         }
+
+         check(walk.count > 100, "and a lot in front: " + walk.count);
+      });
+
+      test("cull: no ray from the camera ever ends in a section the walk did not reach (terrain of the new generator, cameras on the ground, in the air and in caves)", () -> {
+         World w = new World(12345, null, Dim.OVERWORLD, new WorldSettings());
+         w.saveEnabled = false;
+         int R = 5;
+         java.util.List<Chunk> cs = new ArrayList<>();
+         for (int cz = -R; cz <= R; cz++) {
+            for (int cx = -R; cx <= R; cx++) {
+               Chunk c = w.gen.generate(cx, cz);
+               cs.add(c);
+               w.chunks.put(World.key(cx, cz), c);
+            }
+         }
+
+         for (Chunk c : cs) {
+            w.lightChunk(c);
+         }
+
+         for (Chunk c : cs) {
+            for (int sy = 0; sy < 16; sy++) {
+               Mesher.Result r = Mesher.build(w, c, sy, true);
+               c.sections[sy].conn = r.conn;
+               Renderer.free(r);
+            }
+         }
+
+         // cameras: three above the ground, three in caves (an open block that has solid rock above it and a surface well above)
+         java.util.List<double[]> cams = new ArrayList<>();
+         java.util.Random rnd = new java.util.Random(5);
+         for (int i = 0; i < 3; i++) {
+            int x = rnd.nextInt(60) - 30;
+            int z = rnd.nextInt(60) - 30;
+            Chunk c = w.chunkAt(x, z);
+            cams.add(new double[]{x + 0.5, c.hm[(z & 15) * 16 + (x & 15)] + 2.5, z + 0.5});
+         }
+
+         int tries = 0;
+         while (cams.size() < 8 && tries++ < 40000) {
+            int x = rnd.nextInt(100) - 50;
+            int z = rnd.nextInt(100) - 50;
+            int y = 8 + rnd.nextInt(60);
+            Chunk c = w.chunkAt(x, z);
+            if (y < c.hm[(z & 15) * 16 + (x & 15)] - 12 && w.getBlock(x, y, z) == 0 && w.getBlock(x, y + 1, z) == 0 && w.getBlock(x, y + 2, z) != 0) {
+               cams.add(new double[]{x + 0.5, y + 1.0, z + 0.5});
+            }
+         }
+
+         check(cams.size() >= 6, "cameras found: " + cams.size());
+         CaveCull.Walk walk = new CaveCull.Walk();
+         int rays = 0;
+         int misses = 0;
+         int total = 0;
+         int reachedTotal = 0;
+         for (double[] cam : cams) {
+            int cx = (int)Math.floor(cam[0]) >> 4;
+            int cz = (int)Math.floor(cam[2]) >> 4;
+            int sy = (int)Math.floor(cam[1]) >> 4;
+            walk.run(w, cx, sy, cz, 4, cam[0], cam[1], cam[2], null);
+            boolean[] reached = new boolean[walk.cells];
+            for (int i = 0; i < walk.count; i++) {
+               reached[walk.order[i]] = true;
+            }
+
+            int withFaces = 0;
+            int reachedWithFaces = 0;
+            for (int dz = -4; dz <= 4; dz++) {
+               for (int dx = -4; dx <= 4; dx++) {
+                  Chunk c = w.chunk(cx + dx, cz + dz);
+                  if (c == null || dx * dx + dz * dz > 25) {
+                     continue;
+                  }
+
+                  for (int y = 0; y < 16; y++) {
+                     Mesher.Result r = Mesher.build(w, c, y, true);
+                     boolean faces = r.nO + r.nT > 0;
+                     Renderer.free(r);
+                     if (faces) {
+                        withFaces++;
+                        if (reached[(((dz + 5) * 11) + dx + 5) * 16 + y]) {
+                           reachedWithFaces++;
+                        }
+                     }
+                  }
+               }
+            }
+
+            total += withFaces;
+            reachedTotal += reachedWithFaces;
+            // 4000 rays on a spiral over the whole sphere
+            int n = 4000;
+            for (int k = 0; k < n; k++) {
+               double yy = 1.0 - 2.0 * (k + 0.5) / n;
+               double rr = Math.sqrt(1.0 - yy * yy);
+               double phi = k * 2.399963229728653;
+               double[] dir = {rr * Math.cos(phi), yy, rr * Math.sin(phi)};
+               rays++;
+               int[] voxel = {(int)Math.floor(cam[0]), (int)Math.floor(cam[1]), (int)Math.floor(cam[2])};
+               double t = 0.0;
+               int[] step = new int[3];
+               double[] tMax = new double[3];
+               double[] tDelta = new double[3];
+               for (int a = 0; a < 3; a++) {
+                  step[a] = dir[a] > 0 ? 1 : -1;
+                  double next = dir[a] > 0 ? voxel[a] + 1 : voxel[a];
+                  tMax[a] = dir[a] == 0 ? 1e30 : (next - cam[a]) / dir[a];
+                  tDelta[a] = dir[a] == 0 ? 1e30 : Math.abs(1.0 / dir[a]);
+               }
+
+               while (t < 60.0) {
+                  int vx = voxel[0];
+                  int vy = voxel[1];
+                  int vz = voxel[2];
+                  if (vy < 0 || vy > 255) {
+                     break;
+                  }
+
+                  Chunk c = w.chunkAt(vx, vz);
+                  if (c == null) {
+                     break;
+                  }
+
+                  int ddx = (vx >> 4) - cx;
+                  int ddz = (vz >> 4) - cz;
+                  if (ddx * ddx + ddz * ddz <= 25) {
+                     int cell = (((ddz + 5) * 11) + ddx + 5) * 16 + (vy >> 4);
+                     if (Math.abs(ddx) <= 5 && Math.abs(ddz) <= 5 && !reached[cell]) {
+                        misses++;
+                        if (misses <= 5) {
+                           System.out.println("   missed: camera " + Arrays.toString(cam) + " ray " + Arrays.toString(dir) + " in block " + vx + "," + vy + "," + vz + " section " + ddx + "," + (vy >> 4) + "," + ddz);
+                        }
+
+                        break;
+                     }
+                  }
+
+                  if (Blocks.opaque[w.getBlock(vx, vy, vz)]) {
+                     break;
+                  }
+
+                  int axis = tMax[0] < tMax[1] ? (tMax[0] < tMax[2] ? 0 : 2) : (tMax[1] < tMax[2] ? 1 : 2);
+                  t = tMax[axis];
+                  tMax[axis] += tDelta[axis];
+                  voxel[axis] += step[axis];
+               }
+            }
+         }
+
+         eq(0, misses, "rays that ended in (or passed through) a section the walk did not reach: " + misses + " of " + rays);
+         check(reachedTotal < total * 0.9, "the walk does cull: it reached " + reachedTotal + " of " + total + " sections with faces round the cameras");
+         System.out.println("   cull: reached " + reachedTotal + " of " + total + " sections with faces (" + (100 * reachedTotal / Math.max(1, total)) + " %), " + rays + " rays, no misses");
+      });
    }
 
    // ------------------------------------------------------------------ the frame timer
@@ -124,7 +511,7 @@ final class TestsPerf {
       });
 
       test("perf: the benchmark's list of settings has the names the report prints, and the leaf / shadow switches exist", () -> {
-         eq(8, PerfBench.PRESETS.length, "settings");
+         eq(12, PerfBench.PRESETS.length, "settings");
          check(PerfBench.PRESETS[0].equals("as configured") && PerfBench.PRESETS[1].equals("exact phases"), "the first two");
          check(!PerfBench.enabled() && !PerfBench.running(), "off by default");
          check(!Perf.noShadow && !Perf.noCull, "switches are off");
@@ -255,6 +642,46 @@ final class TestsPerf {
             System.clearProperty("bc.gpu");
             GpuPref.forceWindows = savedWin;
             GpuPref.runner = savedRunner;
+            Tests311.deleteAll(dir);
+         }
+      });
+
+      test("perf: render scale and frame limit are saved, read again and kept inside their range; the limit does nothing without a window", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("opt").toFile();
+         try {
+            Options o = new Options(dir);
+            eq(100, o.renderScale, "default scale");
+            eq(0, o.maxFps, "default: no limit");
+            o.renderScale = 65;
+            o.maxFps = 144;
+            o.save();
+            Options p = new Options(dir);
+            p.load();
+            eq(65, p.renderScale, "scale");
+            eq(144, p.maxFps, "limit");
+            java.util.Properties pr = new java.util.Properties();
+            pr.setProperty("renderScale", "5");
+            pr.setProperty("maxFps", "-3");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(new File(dir, "options.txt"))) {
+               pr.store(out, "bad values");
+            }
+
+            p.load();
+            eq(50, p.renderScale, "a scale below 50 is brought back to 50");
+            eq(0, p.maxFps, "a negative limit is no limit");
+            pr.setProperty("renderScale", "900");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(new File(dir, "options.txt"))) {
+               pr.store(out, "bad values");
+            }
+
+            p.load();
+            eq(100, p.renderScale, "a scale above 100 is brought back to 100");
+            Game g = GameTests.newGame(1);
+            eq(0, g.fpsCap(), "no window: no limit");
+            for (int step : Screens.FPS_STEPS) {
+               check(step == 0 || step >= 30 && step <= 240, "the limits to choose from are sensible: " + step);
+            }
+         } finally {
             Tests311.deleteAll(dir);
          }
       });

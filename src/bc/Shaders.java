@@ -375,7 +375,7 @@ public final class Shaders {
       double var10 = var4 - this.mapX;
       double var12 = var6 - this.mapY;
       double var14 = var8 - this.mapZ;
-      return var10 * var10 + var12 * var12 + var14 * var14 > 144.0 ? true : var1 * this.mapSx + var2 * this.mapSy + var3 * this.mapSz < 0.999995F;
+      return var10 * var10 + var12 * var12 + var14 * var14 > 144.0 ? true : var1 * this.mapSx + var2 * this.mapSy + var3 * this.mapSz < 0.99998F;
    }
 
    public void computeShadow(float var1, float var2, float var3, double var4, double var6, double var8) {
@@ -754,6 +754,14 @@ public final class Shaders {
    }
 
    public void endScene(int var1, int var2, float var3) {
+      this.endScene(var1, var2, var1, var2, var3);
+   }
+
+   /**
+    * Update 3.18: {@code var1 x var2} is the size of the scene that was drawn (the render scale makes it smaller than the window), {@code outW x outH} the
+    * size of the window the finished picture is stretched to.
+    */
+   public void endScene(int var1, int var2, int outW, int outH, float var3) {
       if (this.ok && this.sceneActive) {
          this.sceneActive = false;
          int var4 = Math.max(1, var1 / 2);
@@ -793,7 +801,7 @@ public final class Shaders {
          }
 
          GL30.glBindFramebuffer(36160, 0);
-         GL11.glViewport(0, 0, var1, var2);
+         GL11.glViewport(0, 0, outW, outH);
          GL20.glUseProgram(this.pComp);
          this.u1i(this.pComp, "scene", 0);
          this.u1i(this.pComp, "bloom", 1);

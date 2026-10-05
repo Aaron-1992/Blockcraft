@@ -33,7 +33,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libglu1-mesa mesa-utils \
-            libxcursor1 libxrandr2 libxinerama1 libxi6 libxxf86vm1 libxrender1
+            libxcursor1 libxrandr2 libxinerama1 libxi6 libxxf86vm1 libxrender1 imagemagick
 
       - name: Build the game
         run: python3 tools/build.py
@@ -52,10 +52,20 @@ jobs:
           echo "scenes: $SCENES window: $WIN frames: $FRAMES"
           timeout 40m python3 tools/perf.py --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" 2>&1 | tee build/perf.log
 
+      - name: Culling check (the same scenes with and without the culling of hidden sections must look the same)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          # line 4 of ci/perf-trigger.txt = scenes for the check (surface, hill, forest, cave1, cave2, cave3), 'all' or 'none'
+          CHECK="$(sed -n 4p ci/perf-trigger.txt | tr -d '[:space:]')"
+          case "$CHECK" in ''|*[!a-z0-9,]*) CHECK=none;; esac
+          if [ "$CHECK" != none ]; then timeout 30m python3 tools/cullcheck.py --scenes "$CHECK" 2>&1 | tee build/cullcheck.log; fi
+
       - name: Output (readable through the check-run API)
         if: always()
         run: |
           python3 tools/ci_annotate.py ci-results/perf/summary.md "perf summary" notice || true
+          python3 tools/ci_annotate.py ci-results/perf/cullcheck.md "culling check" notice || true
 
       - name: Commit results to the branch
         if: always()
