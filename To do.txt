@@ -1,13 +1,15 @@
 DO THIS ONE FIRST --> Performance optimisation (one Thing that has to be changed is that it entirely runs on the igpu if one is present should use gpu if one is there)
 
-Massive structure overhaul
+Massive structure overhaul (villages like better villages in minecraft and the others structures in a similar way)
 
-Massive Models overhaul (villagers and blazes to be exact very bad)
+Massive Texture overhaul (Redo all textures in a more modern style)
 
-Massive Texture overhaul (ALL textures but not the already redone models but blocks and items 100 %
+Massive Animation overhaul (Dragon is Pretty stiff and player arms are to far down)
 
-Massive Animation overhaul (Player animations are still ass and Dragon is Pretty stiff)
-
-Massive graphics overhaul (Nothing changed)
+Massive graphics overhaul (Bushy leaves and stuff)
 
 and add missing Features from last update
+
+Fix gaps between blocks far away
+
+add prototype multiplayer (peer to peer preferred or a file that you can start on your pc that creates a server and lets people join)
