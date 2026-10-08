@@ -127,7 +127,7 @@ public final class Renderer {
          }
 
          var5.vboO = var5.vboT = 0;
-         var5.nO = var5.nT = 0;
+         var5.nO = var5.nT = var5.nX = 0;
       }
    }
 
@@ -263,6 +263,28 @@ public final class Renderer {
    private final CaveCull.Walk walk = new CaveCull.Walk();
    private final CaveCull.Visible frustumTest = (rx, ry, rz) -> this.visible(rx, ry, rz, 14.0F);
    static final boolean CAVE_CULL = !"false".equals(System.getProperty("bc.cavecull"));
+   /**
+    * Test hook for "gaps between blocks": -Dbc.gapbg=ff00ff draws the near terrain on a plain colour - no sky, no distant terrain - so that a crack between two blocks
+    * (or a texel of the terrain that was thrown away) shows as a pixel of that colour in the middle of the ground (tools/shots.py counts them).
+    */
+   static final float[] GAP_BG = parseGapBg(System.getProperty("bc.gapbg"));
+
+   static float[] parseGapBg(String s) {
+      if (s == null || s.length() != 6) {
+         return null;
+      }
+
+      try {
+         int v = Integer.parseInt(s, 16);
+         return new float[]{(v >> 16 & 255) / 255.0F, (v >> 8 & 255) / 255.0F, (v & 255) / 255.0F};
+      } catch (NumberFormatException e) {
+         return null;
+      }
+   }
+
+   /** Update 3.19: Options "Bushy leaves": NEAR = 64 blocks, FAR = 160 blocks (plus the half diagonal of a section), squared. */
+   static final float BUSHY_NEAR2 = 78.0F * 78.0F;
+   static final float BUSHY_FAR2 = 174.0F * 174.0F;
    static final java.util.Comparator<Renderer.Vis> VIS_NEAR_FIRST = (a, b) -> Float.compare(a.d, b.d);
 
    /** Adds section {@code sy} of {@code c} to the list of what is drawn, if it has something to draw and is inside the pyramid of view. */
@@ -294,6 +316,7 @@ public final class Renderer {
       }
 
       var4.nO = var3.nO;
+      var4.nX = var3.nX;
       var4.nT = var3.nT;
       var1.markMeshed(var2);
 
@@ -677,7 +700,12 @@ public final class Renderer {
       }
 
       GL11.glColorMask(true, true, true, true);
-      GL11.glClearColor(var41, var42, var43, glow ? 0.0F : 1.0F);
+      if (GAP_BG != null) {
+         GL11.glClearColor(GAP_BG[0], GAP_BG[1], GAP_BG[2], glow ? 0.0F : 1.0F);
+      } else {
+         GL11.glClearColor(var41, var42, var43, glow ? 0.0F : 1.0F);
+      }
+
       GL11.glClear(16640);
       if (glow) {
          GL11.glColorMask(true, true, true, false);
@@ -706,7 +734,9 @@ public final class Renderer {
       GL11.glGetFloatv(2982, this.mv);
       this.extractFrustum();
       GL11.glDisable(2912);
-      if (!var6 && !var7 && skyOn) {
+      if (GAP_BG != null) {
+         // test hook: nothing but the near terrain on a plain colour (see GAP_BG)
+      } else if (!var6 && !var7 && skyOn) {
          this.drawSky(var41, var42, var43);
       } else if (!var6 && !var7 && var5.dim == Dim.END) {
          this.drawEndSky();
@@ -722,7 +752,7 @@ public final class Renderer {
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
       this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.LOD);
-      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
+      if (var16 && GAP_BG == null && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
          GL11.glEnable(2929);
          GL11.glDepthMask(true);
          boolean var29 = this.sh.lodOk;
@@ -848,15 +878,18 @@ public final class Renderer {
          GL11.glDisable(3008);
       }
 
+      // Update 3.19: the bushy layer of the leaves is drawn within this distance (squared, from the middle of a section; 0 = never)
+      float bushyLim = this.g.opt.bushy >= 2 ? BUSHY_FAR2 : (this.g.opt.bushy == 1 ? BUSHY_NEAR2 : 0.0F);
       for (Renderer.Vis var56 : this.vis) {
          Section var59 = var56.c.sections[var56.sy];
          if (var59.nO != 0 && var59.vboO != 0) {
             GL11.glPushMatrix();
             GL11.glTranslatef((float)(var56.c.cx * 16 - this.camX), (float)(var56.sy * 16 - this.camY), (float)(var56.c.cz * 16 - this.camZ));
             bindPointers(var59.vboO);
-            GL11.glDrawArrays(7, 0, var59.nO);
+            int count = var59.nX != 0 && var56.d < bushyLim ? var59.nO + var59.nX : var59.nO;
+            GL11.glDrawArrays(7, 0, count);
             this.drawCalls++;
-            Perf.verts += var59.nO;
+            Perf.verts += count;
             GL11.glPopMatrix();
          }
       }

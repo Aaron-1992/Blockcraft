@@ -926,6 +926,7 @@ public final class Shaders {
                   this.rayCol[2] = 0.46F + 0.47F * var14;
                   int var15 = Math.max(1, var1 / 2);
                   int var16 = Math.max(1, var2 / 2);
+                  GL11.glColorMask(true, true, true, true);
                   GL11.glDisable(2929);
                   GL11.glDisable(3042);
                   GL11.glDisable(3008);
@@ -954,6 +955,7 @@ public final class Shaders {
                   GL13.glActiveTexture(33984);
                   GL30.glBindFramebuffer(36160, this.sceneFbo);
                   GL11.glViewport(0, 0, var1, var2);
+                  GL11.glColorMask(true, true, true, !this.glowOn);
                   GL11.glMatrixMode(5889);
                   GL11.glPopMatrix();
                   GL11.glMatrixMode(5888);
@@ -979,12 +981,13 @@ public final class Shaders {
       float far = this.projM[14] / (this.projM[10] + 1.0F);
       int aw = Math.max(1, w / 2);
       int ah = Math.max(1, h / 2);
-      GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_VIEWPORT_BIT);
+      GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_VIEWPORT_BIT | GL11.GL_COLOR_BUFFER_BIT);
       GL11.glDisable(2929);
       GL11.glDisable(3042);
       GL11.glDisable(3008);
       GL11.glDisable(2884);
       GL11.glDisable(2912);
+      GL11.glColorMask(true, true, true, true);
       GL11.glMatrixMode(5889);
       GL11.glPushMatrix();
       GL11.glLoadIdentity();
@@ -1077,7 +1080,7 @@ public final class Shaders {
          }
 
          // small light sources (torches, fire, plants that shine) glow strongly - their halo is all there is to see of them; big surfaces (a lava lake, a wall of glowstone) a lot less
-         float s = id == Blocks.LAVA ? 0.20F : (Blocks.kind[id] == 0 || Blocks.kind[id] == 3 ? 0.50F : 1.0F);
+         float s = id == Blocks.LAVA ? 0.18F : (Blocks.kind[id] == 0 || Blocks.kind[id] == 3 ? 0.30F : 1.0F);
          for (int f = 0; f < 6; f++) {
             int t = Blocks.tiles[id][f];
             if (t >= 0 && t < n) {
@@ -1497,6 +1500,8 @@ public final class Shaders {
          GL11.glDisable(2884);
          GL11.glDisable(2912);
          GL11.glDepthMask(false);
+         // Update 3.19: the cloud picture has an alpha channel of its own (how much of the sky the cloud covers) - with the glow on the colour mask kept alpha out
+         GL11.glColorMask(true, true, true, true);
          GL11.glMatrixMode(5889);
          GL11.glPushMatrix();
          GL11.glLoadIdentity();
@@ -1534,6 +1539,8 @@ public final class Shaders {
          GL13.glActiveTexture(33984);
          GL30.glBindFramebuffer(36160, this.sceneFbo);
          GL11.glViewport(0, 0, var12, var13);
+         // ... and into the scene the clouds are laid without touching its alpha channel (the glow mask)
+         GL11.glColorMask(true, true, true, !this.glowOn);
          GL13.glActiveTexture(33985);
          GL11.glBindTexture(3553, 0);
          GL13.glActiveTexture(33984);

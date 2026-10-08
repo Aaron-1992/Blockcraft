@@ -515,6 +515,15 @@ final class Screens {
          ui.button("Effects: " + new String[]{"\u00a77LOW", "\u00a7aMEDIUM", "\u00a7bHIGH"}[Math.max(0, Math.min(2, o.fx))], x0, oy, colW, 20.0F, true,
             "LOW: the picture of Update 3.18. MEDIUM: lava, fire and torches glow, clouds throw shadows on the land, the ground is wet and shiny in rain. HIGH: also soft shadows in corners and under trees (a little slower). Needs Shaders ON.",
             () -> o.fx = (o.fx + 1) % 3);
+         ui.button("Bushy leaves: " + new String[]{"\u00a77OFF", "\u00a7aNEAR", "\u00a7bFAR"}[Math.max(0, Math.min(2, o.bushy))], x1, oy, colW, 20.0F, true,
+            "A second layer of leaves in front of the trees' leaves: thicker, softer crowns. NEAR: within 64 blocks. FAR: within 160 blocks (more to draw in a big forest). OFF is the fastest.", () -> {
+               boolean before = o.bushy > 0;
+               o.bushy = (o.bushy + 1) % 3;
+               Mesher.bushy = o.bushy > 0;
+               if (before != (o.bushy > 0)) {
+                  g.remeshAll();
+               }
+            });
       }
    }
 

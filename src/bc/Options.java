@@ -42,6 +42,8 @@ public final class Options {
    public int look = Look.DEFAULT;
    /** Update 3.19: how many of the new shader effects are on - 0 = LOW (none: the picture of 3.18), 1 = MEDIUM (glowing lava and torches, cloud shadows, wet ground in rain), 2 = HIGH (also soft contact shadows in corners). */
    public int fx = 1;
+   /** Update 3.19: bushy leaves: 0 off, 1 near (64 blocks), 2 far (160 blocks). */
+   public int bushy = 1;
    final File file;
 
    public Options(File var1) {
@@ -79,6 +81,7 @@ public final class Options {
                this.maxFps = Math.max(0, Math.min(1000, Integer.parseInt(var2.getProperty("maxFps", "0"))));
                this.look = Look.clamp(Integer.parseInt(var2.getProperty("look", Look.DEFAULT + "")));
                this.fx = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("fx", "1"))));
+               this.bushy = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("bushy", "1"))));
             } catch (Throwable var5) {
                try {
                   var1.close();
@@ -121,6 +124,7 @@ public final class Options {
       var1.setProperty("maxFps", this.maxFps + "");
       var1.setProperty("look", this.look + "");
       var1.setProperty("fx", this.fx + "");
+      var1.setProperty("bushy", this.bushy + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

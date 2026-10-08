@@ -24,6 +24,144 @@ final class TestsGfx {
       sources();
       emissive();
       variation();
+      bushy();
+   }
+
+   // ------------------------------------------------------------------ bushy leaves (Mesher)
+   /** Meshes the section that holds a 5 x 3 x 5 cluster of {@code id} blocks (world x 2..6, y GROUND+4..GROUND+6, z 2..6) and returns {nO, nX, the floats of the buffer}. */
+   static Object[] clusterMesh(Game g, boolean bushy, boolean legacy) {
+      boolean b0 = Mesher.bushy;
+      boolean l0 = Mesher.legacy;
+      Mesher.bushy = bushy;
+      Mesher.legacy = legacy;
+      try {
+         java.util.Arrays.fill(g.world.chunk(0, 0).foliageColor, 0x48B518);   // the flat test world has no biome colours: the leaves would be black
+         Mesher.Result r = Mesher.build(g.world, g.world.chunk(0, 0), (GameTests.GROUND + 4) >> 4, true);
+         float[] a = new float[r.opaque == null ? 0 : r.opaque.limit()];
+         if (r.opaque != null) {
+            r.opaque.get(0, a);
+            org.lwjgl.system.MemoryUtil.memFree(r.opaque);
+         }
+
+         if (r.trans != null) {
+            org.lwjgl.system.MemoryUtil.memFree(r.trans);
+         }
+
+         return new Object[]{r.nO, r.nX, a};
+      } finally {
+         Mesher.bushy = b0;
+         Mesher.legacy = l0;
+      }
+   }
+
+   static void fillCluster(Game g, int id) {
+      for (int x = 2; x <= 6; x++) {
+         for (int y = GameTests.GROUND + 4; y <= GameTests.GROUND + 6; y++) {
+            for (int z = 2; z <= 6; z++) {
+               g.world.setBlock(x, y, z, id);
+            }
+         }
+      }
+   }
+
+   static void bushy() {
+      test("bushy leaves: every outside face of a crown gets a second layer in front of it, behind the ordinary faces in the same buffer", () -> {
+         Game g = GameTests.newGame(0);
+         fillCluster(g, Blocks.LEAVES_OAK);
+         Object[] off = clusterMesh(g, false, false);
+         Object[] on = clusterMesh(g, true, false);
+         eq((Integer)off[0], (Integer)on[0], "the ordinary faces are the same number");
+         eq(0, (Integer)off[1], "off: no extra faces");
+         int outside = 2 * 5 * 5 + 4 * 5 * 3;
+         eq(outside * 4, (Integer)on[1], "on: one extra quad for each of the " + outside + " faces on the outside of the cluster");
+         float[] a = (float[])on[2];
+         float[] b = (float[])off[2];
+         int nO = (Integer)on[0];
+         eq((nO + (Integer)on[1]) * 11, a.length, "the buffer holds the ordinary and the extra vertices");
+         eq(nO * 11, b.length, "off: the buffer holds the ordinary vertices only");
+         for (int i = 0; i < nO * 11; i++) {
+            check(a[i] == b[i], "the ordinary vertices come first and are exactly the same");
+         }
+
+         // the extra quads lie in front of the cluster: within the box in two directions, 0.12 - 0.26 outside it in the third
+         float y0 = GameTests.GROUND + 4 - (((GameTests.GROUND + 4) >> 4) << 4);
+         float[] lo = {2.0F, y0, 2.0F};
+         float[] hi = {7.0F, y0 + 3.0F, 7.0F};
+         for (int v = nO; v < nO + (Integer)on[1]; v++) {
+            int outAxes = 0;
+            for (int k = 0; k < 3; k++) {
+               float c = a[v * 11 + k];
+               if (c < lo[k] - 0.2605F || c > hi[k] + 0.2605F) {
+                  throw new AssertionError("extra vertex " + v + " is too far from the cluster on axis " + k + ": " + c);
+               }
+
+               if (c < lo[k] - 0.001F || c > hi[k] + 0.001F) {
+                  outAxes++;
+               }
+            }
+
+            check(outAxes == 1, "an extra vertex lies in front of exactly one side of the cluster: " + outAxes);
+            for (int k = 0; k < 3; k++) {
+               float c = a[v * 11 + k];
+               if (c < lo[k] - 0.001F) {
+                  check(c <= lo[k] - 0.1195F, "in front of the low side by at least 0.12: " + (lo[k] - c));
+               } else if (c > hi[k] + 0.001F) {
+                  check(c >= hi[k] + 0.1195F, "in front of the high side by at least 0.12: " + (c - hi[k]));
+               }
+            }
+            float r = a[v * 11 + 5];
+            check(r > 0.0F, "the extra layer is not black");
+         }
+
+         // a second layer is a little lighter than the first one in front of which it lies
+         float lightOn = 0.0F;
+         float lightBase = 0.0F;
+         for (int q = 0; q < (Integer)on[1] / 4; q++) {
+            lightOn += a[(nO + q * 4) * 11 + 5];
+         }
+
+         for (int q = 0; q < nO / 4; q++) {
+            lightBase += a[q * 4 * 11 + 5];
+         }
+
+         check(lightOn / ((Integer)on[1] / 4) > lightBase / (nO / 4) * 0.98F, "the extra layer is not darker than the first");
+      });
+      test("bushy leaves: only leaves get them; Update 3.5 compatibility (legacy) and -Dbc.nobushy leave the meshes alone", () -> {
+         Game g = GameTests.newGame(0);
+         fillCluster(g, Blocks.STONE);
+         Object[] stone = clusterMesh(g, true, false);
+         eq(0, (Integer)stone[1], "a cluster of stone has no extra layer");
+         fillCluster(g, Blocks.LEAVES_OAK);
+         Object[] leg = clusterMesh(g, true, true);
+         eq(0, (Integer)leg[1], "legacy meshes have no extra layer");
+         Object[] legOff = clusterMesh(g, false, true);
+         check(java.util.Arrays.equals((float[])leg[2], (float[])legOff[2]), "legacy meshes ignore the switch");
+         Object[] a = clusterMesh(g, true, false);
+         Object[] b = clusterMesh(g, true, false);
+         check(java.util.Arrays.equals((float[])a[2], (float[])b[2]), "the same section meshes the same twice (the extra layer depends on the position only)");
+         // every kind of leaves, the new ones too
+         for (int id : new int[]{Blocks.LEAVES_OAK, 13, 14, Blocks313.LEAVES_JUNGLE, Blocks313.LEAVES_ACACIA, Blocks313.LEAVES_DARKOAK}) {
+            fillCluster(g, id);
+            Object[] m = clusterMesh(g, true, false);
+            eq(2 * 5 * 5 * 4 + 4 * 5 * 3 * 4, (Integer)m[1], Blocks.name[id] + " has the extra layer");
+         }
+
+         // half a cluster: a leaf with a leaf beside it has no face (and so no extra layer) between the two
+         fillCluster(g, 0);
+         for (int x = 2; x <= 3; x++) {
+            g.world.setBlock(x, GameTests.GROUND + 4, 2, Blocks.LEAVES_OAK);
+         }
+
+         Object[] two = clusterMesh(g, true, false);
+         eq(10 * 4, (Integer)two[1], "two leaves side by side: ten outside faces");
+         fillCluster(g, 0);
+      });
+      test("bushy leaves: the section keeps how many of its vertices are extra, and the drawing code takes them only near the camera", () -> {
+         check(Renderer.BUSHY_NEAR2 < Renderer.BUSHY_FAR2, "near is nearer than far");
+         check(Math.sqrt(Renderer.BUSHY_NEAR2) >= 64.0 + 8.0 && Math.sqrt(Renderer.BUSHY_FAR2) >= 160.0 + 8.0, "the limits are the advertised 64 / 160 blocks plus the reach of a section");
+         Chunk.Section s = new Chunk.Section();
+         eq(0, s.nX, "a new section has no extra vertices");
+      });
    }
 
    // ------------------------------------------------------------------ variation between blocks (Mesher)
@@ -242,23 +380,28 @@ final class TestsGfx {
             Options o = new Options(dir);
             eq(Look.DEFAULT, o.look, "default look");
             eq(1, o.fx, "default effects level");
+            eq(1, o.bushy, "default: bushy leaves near");
             o.look = Look.CINEMATIC;
             o.fx = 2;
+            o.bushy = 2;
             o.save();
             Options r = new Options(dir);
             r.load();
             eq(Look.CINEMATIC, r.look, "look after the round trip");
             eq(2, r.fx, "effects level after the round trip");
-            Files.write(new File(dir, "options.txt").toPath(), "look=99\nfx=-4\n".getBytes(StandardCharsets.UTF_8));
+            eq(2, r.bushy, "bushy leaves after the round trip");
+            Files.write(new File(dir, "options.txt").toPath(), "look=99\nfx=-4\nbushy=17\n".getBytes(StandardCharsets.UTF_8));
             Options c = new Options(dir);
             c.load();
             eq(Look.NAME.length - 1, c.look, "look is clamped");
             eq(0, c.fx, "effects level is clamped");
+            eq(2, c.bushy, "bushy leaves are clamped");
             Files.write(new File(dir, "options.txt").toPath(), "fov=80\n".getBytes(StandardCharsets.UTF_8));
             Options old = new Options(dir);
             old.load();
             eq(Look.DEFAULT, old.look, "old file: default look");
             eq(1, old.fx, "old file: default effects level");
+            eq(1, old.bushy, "old file: default bushy leaves");
             eq(80, old.fov, "old file: the other settings are still read");
          } finally {
             Tests311.deleteAll(dir);

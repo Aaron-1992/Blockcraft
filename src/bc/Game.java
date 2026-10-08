@@ -257,6 +257,11 @@ public final class Game {
       }
 
       Mesher.leafMode = this.opt.leaves;
+      if (System.getProperty("bc.bushy") != null) {
+         this.opt.bushy = Math.max(0, Math.min(2, Integer.getInteger("bc.bushy"))); // test hook: bushy leaves (0 off, 1 near, 2 far)
+      }
+
+      Mesher.bushy = this.opt.bushy > 0;
       if (System.getProperty("bc.guiscale") != null) {
          this.opt.guiScale = Integer.getInteger("bc.guiscale"); // test hook: force the GUI scale (screens must cope with narrow windows)
       }

@@ -692,12 +692,29 @@ SCENES["gfx-torch-low"] = (SCENES["mobs-torch-sh"][0] + ["-Dbc.fx=0", "-Dbc.look
 # Update 3.19, part 2: the shadows of the clouds (the camera floats 36 m above the village, looking down), the wet world in rain, ambient occlusion (Effects HIGH)
 _VF = [a for a in SCENES["village-folk-sh"][0] if not a.startswith(("-Dbc.weather=", "-Dbc.lightning=", "-Dbc.look="))]
 _VF_NOMOB = [a for a in _VF if not a.startswith(("-Dbc.summon", "-Dbc.cam=", "-Dbc.time="))]
-SCENES["gfx-cloudshadow"] = (_VF_NOMOB + ["-Dbc.cam=182.5,100,83.5,128,28", "-Dbc.time=4000", "-Dbc.weather=cell:300,0,260", "-Dbc.lightning=off", "-Dbc.look=1"], True)
+SCENES["gfx-cloudshadow"] = (_VF_NOMOB + ["-Dbc.cam=140,100,71,-90,26", "-Dbc.time=4000", "-Dbc.weather=cell:250,0,200", "-Dbc.lightning=off", "-Dbc.look=1"], True)
 SCENES["gfx-cloudshadow-low"] = ([a for a in SCENES["gfx-cloudshadow"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
-SCENES["gfx-cloudshadow-fair"] = (_VF_NOMOB + ["-Dbc.cam=182.5,100,83.5,128,28", "-Dbc.time=4000", "-Dbc.weather=calm", "-Dbc.look=1"], True)
+SCENES["gfx-cloudshadow-fair"] = (_VF_NOMOB + ["-Dbc.cam=140,100,71,-90,26", "-Dbc.time=4000", "-Dbc.weather=calm", "-Dbc.look=1"], True)
 SCENES["gfx-rain"] = (_VF + ["-Dbc.weather=rain", "-Dbc.lightning=off", "-Dbc.look=1"], True)
 SCENES["gfx-rain-low"] = ([a for a in SCENES["gfx-rain"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
 SCENES["gfx-ao"] = (SCENES["gfx-look-vivid"][0] + ["-Dbc.fx=2"], True)
+# Update 3.19, part 3: bushy leaves (the village view and a forest from the air), with and without
+SCENES["gfx-bushy-off"] = (SCENES["gfx-look-vivid"][0] + ["-Dbc.bushy=0"], True)
+_FOREST = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=4", "-Dbc.lod=32", "-Dbc.cam=133,84,71,-45,12", "-Dbc.weather=calm", "-Dbc.time=6000", "-Dbc.shot=150"]
+SCENES["gfx-forest"] = (_FOREST, True)
+SCENES["gfx-forest-off"] = (_FOREST + ["-Dbc.bushy=0"], True)
+# Update 3.19, part 3: "gaps between blocks far away" - the ground along the horizon at the full resolution of the window (CROPS keeps a piece of it
+# as a second picture, because the 800 pixel wide picture smooths thin lines away): the anisotropic filtering of the atlas on (8) and off (1), and without shaders
+_GAP = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=24", "-Dbc.cam=133,80,71,-90,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.clouds=off", "-Dbc.shot=200"]
+SCENES["gap-far"] = (_GAP, True)
+SCENES["gap-far-aniso1"] = (_GAP + ["-Dbc.aniso=1"], True)
+SCENES["gap-far-plain"] = (_GAP + PLAIN, True)
+# the same on a plain magenta ground: no sky, no distant terrain, so that every pixel of the ground that is missing shows (the report counts them)
+SCENES["gap-detect"] = (_GAP + ["-Dbc.gapbg=ff00ff"], True)
+SCENES["gap-detect-aniso1"] = (_GAP + ["-Dbc.gapbg=ff00ff", "-Dbc.aniso=1"], True)
+SCENES["gap-detect-plain"] = (_GAP + PLAIN + ["-Dbc.gapbg=ff00ff"], True)
+CROPS = {"gap-far": "640x300+320+330", "gap-far-aniso1": "640x300+320+330", "gap-far-plain": "640x300+320+330",
+         "gap-detect": "640x300+320+330", "gap-detect-aniso1": "640x300+320+330", "gap-detect-plain": "640x300+320+330"}
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 
@@ -735,6 +752,54 @@ def run_scene(java, label, jar, name, props, timeout):
 
 def im(*args):
     return subprocess.run(list(args), capture_output=True, text=True)
+
+
+NOTES = []
+
+
+def crack_stats(png):
+    """For the gap scenes (-Dbc.gapbg=ff00ff: near terrain on a magenta ground, nothing else): the runs of one to three magenta pixels with terrain on both sides,
+    counted down the columns and along the rows - a crack between two blocks, or a texel of a block that was thrown away. Returns (all, in the lower half)."""
+    r = subprocess.run(["convert", png, "-depth", "8", "rgb:-"], capture_output=True)
+    w, h = [int(x) for x in im("identify", "-format", "%w %h", png).stdout.split()]
+    d = r.stdout
+    if len(d) < w * h * 3:
+        return None
+    bg = bytearray(w * h)
+    for i in range(w * h):
+        R, G, B = d[3 * i], d[3 * i + 1], d[3 * i + 2]
+        if R > 140 and B > 140 and R - G > 60 and B - G > 60:
+            bg[i] = 1
+    total = low = 0
+    half = h * 45 // 100
+    for x in range(w):
+        y = 0
+        while y < h:
+            if bg[y * w + x]:
+                s = y
+                while y < h and bg[y * w + x]:
+                    y += 1
+                if 0 < s and y < h and y - s <= 3:
+                    total += 1
+                    if s > half:
+                        low += 1
+            else:
+                y += 1
+    for y in range(h):
+        row = y * w
+        x = 0
+        while x < w:
+            if bg[row + x]:
+                s = x
+                while x < w and bg[row + x]:
+                    x += 1
+                if 0 < s and x < w and x - s <= 3:
+                    total += 1
+                    if y > half:
+                        low += 1
+            else:
+                x += 1
+    return total, low
 
 
 def diff_pct(a, b):
@@ -780,6 +845,8 @@ def write_report(rows):
         f.write("# Visual run %s\n\n| scene | rendered by | differing pixels (ref vs new) |\n|---|---|---|\n" % time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()))
         for r in rows:
             f.write("| %s | %s | %s |\n" % (r["scene"], ", ".join(r["have"]) or "NOTHING", "n/a" if r["diff"] is None else "%.2f%%" % r["diff"]))
+        if NOTES:
+            f.write("\n## cracks (background pixels with terrain on both sides)\n\n" + "\n".join("- " + t for t in NOTES) + "\n")
         f.write("\n## timings\n\n" + "\n".join("- " + t for t in TIMES) + "\n")
 
 
@@ -814,10 +881,16 @@ def main():
         have = [l for l in got if got[l]]
         if len(have) >= 1:
             composite([got[l] for l in have], have, os.path.join(OUT, "%s.jpg" % name))
+            if name in CROPS and got.get("new"):
+                im("convert", got["new"], "-crop", CROPS[name], "+repage", "-quality", "90", os.path.join(OUT, "%s-crop.jpg" % name))
         if "ref" in got and "new" in got and got["ref"] and got["new"]:
             row["diff"] = diff_pct(got["ref"], got["new"])
         row["have"] = have
         rows.append(row)
+        if name.startswith("gap-detect") and got.get("new"):
+            st = crack_stats(got["new"])
+            NOTES.append("%s: %s" % (name, "no picture to count" if st is None else "%d runs of 1-3 background pixels inside the terrain, %d of them in the lower half of the picture" % st))
+            print("  cracks:", NOTES[-1], flush=True)
         write_report(rows)
         # keep the repo small: only the side-by-side JPEG is kept, full PNGs are deleted
         for l in got:

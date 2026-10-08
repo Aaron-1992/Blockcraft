@@ -758,9 +758,17 @@ public final class Tex {
       GL11.glTexParameteri(3553, 33085, 4);
       GL30.glGenerateMipmap(3553);
       // Update 3.18: anisotropic filtering keeps the ground sharp where you look along it (the mip levels alone blur it)
-      if (GL.getCapabilities().GL_EXT_texture_filter_anisotropic) {
+      // (-Dbc.aniso=<n> sets the strength for screenshot scenes, 1 = off)
+      float wantAniso = 8.0F;
+      try {
+         wantAniso = Float.parseFloat(System.getProperty("bc.aniso", "8"));
+      } catch (NumberFormatException e) {
+         wantAniso = 8.0F;
+      }
+
+      if (wantAniso > 1.0F && GL.getCapabilities().GL_EXT_texture_filter_anisotropic) {
          float maxAniso = GL11.glGetFloat(EXTTextureFilterAnisotropic.GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-         GL11.glTexParameterf(3553, EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8.0F, maxAniso));
+         GL11.glTexParameterf(3553, EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT, Math.min(wantAniso, maxAniso));
       }
 
       crack = upload(160, 16, crackPixels(), false, false);

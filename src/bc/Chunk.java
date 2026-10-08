@@ -150,6 +150,8 @@ public final class Chunk {
       public int vboO;
       public int vboT;
       public int nO;
+      /** Update 3.19: the bushy extra layer of leaves: this many vertices stored after the {@link #nO} ones in the same buffer (drawn near the camera only). */
+      public int nX;
       public int nT;
       public boolean dirty = true;
       public boolean inFlight;

@@ -1,2 +1,2 @@
-gfx-glow-night,gfx-glow-night-low,mobs-torch-sh,nether-vista-sh,gfx-nether-low,gfx-cloudshadow,gfx-cloudshadow-low,gfx-cloudshadow-fair,gfx-rain,gfx-rain-low,gfx-ao,gfx-look-vivid
+gfx-cloudshadow,gfx-cloudshadow-low,gfx-cloudshadow-fair,gfx-look-vivid,gfx-bushy-off,gfx-forest,gfx-forest-off,gfx-rain,gfx-glow-night,mobs-torch-sh,gap-far,gap-far-aniso1,gap-far-plain,gap-detect,gap-detect-aniso1,gap-detect-plain
 jar=build

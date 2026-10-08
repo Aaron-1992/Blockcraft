@@ -43,6 +43,14 @@ public final class Mesher {
     */
    public static volatile boolean legacy = Boolean.getBoolean("bc.legacymesh");
 
+   /**
+    * Update 3.19: bushy leaves. Every outside face of a leaf block gets a second, slightly lighter layer of leaves in front of it (a tenth to a quarter of a
+    * block out, the texture turned another way): the holes of the first layer show leaves instead of the dark inside, and the crown of a tree has a thick,
+    * soft outline instead of hard cubes. The extra faces are stored after all the others in the same buffer ({@link Result#nX}); the renderer draws them
+    * near the camera only (Options: Bushy leaves). {@code -Dbc.nobushy=true} switches them off, so does {@link #legacy}.
+    */
+   public static volatile boolean bushy = !Boolean.getBoolean("bc.nobushy");
+
    /** True if every face neighbour of the block at padded position (x, y, z) is solid or a leaf (so none of its faces can be seen from outside). */
    static boolean enclosed(short[] blocks, int x, int y, int z) {
       if (x < 1 || x > 16 || y < 1 || y > 16 || z < 1 || z > 16) {
@@ -73,6 +81,7 @@ public final class Mesher {
       Mesher.Scratch var4 = (Mesher.Scratch)TL.get();
       var4.o.clear();
       var4.t.clear();
+      var4.x.clear();
       int var5 = var1.cx * 16;
       int var6 = var2 * 16;
       int var7 = var1.cz * 16;
@@ -178,9 +187,15 @@ public final class Mesher {
       var27.conn = CaveCull.compute(var22);
       var27.nO = var4.o.n / 11;
       var27.nT = var4.t.n / 11;
+      var27.nX = var27.nO > 0 ? var4.x.n / 11 : 0;
       if (var27.nO > 0) {
-         var27.opaque = MemoryUtil.memAllocFloat(var4.o.n);
-         var27.opaque.put(var4.o.a, 0, var4.o.n).flip();
+         var27.opaque = MemoryUtil.memAllocFloat(var4.o.n + (var27.nX > 0 ? var4.x.n : 0));
+         var27.opaque.put(var4.o.a, 0, var4.o.n);
+         if (var27.nX > 0) {
+            var27.opaque.put(var4.x.a, 0, var4.x.n);
+         }
+
+         var27.opaque.flip();
       }
 
       if (var27.nT > 0) {
@@ -340,15 +355,28 @@ public final class Mesher {
 
             // Update 3.19: every block is a little lighter or darker than its neighbours, and the top of ground blocks is turned by a random quarter turn
             float jit = 1.0F;
+            int baseRot = 0;
             if (variation && !legacy) {
                int hh = hash3(var0.ox + var2, var0.oy + var3, var0.oz + var4);
                jit = 1.0F + ((hh & 0xFFFF) / 32767.5F - 1.0F) * ampOf(var23);
-               var0.rot = turnsOf(var23, var15, hh);
+               baseRot = turnsOf(var23, var15, hh);
+               var0.rot = baseRot;
             }
 
             quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * jit, var21 * jit, var22 * jit, 1.0F, var6, 0.0F, var14);
             emit(var0, var0.o, var23, flipFor(var0));
             var0.rot = 0;
+            if (bushy && !legacy && Blocks.isLeaves(var5) && !Blocks.isLeaves(var18)) {
+               // Update 3.19: the second layer of leaves in front of an outside face
+               int hs = hash3(var0.ox + var2 * 5 + var15, var0.oy + var3 * 3 + 7, var0.oz + var4 * 7 - var15);
+               float off = BUSHY_MIN + (hs >>> 8 & 255) / 255.0F * (BUSHY_MAX - BUSHY_MIN);
+               float lit = BUSHY_LIGHT * jit;
+               var0.rot = baseRot + 1 + (hs >>> 3 & 1) & 3;
+               quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * lit, var21 * lit, var22 * lit, 1.0F, var6, off, var14);
+               emit(var0, var0.x, var23, flipFor(var0));
+               var0.rot = 0;
+            }
+
             if (var19 && var15 >= 2) {
                float var24 = (var13 >> 16 & 0xFF) / 255.0F;
                float var25 = (var13 >> 8 & 0xFF) / 255.0F;
@@ -377,6 +405,9 @@ public final class Mesher {
       AMP[Tex.SAND] = 0.045F;
       AMP[Tex.GRAVEL] = 0.065F;
       AMP[Tex.LEAVES] = 0.12F;
+      AMP[TexArt313.LEAVES0] = 0.12F;
+      AMP[TexArt313.LEAVES0 + 1] = 0.12F;
+      AMP[TexArt313.LEAVES0 + 2] = 0.12F;
       AMP[Tex.SNOW] = 0.025F;
       AMP[Tex.SANDSTONE_SIDE] = 0.035F;
       AMP[Tex.SANDSTONE_TOP] = 0.035F;
@@ -419,6 +450,9 @@ public final class Mesher {
    static int turnsOf(int tile, int face, int hh) {
       switch (tile) {
          case Tex.LEAVES:
+         case TexArt313.LEAVES0:
+         case TexArt313.LEAVES0 + 1:
+         case TexArt313.LEAVES0 + 2:
             return (hh >>> 18) + face * 3 & 3;
          case Tex.GRASS_TOP:
          case Tex.DIRT:
@@ -437,6 +471,12 @@ public final class Mesher {
             return 0;
       }
    }
+
+   /** How far in front of the face the second layer of leaves lies (blocks): between these two, by position. */
+   static final float BUSHY_MIN = 0.12F;
+   static final float BUSHY_MAX = 0.26F;
+   /** The second layer is a little lighter than the first. */
+   static final float BUSHY_LIGHT = 1.10F;
 
    static boolean flipFor(Mesher.Scratch var0) {
       return var0.ao[0] + var0.ao[2] < var0.ao[1] + var0.ao[3];
@@ -1174,6 +1214,8 @@ public final class Mesher {
       public FloatBuffer trans;
       public int nO;
       public int nT;
+      /** Update 3.19: the number of extra vertices (bushy leaves) behind the {@link #nO} ones in {@link #opaque}. */
+      public int nX;
       /** Update 3.18: which faces of the section are connected through open blocks (CaveCull.compute). */
       public long conn = CaveCull.ALL;
    }
@@ -1183,6 +1225,8 @@ public final class Mesher {
       final byte[] L = new byte[5832];
       final Mesher.FB o = new Mesher.FB();
       final Mesher.FB t = new Mesher.FB();
+      /** Update 3.19: the extra faces of the bushy leaves (appended to the opaque buffer). */
+      final Mesher.FB x = new Mesher.FB();
       final float[] qx = new float[4];
       final float[] qy = new float[4];
       final float[] qz = new float[4];
