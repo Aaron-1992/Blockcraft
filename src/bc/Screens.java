@@ -57,21 +57,22 @@ final class Screens {
 
       float bw = Math.min(200.0F, gui.w - 40.0F);
       float half = (bw - 4.0F) / 2.0F;
-      float row = 24.0F;
-      float by = Math.max(bottom + 36.0F, gui.h * 0.46F);
-      by = Math.min(by, gui.h - 18.0F - row * 3.0F - 20.0F);
+      float row = 22.0F;
+      float by = Math.max(bottom + 24.0F, gui.h * 0.44F);
+      by = Math.min(by, gui.h - 16.0F - row * 4.0F - 20.0F);
       float bx = cx - bw / 2.0F;
       ui.button("Singleplayer", bx, by, bw, 20.0F, true, null, () -> openWorlds(g));
       ui.button("Create New World", bx, by + row, bw, 20.0F, true, null, () -> openNewWorld(g));
-      ui.button("Skins...", bx, by + row * 2, half, 20.0F, true, null, () -> {
+      ui.button("Join Multiplayer", bx, by + row * 2, bw, 20.0F, true, null, () -> Net319.joinFromTitle(g));
+      ui.button("Skins...", bx, by + row * 3, half, 20.0F, true, null, () -> {
          g.skinReturn = Game.S.TITLE;
          g.setScreen(Game.S.SKINS);
       });
-      ui.button("Options...", bx + half + 4.0F, by + row * 2, half, 20.0F, true, null, () -> {
+      ui.button("Options...", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> {
          g.optionsReturn = Game.S.TITLE;
          g.setScreen(Game.S.OPTIONS);
       });
-      ui.button("Quit Game", bx, by + row * 3, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
+      ui.button("Quit Game", bx, by + row * 4, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
       gui.text("Update " + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);

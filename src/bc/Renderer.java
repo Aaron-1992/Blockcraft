@@ -1003,7 +1003,7 @@ public final class Renderer {
                   for (int var12 = 0; var12 < 16; var12++) {
                      for (int var13 = 0; var13 < 16; var13++) {
                         int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
-                        if (var14 != 0 && Blocks.emit[var14] >= 10) {
+                        if (var14 != 0 && Blocks.emit[var14] >= 7) {
                            float var15 = var10.cx * 16 + var13 + 0.5F;
                            float var16 = var10.cz * 16 + var12 + 0.5F;
                            float var17 = (float)(var15 - this.camX);
@@ -1053,9 +1053,13 @@ public final class Renderer {
    }
 
    static float[] lightColor(int var0) {
-      if (var0 == 25) {
-         return new float[]{1.0F, 0.82F, 0.5F};
-      } else if (Blocks.isLava(var0)) {
+      if (var0 == 25 || var0 == Redstone319.REDSTONE_LAMP_LIT) {
+         return new float[]{1.0F, 0.84F, 0.52F};
+      } else if (var0 == Redstone319.SEA_LANTERN) {
+         return new float[]{0.68F, 0.96F, 1.0F};
+      } else if (var0 == Redstone319.REDSTONE_TORCH) {
+         return new float[]{1.0F, 0.22F, 0.16F};
+      } else if (Blocks.isLava(var0) || var0 == Blocks.MAGMA) {
          return new float[]{1.0F, 0.42F, 0.1F};
       } else if (Blocks.isPortal(var0)) {
          return new float[]{0.62F, 0.3F, 1.0F};
@@ -2041,6 +2045,12 @@ public final class Renderer {
     * @param swayPitch the hand's lag behind the camera, degrees (already scaled)
     */
    public void renderHand(float partial, Stack item, float swing, float use, float bright, int fbW, int fbH, float equip, float swayPitch, float swayYaw, float bobDist, float bobAmp) {
+      GL11.glDepthMask(true);
+      GL11.glEnable(2929);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(3042);
+      GL11.glDisable(2884);
+      GL11.glColorMask(true, true, true, true);
       GL11.glClear(256);
       GL11.glMatrixMode(5889);
       GL11.glLoadIdentity();
@@ -2051,20 +2061,45 @@ public final class Renderer {
       GL11.glMatrixMode(5888);
       GL11.glLoadIdentity();
       GL11.glDisable(2912);
-      GL11.glEnable(2929);
       float p = 1.0F - equip;
-      if (bobAmp > 0.0F) {
-         // Minecraft's EntityRenderer.applyBobbing: the view (here only the hand) rocks and dips with every step
-         GL11.glTranslatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 0.5F, -Math.abs((float)Math.cos(bobDist * Math.PI) * bobAmp), 0.0F);
-         GL11.glRotatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 3.0F, 0.0F, 0.0F, 1.0F);
-         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.0F, 1.0F, 0.0F, 0.0F);
+      // Smooth equip curve (ease-out)
+      p = p * p * (3.0F - 2.0F * p);
+      // Organic idle breathing + vertical jump/fall inertia + sprint cadence
+      float idleT = (float)Perf.seconds(600.0);
+      float breathX = (float)Math.cos(idleT * 1.15F) * 0.008F;
+      float breathY = (float)Math.sin(idleT * 2.10F) * 0.013F;
+      float breathPitch = (float)Math.cos(idleT * 2.10F) * 1.15F;
+      float breathRoll = (float)Math.sin(idleT * 1.15F) * 0.85F;
+      Player pl = this.g != null ? this.g.player : null;
+      float vyOff = 0.0F;
+      float vyTilt = 0.0F;
+      float sprintPitch = 0.0F;
+      if (pl != null) {
+         vyOff = Math.max(-0.065F, Math.min(0.065F, (float)(-pl.vy * 0.085)));
+         vyTilt = Math.max(-7.5F, Math.min(7.5F, (float)(-pl.vy * 10.5)));
+         if (pl.sprinting && bobAmp > 0.01F) {
+            sprintPitch = -5.5F * Math.min(1.0F, bobAmp * 8.0F);
+         }
       }
 
-      GL11.glRotatef(swayPitch, 1.0F, 0.0F, 0.0F);
-      GL11.glRotatef(swayYaw, 0.0F, 1.0F, 0.0F);
-      boolean entShader = this.shadersOn() && this.sh.entityOk && this.sh.sceneActive;
+      GL11.glTranslatef(breathX, breathY + vyOff, 0.0F);
+      if (bobAmp > 0.0F) {
+         // Minecraft's EntityRenderer.applyBobbing + figure-8 wrist roll
+         float bSin = (float)Math.sin(bobDist * Math.PI);
+         float bCos = (float)Math.cos(bobDist * Math.PI);
+         GL11.glTranslatef(bSin * bobAmp * 0.58F, -Math.abs(bCos * bobAmp) * 1.08F, -Math.abs(bSin * bobAmp) * 0.18F);
+         GL11.glRotatef(bSin * bobAmp * 3.8F, 0.0F, 0.0F, 1.0F);
+         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.6F, 1.0F, 0.0F, 0.0F);
+      }
+
+      float clPitch = Math.max(-14.0F, Math.min(14.0F, swayPitch * 1.35F));
+      float clYaw = Math.max(-16.0F, Math.min(16.0F, swayYaw * 1.35F));
+      GL11.glRotatef(clPitch + breathPitch + vyTilt + sprintPitch, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(clYaw, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef(-clYaw * 0.32F + breathRoll, 0.0F, 0.0F, 1.0F);
+      boolean entShader = this.shadersOn() && this.sh.entityOk;
       if (entShader) {
-         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, this.entFogNear, this.entFogFar, this.entFogCol, this.entShadow, this.lastSky, this.lastBlk);
+         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, 80.0F, 160.0F, this.entFogCol, false, this.lastSky, this.lastBlk);
       }
 
       float s1 = (float)Math.sqrt(swing);
@@ -2086,13 +2121,14 @@ public final class Renderer {
             GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
             GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
          } else {
-            GL11.glTranslatef(-0.4F * (float)Math.sin(s1 * Math.PI), 0.2F * (float)Math.sin(s1 * Math.PI * 2.0), -0.2F * (float)Math.sin(swing * Math.PI));
+            float swArc = (float)Math.sin(s1 * Math.PI);
+            float swSnap = (float)Math.sin(swing * Math.PI);
+            GL11.glTranslatef(-0.42F * swArc, 0.24F * (float)Math.sin(s1 * Math.PI * 2.0), -0.28F * swSnap);
             GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
             float f = (float)Math.sin(swing * swing * Math.PI);
-            GL11.glRotatef(45.0F - f * 20.0F, 0.0F, 1.0F, 0.0F);
-            float f1 = (float)Math.sin(s1 * Math.PI);
-            GL11.glRotatef(f1 * -20.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glRotatef(f1 * -80.0F, 1.0F, 0.0F, 0.0F);
+            GL11.glRotatef(45.0F - f * 24.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(swArc * -24.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glRotatef(swArc * -84.0F, 1.0F, 0.0F, 0.0F);
             GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
          }
 

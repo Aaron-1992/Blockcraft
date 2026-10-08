@@ -381,7 +381,7 @@ public final class Game {
          this.winH = Math.max(1, var4);
       });
       GLFW.glfwSetWindowFocusCallback(this.window, (var1x, var3x) -> {
-         if (!var3x && this.screen == Game.S.PLAY) {
+         if (!var3x && this.screen == Game.S.PLAY && !Net319.isActive()) {
             this.setScreen(Game.S.PAUSE);
          }
       });
@@ -1171,6 +1171,69 @@ public final class Game {
       this.adv.load(this.rootDir); // Update 3.12: advancements (a new world starts with none)
       this.player.updateBox();
       this.setScreen(Game.S.LOADING);
+   }
+
+   /** Update 3.19: synchronizes a multiplayer client into the host's world seed, dimension, time of day, and position near the host. */
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz) {
+      int targetDim = Dim.valid(dim) ? dim : Dim.OVERWORLD;
+      if (this.world == null || this.world.seed != seed || this.world.dim != targetDim) {
+         Panorama.stop(this);
+
+         if (this.world != null) {
+            for (Chunk c : this.world.chunks.values()) {
+               c.unloaded = true;
+               if (this.rend != null) {
+                  this.rend.onUnload(c);
+               }
+            }
+
+            this.world.chunks.clear();
+            this.world.shutdown();
+         }
+
+         WorldSettings ws = new WorldSettings();
+         this.worldSettings = ws;
+         this.bonusPending = false;
+         this.world = new World(seed, null, targetDim, ws);
+         this.world.saveEnabled = false;
+         this.world.game = this;
+         if (this.rend != null) {
+            this.rend.setLod(this.world);
+            this.world.unloadHook = this.rend::onUnload;
+         }
+
+         this.mobs.clear();
+         this.targetMob = null;
+         if (this.player == null) {
+            this.player = new Player();
+            this.player.setMode(1);
+            int[] startItems = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
+            for (int i = 0; i < startItems.length; i++) {
+               this.inv[i] = new Stack(startItems[i], 64);
+            }
+         }
+
+         this.cursor = null;
+         this.menu = null;
+         this.eatTicks = 0;
+         this.bowCharge = 0;
+         this.deathHandled = false;
+         this.particles.clear();
+      }
+
+      this.world.dayTime = dayTime;
+      this.needSpawn = false;
+      this.spawnXZ = new int[]{(int)Math.floor(sx), (int)Math.floor(sz)};
+      double px = sx + 1.6;
+      double py = Math.max(4.0, sy);
+      double pz = sz;
+      this.player.setPos(px, py, pz);
+      this.player.yaw = -90.0F;
+      this.player.pitch = 0.0F;
+      this.player.updateBox();
+      if (this.screen != Game.S.PLAY && this.screen != Game.S.LOADING) {
+         this.setScreen(Game.S.LOADING);
+      }
    }
 
    static void parseStacks(String var0, Stack[] var1) {
@@ -2569,6 +2632,10 @@ public final class Game {
          this.pano.update(var1); // Update 3.13: the turning world behind the title and the menus
       }
 
+      if (this.world == null && Net319.isActive()) {
+         Net319.tick(this);
+      }
+
       if (this.world != null) {
          int var3 = (int)Math.floor(this.player.x) >> 4;
          int var4 = (int)Math.floor(this.player.z) >> 4;
@@ -2580,6 +2647,10 @@ public final class Game {
          this.rend.scheduleMeshes(this.world, var5 ? 64 : 48);
          this.rend.uploadMeshes(256, var5 ? 20000000L : 4000000L);
          if (this.screen == Game.S.LOADING) {
+            if (Net319.isActive()) {
+               Net319.tick(this);
+            }
+
             int var16 = 25;
             int var18 = this.world.loadedAround(var3, var4, 2);
             boolean var19 = var18 >= var16;
@@ -2633,7 +2704,7 @@ public final class Game {
                }
             }
          } else {
-            boolean var6 = this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.CHAT || this.screen == Game.S.DEAD;
+            boolean var6 = this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.CHAT || this.screen == Game.S.DEAD || Net319.isActive();
             if (var6) {
                this.acc += var1 * 20.0;
 
@@ -3133,6 +3204,10 @@ public final class Game {
 
          if (!var19 && var2 && this.target != null && (!this.player.sneaking || var3 == null)) {
             var19 = this.useBlock();
+            if (var19) {
+               this.swinging = true;
+               this.swing = 1.0E-4F;
+            }
          }
 
          if (var19) {
@@ -4522,12 +4597,21 @@ public final class Game {
          }
 
          this.rend.renderWorld(this.partial, sceneW, sceneH);
-         Perf.mark(Perf.HAND);
          if (var3) {
             this.rend.sh.skyMask(sceneW, sceneH);
             this.rend.sh.aoPass(sceneW, sceneH);
+            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
+            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
+            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
+               this.rend.sh.underwater = uwTarget;
+            }
+
+            Perf.mark(Perf.POST);
+            this.rend.sh.look = this.opt.look;
+            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
 
+         Perf.mark(Perf.HAND);
          if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {
             float var4 = this.swingPrev + (this.swing - this.swingPrev) * this.partial;
             float var5 = this.rend.brightnessAt(this.world, this.player.x, this.player.y + 1.0, this.player.z);
@@ -4538,26 +4622,14 @@ public final class Game {
                   HAND_SWING != null ? Float.parseFloat(HAND_SWING) : (this.swinging ? var4 : 0.0F),
                   HAND_EAT != null ? Float.parseFloat(HAND_EAT) : (this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F),
                   var5,
-                  sceneW,
-                  sceneH,
+                  this.fbW,
+                  this.fbH,
                   this.pEquip + (this.equip - this.pEquip) * this.partial,
                   (this.player.pitch - (this.pArmPitch + (this.armPitch - this.pArmPitch) * this.partial)) * 0.1F,
                   (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F,
                   this.opt.bobbing ? -(this.pBobDist + (this.bobDist - this.pBobDist) * this.partial) : 0.0F,
                   this.opt.bobbing ? this.pBobAmp + (this.bobAmp - this.pBobAmp) * this.partial : 0.0F
                );
-         }
-
-         if (var3) {
-            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
-            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
-            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
-               this.rend.sh.underwater = uwTarget;
-            }
-
-            Perf.mark(Perf.POST);
-            this.rend.sh.look = this.opt.look;
-            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
       } else {
          GL11.glClearColor(0.0F, 0.0F, 0.0F, 1.0F);

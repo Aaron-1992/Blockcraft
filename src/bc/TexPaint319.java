@@ -56,6 +56,7 @@ final class TexPaint319 {
 
    static void blocks() {
       // Base tiles in 0..36 that were still using the old 3.5 painters
+      Tex.blit(Tex.LEAVES, leaves(0));
       Tex.blit(Tex.BEDROCK, bedrock());
       Tex.blit(Tex.GLASS, glass());
       Tex.blit(Tex.BRICKS, bricks());
@@ -164,6 +165,9 @@ final class TexPaint319 {
       Tex.blit(TexArt313.MYCELIUM_SIDE, myceliumSide());
       Tex.blit(TexArt313.ICE, ice(false));
       Tex.blit(TexArt313.PACKED_ICE, ice(true));
+      for (int k = 0; k < 3; k++) {
+         Tex.blit(TexArt313.LEAVES0 + k, leaves(k + 1));
+      }
 
       // Bushy leaf frond tile (Update 3.19 graphics overhaul)
       Tex.blit(BUSHY_FROND, bushyFrond());
@@ -1001,14 +1005,32 @@ final class TexPaint319 {
    }
 
    static int[] magma() {
-      int[] p = netherrack();
+      int[] crustPal = {c(0x221014), c(0x2E151B), c(0x3C1C23), c(0x4C242C), c(0x5A2C35)};
+      int[] p = new int[N * N];
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
-            float v = vn(x + 0.5F, y + 0.5F, 4, 304);
-            if (v > 0.58F) {
-               p[y * N + x] = v > 0.72F ? c(0xFFE058) : (v > 0.65F ? c(0xFF8E18) : c(0xD4420A));
+            float wx = x + 0.5F + (vn(x + 0.5F, y + 0.5F, 4, 3040) - 0.5F) * 3.2F;
+            float wy = y + 0.5F + (vn(x + 0.5F, y + 0.5F, 4, 3041) - 0.5F) * 3.2F;
+            float r1 = Math.abs(vn(wx, wy, 4, 3042) - 0.50F);
+            float r2 = Math.abs(vn(wx + 4.3F, wy + 2.7F, 4, 3043) - 0.48F);
+            float fissure = Math.min(r1, r2 * 1.08F);
+            // Secondary hot pocket veins so every quadrant has interconnected glowing magma
+            float pocket = vn(x + 0.5F, y + 0.5F, 4, 3044);
+            if (pocket > 0.72F) {
+               fissure = Math.min(fissure, (0.86F - pocket) * 0.75F);
+            }
+
+            if (fissure < 0.042F) {
+               p[y * N + x] = c(0xFFF488); // white-hot yellow magma core
+            } else if (fissure < 0.082F) {
+               p[y * N + x] = c(0xFFA61A); // bright molten orange
+            } else if (fissure < 0.125F) {
+               p[y * N + x] = c(0xE0440A); // fiery red-orange lava
+            } else if (fissure < 0.165F) {
+               p[y * N + x] = c(0x8E2012); // glowing heated crust rim
             } else {
-               p[y * N + x] = mul(p[y * N + x], 0.62F);
+               float cv = fbm(x, y, 3045) * 0.72F + hash(x, y, 3046) * 0.28F;
+               p[y * N + x] = step(crustPal, contrast(cv, 2.1F));
             }
          }
       }
@@ -1332,28 +1354,114 @@ final class TexPaint319 {
    }
 
    /**
-    * Update 3.19: 16 x 16 scalloped greyscale leaf-cluster sprite used by the diagonal 3D fronds of {@link Mesher#bushyLeaves}.
-    * Painted in greyscale (average ~162) so the mesher tints it with the exact biome/species foliage colour.
+    * Update 3.19: crisp pixel-art overlapping leaflet clusters for Oak/Spruce/Birch (kind 0), Jungle (kind 1), Acacia (kind 2), and Dark Oak (kind 3).
+    * Painted in greyscale (average ~160) so the mesher tints it with the exact biome/species foliage colour.
+    */
+   static int[] leaves(int kind) {
+      int[] p = new int[N * N];
+      int seed = 5500 + kind * 97;
+      // 1. Deep shaded interior canopy base with small organic sky gaps
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float g = vn(x + 0.5F, y + 0.5F, 4, seed) * 0.65F + hash(x, y, seed + 1) * 0.35F;
+            if (g < 0.22F && ((x + y + kind) & 1) == 0) {
+               p[y * N + x] = 0;
+            } else {
+               int d = 108 + (int)(hash(x, y, seed + 2) * 18.0F);
+               p[y * N + x] = rgb(d, d, d);
+            }
+         }
+      }
+
+      // 2. Hand-layered overlapping 4x3 / 3x4 pixel-art leaf blades tiled seamlessly modulo 16
+      int[][] clusters = {
+         {1, 1, 0}, {6, 0, 1}, {11, 2, 0}, {14, 5, 1},
+         {2, 5, 1}, {7, 4, 0}, {10, 7, 1}, {0, 9, 0},
+         {5, 9, 1}, {13, 10, 0}, {3, 13, 0}, {8, 12, 1},
+         {12, 14, 1}, {4, 2, 1}, {9, 5, 0}, {15, 1, 0}
+      };
+      for (int i = 0; i < clusters.length; i++) {
+         int cx = (clusters[i][0] + kind * 3) & 15;
+         int cy = (clusters[i][1] + kind * 5) & 15;
+         int dir = (clusters[i][2] + kind) & 1;
+         paintLeaflet(p, cx, cy, dir, true, seed + i * 13);
+      }
+
+      return p;
+   }
+
+   private static void paintLeaflet(int[] p, int cx, int cy, int dir, boolean wrap, int seed) {
+      // Cast shadow under the lower-right rim of the leaflet
+      int[][] shadow = dir == 0
+         ? new int[][]{{1, 2}, {2, 2}, {3, 1}}
+         : new int[][]{{1, 3}, {2, 2}, {2, 1}};
+      for (int[] s : shadow) {
+         int x = wrap ? (cx + s[0]) & 15 : cx + s[0];
+         int y = wrap ? (cy + s[1]) & 15 : cy + s[1];
+         if (x >= 0 && x < N && y >= 0 && y < N && p[y * N + x] != 0) {
+            int sh = 98 + (int)(hash(x, y, seed) * 12.0F);
+            p[y * N + x] = rgb(sh, sh, sh);
+         }
+      }
+
+      // Leaflet blade pixels: {dx, dy, tone} where tone 0 = shaded stem/rim, 1 = mid blade, 2 = sunlit top-left edge, 3 = bright tip
+      int[][] blade = dir == 0
+         ? new int[][]{
+            {0, 0, 2}, {1, 0, 3}, {2, 0, 2},
+            {0, 1, 2}, {1, 1, 1}, {2, 1, 1}, {3, 0, 1},
+            {1, 2, 0}, {2, 1, 0}
+         }
+         : new int[][]{
+            {0, 0, 2}, {1, 0, 2},
+            {0, 1, 3}, {1, 1, 1}, {2, 1, 0},
+            {0, 2, 2}, {1, 2, 1}, {1, 3, 0}
+         };
+      for (int[] b : blade) {
+         int x = wrap ? (cx + b[0]) & 15 : cx + b[0];
+         int y = wrap ? (cy + b[1]) & 15 : cy + b[1];
+         if (x >= 0 && x < N && y >= 0 && y < N) {
+            int jit = (int)((hash(x, y, seed + 7) - 0.5F) * 10.0F);
+            int v = b[2] == 3 ? 206 + jit : (b[2] == 2 ? 186 + jit : (b[2] == 1 ? 160 + jit : 134 + jit));
+            p[y * N + x] = rgb(v, v, v);
+         }
+      }
+   }
+
+   /**
+    * Update 3.19: 16 x 16 lush multi-leaflet foliage branch spray used by the 3D fronds of {@link Mesher#bushyLeaves}.
+    * Painted in greyscale with the same leaflet clusters as {@link #leaves(int)} so the 3D fronds and the leaf cube blend seamlessly.
     */
    static int[] bushyFrond() {
-      int[] pal = {rgb(122, 122, 122), rgb(146, 146, 146), rgb(168, 168, 168), rgb(190, 190, 190), rgb(212, 212, 212)};
       int[] p = new int[N * N];
+      // 1. Broad scalloped foliage silhouette extending out to the edges of the 16x16 tile so fronds protrude lushly beyond the block
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
             float dx = (x + 0.5F - 8.0F) / 8.0F;
             float dy = (y + 0.5F - 8.0F) / 8.0F;
             double ang = Math.atan2(dy, dx);
             float r = (float)Math.hypot(dx, dy);
-            float lobe = 0.82F + 0.16F * (float)Math.cos(ang * 6.0) + 0.08F * (float)Math.sin(ang * 4.0 + 0.7);
+            float lobe = 0.94F + 0.14F * (float)Math.cos(ang * 5.0 + 0.4) + 0.10F * (float)Math.sin(ang * 7.0);
             if (r <= lobe) {
-               float v = vn(x + 0.5F, y + 0.5F, 6, 642) * 0.6F + hash(x, y, 6420) * 0.4F - dy * 0.15F;
-               if (r > lobe - 0.14F && hash(x, y, 6421) > 0.45F) {
-                  v += 0.18F; // sunlit outer leaflet tips
+               // Small organic airy gaps inside the branch spray
+               if (r > 0.35F && hash(x, y, 6425) < 0.14F) {
+                  continue;
                }
 
-               p[y * N + x] = step(pal, contrast(v, 2.1F));
+               int base = (int)(132.0F - dy * 16.0F + (hash(x, y, 6420) - 0.5F) * 18.0F);
+               p[y * N + x] = rgb(base, base, base);
             }
          }
+      }
+
+      // 2. Overlapping pixel-art leaflets radiating from the core out to the branch tips
+      int[][] sprays = {
+         {2, 2, 0}, {6, 1, 1}, {10, 1, 0}, {12, 3, 1},
+         {1, 6, 1}, {5, 5, 0}, {9, 4, 1}, {12, 7, 0},
+         {1, 10, 0}, {4, 9, 1}, {8, 8, 0}, {11, 10, 1},
+         {3, 12, 0}, {7, 12, 1}, {10, 12, 0}, {6, 6, 1}
+      };
+      for (int i = 0; i < sprays.length; i++) {
+         paintLeaflet(p, sprays[i][0], sprays[i][1], sprays[i][2], false, 6430 + i * 17);
       }
 
       return p;

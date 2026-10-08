@@ -31,12 +31,13 @@ final class Tests319 {
    }
 
    static void bushyLeaves() {
-      test("3.19 bushy leaves: diagonal foliage fronds add 16 vertices per isolated leaf block", () -> {
+      test("3.19 bushy leaves: 3D foliage fronds add 24 vertices per isolated leaf block and map sky light to qm", () -> {
          TexExtra.blocks();
          Game g = newGame(1);
          World w = g.world;
          Chunk c = w.chunkAt(8, 8);
          w.setBlock(8, GROUND + 5, 8, 12);
+         w.lightChunk(c);
 
          Mesher.bushyLeaves = false;
          Mesher.Result plain = Mesher.build(w, c, (GROUND + 5) >> 4, true);
@@ -48,12 +49,16 @@ final class Tests319 {
          Mesher.bushyLeaves = true;
          Mesher.Result bushy = Mesher.build(w, c, (GROUND + 5) >> 4, true);
          int vBushy = bushy.nO;
+         // Inspect the last vertex's lightmap coordinates (stride 11 floats: x, y, z, u, v, r, g, b, a, qm_sky, ql_blk)
+         float frondSky = bushy.opaque.get((vBushy - 1) * 11 + 9);
+         float frondBlk = bushy.opaque.get((vBushy - 1) * 11 + 10);
          if (bushy.opaque != null) {
             MemoryUtil.memFree(bushy.opaque);
          }
 
          Mesher.bushyLeaves = false;
-         eq(vPlain + 16, vBushy, "isolated leaf block gains 4 two-sided frond quads (16 vertices)");
+         eq(vPlain + 24, vBushy, "isolated leaf block gains 6 two-sided frond quads (24 vertices)");
+         check(frondSky > 0.85F && frondBlk < 0.15F, "bushy frond vertex receives outdoor sky light in qm (" + frondSky + ") and low block light in ql (" + frondBlk + ")");
       });
    }
 
@@ -152,6 +157,15 @@ final class Tests319 {
          eq(Redstone319.REDSTONE_WIRE0, w.getBlock(8, y, 8), "wire 1 unpowered");
          eq(Redstone319.REDSTONE_LAMP, w.getBlock(11, y, 8), "redstone lamp unlit");
          check(!Shapes.trapOpen(w.getBlock(10, y, 9)), "iron trapdoor closed again");
+
+         // Manual door toggle stays open across world ticks when unpowered by Redstone
+         w.setBlock(4, y, 4, 73);
+         w.setBlock(4, y + 1, 4, 81);
+         g.toggleDoor(4, y, 4);
+         check(Blocks.doorOpen(w.getBlock(4, y, 4)), "door opened manually");
+         w.tick();
+         w.tick();
+         check(Blocks.doorOpen(w.getBlock(4, y, 4)), "door remains open after world ticks");
 
          // Slime Block bounce & zero fall damage
          w.setBlock(5, GROUND, 5, Redstone319.SLIME_BLOCK);

@@ -111,6 +111,7 @@ public final class Net319 {
    private static volatile boolean hosting = false;
    private static volatile boolean clientConnected = false;
    private static volatile int activePort = DEFAULT_PORT;
+   private static volatile Game hostGame;
    private static volatile ServerSocket serverSock;
    private static volatile DatagramSocket udpSock;
    private static volatile Conn clientConn;
@@ -164,6 +165,7 @@ public final class Net319 {
          ss.bind(new InetSocketAddress("0.0.0.0", port));
          serverSock = ss;
          activePort = ss.getLocalPort();
+         hostGame = g;
          hosting = true;
          selfId = 1;
          selfName = "Host";
@@ -219,10 +221,74 @@ public final class Net319 {
 
             Conn c = new Conn(cid, s);
             hostConns.add(c);
-            long seed = w != null ? w.seed : 1L;
-            int dim = w != null ? w.dim : 0;
-            long dayTime = w != null ? w.dayTime : 1000L;
-            c.send("ASSIGN " + cid + " " + seed + " " + dim + " " + dayTime);
+            Game hg = hostGame;
+            World curW = hg != null && hg.world != null ? hg.world : w;
+            long seed = curW != null ? curW.seed : 12345L;
+            int dim = curW != null ? curW.dim : 0;
+            long dayTime = curW != null ? curW.dayTime : 1000L;
+            double sx = 8.5;
+            double sy = 72.0;
+            double sz = 8.5;
+            if (hg != null && hg.player != null) {
+               sx = hg.player.x;
+               sy = hg.player.y;
+               sz = hg.player.z;
+            } else if (!peers.isEmpty()) {
+               Peer first = peers.values().iterator().next();
+               sx = first.x;
+               sy = first.y;
+               sz = first.z;
+            }
+
+            c.send(String.format(Locale.ROOT, "ASSIGN %d %d %d %d %.3f %.3f %.3f", cid, seed, dim, dayTime, sx, sy, sz));
+            if (hg != null && hg.player != null && curW != null) {
+               Player pl = hg.player;
+               int flags = (pl.sneaking ? 1 : 0) | (pl.sprinting ? 2 : 0) | (pl.inWater ? 4 : 0) | (pl.onGround ? 8 : 0) | (pl.hurtTime > 0 ? 16 : 0);
+               float sw = hg.swinging ? hg.swing : -1.0F;
+               c.send(
+                  String.format(
+                     Locale.ROOT,
+                     "POSE %d %s %.3f %.3f %.3f %.2f %.2f %.2f %d %.3f %d %d %d",
+                     1,
+                     selfName,
+                     pl.x,
+                     pl.y,
+                     pl.z,
+                     pl.yaw,
+                     pl.pitch,
+                     pl.yaw,
+                     flags,
+                     sw,
+                     hg.heldId(),
+                     Math.abs(selfName.hashCode()) & 1,
+                     curW.dim
+                  )
+               );
+            }
+
+            for (Peer p : peers.values()) {
+               int flags = (p.sneak ? 1 : 0) | (p.sprint ? 2 : 0) | (p.swim ? 4 : 0) | (p.onGround ? 8 : 0) | (p.hurt ? 16 : 0);
+               c.send(
+                  String.format(
+                     Locale.ROOT,
+                     "POSE %d %s %.3f %.3f %.3f %.2f %.2f %.2f %d %.3f %d %d %d",
+                     p.id,
+                     p.name,
+                     p.x,
+                     p.y,
+                     p.z,
+                     p.yaw,
+                     p.pitch,
+                     p.headYaw,
+                     flags,
+                     p.swing,
+                     p.heldId,
+                     p.skinIdx,
+                     p.dim
+                  )
+               );
+            }
+
             for (Map.Entry<Long, Integer> e : edits.entrySet()) {
                long k = e.getKey();
                c.send("BLOCK " + unpackX(k) + " " + unpackY(k) + " " + unpackZ(k) + " " + e.getValue());
@@ -311,6 +377,7 @@ public final class Net319 {
          clientConn = c;
          clientConnected = true;
          activePort = port;
+         selfId = 0;
          selfName = "Peer" + (int)(System.currentTimeMillis() % 900 + 100);
          c.send("HELLO 0 " + selfName);
          Thread rt = new Thread(() -> readLoopClient(c), "bc-net-reader");
@@ -320,6 +387,29 @@ public final class Net319 {
       } catch (IOException e) {
          clientConnected = false;
          return "§cCould not connect to " + host + ":" + port + " (" + e.getMessage() + ")";
+      }
+   }
+
+   /** Update 3.19: called from the Title Screen "Join Multiplayer" button. Connects to LAN / localhost and enters the host's world. */
+   public static void joinFromTitle(Game g) {
+      String msg = join(g, "lan");
+      if (clientConnected && g != null) {
+         for (int i = 0; i < 25 && inbox.isEmpty(); i++) {
+            try {
+               Thread.sleep(10L);
+            } catch (InterruptedException ignored) {
+               break;
+            }
+         }
+
+         tick(g);
+         if (g.world == null) {
+            g.joinMultiplayerWorld(12345L, 0, 1000L, 8.5, 72.0, 8.5);
+         }
+
+         g.say(msg);
+      } else if (g != null && g.ui != null) {
+         g.ui.say(Gui.stripCodes(msg));
       }
    }
 
@@ -542,13 +632,43 @@ public final class Net319 {
                   if (p.length >= 5) {
                      selfId = Integer.parseInt(p[1]);
                      selfName = "Player" + selfId;
+                     long seed = Long.parseLong(p[2]);
+                     int dim = Integer.parseInt(p[3]);
                      long dayTime = Long.parseLong(p[4]);
-                     if (w != null) {
+                     double sx = p.length >= 8 ? Double.parseDouble(p[5]) : 8.5;
+                     double sy = p.length >= 8 ? Double.parseDouble(p[6]) : 72.0;
+                     double sz = p.length >= 8 ? Double.parseDouble(p[7]) : 8.5;
+                     if (g != null) {
+                        g.joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz);
+                     } else if (w != null) {
                         w.dayTime = dayTime;
                      }
 
                      if (clientConn != null) {
                         clientConn.send("HELLO " + selfId + " " + selfName);
+                        if (g != null && g.player != null && g.world != null) {
+                           Player pl = g.player;
+                           int flags = (pl.sneaking ? 1 : 0) | (pl.sprinting ? 2 : 0) | (pl.inWater ? 4 : 0) | (pl.onGround ? 8 : 0);
+                           clientConn.send(
+                              String.format(
+                                 Locale.ROOT,
+                                 "POSE %d %s %.3f %.3f %.3f %.2f %.2f %.2f %d %.3f %d %d %d",
+                                 selfId,
+                                 selfName,
+                                 pl.x,
+                                 pl.y,
+                                 pl.z,
+                                 pl.yaw,
+                                 pl.pitch,
+                                 pl.yaw,
+                                 flags,
+                                 -1.0F,
+                                 g.heldId(),
+                                 Math.abs(selfName.hashCode()) & 1,
+                                 g.world.dim
+                              )
+                           );
+                        }
                      }
                   }
                }
@@ -684,6 +804,7 @@ public final class Net319 {
 
       World w = r.g.world;
       GL11.glEnable(2929);
+      GL11.glDepthMask(true);
       GL11.glDisable(2884);
       for (Peer p : peers.values()) {
          if (p.dim != w.dim) {
@@ -697,10 +818,78 @@ public final class Net319 {
          GL11.glPushMatrix();
          GL11.glTranslated(x - r.camX, y - r.camY, z - r.camZ);
          PlayerModel.draw(skinPixels(p.skinIdx), false, pose(p, partial), bright);
+         drawNameTag(r, p.name, p.sneak ? 1.98F : 2.16F);
          GL11.glPopMatrix();
       }
 
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+   }
+
+   private static void drawNameTag(Renderer r, String name, float yOff) {
+      if (name == null || name.isEmpty() || Tex.fontTex == 0) {
+         return;
+      }
+
+      boolean wasEnt = r.sh != null && r.sh.entityOn;
+      if (wasEnt) {
+         r.sh.stopEntity();
+      }
+
+      GL11.glPushMatrix();
+      GL11.glTranslatef(0.0F, yOff, 0.0F);
+      GL11.glRotatef(-r.g.player.yaw, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef(r.g.player.pitch, 1.0F, 0.0F, 0.0F);
+      float sc = 0.026F;
+      GL11.glScalef(-sc, -sc, sc);
+      float tw = Gui.textWidth(name);
+      float x0 = -tw * 0.5F;
+      GL11.glDisable(3553);
+      GL11.glDisable(3008);
+      GL11.glEnable(3042);
+      GL11.glBlendFunc(770, 771);
+      GL11.glDepthMask(false);
+      GL11.glColor4f(0.0F, 0.0F, 0.0F, 0.42F);
+      GL11.glBegin(7);
+      GL11.glVertex3f(x0 - 2.0F, -1.0F, 0.01F);
+      GL11.glVertex3f(x0 + tw + 2.0F, -1.0F, 0.01F);
+      GL11.glVertex3f(x0 + tw + 2.0F, 9.0F, 0.01F);
+      GL11.glVertex3f(x0 - 2.0F, 9.0F, 0.01F);
+      GL11.glEnd();
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, Tex.fontTex);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 0.95F);
+      float cx = x0;
+      float invW = 1.0F / (Tex.fontCols * Tex.fontCellW);
+      float invH = 1.0F / (6 * Tex.fontCellH);
+      GL11.glBegin(7);
+      for (int i = 0; i < name.length(); i++) {
+         int ch = name.charAt(i) - 32;
+         if (ch >= 0 && ch < 96) {
+            int col = ch % Tex.fontCols;
+            int row = ch / Tex.fontCols;
+            float u0 = col * Tex.fontCellW * invW;
+            float v0 = row * Tex.fontCellH * invH;
+            float u1 = (col + 1) * Tex.fontCellW * invW;
+            float v1 = (row + 1) * Tex.fontCellH * invH;
+            GL11.glTexCoord2f(u0, v0);
+            GL11.glVertex3f(cx, 0.0F, 0.0F);
+            GL11.glTexCoord2f(u1, v0);
+            GL11.glVertex3f(cx + Tex.fontCellW, 0.0F, 0.0F);
+            GL11.glTexCoord2f(u1, v1);
+            GL11.glVertex3f(cx + Tex.fontCellW, Tex.fontCellH, 0.0F);
+            GL11.glTexCoord2f(u0, v1);
+            GL11.glVertex3f(cx, Tex.fontCellH, 0.0F);
+            cx += Tex.fontW[ch];
+         }
+      }
+
+      GL11.glEnd();
+      GL11.glDepthMask(true);
+      GL11.glDisable(3042);
+      GL11.glPopMatrix();
+      if (wasEnt) {
+         r.sh.useEntity(r.mv, r.camX, r.camY, r.camZ, r.entFogNear, r.entFogFar, r.entFogCol, r.entShadow, r.lastSky, r.lastBlk);
+      }
    }
 
    private static String sanitizeName(String s) {

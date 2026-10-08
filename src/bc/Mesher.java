@@ -333,6 +333,16 @@ public final class Mesher {
                continue;
             }
 
+            if (!legacy && var5 == Redstone319.SLIME_BLOCK) {
+               if (var18 != var5) {
+                  int tile = Blocks.tiles[var5][var15];
+                  quad(var0, var15, var2, var3, var4, var17, var12, tile, 1.0F, 1.0F, 1.0F, 0.78F, var6, 0.0F, var14);
+                  emit(var0, var0.t, tile, flipFor(var0));
+               }
+
+               continue;
+            }
+
             boolean var19 = Blocks.tint[var5] == 1;
             float var20 = 1.0F;
             float var21 = 1.0F;
@@ -353,6 +363,15 @@ public final class Mesher {
             }
 
             quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * jit, var21 * jit, var22 * jit, 1.0F, var6, 0.0F, var14);
+            if (!legacy && Blocks.emit[var5] > 0) {
+               float selfBl = lu(Blocks.emit[var5]);
+               for (int k = 0; k < 4; k++) {
+                  if (var0.ql[k] < selfBl) {
+                     var0.ql[k] = selfBl;
+                  }
+               }
+            }
+
             emit(var0, var0.o, var23, flipFor(var0));
             var0.rot = 0;
             if (var19 && var15 >= 2) {
@@ -365,6 +384,10 @@ public final class Mesher {
          }
       }
 
+      if (!legacy && var5 == Redstone319.SLIME_BLOCK) {
+         Shapes.emitBox(var0, var2, var3, var4, var5, new double[]{0.1875, 0.1875, 0.1875, 0.8125, 0.8125, 0.8125, 0.0}, 0, var0.o, 1.0F);
+      }
+
       if (bushyLeaves && !legacy && Blocks.isLeaves(var5) && !enclosed(var7, var9, var10, var11)) {
          bushyFronds(var0, var2, var3, var4, var9, var10, var11, var13);
       }
@@ -373,6 +396,9 @@ public final class Mesher {
    static void bushyFronds(Mesher.Scratch s, int x, int y, int z, int px, int py, int pz, int tint) {
       int maxSky = 0;
       int maxBlk = 0;
+      int[] fSky = new int[6];
+      int[] fBlk = new int[6];
+      boolean[] fOpen = new boolean[6];
       for (int f = 0; f < 6; f++) {
          int nb = ci(px + FN[f][0], py + FN[f][1], pz + FN[f][2]);
          int id = s.B[nb] & 0xFFFF;
@@ -380,6 +406,9 @@ public final class Mesher {
             int lv = s.L[nb] & 255;
             int sl = lv >> 4 & 15;
             int bl = lv & 15;
+            fOpen[f] = true;
+            fSky[f] = sl;
+            fBlk[f] = bl;
             if (sl > maxSky) {
                maxSky = sl;
             }
@@ -395,33 +424,54 @@ public final class Mesher {
       float cr = (tint >> 16 & 0xFF) / 255.0F * jit;
       float cg = (tint >> 8 & 0xFF) / 255.0F * jit;
       float cb = (tint & 0xFF) / 255.0F * jit;
-      float cx = x + 0.5F + (((hh >>> 4) & 15) / 7.5F - 1.0F) * 0.06F;
-      float cy = y + 0.5F + (((hh >>> 8) & 15) / 7.5F - 1.0F) * 0.05F;
-      float cz = z + 0.5F + (((hh >>> 12) & 15) / 7.5F - 1.0F) * 0.06F;
-      float ang = (((hh >>> 16) & 31) / 15.5F - 1.0F) * 0.28F;
-      float r = 0.72F;
-      float hy = 0.68F;
-      float lm = lu(maxBlk);
-      float ll = lu(maxSky);
+      float cx = x + 0.5F + (((hh >>> 4) & 15) / 7.5F - 1.0F) * 0.08F;
+      float cy = y + 0.5F + (((hh >>> 8) & 15) / 7.5F - 1.0F) * 0.07F;
+      float cz = z + 0.5F + (((hh >>> 12) & 15) / 7.5F - 1.0F) * 0.08F;
+      float ang = (((hh >>> 16) & 31) / 15.5F - 1.0F) * 0.34F;
+      float r = 1.06F;
+      float hy = 0.88F;
       s.rot = 0;
       s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
-      for (int p = 0; p < 2; p++) {
-         double a = (p == 0 ? 0.7853982 : 2.3561945) + ang;
-         float rx = (float)Math.cos(a) * r;
-         float rz = (float)Math.sin(a) * r;
-         float tilt = (p == 0 ? 1.0F : -1.0F) * (((hh >>> 21) & 7) - 3.5F) * 0.025F;
-         s.qx[0] = cx - rx - tilt;
-         s.qy[0] = cy - hy;
-         s.qz[0] = cz - rz + tilt;
-         s.qx[1] = cx + rx - tilt;
-         s.qy[1] = cy - hy;
-         s.qz[1] = cz + rz + tilt;
-         s.qx[2] = cx + rx + tilt;
-         s.qy[2] = cy + hy;
-         s.qz[2] = cz + rz - tilt;
-         s.qx[3] = cx - rx + tilt;
-         s.qy[3] = cy + hy;
-         s.qz[3] = cz - rz - tilt;
+      for (int p = 0; p < 3; p++) {
+         if (p < 2) {
+            double a = (p == 0 ? 0.7853982 : 2.3561945) + ang;
+            float rx = (float)Math.cos(a) * r;
+            float rz = (float)Math.sin(a) * r;
+            float tilt = (p == 0 ? 1.0F : -1.0F) * (((hh >>> 21) & 7) - 3.5F) * 0.045F;
+            s.qx[0] = cx - rx - tilt;
+            s.qy[0] = cy - hy;
+            s.qz[0] = cz - rz + tilt;
+            s.qx[1] = cx + rx - tilt;
+            s.qy[1] = cy - hy;
+            s.qz[1] = cz + rz + tilt;
+            s.qx[2] = cx + rx + tilt;
+            s.qy[2] = cy + hy;
+            s.qz[2] = cz + rz - tilt;
+            s.qx[3] = cx - rx + tilt;
+            s.qy[3] = cy + hy;
+            s.qz[3] = cz - rz - tilt;
+         } else {
+            // 3rd tilted canopy crown plane pitching across the leaf block for lush 3D volume from above and below
+            double a = 1.5707963 + ang * 0.8;
+            float rx = (float)Math.cos(a) * 1.02F;
+            float rz = (float)Math.sin(a) * 1.02F;
+            float px2 = -rz * 0.62F;
+            float pz2 = rx * 0.62F;
+            float py2 = 0.68F;
+            s.qx[0] = cx - rx - px2;
+            s.qy[0] = cy - py2;
+            s.qz[0] = cz - rz - pz2;
+            s.qx[1] = cx + rx - px2;
+            s.qy[1] = cy - py2;
+            s.qz[1] = cz + rz - pz2;
+            s.qx[2] = cx + rx + px2;
+            s.qy[2] = cy + py2;
+            s.qz[2] = cz + rz + pz2;
+            s.qx[3] = cx - rx + px2;
+            s.qy[3] = cy + py2;
+            s.qz[3] = cz - rz + pz2;
+         }
+
          s.qu[0] = 0.0F;
          s.qv[0] = 1.0F;
          s.qu[1] = 1.0F;
@@ -431,13 +481,35 @@ public final class Mesher {
          s.qu[3] = 0.0F;
          s.qv[3] = 0.0F;
          for (int k = 0; k < 4; k++) {
-            float sh = k < 2 ? 0.76F : 0.96F;
+            int fy = s.qy[k] >= y + 0.5F ? 0 : 1;
+            int fz = s.qz[k] >= z + 0.5F ? 3 : 2;
+            int fx = s.qx[k] >= x + 0.5F ? 4 : 5;
+            float sumSky = maxSky;
+            float sumBlk = maxBlk;
+            int cnt = 1;
+            int occ = 0;
+            int[] faces = {fy, fz, fx};
+            for (int f : faces) {
+               if (fOpen[f]) {
+                  sumSky += fSky[f];
+                  sumBlk += fBlk[f];
+                  cnt++;
+               } else {
+                  occ++;
+               }
+            }
+
+            float vSky = Math.max(maxSky * 0.85F, sumSky / cnt);
+            float vBlk = Math.max(maxBlk * 0.85F, sumBlk / cnt);
+            float ao = 1.0F - occ * 0.06F;
+            float sh = (k < 2 ? 0.78F : 0.96F) * ao;
             s.qr[k] = cr * sh;
             s.qg[k] = cg * sh;
             s.qb[k] = cb * sh;
             s.qa[k] = 1.0F;
-            s.qm[k] = lm;
-            s.ql[k] = ll;
+            // qm is sky light (vLm.x), ql is block light (vLm.y)
+            s.qm[k] = lu(vSky);
+            s.ql[k] = lu(vBlk);
          }
 
          emit(s, s.o, TexPaint319.BUSHY_FROND, false);
@@ -483,6 +555,17 @@ public final class Mesher {
       AMP[TexArt313.PODZOL_TOP] = 0.065F;
       AMP[TexArt313.MYCELIUM_TOP] = 0.065F;
       AMP[TexArt313.COARSE_DIRT] = 0.065F;
+      AMP[TexArt313.LEAVES0] = 0.12F;
+      AMP[TexArt313.LEAVES0 + 1] = 0.12F;
+      AMP[TexArt313.LEAVES0 + 2] = 0.12F;
+      AMP[TexArt312.QUARTZ_ORE] = 0.04F;
+      AMP[Color312.T_EMERALD_ORE] = 0.03F;
+      AMP[Color312.T_CLAY] = 0.045F;
+      AMP[Color312.T_TERRACOTTA] = 0.035F;
+      for (int i = 0; i < 16; i++) {
+         AMP[Color312.T_POWDER0 + i] = 0.04F;
+      }
+
       AMP[TexPaint319.BUSHY_FROND] = 0.12F;
    }
 
@@ -505,6 +588,9 @@ public final class Mesher {
    static int turnsOf(int tile, int face, int hh) {
       switch (tile) {
          case Tex.LEAVES:
+         case TexArt313.LEAVES0:
+         case TexArt313.LEAVES0 + 1:
+         case TexArt313.LEAVES0 + 2:
             return (hh >>> 18) + face * 3 & 3;
          case Tex.GRASS_TOP:
          case Tex.DIRT:
@@ -515,9 +601,12 @@ public final class Mesher {
          case Tex.COBBLE:
          case TexArt312.NETHERRACK:
          case TexArt312.SOUL_SAND:
+         case TexArt312.END_STONE:
          case TexArt313.RED_SAND:
          case TexArt313.PODZOL_TOP:
+         case TexArt313.MYCELIUM_TOP:
          case TexArt313.COARSE_DIRT:
+         case Color312.T_CLAY:
             return face == 0 ? hh >>> 20 & 3 : 0;
          default:
             return 0;

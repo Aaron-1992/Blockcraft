@@ -504,6 +504,8 @@ final class Redstone319 {
       }
    }
 
+   private static final java.util.Set<Long> redstoneOpened = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
    private static void actuateAround(World w, int cx, int cy, int cz) {
       for (int dy = -1; dy <= 1; dy++) {
          for (int dz = -1; dz <= 1; dz++) {
@@ -517,6 +519,7 @@ final class Redstone319 {
                int z = cz + dz;
                int id = w.getBlock(x, y, z);
                boolean pow = isPowered(w, x, y, z);
+               long key = pack(x, y, z);
                if (id == REDSTONE_LAMP && pow) {
                   w.setBlock(x, y, z, REDSTONE_LAMP_LIT);
                   if (w.game != null) {
@@ -529,7 +532,16 @@ final class Redstone319 {
                   }
                } else if (Shapes.isTrap(id)) {
                   boolean open = Shapes.trapOpen(id);
-                  if (pow != open) {
+                  boolean iron = Shapes.trapKind(id) == 6;
+                  if (pow) {
+                     redstoneOpened.add(key);
+                     if (!open) {
+                        w.setBlock(x, y, z, Shapes.toggled(id));
+                        if (w.game != null) {
+                           w.game.meshNow(x, y, z);
+                        }
+                     }
+                  } else if (open && (iron || redstoneOpened.remove(key))) {
                      w.setBlock(x, y, z, Shapes.toggled(id));
                      if (w.game != null) {
                         w.game.meshNow(x, y, z);
@@ -537,7 +549,15 @@ final class Redstone319 {
                   }
                } else if (Shapes.isGate(id)) {
                   boolean open = Shapes.gateOpen(id);
-                  if (pow != open) {
+                  if (pow) {
+                     redstoneOpened.add(key);
+                     if (!open) {
+                        w.setBlock(x, y, z, Shapes.toggled(id));
+                        if (w.game != null) {
+                           w.game.meshNow(x, y, z);
+                        }
+                     }
+                  } else if (open && redstoneOpened.remove(key)) {
                      w.setBlock(x, y, z, Shapes.toggled(id));
                      if (w.game != null) {
                         w.game.meshNow(x, y, z);
@@ -546,13 +566,24 @@ final class Redstone319 {
                } else if (Blocks.isDoorLo(id)) {
                   boolean open = Blocks.doorOpen(id);
                   int hi = w.getBlock(x, y + 1, z);
-                  if (pow != open && Blocks.isDoorHi(hi)) {
-                     int delta = pow ? 4 : -4;
-                     w.setBlock(x, y, z, id + delta);
-                     w.setBlock(x, y + 1, z, hi + delta);
-                     if (w.game != null) {
-                        w.game.meshNow(x, y, z);
-                        w.game.meshNow(x, y + 1, z);
+                  if (Blocks.isDoorHi(hi)) {
+                     if (pow) {
+                        redstoneOpened.add(key);
+                        if (!open) {
+                           w.setBlock(x, y, z, id + 4);
+                           w.setBlock(x, y + 1, z, hi + 4);
+                           if (w.game != null) {
+                              w.game.meshNow(x, y, z);
+                              w.game.meshNow(x, y + 1, z);
+                           }
+                        }
+                     } else if (open && redstoneOpened.remove(key)) {
+                        w.setBlock(x, y, z, id - 4);
+                        w.setBlock(x, y + 1, z, hi - 4);
+                        if (w.game != null) {
+                           w.game.meshNow(x, y, z);
+                           w.game.meshNow(x, y + 1, z);
+                        }
                      }
                   }
                } else if (id == Blocks.TNT && pow) {

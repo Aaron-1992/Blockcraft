@@ -1201,6 +1201,7 @@ public final class Shaders {
          GL11.glPopMatrix();
          GL11.glMatrixMode(5888);
          GL11.glPopMatrix();
+         GL11.glDepthMask(true);
          GL11.glEnable(2929);
       }
    }

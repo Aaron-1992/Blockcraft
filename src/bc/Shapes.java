@@ -562,7 +562,7 @@ final class Shapes {
          }
 
          float sky = light >> 4 & 15;
-         float blk = light & 15;
+         float blk = Math.max(light & 15, Blocks.emit[id]);
          for (int i = 0; i < 4; i++) {
             int[] corner = Mesher.FC[f][i];
             float px = (float)(corner[0] == 0 ? b[0] : b[3]);
