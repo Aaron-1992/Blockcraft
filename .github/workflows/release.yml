@@ -49,7 +49,7 @@ jobs:
         run: |
           VER="$(cat build/release/VERSION)"
           TAG="v$VER"
-          TITLE="Blockcraft Update $VER"
+          TITLE="Blockcraft V$VER"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG exists -> replacing its files"
             gh release upload "$TAG" build/release/*.zip --clobber

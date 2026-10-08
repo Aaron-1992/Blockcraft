@@ -81,6 +81,10 @@ final class Creative {
    }
 
    static int tabOf(int id) {
+      if (Redstone319.isRedstoneUtility(id)) {
+         return UTILITY;
+      }
+
       String n = Items.name(id).toLowerCase(Locale.ROOT);
       if (colorGroup(n) >= 0) {
          return COLORS;
@@ -192,6 +196,8 @@ final class Creative {
             }
 
             return 4;
+         case UTILITY:
+            return Redstone319.isRedstoneUtility(id) ? 1 : 0;
          default:
             return 0;
       }
@@ -265,6 +271,10 @@ final class Creative {
 
    /** A short word for what an item is (shown under its name in the tooltip). */
    static String kind(int id) {
+      if (Redstone319.isRedstoneUtility(id)) {
+         return "Redstone";
+      }
+
       String n = Items.name(id).toLowerCase(Locale.ROOT);
       if (Items.isArmor(id)) {
          return "Armor";

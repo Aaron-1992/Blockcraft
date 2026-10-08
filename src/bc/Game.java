@@ -34,9 +34,8 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.19";
-   /** "3.8": the version without the words, for the title screen and the F3 screen. */
-   public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
+   public static final String VERSION_STR = "4.0";
+   public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
    public Player player;
@@ -54,6 +53,7 @@ public final class Game {
    File root;
    Game.S screen = Game.S.TITLE;
    Game.S optionsReturn = Game.S.TITLE;
+   Game.S mpReturn = Game.S.TITLE;
    final Stack[] inv = new Stack[36];
    final Stack[] armor = new Stack[4];
    Stack cursor;
@@ -1724,6 +1724,10 @@ public final class Game {
                this.seedField = this.seedField + (char)var1;
             }
          }
+      } else if (this.screen == Game.S.MULTIPLAYER) {
+         if (var1 >= 32 && var1 < 127 && Net319.serverAddr.length() < 48) {
+            Net319.serverAddr = Net319.serverAddr + (char)var1;
+         }
       } else if (this.screen == Game.S.INV && this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
          if (System.currentTimeMillis() - this.menu.openedAt > 100L) {
             this.menu.typed((char)var1);
@@ -1830,6 +1834,16 @@ public final class Game {
                case WORLDS:
                   if (var1 == 256 && var2 == 1) {
                      this.setScreen(Game.S.TITLE);
+                  }
+
+                  return;
+               case MULTIPLAYER:
+                  if (var1 == 259 && Net319.serverAddr.length() > 0) {
+                     Net319.serverAddr = Net319.serverAddr.substring(0, Net319.serverAddr.length() - 1);
+                  } else if (var1 == 256 && var2 == 1) {
+                     this.setScreen(this.mpReturn != null ? this.mpReturn : Game.S.TITLE);
+                  } else if ((var1 == 257 || var1 == 335) && var2 == 1) {
+                     Net319.joinFromMenu(this, Net319.serverAddr);
                   }
 
                   return;
@@ -2322,6 +2336,7 @@ public final class Game {
          var14.vz = Math.cos(var4) * Math.cos(var6) * 0.3;
          var14.vy = -Math.sin(var6) * 0.3 + 0.1;
          var14.delay = 40;
+         Net319.onDropItem(this.world, var14);
       }
    }
 
@@ -2567,8 +2582,8 @@ public final class Game {
       }
 
       int cap = this.opt.maxFps;
-      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.OPTIONS
-         || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
+      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
+         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -3149,7 +3164,10 @@ public final class Game {
          }
 
          boolean var5 = false;
-         if (this.targetMob != null) {
+         if (var1 && Net319.tryAttackPeer(this)) {
+            var5 = true;
+            this.breakProg = 0.0F;
+         } else if (this.targetMob != null) {
             if (var1) {
                this.attackMob(this.targetMob);
             }
@@ -3630,6 +3648,13 @@ public final class Game {
          }
 
          this.meshNow(var1, var2, var3);
+         if (Redstone319.handlesUpdate(var4)) {
+            Redstone319.propagate(this.world, var1, var2, var3);
+            this.meshNow(var1 + 1, var2, var3);
+            this.meshNow(var1 - 1, var2, var3);
+            this.meshNow(var1, var2, var3 + 1);
+            this.meshNow(var1, var2, var3 - 1);
+         }
          if (Blocks.isLog(var4)) {
             // Update 3.10: cutting through a trunk makes the tree above fall over
             this.world.trees.fell(var1, var2, var3, this.player.x, this.player.z);
@@ -4455,6 +4480,10 @@ public final class Game {
                   this.meshNow(var3, var4 + 1, var5);
                }
 
+               if (Redstone319.handlesUpdate(var2) || var2 == Redstone319.DAYLIGHT_SENSOR) {
+                  Redstone319.propagate(this.world, var3, var4, var5);
+               }
+
                this.meshNow(var3, var4, var5);
                if (!this.player.creative) {
                   var1.n--;
@@ -4497,9 +4526,14 @@ public final class Game {
                double var7 = var2.y - (this.player.y + 0.5);
                if (var3 * var3 + var5 * var5 < 1.44 && Math.abs(var7) < 1.3) {
                   Stack var9 = new Stack(var2.id, var2.count, var2.dmg);
+                  int prevCount = var2.count;
                   this.addItem(var9);
                   if (var9.n <= 0) {
                      var2.dead = true;
+                     Net319.onPickupItem(var2);
+                  } else if (var9.n < prevCount) {
+                     var2.count = var9.n;
+                     Net319.onPickupItem(var2);
                   } else {
                      var2.count = var9.n;
                   }
@@ -4644,6 +4678,9 @@ public final class Game {
             break;
          case WORLDS:
             Screens.worlds(this);
+            break;
+         case MULTIPLAYER:
+            Screens.multiplayer(this);
             break;
          case NEWWORLD:
             Screens.newWorld(this);
@@ -5500,6 +5537,7 @@ public final class Game {
    enum S {
       TITLE,
       WORLDS,
+      MULTIPLAYER,
       NEWWORLD,
       LOADING,
       PLAY,

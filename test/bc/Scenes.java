@@ -34,6 +34,10 @@ final class Scenes {
             g.screen = Game.S.TITLE;
             Screens.title(g);
             break;
+         case "multiplayer":
+            g.screen = Game.S.MULTIPLAYER;
+            Screens.multiplayer(g);
+            break;
          case "worlds":
          case "worlds-long":
          case "worlds-empty": {

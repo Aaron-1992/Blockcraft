@@ -27,7 +27,7 @@ public final class ServerMain {
          }
       }
 
-      System.out.println("=== Blockcraft 3.19 Standalone Server ===");
+      System.out.println("=== Blockcraft V" + Game.VERSION_STR + " Standalone Server ===");
       World w = new World(seed, null);
       String status = Net319.startHost(null, w, port);
       System.out.println(status.replaceAll("§.", ""));

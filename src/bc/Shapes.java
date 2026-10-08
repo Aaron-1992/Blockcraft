@@ -515,6 +515,8 @@ final class Shapes {
          boxes = wallBoxes(nbr, false);
       } else if (isGate(id)) {
          boxes = gateBoxes(id);
+      } else if (Redstone319.isWire(id)) {
+         boxes = Redstone319.wireBoxes(nbr, id);
       } else if (isModel(id)) {
          boxes = MODEL[id];
       } else {
@@ -529,6 +531,7 @@ final class Shapes {
 
    /** One box of a shape: the six faces (except the hidden ones) with the texture laid over the whole block, so that the parts line up. */
    static void emitBox(Mesher.Scratch s, int x, int y, int z, int id, double[] b, int hide, Mesher.FB buf, float alpha) {
+      s.rot = 0;
       int cell = Mesher.ci(x + 1, y + 1, z + 1);
       int own = s.L[cell] & 255;
       float[] uv = new float[2];
@@ -562,7 +565,10 @@ final class Shapes {
          }
 
          float sky = light >> 4 & 15;
-         float blk = Math.max(light & 15, Blocks.emit[id]);
+         int selfGlow = (id > Redstone319.REDSTONE_WIRE0 && id <= Redstone319.REDSTONE_WIRE0 + 15)
+            ? 6 + (id - Redstone319.REDSTONE_WIRE0) * 9 / 15
+            : Blocks.emit[id];
+         float blk = Math.max(light & 15, selfGlow);
          for (int i = 0; i < 4; i++) {
             int[] corner = Mesher.FC[f][i];
             float px = (float)(corner[0] == 0 ? b[0] : b[3]);
@@ -636,7 +642,7 @@ final class Shapes {
    }
 
    static boolean placesSpecially(int id) {
-      return isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id);
+      return isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
    }
 
    /** The way the player looks, as a facing (0 north, 1 south, 2 east, 3 west). */
@@ -694,6 +700,11 @@ final class Shapes {
          } else {
             put = trap(trapKind(id), ny == -1, false, playerFacing(g.player));
          }
+      } else if (Redstone319.placesOriented(id)) {
+         if (id == Redstone319.REPEATER_OFF && !Blocks.solid[w.getBlock(x, y - 1, z)]) {
+            return false;
+         }
+         put = Redstone319.orientForPlace(g, id, x, y, z);
       } else if (!Blocks.solid[w.getBlock(x, y - 1, z)]) {
          return false;
       }

@@ -699,8 +699,17 @@ public final class World {
          this.resetBounds();
          this.touch(var1, var2, var3);
 
+         int oldOp = Blocks.opacity[var8];
+         int newOp = Blocks.opacity[var4];
+         int oldEm = Blocks.emit[var8];
+         int newEm = Blocks.emit[var4];
+
          for (int var9 = 0; var9 < 2; var9++) {
             boolean var10 = var9 == 0;
+            if (var10 ? oldOp == newOp : (oldOp == newOp && oldEm == newEm)) {
+               continue;
+            }
+
             int var11 = this.lightOf(var5, var10, var6, var2, var7);
             if (var11 > 0) {
                this.removeLight(var10, var1, var2, var3, var11);
@@ -798,6 +807,7 @@ public final class World {
             }
          }
       }
+      Redstone319.onBlockChanged(this, var1, var2, var3);
    }
 
    public void tick() {
@@ -1301,7 +1311,9 @@ public final class World {
          var10.count = var8;
          var10.dmg = var9;
          var10.spin = this.rnd.nextFloat() * 360.0F;
+         var10.netId = Net319.nextItemId();
          this.items.add(var10);
+         Net319.onDropItem(this, var10);
          return var10;
       } else {
          return null;
@@ -1880,6 +1892,7 @@ public final class World {
       public int dmg;
       public boolean dead;
       public float spin;
+      public long netId;
       /** Update 3.12: an Eye of Ender in flight: it flies from (lx, ly, lz) to above (ax, az) and then drops like any other item. */
       public boolean eye;
       public int eyeT;

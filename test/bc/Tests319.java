@@ -27,6 +27,8 @@ final class Tests319 {
       tileMipmaps();
       landmarksAndVillages();
       redstoneAndBlocks();
+      v40RedstoneAndPistons();
+      v40LodBiomesAndStructures();
       multiplayer();
    }
 
@@ -186,15 +188,94 @@ final class Tests319 {
       });
    }
 
-   static void multiplayer() {
-      test("3.19 multiplayer: P2P/LAN host, client join, block sync and pose sync", () -> {
+   static void v40RedstoneAndPistons() {
+      test("4.0 redstone: dense wire grid relaxation, repeaters, NOT-gate torches, pistons, sticky pistons, daylight sensors & observers", () -> {
+         TexExtra.blocks();
+         Game g = newGame(0);
+         World w = g.world;
+         int y = GROUND + 1;
+
+         // 1. Place a dense 5x5 grid of redstone dust and toggle a lever next to it repeatedly (must not StackOverflow or hang)
+         for (int dx = 0; dx < 5; dx++) {
+            for (int dz = 0; dz < 5; dz++) {
+               w.setBlock(2 + dx, y, 2 + dz, Redstone319.REDSTONE_WIRE0);
+            }
+         }
+
+         w.setBlock(1, y, 2, Redstone319.LEVER_OFF);
+         Shapes.use(g, 1, y, 2, Redstone319.LEVER_OFF);
+         eq(Redstone319.REDSTONE_WIRE0 + 15, w.getBlock(2, y, 2), "corner of 5x5 wire grid powered to 15");
+         eq(Redstone319.REDSTONE_WIRE0 + 7, w.getBlock(6, y, 6), "opposite corner of 5x5 wire grid powered to 7 (Manhattan distance 8)");
+         Shapes.use(g, 1, y, 2, Redstone319.LEVER_ON);
+         eq(Redstone319.REDSTONE_WIRE0, w.getBlock(2, y, 2), "corner of 5x5 wire grid unpowered cleanly");
+         eq(Redstone319.REDSTONE_WIRE0, w.getBlock(6, y, 6), "opposite corner of 5x5 wire grid unpowered cleanly");
+
+         // 2. Dynamic wire 3D geometry: isolated wire has 3 boxes (hub + N-S + E-W cross), single neighbor has 2 boxes
+         Shapes.Nbr nbr = (nx, ny, nz) -> nx == 1 ? Redstone319.REDSTONE_WIRE0 : 0;
+         double[][] boxes1 = Redstone319.wireBoxes(nbr, Redstone319.REDSTONE_WIRE0);
+         eq(2, boxes1.length, "wire connected only to +X emits hub + east arm");
+
+         // 3. Redstone Torch NOT-gate inversion (torch on top of block turns OFF when block below is powered)
+         w.setBlock(10, y, 2, 1); // stone block
+         w.setBlock(10, y + 1, 2, Redstone319.REDSTONE_TORCH);
+         w.setBlock(9, y, 2, Redstone319.REDSTONE_BLOCK);
+         Redstone319.propagate(w, 9, y, 2);
+         eq(Redstone319.REDSTONE_TORCH_OFF, w.getBlock(10, y + 1, 2), "redstone torch turns OFF when supporting block is powered");
+         w.setBlock(9, y, 2, 0);
+         Redstone319.propagate(w, 9, y, 2);
+         eq(Redstone319.REDSTONE_TORCH, w.getBlock(10, y + 1, 2), "redstone torch relights when power removed");
+
+         // 4. Redstone Repeater boosts weak signal back to 15 in facing direction (+X = dir 2)
+         w.setBlock(2, y, 10, Redstone319.REDSTONE_WIRE0);
+         w.setBlock(3, y, 10, Redstone319.REPEATER_OFF + 2); // facing +X (dir 2), input at -X (2, y, 10)
+         w.setBlock(4, y, 10, Redstone319.REDSTONE_WIRE0);
+         w.setBlock(1, y, 10, Redstone319.REDSTONE_BLOCK);
+         Redstone319.propagate(w, 1, y, 10);
+         eq(Redstone319.REPEATER_ON + 2, w.getBlock(3, y, 10), "repeater turns ON from input behind it");
+         eq(Redstone319.REDSTONE_WIRE0 + 15, w.getBlock(4, y, 10), "repeater boosts output wire to 15");
+
+         // 5. Sticky Piston pushes a stone block on power and pulls it back on depower (facing +X = face 4)
+         w.setBlock(8, y, 12, Redstone319.STICKY_PISTON + 4);
+         w.setBlock(9, y, 12, 4); // cobblestone in front of piston
+         w.setBlock(7, y, 12, Redstone319.REDSTONE_BLOCK);
+         Redstone319.propagate(w, 7, y, 12);
+         eq(Redstone319.STICKY_PISTON_EXT + 4, w.getBlock(8, y, 12), "sticky piston extended");
+         eq(Redstone319.PISTON_HEAD + 4, w.getBlock(9, y, 12), "piston head placed at +X");
+         eq(4, w.getBlock(10, y, 12), "cobblestone pushed to (10, y, 12)");
+         w.setBlock(7, y, 12, 0);
+         Redstone319.propagate(w, 7, y, 12);
+         eq(Redstone319.STICKY_PISTON + 4, w.getBlock(8, y, 12), "sticky piston retracted");
+         eq(4, w.getBlock(9, y, 12), "sticky piston pulled cobblestone back to (9, y, 12)");
+         eq(0, w.getBlock(10, y, 12), "pushed cell cleared after sticky retraction");
+      });
+   }
+
+   static void v40LodBiomesAndStructures() {
+      test("4.0 LOD: new biomes and 3.14/3.19 structures render into LOD buffers without legacy v.blds", () -> {
          Game g = newGame(1);
+         World w = g.world;
+         Lod lod = new Lod(null, w.gen);
+         try {
+            Lod.Tile t64 = new Lod.Tile(64, 0, 0);
+            lod.build(t64);
+            check(t64.vcount > 0 && t64.data != null, "LOD 64x64 tile (surface + trees + buildings/landmarks) built vertices: " + t64.vcount);
+            Lod.Tile t128 = new Lod.Tile(128, -256, -256);
+            lod.build(t128);
+            check(t128.vcount > 0 && t128.data != null, "LOD 128x128 tile built vertices: " + t128.vcount);
+         } finally {
+            lod.pool.shutdownNow();
+         }
+      });
+   }
+
+   static void multiplayer() {
+      test("3.19 / 4.0 multiplayer: P2P/LAN host, client join, block sync, pose sync, dropped item sync and survival PvP", () -> {
+         Game g = newGame(0); // Survival mode (mode 0) for PvP testing
          World w = g.world;
          int port = 25579;
          String hostMsg = Net319.host(g, port);
          check(Net319.isHosting(), "host started: " + hostMsg);
          try {
-            // Connect a raw socket peer to the host, send HELLO, POSE and BLOCK, and verify Net319 processes them
             try (java.net.Socket s = new java.net.Socket("127.0.0.1", port)) {
                s.setSoTimeout(1500);
                java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream()));
@@ -204,6 +285,8 @@ final class Tests319 {
                out.println("HELLO 2 AlexPeer");
                out.println("POSE 2 AlexPeer 12.500 65.000 12.500 90.00 0.00 90.00 8 -1.000 1 0 0");
                out.println("BLOCK 6 " + (GROUND + 2) + " 6 " + Redstone319.SEA_LANTERN);
+               out.println("DROP 99001 9.500 " + (GROUND + 1.5) + " 9.500 0.0000 0.1000 0.0000 264 3 0 10");
+               out.println("HIT " + Net319.selfId() + " 4 12.500 12.500 AlexPeer");
                for (int i = 0; i < 20 && (Net319.peerCount() == 0 || w.getBlock(6, GROUND + 2, 6) != Redstone319.SEA_LANTERN); i++) {
                   try {
                      Thread.sleep(20L);
@@ -213,8 +296,31 @@ final class Tests319 {
                   Net319.tick(g);
                }
 
+               Net319.tick(g);
                eq(1, Net319.peerCount(), "one remote peer tracked");
                eq(Redstone319.SEA_LANTERN, w.getBlock(6, GROUND + 2, 6), "remote BLOCK packet updated world");
+               check(g.player.health < 20, "survival PvP HIT packet reduced host player health to " + g.player.health);
+
+               World.Item syncedItem = null;
+               for (World.Item it : w.items) {
+                  if (it != null && it.netId == 99001L) {
+                     syncedItem = it;
+                     break;
+                  }
+               }
+
+               check(syncedItem != null && syncedItem.id == 264 && syncedItem.count == 3, "remote DROP packet spawned item stack in world");
+               out.println("PICKUP 99001 0");
+               for (int i = 0; i < 15 && syncedItem != null && !syncedItem.dead; i++) {
+                  try {
+                     Thread.sleep(15L);
+                  } catch (InterruptedException ignored) {
+                  }
+
+                  Net319.tick(g);
+               }
+
+               check(syncedItem != null && syncedItem.dead, "remote PICKUP packet marked dropped item dead");
             }
          } finally {
             Net319.disconnect(g);

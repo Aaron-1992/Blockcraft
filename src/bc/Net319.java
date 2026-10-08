@@ -124,8 +124,21 @@ public final class Net319 {
    private static String selfName = "Player" + (int)(System.currentTimeMillis() % 900 + 100);
    private static boolean applyingRemote = false;
    private static int[][] peerSkins;
+   private static final java.util.concurrent.atomic.AtomicLong itemIdGen = new java.util.concurrent.atomic.AtomicLong((System.currentTimeMillis() & 0xFFFFFL) << 16);
+   public static String serverAddr = "127.0.0.1:25565";
+   public static String statusText = "Ready — Host a world, launch Server.bat, or join a server";
+   private static volatile Process dedicatedProc;
+   private static volatile Thread bgServerThread;
 
    private Net319() {
+   }
+
+   public static long nextItemId() {
+      return itemIdGen.incrementAndGet();
+   }
+
+   public static int selfId() {
+      return selfId;
    }
 
    public static boolean isHosting() {
@@ -294,6 +307,18 @@ public final class Net319 {
                c.send("BLOCK " + unpackX(k) + " " + unpackY(k) + " " + unpackZ(k) + " " + e.getValue());
             }
 
+            if (curW != null) {
+               for (World.Item it : curW.items) {
+                  if (it != null && !it.dead && it.count > 0) {
+                     if (it.netId == 0L) {
+                        it.netId = nextItemId();
+                     }
+
+                     c.send(formatDropPacket(it));
+                  }
+               }
+            }
+
             Thread rt = new Thread(() -> readLoopHost(c), "bc-net-client-" + cid);
             rt.setDaemon(true);
             rt.start();
@@ -319,7 +344,12 @@ public final class Net319 {
                   inbox.add("JOINED " + c.id + " " + c.name);
                   broadcastExcept(c.id, "CHAT * " + c.name + " joined the world");
                }
-            } else if (line.startsWith("POSE ") || line.startsWith("BLOCK ") || line.startsWith("CHAT ")) {
+            } else if (line.startsWith("POSE ")
+               || line.startsWith("BLOCK ")
+               || line.startsWith("CHAT ")
+               || line.startsWith("HIT ")
+               || line.startsWith("DROP ")
+               || line.startsWith("PICKUP ")) {
                inbox.add(line);
                broadcastExcept(c.id, line);
             }
@@ -383,16 +413,22 @@ public final class Net319 {
          Thread rt = new Thread(() -> readLoopClient(c), "bc-net-reader");
          rt.setDaemon(true);
          rt.start();
-         return "Connected to " + host + ":" + port + " as " + selfName;
+         statusText = "Connected to " + host + ":" + port + " as " + selfName;
+         return statusText;
       } catch (IOException e) {
          clientConnected = false;
-         return "§cCould not connect to " + host + ":" + port + " (" + e.getMessage() + ")";
+         statusText = "Could not connect to " + host + ":" + port + " (" + e.getMessage() + ")";
+         return "§c" + statusText;
       }
    }
 
-   /** Update 3.19: called from the Title Screen "Join Multiplayer" button. Connects to LAN / localhost and enters the host's world. */
+   /** Update 3.19 / 4.0: called from the Multiplayer menu to join a target server or LAN host. */
    public static void joinFromTitle(Game g) {
-      String msg = join(g, "lan");
+      joinFromMenu(g, "lan");
+   }
+
+   public static void joinFromMenu(Game g, String target) {
+      String msg = join(g, target);
       if (clientConnected && g != null) {
          for (int i = 0; i < 25 && inbox.isEmpty(); i++) {
             try {
@@ -411,6 +447,105 @@ public final class Net319 {
       } else if (g != null && g.ui != null) {
          g.ui.say(Gui.stripCodes(msg));
       }
+   }
+
+   /** V4.0: Hosts a world directly from the Multiplayer screen (loading or creating a world if not yet in one). */
+   public static void hostFromMenu(Game g) {
+      if (g == null) {
+         return;
+      }
+
+      int port = parsePortFromAddr(serverAddr, DEFAULT_PORT);
+      if (g.world == null) {
+         g.joinMultiplayerWorld(20260400L, 0, 1000L, 8.5, 72.0, 8.5);
+      }
+
+      String msg = host(g, port);
+      statusText = Gui.stripCodes(msg);
+      g.setScreen(Game.S.PLAY);
+      g.say(msg);
+   }
+
+   /**
+    * V4.0: Launches {@code Blockcraft-server.bat} (or a background {@link ServerMain} instance) if not already listening on
+    * the configured port, then automatically connects the client into the server world.
+    */
+   public static void launchServerAndJoin(Game g) {
+      int port = parsePortFromAddr(serverAddr, DEFAULT_PORT);
+      String addr = "127.0.0.1:" + port;
+      if (!isPortListening("127.0.0.1", port)) {
+         boolean launchedBat = false;
+         java.io.File bat = new java.io.File("Blockcraft-server.bat");
+         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+         if (bat.isFile() && os.contains("win")) {
+            try {
+               dedicatedProc = new ProcessBuilder("cmd", "/c", "start", "\"Blockcraft Server\"", "/min", bat.getAbsolutePath(), String.valueOf(port))
+                  .directory(bat.getAbsoluteFile().getParentFile())
+                  .start();
+               launchedBat = true;
+               statusText = "Started Blockcraft-server.bat on port " + port + "...";
+            } catch (IOException ignored) {
+            }
+         }
+
+         if (!launchedBat) {
+            try {
+               String javaBin = new java.io.File(System.getProperty("java.home"), "bin/java").getAbsolutePath();
+               String cp = System.getProperty("java.class.path", "blockcraft.jar");
+               dedicatedProc = new ProcessBuilder(javaBin, "-cp", cp, "bc.ServerMain", String.valueOf(port))
+                  .redirectErrorStream(true)
+                  .start();
+               statusText = "Started dedicated ServerMain process on port " + port + "...";
+            } catch (IOException ignored) {
+            }
+         }
+
+         for (int i = 0; i < 40 && !isPortListening("127.0.0.1", port); i++) {
+            try {
+               Thread.sleep(35L);
+            } catch (InterruptedException ignored) {
+               break;
+            }
+         }
+      }
+
+      if (g != null) {
+         if (isPortListening("127.0.0.1", port)) {
+            joinFromMenu(g, addr);
+         } else {
+            // Fallback to in-process LAN host so the user always gets an active server immediately
+            hostFromMenu(g);
+         }
+      }
+   }
+
+   private static boolean isPortListening(String host, int port) {
+      try (Socket s = new Socket()) {
+         s.connect(new InetSocketAddress(host, port), 120);
+         return true;
+      } catch (IOException e) {
+         return false;
+      }
+   }
+
+   public static int parsePortFromAddr(String addr, int defPort) {
+      if (addr == null || addr.isBlank()) {
+         return defPort;
+      }
+
+      String t = addr.trim();
+      int colon = t.lastIndexOf(':');
+      if (colon >= 0 && colon < t.length() - 1) {
+         try {
+            int p = Integer.parseInt(t.substring(colon + 1).trim());
+            if (p > 0 && p <= 65535) {
+               return p;
+            }
+         } catch (NumberFormatException ignored) {
+         }
+      }
+
+      return defPort;
    }
 
    public static String[] discoverLan(int timeoutMs) {
@@ -546,6 +681,206 @@ public final class Net319 {
          } else if (clientConnected && clientConn != null) {
             clientConn.send(pkt);
          }
+      }
+   }
+
+   // ------------------------------------------------------------------ V4.0: Dropped Item Synchronization
+   static String formatDropPacket(World.Item it) {
+      return String.format(
+         Locale.ROOT,
+         "DROP %d %.3f %.3f %.3f %.4f %.4f %.4f %d %d %d %d",
+         it.netId,
+         it.x,
+         it.y,
+         it.z,
+         it.vx,
+         it.vy,
+         it.vz,
+         it.id,
+         it.count,
+         it.dmg,
+         it.delay
+      );
+   }
+
+   public static void onDropItem(World w, World.Item it) {
+      if (applyingRemote || w == null || it == null || it.count <= 0) {
+         return;
+      }
+
+      if (it.netId == 0L) {
+         it.netId = nextItemId();
+      }
+
+      if (hosting || clientConnected) {
+         String pkt = formatDropPacket(it);
+         if (hosting) {
+            broadcastExcept(0, pkt);
+         } else if (clientConnected && clientConn != null) {
+            clientConn.send(pkt);
+         }
+      }
+   }
+
+   public static void onPickupItem(World.Item it) {
+      if (applyingRemote || it == null || it.netId == 0L) {
+         return;
+      }
+
+      if (hosting || clientConnected) {
+         int rem = it.dead ? 0 : Math.max(0, it.count);
+         String pkt = "PICKUP " + it.netId + " " + rem;
+         if (hosting) {
+            broadcastExcept(0, pkt);
+         } else if (clientConnected && clientConn != null) {
+            clientConn.send(pkt);
+         }
+      }
+   }
+
+   // ------------------------------------------------------------------ V4.0: Survival PvP Player-vs-Player Combat
+   private static double rayBox(
+      double ox,
+      double oy,
+      double oz,
+      double dx,
+      double dy,
+      double dz,
+      double x0,
+      double y0,
+      double z0,
+      double x1,
+      double y1,
+      double z1,
+      double maxDist
+   ) {
+      double tMin = 0.0;
+      double tMax = maxDist;
+      double[] o = {ox, oy, oz};
+      double[] d = {dx, dy, dz};
+      double[] b0 = {x0, y0, z0};
+      double[] b1 = {x1, y1, z1};
+      for (int i = 0; i < 3; i++) {
+         if (Math.abs(d[i]) < 1.0E-8) {
+            if (o[i] < b0[i] || o[i] > b1[i]) {
+               return -1.0;
+            }
+         } else {
+            double inv = 1.0 / d[i];
+            double t1 = (b0[i] - o[i]) * inv;
+            double t2 = (b1[i] - o[i]) * inv;
+            if (t1 > t2) {
+               double tmp = t1;
+               t1 = t2;
+               t2 = tmp;
+            }
+
+            tMin = Math.max(tMin, t1);
+            tMax = Math.min(tMax, t2);
+            if (tMin > tMax) {
+               return -1.0;
+            }
+         }
+      }
+
+      return tMin;
+   }
+
+   public static Peer pickPeer(Game g, double ox, double oy, double oz, double dx, double dy, double dz, double maxDist) {
+      if (!isActive() || peers.isEmpty() || g == null || g.world == null) {
+         return null;
+      }
+
+      Peer best = null;
+      double bestT = maxDist;
+      for (Peer p : peers.values()) {
+         if (p.dim != g.world.dim) {
+            continue;
+         }
+
+         double h = p.sneak ? 1.55 : 1.85;
+         double t = rayBox(ox, oy, oz, dx, dy, dz, p.x - 0.36, p.y, p.z - 0.36, p.x + 0.36, p.y + h, p.z + 0.36, bestT);
+         if (t >= 0.0 && t < bestT) {
+            bestT = t;
+            best = p;
+         }
+      }
+
+      return best;
+   }
+
+   public static boolean tryAttackPeer(Game g) {
+      if (!isActive() || peers.isEmpty() || g == null || g.player == null || g.world == null) {
+         return false;
+      }
+
+      Player pl = g.player;
+      double yawR = Math.toRadians(pl.yaw);
+      double pitchR = Math.toRadians(pl.pitch);
+      double cp = Math.cos(pitchR);
+      double dx = -Math.sin(yawR) * cp;
+      double dy = -Math.sin(pitchR);
+      double dz = Math.cos(yawR) * cp;
+      double ox = pl.x;
+      double oy = pl.y + pl.eye;
+      double oz = pl.z;
+      double maxReach = pl.creative ? 5.0 : 3.5;
+      if (g.target != null && g.target.t < maxReach) {
+         maxReach = g.target.t;
+      }
+
+      if (g.targetMob != null && g.targetMobT < maxReach) {
+         maxReach = g.targetMobT;
+      }
+
+      Peer hit = pickPeer(g, ox, oy, oz, dx, dy, dz, maxReach);
+      if (hit == null) {
+         return false;
+      }
+
+      int held = g.heldId();
+      boolean isTool = Items.isTool(held);
+      float baseDmg = isTool ? Items.attackDamage(held) : 1.0F;
+      float speed = 4.0F;
+      if (isTool) {
+         int tc = Items.toolClass(held);
+         speed = tc == 4 ? 1.6F : (tc == 1 ? 1.2F : (tc == 2 ? (Items.toolTier(held) >= 3 ? 1.0F : 0.8F) : 1.0F));
+      }
+
+      float cd = Math.min(1.0F, (g.atkTicks + 0.5F) / (20.0F / speed));
+      baseDmg *= 0.2F + cd * cd * 0.8F;
+      if (cd > 0.9F && !pl.onGround && pl.vy < 0.0 && !pl.inWater && !pl.sprinting) {
+         baseDmg *= 1.5F;
+      }
+
+      int dmg = Math.max(1, Math.round(baseDmg));
+      g.atkTicks = 0;
+      g.swinging = true;
+      g.swing = 1.0E-4F;
+      hit.hurt = true;
+      if (pl.sprinting) {
+         pl.sprinting = false;
+      }
+
+      if (!pl.creative) {
+         if (isTool) {
+            g.damageHeld(Items.toolClass(held) == 4 ? 1 : 2);
+         }
+
+         pl.addExhaustion(0.1F);
+      }
+
+      sendHit(hit.id, dmg, pl.x, pl.z, selfName);
+      return true;
+   }
+
+   public static void sendHit(int targetId, int dmg, double attackerX, double attackerZ, String attackerName) {
+      String pkt = String.format(Locale.ROOT, "HIT %d %d %.3f %.3f %s", targetId, dmg, attackerX, attackerZ, sanitizeName(attackerName));
+      if (hosting) {
+         inbox.add(pkt);
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
       }
    }
 
@@ -759,6 +1094,103 @@ public final class Net319 {
                      peer.heldId = Integer.parseInt(p[11]);
                      peer.skinIdx = Integer.parseInt(p[12]);
                      peer.dim = p.length >= 14 ? Integer.parseInt(p[13]) : 0;
+                  }
+               }
+               case "DROP" -> {
+                  if (p.length >= 12 && w != null) {
+                     long nid = Long.parseLong(p[1]);
+                     double dx = Double.parseDouble(p[2]);
+                     double dy = Double.parseDouble(p[3]);
+                     double dz = Double.parseDouble(p[4]);
+                     double vx = Double.parseDouble(p[5]);
+                     double vy = Double.parseDouble(p[6]);
+                     double vz = Double.parseDouble(p[7]);
+                     int iid = Integer.parseInt(p[8]);
+                     int cnt = Integer.parseInt(p[9]);
+                     int idmg = Integer.parseInt(p[10]);
+                     int idelay = Integer.parseInt(p[11]);
+                     applyingRemote = true;
+                     try {
+                        World.Item found = null;
+                        for (World.Item it : w.items) {
+                           if (it != null && it.netId == nid) {
+                              found = it;
+                              break;
+                           }
+                        }
+
+                        if (found != null) {
+                           found.x = dx;
+                           found.y = dy;
+                           found.z = dz;
+                           found.vx = vx;
+                           found.vy = vy;
+                           found.vz = vz;
+                           found.count = cnt;
+                           found.dmg = idmg;
+                           found.delay = idelay;
+                           found.dead = cnt <= 0;
+                        } else if (cnt > 0) {
+                           World.Item it = new World.Item();
+                           it.netId = nid;
+                           it.x = dx;
+                           it.y = dy;
+                           it.z = dz;
+                           it.vx = vx;
+                           it.vy = vy;
+                           it.vz = vz;
+                           it.id = iid;
+                           it.count = cnt;
+                           it.dmg = idmg;
+                           it.delay = idelay;
+                           w.items.add(it);
+                        }
+                     } finally {
+                        applyingRemote = false;
+                     }
+                  }
+               }
+               case "PICKUP" -> {
+                  if (p.length >= 3 && w != null) {
+                     long nid = Long.parseLong(p[1]);
+                     int rem = Integer.parseInt(p[2]);
+                     for (World.Item it : w.items) {
+                        if (it != null && it.netId == nid) {
+                           if (rem <= 0) {
+                              it.dead = true;
+                           } else {
+                              it.count = rem;
+                           }
+                        }
+                     }
+                  }
+               }
+               case "HIT" -> {
+                  if (p.length >= 5) {
+                     int targetId = Integer.parseInt(p[1]);
+                     int dmg = Integer.parseInt(p[2]);
+                     double ax = Double.parseDouble(p[3]);
+                     double az = Double.parseDouble(p[4]);
+                     String atkName = p.length >= 6 ? p[5] : "Player";
+                     if (targetId == selfId && g != null && g.player != null) {
+                        boolean wasDead = g.player.dead;
+                        g.damagePlayer(dmg, ax, az);
+                        if (!wasDead && g.player.dead) {
+                           String deathMsg = selfName + " was slain by " + atkName;
+                           g.say("§e" + deathMsg);
+                           String chatPkt = "CHAT * " + deathMsg;
+                           if (hosting) {
+                              broadcastExcept(0, chatPkt);
+                           } else if (clientConnected && clientConn != null) {
+                              clientConn.send(chatPkt);
+                           }
+                        }
+                     } else {
+                        Peer targetPeer = peers.get(targetId);
+                        if (targetPeer != null) {
+                           targetPeer.hurt = true;
+                        }
+                     }
                   }
                }
             }

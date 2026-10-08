@@ -383,6 +383,8 @@ public final class Blocks {
          return 350;
       } else if (isSideLog(var0)) {
          return uprightLog(var0);
+      } else if (var0 >= Redstone319.REDSTONE_BLOCK && var0 <= Redstone319.OBSERVER_ON + 3) {
+         return Redstone319.pickItem(var0);
       } else {
          return isFire(var0) ? 0 : var0;
       }

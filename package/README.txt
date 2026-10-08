@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.19)
+BLOCKCRAFT V4.0  -  an original Minecraft-style voxel sandbox   (EDITION V4.0)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -7,7 +7,13 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 %USERPROFILE%\.blockcraft112\crash.log  and  latest.log
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
-generator and the physics are written from scratch to feel like Java Edition 1.12.
+generator and the physics are written from scratch.
+
+WHAT'S NEW IN V4.0  (New Edition V4.0, Dedicated Multiplayer Menu & Auto-Server Launcher, Survival PvP & Dropped Item Sync, Complete Redstone Expansion with Pistons/Repeaters/Observers & 3D Connected Wire, Full 28-Biome & Modern Structure LOD)
+  * NEW EDITION V4.0 & DEDICATED MULTIPLAYER MENU. Blockcraft enters major Edition V4.0! The Title Screen is streamlined with Singleplayer and a dedicated Multiplayer menu (removing redundant Create New World from the title screen), where you can enter any server Host:Port, join LAN hosts automatically, host your world on LAN, or click "Start Server.bat" to automatically launch Blockcraft-server.bat / ServerMain in the background and connect immediately.
+  * MULTIPLAYER SURVIVAL PVP & DROPPED ITEM SYNC. Players in Survival mode can now engage in melee PvP combat against other connected players with full weapon damage, attack cooldown, critical hits, armor reduction, knockback, hurt flash and death announcements. Dropped items (from Q throws or breaking blocks) and item pickups are synchronized live across all connected players.
+  * REDSTONE OVERHAUL, FIXES & NEW COMPONENTS. Placing large grids of Redstone Dust no longer crashes or lags (replaced recursive neighbour updates and per-wire block relighting with an O(N) BFS network relaxation pass and batched chunk re-meshing). Redstone Dust now has a distinct inventory icon, opaque 3D connected wire lines that dynamically form crosses, straight lines or corners towards adjacent components (including 1-block step-up/down), and self-lit glowing red power states. Added Redstone Torch NOT-gate inversion, Redstone Repeaters (directional diode + 15-power booster), Pistons & Sticky Pistons (pushing up to 12 blocks and pulling blocks back), Note Blocks, Daylight Sensors, and Observers.
+  * DISTANT TERRAIN (LOD) FOR ALL 28 BIOMES & NEW STRUCTURES. Distant LOD tiles now support all 28 biomes (Meadow, Flower Forest, Birch Forest, Dark Forest with giant mushrooms, Taiga/Mega Taiga/Snowy Taiga, Swamp, Savanna acacia, Jungle trees, Desert/Badlands cacti & terracotta bands, Mushroom Islands, Ice Spikes & Frozen Peaks) and render modern Update 3.14/3.19 village templates and biome landmarks (Desert Pyramids, Jungle Temples, Witch Huts, Igloos, Ruined Watchtowers) instead of legacy Update 3.5 village boxes.
 
 WHAT'S NEW IN UPDATE 3.19  (discrete GPU PE exports, LOD speedup, Better Villages & biome landmarks, complete modern texture overhaul, raised player arms & fluid dragon animation, bushy leaves & colour looks, Redstone & 1.12 blocks, zero distant block seams, prototype P2P/LAN & standalone server multiplayer)
   * DISCRETE GPU SELECTION & PERFORMANCE. Both Blockcraft.exe and a dedicated JRE copy (jre\bin\blockcraft-gpu.exe) now carry native PE32/PE32+ export tables exporting NvOptimusEnablement = 1 and AmdPowerXpressRequestHighPerformance = 1 alongside DirectX UserGpuPreferences registry entries and NVIDIA/AMD OpenGL driver offload hints, and every start on an integrated GPU automatically relaunches onto blockcraft-gpu.exe. Distant LOD terrain now renders after near terrain (for hardware Early-Z rejection) with streamlined octree subdivision and far-tree geometry.

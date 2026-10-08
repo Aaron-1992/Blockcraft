@@ -91,11 +91,12 @@ def compile_java(out_dir, source_roots, classpath, debug=True):
 
 
 def game_version():
-    """'3.6' etc, parsed from Game.TITLE_STR (single source of truth)."""
+    """'4.0' etc, parsed from Game.VERSION_STR or Game.TITLE_STR (single source of truth)."""
     with open(os.path.join(ROOT, "src", "bc", "Game.java"), encoding="utf-8") as f:
-        m = re.search(r'TITLE_STR\s*=\s*"[^"]*Update\s+([0-9.]+)"', f.read())
+        txt = f.read()
+    m = re.search(r'VERSION_STR\s*=\s*"([0-9.]+)"', txt) or re.search(r'TITLE_STR\s*=\s*"[^"]*(?:Update\s+|V)([0-9.]+)"', txt)
     if not m:
-        sys.exit("could not find the version in Game.TITLE_STR")
+        sys.exit("could not find the version in Game.java")
     return m.group(1)
 
 

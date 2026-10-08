@@ -42,7 +42,7 @@ final class Screens {
       float top = Math.max(10.0F, gui.h * 0.08F);
       double time = ui.time();
       float bottom = Logo.draw(gui, cx, top, cell, time);
-      gui.centered("JAVA EDITION 1.12  -  UPDATE " + Game.VERSION_STR, cx, bottom + 10.0F, 0xFFD6D6E0, true, 1.0F);
+      gui.centered("JAVA EDITION  -  V" + Game.VERSION_STR, cx, bottom + 10.0F, 0xFFD6D6E0, true, 1.0F);
       if (g.splash != null) {
          float sw = Gui.textWidth(g.splash);
          float sx = Math.min(cx + Logo.width(cell) / 2.0F - 22.0F, gui.w - sw / 2.0F - 12.0F);
@@ -57,25 +57,94 @@ final class Screens {
 
       float bw = Math.min(200.0F, gui.w - 40.0F);
       float half = (bw - 4.0F) / 2.0F;
-      float row = 22.0F;
-      float by = Math.max(bottom + 24.0F, gui.h * 0.44F);
-      by = Math.min(by, gui.h - 16.0F - row * 4.0F - 20.0F);
+      float row = 24.0F;
+      float by = Math.max(bottom + 26.0F, gui.h * 0.45F);
+      by = Math.min(by, gui.h - 16.0F - row * 3.0F - 20.0F);
       float bx = cx - bw / 2.0F;
       ui.button("Singleplayer", bx, by, bw, 20.0F, true, null, () -> openWorlds(g));
-      ui.button("Create New World", bx, by + row, bw, 20.0F, true, null, () -> openNewWorld(g));
-      ui.button("Join Multiplayer", bx, by + row * 2, bw, 20.0F, true, null, () -> Net319.joinFromTitle(g));
-      ui.button("Skins...", bx, by + row * 3, half, 20.0F, true, null, () -> {
+      ui.button("Multiplayer", bx, by + row, bw, 20.0F, true, null, () -> {
+         g.mpReturn = Game.S.TITLE;
+         openMultiplayer(g);
+      });
+      ui.button("Skins...", bx, by + row * 2, half, 20.0F, true, null, () -> {
          g.skinReturn = Game.S.TITLE;
          g.setScreen(Game.S.SKINS);
       });
-      ui.button("Options...", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> {
+      ui.button("Options...", bx + half + 4.0F, by + row * 2, half, 20.0F, true, null, () -> {
          g.optionsReturn = Game.S.TITLE;
          g.setScreen(Game.S.OPTIONS);
       });
-      ui.button("Quit Game", bx, by + row * 4, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
-      gui.text("Update " + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
+      ui.button("Quit Game", bx, by + row * 3, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
+      gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
+   }
+
+   static void openMultiplayer(Game g) {
+      g.focusField = 0;
+      g.setScreen(Game.S.MULTIPLAYER);
+   }
+
+   // =================================================================== V4.0: Multiplayer Screen
+   static void multiplayer(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      float cx = gui.w / 2.0F;
+      ui.title("Multiplayer", 10.0F);
+      float pw = Math.min(280.0F, gui.w - 24.0F);
+      float px = cx - pw / 2.0F;
+      float py = 26.0F;
+      float ph = Math.min(148.0F, gui.h - py - 38.0F);
+      ui.panel(px, py, pw, ph);
+
+      float ix = px + 8.0F;
+      float iw = pw - 16.0F;
+      float colW = (iw - 6.0F) / 2.0F;
+      float x1 = ix + colW + 6.0F;
+      float iy = py + 8.0F;
+      ui.label("Server Address (Host:Port)", ix, iy, Ui.DIM);
+      ui.field(ix, iy + 10.0F, iw, 18.0F, Net319.serverAddr, "127.0.0.1:25565", g.focusField == 0, () -> g.focusField = 0);
+
+      String stateLine = Net319.isHosting()
+         ? "Hosting on port " + Net319.DEFAULT_PORT + " (" + Net319.peerCount() + " connected)"
+         : (Net319.isConnected() ? "Connected (" + Net319.peerCount() + " online)" : Net319.statusText);
+      gui.text(Game.clipText(stateLine, iw), ix, iy + 33.0F, Net319.isActive() ? 0xFF8FE060 : Ui.FAINT, true);
+
+      float by0 = iy + 46.0F;
+      ui.button("Join Server", ix, by0, colW, 20.0F, true,
+         "Connect directly to the IP address and port entered above.",
+         () -> Net319.joinFromMenu(g, Net319.serverAddr));
+      ui.button("Join LAN", x1, by0, colW, 20.0F, true,
+         "Auto-discover a Blockcraft LAN or local host on your network and join.",
+         () -> Net319.joinFromMenu(g, "lan"));
+
+      float by1 = by0 + 24.0F;
+      ui.button("Start Server.bat", ix, by1, colW, 20.0F, true,
+         "Automatically launches Blockcraft-server.bat (or standalone ServerMain) in the background and connects you to it.",
+         () -> Net319.launchServerAndJoin(g));
+      ui.button("Host World", x1, by1, colW, 20.0F, true,
+         "Host your world directly on TCP/UDP port 25565 so friends on LAN or port-forwarded IP can join.",
+         () -> Net319.hostFromMenu(g));
+
+      float by2 = by1 + 24.0F;
+      if (by2 + 20.0F <= py + ph - 4.0F) {
+         ui.button("Disconnect", ix, by2, colW, 20.0F, Net319.isActive(),
+            "Disconnect from the active server or stop hosting.",
+            () -> {
+               Net319.disconnect(g);
+               Net319.statusText = "Disconnected.";
+            });
+         ui.button("Reset Port", x1, by2, colW, 20.0F, true,
+            "Reset server address to default localhost (127.0.0.1:25565).",
+            () -> Net319.serverAddr = "127.0.0.1:25565");
+      }
+
+      float footY = gui.h - 28.0F;
+      float bw = Math.min(200.0F, pw);
+      ui.button("Back", cx - bw / 2.0F, footY, bw, 20.0F, true, null, () -> g.setScreen(g.mpReturn != null ? g.mpReturn : Game.S.TITLE));
+      ui.drawToast();
    }
 
    static void openWorlds(Game g) {
