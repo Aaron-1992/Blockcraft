@@ -572,23 +572,32 @@ public final class Player {
          int landY = fl(this.y - 0.001);
          int landZ = fl(this.z);
          int below = var1.getBlock(landX, landY, landZ);
-         if (this.fallDistance > 0.5F && !this.flying) {
-            var1.trample(landX, landY, landZ, this.fallDistance);
-         }
-
-         if (this.fallDistance > 3.0F && !this.creative && !this.flying) {
-            int var29 = (int)Math.ceil(this.fallDistance - 3.0F);
-            if (below == Blocks.HAY_BALE) {
-               var29 = (int)Math.ceil(var29 * 0.2F);
+         if (below == Redstone319.SLIME_BLOCK && !this.sneaking) {
+            if (this.fallDistance > 1.0F && !this.flying) {
+               this.vy = Math.min(1.15, Math.sqrt(this.fallDistance) * 0.28);
+               this.onGround = false;
             }
 
-            if (var29 > 0) {
-               this.invuln = 0;
-               this.hurt(var29);
+            this.fallDistance = 0.0F;
+         } else {
+            if (this.fallDistance > 0.5F && !this.flying) {
+               var1.trample(landX, landY, landZ, this.fallDistance);
             }
-         }
 
-         this.fallDistance = 0.0F;
+            if (this.fallDistance > 3.0F && !this.creative && !this.flying) {
+               int var29 = (int)Math.ceil(this.fallDistance - 3.0F);
+               if (below == Blocks.HAY_BALE) {
+                  var29 = (int)Math.ceil(var29 * 0.2F);
+               }
+
+               if (var29 > 0) {
+                  this.invuln = 0;
+                  this.hurt(var29);
+               }
+            }
+
+            this.fallDistance = 0.0F;
+         }
       } else if (var12 < 0.0) {
          this.fallDistance -= (float)var12;
       }

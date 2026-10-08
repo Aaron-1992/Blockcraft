@@ -351,13 +351,15 @@ public final class Lod {
       int var6 = Math.floorDiv(var1.x0 + var1.size - 1, 16);
       int var7 = Math.floorDiv(var1.z0, 16);
       int var8 = Math.floorDiv(var1.z0 + var1.size - 1, 16);
-      boolean var9 = var1.size <= 128;
+      boolean var9 = var1.size <= 64;
+      int maxTries = var1.size <= 64 ? 16 : (var1.size == 128 ? 6 : 2);
+      boolean drawTrunk = var1.size <= 128;
 
       for (int var10 = var5; var10 <= var6; var10++) {
          for (int var11 = var7; var11 <= var8; var11++) {
             Random var12 = new Random(this.gen.seed * 7919L ^ (var10 * 734287L + var11 * 912931L) * 31L + 17L);
 
-            for (int var13 = 0; var13 < 16; var13++) {
+            for (int var13 = 0; var13 < maxTries; var13++) {
                int var14 = var12.nextInt(16);
                int var15 = var12.nextInt(16);
                float var16 = var12.nextFloat();
@@ -470,14 +472,22 @@ public final class Lod {
                                  );
                               }
                            } else {
-                              box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var55, var48 + 0.5F, var31, 0.0F);
+                              if (drawTrunk) {
+                                 box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var55, var48 + 0.5F, var31, 0.0F);
+                              }
+
                               box(var2, var47 - 2.5F, var50 + 2.0F, var48 - 2.5F, var47 + 2.5F, var50 + var53 * 0.55F, var48 + 2.5F, shade(var30, 0.85F), var29);
-                              box(var2, var47 - 1.5F, var50 + var53 * 0.55F, var48 - 1.5F, var47 + 1.5F, var55 + 1.0F, var48 + 1.5F, var30, var29);
+                              if (drawTrunk) {
+                                 box(var2, var47 - 1.5F, var50 + var53 * 0.55F, var48 - 1.5F, var47 + 1.5F, var55 + 1.0F, var48 + 1.5F, var30, var29);
+                              }
                            }
                         } else if (var23 == 1) {
                            int var52 = 6 + var18 + var32.nextInt(2);
                            float var54 = var50 + var52 - 1.0F;
-                           box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + var52 + 1.0F, var48 + 0.5F, var31, 0.0F);
+                           if (drawTrunk) {
+                              box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + var52 + 1.0F, var48 + 0.5F, var31, 0.0F);
+                           }
+
                            if (var9) {
                               canopy(var2, var47, var54, var48, 2.3F, 3.0F, 2.3F, var30, var29, 2);
                               canopy(var2, var47, var54 + 2.0F, var48, 1.4F, 1.6F, 1.4F, var30, var29, 2);
@@ -490,17 +500,20 @@ public final class Lod {
                            float var35 = var50 + var34 - 1.0F;
                            float var36 = var51 ? 4.2F : 3.1F;
                            float var37 = var51 ? 3.2F : 2.5F;
-                           box(
-                              var2,
-                              var47 - 0.5F,
-                              var49,
-                              var48 - 0.5F,
-                              var47 + (var51 ? 1.5F : 0.5F),
-                              var50 + var34 + 1.0F,
-                              var48 + (var51 ? 1.5F : 0.5F),
-                              var31,
-                              0.0F
-                           );
+                           if (drawTrunk) {
+                              box(
+                                 var2,
+                                 var47 - 0.5F,
+                                 var49,
+                                 var48 - 0.5F,
+                                 var47 + (var51 ? 1.5F : 0.5F),
+                                 var50 + var34 + 1.0F,
+                                 var48 + (var51 ? 1.5F : 0.5F),
+                                 var31,
+                                 0.0F
+                              );
+                           }
+
                            if (!var9) {
                               box(
                                  var2,
@@ -513,7 +526,9 @@ public final class Lod {
                                  shade(var30, 0.92F),
                                  var29
                               );
-                              box(var2, var47 - 1.5F, var35 + var37, var48 - 1.5F, var47 + 1.5F, var35 + var37 + 2.0F, var48 + 1.5F, var30, var29);
+                              if (drawTrunk) {
+                                 box(var2, var47 - 1.5F, var35 + var37, var48 - 1.5F, var47 + 1.5F, var35 + var37 + 2.0F, var48 + 1.5F, var30, var29);
+                              }
                            } else {
                               canopy(var2, var47, var35, var48, var36, var37, var36, var30, var29, 1);
                               Random var38 = new Random(var19 * 31L + 7L);
@@ -844,7 +859,7 @@ public final class Lod {
    boolean insideInner(int var1, int var2, int var3) {
       double var4 = Math.max(Math.abs(var1 - this.cx), Math.abs(var1 + var3 - this.cx));
       double var6 = Math.max(Math.abs(var2 - this.cz), Math.abs(var2 + var3 - this.cz));
-      double var8 = this.innerHalf + 8;
+      double var8 = this.innerHalf + 24;
       return var4 * var4 + var6 * var6 <= var8 * var8;
    }
 
@@ -874,9 +889,9 @@ public final class Lod {
       double var4 = this.nearest(var1, var2, var3);
       if (!(var4 > this.maxDist)) {
          if (var3 != 32 || !this.insideInner(var1, var2, var3) || !this.covered(var1, var2)) {
-            if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.78F + 80.0F)) {
+            if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.72F + 28.0F)) {
                // (Update 3.11: a tile that may reach into the real chunks is always split down to 32, which is skipped where the chunks are meshed)
-               boolean var6 = var3 > 32 && (var4 < var3 * 3.0 || var4 < this.innerHalf + 48.0);
+               boolean var6 = var3 > 32 && (var4 < var3 * 1.45 || var4 < this.innerHalf + 32.0);
                if (!var6) {
                   Lod.Tile var16 = this.tile(var3, var1, var2);
                   var16.lastUse = this.frame;

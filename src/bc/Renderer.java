@@ -721,29 +721,6 @@ public final class Renderer {
       float[] var27 = new float[]{this.topR, this.topG, this.topB};
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
       this.sh.sunAtten = this.wfx.sunVis;
-      Perf.mark(Perf.LOD);
-      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
-         GL11.glEnable(2929);
-         GL11.glDepthMask(true);
-         boolean var29 = this.sh.lodOk;
-         if (var29) {
-            boolean var30 = this.shadersOn();
-            if (var30) {
-               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
-            } else {
-               this.sh.setSun(0.0F, 1.0F, 0.0F);
-            }
-
-            this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
-         }
-
-         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
-         if (var29) {
-            this.sh.stopLod();
-         }
-      }
-
-      this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.CULL);
       this.vis.clear();
       this.visN = 0;
@@ -876,6 +853,33 @@ public final class Renderer {
       }
 
       lightmapUnit(false);
+      Perf.mark(Perf.LOD);
+      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
+         GL11.glEnable(2929);
+         GL11.glDepthMask(true);
+         boolean var29 = this.sh.lodOk;
+         if (var29) {
+            boolean var30 = this.shadersOn();
+            if (var30) {
+               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
+            } else {
+               this.sh.setSun(0.0F, 1.0F, 0.0F);
+            }
+
+            this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
+         }
+
+         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
+         if (var29) {
+            this.sh.stopLod();
+         }
+
+         GL11.glEnable(3008);
+         GL11.glAlphaFunc(516, 0.5F);
+         GL11.glBindTexture(3553, Tex.atlas);
+      }
+
+      this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.ENTITIES);
       // Update 3.11: with shaders on, animals, monsters, items, falling blocks and your own body are lit like the terrain (sun, shade, shadows, torches, fog)
       this.entFogNear = var11;
@@ -1823,6 +1827,7 @@ public final class Renderer {
 
    /** Update 3.9: the player's own body (skin, walking, hitting, sneaking) in the third-person views. */
    void drawSelf(float partial) {
+      Net319.drawPeers(this, partial);
       Game g = this.g;
       Player pl = g.player;
       if (g.view == 0 || pl.spectator || pl.dead) {

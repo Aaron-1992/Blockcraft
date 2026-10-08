@@ -35,6 +35,12 @@ public final class Mesher {
    public static volatile int leafMode = Integer.getInteger("bc.leaves", 1);
 
    /**
+    * Update 3.19: 3D crossed diagonal foliage fronds protruding from exposed canopy leaf blocks. Defaults to false for headless unit tests that
+    * count exact cube faces; {@link Game} and {@link Screens} sync it with {@link Options#bushyLeaves} (which defaults to true).
+    */
+   public static volatile boolean bushyLeaves = Boolean.getBoolean("bc.bushy");
+
+   /**
     * Update 3.11: faces are drawn from their front side only (GL back-face culling, like Minecraft), so everything that has to be seen from
     * both sides - plants, crops, flames, the top of a water or lava surface - gets a second quad that faces the other way, and the test that
     * decides whether the face of a box lies against a neighbouring block now looks at the right side for the z faces (before, a thin door
@@ -358,6 +364,85 @@ public final class Mesher {
             }
          }
       }
+
+      if (bushyLeaves && !legacy && Blocks.isLeaves(var5) && !enclosed(var7, var9, var10, var11)) {
+         bushyFronds(var0, var2, var3, var4, var9, var10, var11, var13);
+      }
+   }
+
+   static void bushyFronds(Mesher.Scratch s, int x, int y, int z, int px, int py, int pz, int tint) {
+      int maxSky = 0;
+      int maxBlk = 0;
+      for (int f = 0; f < 6; f++) {
+         int nb = ci(px + FN[f][0], py + FN[f][1], pz + FN[f][2]);
+         int id = s.B[nb] & 0xFFFF;
+         if (!Blocks.opaque[id]) {
+            int lv = s.L[nb] & 255;
+            int sl = lv >> 4 & 15;
+            int bl = lv & 15;
+            if (sl > maxSky) {
+               maxSky = sl;
+            }
+
+            if (bl > maxBlk) {
+               maxBlk = bl;
+            }
+         }
+      }
+
+      int hh = hash3(s.ox + x, s.oy + y, s.oz + z);
+      float jit = variation ? 1.0F + ((hh & 0xFFFF) / 32767.5F - 1.0F) * AMP[TexPaint319.BUSHY_FROND] : 1.0F;
+      float cr = (tint >> 16 & 0xFF) / 255.0F * jit;
+      float cg = (tint >> 8 & 0xFF) / 255.0F * jit;
+      float cb = (tint & 0xFF) / 255.0F * jit;
+      float cx = x + 0.5F + (((hh >>> 4) & 15) / 7.5F - 1.0F) * 0.06F;
+      float cy = y + 0.5F + (((hh >>> 8) & 15) / 7.5F - 1.0F) * 0.05F;
+      float cz = z + 0.5F + (((hh >>> 12) & 15) / 7.5F - 1.0F) * 0.06F;
+      float ang = (((hh >>> 16) & 31) / 15.5F - 1.0F) * 0.28F;
+      float r = 0.72F;
+      float hy = 0.68F;
+      float lm = lu(maxBlk);
+      float ll = lu(maxSky);
+      s.rot = 0;
+      s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
+      for (int p = 0; p < 2; p++) {
+         double a = (p == 0 ? 0.7853982 : 2.3561945) + ang;
+         float rx = (float)Math.cos(a) * r;
+         float rz = (float)Math.sin(a) * r;
+         float tilt = (p == 0 ? 1.0F : -1.0F) * (((hh >>> 21) & 7) - 3.5F) * 0.025F;
+         s.qx[0] = cx - rx - tilt;
+         s.qy[0] = cy - hy;
+         s.qz[0] = cz - rz + tilt;
+         s.qx[1] = cx + rx - tilt;
+         s.qy[1] = cy - hy;
+         s.qz[1] = cz + rz + tilt;
+         s.qx[2] = cx + rx + tilt;
+         s.qy[2] = cy + hy;
+         s.qz[2] = cz + rz - tilt;
+         s.qx[3] = cx - rx + tilt;
+         s.qy[3] = cy + hy;
+         s.qz[3] = cz - rz - tilt;
+         s.qu[0] = 0.0F;
+         s.qv[0] = 1.0F;
+         s.qu[1] = 1.0F;
+         s.qv[1] = 1.0F;
+         s.qu[2] = 1.0F;
+         s.qv[2] = 0.0F;
+         s.qu[3] = 0.0F;
+         s.qv[3] = 0.0F;
+         for (int k = 0; k < 4; k++) {
+            float sh = k < 2 ? 0.76F : 0.96F;
+            s.qr[k] = cr * sh;
+            s.qg[k] = cg * sh;
+            s.qb[k] = cb * sh;
+            s.qa[k] = 1.0F;
+            s.qm[k] = lm;
+            s.ql[k] = ll;
+         }
+
+         emit(s, s.o, TexPaint319.BUSHY_FROND, false);
+         emitBack(s, s.o, TexPaint319.BUSHY_FROND);
+      }
    }
 
    /**
@@ -398,6 +483,7 @@ public final class Mesher {
       AMP[TexArt313.PODZOL_TOP] = 0.065F;
       AMP[TexArt313.MYCELIUM_TOP] = 0.065F;
       AMP[TexArt313.COARSE_DIRT] = 0.065F;
+      AMP[TexPaint319.BUSHY_FROND] = 0.12F;
    }
 
    static int hash3(int x, int y, int z) {

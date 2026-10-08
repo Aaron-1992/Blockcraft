@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.18";
+   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.19";
    /** "3.8": the version without the words, for the title screen and the F3 screen. */
    public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
    public Options opt;
@@ -256,7 +256,12 @@ public final class Game {
          this.opt.leaves = Math.max(0, Math.min(2, Integer.getInteger("bc.leaves")));
       }
 
+      if (System.getProperty("bc.bushy") != null) {
+         this.opt.bushyLeaves = Boolean.getBoolean("bc.bushy");
+      }
+
       Mesher.leafMode = this.opt.leaves;
+      Mesher.bushyLeaves = this.opt.bushyLeaves;
       if (System.getProperty("bc.guiscale") != null) {
          this.opt.guiScale = Integer.getInteger("bc.guiscale"); // test hook: force the GUI scale (screens must cope with narrow windows)
       }
@@ -341,8 +346,9 @@ public final class Game {
       System.out.println("GL: " + GL11.glGetString(7938) + " / " + this.gpuName);
       // (-Dbc.gpuforce=1, a test hook: behave as if the first process had got the small chip - the Windows smoke test proves with it that the second start works)
       boolean gpuForce = Boolean.getBoolean("bc.gpuforce");
-      if ((gpuChanged || gpuForce) && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
-         // the entry for Windows was written just now but this process already got the small chip: start once more, the new process gets the real one
+      boolean wantDedicated = gpuChanged || gpuForce || this.opt.gpuHigh && GpuPref.windows() && !"off".equals(System.getProperty("bc.gpu"));
+      if (wantDedicated && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
+         // the first process got the integrated processor GPU (e.g. started as javaw.exe before Optimus/PowerXpress saw blockcraft-gpu.exe): relaunch once
          System.out.println("GPU: " + this.gpuName + " is part of the processor; starting again with the high performance preference");
          if (GpuPref.relaunch(this.gpuName)) {
             GLFW.glfwDestroyWindow(this.window);
@@ -1440,6 +1446,7 @@ public final class Game {
    }
 
    void quitToTitle() {
+      Net319.disconnect(this);
       this.saveWorld();
 
       for (Chunk var2 : this.world.chunks.values()) {
@@ -1953,6 +1960,7 @@ public final class Game {
    void runCommand(String var1) {
       if (!var1.startsWith("/")) {
          this.say("<Player> " + var1);
+         Net319.sendChat(this, var1);
       } else {
          String[] var2 = var1.substring(1).split("\\s+");
 
@@ -2165,8 +2173,30 @@ public final class Game {
 
                   this.say("The hand bobs when you walk: " + (this.opt.bobbing ? "on" : "off") + "  (/bobbing on|off)");
                   break;
+               case "host":
+                  int hPort = var2.length > 1 ? Integer.parseInt(var2[1]) : Net319.DEFAULT_PORT;
+                  this.say(Net319.host(this, hPort));
+                  break;
+               case "join":
+               case "connect":
+                  String target = var2.length > 1 ? var2[1] : "lan";
+                  this.say(Net319.join(this, target));
+                  break;
+               case "disconnect":
+               case "leave":
+                  Net319.disconnect(this);
+                  this.say("Disconnected from multiplayer");
+                  break;
+               case "mp":
+               case "peers":
+                  this.say(
+                     Net319.isHosting()
+                        ? "Hosting LAN world (" + Net319.peerCount() + " peer(s) connected)"
+                        : (Net319.isConnected() ? "Connected to multiplayer (" + Net319.peerCount() + " peer(s))" : "Multiplayer inactive (/host [port] or /join [host:port])")
+                  );
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /dim /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing");
+                  this.say("Commands: /gamemode /time set /tp /seed /dim /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /host /join /disconnect");
                   break;
                default:
                   this.say("§cUnknown command. Try /help");
@@ -2867,6 +2897,8 @@ public final class Game {
          this.tickPose();
       }
 
+      Redstone319.tick(this);
+      Net319.tick(this);
       this.adv.tick();
       if (this.tickCount % 10 == 0) {
          this.adv.poll(this);
@@ -3270,6 +3302,10 @@ public final class Game {
                   break;
                case 22:
                   var6 = 260;
+                  break;
+               case 23:
+                  var6 = Redstone319.ITEM_REDSTONE; // Update 3.19: redstone ore gives 4 - 5 redstone dust
+                  var7 = 4 + this.rnd.nextInt(2);
                   break;
                case 24:
                   var6 = Color312.dyeItem(11); // Update 3.12: lapis lazuli ore gives 4 - 8 blue dye
@@ -4184,6 +4220,10 @@ public final class Game {
 
       if (var1 != null && Items.plantBlock(var1.id) != 0) {
          return this.placeSeeds(var1);
+      }
+
+      if (var1 != null && var1.id == Redstone319.ITEM_REDSTONE) {
+         return Redstone319.placeWire(this, var1);
       }
 
       if (var1 != null && Blocks.isBlockId(var1.id)) {

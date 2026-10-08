@@ -59,6 +59,7 @@ public final class Structs {
    public void apply(Chunk var1) {
       try {
          this.villages(var1);
+         Landmarks319.apply(this, var1);
          this.dungeons(var1);
          this.mineshafts(var1);
       } catch (RuntimeException var3) {

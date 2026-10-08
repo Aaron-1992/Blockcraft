@@ -1,4 +1,4 @@
-BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.18)
+BLOCKCRAFT 1.12  -  an original Minecraft-style voxel sandbox   (UPDATE 3.19)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,16 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch to feel like Java Edition 1.12.
+
+WHAT'S NEW IN UPDATE 3.19  (discrete GPU PE exports, LOD speedup, Better Villages & biome landmarks, complete modern texture overhaul, raised player arms & fluid dragon animation, bushy leaves & colour looks, Redstone & 1.12 blocks, zero distant block seams, prototype P2P/LAN & standalone server multiplayer)
+  * DISCRETE GPU SELECTION & PERFORMANCE. Both Blockcraft.exe and a dedicated JRE copy (jre\bin\blockcraft-gpu.exe) now carry native PE32/PE32+ export tables exporting NvOptimusEnablement = 1 and AmdPowerXpressRequestHighPerformance = 1 alongside DirectX UserGpuPreferences registry entries and NVIDIA/AMD OpenGL driver offload hints, and every start on an integrated GPU automatically relaunches onto blockcraft-gpu.exe. Distant LOD terrain now renders after near terrain (for hardware Early-Z rejection) with streamlined octree subdivision and far-tree geometry.
+  * DISTANT BLOCK GAPS FIXED. Block atlas mipmaps (levels 1..3) are now downsampled per 16x16 tile on the CPU so adjacent tiles never bleed across borders, shader UVs are clamped inside each tile's half-texel safe zone, and chunk section origins are grid-snapped.
+  * BETTER VILLAGES & BIOME LANDMARKS. Villages gain five new multi-story and civic templates (Inn/Tavern, Bakery, Windmill, Town Square Gazebo, Archery Range) with deeper terrain foundations, and the Overworld generates five biome-specific landmarks with loot chests: Desert Pyramids, mossy Jungle Temples, Swamp Witch Huts, Snowy Igloos and Ruined Watchtowers.
+  * COMPLETE MODERN TEXTURE OVERHAUL. Every remaining block and item sprite in the 512x512 atlas has been repainted in a cohesive modern pixel-art style with directional shading and bevels.
+  * ANIMATION OVERHAUL. Player arms sit two pixels higher so the shoulders are flush with the top of the torso, and the Ender Dragon features 3D figure-8 wing strokes, full-body heave/surge/bank, a travelling 5-segment serpentine neck wave, head yaw/pitch tracking on turns and perches, articulated leg flex and a 3-axis tail whip.
+  * BUSHY LEAVES & GRAPHICS OVERHAUL. Leaf blocks sprout 3D diagonal crossed foliage fronds (Options > Graphics > Bushy Leaves, ON by default) with wind sway and warm subsurface sunlight scattering, alongside six colour-graded looks (Graphics > Look), bloom and ACES filmic tonemapping.
+  * REDSTONE & MISSING 1.12 BLOCKS. Redstone Dust, Redstone Wire (15-step signal propagation), Block of Redstone, Redstone Torch, Redstone Lamp, Lever, Stone & Wooden Buttons, Stone & Wooden Pressure Plates (activating lamps, Iron Trapdoors, doors, fence gates and TNT), plus Slime Block (with bounce physics and zero fall damage), Sea Lantern, Polished Granite/Diorite/Andesite, Smooth & Chiseled Sandstone / Red Sandstone, and Chiseled, Mossy & Cracked Stone Bricks.
+  * PROTOTYPE MULTIPLAYER (P2P / LAN & STANDALONE SERVER). Host your current world directly from the Pause Menu ("Host LAN") or with /host [port], and join a friend on LAN or localhost with "Join LAN" or /join [host:port]. Or run Blockcraft-server.bat to start a standalone headless server on your PC! Synchronizes world time, live block edits, chat messages and 20 Hz 3D animated remote players.
 
 WHAT'S NEW IN UPDATE 3.18  (the real graphics card, less work per picture, a frame timer, the first repainted textures, a new villager, blaze, player body and dragon)
   * THE REAL GRAPHICS CARD. A laptop usually has two graphics chips: a weak one inside the processor (Intel UHD / Iris, AMD "Radeon Graphics") and a real graphics card (GeForce, Radeon RX). Windows hands a program

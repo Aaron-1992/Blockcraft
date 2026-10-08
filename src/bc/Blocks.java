@@ -499,6 +499,7 @@ public final class Blocks {
       Blocks313.addToCreative(var1);
       Shapes.addToCreative(var1);
       Decor315.addToCreative(var1);
+      Redstone319.addToCreative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -985,5 +986,6 @@ public final class Blocks {
       Blocks313.register();
       Shapes.register();
       Decor315.register();
+      Redstone319.register();
    }
 }

@@ -94,7 +94,7 @@ final class Shapes {
 
    /** Blocks that have to be looked at when a neighbour changes. */
    static boolean handlesUpdate(int id) {
-      return isCarpet(id) || Decor315.handlesUpdate(id);
+      return isCarpet(id) || Decor315.handlesUpdate(id) || Redstone319.handlesUpdate(id);
    }
 
    // ------------------------------------------------------------------ static models: a fixed list of boxes per id (beds, banners, redstone parts ...)
@@ -602,8 +602,12 @@ final class Shapes {
    }
 
    // ------------------------------------------------------------------ the world: use, place, update
-   /** Right click: a gate or a wooden trapdoor opens or closes. */
+   /** Right click: a gate, wooden trapdoor, lever or button opens/closes/toggles. */
    static boolean use(Game g, int x, int y, int z, int id) {
+      if (Redstone319.use(g, x, y, z, id)) {
+         return true;
+      }
+
       if (!handToggles(id)) {
          return false;
       }
@@ -620,6 +624,11 @@ final class Shapes {
          return;
       }
 
+      if (Redstone319.handlesUpdate(id)) {
+         Redstone319.update(w, x, y, z, id);
+         return;
+      }
+
       if (isCarpet(id) && !Blocks.solid[w.getBlock(x, y - 1, z)]) {
          w.setBlock(x, y, z, 0);
          w.dropItem(x + 0.5, y + 0.3, z + 0.5, id, 1);
@@ -627,7 +636,7 @@ final class Shapes {
    }
 
    static boolean placesSpecially(int id) {
-      return isGate(id) || isTrap(id) || isCarpet(id);
+      return isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id);
    }
 
    /** The way the player looks, as a facing (0 north, 1 south, 2 east, 3 west). */
@@ -691,6 +700,10 @@ final class Shapes {
 
       if (hitsPlayer(g, x, y, z, put) || !w.setBlock(x, y, z, put)) {
          return false;
+      }
+
+      if (Redstone319.handlesUpdate(put)) {
+         Redstone319.propagate(w, x, y, z);
       }
 
       g.meshNow(x, y, z);

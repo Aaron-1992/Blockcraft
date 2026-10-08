@@ -748,6 +748,7 @@ public final class World {
          }
 
          this.notifyAround(var1, var2, var3);
+         Net319.onSetBlock(this, var1, var2, var3, var4);
          return true;
       } else {
          return false;
@@ -1205,6 +1206,8 @@ public final class World {
                      }
 
                      this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, 281, 1);
+                  } else {
+                     Redstone319.propagate(this, var1, var2, var3);
                   }
                } else if (!Blocks.isDoorLo(this.getBlock(var1, var2 - 1, var3))) {
                   this.setBlock(var1, var2, var3, 0);

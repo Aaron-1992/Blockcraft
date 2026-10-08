@@ -515,6 +515,12 @@ final class Screens {
          ui.button("Effects: " + new String[]{"\u00a77LOW", "\u00a7aMEDIUM", "\u00a7bHIGH"}[Math.max(0, Math.min(2, o.fx))], x0, oy, colW, 20.0F, true,
             "LOW: the picture of Update 3.18. MEDIUM: lava, fire and torches glow, clouds throw shadows on the land, the ground is wet and shiny in rain. HIGH: also soft shadows in corners and under trees (a little slower). Needs Shaders ON.",
             () -> o.fx = (o.fx + 1) % 3);
+         ui.toggle("Bushy Leaves", o.bushyLeaves, x1, oy, colW, 20.0F,
+            "3D foliage fronds protruding from tree canopies so trees look full and organic instead of flat cubes.", () -> {
+               o.bushyLeaves = !o.bushyLeaves;
+               Mesher.bushyLeaves = o.bushyLeaves;
+               g.remeshAll();
+            });
       }
    }
 
@@ -575,7 +581,15 @@ final class Screens {
 
          ui.say("Seed " + g.world.seed + " copied");
       });
-      ui.button("Save and Quit to Title", bx, y + 80.0F, bw, 20.0F, true, null, g::quitToTitle);
+      ui.button(Net319.hostLabel(), bx, y + 76.0F, half, 20.0F, true, null, () -> {
+         Net319.toggleHost(g);
+         ui.say(Net319.isHosting() ? "Hosting on LAN (port " + Net319.DEFAULT_PORT + ")" : "Stopped LAN host");
+      });
+      ui.button(Net319.joinLabel(), bx + half + 4.0F, y + 76.0F, half, 20.0F, true, null, () -> {
+         Net319.toggleJoin(g);
+         ui.say(Net319.isConnected() ? "Connected to LAN world" : "Not connected");
+      });
+      ui.button("Save and Quit to Title", bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
       ui.drawToast();
    }
 

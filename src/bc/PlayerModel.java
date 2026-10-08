@@ -279,16 +279,17 @@ final class PlayerModel {
       s.translate(0.0F, -12.0F, 0.0F);
       layered(s, -4.0F, 12.0F, -2.0F, 8, 12, 4, 16, 16, 16, 32, 0.25F, bright);
       s.translate(0.0F, j.chest, 0.0F);
-      // arms: pivot at the shoulders (the body's tilt carries them), the elbow 6 pixels below
+      // arms: pivot at the shoulders (the body's tilt carries them), the elbow 6 pixels below; the top of the shoulder sits 2 pixels above the pivot (flush with y = 24)
       for (int side = 0; side < 2; side++) {
          s.push();
          s.translate(side == 0 ? -5.0F : 5.0F, 22.0F, 0.0F);
          s.rotate(-j.sh[side], 1.0F, 0.0F, 0.0F); // a forward swing is a negative angle about +x for a hanging limb
          s.rotate((side == 0 ? -1.0F : 1.0F) * j.abd[side], 0.0F, 0.0F, 1.0F);
+         s.translate(0.0F, 2.0F, 0.0F);
          if (side == 0) {
             final int held = p.held;
             limb(s, slim ? -2.0F : -3.0F, -2.0F, aw, 4, 40, 16, 40, 32, bright, -j.el[side], held > 0 ? () -> {
-               s.translate(0.0F, 6.0F, 0.0F); // the item is placed relative to the shoulder
+               s.translate(0.0F, 4.0F, 0.0F); // the item is placed relative to the shoulder
                s.held(held, slim, bright);
             } : null);
          } else {

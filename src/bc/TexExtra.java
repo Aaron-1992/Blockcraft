@@ -84,6 +84,8 @@ final class TexExtra {
             }
          }
       }
+
+      TexPaint319.blocks();
    }
 
    static int[] farmTop() {
