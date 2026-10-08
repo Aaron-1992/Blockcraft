@@ -66,9 +66,12 @@ final class AnimE317 {
       float stretch = perched ? Anim317.moment(s, 6, 420.0F, 70.0F) : 0.0F;
       float stretchK = stretch > 0.0F ? sin(Math.PI * (1.0F - stretch)) : 0.0F;
       float fold = perched ? 1.0F - 0.6F * stretchK : (landing ? 0.35F : 0.0F);
-      float amp = dead ? 0.12F : (perched ? 0.14F + 0.8F * stretchK : 1.0F);
+      // Update 3.19: now and then the dragon glides: the wings stay spread and only ripple, then the beat picks up again (the phase of the beat goes on, so nothing jumps)
+      float glide = perched || dead ? 0.0F : Anim317.smooth(0.55F, 0.85F, 0.5F + 0.5F * sin(t * 0.019F + (s.seed & 255) * 0.37F));
+      float amp = dead ? 0.12F : (perched ? 0.14F + 0.8F * stretchK : 1.0F - 0.72F * glide);
       float climb = perched ? 0.0F : clamp(-s.vy * 45.0F, -28.0F, 28.0F);
-      float bank = perched ? 0.0F : clamp(s.turn * 5.0F, -24.0F, 24.0F);
+      // it leans into its turns (a dragon on a circle always banks) and sways a little on top of that
+      float bank = perched ? 0.0F : clamp(s.turn * 11.0F, -28.0F, 28.0F) + 3.5F * sin(t * 0.021F + 0.7F);
       float[] fan = {6.0F, 27.0F, 50.0F};
       for (int i = 0; i < 2; i++) {
          float sg = i == 0 ? 1.0F : -1.0F;
@@ -78,7 +81,7 @@ final class AnimE317 {
          float e2 = flap(ph - 1.1F);
          float e3 = flap(ph - 1.5F);
          // 1 while the wing goes up (it folds then), 0 while it goes down
-         float up = Anim317.smooth(-0.02F, 0.12F, flap(ph + 0.06F) - flap(ph - 0.06F)) * flyK;
+         float up = Anim317.smooth(-0.02F, 0.12F, flap(ph + 0.06F) - flap(ph - 0.06F)) * flyK * (1.0F - 0.8F * glide);
          // the shoulder, the elbow, the wrist: flying (spread, beating) and perched (folded back along the body), mixed by fold
          p.rot(r.idx("wing" + n), 0.0F, sg * lerp(6.0F + 12.0F * up, 36.0F, fold), sg * lerp(amp * 30.0F * e0 + 4.0F, 12.0F + amp * 8.0F * e0, fold));
          p.rot(r.idx("wingMid" + n), 0.0F, sg * lerp(4.0F + 24.0F * up, 118.0F, fold), sg * lerp(amp * 24.0F * e1 + 3.0F, -6.0F, fold));
@@ -109,8 +112,8 @@ final class AnimE317 {
 
       int body = r.idx("body");
       float pitch = clamp(s.headPitch, -35.0F, 35.0F);
-      p.move(body, 0.0F, perched ? 0.35F * sin(t * 0.07F) : 1.1F * lift, 0.0F);
-      p.rot(body, perched ? 4.0F : pitch * 0.45F + climb - 3.5F * lift, 0.0F, bank);
+      p.move(body, 0.0F, perched ? 0.35F * sin(t * 0.07F) : 1.8F * lift * (1.0F - 0.6F * glide), 0.0F);
+      p.rot(body, perched ? 4.0F : pitch * 0.45F + climb - 5.0F * lift * (1.0F - 0.6F * glide) - 2.0F * glide, 0.0F, bank);
       float breathe = 1.0F + 0.012F * sin(t * 0.09F);
       p.scale(body, breathe, breathe, 1.0F);
       // the neck is an S that follows where the head looks; its pieces follow the wings a little later, one after the other
@@ -121,15 +124,19 @@ final class AnimE317 {
       float[] riseAdd = {-18.0F, 8.0F, 4.0F, 2.0F, 2.0F};
       float[] yawW = {0.12F, 0.16F, 0.2F, 0.24F, 0.28F};
       float wobble = 0.0F;
+      // the neck bends into a turn, piece by piece
+      float neckLean = clamp(s.turn * 0.9F, -3.0F, 3.0F) * flyK;
       for (int k = 0; k < 5; k++) {
-         float wave = flyK * (2.2F + 0.5F * k) * sin(u - 0.5F - 0.4F * k);
-         p.rot(r.idx("neck" + k), base[k] + rise * riseAdd[k] + pitch * 0.12F + wave, -hy * yawW[k] + sway * (0.25F + 0.1F * k), 0.0F);
+         float wave = flyK * (3.8F + 0.9F * k) * sin(u - 0.5F - 0.4F * k) * (1.0F - 0.5F * glide);
+         p.rot(r.idx("neck" + k), base[k] + rise * riseAdd[k] + pitch * 0.12F + wave, -hy * yawW[k] + sway * (0.25F + 0.1F * k) - neckLean, 0.0F);
          wobble += wave;
       }
 
       int head = r.idx("head");
       p.rot(head, pitch * 0.4F - 6.0F - 8.0F * rise - 0.55F * wobble, -hy * 0.2F, sin(t * 0.03F) * 2.0F);
       float roar = perched ? Anim317.moment(s, 5, 70.0F, 28.0F) : 0.0F;
+      // in flight it roars now and then (about every 25 seconds, for two or three)
+      float flyRoar = perched || dead ? 0.0F : Anim317.smooth(0.94F, 0.985F, sin(t * 0.0125F + (s.seed & 255) * 0.7F));
       float rest = 5.0F + sin(t * 0.12F) * 3.0F;
       float bite = s.attackT > 0.0F ? Math.min(1.0F, s.attackT / 6.0F) * Anim317.smooth(10.0F, 9.0F, s.attackT) : 0.0F;
       float open = rest + (30.0F - rest) * bite;
@@ -138,17 +145,23 @@ final class AnimE317 {
          p.rot(head, -16.0F * sin(Math.PI * (1.0F - roar)), 0.0F, 0.0F);
       }
 
+      if (flyRoar > 0.0F) {
+         open = Math.max(open, 34.0F * flyRoar);
+         p.rot(head, pitch * 0.4F - 6.0F - 0.55F * wobble - 14.0F * flyRoar, -hy * 0.2F, sin(t * 0.03F) * 2.0F);
+      }
+
       if (dead) {
          open = 28.0F;
       }
 
       p.rot(r.idx("jaw"), open, 0.0F, 0.0F);
       // the tail whips from side to side, more and more towards the tip, bobs with a delay after the wings and trails behind a turn
-      float lag = clamp(s.turn, -4.0F, 4.0F) * flyK;
+      // Update 3.19: the tail follows the path of the body: on a circle it curves along the circle (every piece bends a few degrees), in a sharp turn more
+      float curve = clamp(s.turn * 2.6F, -5.0F, 5.0F) * flyK;
       for (int k = 0; k < 9; k++) {
-         float w = sin(s.walk * 0.3F - k * 0.55F) * (1.8F + 0.45F * k);
-         float l = flyK * (1.0F + 0.55F * k) * sin(u - 0.8F - 0.55F * k) + climb * 0.1F;
-         p.rot(r.idx("tail" + k), (perched ? -2.0F : 0.0F) + l, w * (perched ? 0.4F : 1.0F) + (perched ? sin(t * 0.04F - k * 0.5F) * (1.2F + k * 0.6F) : 0.0F) - lag * 0.45F, 0.0F);
+         float w = sin(s.walk * 0.3F - k * 0.55F) * (1.8F + 0.45F * k) * (1.0F - 0.4F * glide);
+         float l = flyK * (1.4F + 0.8F * k) * sin(u - 0.8F - 0.55F * k) * (1.0F - 0.4F * glide) + climb * 0.1F;
+         p.rot(r.idx("tail" + k), (perched ? -2.0F : 0.0F) + l, w * (perched ? 0.4F : 1.0F) + (perched ? sin(t * 0.04F - k * 0.5F) * (1.2F + k * 0.6F) : 0.0F) - curve, 0.0F);
       }
 
       if (dead) {

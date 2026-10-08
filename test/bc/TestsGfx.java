@@ -25,6 +25,132 @@ final class TestsGfx {
       emissive();
       variation();
       bushy();
+      dragon();
+   }
+
+   // ------------------------------------------------------------------ a livelier dragon
+   static void dragon() {
+      test("dragon: it banks into its turns, glides now and then, its tail curves along the circle", () -> {
+         Rig d = Rigs317.build(Mobs.ENDER_DRAGON);
+         Pose p = d.pose();
+         int body = d.idx("body");
+         Anim317.MState s = new Anim317.MState();
+         s.t = 100.0F;
+         s.turn = 1.1F;
+         p.reset();
+         Anim317.pose(d, s, p);
+         float bankRight = p.rz[body];
+         float tailRight = 0.0F;
+         for (int k = 0; k < 9; k++) {
+            tailRight += p.ry[d.idx("tail" + k)];
+         }
+
+         s.turn = -1.1F;
+         p.reset();
+         Anim317.pose(d, s, p);
+         float bankLeft = p.rz[body];
+         float tailLeft = 0.0F;
+         for (int k = 0; k < 9; k++) {
+            tailLeft += p.ry[d.idx("tail" + k)];
+         }
+
+         check(bankRight > 8.0F && bankRight < 25.0F, "a circle banks the body 8 to 25 degrees: " + bankRight);
+         check(bankLeft < -8.0F && bankLeft > -25.0F, "and the other way round: " + bankLeft);
+         check(Math.abs(tailRight - tailLeft) > 30.0F && tailRight * tailLeft < 0.0F, "the tail curves to the inside of the turn, the other way for the other turn: " + tailRight + " / " + tailLeft);
+         s.turn = 30.0F;
+         p.reset();
+         Anim317.pose(d, s, p);
+         check(Math.abs(p.rz[body]) <= 28.0F + 3.6F, "a very sharp turn does not roll it over: " + p.rz[body]);
+         // glides: the beat of the wing gets small for a while, then big again
+         int wing = d.idx("wingL");
+         float lo = 1e9F;
+         float hi = -1e9F;
+         for (int t = 0; t < 1400; t += 10) {
+            float beatLo = 1e9F;
+            float beatHi = -1e9F;
+            for (int i = 0; i < 40; i++) {
+               Anim317.MState g = new Anim317.MState();
+               g.t = t;
+               g.walk = i * 0.4F * 1.5F;
+               g.onGround = false;
+               p.reset();
+               Anim317.pose(d, g, p);
+               beatLo = Math.min(beatLo, p.rz[wing]);
+               beatHi = Math.max(beatHi, p.rz[wing]);
+            }
+
+            lo = Math.min(lo, beatHi - beatLo);
+            hi = Math.max(hi, beatHi - beatLo);
+         }
+
+         check(hi > 50.0F, "the beat is big: " + hi);
+         check(lo < hi * 0.55F, "while it glides the beat is much smaller: " + lo + " vs " + hi);
+         // it roars in flight now and then: the jaw opens wide, while the rest of the time it is nearly shut
+         int jaw = d.idx("jaw");
+         float maxOpen = 0.0F;
+         float minOpen = 1e9F;
+         for (int t = 0; t < 2000; t += 5) {
+            Anim317.MState g = new Anim317.MState();
+            g.t = t;
+            p.reset();
+            Anim317.pose(d, g, p);
+            maxOpen = Math.max(maxOpen, p.rx[jaw]);
+            minOpen = Math.min(minOpen, p.rx[jaw]);
+         }
+
+         check(maxOpen > 30.0F && minOpen < 9.0F, "a roar in flight: jaw " + minOpen + " .. " + maxOpen);
+      });
+      test("dragon: its head turns towards you while you are near, not further than 55 degrees off its body, and straight again when you are far away", () -> {
+         File dir = java.nio.file.Files.createTempDirectory("dragonlook").toFile();
+         Game g = null;
+         try {
+            g = Tests312.endGame(99L, dir);
+            Tests312.load(g.world, 0, 0, 3);
+            g.world.fight.enter(g);
+            Mobs.Mob d = g.world.fight.dragon(g.mobs);
+            d.health = 200;
+            double sameSide = 0.0;
+            double ticks = 0.0;
+            double maxRel = 0.0;
+            for (int i = 0; i < 900; i++) {
+               g.mobs.tick();
+               g.player.health = 20;
+               g.player.invuln = 0;
+               if (d.phase == Dragon.CIRCLE) {
+                  float rel = Mobs.wrap(d.headYaw - d.yaw);
+                  maxRel = Math.max(maxRel, Math.abs(rel));
+                  float toPlayer = Mobs.wrap(Mobs.angleTo(g.player.x - d.x, g.player.z - d.z) - d.yaw);
+                  double dist = Math.hypot(g.player.x - d.x, g.player.z - d.z);
+                  if (i > 200 && dist < 80.0 && Math.abs(toPlayer) > 12.0F && Math.abs(toPlayer) < 50.0F) {
+                     ticks++;
+                     if (rel * toPlayer > 0.0F) {
+                        sameSide++;
+                     }
+                  }
+               }
+            }
+
+            check(maxRel <= 55.5, "never further than 55 degrees off the body: " + maxRel);
+            check(maxRel > 8.0, "the head does turn: " + maxRel);
+            check(ticks < 20 || sameSide > ticks * 0.7, "the head is on the player's side: " + sameSide + " of " + ticks + " ticks");
+            // far away: straight
+            g.player.setPos(900.0, 70.0, 900.0);
+            for (int i = 0; i < 200; i++) {
+               g.mobs.tick();
+               g.player.health = 20;
+            }
+
+            if (d.phase != Dragon.PERCH) {
+               check(Math.abs(Mobs.wrap(d.headYaw - d.yaw)) < 6.0F, "straight again: " + Mobs.wrap(d.headYaw - d.yaw));
+            }
+         } finally {
+            if (g != null) {
+               g.world.shutdown();
+            }
+
+            Tests311.deleteAll(dir);
+         }
+      });
    }
 
    // ------------------------------------------------------------------ bushy leaves (Mesher)

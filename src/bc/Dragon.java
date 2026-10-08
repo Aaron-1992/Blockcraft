@@ -31,13 +31,14 @@ final class Dragon {
    }
 
    private static void face(Mob m, double dx, double dz, double dy, float turn) {
+      float look = Mobs.wrap(m.headYaw - m.yaw);   // where the head looked relative to the body (Update 3.19: it follows the player)
       if (dx * dx + dz * dz > 1.0E-6) {
          float target = Mobs.angleTo(dx, dz);
          m.yaw += Math.max(-turn, Math.min(turn, Mobs.wrap(target - m.yaw)));
          m.dirYaw = m.yaw;
       }
 
-      m.headYaw = m.yaw;
+      m.headYaw = m.yaw + Math.max(-55.0F, Math.min(55.0F, look));
       m.headPitch = (float)Math.max(-35.0, Math.min(35.0, -Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz) + 1.0E-6)) * 0.6));
    }
 
@@ -179,6 +180,13 @@ final class Dragon {
       setPos(m, nx, ny, nz);
       if (m.phase != PERCH) {
          face(m, m.vx, m.vz, m.vy, 5.0F);
+         // the head turns towards you while you are near (up to 50 degrees off the way the body flies) and back again when you are not
+         double lx = p.x - m.x;
+         double lz = p.z - m.z;
+         float rel = Mobs.wrap(Mobs.angleTo(lx, lz) - m.yaw);
+         float want = target && lx * lx + lz * lz < 90.0 * 90.0 && Math.abs(rel) < 150.0F ? Math.max(-50.0F, Math.min(50.0F, rel)) : 0.0F;
+         float cur = Mobs.wrap(m.headYaw - m.yaw);
+         m.headYaw = m.yaw + cur + (want - cur) * 0.07F;
       }
 
       // it rams: whoever is inside its body is hurt and thrown away
