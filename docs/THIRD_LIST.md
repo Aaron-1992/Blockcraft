@@ -1,3 +1,19 @@
+# Fifth to-do list (`To do.txt`, commit befdb28, 2026-10-08 20:28 +0200) - work board
+
+Same rules as below: **`git fetch` before every commit, rebase on `origin` (never force-push, never `git pull --rebase`), small commits, put a line here when you take an item.**
+The owner's list, in his words (the performance line is unchanged from the fourth list):
+
+| # | Item (the owner's words) | Taken by | State |
+|---|---|---|---|
+| 1 | **DO THIS ONE FIRST - performance** (it runs entirely on the iGPU if one is present, should use the GPU) | run 10: done in 3.18 (`GpuPref`: Windows graphics preference for the process, `javaw.exe` and `java.exe`, a second start when the chip is integrated; `CaveCull`, shadow map redrawn on movement only, render scale, frame timer Shift+F3, MAX FPS). **Nobody has run it on a PC with two GPUs**: waiting for the owner's report (F3 shows `GPU:`) | done, unverified |
+| 2 | Massive structure overhaul (villages like the better villages in Minecraft, and the other structures in a similar way) | open (run 7's area: `Tpl`, `Style`, `Village314`, `Struct314`) | open |
+| 3 | Massive texture overhaul (redo all textures in a more modern style) | run 9 (`TexPaint`; 3.18 repainted part of tiles 0-399) | open |
+| 4 | Massive animation overhaul (**the dragon is pretty stiff and the player's arms are too far down**) | **run 10, 2026-10-08**: the arms were 2 pixels too low in 3.18 (the limb started at the shoulder joint, in Minecraft it starts 2 pixels above it): fixed in `PlayerModel.limb` (`ARM_LIFT`, test in `TestsPlayerAnim.geometry`). The dragon: next (`AnimE317.dragon`, `Dragon.tick`) | arms done (3.19), dragon open |
+| 5 | Massive graphics overhaul (**bushy leaves** and stuff) | **run 10** (3.19): `Look` (4 colour gradings), glow + bloom for light sources, cloud shadows (terrain, water, LOD), wet world in rain, SSAO (Effects HIGH), block variation, **bushy leaves** (`Mesher.bushy`, Options "Bushy leaves"); `ShaderSrc`, `Shaders`, `Look`, `Mesher`, `Renderer` | in progress, 3.19 |
+| 6 | and add missing features from the last update (redstone, XP + enchanting, brewing, End cities, endermites ...) | run 9 (took the rest of item 11 of the third list on 2026-10-04) | open |
+| 7 | Fix gaps between blocks far away | **run 10, 2026-10-08**: looking for it with `tools/shots.py` scenes `gap-far*` / `gap-detect*` (a native-resolution crop and a counter for background pixels inside the terrain; hooks `-Dbc.aniso`, `-Dbc.gapbg`). First suspect: the anisotropic filtering that came with 3.18 samples the neighbouring tile of the atlas at the edge of a block | investigating |
+| 8 | Add a prototype multiplayer (peer to peer preferred, or a file that you start on your PC that creates a server and lets people join) | open | open |
+
 # Fourth to-do list (`To do.txt`, commit c214df8, 2026-10-05 00:50 +0200) - work board
 
 Same rules as below: **`git fetch` before every commit, rebase on `origin` (never force-push), small commits, put a line here when you take an item.**

@@ -83,32 +83,26 @@ final class TestsGfx {
             check(a[i] == b[i], "the ordinary vertices come first and are exactly the same");
          }
 
-         // the extra quads lie in front of the cluster: within the box in two directions, 0.12 - 0.26 outside it in the third
+         // the extra quads lie in front of the cluster: Mesher.BUSHY_MIN .. BUSHY_MAX outside it in one direction, and in the other two they are
+         // no bigger than the box plus the growth of the quad (BUSHY_GROW)
          float y0 = GameTests.GROUND + 4 - (((GameTests.GROUND + 4) >> 4) << 4);
          float[] lo = {2.0F, y0, 2.0F};
          float[] hi = {7.0F, y0 + 3.0F, 7.0F};
+         float side = (Mesher.BUSHY_GROW - 1.0F) * 0.5F + 0.001F;
          for (int v = nO; v < nO + (Integer)on[1]; v++) {
-            int outAxes = 0;
+            int far = 0;
             for (int k = 0; k < 3; k++) {
                float c = a[v * 11 + k];
-               if (c < lo[k] - 0.2605F || c > hi[k] + 0.2605F) {
-                  throw new AssertionError("extra vertex " + v + " is too far from the cluster on axis " + k + ": " + c);
+               float beyond = Math.max(lo[k] - c, c - hi[k]);   // > 0: beyond the box on this axis
+               if (beyond > side) {
+                  far++;
+                  check(beyond >= Mesher.BUSHY_MIN - 0.001F && beyond <= Mesher.BUSHY_MAX + 0.001F, "in front of a side by BUSHY_MIN .. BUSHY_MAX: " + beyond);
                }
 
-               if (c < lo[k] - 0.001F || c > hi[k] + 0.001F) {
-                  outAxes++;
-               }
+               check(beyond <= Mesher.BUSHY_MAX + 0.001F, "extra vertex " + v + " is too far from the cluster on axis " + k + ": " + c);
             }
 
-            check(outAxes == 1, "an extra vertex lies in front of exactly one side of the cluster: " + outAxes);
-            for (int k = 0; k < 3; k++) {
-               float c = a[v * 11 + k];
-               if (c < lo[k] - 0.001F) {
-                  check(c <= lo[k] - 0.1195F, "in front of the low side by at least 0.12: " + (lo[k] - c));
-               } else if (c > hi[k] + 0.001F) {
-                  check(c >= hi[k] + 0.1195F, "in front of the high side by at least 0.12: " + (c - hi[k]));
-               }
-            }
+            check(far == 1, "an extra vertex lies in front of exactly one side of the cluster: " + far);
             float r = a[v * 11 + 5];
             check(r > 0.0F, "the extra layer is not black");
          }

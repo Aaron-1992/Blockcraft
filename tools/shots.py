@@ -692,9 +692,9 @@ SCENES["gfx-torch-low"] = (SCENES["mobs-torch-sh"][0] + ["-Dbc.fx=0", "-Dbc.look
 # Update 3.19, part 2: the shadows of the clouds (the camera floats 36 m above the village, looking down), the wet world in rain, ambient occlusion (Effects HIGH)
 _VF = [a for a in SCENES["village-folk-sh"][0] if not a.startswith(("-Dbc.weather=", "-Dbc.lightning=", "-Dbc.look="))]
 _VF_NOMOB = [a for a in _VF if not a.startswith(("-Dbc.summon", "-Dbc.cam=", "-Dbc.time="))]
-SCENES["gfx-cloudshadow"] = (_VF_NOMOB + ["-Dbc.cam=140,100,71,-90,26", "-Dbc.time=4000", "-Dbc.weather=cell:250,0,200", "-Dbc.lightning=off", "-Dbc.look=1"], True)
+SCENES["gfx-cloudshadow"] = (_VF_NOMOB + ["-Dbc.cam=140,125,71,-90,70", "-Dbc.time=4000", "-Dbc.weather=cell:70,0,130", "-Dbc.lightning=off", "-Dbc.look=1"], True)
 SCENES["gfx-cloudshadow-low"] = ([a for a in SCENES["gfx-cloudshadow"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
-SCENES["gfx-cloudshadow-fair"] = (_VF_NOMOB + ["-Dbc.cam=140,100,71,-90,26", "-Dbc.time=4000", "-Dbc.weather=calm", "-Dbc.look=1"], True)
+SCENES["gfx-cloudshadow-fair"] = (_VF_NOMOB + ["-Dbc.cam=140,125,71,-90,70", "-Dbc.time=4000", "-Dbc.weather=calm", "-Dbc.look=1"], True)
 SCENES["gfx-rain"] = (_VF + ["-Dbc.weather=rain", "-Dbc.lightning=off", "-Dbc.look=1"], True)
 SCENES["gfx-rain-low"] = ([a for a in SCENES["gfx-rain"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
 SCENES["gfx-ao"] = (SCENES["gfx-look-vivid"][0] + ["-Dbc.fx=2"], True)
@@ -705,7 +705,7 @@ SCENES["gfx-forest"] = (_FOREST, True)
 SCENES["gfx-forest-off"] = (_FOREST + ["-Dbc.bushy=0"], True)
 # Update 3.19, part 3: "gaps between blocks far away" - the ground along the horizon at the full resolution of the window (CROPS keeps a piece of it
 # as a second picture, because the 800 pixel wide picture smooths thin lines away): the anisotropic filtering of the atlas on (8) and off (1), and without shaders
-_GAP = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=24", "-Dbc.cam=133,80,71,-90,6", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.clouds=off", "-Dbc.shot=200"]
+_GAP = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=24", "-Dbc.cam=190.5,96,-25.5,90,10", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.clouds=off", "-Dbc.shot=160"]
 SCENES["gap-far"] = (_GAP, True)
 SCENES["gap-far-aniso1"] = (_GAP + ["-Dbc.aniso=1"], True)
 SCENES["gap-far-plain"] = (_GAP + PLAIN, True)
@@ -713,8 +713,10 @@ SCENES["gap-far-plain"] = (_GAP + PLAIN, True)
 SCENES["gap-detect"] = (_GAP + ["-Dbc.gapbg=ff00ff"], True)
 SCENES["gap-detect-aniso1"] = (_GAP + ["-Dbc.gapbg=ff00ff", "-Dbc.aniso=1"], True)
 SCENES["gap-detect-plain"] = (_GAP + PLAIN + ["-Dbc.gapbg=ff00ff"], True)
+# ... and with the distant terrain drawn (the seam between it and the near terrain: rd 3, so it is close)
+SCENES["gap-detect-lod"] = ([a for a in _GAP if not a.startswith("-Dbc.rd=")] + ["-Dbc.rd=3", "-Dbc.gapbg=ff00ff", "-Dbc.gaplod=true"], True)
 CROPS = {"gap-far": "640x300+320+330", "gap-far-aniso1": "640x300+320+330", "gap-far-plain": "640x300+320+330",
-         "gap-detect": "640x300+320+330", "gap-detect-aniso1": "640x300+320+330", "gap-detect-plain": "640x300+320+330"}
+         "gap-detect": "640x300+320+330", "gap-detect-aniso1": "640x300+320+330", "gap-detect-plain": "640x300+320+330", "gap-detect-lod": "640x300+320+330"}
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

@@ -373,6 +373,7 @@ public final class Mesher {
                float lit = BUSHY_LIGHT * jit;
                var0.rot = baseRot + 1 + (hs >>> 3 & 1) & 3;
                quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * lit, var21 * lit, var22 * lit, 1.0F, var6, off, var14);
+               growQuad(var0, BUSHY_GROW);
                emit(var0, var0.x, var23, flipFor(var0));
                var0.rot = 0;
             }
@@ -473,10 +474,24 @@ public final class Mesher {
    }
 
    /** How far in front of the face the second layer of leaves lies (blocks): between these two, by position. */
-   static final float BUSHY_MIN = 0.12F;
-   static final float BUSHY_MAX = 0.26F;
+   static final float BUSHY_MIN = 0.14F;
+   static final float BUSHY_MAX = 0.34F;
+   /** ... and it is a little bigger than the face (about its middle), so the layers of neighbouring faces overlap and the outline of a crown is not made of squares. */
+   static final float BUSHY_GROW = 1.22F;
    /** The second layer is a little lighter than the first. */
    static final float BUSHY_LIGHT = 1.10F;
+
+   /** The quad in the scratch arrays, scaled by {@code k} about its middle (it stays in its plane). */
+   static void growQuad(Mesher.Scratch s, float k) {
+      float cx = (s.qx[0] + s.qx[1] + s.qx[2] + s.qx[3]) * 0.25F;
+      float cy = (s.qy[0] + s.qy[1] + s.qy[2] + s.qy[3]) * 0.25F;
+      float cz = (s.qz[0] + s.qz[1] + s.qz[2] + s.qz[3]) * 0.25F;
+      for (int i = 0; i < 4; i++) {
+         s.qx[i] = cx + (s.qx[i] - cx) * k;
+         s.qy[i] = cy + (s.qy[i] - cy) * k;
+         s.qz[i] = cz + (s.qz[i] - cz) * k;
+      }
+   }
 
    static boolean flipFor(Mesher.Scratch var0) {
       return var0.ao[0] + var0.ao[2] < var0.ao[1] + var0.ao[3];

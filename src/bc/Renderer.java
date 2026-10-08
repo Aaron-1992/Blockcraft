@@ -268,6 +268,8 @@ public final class Renderer {
     * (or a texel of the terrain that was thrown away) shows as a pixel of that colour in the middle of the ground (tools/shots.py counts them).
     */
    static final float[] GAP_BG = parseGapBg(System.getProperty("bc.gapbg"));
+   /** ... with -Dbc.gaplod=true the distant terrain is drawn too (to look for cracks between it and the near terrain). */
+   static final boolean GAP_LOD = Boolean.getBoolean("bc.gaplod");
 
    static float[] parseGapBg(String s) {
       if (s == null || s.length() != 6) {
@@ -752,7 +754,7 @@ public final class Renderer {
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
       this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.LOD);
-      if (var16 && GAP_BG == null && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
+      if (var16 && (GAP_BG == null || GAP_LOD) && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
          GL11.glEnable(2929);
          GL11.glDepthMask(true);
          boolean var29 = this.sh.lodOk;

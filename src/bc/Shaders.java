@@ -1080,7 +1080,7 @@ public final class Shaders {
          }
 
          // small light sources (torches, fire, plants that shine) glow strongly - their halo is all there is to see of them; big surfaces (a lava lake, a wall of glowstone) a lot less
-         float s = id == Blocks.LAVA ? 0.18F : (Blocks.kind[id] == 0 || Blocks.kind[id] == 3 ? 0.30F : 1.0F);
+         float s = id == Blocks.LAVA ? 0.14F : (Blocks.kind[id] == 0 || Blocks.kind[id] == 3 ? 0.22F : 1.0F);
          for (int f = 0; f < 6; f++) {
             int t = Blocks.tiles[id][f];
             if (t >= 0 && t < n) {
@@ -1138,7 +1138,7 @@ public final class Shaders {
          GL20.glUseProgram(this.pBright);
          this.u1i(this.pBright, "scene", 0);
          this.u1f(this.pBright, "emis", glow ? 1.0F : 0.0F);
-         this.u1f(this.pBright, "emisGain", this.hdrGlow ? 5.0F : 1.0F);
+         this.u1f(this.pBright, "emisGain", this.hdrGlow ? 7.0F : 1.0F);
          GL11.glBindTexture(3553, this.sceneTex);
          this.quad();
          this.blurLevel(this.bloomFbo0, this.bloomTex0, this.bloomFbo1, this.bloomTex1, var4, var5, 2);

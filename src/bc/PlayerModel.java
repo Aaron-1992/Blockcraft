@@ -288,11 +288,11 @@ final class PlayerModel {
          if (side == 0) {
             final int held = p.held;
             limb(s, slim ? -2.0F : -3.0F, -2.0F, aw, 4, 40, 16, 40, 32, bright, -j.el[side], held > 0 ? () -> {
-               s.translate(0.0F, 6.0F, 0.0F); // the item is placed relative to the shoulder
+               s.translate(0.0F, 6.0F - ARM_LIFT, 0.0F); // the item is placed relative to the shoulder
                s.held(held, slim, bright);
-            } : null);
+            } : null, ARM_LIFT);
          } else {
-            limb(s, -1.0F, -2.0F, aw, 4, 32, 48, 48, 48, bright, -j.el[side], null);
+            limb(s, -1.0F, -2.0F, aw, 4, 32, 48, 48, 48, bright, -j.el[side], null, ARM_LIFT);
          }
 
          s.pop();
@@ -377,12 +377,22 @@ final class PlayerModel {
     * {@code bendDeg} about +x. {@code inLower} draws what is held in the lower half's frame. (x0, z0) is the corner of the box, w x 4 its
     * section; (u, v) the base layer in the skin, (u2, v2) the second layer.
     */
+   /**
+    * Update 3.19: an arm reaches 2 pixels above its shoulder joint (as in Minecraft: the joint sits 2 pixels below the top of the arm, which is level with the top of the
+    * torso). In Update 3.18 the arms started at the joint and hung 2 pixels too low. A leg starts at its hip joint (lift 0).
+    */
+   static final float ARM_LIFT = 2.0F;
+
    static void limb(Sink s, float x0, float z0, int w, int d, int u, int v, int u2, int v2, float bright, float bendDeg, Runnable inLower) {
+      limb(s, x0, z0, w, d, u, v, u2, v2, bright, bendDeg, inLower, 0.0F);
+   }
+
+   static void limb(Sink s, float x0, float z0, int w, int d, int u, int v, int u2, int v2, float bright, float bendDeg, Runnable inLower, float lift) {
       float e = 0.25F;
-      // the upper half (the second layer is a quarter of a pixel bigger, except where the halves meet)
-      s.box(x0, -6.0F, z0, x0 + w, 0.0F, z0 + d, partRects(u, v, w, d, 0, 6), bright);
-      s.box(x0 - e, -6.0F, z0 - e, x0 + w + e, e, z0 + d + e, partRects(u2, v2, w, d, 0, 6), bright);
-      s.translate(0.0F, -6.0F, 0.0F);
+      // the upper half (the second layer is a quarter of a pixel bigger, except where the halves meet); it ends 6 pixels below its top, where the elbow / knee is
+      s.box(x0, lift - 6.0F, z0, x0 + w, lift, z0 + d, partRects(u, v, w, d, 0, 6), bright);
+      s.box(x0 - e, lift - 6.0F, z0 - e, x0 + w + e, lift + e, z0 + d + e, partRects(u2, v2, w, d, 0, 6), bright);
+      s.translate(0.0F, lift - 6.0F, 0.0F);
       float bend = Math.abs(bendDeg);
       if (bend > 7.0F) {
          // the cap: a box at the joint, as high as the gap on the outside of the bend is, in the colour of the skin at the joint

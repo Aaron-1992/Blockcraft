@@ -312,6 +312,8 @@ final class TestsPlayerAnim {
       int boxes;
       int held;
       boolean bad;
+      /** For every box in the order of drawing: {lowest y, highest y, middle x} (blocks). */
+      final java.util.List<double[]> each = new java.util.ArrayList<>();
 
       @Override
       public void push() {
@@ -353,8 +355,14 @@ final class TestsPlayerAnim {
          }
 
          double[] p = new double[3];
+         double lo = 1e9;
+         double hi = -1e9;
+         double mx = 0.0;
          for (int i = 0; i < 8; i++) {
             Rig.apply(this.m, (i & 1) == 0 ? x0 : x1, (i & 2) == 0 ? y0 : y1, (i & 4) == 0 ? z0 : z1, p);
+            lo = Math.min(lo, p[1]);
+            hi = Math.max(hi, p[1]);
+            mx += p[0] / 8.0;
             this.minX = Math.min(this.minX, p[0]);
             this.minY = Math.min(this.minY, p[1]);
             this.minZ = Math.min(this.minZ, p[2]);
@@ -362,6 +370,8 @@ final class TestsPlayerAnim {
             this.maxY = Math.max(this.maxY, p[1]);
             this.maxZ = Math.max(this.maxZ, p[2]);
          }
+
+         this.each.add(new double[]{lo, hi, mx});
       }
 
       @Override
@@ -396,6 +406,28 @@ final class TestsPlayerAnim {
          PlayerModel.Pose held = new PlayerModel.Pose();
          held.held = 276;
          check(bounds(held, false).held == 1, "the item in the hand is drawn once");
+      });
+      test("player model: the arms start level with the top of the torso and end level with its bottom (in Update 3.18 they hung 2 pixels too low)", () -> {
+         for (boolean slim : new boolean[]{false, true}) {
+            PlayerModel.Pose p = new PlayerModel.Pose();
+            Bounds b = bounds(p, slim);
+            check(b.each.size() == 20, "twenty boxes: " + b.each.size());
+            double[] torso = b.each.get(8);
+            double px = 0.9375 / 16.0;
+            // boxes 10, 12 = the right arm (upper, lower half), 14, 16 = the left arm; 11, 13, 15, 17 are their second layers
+            for (int[] arm : new int[][]{{10, 12}, {14, 16}}) {
+               double top = b.each.get(arm[0])[1];
+               double bottom = b.each.get(arm[1])[0];
+               check(Math.abs(top - torso[1]) < 0.35 * px, "the arm starts at the top of the torso (" + slim + "): arm " + top / px + " px, torso " + torso[1] / px + " px");
+               check(Math.abs(bottom - torso[0]) < 0.35 * px, "the arm ends at the bottom of the torso (" + slim + "): arm " + bottom / px + " px, torso " + torso[0] / px + " px");
+            }
+
+            // and the legs: from the soles to the bottom of the torso
+            for (int[] leg : new int[][]{{0, 2}, {4, 6}}) {
+               check(Math.abs(b.each.get(leg[0])[1] - torso[0]) < 0.35 * px, "a leg reaches up to the torso");
+               check(Math.abs(b.each.get(leg[1])[0]) < 0.35 * px, "a leg reaches down to the floor");
+            }
+         }
       });
       test("player model: the two halves of a limb use the whole texture of the long box between them", () -> {
          for (int[] box : new int[][]{{0, 16, 4, 4}, {40, 16, 4, 4}, {40, 16, 3, 4}, {16, 48, 4, 4}, {32, 48, 4, 4}}) {

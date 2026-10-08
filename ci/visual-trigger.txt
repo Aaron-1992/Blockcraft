@@ -1,2 +1,2 @@
-gfx-cloudshadow,gfx-cloudshadow-low,gfx-cloudshadow-fair,gfx-look-vivid,gfx-bushy-off,gfx-forest,gfx-forest-off,gfx-rain,gfx-glow-night,mobs-torch-sh,gap-far,gap-far-aniso1,gap-far-plain,gap-detect,gap-detect-aniso1,gap-detect-plain
+gfx-forest,gfx-look-vivid,gfx-cloudshadow,gfx-cloudshadow-low,gfx-cloudshadow-fair,mobs-torch-sh,gfx-glow-night,pl-walk,pl-bow,gap-far,gap-far-aniso1,gap-far-plain,gap-detect,gap-detect-aniso1,gap-detect-plain,gap-detect-lod
 jar=build
