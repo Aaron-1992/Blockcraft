@@ -76,6 +76,10 @@ public final class Mesher {
       int var5 = var1.cx * 16;
       int var6 = var2 * 16;
       int var7 = var1.cz * 16;
+      var4.ox = var5;
+      var4.oy = var6;
+      var4.oz = var7;
+      var4.rot = 0;
       Chunk[] var8 = new Chunk[9];
 
       for (int var9 = -1; var9 <= 1; var9++) {
@@ -223,12 +227,13 @@ public final class Mesher {
 
       for (int var10 = 0; var10 < 4; var10++) {
          int var11 = var3 ? var10 + 1 & 3 : var10;
+         int var12 = var0.rot == 0 ? var11 : var11 + var0.rot & 3;
          var1.v(
             var0.qx[var11],
             var0.qy[var11],
             var0.qz[var11],
-            var6 + (var7 - var6) * var0.qu[var11],
-            var8 + (var9 - var8) * var0.qv[var11],
+            var6 + (var7 - var6) * var0.qu[var12],
+            var8 + (var9 - var8) * var0.qv[var12],
             var0.qr[var11],
             var0.qg[var11],
             var0.qb[var11],
@@ -333,16 +338,103 @@ public final class Mesher {
                var22 = (var13 & 0xFF) / 255.0F;
             }
 
-            quad(var0, var15, var2, var3, var4, var17, var12, var23, var20, var21, var22, 1.0F, var6, 0.0F, var14);
+            // Update 3.19: every block is a little lighter or darker than its neighbours, and the top of ground blocks is turned by a random quarter turn
+            float jit = 1.0F;
+            if (variation && !legacy) {
+               int hh = hash3(var0.ox + var2, var0.oy + var3, var0.oz + var4);
+               jit = 1.0F + ((hh & 0xFFFF) / 32767.5F - 1.0F) * ampOf(var23);
+               var0.rot = turnsOf(var23, var15, hh);
+            }
+
+            quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * jit, var21 * jit, var22 * jit, 1.0F, var6, 0.0F, var14);
             emit(var0, var0.o, var23, flipFor(var0));
+            var0.rot = 0;
             if (var19 && var15 >= 2) {
                float var24 = (var13 >> 16 & 0xFF) / 255.0F;
                float var25 = (var13 >> 8 & 0xFF) / 255.0F;
                float var26 = (var13 & 0xFF) / 255.0F;
-               quad(var0, var15, var2, var3, var4, var17, var12, 2, var24, var25, var26, 1.0F, var6, 0.002F, var14);
+               quad(var0, var15, var2, var3, var4, var17, var12, 2, var24 * jit, var25 * jit, var26 * jit, 1.0F, var6, 0.002F, var14);
                emit(var0, var0.o, 2, flipFor(var0));
             }
          }
+      }
+   }
+
+   /**
+    * Update 3.19: variation between blocks. Brightness: every block of the natural kinds (grass, dirt, sand, gravel, stone, leaves, snow ...) gets
+    * its own brightness, within a few percent (leaves: a little more), by its position - so a meadow no longer looks like one stamp repeated; the
+    * top of ground blocks (and every face of leaves) is also turned by a random quarter turn. It only changes colours and texture coordinates:
+    * the shapes, the light and the number of faces are the same. {@code -Dbc.novariation=true} switches it off (so does {@link #legacy}).
+    */
+   public static volatile boolean variation = !Boolean.getBoolean("bc.novariation");
+   static final float[] AMP = new float[1024];
+
+   static {
+      AMP[Tex.GRASS_TOP] = 0.075F;
+      AMP[Tex.DIRT] = 0.06F;
+      AMP[Tex.STONE] = 0.05F;
+      AMP[Tex.COBBLE] = 0.04F;
+      AMP[Tex.SAND] = 0.045F;
+      AMP[Tex.GRAVEL] = 0.065F;
+      AMP[Tex.LEAVES] = 0.12F;
+      AMP[Tex.SNOW] = 0.025F;
+      AMP[Tex.SANDSTONE_SIDE] = 0.035F;
+      AMP[Tex.SANDSTONE_TOP] = 0.035F;
+      AMP[Tex.BEDROCK] = 0.05F;
+      AMP[Tex.MOSSY] = 0.04F;
+      AMP[Tex.COAL] = 0.03F;
+      AMP[Tex.IRON] = 0.03F;
+      AMP[Tex.GOLD] = 0.03F;
+      AMP[Tex.DIAMOND] = 0.03F;
+      AMP[Tex.REDSTONE] = 0.03F;
+      AMP[Tex.LAPIS] = 0.03F;
+      AMP[TexArt312.NETHERRACK] = 0.06F;
+      AMP[TexArt312.SOUL_SAND] = 0.05F;
+      AMP[TexArt312.END_STONE] = 0.04F;
+      AMP[TexArt313.GRANITE] = 0.04F;
+      AMP[TexArt313.DIORITE] = 0.04F;
+      AMP[TexArt313.ANDESITE] = 0.04F;
+      AMP[TexArt313.RED_SAND] = 0.045F;
+      AMP[TexArt313.PODZOL_TOP] = 0.065F;
+      AMP[TexArt313.MYCELIUM_TOP] = 0.065F;
+      AMP[TexArt313.COARSE_DIRT] = 0.065F;
+   }
+
+   static int hash3(int x, int y, int z) {
+      int h = x * 0x27D4EB2D + y * 0x165667B1 + z * 0x9E3779B1;
+      h ^= h >>> 15;
+      h *= 0x85EBCA6B;
+      h ^= h >>> 13;
+      h *= 0xC2B2AE35;
+      h ^= h >>> 16;
+      return h;
+   }
+
+   /** How much the brightness of a block with this face tile may vary (0.075 = +-7.5 %). */
+   static float ampOf(int tile) {
+      return tile >= 0 && tile < AMP.length ? AMP[tile] : 0.0F;
+   }
+
+   /** The quarter turns of the texture of face {@code face} of a block with this tile: the tops of the ground kinds, every face of leaves. */
+   static int turnsOf(int tile, int face, int hh) {
+      switch (tile) {
+         case Tex.LEAVES:
+            return (hh >>> 18) + face * 3 & 3;
+         case Tex.GRASS_TOP:
+         case Tex.DIRT:
+         case Tex.STONE:
+         case Tex.SAND:
+         case Tex.GRAVEL:
+         case Tex.SNOW:
+         case Tex.COBBLE:
+         case TexArt312.NETHERRACK:
+         case TexArt312.SOUL_SAND:
+         case TexArt313.RED_SAND:
+         case TexArt313.PODZOL_TOP:
+         case TexArt313.COARSE_DIRT:
+            return face == 0 ? hh >>> 20 & 3 : 0;
+         default:
+            return 0;
       }
    }
 
@@ -1103,5 +1195,10 @@ public final class Mesher {
       final float[] ql = new float[4];
       final float[] qm = new float[4];
       final float[] ao = new float[4];
+      /** Update 3.19: the world position of the section's corner (for the variation between blocks) and the quarter turns of the next quad's texture. */
+      int ox;
+      int oy;
+      int oz;
+      int rot;
    }
 }

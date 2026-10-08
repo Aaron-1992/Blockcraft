@@ -4485,6 +4485,7 @@ public final class Game {
          Perf.mark(Perf.HAND);
          if (var3) {
             this.rend.sh.skyMask(sceneW, sceneH);
+            this.rend.sh.aoPass(sceneW, sceneH);
          }
 
          if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {

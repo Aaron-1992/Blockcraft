@@ -671,8 +671,11 @@ public final class Renderer {
       GL11.glViewport(0, 0, var2, var3);
       // Update 3.19: the scene's alpha channel is the glow mask of the light sources (0 everywhere, the terrain pass writes it); nothing else may touch it
       boolean glow = this.shadersOn() && this.sh.sceneActive && this.sh.fxOk && this.g.opt.fx >= 1;
-      this.sh.glowOn = glow;
-      this.sh.fxLevel = this.g.opt.fx;
+      if (this.sh != null) {
+         this.sh.glowOn = glow;
+         this.sh.fxLevel = this.g.opt.fx;
+      }
+
       GL11.glColorMask(true, true, true, true);
       GL11.glClearColor(var41, var42, var43, glow ? 0.0F : 1.0F);
       GL11.glClear(16640);
@@ -798,6 +801,15 @@ public final class Renderer {
          } else {
             this.sh.mapValid = false;
          }
+      }
+
+      if (var50 && glow) {
+         // Update 3.19: the shadows of the clouds (a small map, drawn before the terrain that reads it) and the wetness of the world in rain
+         this.sh.wet = this.g.opt.weather ? Math.min(1.0F, this.wfx.rain * 1.15F) * (1.0F - Math.min(1.0F, this.wfx.snowy)) : 0.0F;
+         this.sh.cloudShadows(this.camX, this.camY, this.camZ, this.wfx, skyOn && this.g.opt.clouds, var2, var3);
+      } else if (var50) {
+         this.sh.wet = 0.0F;
+         this.sh.cloudShadows(this.camX, this.camY, this.camZ, this.wfx, false, var2, var3);
       }
 
       Perf.mark(Perf.TERRAIN);

@@ -1,6 +1,31 @@
 package bc;
 
 final class ShaderSrc {
+   /**
+    * Update 3.19: the lookup of the cloud shadows (see CLOUD_SHADOW_FS), shared by the terrain, water and LOD programs. The map lies on the plane y = csY; the
+    * point is moved along the line to the sun until it reaches that plane. {@code rel} is the position relative to the camera, {@code wy} the world height.
+    */
+   static final String CS_UNIFORMS = String.join(
+      "\n",
+      new CharSequence[]{
+         "uniform sampler2D cloudShadow;        // the map of the cloud shadows",
+         "uniform vec4 csP;                     // x, y: centre of the map relative to the camera, z: 1 / blocks covered, w: strength (0 = off)",
+         "uniform vec2 csSunXZ;                 // sunDir.xz / sunDir.y",
+         "uniform float csY;                    // the height of the plane the map lies on"
+      }
+   );
+   static final String CS_FUNC = String.join(
+      "\n",
+      new CharSequence[]{
+         "float cloudShade(vec3 rel, float wy){",
+         "  if (csP.w < 0.001) return 1.0;",
+         "  vec2 cg = rel.xz - csSunXZ * (wy - csY);",
+         "  vec2 cuv = (cg - csP.xy) * csP.z + 0.5;",
+         "  float cin = smoothstep(0.0, 0.06, min(min(cuv.x, 1.0 - cuv.x), min(cuv.y, 1.0 - cuv.y)));",
+         "  return mix(1.0, texture2D(cloudShadow, cuv).r, csP.w * cin);",
+         "}"
+      }
+   );
    static final String WORLD_VS = String.join(
       "\n",
       new CharSequence[]{
@@ -92,6 +117,10 @@ final class ShaderSrc {
          "uniform float shadowOn;",
          "uniform vec4 dynL[12];",
          "uniform vec4 dynC[12];",
+         "#ifdef FX",
+         CS_UNIFORMS,
+         "uniform float wet;                    // 0..1: how wet the world is (rain)",
+         "#endif",
          "varying vec2 vUv;",
          "varying vec2 vLm;",
          "varying vec4 vCol;",
@@ -102,6 +131,12 @@ final class ShaderSrc {
          "varying float vDepth;",
          "#ifdef FX",
          "varying float vEmis;",
+         CS_FUNC,
+         "float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
+         "float vn(vec2 p){",
+         "  vec2 i = floor(p); vec2 f = fract(p); f = f*f*(3.0 - 2.0*f);",
+         "  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);",
+         "}",
          "#endif",
          "vec3 waterNormal(vec3 p, float time, float d){",
          "  float a1 = 1.0 - smoothstep(40.0, 220.0, d);",
@@ -146,6 +181,9 @@ final class ShaderSrc {
          "    }",
          "  }",
          "  lit *= mix(0.55, 1.0, smoothstep(0.0, 0.35, ndl));      // faces turned away from the sun receive less direct light",
+         "#ifdef FX",
+         "  lit *= cloudShade(vRel, vWorld.y);                      // Update 3.19: the shadow of the clouds",
+         "#endif",
          "  float skyAmt = smoothstep(0.55, 0.97, vLm.x) * sunUp;",
          "  vec3 sunTint = sunTintOf(sunDir.y);",
          "  vec3 shTint = vec3(0.45, 0.53, 0.78);                   // cool skylight in the shade",
@@ -169,8 +207,27 @@ final class ShaderSrc {
          "  float a = t.a * vCol.a;",
          "#ifdef FX",
          "  // Update 3.19: faces of light sources (lava, fire, torches, glowstone ...) shine by themselves and mark themselves in the alpha channel of the scene: the bloom turns that mask into a glow",
-         "  float glow = vEmis * smoothstep(0.30, 0.62, dot(t.rgb, vec3(0.299, 0.587, 0.114)));",
-         "  c += t.rgb * (glow * 0.22);",
+         "  float glowL = smoothstep(0.30, 0.62, dot(t.rgb, vec3(0.299, 0.587, 0.114)));   // only the bright texels of a light source's tile shine",
+         "  float glow = vEmis * glowL;                          // how strongly this texel glows: goes into the alpha channel of the scene",
+         "  c += t.rgb * (step(0.001, vEmis) * glowL * 0.22);    // and it shines by itself a little",
+         "  if (wet > 0.01 && isTrans < 0.5) {",
+         "    // Update 3.19: rain wets the world under open sky: darker, richer colours, and flat ground collects puddles that mirror the sky",
+         "    float skyE = smoothstep(0.45, 0.95, vLm.x);",
+         "    float upF = smoothstep(0.55, 0.95, Nf.y);",
+         "    float wm = wet * skyE * mix(0.55, 1.0, upF);",
+         "    float lw = dot(c, vec3(0.299, 0.587, 0.114));",
+         "    c = mix(c, mix(vec3(lw), c, 1.25) * 0.70, wm * 0.85);",
+         "    float pn = vn(vWorld.xz * 0.45) * 0.65 + vn(vWorld.xz * 1.7 + 11.0) * 0.35;",
+         "    float pud = smoothstep(0.50, 0.66, pn) * upF * skyE * smoothstep(0.30, 0.80, wet);",
+         "    if (pud > 0.001) {",
+         "      vec3 Vp = normalize(vRel);",
+         "      float cv = clamp(-Vp.y, 0.0, 1.0);",
+         "      float Fp = 0.10 + 0.90 * pow(1.0 - cv, 4.0);",
+         "      vec3 skyP = mix(skyHor, skyTop, pow(clamp(abs(Vp.y), 0.0, 1.0), 0.55));",
+         "      vec3 pc = mix(c * 0.62, skyP * (0.45 + 0.55 * skyE), clamp(Fp * 0.9 + 0.12, 0.0, 0.85));",
+         "      c = mix(c, pc, pud);",
+         "    }",
+         "  }",
          "#endif",
          "  if (vWater > 0.5) {",
          "    vec3 N = waterNormal(vWorld, time, vDepth);",
@@ -512,10 +569,16 @@ final class ShaderSrc {
          "uniform vec3 skyTop;",
          "uniform vec3 skyHor;",
          "uniform float fancy;",
+         "#ifdef FX",
+         CS_UNIFORMS,
+         "#endif",
          "varying vec4 vCol;",
          "varying vec3 vRel;",
          "varying vec3 vWorld;",
          "varying float vDepth;",
+         "#ifdef FX",
+         CS_FUNC,
+         "#endif",
          "vec3 waterNormal(vec3 p, float time, float d){",
          "  float a1 = 1.0 - smoothstep(40.0, 220.0, d);",
          "  float a2 = 1.0 - smoothstep(20.0, 90.0, d);",
@@ -564,6 +627,9 @@ final class ShaderSrc {
          "    vec3 amb = mix(vec3(0.40, 0.38, 0.36), shTint, 0.5 + 0.5 * N.y);",
          "    vec3 direct = sunTint * 1.04;",
          "    vec3 shadeC = mix(vec3(1.0), mix(amb, direct, mix(0.30, 1.0, sunAmt)), sunUp);",
+         "#ifdef FX",
+         "    shadeC = mix(vec3(1.0), mix(amb, direct, mix(0.30, 1.0, sunAmt) * cloudShade(vRel, vWorld.y)), sunUp);   // Update 3.19: the shadow of the clouds",
+         "#endif",
          "    // procedural surface variation (stands in for the texture detail LOD does not have)",
          "    float cellN = hash3(floor(vWorld - N * 0.02));",
          "    float fine = (cellN - 0.5) * 0.11 * (1.0 - smoothstep(60.0, 420.0, vDepth));",
@@ -592,12 +658,13 @@ final class ShaderSrc {
          ""
       }
    );
+   static final String LOD_FS_FX = fx(LOD_FS);
    /**
     * Volumetric clouds (raymarched). Update 3.8: the coverage, the base height and the towering of the clouds come from the
     * weather field {@link Weather} (same noise maps, same maths: a storm you see here is where it rains), storms are dark
     * with a lowered base, and lightning lights the cloud around the bolt.
     */
-   static final String CLOUD_FS = String.join(
+   static final String CLOUD_DECL = String.join(
       "\n",
       new CharSequence[]{
          "#version 120",
@@ -670,7 +737,12 @@ final class ShaderSrc {
          "  float core = clamp((n - edge) * 2.6, 0.0, 1.0);",
          "  core = clamp(core - (n3 - 0.45) * 0.50 * (1.0 - 0.6*core), 0.0, 1.0);    // wispy borders, solid cores",
          "  return core * prof;",
-         "}",
+         "}"
+      }
+   );
+   static final String CLOUD_FS = CLOUD_DECL + "\n" + String.join(
+      "\n",
+      new CharSequence[]{
          "// a high, thin layer of ice cloud streaks (only in fair weather): colour and opacity as seen along dir",
          "vec4 cirrus(vec3 dir, float fair, vec3 sc, vec3 amb){",
          "  if (dir.y < 0.03) return vec4(0.0);",
@@ -761,11 +833,130 @@ final class ShaderSrc {
          ""
       }
    );
+   /**
+    * Update 3.19: the shadows of the clouds. A small top-down map (128 x 128 texels over 1024 blocks around the player) of how much of the sun gets through
+    * the clouds, marched with the very same cloud functions as the clouds you see ({@link #CLOUD_DECL}): a shadow lies under the cloud that throws it,
+    * and it moves with it. The terrain shader looks the map up along the line to the sun (so a hill top is shaded by another part of the cloud than the
+    * valley below it).
+    */
+   static final String CLOUD_SHADOW_FS = CLOUD_DECL + "\n" + String.join(
+      "\n",
+      new CharSequence[]{
+         "uniform vec2 csCenter;        // the centre of the map, relative to the camera (blocks)",
+         "uniform float csSize;         // blocks covered by the map",
+         "uniform vec2 csSun;           // sunDir.xz / sunDir.y: how far the line to the sun moves sideways per block of height",
+         "uniform float csY;            // the height of the plane the map lies on",
+         "void main(){",
+         "  vec2 g = camPos.xz + csCenter + (vUv - 0.5) * csSize;",
+         "  float y0 = cloudY.x, y1 = cloudY.y;",
+         "  const int N = 14;",
+         "  float dy = (y1 - y0) / float(N);",
+         "  float ds = dy / max(sunDir.y, 0.15);",
+         "  float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));",
+         "  float tau = 0.0;",
+         "  for (int i = 0; i < N; i++) {",
+         "    float y = y0 + (float(i) + jit) * dy;",
+         "    vec2 xz = g + csSun * (y - csY);",
+         "    vec4 w = weather(xz);",
+         "    if (w.x < 0.02) continue;",
+         "    float thick = thickOf(w, xz - wOff.xy);",
+         "    float de = dens(vec3(xz.x, y, xz.y), w, thick);",
+         "    tau += de * ds * 0.052 * (1.0 + 0.6 * max(w.y, 0.65 * w.w));",
+         "  }",
+         "  float T = exp(-tau);",
+         "  gl_FragColor = vec4(T, T, T, 1.0);",
+         "}",
+         ""
+      }
+   );
+   /**
+    * Update 3.19: screen-space ambient occlusion (Effects: HIGH). Half the size of the picture: the depth buffer is turned back into view-space positions,
+    * the normal comes from the neighbouring depths, and a dozen samples in the half sphere above the surface count how many of them lie inside something
+    * (the corner where two walls meet, the foot of a block, the ground under a tree). The result is blurred by {@link #AOBLUR_FS} and darkens the picture
+    * in the composite.
+    */
+   static final String AO_FS = String.join(
+      "\n",
+      new CharSequence[]{
+         "#version 120",
+         "uniform sampler2D depthTex;",
+         "uniform vec2 projScale;       // the projection matrix's x and y scale",
+         "uniform vec2 zNF;             // near and far plane",
+         "uniform vec2 invRes;          // 1 / the size of the depth buffer",
+         "uniform float radius;         // how far from a point something can darken it (blocks)",
+         "varying vec2 vUv;",
+         "float lin(float d){ return 2.0*zNF.x*zNF.y / (zNF.y + zNF.x - (2.0*d - 1.0)*(zNF.y - zNF.x)); }",
+         "vec3 vpos(vec2 uv, float d){",
+         "  float z = lin(d);",
+         "  vec2 ndc = uv*2.0 - 1.0;",
+         "  return vec3(ndc.x / projScale.x * z, ndc.y / projScale.y * z, -z);",
+         "}",
+         "float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }",
+         "void main(){",
+         "  float d = texture2D(depthTex, vUv).r;",
+         "  if (d > 0.99999) { gl_FragColor = vec4(1.0); return; }",
+         "  vec3 p = vpos(vUv, d);",
+         "  vec2 ex = vec2(invRes.x, 0.0);",
+         "  vec2 ey = vec2(0.0, invRes.y);",
+         "  vec3 pr = vpos(vUv + ex, texture2D(depthTex, vUv + ex).r);",
+         "  vec3 pl = vpos(vUv - ex, texture2D(depthTex, vUv - ex).r);",
+         "  vec3 pu = vpos(vUv + ey, texture2D(depthTex, vUv + ey).r);",
+         "  vec3 pd = vpos(vUv - ey, texture2D(depthTex, vUv - ey).r);",
+         "  vec3 ddx = abs(pr.z - p.z) < abs(pl.z - p.z) ? pr - p : p - pl;",
+         "  vec3 ddy = abs(pu.z - p.z) < abs(pd.z - p.z) ? pu - p : p - pd;",
+         "  vec3 n = normalize(cross(ddx, ddy));",
+         "  if (dot(n, p) > 0.0) n = -n;",
+         "  float rnd = ign(gl_FragCoord.xy) * 6.2831853;",
+         "  vec3 rv = vec3(cos(rnd), sin(rnd), 0.37);",
+         "  vec3 t = normalize(rv - n * dot(rv, n));",
+         "  vec3 b = cross(n, t);",
+         "  float occ = 0.0;",
+         "  for (int i = 0; i < 12; i++) {",
+         "    float fi = float(i);",
+         "    float s = (fi + 0.5) / 12.0;",
+         "    float phi = fi * 2.39996323 + rnd;",
+         "    vec3 dir = t * (sqrt(1.0 - s) * cos(phi)) + b * (sqrt(1.0 - s) * sin(phi)) + n * sqrt(s);",
+         "    float len = radius * (0.25 + 0.75 * fract(fi * 0.618034 + rnd * 0.159155));",
+         "    vec3 sp = p + dir * len;",
+         "    vec2 suv = (sp.xy / -sp.z) * projScale * 0.5 + 0.5;",
+         "    float sd = lin(texture2D(depthTex, suv).r);",
+         "    float diff = -sp.z - sd;                  // > 0: the surface seen there is nearer than the sample: the sample is inside something",
+         "    float rc = smoothstep(0.0, 1.0, radius / max(abs(-p.z - sd), 0.001));",
+         "    occ += step(0.03 + 0.012 * -p.z, diff) * rc;",
+         "  }",
+         "  float ao = 1.0 - occ / 12.0;",
+         "  ao = mix(ao, 1.0, smoothstep(40.0, 110.0, -p.z));",
+         "  gl_FragColor = vec4(vec3(ao), 1.0);",
+         "}",
+         ""
+      }
+   );
+   static final String AOBLUR_FS = String.join(
+      "\n",
+      new CharSequence[]{
+         "#version 120",
+         "uniform sampler2D aoTex;",
+         "uniform vec2 invRes;",
+         "varying vec2 vUv;",
+         "void main(){",
+         "  float s = 0.0;",
+         "  for (int i = -2; i <= 2; i++) {",
+         "    for (int j = -2; j <= 2; j++) {",
+         "      s += texture2D(aoTex, vUv + vec2(float(i), float(j)) * invRes).r;",
+         "    }",
+         "  }",
+         "  gl_FragColor = vec4(vec3(s / 25.0), 1.0);",
+         "}",
+         ""
+      }
+   );
    static final String COMP_FS = String.join(
       "\n",
       new CharSequence[]{
          "#version 120",
          "uniform sampler2D scene;",
+         "uniform sampler2D aoTex;           // Update 3.19: ambient occlusion (Effects: HIGH), see AO_FS",
+         "uniform float aoAmt;               // 0 = off",
          "uniform sampler2D bloom;",
          "uniform sampler2D bloom2;          // Update 3.19: the same glow blurred wider (quarter and eighth of the size)",
          "uniform sampler2D bloom3;",
@@ -815,6 +1006,10 @@ final class ShaderSrc {
          "  vec3 rgbB = rgbA*0.5 + 0.25*(S(vUv + dir*-0.5) + S(vUv + dir*0.5));",
          "  float lB = luma(rgbB);",
          "  vec3 c = (lB < lmin || lB > lmax) ? rgbA : rgbB;",
+         "  if (aoAmt > 0.001) {",
+         "    float emis = texture2D(scene, vUv).a;              // light sources are not darkened",
+         "    c *= mix(1.0, texture2D(aoTex, vUv).r, aoAmt * (1.0 - emis));",
+         "  }",
          "  // sun shafts (screen-space radial blur of the sky mask towards the sun)",
          "  if (rayAmt > 0.001) {",
          "    vec2 dl = sunUv - vUv;",
