@@ -1,0 +1,2 @@
+gap-far,gap-far-aniso1,gap-far-plain,gap-detect,gap-detect-aniso1,gap-detect-plain,gap-detect-lod
+jar=build

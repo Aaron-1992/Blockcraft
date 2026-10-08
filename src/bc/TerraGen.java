@@ -1,0 +1,1108 @@
+package bc;
+
+import java.util.Random;
+
+/**
+ * Update 3.13: the new Overworld generator. Terrain is still a height map with caves cut into it (so {@link #column} stays cheap for the LOD,
+ * the villages and the weather), but the map now comes from five climate fields: continentalness (oceans, coasts, inland), erosion (flat or
+ * rugged), a ridge noise for the peaks, temperature and humidity. They pick one of 28 {@link Biomes}; rivers are carved along the zero lines
+ * of another noise, and every biome has its own surface, trees and plants.
+ */
+public final class TerraGen extends Gen {
+   private static final double[] SPLINE_C = new double[]{-1.0, -0.6, -0.35, -0.16, -0.05, 0.02, 0.10, 0.30, 0.60, 1.0};
+   private static final double[] SPLINE_H = new double[]{22.0, 32.0, 44.0, 55.0, 61.0, 64.0, 66.0, 72.0, 86.0, 100.0};
+
+   final WorldSettings st;
+   final double bs;
+   final double vs;
+   final Noise nC;
+   final Noise nE;
+   final Noise nT;
+   final Noise nH;
+   final Noise nPk;
+   final Noise nMt;
+   final Noise nRv;
+   final Noise nD1;
+   final Noise nD2;
+   final Noise nVar;
+   final Noise nMu;
+   final Noise nSw;
+   final Noise nTr;
+   final Noise nS2;
+   final Noise nRav;
+   final Noise nRavZ;
+   final Noise nRavW;
+   final Noise nFl;
+   final Noise nBad;
+   /** The terracotta bands of the badlands, one entry per y. */
+   final int[] bands = new int[256];
+
+   public TerraGen(long seed, WorldSettings settings) {
+      super(seed);
+      this.st = settings;
+      this.settings = settings;
+      this.bs = settings.type == WorldSettings.LARGE ? 4.0 : 1.0;
+      this.vs = settings.type == WorldSettings.AMPLIFIED ? 1.7 : 1.0;
+      Random r = new Random(seed * 0x2545F4914F6CDD1DL + 0x7E44A6E13L);
+      this.nC = new Noise(r.nextLong());
+      this.nE = new Noise(r.nextLong());
+      this.nT = new Noise(r.nextLong());
+      this.nH = new Noise(r.nextLong());
+      this.nPk = new Noise(r.nextLong());
+      this.nMt = new Noise(r.nextLong());
+      this.nRv = new Noise(r.nextLong());
+      this.nD1 = new Noise(r.nextLong());
+      this.nD2 = new Noise(r.nextLong());
+      this.nVar = new Noise(r.nextLong());
+      this.nMu = new Noise(r.nextLong());
+      this.nSw = new Noise(r.nextLong());
+      this.nTr = new Noise(r.nextLong());
+      this.nS2 = new Noise(r.nextLong());
+      this.nRav = new Noise(r.nextLong());
+      this.nRavZ = new Noise(r.nextLong());
+      this.nRavW = new Noise(r.nextLong());
+      this.nFl = new Noise(r.nextLong());
+      this.nBad = new Noise(r.nextLong());
+      int[] pal = new int[]{Blocks.STAINED0 + 1, Blocks.STAINED0, Blocks.STAINED0 + 4, Blocks.STAINED0 + 12, Blocks.STAINED0 + 14, Blocks.STAINED0 + 8, Blocks.TERRACOTTA};
+      int y = 0;
+      while (y < 256) {
+         int id = pal[r.nextInt(pal.length)];
+         int len = 1 + r.nextInt(3);
+         for (int i = 0; i < len && y < 256; i++) {
+            this.bands[y++] = id;
+         }
+      }
+   }
+
+   /** Everything the generator knows about a column before it is built. */
+   static final class Cl {
+      double c;
+      double e;
+      double t;
+      double hu;
+      double v;
+      double mtn;
+      double rf;
+      double sw;
+      double bad;
+      double isle;
+      double tEff;
+      int h;
+      int biome;
+   }
+
+   static final ThreadLocal<Cl[]> GRID = ThreadLocal.withInitial(() -> {
+      Cl[] a = new Cl[18 * 18];
+      for (int i = 0; i < a.length; i++) {
+         a[i] = new Cl();
+      }
+
+      return a;
+   });
+
+   static double spline(double c) {
+      if (c <= SPLINE_C[0]) {
+         return SPLINE_H[0];
+      }
+
+      for (int i = 1; i < SPLINE_C.length; i++) {
+         if (c <= SPLINE_C[i]) {
+            double f = (c - SPLINE_C[i - 1]) / (SPLINE_C[i] - SPLINE_C[i - 1]);
+            return SPLINE_H[i - 1] + (SPLINE_H[i] - SPLINE_H[i - 1]) * f;
+         }
+      }
+
+      return SPLINE_H[SPLINE_H.length - 1];
+   }
+
+   // ------------------------------------------------------------------------------------------------ the climate
+   void sample(int x, int z, Cl o) {
+      double k = 1.0 / this.bs;
+      double c = clamp(this.nC.fbm(x * k / 760.0, z * k / 760.0, 5) * 1.9 + 0.14, -1.0, 1.0);
+      double e = clamp(this.nE.fbm(x * k / 460.0 + 91.0, z * k / 460.0 - 47.0, 4) * 1.8, -1.0, 1.0);
+      double t = clamp(this.nT.fbm(x * k / 900.0 + 500.0, z * k / 900.0, 3) * 0.84 + 0.5, 0.0, 1.0);
+      double hu = clamp(this.nH.fbm(x * k / 760.0 - 300.0, z * k / 760.0 + 120.0, 3) * 0.88 + 0.5, 0.0, 1.0);
+      double v = clamp(this.nVar.fbm(x / 170.0 + 17.0, z / 170.0 - 9.0, 2) * 0.9 + 0.5, 0.0, 1.0);
+      double coast = smooth(-0.03, 0.16, c);
+      double rough = (2.0 + 14.0 * smooth(0.40, -0.55, e)) * (0.3 + 0.7 * coast);
+      double d1 = this.nD1.fbm(x / 85.0, z / 85.0, 5);
+      double d2 = this.nD2.fbm(x / 13.0 + 3.0, z / 13.0, 2);
+      double hd = spline(c) + d1 * rough * 1.45 + d2 * (0.6 + 1.6 * coast * (0.4 + 0.6 * smooth(0.3, -0.5, e)));
+      if (this.vs > 1.0) {
+         hd += smooth(0.0, 0.5, c) * 10.0;
+      }
+
+      // mountains: where the land is high and rugged, in blobs
+      double mm = this.nMt.fbm(x * k / 380.0 + 211.0, z * k / 380.0 + 55.0, 3);
+      double mtn = smooth(0.12, 0.46, c) * smooth(0.08, -0.42, e) * smooth(-0.05, 0.30, mm);
+      double pk = clamp(1.0 - Math.abs(this.nPk.fbm(x * k / 210.0, z * k / 210.0, 4)) * 2.3, 0.0, 1.0);
+      hd += mtn * (12.0 + 118.0 * pk * pk * this.vs);
+      if (hd > 168.0) {
+         hd = 168.0 + (hd - 168.0) * 0.55;
+      }
+
+      if (hd > 212.0) {
+         hd = 212.0 + (hd - 212.0) * 0.3;
+      }
+
+      // badlands: stepped mesas in the hot, dry corners of the map
+      double bad = smooth(0.60, 0.68, t) * smooth(0.45, 0.30, hu) * smooth(0.10, 0.30, c) * smooth(0.45, 0.58, v);
+      if (bad > 0.0) {
+         double mesa = 66.0 + 34.0 * smooth(-0.15, 0.55, this.nBad.fbm(x / 110.0, z / 110.0, 3));
+         double f = (mesa - 64.0) / 5.0;
+         double fl = Math.floor(f);
+         double stepped = 64.0 + 5.0 * (fl + smooth(0.55, 0.95, f - fl));
+         hd = hd + (stepped - hd) * bad;
+      }
+
+      // swamps: low, flat ground with pools
+      double sw = smooth(0.60, 0.68, hu) * smooth(0.36, 0.46, t) * smooth(0.82, 0.66, t) * smooth(76.0, 67.0, hd) * smooth(0.04, 0.2, c);
+      if (sw > 0.0) {
+         double sh = 62.5 + this.nSw.fbm(x / 20.0, z / 20.0, 2) * 3.4;
+         hd = hd + (sh - hd) * sw;
+      }
+
+      // mushroom islands in the deep sea
+      double mu = this.nMu.fbm(x / 300.0 + 5.0, z / 300.0 - 8.0, 3);
+      double isle = smooth(0.30, 0.50, mu) * smooth(-0.30, -0.54, c);
+      if (isle > 0.0) {
+         hd = hd + (67.0 + d2 * 1.4 + 5.0 * smooth(0.4, 0.62, mu) - hd) * isle;
+      }
+
+      // rivers along the zero lines of a noise; the distance to the line (in blocks) makes them the same width everywhere
+      double rx = x / 540.0 + 33.0;
+      double rz = z / 540.0 - 71.0;
+      double rn = this.nRv.fbm(rx, rz, 3);
+      double rf = 0.0;
+      if (Math.abs(rn) < 0.10 && c > -0.12 && !(isle > 0.2)) {
+         double gx = this.nRv.fbm(rx + 6.0 / 540.0, rz, 3) - this.nRv.fbm(rx - 6.0 / 540.0, rz, 3);
+         double gz = this.nRv.fbm(rx, rz + 6.0 / 540.0, 3) - this.nRv.fbm(rx, rz - 6.0 / 540.0, 3);
+         double grad = Math.max(1.0e-5, Math.sqrt(gx * gx + gz * gz) / 12.0);
+         double dist = Math.abs(rn) / grad;
+         rf = (1.0 - smooth(4.5, 21.0, dist)) * smooth(-0.12, 0.03, c) * smooth(104.0, 80.0, hd);
+         if (rf > 0.0) {
+            double bed = 56.0 + d2 * 1.1;
+            if (hd > bed) {
+               hd += (bed - hd) * rf;
+            }
+         }
+      }
+
+      o.c = c;
+      o.e = e;
+      o.t = t;
+      o.hu = hu;
+      o.v = v;
+      o.mtn = mtn;
+      o.rf = rf;
+      o.sw = sw;
+      o.bad = bad;
+      o.isle = isle;
+      o.h = (int)clamp(Math.floor(hd), 4.0, 245.0);
+      o.tEff = t - Math.max(0.0, o.h - 82.0) * 0.0035;
+      o.biome = pick(o);
+   }
+
+   static int pick(Cl o) {
+      int h = o.h;
+      double t = o.t;
+      double hu = o.hu;
+      double v = o.v;
+      double c = o.c;
+      double te = o.tEff;
+      if (o.isle > 0.5 && h >= 61) {
+         return Biomes.MUSHROOM;
+      }
+
+      if (o.sw > 0.5 && h <= 70) {
+         return Biomes.SWAMP;
+      }
+
+      if (h < 63) {
+         if (o.rf > 0.2 && c > 0.0) {
+            return t < 0.2 ? Biomes.FROZEN_RIVER : Biomes.RIVER;
+         }
+
+         if (t < 0.17) {
+            return Biomes.FROZEN_OCEAN;
+         }
+
+         if (h < 45) {
+            return Biomes.DEEP_OCEAN;
+         }
+
+         return t > 0.80 ? Biomes.WARM_OCEAN : Biomes.OCEAN;
+      }
+
+      if (c < 0.058 && h <= 65 && o.rf < 0.3) {
+         if (o.mtn > 0.02 || o.e < -0.3) {
+            return Biomes.STONE_SHORE;
+         }
+
+         return te < 0.2 ? Biomes.SNOWY_BEACH : Biomes.BEACH;
+      }
+
+      if (o.mtn > 0.4 && h >= 92 || h >= 120) {
+         return te < 0.26 || h >= 150 ? Biomes.FROZEN_PEAKS : Biomes.MOUNTAINS;
+      }
+
+      if (o.mtn > 0.1 && h >= 78 && hu > 0.25 && te > 0.22 && te < 0.78) {
+         return Biomes.MEADOW;
+      }
+
+      if (t < 0.2) {
+         if (hu >= 0.5) {
+            return Biomes.SNOWY_TAIGA;
+         }
+
+         return v > 0.8 && o.e > 0.0 && hu < 0.45 ? Biomes.ICE_SPIKES : Biomes.ICE_PLAINS;
+      }
+
+      if (t < 0.4) {
+         if (hu < 0.3) {
+            return Biomes.PLAINS;
+         }
+
+         if (hu < 0.7) {
+            return Biomes.TAIGA;
+         }
+
+         return v > 0.35 ? Biomes.MEGA_TAIGA : Biomes.TAIGA;
+      }
+
+      if (t < 0.62) {
+         if (hu < 0.33) {
+            return Biomes.PLAINS;
+         }
+
+         if (hu < 0.5) {
+            return v > 0.68 ? Biomes.FLOWER_FOREST : (v < 0.3 ? Biomes.BIRCH_FOREST : Biomes.FOREST);
+         }
+
+         if (hu < 0.7) {
+            return v > 0.7 ? Biomes.DARK_FOREST : (v < 0.4 ? Biomes.BIRCH_FOREST : Biomes.FOREST);
+         }
+
+         return Biomes.DARK_FOREST;
+      }
+
+      if (hu < 0.36) {
+         return o.bad > 0.5 ? Biomes.BADLANDS : Biomes.DESERT;
+      }
+
+      if (hu < 0.52) {
+         return o.bad > 0.5 && hu < 0.44 ? Biomes.BADLANDS : Biomes.SAVANNA;
+      }
+
+      if (hu < 0.62) {
+         return Biomes.SAVANNA;
+      }
+
+      return Biomes.JUNGLE;
+   }
+
+   @Override
+   public Gen.Col column(int x, int z) {
+      Cl s = new Cl();
+      this.sample(x, z, s);
+      Gen.Col c = new Gen.Col();
+      c.h = s.h;
+      c.biome = s.biome;
+      c.t = s.t;
+      c.hu = s.hu;
+      return c;
+   }
+
+   int heightAt(int x, int z) {
+      Cl s = new Cl();
+      this.sample(x, z, s);
+      return s.h;
+   }
+
+   // ------------------------------------------------------------------------------------------------ colours
+   int grassColor(Cl s) {
+      int g = grassColorFor(s.t, s.hu);
+      if (s.sw > 0.0) {
+         g = lerpColor(g, 0x5E6B35, Math.min(1.0, s.sw * 1.6));
+      }
+
+      if (s.biome == Biomes.BADLANDS || s.bad > 0.0) {
+         g = lerpColor(g, 0x90814D, Math.min(1.0, s.bad * 1.4));
+      }
+
+      if (s.biome == Biomes.DARK_FOREST) {
+         g = lerpColor(g, 0x2F5A22, 0.45);
+      }
+
+      if (s.biome == Biomes.MEADOW) {
+         g = lerpColor(g, 0x7BC25A, 0.4);
+      }
+
+      return g;
+   }
+
+   int foliageColor(Cl s) {
+      int g = foliageColorFor(s.t, s.hu);
+      if (s.sw > 0.0) {
+         g = lerpColor(g, 0x4B5F2C, Math.min(1.0, s.sw * 1.6));
+      }
+
+      if (s.biome == Biomes.BADLANDS) {
+         g = lerpColor(g, 0x9E814D, 0.7);
+      }
+
+      if (s.biome == Biomes.DARK_FOREST) {
+         g = lerpColor(g, 0x244E1A, 0.5);
+      }
+
+      return g;
+   }
+
+   // ------------------------------------------------------------------------------------------------ surface
+   /** rule[0] top, [1] filler, [2] filler depth below the top, [3] block under the filler, [4] its depth. */
+   void surface(Cl s, int slope, int wx, int wz, int[] rule) {
+      int b = s.biome;
+      int h = s.h;
+      double n = this.nSurf.noise2(wx * 0.08, wz * 0.08);
+      double n2 = this.nS2.noise2(wx * 0.03 + 40.0, wz * 0.03);
+      rule[0] = Blocks.GRASS;
+      rule[1] = Blocks.DIRT;
+      rule[2] = 3 + (n > 0.0 ? 1 : 0);
+      rule[3] = Blocks.STONE;
+      rule[4] = 0;
+      if (h < 63) {
+         // the floor of a sea, a lake or a river
+         rule[2] = 3;
+         switch (b) {
+            case Biomes.DEEP_OCEAN:
+               rule[0] = n2 > 0.1 ? Blocks.GRAVEL : (n > 0.2 ? Blocks.CLAY : Blocks.GRAVEL);
+               rule[1] = Blocks.GRAVEL;
+               return;
+            case Biomes.FROZEN_OCEAN:
+            case Biomes.FROZEN_RIVER:
+               rule[0] = n2 > 0.0 ? Blocks.GRAVEL : Blocks.SAND;
+               rule[1] = Blocks.GRAVEL;
+               return;
+            case Biomes.WARM_OCEAN:
+               rule[0] = n > 0.35 ? Blocks.CLAY : Blocks.SAND;
+               rule[1] = Blocks.SAND;
+               return;
+            case Biomes.RIVER:
+               rule[0] = n > 0.25 ? Blocks.GRAVEL : (n < -0.28 ? Blocks.CLAY : Blocks.SAND);
+               rule[1] = rule[0] == Blocks.GRAVEL ? Blocks.GRAVEL : Blocks.SAND;
+               return;
+            case Biomes.SWAMP:
+               rule[0] = n > 0.1 ? Blocks.DIRT : (n < -0.2 ? Blocks.CLAY : Blocks.DIRT);
+               rule[1] = Blocks.DIRT;
+               return;
+            case Biomes.MUSHROOM:
+               rule[0] = Blocks313.MYCELIUM;
+               rule[1] = Blocks.DIRT;
+               return;
+            default:
+               rule[0] = n2 > 0.25 ? Blocks.GRAVEL : (n > 0.3 ? Blocks.CLAY : Blocks.SAND);
+               rule[1] = rule[0] == Blocks.GRAVEL ? Blocks.GRAVEL : Blocks.SAND;
+               return;
+         }
+      }
+
+      if (s.rf > 0.12 && h <= 65 && b != Biomes.DESERT && b != Biomes.BADLANDS && b != Biomes.MUSHROOM) {
+         rule[0] = n > 0.3 ? Blocks.GRAVEL : (n < -0.32 ? Blocks.CLAY : Blocks.SAND);
+         rule[1] = rule[0] == Blocks.GRAVEL ? Blocks.GRAVEL : Blocks.SAND;
+         rule[2] = 3;
+         return;
+      }
+
+      switch (b) {
+         case Biomes.BEACH:
+         case Biomes.SNOWY_BEACH:
+            rule[0] = Blocks.SAND;
+            rule[1] = Blocks.SAND;
+            rule[2] = 3;
+            rule[3] = Blocks.SANDSTONE;
+            rule[4] = 3;
+            return;
+         case Biomes.DESERT:
+            rule[0] = Blocks.SAND;
+            rule[1] = Blocks.SAND;
+            rule[2] = 4;
+            rule[3] = Blocks.SANDSTONE;
+            rule[4] = 4;
+            return;
+         case Biomes.STONE_SHORE:
+            rule[0] = n > 0.3 ? Blocks.GRAVEL : Blocks.STONE;
+            rule[1] = Blocks.STONE;
+            rule[2] = 3;
+            return;
+         case Biomes.BADLANDS:
+            if (slope >= 3 || h > 78) {
+               rule[0] = this.bands[h & 255];
+               rule[1] = this.bands[h & 255];
+               rule[2] = 12;
+            } else {
+               rule[0] = Blocks313.RED_SAND;
+               rule[1] = Blocks313.RED_SAND;
+               rule[2] = 3;
+               rule[3] = this.bands[(h - 4) & 255];
+               rule[4] = 6;
+            }
+
+            return;
+         case Biomes.MOUNTAINS:
+         case Biomes.FROZEN_PEAKS: {
+            double snowline = 112.0 + (0.5 - s.t) * 44.0;
+            if (b == Biomes.FROZEN_PEAKS) {
+               snowline = Math.min(snowline, 128.0);
+            }
+
+            // bare rock on the steep faces; above the snow line only the really steep ones and, in patches, the steep ones (not a speckle of stone in the snow)
+            boolean above = h >= snowline || b == Biomes.FROZEN_PEAKS;
+            if (above ? (slope >= 6 || slope >= 4 && n2 > 0.15) : slope >= 4) {
+               rule[0] = Blocks.STONE;
+               rule[1] = Blocks.STONE;
+               rule[2] = 3;
+            } else if (h >= snowline || b == Biomes.FROZEN_PEAKS && slope <= 3) {
+               rule[0] = n2 > 0.35 && h > 160 ? Blocks313.PACKED_ICE : Blocks.SNOW;
+               rule[1] = Blocks.STONE;
+               rule[2] = 2;
+            } else if (h > 98 || slope >= 3) {
+               rule[0] = n > 0.28 ? Blocks.GRAVEL : Blocks.STONE;
+               rule[1] = Blocks.STONE;
+               rule[2] = 3;
+            } else {
+               rule[0] = Blocks.GRASS;
+               rule[1] = Blocks.DIRT;
+               rule[2] = 3;
+            }
+
+            return;
+         }
+
+         case Biomes.MUSHROOM:
+            rule[0] = Blocks313.MYCELIUM;
+            return;
+         case Biomes.ICE_SPIKES:
+            rule[0] = Blocks.SNOW;
+            rule[1] = Blocks.DIRT;
+            rule[2] = 3;
+            return;
+         case Biomes.MEGA_TAIGA:
+            rule[0] = n2 > -0.25 ? Blocks313.PODZOL : Blocks.GRASS;
+            return;
+         case Biomes.TAIGA:
+            rule[0] = n2 > 0.4 ? Blocks313.PODZOL : Blocks.GRASS;
+            return;
+         case Biomes.SAVANNA:
+            rule[0] = n2 > 0.3 && slope >= 1 ? Blocks313.COARSE_DIRT : Blocks.GRASS;
+            return;
+         case Biomes.MEADOW:
+            if (slope >= 4) {
+               rule[0] = Blocks.STONE;
+               rule[1] = Blocks.STONE;
+            }
+
+            return;
+         default:
+            return;
+      }
+   }
+
+   // ------------------------------------------------------------------------------------------------ ravines
+   /** 0 = no ravine here, up to 1 in the middle of one. */
+   double ravine(int x, int z) {
+      double zone = this.nRavZ.noise2(x / 420.0 + 12.0, z / 420.0 - 5.0);
+      if (zone < 0.2) {
+         return 0.0;
+      }
+
+      double d = Math.abs(this.nRav.fbm(x / 170.0, z / 170.0, 2));
+      double width = 0.011 + 0.010 * (this.nRavW.noise2(x / 33.0, z / 33.0) * 0.5 + 0.5);
+      return d >= width ? 0.0 : 1.0 - d / width;
+   }
+
+   // ------------------------------------------------------------------------------------------------ the chunk
+   @Override
+   public Chunk generate(int cx, int cz) {
+      Chunk ch = new Chunk(cx, cz);
+      short[] b = ch.blocks;
+      Cl[] g = GRID.get();
+      for (int gz = 0; gz < 18; gz++) {
+         for (int gx = 0; gx < 18; gx++) {
+            this.sample(cx * 16 + gx - 1, cz * 16 + gz - 1, g[gz * 18 + gx]);
+         }
+      }
+
+      Random r = new Random(this.seed * 31L + cx * 341873128712L + cz * 132897987541L);
+      int[] hs = new int[256];
+      int[] bm = new int[256];
+      int[] rule = new int[5];
+      for (int z = 0; z < 16; z++) {
+         for (int x = 0; x < 16; x++) {
+            Cl s = g[(z + 1) * 18 + x + 1];
+            int i = z * 16 + x;
+            int wx = cx * 16 + x;
+            int wz = cz * 16 + z;
+            int h = s.h;
+            hs[i] = h;
+            bm[i] = s.biome;
+            ch.biome[i] = (byte)s.biome;
+            ch.grassColor[i] = this.grassColor(s);
+            ch.foliageColor[i] = this.foliageColor(s);
+            ch.waterColor[i] = Biomes.waterTint(s.biome);
+            int slope = Math.max(Math.max(Math.abs(h - g[(z + 1) * 18 + x].h), Math.abs(h - g[(z + 1) * 18 + x + 2].h)), Math.max(Math.abs(h - g[z * 18 + x + 1].h), Math.abs(h - g[(z + 2) * 18 + x + 1].h)));
+            this.surface(s, slope, wx, wz, rule);
+            int top = rule[0];
+            int fill = rule[1];
+            int fd = rule[2];
+            int under = rule[3];
+            int ud = rule[4];
+            boolean banded = s.biome == Biomes.BADLANDS && h >= 60;
+            for (int y = 0; y <= h; y++) {
+               int id = 1;
+               int d = h - y;
+               if (y == 0) {
+                  id = 6;
+               } else if (y <= 4 && r.nextInt(5) < 5 - y) {
+                  id = 6;
+               } else if (d == 0) {
+                  id = top;
+               } else if (d <= fd) {
+                  id = fill;
+               } else if (ud > 0 && d <= fd + ud) {
+                  id = under;
+               } else if (banded && y >= 44) {
+                  id = this.bands[y];
+               }
+
+               b[Chunk.idx(x, y, z)] = (short)id;
+            }
+
+            for (int y = h + 1; y < 63; y++) {
+               b[Chunk.idx(x, y, z)] = 50;
+            }
+
+            if (h < 63 && (s.biome == Biomes.FROZEN_OCEAN || s.biome == Biomes.FROZEN_RIVER)) {
+               b[Chunk.idx(x, 62, z)] = (short)Blocks313.ICE;
+            }
+
+            // caves
+            int top2 = h - 3;
+            boolean mouth = h >= 64 && this.entrance(wx, wz) && s.biome != Biomes.MUSHROOM;
+            if (mouth) {
+               top2 = h;
+            }
+
+            if (h < 64) {
+               top2 = Math.min(top2, h - 6);
+            }
+
+            for (int y = 6; y <= top2; y++) {
+               int id = b[Chunk.idx(x, y, z)] & 0xFFFF;
+               if (id != 6 && !Blocks.isFluid(id) && this.carve(wx, y, wz)) {
+                  b[Chunk.idx(x, y, z)] = (short)(y <= 10 ? 58 : 0);
+               }
+            }
+
+            // ravines
+            if (h >= 67 && s.biome != Biomes.MUSHROOM) {
+               double rv = this.ravine(wx, wz);
+               if (rv > 0.0) {
+                  int floor = 14 + (int)((this.nRavW.noise2(wx / 90.0 + 9.0, wz / 90.0) * 0.5 + 0.5) * 8.0);
+                  for (int y = floor; y <= h + 1; y++) {
+                     double f = (double)(y - floor) / Math.max(1, h - floor);
+                     double need = 0.85 * (1.0 - Math.pow(Math.min(1.0, f), 0.55));
+                     if (rv > need) {
+                        int id = b[Chunk.idx(x, y, z)] & 0xFFFF;
+                        if (id != 6 && !Blocks.isFluid(id)) {
+                           b[Chunk.idx(x, y, z)] = (short)(y <= floor + 1 && y <= 12 ? 58 : 0);
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      // stone of other kinds, ores
+      Random vr = new Random(this.seed ^ (cx * 7919L + cz * 104729L) * 1000003L);
+      this.vein(ch, vr, 3, 8, 20, 0, 128);
+      this.vein(ch, vr, 8, 6, 20, 0, 128);
+      this.vein(ch, vr, Blocks313.GRANITE, 6, 26, 0, 90);
+      this.vein(ch, vr, Blocks313.DIORITE, 6, 26, 0, 90);
+      this.vein(ch, vr, Blocks313.ANDESITE, 6, 26, 0, 90);
+      this.vein(ch, vr, 19, 20, 14, 0, 128);
+      this.vein(ch, vr, 20, 20, 8, 0, 64);
+      this.vein(ch, vr, 21, 2, 8, 0, 32);
+      this.vein(ch, vr, 23, 8, 7, 0, 16);
+      this.vein(ch, vr, 22, 2, 7, 0, 16);
+      this.vein(ch, vr, 24, 1, 6, 0, 30);
+      if (bm[136] == Biomes.BADLANDS) {
+         this.vein(ch, vr, 21, 6, 8, 32, 80);
+      }
+
+      this.decorate(ch, hs, bm, g);
+      this.treesFor(ch);
+      if (this.settings.structures) {
+         this.structs.apply(ch);
+         if (extras) {
+            Stronghold.apply(this.seed, ch);
+         }
+      }
+
+      if (extras) {
+         Color312.decorate(this.seed, ch, hs, bm);
+      }
+
+      this.plantShoreAndPatches(ch, hs, bm);
+      ch.computeHeightmap();
+      return ch;
+   }
+
+   // ------------------------------------------------------------------------------------------------ plants
+   private static final int[] PLAINS_FLOWERS = new int[]{Blocks.FLOWER_YELLOW, Blocks.FLOWER_RED, Blocks313.FLOWER0 + 2, Blocks313.FLOWER0 + 3, Blocks313.FLOWER0 + 4, Blocks313.FLOWER0 + 5,
+      Blocks313.FLOWER0 + 6, Blocks313.FLOWER0 + 7, Blocks313.FLOWER0 + 8};
+   private static final int[] FOREST_FLOWERS = new int[]{Blocks.FLOWER_RED, Blocks.FLOWER_YELLOW, Blocks313.FLOWER0 + 9, Blocks313.FLOWER0 + 1};
+   private static final int[] FLOWER_FOREST = new int[]{Blocks313.FLOWER0 + 1, Blocks313.FLOWER0 + 2, Blocks313.FLOWER0 + 3, Blocks313.FLOWER0 + 4, Blocks313.FLOWER0 + 5, Blocks313.FLOWER0 + 6,
+      Blocks313.FLOWER0 + 7, Blocks313.FLOWER0 + 8, Blocks313.FLOWER0 + 9, Blocks.FLOWER_YELLOW, Blocks.FLOWER_RED};
+   private static final int[] MEADOW_FLOWERS = new int[]{Blocks.FLOWER_YELLOW, Blocks313.FLOWER0 + 2, Blocks313.FLOWER0 + 7, Blocks313.FLOWER0 + 8, Blocks313.FLOWER0 + 1, Blocks313.FLOWER0 + 9};
+   private static final int[] SWAMP_FLOWERS = new int[]{Blocks313.FLOWER0};
+
+   private int pickFlower(int[] list, int wx, int wz) {
+      double n = this.nFl.noise2(wx / 14.0, wz / 14.0) * 0.5 + 0.5;
+      int i = (int)(clamp((n - 0.15) / 0.7, 0.0, 0.999) * list.length);
+      return list[i];
+   }
+
+   /** Tall grass, ferns, flowers, mushrooms, dead bushes, cacti, snow, lily pads. */
+   private void decorate(Chunk ch, int[] hs, int[] bm, Cl[] g) {
+      Random r = new Random(this.seed * -7046029254386353131L ^ (ch.cx * 73856093L + ch.cz * 19349663L) * 1000003L + 91L);
+      for (int z = 0; z < 16; z++) {
+         for (int x = 0; x < 16; x++) {
+            int i = z * 16 + x;
+            int h = hs[i];
+            int biome = bm[i];
+            int wx = ch.cx * 16 + x;
+            int wz = ch.cz * 16 + z;
+            float p = r.nextFloat();
+            float q = r.nextFloat();
+            if (h < 63) {
+               // lily pads on the still water of swamps and (rarely) rivers, jungles' pools
+               if (h <= 61 && ch.get(x, 62, z) == 50 && ch.get(x, 63, z) == 0 && (biome == Biomes.SWAMP && p < 0.16F || biome == Biomes.RIVER && p < 0.015F)) {
+                  ch.set(x, 63, z, Blocks313.LILY_PAD);
+               }
+
+               continue;
+            }
+
+            if (h > 240) {
+               continue;
+            }
+
+            int ground = ch.get(x, h, z);
+            if (ch.get(x, h + 1, z) != 0) {
+               continue;
+            }
+
+            if (Biomes.snowy(biome) && biome != Biomes.FROZEN_PEAKS && (ground == Blocks.GRASS || ground == Blocks.SAND || ground == Blocks.DIRT || ground == Blocks313.PODZOL)) {
+               ch.set(x, h + 1, z, Blocks313.SNOW_LAYER);
+               continue;
+            }
+
+            boolean grassy = ground == Blocks.GRASS || ground == Blocks313.PODZOL;
+            switch (biome) {
+               case Biomes.PLAINS:
+                  if (grassy) {
+                     if (p < 0.012F) {
+                        ch.set(x, h + 1, z, this.pickFlower(PLAINS_FLOWERS, wx, wz));
+                     } else if (p < 0.05F) {
+                        this.tall(ch, x, h, z, 0);
+                     } else if (p < 0.30F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     }
+                  }
+
+                  break;
+               case Biomes.FOREST:
+               case Biomes.BIRCH_FOREST:
+                  if (grassy) {
+                     if (p < 0.006F) {
+                        ch.set(x, h + 1, z, this.pickFlower(FOREST_FLOWERS, wx, wz));
+                     } else if (p < 0.024F) {
+                        this.tall(ch, x, h, z, 0);
+                     } else if (p < 0.14F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     } else if (q < 0.004F) {
+                        ch.set(x, h + 1, z, Blocks313.MUSHROOM_BROWN);
+                     }
+                  }
+
+                  break;
+               case Biomes.FLOWER_FOREST:
+                  if (grassy) {
+                     if (p < 0.22F) {
+                        ch.set(x, h + 1, z, this.pickFlower(FLOWER_FOREST, wx, wz));
+                     } else if (p < 0.26F) {
+                        this.tall(ch, x, h, z, 2 + (int)(q * 4.0F));
+                     } else if (p < 0.38F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     }
+                  }
+
+                  break;
+               case Biomes.MEADOW:
+                  if (grassy) {
+                     if (p < 0.10F) {
+                        ch.set(x, h + 1, z, this.pickFlower(MEADOW_FLOWERS, wx, wz));
+                     } else if (p < 0.35F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     } else if (p < 0.38F) {
+                        this.tall(ch, x, h, z, 0);
+                     }
+                  }
+
+                  break;
+               case Biomes.DARK_FOREST:
+                  if (grassy) {
+                     if (p < 0.03F) {
+                        ch.set(x, h + 1, z, q < 0.5F ? Blocks313.MUSHROOM_BROWN : Blocks313.MUSHROOM_RED);
+                     } else if (p < 0.10F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     } else if (p < 0.12F) {
+                        ch.set(x, h + 1, z, Blocks313.FERN);
+                     }
+                  }
+
+                  break;
+               case Biomes.TAIGA:
+               case Biomes.MEGA_TAIGA:
+               case Biomes.SNOWY_TAIGA:
+                  if (grassy) {
+                     if (p < 0.12F) {
+                        ch.set(x, h + 1, z, Blocks313.FERN);
+                     } else if (p < 0.20F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     } else if (p < 0.235F && biome == Biomes.MEGA_TAIGA) {
+                        this.tall(ch, x, h, z, 1);
+                     } else if (q < 0.006F) {
+                        ch.set(x, h + 1, z, q < 0.003F ? Blocks313.MUSHROOM_RED : Blocks313.MUSHROOM_BROWN);
+                     }
+                  }
+
+                  break;
+               case Biomes.SAVANNA:
+                  if (grassy) {
+                     if (p < 0.07F) {
+                        this.tall(ch, x, h, z, 0);
+                     } else if (p < 0.50F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     }
+                  } else if (ground == Blocks313.COARSE_DIRT && p < 0.02F) {
+                     ch.set(x, h + 1, z, Blocks313.DEAD_BUSH);
+                  }
+
+                  break;
+               case Biomes.JUNGLE:
+                  if (grassy) {
+                     if (p < 0.12F) {
+                        ch.set(x, h + 1, z, Blocks313.FERN);
+                     } else if (p < 0.34F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     } else if (p < 0.42F) {
+                        this.tall(ch, x, h, z, q < 0.5F ? 0 : 1);
+                     } else if (q < 0.0015F) {
+                        ch.set(x, h + 1, z, Blocks.MELON);
+                     }
+                  }
+
+                  break;
+               case Biomes.SWAMP:
+                  if (grassy) {
+                     if (p < 0.004F) {
+                        ch.set(x, h + 1, z, Blocks313.FLOWER0);
+                     } else if (p < 0.24F) {
+                        ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                     } else if (q < 0.008F) {
+                        ch.set(x, h + 1, z, q < 0.004F ? Blocks313.MUSHROOM_RED : Blocks313.MUSHROOM_BROWN);
+                     }
+                  }
+
+                  break;
+               case Biomes.MUSHROOM:
+                  if (ground == Blocks313.MYCELIUM && p < 0.03F) {
+                     ch.set(x, h + 1, z, q < 0.5F ? Blocks313.MUSHROOM_RED : Blocks313.MUSHROOM_BROWN);
+                  }
+
+                  break;
+               case Biomes.DESERT:
+                  if (ground == Blocks.SAND) {
+                     if (p < 0.012F) {
+                        ch.set(x, h + 1, z, Blocks313.DEAD_BUSH);
+                     } else if (p < 0.0145F && this.cactusRoom(ch, x, h, z)) {
+                        int n = 1 + r.nextInt(3);
+                        for (int k = 1; k <= n; k++) {
+                           ch.set(x, h + k, z, Blocks.CACTUS);
+                        }
+                     }
+                  }
+
+                  break;
+               case Biomes.BADLANDS:
+                  if (ground == Blocks313.RED_SAND) {
+                     if (p < 0.02F) {
+                        ch.set(x, h + 1, z, Blocks313.DEAD_BUSH);
+                     } else if (p < 0.026F && this.cactusRoom(ch, x, h, z)) {
+                        int n = 1 + r.nextInt(3);
+                        for (int k = 1; k <= n; k++) {
+                           ch.set(x, h + 1 + k - 1, z, Blocks.CACTUS);
+                        }
+                     }
+                  }
+
+                  break;
+               case Biomes.MOUNTAINS:
+                  if (ground == Blocks.GRASS && p < 0.05F) {
+                     ch.set(x, h + 1, z, Blocks.TALLGRASS);
+                  }
+
+                  break;
+               case Biomes.BEACH:
+                  break;
+               default:
+                  break;
+            }
+         }
+      }
+   }
+
+   private boolean cactusRoom(Chunk ch, int x, int h, int z) {
+      int[][] d = new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+      for (int[] o : d) {
+         int nx = x + o[0];
+         int nz = z + o[1];
+         if (nx >= 0 && nx <= 15 && nz >= 0 && nz <= 15 && ch.get(nx, h + 1, nz) != 0) {
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   /** A two block tall plant: kind 0 tall grass, 1 large fern, 2 sunflower, 3 lilac, 4 rose bush, 5 peony. */
+   private void tall(Chunk ch, int x, int h, int z, int kind) {
+      if (ch.get(x, h + 2, z) == 0) {
+         ch.set(x, h + 1, z, Blocks313.DOUBLE0 + kind * 2);
+         ch.set(x, h + 2, z, Blocks313.DOUBLE0 + kind * 2 + 1);
+      }
+   }
+
+   // ------------------------------------------------------------------------------------------------ trees
+   private void treesFor(Chunk ch) {
+      TerraTrees.Buf buf = BUF.get();
+      int[] rule = new int[5];
+      Cl s = new Cl();
+      for (int dx = -1; dx <= 1; dx++) {
+         for (int dz = -1; dz <= 1; dz++) {
+            int ncx = ch.cx + dx;
+            int ncz = ch.cz + dz;
+            Random tr = new Random(this.seed * 7919L ^ (ncx * 734287L + ncz * 912931L) * 31L + 17L);
+            for (int i = 0; i < 44; i++) {
+               int lx = tr.nextInt(16);
+               int lz = tr.nextInt(16);
+               float p = tr.nextFloat();
+               int kind = tr.nextInt(1000);
+               long ts = tr.nextLong();
+               int wx = ncx * 16 + lx;
+               int wz = ncz * 16 + lz;
+               if (wx < ch.cx * 16 - 10 || wx > ch.cx * 16 + 25 || wz < ch.cz * 16 - 10 || wz > ch.cz * 16 + 25) {
+                  continue;
+               }
+
+               this.sample(wx, wz, s);
+               if (s.h < 64 || s.h > 232) {
+                  continue;
+               }
+
+               double dens = 0.35 + 1.3 * clamp(this.nTr.noise2(wx / 70.0, wz / 70.0) * 0.9 + 0.5, 0.0, 1.0);
+               int plan = this.treePlan(s.biome, p, kind, dens);
+               if (plan < 0) {
+                  continue;
+               }
+
+               if (this.entrance(wx, wz) || this.ravine(wx, wz) > 0.0) {
+                  continue;
+               }
+
+               int slope = Math.max(Math.max(Math.abs(s.h - this.heightAt(wx - 1, wz)), Math.abs(s.h - this.heightAt(wx + 1, wz))),
+                  Math.max(Math.abs(s.h - this.heightAt(wx, wz - 1)), Math.abs(s.h - this.heightAt(wx, wz + 1))));
+               this.surface(s, slope, wx, wz, rule);
+               int top = rule[0];
+               boolean ok = top == Blocks.GRASS || top == Blocks.DIRT || top == Blocks313.PODZOL || top == Blocks313.COARSE_DIRT || top == Blocks313.MYCELIUM;
+               if (!ok || slope > 3) {
+                  continue;
+               }
+
+               int mega = plan == P_MEGA_SPRUCE || plan == P_DARK_OAK || plan == P_MEGA_JUNGLE ? 1 : 0;
+               if (mega == 1) {
+                  if (this.heightAt(wx + 1, wz) != s.h || this.heightAt(wx, wz + 1) != s.h || this.heightAt(wx + 1, wz + 1) != s.h) {
+                     continue;
+                  }
+               }
+
+               buf.begin(wx, s.h + 1, wz);
+               Random rnd = new Random(ts);
+               this.buildPlan(buf, rnd, plan);
+               buf.commit(ch);
+               if (plan == P_MEGA_SPRUCE) {
+                  // podzol under the giant spruce
+                  for (int px = -2; px <= 3; px++) {
+                     for (int pz = -2; pz <= 3; pz++) {
+                        int x = wx + px - ch.cx * 16;
+                        int zz = wz + pz - ch.cz * 16;
+                        if (x >= 0 && x <= 15 && zz >= 0 && zz <= 15 && px * px + pz * pz < 10 && ch.get(x, s.h, zz) == Blocks.GRASS) {
+                           ch.set(x, s.h, zz, Blocks313.PODZOL);
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   static final ThreadLocal<TerraTrees.Buf> BUF = ThreadLocal.withInitial(TerraTrees.Buf::new);
+   static final int P_OAK_SMALL = 0;
+   static final int P_OAK_CLASSIC = 1;
+   static final int P_BIRCH = 2;
+   static final int P_BIRCH_TALL = 3;
+   static final int P_SPRUCE = 4;
+   static final int P_MEGA_SPRUCE = 5;
+   static final int P_DARK_OAK = 6;
+   static final int P_JUNGLE_SMALL = 7;
+   static final int P_JUNGLE_TALL = 8;
+   static final int P_MEGA_JUNGLE = 9;
+   static final int P_BUSH = 10;
+   static final int P_ACACIA = 11;
+   static final int P_SWAMP_OAK = 12;
+   static final int P_MUSH_RED = 13;
+   static final int P_MUSH_BROWN = 14;
+   static final int P_ICE_SPIKE = 15;
+   static final int P_SPRUCE_PINE = 16;
+
+   /** Which plant (a P_ constant) a biome grows at this attempt, or -1. p is the dice (0..1), kind a second die (0..999), dens the local density. */
+   int treePlan(int biome, float p, int kind, double dens) {
+      switch (biome) {
+         case Biomes.PLAINS:
+            return p < 0.006 * dens ? (kind < 150 ? P_OAK_CLASSIC : P_OAK_SMALL) : -1;
+         case Biomes.FOREST:
+            return p < 0.17 * dens ? (kind < 200 ? P_BIRCH : (kind < 330 ? P_OAK_CLASSIC : (kind < 520 ? P_OAK_SMALL : P_OAK_CLASSIC))) : -1;
+         case Biomes.BIRCH_FOREST:
+            return p < 0.17 * dens ? (kind < 250 ? P_BIRCH_TALL : P_BIRCH) : -1;
+         case Biomes.FLOWER_FOREST:
+            return p < 0.07 * dens ? (kind < 500 ? P_BIRCH : P_OAK_CLASSIC) : -1;
+         case Biomes.DARK_FOREST:
+            return p < 0.30 * dens ? (kind < 700 ? P_DARK_OAK : (kind < 780 ? P_MUSH_RED : (kind < 850 ? P_MUSH_BROWN : P_OAK_SMALL))) : -1;
+         case Biomes.TAIGA:
+            return p < 0.15 * dens ? (kind < 250 ? P_SPRUCE_PINE : P_SPRUCE) : -1;
+         case Biomes.SNOWY_TAIGA:
+            return p < 0.11 * dens ? (kind < 250 ? P_SPRUCE_PINE : P_SPRUCE) : -1;
+         case Biomes.MEGA_TAIGA:
+            return p < 0.12 * dens ? (kind < 450 ? P_MEGA_SPRUCE : (kind < 700 ? P_SPRUCE_PINE : P_SPRUCE)) : -1;
+         case Biomes.SWAMP:
+            return p < 0.055 * dens ? P_SWAMP_OAK : -1;
+         case Biomes.SAVANNA:
+            return p < 0.028 * dens ? (kind < 800 ? P_ACACIA : P_OAK_SMALL) : -1;
+         case Biomes.JUNGLE:
+            return p < 0.38 * dens ? (kind < 500 ? P_JUNGLE_SMALL : (kind < 780 ? P_JUNGLE_TALL : (kind < 880 ? P_MEGA_JUNGLE : P_BUSH))) : -1;
+         case Biomes.MEADOW:
+            return p < 0.003 ? P_OAK_SMALL : -1;
+         case Biomes.ICE_PLAINS:
+            return p < 0.004 ? P_SPRUCE : -1;
+         case Biomes.ICE_SPIKES:
+            return p < 0.06 ? P_ICE_SPIKE : -1;
+         case Biomes.MUSHROOM:
+            return p < 0.03 * dens ? (kind < 500 ? P_MUSH_RED : P_MUSH_BROWN) : -1;
+         case Biomes.MOUNTAINS:
+            return p < 0.05 ? P_SPRUCE : -1;
+         default:
+            return -1;
+      }
+   }
+
+   void buildPlan(TerraTrees.Buf t, Random r, int plan) {
+      switch (plan) {
+         case P_OAK_SMALL:
+            TerraTrees.smallOak(t, r, 0);
+            break;
+         case P_OAK_CLASSIC:
+            TerraTrees.classic(t, r, 0, r.nextInt(3));
+            break;
+         case P_BIRCH:
+            TerraTrees.classic(t, r, 1, r.nextInt(3));
+            break;
+         case P_BIRCH_TALL:
+            TerraTrees.tallBirch(t, r);
+            break;
+         case P_SPRUCE:
+            TerraTrees.classic(t, r, 2, r.nextInt(2));
+            break;
+         case P_SPRUCE_PINE:
+            TerraTrees.classic(t, r, 2, 2);
+            break;
+         case P_MEGA_SPRUCE:
+            TerraTrees.megaSpruce(t, r);
+            break;
+         case P_DARK_OAK:
+            TerraTrees.darkOak(t, r);
+            break;
+         case P_JUNGLE_SMALL:
+            TerraTrees.jungleSmall(t, r);
+            break;
+         case P_JUNGLE_TALL:
+            TerraTrees.jungleTall(t, r);
+            break;
+         case P_MEGA_JUNGLE:
+            TerraTrees.megaJungle(t, r);
+            break;
+         case P_BUSH:
+            TerraTrees.bush(t, r, 3);
+            break;
+         case P_ACACIA:
+            TerraTrees.acacia(t, r);
+            break;
+         case P_SWAMP_OAK:
+            TerraTrees.swampOak(t, r);
+            break;
+         case P_MUSH_RED:
+            TerraTrees.giantMushroom(t, r, 0);
+            break;
+         case P_MUSH_BROWN:
+            TerraTrees.giantMushroom(t, r, 1);
+            break;
+         case P_ICE_SPIKE:
+            TerraTrees.iceSpike(t, r);
+            break;
+         default:
+            break;
+      }
+   }
+
+   // ------------------------------------------------------------------------------------------------ the world's spawn
+   @Override
+   public int[] findSpawn() {
+      // rings round the middle, 8 blocks apart; Large Biomes can have a sea that wide, so in 1 of 20 worlds the search goes on (to 4000 blocks)
+      for (int ring = 0; ring < 4000; ring += ring < 900 ? 8 : 16) {
+         int n = ring == 0 ? 1 : (ring < 900 ? 16 : 48);
+         for (int k = 0; k < n; k++) {
+            double a = k * Math.PI * 2.0 / n;
+            int x = (int)(Math.cos(a) * ring);
+            int z = (int)(Math.sin(a) * ring);
+            Gen.Col c = this.column(x, z);
+            if (c.h >= 65 && c.h <= 100 && Biomes.spawnable(c.biome) && !this.entrance(x, z) && this.ravine(x, z) <= 0.0) {
+               return new int[]{x, c.h + 1, z};
+            }
+         }
+      }
+
+      return new int[]{0, Math.max(65, this.column(0, 0).h) + 1, 0};
+   }
+}

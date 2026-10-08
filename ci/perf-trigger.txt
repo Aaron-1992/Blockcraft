@@ -1,0 +1,4 @@
+none
+640x360
+30
+surface,forest,hill,cave1,shadow-forest

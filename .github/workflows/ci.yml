@@ -1,0 +1,47 @@
+name: CI
+
+# Builds the game with a real JDK (javac), runs the headless tests and keeps the update pack as a build artifact.
+on:
+  push:
+    branches: ["arena/**"]
+    paths-ignore: ["docs/**", "**.md", "ci-results/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build (javac) and make the update pack
+        run: python3 tools/build.py --patch
+
+      - name: GLSL syntax check of every shader (no GPU needed)
+        run: python3 tools/glsl_check.py
+
+      - name: Headless tests (equivalence vs the 3.5 jar + unit tests)
+        run: |
+          set -o pipefail
+          python3 tools/runtests.py 2>&1 | tee build/runtests.log
+
+      - name: Test output (readable through the check-run API)
+        if: always()
+        run: |
+          python3 tools/ci_annotate.py build/runtests.log "test output" notice
+          if [ -f build/equivalence-diff.txt ]; then python3 tools/ci_annotate.py build/equivalence-diff.txt "equivalence diff" error; fi
+
+      - name: Keep the update pack
+        uses: actions/upload-artifact@v4
+        with:
+          name: update-pack
+          path: releases/*.zip
+          if-no-files-found: error

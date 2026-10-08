@@ -1,0 +1,67 @@
+name: Windows smoke test
+
+# Installs the game like a player would (3.5 base zip + the update pack that is COMMITTED in releases/ - i.e. the exact
+# files the owner downloads) on a real Windows machine,
+# adds a software OpenGL (Mesa) because GitHub's Windows runners have no GPU, starts the real Blockcraft.exe through the
+# game's built-in test hooks and commits screenshots + logs to ci-results/windows/.
+# Trigger: push a change to ci/windows-trigger.txt (first line = comma separated scene names from tools/shots.py).
+on:
+  push:
+    branches: ["arena/**"]
+    paths: ["ci/windows-trigger.txt"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Pillow
+        run: python -m pip install pillow
+
+      - name: Which release is being tested
+        shell: bash
+        run: ls -la releases/ && sha256sum releases/*.zip
+
+      - name: Smoke test (real Blockcraft.exe, software OpenGL)
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SCENES="$(head -n1 ci/windows-trigger.txt | tr -d '[:space:]')"
+          case "$SCENES" in ''|*[!a-z0-9,-]*|[0-9]*) SCENES="title,day-plain,farm";; esac
+          echo "scenes: $SCENES"
+          mkdir -p build
+          python tools/win_smoke.py "$SCENES" 2>&1 | tee build/win-smoke.log
+
+      - name: Output (readable through the check-run API)
+        if: always()
+        shell: bash
+        run: |
+          python tools/ci_annotate.py ci-results/windows/smoke.log "windows smoke log" notice || true
+          for f in ci-results/windows/*-crash.log; do [ -f "$f" ] && python tools/ci_annotate.py "$f" "$(basename $f)" error; done || true
+
+      - name: Commit results to the branch
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "blockcraft-ci"
+          git config user.email "blockcraft-ci@users.noreply.github.com"
+          git add -f ci-results/windows
+          git commit -m "CI: windows smoke results for ${GITHUB_SHA::7}" || { echo "nothing to commit"; exit 0; }
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

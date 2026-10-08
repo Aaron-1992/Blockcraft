@@ -1,0 +1,30 @@
+extracted base zip: Blockcraft-1.12-UPDATE3.5-windows.zip
+extracted update pack: Blockcraft-UPDATE3.18-patch.zip
+installed to C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft
+Mesa: mesa3d-26.2.4-release-msvc.7z (70 MB)
+copied next to javaw.exe: opengl32.dll, libgallium_wgl.dll
+title: starting via Blockcraft.exe (Launch4j stub)
+title            exit code 0                      5s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=TITLE
+day-plain: starting via Blockcraft.exe (Launch4j stub)
+day-plain        exit code 0                     27s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.time=6000 -Dbc.shaders=false -Dbc.shot=100
+gpu-relaunch: starting via Blockcraft.exe (Launch4j stub)
+gpu-relaunch     exit code 0 (+ the second start)    17s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.time=6000 -Dbc.weather=calm -Dbc.gpuforce=1 -Dbc.shaders=false -Dbc.shot=60
+terra-mount: starting via Blockcraft.exe (Launch4j stub)
+terra-mount      exit code 0                     61s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.gen=1 -Dbc.mode=1 -Dbc.rd=4 -Dbc.lod=64 -Dbc.time=6000 -Dbc.weather=calm -Dbc.cam=392.5,150,-303.5,200,8 -Dbc.shaders=false -Dbc.shot=260
+nether-fortress: starting via Blockcraft.exe (Launch4j stub)
+nether-fortress  exit code 0                     19s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.dim=-1 -Dbc.cam=121.5,63,102,180,3 -Dbc.rd=4 -Dbc.shaders=false -Dbc.shot=220
+pl-walk: starting via Blockcraft.exe (Launch4j stub)
+pl-walk          exit code 0                     21s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=140.5,67,74.5,0,8 -Dbc.view=2 -Dbc.bodyyaw=65 -Dbc.skin=demo -Dbc.posestate=phase=0.9,amp=0.86 -Dbc.
+mobs317-nether: starting via Blockcraft.exe (Launch4j stub)
+mobs317-nether   exit code 0                     13s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.dim=-1 -Dbc.cam=23,43,-111,180,6 -Dbc.summon=pigman,magmacube,blaze,pigman -Dbc.summonDist=6 -Dbc.summonDy=-1.6 -Dbc
+GPU preference entries in the registry (2):
+    | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\javaw.exe    REG_SZ    GpuPreference=2;
+    | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\java.exe    REG_SZ    GpuPreference=2;
+RESULT: {"title": true, "day-plain": true, "gpu-relaunch": true, "terra-mount": true, "nether-fortress": true, "pl-walk": true, "mobs317-nether": true, "gpu_pref_in_registry": true}
