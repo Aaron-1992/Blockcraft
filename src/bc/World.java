@@ -82,6 +82,19 @@ public final class World {
    public boolean rayFluids;
    /** Update 3.13: what the world was created with (generator type, structures). */
    public final WorldSettings settings;
+   /**
+    * Update 3.20 (multiplayer): a guest's copy of the host's world. It generates and simulates nothing: its chunks come over the network, and what
+    * changes happens on the host and is sent. Only the sun moves and the guest's own dropped items fall.
+    */
+   public boolean remote;
+   /** Told about every block that changes (the host sends it to its guests, a guest sends its own changes to the host). */
+   public interface BlockHook {
+      void blockChanged(int x, int y, int z, int id);
+   }
+
+   public volatile World.BlockHook netHook;
+   /** True while a change that came over the network is being applied, so that a guest does not send it back. */
+   public boolean netApplying;
 
    public World(long var1, File var3) {
       this(var1, var3, Dim.OVERWORLD);
@@ -185,38 +198,78 @@ public final class World {
       if (this.requested.add(var3)) {
          this.pool.execute(() -> {
             try {
-               Chunk var5 = this.gen.generate(var1, var2);
-               File var6 = this.dir == null ? null : this.chunkFile(var1, var2);
-               if (var6 != null && var6.exists()) {
-                  try {
-                     DataInputStream var7 = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new FileInputStream(var6))));
-
-                     try {
-                        Chunk.readBlocks(var7, var5.blocks);
-                        var5.computeHeightmap();
-                     } catch (Throwable var11) {
-                        try {
-                           var7.close();
-                        } catch (Throwable var10) {
-                           var11.addSuppressed(var10);
-                        }
-
-                        throw var11;
-                     }
-
-                     var7.close();
-                  } catch (Exception var12) {
-                     System.err.println("Failed to read chunk " + var1 + "," + var2 + ": " + var12);
-                  }
-               }
-
-               this.ready.add(var5);
+               this.ready.add(this.loadDetached(var1, var2));
             } catch (Throwable var13) {
                var13.printStackTrace();
                this.requested.remove(var3);
             }
          });
       }
+   }
+
+   /** The chunk as it is made or read: the generator's terrain with the blocks of the chunk file over it (if the chunk was ever saved). Touches nothing in the world. */
+   public Chunk loadDetached(int var1, int var2) {
+      Chunk var5 = this.gen.generate(var1, var2);
+      File var6 = this.dir == null ? null : this.chunkFile(var1, var2);
+      if (var6 != null && var6.exists()) {
+         try {
+            DataInputStream var7 = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new FileInputStream(var6))));
+
+            try {
+               Chunk.readBlocks(var7, var5.blocks);
+               var5.computeHeightmap();
+            } catch (Throwable var11) {
+               try {
+                  var7.close();
+               } catch (Throwable var10) {
+                  var11.addSuppressed(var10);
+               }
+
+               throw var11;
+            }
+
+            var7.close();
+         } catch (Exception var12) {
+            System.err.println("Failed to read chunk " + var1 + "," + var2 + ": " + var12);
+         }
+      }
+
+      return var5;
+   }
+
+   /** Update 3.20: the chunk, loaded into the world on the spot if it is not there (a guest changed a block far from the host: the change must land somewhere). */
+   public Chunk loadNow(int cx, int cz) {
+      Chunk c = this.chunk(cx, cz);
+      if (c == null) {
+         c = this.loadDetached(cx, cz);
+         this.requested.remove(key(cx, cz));
+         this.adopt(c);
+      }
+
+      return c;
+   }
+
+   /** Puts a finished chunk into the world: lights it and tells its neighbours that they have to be meshed again. */
+   private void adopt(Chunk var22) {
+      this.chunks.put(key(var22.cx, var22.cz), var22);
+      this.fire.scanChunk(var22);
+      this.lightChunk(var22);
+
+      for (int var24 = -1; var24 <= 1; var24++) {
+         for (int var25 = -1; var25 <= 1; var25++) {
+            Chunk var26 = this.chunk(var22.cx + var24, var22.cz + var25);
+            if (var26 != null) {
+               for (Section var19 : var26.sections) {
+                  var19.dirty = true;
+               }
+            }
+         }
+      }
+   }
+
+   /** Update 3.20: a chunk that came over the network is put in the queue the finished chunks wait in. */
+   public void deliver(Chunk c) {
+      this.ready.add(c);
    }
 
    public void updateChunks(int var1, int var2, int var3, int var4) {
@@ -227,7 +280,7 @@ public final class World {
       int var7 = this.requested.size();
       int var8 = genThreads() * 4;
       long var9 = System.nanoTime();
-      if (var7 < var8) {
+      if (!this.remote && var7 < var8) {
          int var11 = (var3 + 1) * (var3 + 1) + 2;
          int var12 = 0;
 
@@ -255,20 +308,7 @@ public final class World {
 
          this.requested.remove(key(var22.cx, var22.cz));
          if (Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
-            this.chunks.put(key(var22.cx, var22.cz), var22);
-            this.fire.scanChunk(var22);
-            this.lightChunk(var22);
-
-            for (int var24 = -1; var24 <= 1; var24++) {
-               for (int var25 = -1; var25 <= 1; var25++) {
-                  Chunk var26 = this.chunk(var22.cx + var24, var22.cz + var25);
-                  if (var26 != null) {
-                     for (Section var19 : var26.sections) {
-                        var19.dirty = true;
-                     }
-                  }
-               }
-            }
+            this.adopt(var22);
          }
       }
 
@@ -689,6 +729,10 @@ public final class World {
          var5.set(var6, var2, var7, var4);
          var5.modified = true;
          var5.lodDirty = this.tickCount + 1L;
+         if (this.netHook != null && !(this.netApplying && this.remote)) {
+            this.netHook.blockChanged(var1, var2, var3, var4);
+         }
+
          if (var4 == Blocks.FIRE) {
             this.fire.added(var1, var2, var3);
             Portals.tryLight(this, var1, var2, var3);
@@ -803,6 +847,20 @@ public final class World {
       this.tickCount++;
       if (!Perf.FROZEN) {
          this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)
+      }
+
+      if (this.remote) {
+         // a guest's copy: the host does the simulating; only what is dropped here falls
+         this.blockUpdates.clear();
+         this.blockPending.clear();
+         this.fluidDue.clear();
+         this.fluidPending.clear();
+         for (World.Item var13 : this.items) {
+            this.tickItem(var13);
+         }
+
+         this.items.removeIf(var0 -> var0.dead);
+         return;
       }
 
       if (this.tickCount % 20L == 0L && this.dim == Dim.OVERWORLD) {

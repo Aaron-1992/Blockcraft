@@ -705,7 +705,8 @@ SCENES["gfx-forest"] = (_FOREST, True)
 SCENES["gfx-forest-off"] = (_FOREST + ["-Dbc.bushy=0"], True)
 # Update 3.19, part 3: "gaps between blocks far away" - the ground along the horizon at the full resolution of the window (CROPS keeps a piece of it
 # as a second picture, because the 800 pixel wide picture smooths thin lines away): the anisotropic filtering of the atlas on (8) and off (1), and without shaders
-_GAP = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=24", "-Dbc.cam=190.5,96,-25.5,90,10", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.clouds=off", "-Dbc.shot=160"]
+# (a Superflat grass plain: nothing but bare ground to the horizon, so every pixel that is not ground is a crack - no trees, no leaves with holes)
+_GAP = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=2", "-Dbc.flat=0", "-Dbc.structs=false", "-Dbc.mode=1", "-Dbc.rd=8", "-Dbc.lod=24", "-Dbc.cam=0.5,76,0.5,90,5", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.clouds=off", "-Dbc.shot=120"]
 SCENES["gap-far"] = (_GAP, True)
 SCENES["gap-far-aniso1"] = (_GAP + ["-Dbc.aniso=1"], True)
 SCENES["gap-far-plain"] = (_GAP + PLAIN, True)
