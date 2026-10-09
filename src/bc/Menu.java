@@ -315,6 +315,9 @@ final class Menu {
       if (this.grid != null) {
          this.out[0] = Recipes.find(this.grid, this.gw, this.gh);
       }
+      if (this.tile != null && this.g != null && this.g.world != null) {
+         Net319.onTileChanged(this.g.world, this.tile);
+      }
    }
 
    boolean accepts(Menu.Slot var1, Stack var2) {
@@ -467,6 +470,9 @@ final class Menu {
                   this.g.cursor.n = this.g.cursor.n + var7.n;
                   var1.arr[var1.idx] = null;
                }
+            }
+            if (this.tile != null && this.g != null && this.g.world != null) {
+               Net319.onTileChanged(this.g.world, this.tile);
             }
          }
       } else {

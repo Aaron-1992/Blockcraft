@@ -1004,6 +1004,9 @@ public final class ModLoader {
             } catch (Throwable ignored) {
             }
          }
+         if (Net319.isHosting()) {
+            Net319.sendModsSync();
+         }
       }
    }
 
@@ -1023,6 +1026,9 @@ public final class ModLoader {
                m.instance.onDisable(activeGame);
             } catch (Throwable ignored) {
             }
+         }
+         if (Net319.isHosting()) {
+            Net319.sendModsSync();
          }
       }
    }
@@ -1050,7 +1056,114 @@ public final class ModLoader {
             } catch (Throwable ignored) {
             }
          }
+         if (changed && Net319.isHosting()) {
+            Net319.sendModsSync();
+         }
       }
+   }
+
+   private static Map<String, boolean[]> preSessionMods;
+
+   public static synchronized String getActiveModsCsv() {
+      if (!initialized) {
+         init();
+      }
+      StringBuilder sb = new StringBuilder();
+      for (ModEntry m : entries.values()) {
+         if (m.installed && m.enabled) {
+            if (sb.length() > 0) {
+               sb.append(',');
+            }
+            sb.append(m.id);
+         }
+      }
+      return sb.length() == 0 ? "NONE" : sb.toString();
+   }
+
+   public static synchronized void applySyncedModsCsv(String csv, Game g) {
+      if (!initialized) {
+         init();
+      }
+      if (g != null) {
+         activeGame = g;
+      }
+      if (preSessionMods == null) {
+         preSessionMods = new HashMap<>();
+         for (ModEntry m : entries.values()) {
+            preSessionMods.put(m.id, new boolean[]{m.installed, m.enabled});
+         }
+      }
+      java.util.HashSet<String> want = new java.util.HashSet<>();
+      if (csv != null && !csv.isEmpty() && !"NONE".equalsIgnoreCase(csv)) {
+         for (String part : csv.split(",")) {
+            String id = part.trim();
+            if (!id.isEmpty()) {
+               want.add(id);
+            }
+         }
+      }
+      boolean infdevChanged = false;
+      boolean wasInfdev = isInfdevActive();
+      for (ModEntry m : entries.values()) {
+         boolean en = want.contains(m.id);
+         if (en) {
+            m.installed = true;
+         }
+         if (m.enabled != en) {
+            m.enabled = en;
+            if (m.instance != null) {
+               try {
+                  if (en) {
+                     m.instance.onEnable(activeGame);
+                  } else {
+                     m.instance.onDisable(activeGame);
+                  }
+               } catch (Throwable ignored) {
+               }
+            }
+         }
+      }
+      rebuildActiveModEffects();
+      if (wasInfdev != isInfdevActive()) {
+         infdevChanged = true;
+      }
+      if (infdevChanged && g != null && g.world != null) {
+         g.world.gen = Dim.makeGen(g.world.dim, g.world.seed, g.world.settings);
+         g.world.resetAllChunks();
+         if (g.rend != null) {
+            g.rend.setLod(g.world);
+         }
+      }
+   }
+
+   public static synchronized void restoreSessionMods(Game g) {
+      if (preSessionMods == null) {
+         return;
+      }
+      if (g != null) {
+         activeGame = g;
+      }
+      Map<String, boolean[]> snap = preSessionMods;
+      preSessionMods = null;
+      for (ModEntry m : entries.values()) {
+         boolean[] st = snap.get(m.id);
+         if (st != null) {
+            boolean wasEn = m.enabled;
+            m.installed = st[0];
+            m.enabled = st[1];
+            if (wasEn != m.enabled && m.instance != null) {
+               try {
+                  if (m.enabled) {
+                     m.instance.onEnable(activeGame);
+                  } else {
+                     m.instance.onDisable(activeGame);
+                  }
+               } catch (Throwable ignored) {
+               }
+            }
+         }
+      }
+      rebuildActiveModEffects();
    }
 
    public static synchronized void toggleEnabled(String id) {

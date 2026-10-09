@@ -44,6 +44,7 @@ public final class Mobs {
       }
 
       m.ignited = true;
+      Net319.onClientInteractMob(m, "IGNITE", 0);
       return true;
    }
 
@@ -103,11 +104,27 @@ public final class Mobs {
       return (float)Math.max(0.0, Math.min(1.0, 0.5 + var4 * 1.3));
    }
 
+   public Mobs.Mob findByNetId(int netId) {
+      if (netId <= 0) {
+         return null;
+      }
+      for (Mobs.Mob m : this.list) {
+         if (m != null && m.netId == netId) {
+            return m;
+         }
+      }
+      return null;
+   }
+
    public Mobs.Mob spawn(int var1, double var2, double var4, double var6) {
       Mobs.Mob var8 = new Mobs.Mob();
+      var8.netId = Net319.nextMobId();
       var8.type = var1;
       var8.health = HP[var1];
       var8.setPos(var2, var4, var6);
+      var8.tx = var2;
+      var8.ty = var4;
+      var8.tz = var6;
       var8.yaw = var8.pyaw = this.rnd.nextFloat() * 360.0F;
       var8.dirYaw = var8.yaw;
       var8.headYaw = var8.pheadYaw = var8.yaw;
@@ -131,6 +148,7 @@ public final class Mobs {
       Player var2 = this.g.player;
       if (var1 != null && var2 != null) {
          float var3 = daylightAt(var1.dayTime);
+         boolean remoteClientOnly = Net319.isClientConnected() && !Net319.isHosting();
 
          for (int var4 = this.list.size() - 1; var4 >= 0; var4--) {
             Mobs.Mob var5 = (Mobs.Mob)this.list.get(var4);
@@ -154,6 +172,36 @@ public final class Mobs {
                   this.list.remove(var4);
                   Mobs312.removed(this, var5, var1);
                }
+            } else if (remoteClientOnly && var5.remoteSynced) {
+               var5.px = var5.x;
+               var5.py = var5.y;
+               var5.pz = var5.z;
+               var5.pyaw = var5.yaw;
+               var5.pheadYaw = var5.headYaw;
+               var5.pheadPitch = var5.headPitch;
+               var5.pwalk = var5.walk;
+               var5.pwalkAmp = var5.walkAmp;
+               var5.pswell = var5.swell;
+               var5.age++;
+               if (var5.hurtTime > 0) {
+                  var5.hurtTime--;
+               }
+               if (var5.invuln > 0) {
+                  var5.invuln--;
+               }
+               if (var5.attackAnim > 0) {
+                  var5.attackAnim--;
+               }
+               double nx = var5.x + (var5.tx - var5.x) * 0.5;
+               double ny = var5.y + (var5.ty - var5.y) * 0.5;
+               double nz = var5.z + (var5.tz - var5.z) * 0.5;
+               var5.setPos(nx, ny, nz);
+               double dx = var5.x - var5.px;
+               double dz = var5.z - var5.pz;
+               float step = (float)Math.min(0.6, Math.hypot(dx, dz));
+               var5.walkAmp += (Math.min(1.0F, step * 4.5F) - var5.walkAmp) * 0.45F;
+               var5.walk += step * 2.5F;
+               var5.moving = step > 0.01F;
             } else {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;
@@ -178,25 +226,31 @@ public final class Mobs {
          }
 
          this.timer++;
-         if (this.timer % 20 == 3) {
-            this.tickSpawners(var1, var2);
-         }
-
-         if (this.timer % 20 == 0) {
-            if (var1.dim == Dim.OVERWORLD) {
-               this.spawnHostile(var1, var2, var3);
-            } else {
-               Mobs312.spawnElsewhere(this, var1, var2);
+         if (!remoteClientOnly || !Net319.hostHasMobSync) {
+            if (this.timer % 20 == 3) {
+               this.tickSpawners(var1, var2);
             }
+
+            if (this.timer % 20 == 0) {
+               if (var1.dim == Dim.OVERWORLD) {
+                  this.spawnHostile(var1, var2, var3);
+               } else {
+                  Mobs312.spawnElsewhere(this, var1, var2);
+               }
+            }
+
+            if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD) {
+               this.spawnPassive(var1, var2);
+               Mobs312.spawnVillagers(this, var1, var2);
+               Mobs312.spawnParrots(this, var1, var2);
+            }
+
+            Mobs312.tickFireballs(this, var1, var2);
          }
 
-         if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD) {
-            this.spawnPassive(var1, var2);
-            Mobs312.spawnVillagers(this, var1, var2);
-            Mobs312.spawnParrots(this, var1, var2);
+         if (Net319.isHosting() && this.timer % 2 == 0) {
+            Net319.broadcastMobs(var1, this);
          }
-
-         Mobs312.tickFireballs(this, var1, var2);
       }
    }
 
@@ -687,6 +741,7 @@ public final class Mobs {
       var3.pz = var3.z;
       this.arrows.add(var3);
       var1.attackAnim = 6;
+      Net319.onSpawnArrow(this.g != null ? this.g.world : null, var3);
    }
 
    public void shootFromPlayer(double var1, double var3, double var5, double var7, double var9, double var11, float var13) {
@@ -703,6 +758,7 @@ public final class Mobs {
       var14.fromPlayer = true;
       var14.damage = Math.max(1, Math.round(var13 * 2.0F));
       this.arrows.add(var14);
+      Net319.onSpawnArrow(this.g != null ? this.g.world : null, var14);
    }
 
    boolean tickArrow(Mobs.Arrow var1, World var2, Player var3) {
@@ -739,7 +795,14 @@ public final class Mobs {
                   && var1.y < var7.bb[4] + 0.1
                   && var1.z > var7.bb[2] - 0.1
                   && var1.z < var7.bb[5] + 0.1) {
-                  this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.4, true);
+                  if (!var1.remote) {
+                     this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.4, true);
+                  }
+                  return true;
+               }
+            }
+            if (!var1.remote && Net319.isActive()) {
+               if (Net319.tryArrowHitPeer(this.g, var1.x, var1.y, var1.z, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz)) {
                   return true;
                }
             }
@@ -796,6 +859,7 @@ public final class Mobs {
       }
 
       m.love = 600;
+      Net319.onClientInteractMob(m, "FEED", item);
       return true;
    }
 
@@ -850,12 +914,22 @@ public final class Mobs {
 
       m.sheared = true;
       m.woolTimer = 4800 + this.rnd.nextInt(4800);
-      this.g.world.dropItem(m.x, m.y + 0.6, m.z, 34 + m.color, 1 + this.rnd.nextInt(3));
+      if (!Net319.isClientConnected() || Net319.isHosting()) {
+         this.g.world.dropItem(m.x, m.y + 0.6, m.z, 34 + m.color, 1 + this.rnd.nextInt(3));
+      } else {
+         Net319.onClientInteractMob(m, "SHEAR", 0);
+      }
       return true;
    }
 
    public boolean hurtMob(Mobs.Mob var1, int var2, double var3, double var5, double var7, boolean var9) {
       if (!var1.dead && var1.invuln <= 0) {
+         if (var9 && Net319.isClientConnected() && !Net319.isHosting() && var1.remoteSynced) {
+            var1.hurtTime = 10;
+            var1.invuln = 8;
+            Net319.onClientHitMob(var1, var2, var3, var5, var7);
+            return true;
+         }
          var1.health -= var2;
          var1.hurtTime = 10;
          var1.invuln = 10;
@@ -988,6 +1062,7 @@ public final class Mobs {
       }
 
       this.g.explosionParticles(var1, var3, var5);
+      Net319.onExplosion(var9, var1, var3, var5, var7);
       double var25 = 2 * var7 + 1;
       if (this.targetable(var10)) {
          double var26 = var10.x - var1;
@@ -1330,6 +1405,7 @@ public final class Mobs {
       public double py;
       public double pz;
       public boolean fromPlayer;
+      public boolean remote;
       public boolean stuck;
       public int life;
       public float damage;
@@ -1339,6 +1415,8 @@ public final class Mobs {
       private static int seedCounter;
       /** Update 3.17: a number of its own for the little random things the animation does (blinking, ear flicks ...). */
       public final int seed = (seedCounter++ * 40503 + 17) & 0x7FFFFFFF;
+      public int netId;
+      public boolean remoteSynced;
       public int type;
       public int health;
       public int hurtTime;

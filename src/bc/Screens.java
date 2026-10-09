@@ -1030,8 +1030,13 @@ final class Screens {
             });
       }
 
-      float bw = Math.min(200.0F, pw);
-      ui.button("Leave Lobby", cx - bw / 2.0F, footY, bw, 20.0F, true, null, g::quitToTitle);
+      ui.button("Reset Arena", ix, footY, colW, 20.0F, true,
+         "Regenerate all arena islands, beds, chests, and clear all placed blocks.",
+         () -> {
+            SkyGen.resetArenaMap(g, g.world, true);
+            ui.say("Arena map completely reset!");
+         });
+      ui.button("Leave Lobby", x1, footY, colW, 20.0F, true, null, g::quitToTitle);
       ui.drawToast();
    }
 }

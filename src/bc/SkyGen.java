@@ -212,28 +212,52 @@ public final class SkyGen extends Gen {
       }
    }
 
-   public static void startMatch(Game g, boolean broadcast) {
-      matchState = STATE_PLAYING;
-      lobbyCountdownTicks = -1;
-      Arrays.fill(swIslandStocked, false);
-      Arrays.fill(bwBaseStocked, false);
-      Arrays.fill(bedKnownIntact, true);
-      skywarsWon = false;
-      bedwarsWon = false;
-      if (g != null && g.world != null && g.world.settings != null) {
-         g.world.items.clear();
+   public static void resetArenaMap(Game g, World w, boolean broadcast) {
+      resetMatchState();
+      Net319.clearWorldState();
+      World targetW = w != null ? w : (g != null ? g.world : null);
+      if (targetW != null) {
+         targetW.resetAllChunks();
+      }
+      if (g != null) {
          if (g.mobs != null) {
             g.mobs.clear();
+         }
+         g.particles.clear();
+         if (targetW != null && g.rend != null) {
+            g.rend.setLod(targetW);
          }
          selectTeam(g, myTeam, false);
          if (g.player != null) {
             g.player.dead = false;
+            g.player.burn = 0;
             g.player.health = 20;
             g.player.food = 20;
             g.player.sat = 5.0F;
+            g.player.exh = 0.0F;
+            g.player.air = 300;
             g.player.fallDistance = 0.0F;
+            g.player.invuln = 40;
          }
-         if (g.screen == Game.S.WAITING) {
+         if (targetW != null && targetW.settings != null) {
+            if (targetW.settings.type == WorldSettings.BEDWARS) {
+               stockBedwarsWorld(g, targetW);
+            } else if (targetW.settings.type == WorldSettings.SKYWARS) {
+               stockSkywarsChests(g, targetW, true);
+            }
+         }
+      }
+      if (broadcast && Net319.isActive()) {
+         Net319.sendMatchControl("RESET");
+      }
+   }
+
+   public static void startMatch(Game g, boolean broadcast) {
+      resetArenaMap(g, g != null ? g.world : null, false);
+      matchState = STATE_PLAYING;
+      lobbyCountdownTicks = -1;
+      if (g != null && g.world != null && g.world.settings != null) {
+         if (g.screen == Game.S.WAITING || g.screen == Game.S.PAUSE || g.screen == Game.S.DEAD) {
             g.setScreen(Game.S.PLAY);
          }
          String modeTitle = g.world.settings.type == WorldSettings.BEDWARS
@@ -693,11 +717,21 @@ public final class SkyGen extends Gen {
       }
       int cur = w.getBlock(x, y, z);
       if (cur == Blocks.CHEST_LOOT || cur == Blocks.CHEST) {
-         w.setBlock(x, y, z, Blocks.CHEST);
+         boolean wasPassive = w.inPassiveTick;
+         w.inPassiveTick = true;
+         try {
+            w.setBlock(x, y, z, Blocks.CHEST);
+         } finally {
+            w.inPassiveTick = wasPassive;
+         }
          TileEntity te = w.getOrCreateTile(x, y, z);
          if (te != null && te.slots != null) {
             for (int i = 0; i < te.slots.length; i++) {
                te.slots[i] = i < items.length ? items[i] : null;
+            }
+            Net319.applyPendingTile(w, te);
+            if (!Net319.isClientConnected() || Net319.isHosting()) {
+               Net319.onTileChanged(w, te);
             }
          }
          return true;
@@ -1191,9 +1225,9 @@ public final class SkyGen extends Gen {
             stockSkywarsChests(g, g.world, true);
             g.say("\u00a7b[Skywars] All chests refilled!");
          } else if (sub.equals("reset")) {
-            resetMatchState();
-            startMatch(g, Net319.isHosting());
-            g.say("\u00a7b[Skywars] Match reset! Islands restocked.");
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7b[Skywars] Arena map completely reset and all islands restocked!");
          } else if (sub.equals("lobby")) {
             matchState = STATE_WAITING;
             g.setScreen(Game.S.WAITING);
@@ -1228,19 +1262,9 @@ public final class SkyGen extends Gen {
             return true;
          }
          if (sub.equals("reset")) {
-            resetMatchState();
-            for (int t = 0; t < 4; t++) {
-               int bx = BEDWARS_BASES[t][0];
-               int bz = BEDWARS_BASES[t][1];
-               int dirX = Integer.compare(0, bx);
-               int dirZ = Integer.compare(0, bz);
-               int facing = dirZ < 0 ? 0 : (dirZ > 0 ? 1 : (dirX > 0 ? 2 : 3));
-               int color = BEDWARS_COLORS[t];
-               g.world.setBlock(bx + dirX * 3, Y_DECK + 1, bz + dirZ * 3, Decor315.foot(color, facing));
-               g.world.setBlock(bx + dirX * 4, Y_DECK + 1, bz + dirZ * 4, Decor315.head(color, facing));
-            }
-            startMatch(g, Net319.isHosting());
-            g.say("\u00a7e[Bedwars] Match reset! All 4 Team Beds restored.");
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7e[Bedwars] Arena map completely reset! All bridges cleared and all 4 Team Beds restored.");
             return true;
          }
          StringBuilder sb = new StringBuilder("\u00a7e[Bedwars] Teams: ");

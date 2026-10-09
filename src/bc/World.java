@@ -30,7 +30,7 @@ public final class World {
    public final long seed;
    /** Update 3.12: 0 = Overworld, -1 = Nether, 1 = End (see Dim). */
    public final int dim;
-   public final Gen gen;
+   public Gen gen;
    public final File dir;
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
@@ -80,6 +80,7 @@ public final class World {
    private final double[] res = new double[3];
    static final double[] FULL;
    public boolean rayFluids;
+   public boolean inPassiveTick;
    /** Update 3.13: what the world was created with (generator type, structures). */
    public final WorldSettings settings;
 
@@ -210,7 +211,7 @@ public final class World {
                   }
                }
 
-               Net319.applyEditsToChunk(var5);
+               Net319.applyEditsToChunk(this, var5);
                this.ready.add(var5);
             } catch (Throwable var13) {
                var13.printStackTrace();
@@ -843,6 +844,31 @@ public final class World {
       Redstone319.onBlockChanged(this, var1, var2, var3);
    }
 
+   public void resetAllChunks() {
+      this.fluidDue.clear();
+      this.fluidPending.clear();
+      this.blockUpdates.clear();
+      this.blockPending.clear();
+      this.fallers.clear();
+      this.items.clear();
+      this.tiles.clear();
+      this.ready.clear();
+      this.requested.clear();
+      ArrayList<Chunk> list = new ArrayList<Chunk>(this.chunks.values());
+      for (Chunk ch : list) {
+         Chunk fresh = this.gen.generate(ch.cx, ch.cz);
+         System.arraycopy(fresh.blocks, 0, ch.blocks, 0, fresh.blocks.length);
+         System.arraycopy(fresh.hm, 0, ch.hm, 0, fresh.hm.length);
+         ch.modified = false;
+      }
+      for (Chunk ch : list) {
+         this.lightChunk(ch);
+         for (Section s : ch.sections) {
+            s.dirty = true;
+         }
+      }
+   }
+
    public void tick() {
       this.tickCount++;
       if (!Perf.FROZEN) {
@@ -853,66 +879,81 @@ public final class World {
          this.lodRefresh();
       }
 
-      int var1 = 0;
+      boolean remoteClientOnly = Net319.isClientConnected() && !Net319.isHosting();
+      this.inPassiveTick = true;
+      try {
+         int var1 = 0;
 
-      while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
-         for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
-            this.fluidPending.remove(var4);
-            this.fluidUpdate(ux(var4), uy(var4), uz(var4));
-            var1++;
+         while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
+            for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
+               this.fluidPending.remove(var4);
+               this.fluidUpdate(ux(var4), uy(var4), uz(var4));
+               var1++;
+            }
          }
-      }
 
-      int var7 = 0;
+         int var7 = 0;
 
-      while (!this.blockUpdates.isEmpty() && var7++ < 600) {
-         long var8 = (Long)this.blockUpdates.poll();
-         this.blockPending.remove(var8);
-         this.blockUpdate(ux(var8), uy(var8), uz(var8));
-      }
-
-      for (int var9 = 0; var9 < this.fallers.size(); var9++) {
-         World.Falling var12 = (World.Falling)this.fallers.get(var9);
-         var12.px = var12.x;
-         var12.py = var12.y;
-         var12.pz = var12.z;
-         if (var12.fuse > 0) {
-            this.tickTnt(var12);
-         } else {
-            this.tickFalling(var12);
+         while (!this.blockUpdates.isEmpty() && var7++ < 600) {
+            long var8 = (Long)this.blockUpdates.poll();
+            this.blockPending.remove(var8);
+            this.blockUpdate(ux(var8), uy(var8), uz(var8));
          }
-      }
 
-      this.fallers.removeIf(var0 -> var0.dead);
-      this.tickCrops();
-      this.fire.tick();
-      this.trees.tick();
-      if (this.dim == Dim.OVERWORLD) {
-         // no sky, no weather, no earthquakes in the other dimensions
-         this.disasters.tick();
-         this.weather.tick();
-      }
+         for (int var9 = 0; var9 < this.fallers.size(); var9++) {
+            World.Falling var12 = (World.Falling)this.fallers.get(var9);
+            var12.px = var12.x;
+            var12.py = var12.y;
+            var12.pz = var12.z;
+            if (var12.fuse > 0) {
+               this.tickTnt(var12);
+            } else {
+               this.tickFalling(var12);
+            }
+         }
 
-      for (World.Item var13 : this.items) {
-         this.tickItem(var13);
-      }
+         this.fallers.removeIf(var0 -> var0.dead);
+         if (!remoteClientOnly) {
+            this.tickCrops();
+            this.fire.tick();
+         }
+         this.trees.tick();
+         if (this.dim == Dim.OVERWORLD) {
+            // no sky, no weather, no earthquakes in the other dimensions
+            if (!remoteClientOnly) {
+               this.disasters.tick();
+            }
+            this.weather.tick();
+         }
 
-      this.items.removeIf(var0 -> var0.dead);
-      if (!this.tiles.isEmpty()) {
-         for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
-            if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
-               int var5 = this.getBlock(var14.x, var14.y, var14.z);
-               if (var5 != 67 && var5 != 68) {
-                  this.tiles.remove(tkey(var14.x, var14.y, var14.z));
-               } else {
-                  var14.tickFurnace(this);
-                  int var6 = var14.burn > 0 ? 68 : 67;
-                  if (var5 != var6) {
-                     this.setBlock(var14.x, var14.y, var14.z, var6);
+         for (World.Item var13 : this.items) {
+            this.tickItem(var13);
+         }
+
+         this.items.removeIf(var0 -> var0.dead);
+         if (!this.tiles.isEmpty()) {
+            for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
+               if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
+                  int var5 = this.getBlock(var14.x, var14.y, var14.z);
+                  if (var5 != 67 && var5 != 68) {
+                     this.tiles.remove(tkey(var14.x, var14.y, var14.z));
+                  } else if (!remoteClientOnly) {
+                     int prevCook = var14.cook;
+                     int prevBurn = var14.burn;
+                     var14.tickFurnace(this);
+                     int var6 = var14.burn > 0 ? 68 : 67;
+                     if (var5 != var6) {
+                        this.setBlock(var14.x, var14.y, var14.z, var6);
+                     }
+                     if ((prevCook == 0 && var14.cook > 0) || (prevCook > 0 && var14.cook == 0) || (prevBurn > 0 && var14.burn == 0)) {
+                        Net319.onTileChanged(this, var14);
+                     }
                   }
                }
             }
          }
+      } finally {
+         this.inPassiveTick = false;
       }
    }
 
@@ -925,6 +966,7 @@ public final class World {
       var5.fuse = var4;
       var5.vy = 0.2;
       this.fallers.add(var5);
+      Net319.onPrimeTnt(this, var1, var2, var3, var4);
    }
 
    private void tickTnt(World.Falling var1) {
@@ -944,7 +986,11 @@ public final class World {
          var1.vy *= 0.98;
          if (--var1.fuse <= 0) {
             var1.dead = true;
-            if (this.game != null) {
+            if (Net319.isClientConnected() && !Net319.isHosting()) {
+               if (this.game != null) {
+                  this.game.explosionParticles(var1.x, var1.y + 0.5, var1.z);
+               }
+            } else if (this.game != null) {
                this.game.mobs.blast(var1.x, var1.y + 0.5, var1.z, 4, null);
             }
          }
@@ -1368,7 +1414,9 @@ public final class World {
          this.setBlock(var1, var2, var3, 69);
          var5 = new TileEntity(0, var1, var2, var3);
          this.fillLoot(var5);
+         Net319.applyPendingTile(this, var5);
          this.tiles.put(tkey(var1, var2, var3), var5);
+         Net319.onTileChanged(this, var5);
          return var5;
       }
 
@@ -1383,6 +1431,7 @@ public final class World {
             var5 = new TileEntity(1, var1, var2, var3);
          }
 
+         Net319.applyPendingTile(this, var5);
          this.tiles.put(tkey(var1, var2, var3), var5);
       }
 

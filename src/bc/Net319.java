@@ -121,14 +121,17 @@ public final class Net319 {
    private static volatile Conn clientConn;
    private static final CopyOnWriteArrayList<Conn> hostConns = new CopyOnWriteArrayList<>();
    private static final ConcurrentHashMap<Integer, Peer> peers = new ConcurrentHashMap<>();
-   private static final ConcurrentHashMap<Long, Integer> edits = new ConcurrentHashMap<>();
+   private static final ConcurrentHashMap<Integer, ConcurrentHashMap<Long, Integer>> editsByDim = new ConcurrentHashMap<>();
+   private static final ConcurrentHashMap<Integer, ConcurrentHashMap<Long, String>> tilesByDim = new ConcurrentHashMap<>();
    private static final ConcurrentLinkedQueue<String> inbox = new ConcurrentLinkedQueue<>();
    private static int nextConnId = 2;
    public static int selfId = 1;
    public static String selfName = "Player" + (int)(System.currentTimeMillis() % 900 + 100);
    private static boolean applyingRemote = false;
+   public static volatile boolean hostHasMobSync = false;
    private static int[][] peerSkins;
    private static final java.util.concurrent.atomic.AtomicLong itemIdGen = new java.util.concurrent.atomic.AtomicLong((System.currentTimeMillis() & 0xFFFFFL) << 16);
+   private static final java.util.concurrent.atomic.AtomicInteger mobIdGen = new java.util.concurrent.atomic.AtomicInteger(1);
    public static String serverAddr = "127.0.0.1:25565";
    public static String statusText = "Ready — Host a world, launch Server.bat, or join via IP / Share Code";
    public static int mpWorldType = WorldSettings.DEFAULT;
@@ -324,6 +327,24 @@ public final class Net319 {
       return itemIdGen.incrementAndGet();
    }
 
+   public static int nextMobId() {
+      return mobIdGen.getAndIncrement();
+   }
+
+   public static ConcurrentHashMap<Long, Integer> editsForDim(int dim) {
+      return editsByDim.computeIfAbsent(dim, k -> new ConcurrentHashMap<>());
+   }
+
+   public static ConcurrentHashMap<Long, String> tilesForDim(int dim) {
+      return tilesByDim.computeIfAbsent(dim, k -> new ConcurrentHashMap<>());
+   }
+
+   public static void clearWorldState() {
+      editsByDim.clear();
+      tilesByDim.clear();
+      hostHasMobSync = false;
+   }
+
    public static int selfId() {
       return selfId;
    }
@@ -333,6 +354,10 @@ public final class Net319 {
    }
 
    public static boolean isConnected() {
+      return clientConnected;
+   }
+
+   public static boolean isClientConnected() {
       return clientConnected;
    }
 
@@ -684,9 +709,39 @@ public final class Net319 {
                );
             }
 
-            for (Map.Entry<Long, Integer> e : edits.entrySet()) {
-               long k = e.getKey();
-               c.send("BLOCK " + unpackX(k) + " " + unpackY(k) + " " + unpackZ(k) + " " + e.getValue());
+            c.send("MODS " + ModLoader.getActiveModsCsv());
+            if (curW != null && curW.weather != null) {
+               c.send(
+                  "ENV "
+                     + curW.dayTime
+                     + " "
+                     + curW.weather.ticks
+                     + " "
+                     + curW.weather.forceMode
+                     + " "
+                     + curW.weather.forceEnd
+                     + " "
+                     + (curW.weather.enabled ? 1 : 0)
+               );
+            }
+
+            for (Map.Entry<Integer, ConcurrentHashMap<Long, Integer>> de : editsByDim.entrySet()) {
+               int d = de.getKey();
+               for (Map.Entry<Long, Integer> e : de.getValue().entrySet()) {
+                  long k = e.getKey();
+                  c.send("BLOCK " + unpackX(k) + " " + unpackY(k) + " " + unpackZ(k) + " " + e.getValue() + " " + d);
+               }
+            }
+
+            for (Map.Entry<Integer, ConcurrentHashMap<Long, String>> td : tilesByDim.entrySet()) {
+               for (String tilePkt : td.getValue().values()) {
+                  c.send(tilePkt);
+               }
+            }
+            if (curW != null && !curW.tiles.isEmpty()) {
+               for (TileEntity te : new ArrayList<TileEntity>(curW.tiles.values())) {
+                  c.send(formatTilePacket(curW.dim, te));
+               }
             }
 
             if (curW != null) {
@@ -699,6 +754,10 @@ public final class Net319 {
                      c.send(formatDropPacket(it));
                   }
                }
+            }
+
+            if (hg != null && hg.mobs != null && curW != null) {
+               sendMobsToConn(c, curW, hg.mobs);
             }
 
             Thread rt = new Thread(() -> readLoopHost(c), "bc-net-client-" + cid);
@@ -736,9 +795,19 @@ public final class Net319 {
                || line.startsWith("PICKUP ")
                || line.startsWith("BED ")
                || line.startsWith("TEAM ")
-               || line.startsWith("MATCH ")) {
+               || line.startsWith("MATCH ")
+               || line.startsWith("TILE ")
+               || line.startsWith("MOB_HIT ")
+               || line.startsWith("MOB_ACT ")
+               || line.startsWith("ARROW ")
+               || line.startsWith("TNT ")
+               || line.startsWith("EXPLODE ")
+               || line.startsWith("MODS ")
+               || line.startsWith("ENV ")) {
                inbox.add(line);
-               broadcastExcept(c.id, line);
+               if (!line.startsWith("MOB_HIT ") && !line.startsWith("MOB_ACT ")) {
+                  broadcastExcept(c.id, line);
+               }
             }
          }
       } catch (IOException ignored) {
@@ -1186,6 +1255,8 @@ public final class Net319 {
 
       peers.clear();
       inbox.clear();
+      clearWorldState();
+      ModLoader.restoreSessionMods(g);
    }
 
    // ------------------------------------------------------------------ Pause screen & command helpers
@@ -1238,13 +1309,16 @@ public final class Net319 {
    }
 
    public static void onSetBlock(World w, int x, int y, int z, int id) {
-      if (applyingRemote || w == null) {
+      if (applyingRemote || w == null || !isActive()) {
+         return;
+      }
+      if (clientConnected && !hosting && w.inPassiveTick) {
          return;
       }
 
       if (hosting || clientConnected) {
-         edits.put(pack(x, y, z), id);
-         String pkt = "BLOCK " + x + " " + y + " " + z + " " + id;
+         editsForDim(w.dim).put(pack(x, y, z), id);
+         String pkt = "BLOCK " + x + " " + y + " " + z + " " + id + " " + w.dim;
          if (hosting) {
             broadcastExcept(0, pkt);
          } else if (clientConnected && clientConn != null) {
@@ -1253,12 +1327,16 @@ public final class Net319 {
       }
    }
 
-   public static void applyEditsToChunk(Chunk ch) {
-      if (ch == null || edits.isEmpty() || !isActive()) {
+   public static void applyEditsToChunk(World w, Chunk ch) {
+      if (w == null || ch == null || !isActive() || (!clientConnected && w.dir != null)) {
+         return;
+      }
+      ConcurrentHashMap<Long, Integer> dimEdits = editsByDim.get(w.dim);
+      if (dimEdits == null || dimEdits.isEmpty()) {
          return;
       }
       boolean changed = false;
-      for (Map.Entry<Long, Integer> e : edits.entrySet()) {
+      for (Map.Entry<Long, Integer> e : dimEdits.entrySet()) {
          long k = e.getKey();
          int bx = unpackX(k);
          int bz = unpackZ(k);
@@ -1273,6 +1351,250 @@ public final class Net319 {
       if (changed) {
          ch.computeHeightmap();
       }
+   }
+
+   public static void sendModsSync() {
+      if (!hosting) {
+         return;
+      }
+      broadcastExcept(0, "MODS " + ModLoader.getActiveModsCsv());
+   }
+
+   static String formatTilePacket(int dim, TileEntity te) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("TILE ").append(dim).append(' ')
+         .append(te.x).append(' ').append(te.y).append(' ').append(te.z).append(' ')
+         .append(te.type).append(' ').append(te.burn).append(' ').append(te.burnMax).append(' ').append(te.cook).append(' ');
+      if (te.slots == null || te.slots.length == 0) {
+         sb.append('-');
+      } else {
+         boolean any = false;
+         for (int i = 0; i < te.slots.length; i++) {
+            Stack s = te.slots[i];
+            if (s != null && s.id > 0 && s.n > 0) {
+               if (any) {
+                  sb.append(',');
+               }
+               sb.append(i).append(':').append(s.id).append(':').append(s.n).append(':').append(s.dmg);
+               any = true;
+            }
+         }
+         if (!any) {
+            sb.append('-');
+         }
+      }
+      return sb.toString();
+   }
+
+   public static void onTileChanged(World w, TileEntity te) {
+      if (applyingRemote || w == null || te == null || !isActive()) {
+         return;
+      }
+      String pkt = formatTilePacket(w.dim, te);
+      tilesForDim(w.dim).put(pack(te.x, te.y, te.z), pkt);
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static void applyPendingTile(World w, TileEntity te) {
+      if (w == null || te == null || !isActive()) {
+         return;
+      }
+      ConcurrentHashMap<Long, String> map = tilesByDim.get(w.dim);
+      if (map == null) {
+         return;
+      }
+      String pkt = map.get(pack(te.x, te.y, te.z));
+      if (pkt != null) {
+         applyTilePacketToEntity(te, pkt.split("\\s+"));
+      }
+   }
+
+   private static void applyTilePacketToEntity(TileEntity te, String[] p) {
+      if (te == null || p.length < 10) {
+         return;
+      }
+      te.burn = Integer.parseInt(p[6]);
+      te.burnMax = Integer.parseInt(p[7]);
+      te.cook = Integer.parseInt(p[8]);
+      if (te.slots != null) {
+         java.util.Arrays.fill(te.slots, null);
+         String raw = p[9];
+         if (!"-".equals(raw)) {
+            for (String entry : raw.split(",")) {
+               String[] kv = entry.split(":");
+               if (kv.length >= 4) {
+                  int slot = Integer.parseInt(kv[0]);
+                  int id = Integer.parseInt(kv[1]);
+                  int n = Integer.parseInt(kv[2]);
+                  int dmg = Integer.parseInt(kv[3]);
+                  if (slot >= 0 && slot < te.slots.length && id > 0 && n > 0) {
+                     te.slots[slot] = new Stack(id, n, dmg);
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   public static void onPrimeTnt(World w, int x, int y, int z, int fuse) {
+      if (applyingRemote || w == null || !isActive() || (clientConnected && !hosting && w.inPassiveTick)) {
+         return;
+      }
+      String pkt = "TNT " + w.dim + " " + x + " " + y + " " + z + " " + fuse;
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static void onExplosion(World w, double x, double y, double z, int radius) {
+      if (applyingRemote || w == null || !hosting) {
+         return;
+      }
+      String pkt = String.format(Locale.ROOT, "EXPLODE %d %.2f %.2f %.2f %d", w.dim, x, y, z, radius);
+      broadcastExcept(0, pkt);
+   }
+
+   public static void onSpawnArrow(World w, Mobs.Arrow a) {
+      if (applyingRemote || w == null || a == null || a.remote || !isActive()) {
+         return;
+      }
+      String pkt = String.format(
+         Locale.ROOT,
+         "ARROW %d %d %.3f %.3f %.3f %.4f %.4f %.4f %.1f %d",
+         selfId,
+         w.dim,
+         a.x,
+         a.y,
+         a.z,
+         a.vx,
+         a.vy,
+         a.vz,
+         a.damage,
+         a.fromPlayer ? 1 : 0
+      );
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static boolean tryArrowHitPeer(Game g, double x, double y, double z, int dmg, double ax, double az) {
+      if (!isActive() || peers.isEmpty() || g == null || g.world == null) {
+         return false;
+      }
+      boolean isBedwars = g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS;
+      int myTeam = SkyGen.getPlayerTeam(g);
+      for (Peer p : peers.values()) {
+         if (p.dim != g.world.dim || p.spectator) {
+            continue;
+         }
+         if (isBedwars && p.team == myTeam) {
+            continue;
+         }
+         double h = p.sneak ? 1.55 : 1.85;
+         if (x >= p.x - 0.42 && x <= p.x + 0.42 && y >= p.y - 0.1 && y <= p.y + h + 0.1 && z >= p.z - 0.42 && z <= p.z + 0.42) {
+            sendHit(p.id, Math.max(1, dmg), ax, az, selfName);
+            return true;
+         }
+      }
+      return false;
+   }
+
+   public static void onClientHitMob(Mobs.Mob m, int dmg, double ax, double az, double kb) {
+      if (m == null || m.netId <= 0 || !clientConnected || hosting || clientConn == null) {
+         return;
+      }
+      clientConn.send(String.format(Locale.ROOT, "MOB_HIT %d %d %.3f %.3f %.3f", m.netId, dmg, ax, az, kb));
+   }
+
+   public static void onClientInteractMob(Mobs.Mob m, String action, int arg) {
+      if (m == null || m.netId <= 0 || !clientConnected || hosting || clientConn == null) {
+         return;
+      }
+      clientConn.send("MOB_ACT " + m.netId + " " + action + " " + arg);
+   }
+
+   private static String encodeMobToken(Mobs.Mob m) {
+      int flags = (m.sheared ? 1 : 0)
+         | (m.tamed ? 2 : 0)
+         | (m.charged ? 4 : 0)
+         | (m.ignited ? 8 : 0)
+         | (m.hurtTime > 0 ? 16 : 0)
+         | (m.attackAnim > 0 ? 32 : 0)
+         | (m.dead ? 64 : 0);
+      return String.format(
+         Locale.ROOT,
+         "%d:%d:%.2f:%.2f:%.2f:%.1f:%.1f:%.1f:%d:%d:%d:%d:%d:%d:%d",
+         m.netId,
+         m.type,
+         m.x,
+         m.y,
+         m.z,
+         m.yaw,
+         m.headYaw,
+         m.headPitch,
+         m.health,
+         m.color,
+         m.babyAge,
+         flags,
+         m.swell,
+         m.size,
+         m.variant
+      );
+   }
+
+   private static void sendMobsToConn(Conn c, World w, Mobs mobs) {
+      if (c == null || w == null || mobs == null) {
+         return;
+      }
+      for (String pkt : buildMobSnapshots(w, mobs)) {
+         c.send(pkt);
+      }
+   }
+
+   public static void broadcastMobs(World w, Mobs mobs) {
+      if (!hosting || hostConns.isEmpty() || w == null || mobs == null) {
+         return;
+      }
+      for (String pkt : buildMobSnapshots(w, mobs)) {
+         broadcastExcept(0, pkt);
+      }
+   }
+
+   private static ArrayList<String> buildMobSnapshots(World w, Mobs mobs) {
+      ArrayList<String> out = new ArrayList<>();
+      ArrayList<Mobs.Mob> snap = new ArrayList<>(mobs.list);
+      int total = snap.size();
+      if (total == 0) {
+         out.add("MOBS " + w.dim + " 1 0");
+         return out;
+      }
+      int chunkSize = 16;
+      int chunks = (total + chunkSize - 1) / chunkSize;
+      for (int c = 0; c < chunks; c++) {
+         int start = c * chunkSize;
+         int end = Math.min(total, start + chunkSize);
+         StringBuilder sb = new StringBuilder();
+         sb.append("MOBS ").append(w.dim).append(' ').append(c == chunks - 1 ? 1 : 0).append(' ').append(c == 0 ? 1 : 0);
+         for (int i = start; i < end; i++) {
+            Mobs.Mob m = snap.get(i);
+            if (m != null) {
+               if (m.netId <= 0) {
+                  m.netId = nextMobId();
+               }
+               sb.append(' ').append(encodeMobToken(m));
+            }
+         }
+         out.add(sb.toString());
+      }
+      return out;
    }
 
    public static void sendBedDestroyed(int team, String breaker) {
@@ -1331,7 +1653,10 @@ public final class Net319 {
    }
 
    public static void onDropItem(World w, World.Item it) {
-      if (applyingRemote || w == null || it == null || it.count <= 0) {
+      if (applyingRemote || w == null || it == null || it.count <= 0 || !isActive()) {
+         return;
+      }
+      if (clientConnected && !hosting && w.inPassiveTick) {
          return;
       }
 
@@ -1511,8 +1836,11 @@ public final class Net319 {
       }
    }
 
+   private static final java.util.Set<Integer> seenMobIds = ConcurrentHashMap.newKeySet();
+
    static void recordServerBlock(World w, int x, int y, int z, int id) {
-      edits.put(pack(x, y, z), id);
+      int dim = w != null ? w.dim : 0;
+      editsForDim(dim).put(pack(x, y, z), id);
       if (w != null) {
          Chunk c = w.chunkAt(x, z);
          if (c != null && y >= 0 && y <= 255) {
@@ -1558,6 +1886,21 @@ public final class Net319 {
          broadcastExcept(0, poseLine);
          if (g.tickCount % 40 == 0) {
             broadcastExcept(0, "TIME " + g.world.dayTime);
+            if (g.world.weather != null) {
+               broadcastExcept(
+                  0,
+                  "ENV "
+                     + g.world.dayTime
+                     + " "
+                     + g.world.weather.ticks
+                     + " "
+                     + g.world.weather.forceMode
+                     + " "
+                     + g.world.weather.forceEnd
+                     + " "
+                     + (g.world.weather.enabled ? 1 : 0)
+               );
+            }
          }
       } else if (clientConnected && clientConn != null) {
          clientConn.send(poseLine);
@@ -1591,6 +1934,9 @@ public final class Net319 {
    static void processInbox(World w, Game g) {
       String line;
       while ((line = inbox.poll()) != null) {
+         if (g != null && g.world != null) {
+            w = g.world;
+         }
          try {
             String[] p = line.split("\\s+");
             if (p.length == 0) {
@@ -1600,6 +1946,7 @@ public final class Net319 {
             switch (p[0]) {
                case "ASSIGN" -> {
                   if (p.length >= 5) {
+                     clearWorldState();
                      selfId = Integer.parseInt(p[1]);
                      selfName = "Player" + selfId;
                      long seed = Long.parseLong(p[2]);
@@ -1616,6 +1963,7 @@ public final class Net319 {
                      SkyGen.matchState = hostMatchState;
                      if (g != null) {
                         g.joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, wType, gMode);
+                        w = g.world;
                      } else if (w != null) {
                         w.dayTime = dayTime;
                      }
@@ -1649,6 +1997,21 @@ public final class Net319 {
                      }
                   }
                }
+               case "MODS" -> {
+                  String csv = p.length >= 2 ? p[1] : "-";
+                  ModLoader.applySyncedModsCsv(csv, g);
+               }
+               case "ENV" -> {
+                  if (p.length >= 6 && w != null && !hosting) {
+                     w.dayTime = Long.parseLong(p[1]);
+                     if (w.weather != null) {
+                        w.weather.ticks = Long.parseLong(p[2]);
+                        w.weather.forceMode = Integer.parseInt(p[3]);
+                        w.weather.forceEnd = Long.parseLong(p[4]);
+                        w.weather.enabled = Integer.parseInt(p[5]) != 0;
+                     }
+                  }
+               }
                case "BED" -> {
                   if (p.length >= 2) {
                      int team = Integer.parseInt(p[1]);
@@ -1671,6 +2034,8 @@ public final class Net319 {
                      String act = p[1].toUpperCase(Locale.ROOT);
                      if ("START".equals(act)) {
                         SkyGen.startMatch(g, false);
+                     } else if ("RESET".equals(act)) {
+                        SkyGen.resetArenaMap(g, w, false);
                      } else if ("WAIT".equals(act) || "LOBBY".equals(act)) {
                         SkyGen.matchState = SkyGen.STATE_WAITING;
                         g.setScreen(Game.S.WAITING);
@@ -1710,22 +2075,213 @@ public final class Net319 {
                   }
                }
                case "BLOCK" -> {
-                  if (p.length >= 5 && w != null) {
+                  if (p.length >= 5) {
                      int bx = Integer.parseInt(p[1]);
                      int by = Integer.parseInt(p[2]);
                      int bz = Integer.parseInt(p[3]);
                      int bid = Integer.parseInt(p[4]);
-                     edits.put(pack(bx, by, bz), bid);
-                     applyingRemote = true;
-                     try {
-                        if (w.chunkAt(bx, bz) != null) {
-                           w.setBlock(bx, by, bz, bid);
-                           if (g != null) {
-                              g.meshNow(bx, by, bz);
+                     int bdim = p.length >= 6 ? Integer.parseInt(p[5]) : 0;
+                     editsForDim(bdim).put(pack(bx, by, bz), bid);
+                     if (w != null && w.dim == bdim) {
+                        applyingRemote = true;
+                        try {
+                           if (w.chunkAt(bx, bz) != null) {
+                              w.setBlock(bx, by, bz, bid);
+                              if (g != null) {
+                                 g.meshNow(bx, by, bz);
+                              }
+                           }
+                        } finally {
+                           applyingRemote = false;
+                        }
+                     }
+                  }
+               }
+               case "TILE" -> {
+                  if (p.length >= 10) {
+                     int tdim = Integer.parseInt(p[1]);
+                     int tx = Integer.parseInt(p[2]);
+                     int ty = Integer.parseInt(p[3]);
+                     int tz = Integer.parseInt(p[4]);
+                     tilesForDim(tdim).put(pack(tx, ty, tz), line);
+                     if (w != null && w.dim == tdim) {
+                        applyingRemote = true;
+                        try {
+                           TileEntity te = w.getOrCreateTile(tx, ty, tz);
+                           applyTilePacketToEntity(te, p);
+                        } finally {
+                           applyingRemote = false;
+                        }
+                     }
+                  }
+               }
+               case "MOBS" -> {
+                  if (p.length >= 4 && !hosting) {
+                     hostHasMobSync = true;
+                     int mdim = Integer.parseInt(p[1]);
+                     boolean isLast = Integer.parseInt(p[2]) != 0;
+                     boolean isFirst = Integer.parseInt(p[3]) != 0;
+                     if (w != null && g != null && g.mobs != null && w.dim == mdim) {
+                        if (isFirst) {
+                           seenMobIds.clear();
+                        }
+                        for (int i = 4; i < p.length; i++) {
+                           String[] f = p[i].split(":");
+                           if (f.length >= 15) {
+                              int nid = Integer.parseInt(f[0]);
+                              int mtype = Integer.parseInt(f[1]);
+                              double mx = Double.parseDouble(f[2]);
+                              double my = Double.parseDouble(f[3]);
+                              double mz = Double.parseDouble(f[4]);
+                              float myaw = Float.parseFloat(f[5]);
+                              float mhyaw = Float.parseFloat(f[6]);
+                              float mhpitch = Float.parseFloat(f[7]);
+                              int mhp = Integer.parseInt(f[8]);
+                              int mcol = Integer.parseInt(f[9]);
+                              int mbaby = Integer.parseInt(f[10]);
+                              int mflags = Integer.parseInt(f[11]);
+                              int mswell = Integer.parseInt(f[12]);
+                              int msize = Integer.parseInt(f[13]);
+                              int mvar = Integer.parseInt(f[14]);
+                              seenMobIds.add(nid);
+                              Mobs.Mob m = g.mobs.findByNetId(nid);
+                              if (m == null) {
+                                 m = new Mobs.Mob();
+                                 m.type = mtype;
+                                 m.netId = nid;
+                                 m.remoteSynced = true;
+                                 m.setPos(mx, my, mz);
+                                 m.px = mx;
+                                 m.py = my;
+                                 m.pz = mz;
+                                 m.tx = mx;
+                                 m.ty = my;
+                                 m.tz = mz;
+                                 m.yaw = m.pyaw = myaw;
+                                 m.headYaw = m.pheadYaw = mhyaw;
+                                 m.headPitch = m.pheadPitch = mhpitch;
+                                 g.mobs.list.add(m);
+                              }
+                              m.type = mtype;
+                              m.remoteSynced = true;
+                              if (Math.hypot(mx - m.x, mz - m.z) > 6.0 || Math.abs(my - m.y) > 6.0) {
+                                 m.setPos(mx, my, mz);
+                                 m.px = mx;
+                                 m.py = my;
+                                 m.pz = mz;
+                              }
+                              m.tx = mx;
+                              m.ty = my;
+                              m.tz = mz;
+                              m.yaw = myaw;
+                              m.headYaw = mhyaw;
+                              m.headPitch = mhpitch;
+                              m.health = mhp;
+                              m.color = mcol;
+                              m.babyAge = mbaby;
+                              m.sheared = (mflags & 1) != 0;
+                              m.tamed = (mflags & 2) != 0;
+                              m.charged = (mflags & 4) != 0;
+                              m.ignited = (mflags & 8) != 0;
+                              if ((mflags & 16) != 0 && m.hurtTime == 0) {
+                                 m.hurtTime = 6;
+                              }
+                              if ((mflags & 32) != 0 && m.attackAnim == 0) {
+                                 m.attackAnim = 6;
+                              }
+                              m.dead = (mflags & 64) != 0;
+                              m.swell = mswell;
+                              m.size = msize;
+                              m.variant = mvar;
                            }
                         }
-                     } finally {
-                        applyingRemote = false;
+                        if (isLast) {
+                           g.mobs.list.removeIf(m -> m == null || !seenMobIds.contains(m.netId));
+                        }
+                     }
+                  }
+               }
+               case "MOB_HIT" -> {
+                  if (p.length >= 6 && hosting && w != null && g != null && g.mobs != null) {
+                     int nid = Integer.parseInt(p[1]);
+                     int dmg = Integer.parseInt(p[2]);
+                     double ax = Double.parseDouble(p[3]);
+                     double az = Double.parseDouble(p[4]);
+                     double kb = Double.parseDouble(p[5]);
+                     Mobs.Mob m = g.mobs.findByNetId(nid);
+                     if (m != null) {
+                        g.mobs.hurtMob(m, dmg, ax, az, kb, true);
+                        broadcastMobs(w, g.mobs);
+                     }
+                  }
+               }
+               case "MOB_ACT" -> {
+                  if (p.length >= 4 && hosting && w != null && g != null && g.mobs != null) {
+                     int nid = Integer.parseInt(p[1]);
+                     String act = p[2];
+                     int arg = Integer.parseInt(p[3]);
+                     Mobs.Mob m = g.mobs.findByNetId(nid);
+                     if (m != null) {
+                        applyingRemote = true;
+                        try {
+                           if ("IGNITE".equals(act)) {
+                              g.mobs.ignite(m);
+                           } else if ("SHEAR".equals(act)) {
+                              g.mobs.shear(m);
+                           } else if ("FEED".equals(act)) {
+                              g.mobs.feed(m, arg);
+                           }
+                        } finally {
+                           applyingRemote = false;
+                        }
+                        broadcastMobs(w, g.mobs);
+                     }
+                  }
+               }
+               case "ARROW" -> {
+                  if (p.length >= 11 && w != null && g != null && g.mobs != null) {
+                     int sender = Integer.parseInt(p[1]);
+                     int adim = Integer.parseInt(p[2]);
+                     if (sender != selfId && w.dim == adim) {
+                        Mobs.Arrow a = new Mobs.Arrow();
+                        a.remote = true;
+                        a.x = a.px = Double.parseDouble(p[3]);
+                        a.y = a.py = Double.parseDouble(p[4]);
+                        a.z = a.pz = Double.parseDouble(p[5]);
+                        a.vx = Double.parseDouble(p[6]);
+                        a.vy = Double.parseDouble(p[7]);
+                        a.vz = Double.parseDouble(p[8]);
+                        a.damage = Float.parseFloat(p[9]);
+                        a.fromPlayer = Integer.parseInt(p[10]) != 0;
+                        g.mobs.arrows.add(a);
+                     }
+                  }
+               }
+               case "TNT" -> {
+                  if (p.length >= 6 && w != null) {
+                     int tdim = Integer.parseInt(p[1]);
+                     int tx = Integer.parseInt(p[2]);
+                     int ty = Integer.parseInt(p[3]);
+                     int tz = Integer.parseInt(p[4]);
+                     int tfuse = Integer.parseInt(p[5]);
+                     if (w.dim == tdim) {
+                        applyingRemote = true;
+                        try {
+                           w.primeTnt(tx, ty, tz, tfuse);
+                        } finally {
+                           applyingRemote = false;
+                        }
+                     }
+                  }
+               }
+               case "EXPLODE" -> {
+                  if (p.length >= 6 && w != null && g != null && !hosting) {
+                     int edim = Integer.parseInt(p[1]);
+                     double ex = Double.parseDouble(p[2]);
+                     double ey = Double.parseDouble(p[3]);
+                     double ez = Double.parseDouble(p[4]);
+                     if (w.dim == edim) {
+                        g.explosionParticles(ex, ey, ez);
                      }
                   }
                }
@@ -1998,6 +2554,14 @@ public final class Net319 {
    private static String sanitizeName(String s) {
       String clean = s.replaceAll("[^A-Za-z0-9_\\-]", "");
       return clean.isEmpty() ? "Peer" : (clean.length() > 16 ? clean.substring(0, 16) : clean);
+   }
+
+   static long packCoord(int x, int y, int z) {
+      return pack(x, y, z);
+   }
+
+   static ArrayList<String> buildMobSnapshotsForTest(World w, Mobs mobs) {
+      return buildMobSnapshots(w, mobs);
    }
 
    private static long pack(int x, int y, int z) {

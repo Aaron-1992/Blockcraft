@@ -1135,6 +1135,7 @@ public final class Game {
       }
 
       this.worldSettings = ws;
+      Net319.clearWorldState();
       this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD && !ephemeralMinigame;
       this.world = new World(var6, ephemeralMinigame ? null : Dim.dir(var8, startDim), startDim, ws);
       if (ephemeralMinigame) {

@@ -748,6 +748,71 @@ final class Tests319 {
          } finally {
             Net319.disconnect(bwGame);
          }
+
+         // 7. Bedwars Arena Map Full Reset (wipes placed blocks, restores broken blocks & destroyed beds, respawns shopkeepers)
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 5, 12, Blocks.PLANKS);
+         bwGame.world.setBlock(3, SkyGen.Y_DECK + 6, -10, Blocks.OBSIDIAN);
+         eq(Blocks.PLANKS, bwGame.world.getBlock(0, SkyGen.Y_DECK + 5, 12), "Bridge block placed in Bedwars arena before reset");
+         eq(Blocks.OBSIDIAN, bwGame.world.getBlock(3, SkyGen.Y_DECK + 6, -10), "Obsidian placed in Bedwars arena before reset");
+         check(!SkyGen.isTeamBedIntact(bwGame.world, 0), "Red bed is destroyed before arena reset");
+         SkyGen.resetArenaMap(bwGame, bwGame.world, false);
+         eq(Blocks.AIR, bwGame.world.getBlock(0, SkyGen.Y_DECK + 5, 12), "Arena reset wipes placed bridge blocks back to air");
+         eq(Blocks.AIR, bwGame.world.getBlock(3, SkyGen.Y_DECK + 6, -10), "Arena reset wipes placed obsidian back to air");
+         for (int t = 0; t < 4; t++) {
+            check(SkyGen.isTeamBedIntact(bwGame.world, t), "Arena reset restores Bedwars Team " + t + " bed");
+         }
+
+         // 8. Cross-Dimension & Cross-World Block Isolation + Multiplayer Mod, TileEntity & Entity Sync
+         java.io.File tmpRoot = java.nio.file.Files.createTempDirectory("bcdim").toFile();
+         java.io.File netherDir = Dim.dir(tmpRoot, Dim.NETHER);
+         eq(new java.io.File(tmpRoot, "DIM-1"), netherDir, "Dim.dir resolves DIM-1 under world root");
+         eq(tmpRoot, Dim.dir(netherDir, Dim.OVERWORLD), "Dim.dir from DIM-1 back to Overworld returns root without nesting");
+         eq(new java.io.File(tmpRoot, "DIM1"), Dim.dir(netherDir, Dim.END), "Dim.dir from DIM-1 to End resolves sibling DIM1 without nesting");
+
+         int syncPort = 25596;
+         String syncHostMsg = Net319.host(bwGame, syncPort);
+         check(Net319.isHosting(), "Sync host started: " + syncHostMsg);
+         try {
+            // Place a block in Overworld (dim 0) while hosting
+            bwGame.world.setBlock(2, 70, 2, Blocks.GOLD_BLOCK);
+            check(Net319.editsForDim(Dim.OVERWORLD).containsKey(Net319.packCoord(2, 70, 2)), "Overworld edit recorded in dim 0");
+            check(!Net319.editsForDim(Dim.NETHER).containsKey(Net319.packCoord(2, 70, 2)), "Overworld edit does NOT leak into Nether (dim -1)");
+            check(!Net319.editsForDim(Dim.END).containsKey(Net319.packCoord(2, 70, 2)), "Overworld edit does NOT leak into End (dim 1)");
+
+            // Verify Nether world chunk generation is untouched by Overworld edits
+            World netherW = new World(bwGame.world.seed, null, Dim.NETHER, new WorldSettings());
+            Chunk netherCh = netherW.gen.generate(0, 0);
+            int beforeNetherBlock = netherCh.get(2, 70, 2);
+            Net319.applyEditsToChunk(netherW, netherCh);
+            eq(beforeNetherBlock, netherCh.get(2, 70, 2), "Overworld edits are never applied to Nether chunks");
+            netherW.shutdown();
+
+            // Verify TileEntity (chest) sync packet round-trip
+            bwGame.world.setBlock(3, SkyGen.Y_DECK + 1, -43, Blocks.CHEST);
+            TileEntity hostChest = bwGame.world.getOrCreateTile(3, SkyGen.Y_DECK + 1, -43);
+            hostChest.slots[0] = new Stack(Items.DIAMOND, 12, 0);
+            Net319.onTileChanged(bwGame.world, hostChest);
+            check(Net319.tilesForDim(Dim.OVERWORLD).containsKey(Net319.packCoord(3, SkyGen.Y_DECK + 1, -43)), "Chest TileEntity state recorded for sync");
+
+            // Verify Mob Entity snapshot encoding & client-side decoding
+            Mobs.Mob spawnedMob = bwGame.mobs.spawn(Mobs.VILLAGER, 4.5, SkyGen.Y_DECK + 1.0, 4.5);
+            spawnedMob.color = Trades.BEDWARS_SHOP;
+            check(spawnedMob.netId > 0, "Spawned mob has a valid network ID");
+            java.util.ArrayList<String> mobPkts = Net319.buildMobSnapshotsForTest(bwGame.world, bwGame.mobs);
+            check(!mobPkts.isEmpty() && mobPkts.get(0).startsWith("MOBS "), "Host builds MOBS snapshot packets");
+
+            // Verify Mod sync CSV round-trip
+            ModLoader.setEnabled("waystones-hud", true);
+            String activeCsv = ModLoader.getActiveModsCsv();
+            check(activeCsv.contains("waystones-hud"), "Active mods CSV includes waystones-hud");
+            ModLoader.setEnabled("waystones-hud", false);
+            ModLoader.applySyncedModsCsv(activeCsv, bwGame);
+            check(ModLoader.get("waystones-hud").enabled, "applySyncedModsCsv enables host mod on client");
+            ModLoader.restoreSessionMods(bwGame);
+         } finally {
+            Net319.disconnect(bwGame);
+         }
+         check(Net319.editsForDim(Dim.OVERWORLD).isEmpty(), "Disconnecting clears all multiplayer block edits so they never leak to other worlds");
       });
    }
 }

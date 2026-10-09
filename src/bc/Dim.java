@@ -28,7 +28,12 @@ public final class Dim {
    }
 
    public static File dir(File root, int d) {
-      return root == null || d == OVERWORLD ? root : new File(root, dirName(d));
+      if (root == null) {
+         return null;
+      }
+      String rn = root.getName();
+      File base = ("DIM-1".equals(rn) || "DIM1".equals(rn)) ? root.getParentFile() : root;
+      return d == OVERWORLD || base == null ? base : new File(base, dirName(d));
    }
 
    /** Only the Overworld has a sky: sun, moon, stars, clouds, weather, sky light, the distant terrain (LOD). */
