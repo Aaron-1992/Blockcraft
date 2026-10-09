@@ -210,6 +210,7 @@ public final class World {
                   }
                }
 
+               Net319.applyEditsToChunk(var5);
                this.ready.add(var5);
             } catch (Throwable var13) {
                var13.printStackTrace();
@@ -1184,7 +1185,7 @@ public final class World {
          int var11 = var17 ? Decor315.foot(Decor315.bedColor(var4), var22) : Decor315.head(Decor315.bedColor(var4), var22);
          if (this.getBlock(var9, var2, var10) != var11) {
             this.setBlock(var1, var2, var3, 0);
-            if (!var17) {
+            if (!var17 && (this.settings == null || this.settings.type != WorldSettings.BEDWARS)) {
                this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }

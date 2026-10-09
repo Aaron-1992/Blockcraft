@@ -63,6 +63,8 @@ public final class Net319 {
       boolean swim;
       boolean onGround = true;
       boolean hurt;
+      boolean spectator;
+      int team = -1;
       float swing = -1.0F;
       float pswing = -1.0F;
       int heldId;
@@ -72,6 +74,7 @@ public final class Net319 {
       Peer(int id, String name) {
          this.id = id;
          this.name = name;
+         this.team = Math.max(0, (id - 1) & 3);
       }
    }
 
@@ -86,6 +89,7 @@ public final class Net319 {
          this.id = id;
          this.sock = sock;
          sock.setTcpNoDelay(true);
+         sock.setKeepAlive(true);
          this.out = new PrintWriter(new OutputStreamWriter(sock.getOutputStream(), StandardCharsets.UTF_8), true);
       }
 
@@ -120,8 +124,8 @@ public final class Net319 {
    private static final ConcurrentHashMap<Long, Integer> edits = new ConcurrentHashMap<>();
    private static final ConcurrentLinkedQueue<String> inbox = new ConcurrentLinkedQueue<>();
    private static int nextConnId = 2;
-   private static int selfId = 1;
-   private static String selfName = "Player" + (int)(System.currentTimeMillis() % 900 + 100);
+   public static int selfId = 1;
+   public static String selfName = "Player" + (int)(System.currentTimeMillis() % 900 + 100);
    private static boolean applyingRemote = false;
    private static int[][] peerSkins;
    private static final java.util.concurrent.atomic.AtomicLong itemIdGen = new java.util.concurrent.atomic.AtomicLong((System.currentTimeMillis() & 0xFFFFFL) << 16);
@@ -214,7 +218,15 @@ public final class Net319 {
       return s;
    }
 
-   public static String localLanIp() {
+   /**
+    * Collects all reachable local &amp; virtual VPN IPv4 addresses (Radmin VPN 26.x.x.x, Hamachi 25.x.x.x,
+    * Tailscale 100.64..127.x.x, ZeroTier, and standard LAN 192.168.x.x / 10.x.x.x), prioritizing gaming VPNs
+    * and real Wi-Fi/Ethernet adapters over local hypervisor switches (WSL/Hyper-V/Docker/VirtualBox).
+    */
+   public static ArrayList<String> allLocalIps() {
+      ArrayList<String> vpnIps = new ArrayList<>();
+      ArrayList<String> lanIps = new ArrayList<>();
+      ArrayList<String> fallbackIps = new ArrayList<>();
       try {
          java.util.Enumeration<java.net.NetworkInterface> ifs = java.net.NetworkInterface.getNetworkInterfaces();
          while (ifs != null && ifs.hasMoreElements()) {
@@ -222,26 +234,83 @@ public final class Net319 {
             if (!ni.isUp() || ni.isLoopback()) {
                continue;
             }
+            String desc = (ni.getName() + " " + ni.getDisplayName()).toLowerCase(Locale.ROOT);
+            boolean isHypervisor = desc.contains("vethernet")
+               || desc.contains("wsl")
+               || desc.contains("hyper-v")
+               || desc.contains("docker")
+               || desc.contains("vbox")
+               || desc.contains("virtualbox")
+               || desc.contains("vmware");
+            boolean isGamingVpn = desc.contains("radmin")
+               || desc.contains("hamachi")
+               || desc.contains("tailscale")
+               || desc.contains("zerotier")
+               || desc.contains("wireguard");
             java.util.Enumeration<InetAddress> addrs = ni.getInetAddresses();
             while (addrs.hasMoreElements()) {
                InetAddress a = addrs.nextElement();
-               if (a instanceof java.net.Inet4Address && !a.isLoopbackAddress() && a.isSiteLocalAddress()) {
-                  return a.getHostAddress();
+               if (!(a instanceof java.net.Inet4Address) || a.isLoopbackAddress() || a.isLinkLocalAddress()) {
+                  continue;
+               }
+               byte[] raw = a.getAddress();
+               int b0 = raw[0] & 0xFF;
+               int b1 = raw[1] & 0xFF;
+               String ip = a.getHostAddress();
+               boolean vpnSubnet = (b0 == 26) // Radmin VPN (26.0.0.0/8)
+                  || (b0 == 25) // LogMeIn Hamachi (25.0.0.0/8)
+                  || (b0 == 100 && b1 >= 64 && b1 <= 127) // Tailscale CGNAT (100.64.0.0/10)
+                  || isGamingVpn;
+               if (vpnSubnet) {
+                  if (!vpnIps.contains(ip)) {
+                     vpnIps.add(ip);
+                  }
+               } else if (a.isSiteLocalAddress()) {
+                  if (isHypervisor || ip.startsWith("192.168.56.")) {
+                     if (!fallbackIps.contains(ip)) {
+                        fallbackIps.add(ip);
+                     }
+                  } else if (!lanIps.contains(ip)) {
+                     lanIps.add(ip);
+                  }
                }
             }
          }
       } catch (Exception ignored) {
       }
-      return "127.0.0.1";
+      ArrayList<String> out = new ArrayList<>();
+      out.addAll(vpnIps);
+      out.addAll(lanIps);
+      out.addAll(fallbackIps);
+      if (out.isEmpty()) {
+         out.add("127.0.0.1");
+      }
+      return out;
+   }
+
+   public static String localLanIp() {
+      return allLocalIps().get(0);
+   }
+
+   public static void refreshShareEndpoints(int port, String verifiedExternal) {
+      ArrayList<String> eps = new ArrayList<>();
+      if (verifiedExternal != null && !verifiedExternal.isBlank()) {
+         eps.add(verifiedExternal.trim());
+      }
+      for (String ip : allLocalIps()) {
+         String ep = ip + ":" + port;
+         if (!eps.contains(ep)) {
+            eps.add(ep);
+         }
+      }
+      publicAddress = eps.get(0);
+      shareCode = encodeShareCode(String.join("|", eps));
    }
 
    public static void copyShareCode(Game g) {
       int port = activePort > 0 ? activePort : parsePortFromAddr(serverAddr, DEFAULT_PORT);
-      if (publicAddress == null || publicAddress.isBlank()) {
-         publicAddress = localLanIp() + ":" + port;
-      }
       if (shareCode == null || shareCode.isBlank()) {
-         shareCode = encodeShareCode(publicAddress);
+         refreshShareEndpoints(port, null);
       }
       if (g != null) {
          g.setClipboard(shareCode);
@@ -279,6 +348,32 @@ public final class Net319 {
       return peers;
    }
 
+   public static int aliveEnemyPeers(int myTeam) {
+      int c = 0;
+      for (Peer p : peers.values()) {
+         if (!p.spectator && (myTeam < 0 || p.team != myTeam)) {
+            c++;
+         }
+      }
+      return c;
+   }
+
+   public static int pickAvailableTeam(int cid) {
+      boolean[] taken = new boolean[4];
+      taken[Math.abs(SkyGen.myTeam) & 3] = true;
+      for (Peer p : peers.values()) {
+         if (p.team >= 0 && p.team < 4) {
+            taken[p.team] = true;
+         }
+      }
+      for (int t = 0; t < 4; t++) {
+         if (!taken[t]) {
+            return t;
+         }
+      }
+      return Math.max(0, (cid - 1) & 3);
+   }
+
    // ------------------------------------------------------------------ Host (P2P / LAN or headless ServerMain)
    public static synchronized String host(Game g, int port) {
       return startHost(g, g != null ? g.world : null, port);
@@ -305,9 +400,7 @@ public final class Net319 {
       }
 
       startDiscoveryResponder(activePort);
-      String lanEndpoint = localLanIp() + ":" + activePort;
-      publicAddress = lanEndpoint;
-      shareCode = encodeShareCode(lanEndpoint);
+      refreshShareEndpoints(activePort, null);
       if (mpWorldwide && System.getProperty("bc.test") == null) {
          startWorldwideAccess(activePort);
       }
@@ -315,7 +408,7 @@ public final class Net319 {
       acceptThread.setDaemon(true);
       acceptThread.start();
       return "Hosting " + WorldSettings.TYPE_NAME[w != null && w.settings != null ? w.settings.type : mpWorldType]
-         + " on port " + activePort + " | Share Code: " + shareCode;
+         + " on " + publicAddress + " | Share Code: " + shareCode;
    }
 
    /** Opens worldwide connectivity without manual router configuration via UPnP/NAT-PMP + SSH reverse TCP tunnel. */
@@ -323,9 +416,8 @@ public final class Net319 {
       Thread t = new Thread(() -> {
          tryUpnpAndNatPmp(port);
          String pubIp = queryPublicIp();
-         if (pubIp != null && !pubIp.isBlank()) {
-            publicAddress = pubIp.trim() + ":" + port;
-            shareCode = encodeShareCode(publicAddress);
+         if (pubIp != null && !pubIp.isBlank() && isPortListening(pubIp.trim(), port, 900)) {
+            refreshShareEndpoints(port, pubIp.trim() + ":" + port);
             statusText = "Worldwide UPnP active: " + publicAddress + " | Share Code: " + shareCode;
          }
          startReverseTunnel(port);
@@ -388,48 +480,53 @@ public final class Net319 {
    }
 
    private static void startReverseTunnel(int port) {
-      try {
-         if (tunnelProc != null) {
-            tunnelProc.destroyForcibly();
-            tunnelProc = null;
+      String nullFile = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win") ? "NUL" : "/dev/null";
+      for (String target : new String[]{"tcp@a.pinggy.io", "serveo.net"}) {
+         if (!hosting) {
+            return;
          }
-         Process p = new ProcessBuilder(
-               "ssh",
-               "-o", "StrictHostKeyChecking=no",
-               "-o", "UserKnownHostsFile=/dev/null",
-               "-o", "BatchMode=yes",
-               "-o", "ConnectTimeout=5",
-               "-o", "ServerAliveInterval=30",
-               "-R", "0:127.0.0.1:" + port,
-               "tcp@a.pinggy.io"
-            )
-            .redirectErrorStream(true)
-            .start();
-         tunnelProc = p;
-         try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while (hosting && (line = br.readLine()) != null) {
-               int idx = line.indexOf("tcp://");
-               if (idx >= 0) {
-                  String sub = line.substring(idx + 6).trim();
-                  int sp = sub.indexOf(' ');
-                  if (sp > 0) {
-                     sub = sub.substring(0, sp);
-                  }
-                  if (sub.contains(":") && !sub.startsWith("127.")) {
-                     publicAddress = sub;
-                     shareCode = encodeShareCode(publicAddress);
-                     statusText = "Worldwide Tunnel ready: " + publicAddress + " | Share Code: " + shareCode;
-                     Game hg = hostGame;
-                     if (hg != null) {
-                        hg.say("§a[Worldwide] Public Tunnel ready: " + publicAddress + " (Share Code: " + shareCode + ")");
+         try {
+            if (tunnelProc != null) {
+               tunnelProc.destroyForcibly();
+               tunnelProc = null;
+            }
+            Process p = new ProcessBuilder(
+                  "ssh",
+                  "-T",
+                  "-o", "StrictHostKeyChecking=no",
+                  "-o", "UserKnownHostsFile=" + nullFile,
+                  "-o", "ConnectTimeout=6",
+                  "-o", "ServerAliveInterval=25",
+                  "-R", "0:127.0.0.1:" + port,
+                  target
+               )
+               .redirectErrorStream(true)
+               .start();
+            tunnelProc = p;
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+               String line;
+               while (hosting && (line = br.readLine()) != null) {
+                  int idx = line.indexOf("tcp://");
+                  if (idx >= 0) {
+                     String sub = line.substring(idx + 6).trim();
+                     int sp = sub.indexOf(' ');
+                     if (sp > 0) {
+                        sub = sub.substring(0, sp);
                      }
-                     break;
+                     if (sub.contains(":") && !sub.startsWith("127.")) {
+                        refreshShareEndpoints(port, sub);
+                        statusText = "Worldwide Tunnel ready: " + publicAddress + " | Share Code: " + shareCode;
+                        Game hg = hostGame;
+                        if (hg != null) {
+                           hg.say("§a[Worldwide] Public Tunnel ready: " + publicAddress + " (Share Code: " + shareCode + ")");
+                        }
+                        return;
+                     }
                   }
                }
             }
+         } catch (Exception ignored) {
          }
-      } catch (Exception ignored) {
       }
    }
 
@@ -480,13 +577,14 @@ public final class Net319 {
             int dim = curW != null ? curW.dim : 0;
             long dayTime = curW != null ? curW.dayTime : 1000L;
             int wType = curW != null && curW.settings != null ? curW.settings.type : mpWorldType;
-            int gMode = hg != null && hg.player != null
-               ? hg.player.rawMode()
-               : mpGameMode;
+            int gMode = (wType == WorldSettings.BEDWARS || wType == WorldSettings.SKYWARS || wType == WorldSettings.SKYBLOCK)
+               ? 0
+               : (hg != null && hg.player != null ? hg.player.rawMode() : mpGameMode);
+            int assignedTeam = pickAvailableTeam(cid);
             double sx = 8.5;
             double sy = 72.0;
             double sz = 8.5;
-            double[] modeSp = SkyGen.multiplayerSpawnFor(curW, cid - 1);
+            double[] modeSp = SkyGen.multiplayerSpawnFor(curW, wType == WorldSettings.BEDWARS ? assignedTeam : (cid - 1));
             if (modeSp != null) {
                sx = modeSp[0];
                sy = modeSp[1];
@@ -502,10 +600,39 @@ public final class Net319 {
                sz = first.z;
             }
 
-            c.send(String.format(Locale.ROOT, "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d", cid, seed, dim, dayTime, sx, sy, sz, wType, gMode));
+            c.send(
+               String.format(
+                  Locale.ROOT,
+                  "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d",
+                  cid,
+                  seed,
+                  dim,
+                  dayTime,
+                  sx,
+                  sy,
+                  sz,
+                  wType,
+                  gMode,
+                  assignedTeam,
+                  SkyGen.matchState
+               )
+            );
+            c.send("TEAM 1 " + SkyGen.myTeam);
+            if (curW != null && wType == WorldSettings.BEDWARS) {
+               for (int t = 0; t < 4; t++) {
+                  if (!SkyGen.isTeamBedIntact(curW, t)) {
+                     c.send("BED " + t + " Server");
+                  }
+               }
+            }
             if (hg != null && hg.player != null && curW != null) {
                Player pl = hg.player;
-               int flags = (pl.sneaking ? 1 : 0) | (pl.sprinting ? 2 : 0) | (pl.inWater ? 4 : 0) | (pl.onGround ? 8 : 0) | (pl.hurtTime > 0 ? 16 : 0);
+               int flags = (pl.sneaking ? 1 : 0)
+                  | (pl.sprinting ? 2 : 0)
+                  | (pl.inWater ? 4 : 0)
+                  | (pl.onGround ? 8 : 0)
+                  | (pl.hurtTime > 0 ? 16 : 0)
+                  | ((pl.dead || pl.spectator) ? 32 : 0);
                float sw = hg.swinging ? hg.swing : -1.0F;
                c.send(
                   String.format(
@@ -529,7 +656,13 @@ public final class Net319 {
             }
 
             for (Peer p : peers.values()) {
-               int flags = (p.sneak ? 1 : 0) | (p.sprint ? 2 : 0) | (p.swim ? 4 : 0) | (p.onGround ? 8 : 0) | (p.hurt ? 16 : 0);
+               c.send("TEAM " + p.id + " " + p.team);
+               int flags = (p.sneak ? 1 : 0)
+                  | (p.sprint ? 2 : 0)
+                  | (p.swim ? 4 : 0)
+                  | (p.onGround ? 8 : 0)
+                  | (p.hurt ? 16 : 0)
+                  | (p.spectator ? 32 : 0);
                c.send(
                   String.format(
                      Locale.ROOT,
@@ -586,7 +719,9 @@ public final class Net319 {
                continue;
             }
 
-            if (line.startsWith("HELLO ")) {
+            if (line.equals("PING")) {
+               c.send("PONG");
+            } else if (line.startsWith("HELLO ")) {
                String[] p = line.split("\\s+", 3);
                if (p.length >= 3) {
                   c.name = sanitizeName(p[2]);
@@ -598,7 +733,10 @@ public final class Net319 {
                || line.startsWith("CHAT ")
                || line.startsWith("HIT ")
                || line.startsWith("DROP ")
-               || line.startsWith("PICKUP ")) {
+               || line.startsWith("PICKUP ")
+               || line.startsWith("BED ")
+               || line.startsWith("TEAM ")
+               || line.startsWith("MATCH ")) {
                inbox.add(line);
                broadcastExcept(c.id, line);
             }
@@ -621,54 +759,170 @@ public final class Net319 {
    }
 
    // ------------------------------------------------------------------ Client Join
+   private static String[] parseHostPort(String ep) {
+      String h = "127.0.0.1";
+      int p = DEFAULT_PORT;
+      String t = ep == null ? "" : ep.trim();
+      if (t.startsWith("tcp://")) {
+         t = t.substring(6).trim();
+      }
+      int colon = t.lastIndexOf(':');
+      if (colon > 0 && colon < t.length() - 1) {
+         h = t.substring(0, colon).trim();
+         try {
+            p = Integer.parseInt(t.substring(colon + 1).trim());
+         } catch (NumberFormatException ignored) {
+         }
+      } else if (!t.isEmpty()) {
+         try {
+            p = Integer.parseInt(t);
+         } catch (NumberFormatException e) {
+            h = t;
+         }
+      }
+      return new String[]{h, Integer.toString(p)};
+   }
+
    public static synchronized String join(Game g, String target) {
       disconnect(g);
-      String host = "127.0.0.1";
-      int port = DEFAULT_PORT;
+      ArrayList<String[]> candidates = new ArrayList<>();
       if (target == null || target.isBlank() || target.equalsIgnoreCase("lan") || target.equalsIgnoreCase("auto")) {
-         String[] disc = discoverLan(350);
+         String[] disc = discoverLan(900);
          if (disc != null) {
-            host = disc[0];
-            port = Integer.parseInt(disc[1]);
+            candidates.add(disc);
+         } else {
+            candidates.add(new String[]{"127.0.0.1", Integer.toString(DEFAULT_PORT)});
          }
       } else {
-         String t = decodeAddress(target);
-         int colon = t.lastIndexOf(':');
-         if (colon > 0 && colon < t.length() - 1) {
-            host = t.substring(0, colon);
-            try {
-               port = Integer.parseInt(t.substring(colon + 1));
-            } catch (NumberFormatException ignored) {
+         String decoded = decodeAddress(target);
+         for (String part : decoded.split("[|,;]+")) {
+            if (!part.isBlank()) {
+               candidates.add(parseHostPort(part));
             }
-         } else {
-            try {
-               port = Integer.parseInt(t);
-            } catch (NumberFormatException e) {
-               host = t;
+         }
+         if (candidates.isEmpty()) {
+            candidates.add(new String[]{"127.0.0.1", Integer.toString(DEFAULT_PORT)});
+         }
+      }
+
+      // Race all candidate endpoints (Tunnel, Radmin VPN, Tailscale, Hamachi, LAN) with a generous 5500ms timeout
+      Socket connectedSock = null;
+      String connectedHost = candidates.get(0)[0];
+      int connectedPort = Integer.parseInt(candidates.get(0)[1]);
+      IOException lastErr = null;
+      int timeoutMs = System.getProperty("bc.test") != null ? 1200 : 5500;
+
+      if (candidates.size() == 1) {
+         try {
+            Socket s = new Socket();
+            s.connect(new InetSocketAddress(connectedHost, connectedPort), timeoutMs);
+            connectedSock = s;
+         } catch (IOException e) {
+            lastErr = e;
+         }
+      } else {
+         final Object lock = new Object();
+         final Socket[] winner = new Socket[1];
+         final String[] winAddr = new String[2];
+         final IOException[] errRef = new IOException[1];
+         final int[] remaining = new int[]{candidates.size()};
+         for (String[] cand : candidates) {
+            final String ch = cand[0];
+            final int cp = Integer.parseInt(cand[1]);
+            Thread racer = new Thread(() -> {
+               Socket s = new Socket();
+               try {
+                  s.connect(new InetSocketAddress(ch, cp), timeoutMs);
+                  synchronized (lock) {
+                     if (winner[0] == null) {
+                        winner[0] = s;
+                        winAddr[0] = ch;
+                        winAddr[1] = Integer.toString(cp);
+                        lock.notifyAll();
+                        return;
+                     }
+                  }
+                  s.close();
+               } catch (IOException e) {
+                  try {
+                     s.close();
+                  } catch (IOException ignored) {
+                  }
+                  synchronized (lock) {
+                     errRef[0] = e;
+                     remaining[0]--;
+                     if (remaining[0] <= 0) {
+                        lock.notifyAll();
+                     }
+                  }
+               }
+            }, "bc-net-racer");
+            racer.setDaemon(true);
+            racer.start();
+         }
+         synchronized (lock) {
+            long deadline = System.currentTimeMillis() + timeoutMs + 200L;
+            while (winner[0] == null && remaining[0] > 0) {
+               long wait = deadline - System.currentTimeMillis();
+               if (wait <= 0L) {
+                  break;
+               }
+               try {
+                  lock.wait(wait);
+               } catch (InterruptedException ignored) {
+                  break;
+               }
+            }
+            if (winner[0] != null) {
+               connectedSock = winner[0];
+               connectedHost = winAddr[0];
+               connectedPort = Integer.parseInt(winAddr[1]);
+            } else {
+               lastErr = errRef[0];
             }
          }
       }
 
-      try {
-         Socket s = new Socket();
-         s.connect(new InetSocketAddress(host, port), 1500);
-         Conn c = new Conn(0, s);
-         clientConn = c;
-         clientConnected = true;
-         activePort = port;
-         selfId = 0;
-         selfName = "Peer" + (int)(System.currentTimeMillis() % 900 + 100);
-         c.send("HELLO 0 " + selfName);
-         Thread rt = new Thread(() -> readLoopClient(c), "bc-net-reader");
-         rt.setDaemon(true);
-         rt.start();
-         statusText = "Connected to " + host + ":" + port + " as " + selfName;
-         return statusText;
-      } catch (IOException e) {
-         clientConnected = false;
-         statusText = "Could not connect to " + host + ":" + port + " (" + e.getMessage() + ")";
-         return "§c" + statusText;
+      // Automatic LAN / Radmin VPN broadcast discovery fallback if direct target timed out
+      if (connectedSock == null && System.getProperty("bc.test") == null) {
+         String[] disc = discoverLan(800);
+         if (disc != null) {
+            try {
+               Socket s = new Socket();
+               int dp = Integer.parseInt(disc[1]);
+               s.connect(new InetSocketAddress(disc[0], dp), 2500);
+               connectedSock = s;
+               connectedHost = disc[0];
+               connectedPort = dp;
+            } catch (IOException e) {
+               lastErr = e;
+            }
+         }
       }
+
+      if (connectedSock != null) {
+         try {
+            Conn c = new Conn(0, connectedSock);
+            clientConn = c;
+            clientConnected = true;
+            activePort = connectedPort;
+            selfId = 0;
+            selfName = "Peer" + (int)(System.currentTimeMillis() % 900 + 100);
+            c.send("HELLO 0 " + selfName);
+            Thread rt = new Thread(() -> readLoopClient(c), "bc-net-reader");
+            rt.setDaemon(true);
+            rt.start();
+            statusText = "Connected to " + connectedHost + ":" + connectedPort + " as " + selfName;
+            return statusText;
+         } catch (IOException e) {
+            lastErr = e;
+         }
+      }
+
+      clientConnected = false;
+      String errMsg = lastErr != null ? lastErr.getMessage() : "Connection timed out";
+      statusText = "Could not connect to " + connectedHost + ":" + connectedPort + " (" + errMsg + ")";
+      return "§c" + statusText;
    }
 
    /** Update 3.19 / 4.0: called from the Multiplayer menu to join a target server or LAN host. */
@@ -679,7 +933,7 @@ public final class Net319 {
    public static void joinFromMenu(Game g, String target) {
       String msg = join(g, target);
       if (clientConnected && g != null) {
-         for (int i = 0; i < 25 && inbox.isEmpty(); i++) {
+         for (int i = 0; i < 180 && inbox.isEmpty(); i++) {
             try {
                Thread.sleep(10L);
             } catch (InterruptedException ignored) {
@@ -705,19 +959,27 @@ public final class Net319 {
       }
 
       int port = parsePortFromAddr(decodeAddress(serverAddr), DEFAULT_PORT);
-      if (g.world == null || (g.world.settings != null && g.world.settings.type != mpWorldType)) {
-         WorldSettings ws = new WorldSettings();
-         ws.type = mpWorldType;
-         Gen tmpGen = Dim.makeGen(Dim.OVERWORLD, 20260400L, ws);
+      WorldSettings ws = new WorldSettings();
+      ws.type = mpWorldType;
+      SkyGen.myTeam = 0;
+      if (ws.isMinigame()) {
+         SkyGen.matchState = SkyGen.STATE_WAITING;
+         SkyGen.resetMatchState();
+      }
+      if (g.world == null || ws.isMinigame() || (g.world.settings != null && g.world.settings.type != mpWorldType)) {
+         long seed = ws.isMinigame() ? (System.currentTimeMillis() & 0x7FFFFFFFL) : 20260400L;
+         Gen tmpGen = Dim.makeGen(Dim.OVERWORLD, seed, ws);
          int[] sp = tmpGen.findSpawn();
-         g.joinMultiplayerWorld(20260400L, 0, 1000L, sp[0] + 0.5, Math.max(65.0, sp[1]), sp[2] + 0.5, mpWorldType, mpGameMode);
+         g.joinMultiplayerWorld(seed, 0, 1000L, sp[0] + 0.5, Math.max(65.0, sp[1]), sp[2] + 0.5, mpWorldType, mpGameMode);
       } else if (g.player != null) {
          g.player.setMode(mpGameMode);
       }
 
       String msg = host(g, port);
       statusText = Gui.stripCodes(msg);
-      g.setScreen(Game.S.PLAY);
+      if (g.screen != Game.S.LOADING && g.screen != Game.S.WAITING) {
+         g.setScreen(ws.isMinigame() ? Game.S.WAITING : Game.S.PLAY);
+      }
       g.say(msg);
    }
 
@@ -784,8 +1046,12 @@ public final class Net319 {
    }
 
    private static boolean isPortListening(String host, int port) {
+      return isPortListening(host, port, 120);
+   }
+
+   private static boolean isPortListening(String host, int port, int timeoutMs) {
       try (Socket s = new Socket()) {
-         s.connect(new InetSocketAddress(host, port), 120);
+         s.connect(new InetSocketAddress(host, port), Math.max(80, timeoutMs));
          return true;
       } catch (IOException e) {
          return false;
@@ -798,6 +1064,10 @@ public final class Net319 {
       }
 
       String t = addr.trim();
+      int pipe = t.indexOf('|');
+      if (pipe > 0) {
+         t = t.substring(0, pipe).trim();
+      }
       int colon = t.lastIndexOf(':');
       if (colon >= 0 && colon < t.length() - 1) {
          try {
@@ -815,10 +1085,41 @@ public final class Net319 {
    public static String[] discoverLan(int timeoutMs) {
       try (DatagramSocket ds = new DatagramSocket()) {
          ds.setBroadcast(true);
-         ds.setSoTimeout(Math.max(100, timeoutMs));
+         ds.setSoTimeout(Math.max(150, timeoutMs));
          byte[] req = DISCOVER_REQ.getBytes(StandardCharsets.UTF_8);
-         ds.send(new DatagramPacket(req, req.length, InetAddress.getByName("255.255.255.255"), DISCOVERY_PORT));
          ds.send(new DatagramPacket(req, req.length, InetAddress.getByName("127.0.0.1"), DISCOVERY_PORT));
+         ds.send(new DatagramPacket(req, req.length, InetAddress.getByName("255.255.255.255"), DISCOVERY_PORT));
+         try {
+            java.util.Enumeration<java.net.NetworkInterface> ifs = java.net.NetworkInterface.getNetworkInterfaces();
+            while (ifs != null && ifs.hasMoreElements()) {
+               java.net.NetworkInterface ni = ifs.nextElement();
+               if (!ni.isUp() || ni.isLoopback()) {
+                  continue;
+               }
+               for (java.net.InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                  InetAddress bcast = ia.getBroadcast();
+                  if (bcast != null) {
+                     try {
+                        ds.send(new DatagramPacket(req, req.length, bcast, DISCOVERY_PORT));
+                     } catch (IOException ignored) {
+                     }
+                  }
+                  InetAddress addr = ia.getAddress();
+                  if (addr instanceof java.net.Inet4Address) {
+                     byte[] raw = addr.getAddress();
+                     int b0 = raw[0] & 0xFF;
+                     if (b0 == 26 || b0 == 25) {
+                        // Radmin VPN (26.255.255.255) & Hamachi (25.255.255.255) broadcast
+                        try {
+                           ds.send(new DatagramPacket(req, req.length, InetAddress.getByName(b0 + ".255.255.255"), DISCOVERY_PORT));
+                        } catch (IOException ignored) {
+                        }
+                     }
+                  }
+               }
+            }
+         } catch (Exception ignored) {
+         }
          byte[] buf = new byte[128];
          DatagramPacket rep = new DatagramPacket(buf, buf.length);
          ds.receive(rep);
@@ -952,6 +1253,64 @@ public final class Net319 {
       }
    }
 
+   public static void applyEditsToChunk(Chunk ch) {
+      if (ch == null || edits.isEmpty() || !isActive()) {
+         return;
+      }
+      boolean changed = false;
+      for (Map.Entry<Long, Integer> e : edits.entrySet()) {
+         long k = e.getKey();
+         int bx = unpackX(k);
+         int bz = unpackZ(k);
+         if ((bx >> 4) == ch.cx && (bz >> 4) == ch.cz) {
+            int by = unpackY(k);
+            if (by >= 0 && by <= 255) {
+               ch.set(bx & 15, by, bz & 15, e.getValue());
+               changed = true;
+            }
+         }
+      }
+      if (changed) {
+         ch.computeHeightmap();
+      }
+   }
+
+   public static void sendBedDestroyed(int team, String breaker) {
+      if (!isActive()) {
+         return;
+      }
+      String pkt = "BED " + team + " " + sanitizeName(breaker == null ? selfName : breaker);
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static void sendTeamSelect(int team) {
+      if (!isActive()) {
+         return;
+      }
+      String pkt = "TEAM " + selfId + " " + (Math.abs(team) & 3);
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static void sendMatchControl(String action) {
+      if (!isActive()) {
+         return;
+      }
+      String pkt = "MATCH " + action;
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
    // ------------------------------------------------------------------ V4.0: Dropped Item Synchronization
    static String formatDropPacket(World.Item it) {
       return String.format(
@@ -1062,7 +1421,7 @@ public final class Net319 {
       Peer best = null;
       double bestT = maxDist;
       for (Peer p : peers.values()) {
-         if (p.dim != g.world.dim) {
+         if (p.dim != g.world.dim || p.spectator) {
             continue;
          }
 
@@ -1171,7 +1530,12 @@ public final class Net319 {
 
       // Broadcast our own pose at 20 Hz
       Player pl = g.player;
-      int flags = (pl.sneaking ? 1 : 0) | (pl.sprinting ? 2 : 0) | (pl.inWater ? 4 : 0) | (pl.onGround ? 8 : 0) | (pl.hurtTime > 0 ? 16 : 0);
+      int flags = (pl.sneaking ? 1 : 0)
+         | (pl.sprinting ? 2 : 0)
+         | (pl.inWater ? 4 : 0)
+         | (pl.onGround ? 8 : 0)
+         | (pl.hurtTime > 0 ? 16 : 0)
+         | ((pl.dead || pl.spectator) ? 32 : 0);
       float sw = g.swinging ? g.swing : -1.0F;
       String poseLine = String.format(
          Locale.ROOT,
@@ -1197,6 +1561,9 @@ public final class Net319 {
          }
       } else if (clientConnected && clientConn != null) {
          clientConn.send(poseLine);
+         if (g.tickCount % 40 == 0) {
+            clientConn.send("PING");
+         }
       }
 
       // Step peer animations smoothly
@@ -1243,6 +1610,10 @@ public final class Net319 {
                      double sz = p.length >= 8 ? Double.parseDouble(p[7]) : 8.5;
                      int wType = p.length >= 9 ? Integer.parseInt(p[8]) : WorldSettings.DEFAULT;
                      int gMode = p.length >= 10 ? Integer.parseInt(p[9]) : 1;
+                     int assignedTeam = p.length >= 11 ? Integer.parseInt(p[10]) : Math.max(0, (selfId - 1) & 3);
+                     int hostMatchState = p.length >= 12 ? Integer.parseInt(p[11]) : SkyGen.STATE_PLAYING;
+                     SkyGen.myTeam = Math.abs(assignedTeam) & 3;
+                     SkyGen.matchState = hostMatchState;
                      if (g != null) {
                         g.joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, wType, gMode);
                      } else if (w != null) {
@@ -1251,6 +1622,7 @@ public final class Net319 {
 
                      if (clientConn != null) {
                         clientConn.send("HELLO " + selfId + " " + selfName);
+                        clientConn.send("TEAM " + selfId + " " + SkyGen.myTeam);
                         if (g != null && g.player != null && g.world != null) {
                            Player pl = g.player;
                            int flags = (pl.sneaking ? 1 : 0) | (pl.sprinting ? 2 : 0) | (pl.inWater ? 4 : 0) | (pl.onGround ? 8 : 0);
@@ -1274,6 +1646,34 @@ public final class Net319 {
                               )
                            );
                         }
+                     }
+                  }
+               }
+               case "BED" -> {
+                  if (p.length >= 2) {
+                     int team = Integer.parseInt(p[1]);
+                     String breaker = p.length >= 3 ? p[2] : "";
+                     SkyGen.onBedDestroyed(g, w, team, breaker, false);
+                  }
+               }
+               case "TEAM" -> {
+                  if (p.length >= 3) {
+                     int pid = Integer.parseInt(p[1]);
+                     int team = Math.abs(Integer.parseInt(p[2])) & 3;
+                     if (pid != selfId) {
+                        Peer peer = peers.computeIfAbsent(pid, k -> new Peer(k, "Player" + k));
+                        peer.team = team;
+                     }
+                  }
+               }
+               case "MATCH" -> {
+                  if (p.length >= 2 && g != null) {
+                     String act = p[1].toUpperCase(Locale.ROOT);
+                     if ("START".equals(act)) {
+                        SkyGen.startMatch(g, false);
+                     } else if ("WAIT".equals(act) || "LOBBY".equals(act)) {
+                        SkyGen.matchState = SkyGen.STATE_WAITING;
+                        g.setScreen(Game.S.WAITING);
                      }
                   }
                }
@@ -1360,6 +1760,7 @@ public final class Net319 {
                      peer.swim = (flags & 4) != 0;
                      peer.onGround = (flags & 8) != 0;
                      peer.hurt = (flags & 16) != 0;
+                     peer.spectator = (flags & 32) != 0;
                      peer.swing = Float.parseFloat(p[10]);
                      peer.heldId = Integer.parseInt(p[11]);
                      peer.skinIdx = Integer.parseInt(p[12]);
@@ -1509,7 +1910,7 @@ public final class Net319 {
       GL11.glDepthMask(true);
       GL11.glDisable(2884);
       for (Peer p : peers.values()) {
-         if (p.dim != w.dim) {
+         if (p.dim != w.dim || (p.spectator && (r.g.player == null || !r.g.player.spectator))) {
             continue;
          }
 

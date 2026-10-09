@@ -63,11 +63,33 @@ public final class ServerMain {
       ws.type = worldType;
       ws.structures = structures;
 
-      File dir = new File("saves/server-" + WorldSettings.TYPE_NAME[worldType].split("\\s+")[0].toLowerCase(Locale.ROOT));
-      dir.mkdirs();
+      File dir = null;
+      if (ws.isMinigame()) {
+         SkyGen.matchState = SkyGen.STATE_WAITING;
+         SkyGen.resetMatchState();
+         Game.deleteDir(new File("saves/server-skywars"));
+         Game.deleteDir(new File("saves/server-bedwars"));
+      } else {
+         dir = new File("saves/server-" + WorldSettings.TYPE_NAME[worldType].split("\\s+")[0].toLowerCase(Locale.ROOT));
+         dir.mkdirs();
+      }
       World w = new World(seed, dir, Dim.OVERWORLD, ws);
+      if (ws.isMinigame()) {
+         w.saveEnabled = false;
+      }
       int[] sp = w.gen.findSpawn();
       w.getBlock(sp[0], sp[1], sp[2]); // Warm spawn chunk
+      if (ws.isVoidMode()) {
+         for (int cz = -3; cz <= 3; cz++) {
+            for (int cx = -3; cx <= 3; cx++) {
+               Chunk ch = w.gen.generate(cx, cz);
+               w.chunks.put(World.key(cx, cz), ch);
+            }
+         }
+         for (Chunk ch : new java.util.ArrayList<>(w.chunks.values())) {
+            w.lightChunk(ch);
+         }
+      }
 
       String msg = Net319.startHost(null, w, port);
       System.out.println("================================================================");
@@ -97,6 +119,9 @@ public final class ServerMain {
                   System.out.println("Peers connected : " + Net319.peerCount());
                   System.out.println("Public Endpoint : " + Net319.publicAddress);
                   System.out.println("Share Code      : " + Net319.shareCode);
+               } else if (line.equalsIgnoreCase("start")) {
+                  SkyGen.startMatch(null, true);
+                  System.out.println("Match started!");
                } else if (line.toLowerCase(Locale.ROOT).startsWith("say ")) {
                   Net319.sendChat(null, line.substring(4).trim());
                }
@@ -112,6 +137,7 @@ public final class ServerMain {
          Thread.sleep(50L);
          w.tickCount++;
          w.dayTime = (w.dayTime + 1L) % 24000L;
+         w.updateChunks(0, 0, 4, 32);
          SkyGen.tickMode(null, w);
          Net319.processInbox(w, null);
          if (!Net319.publicAddress.equals(lastPrintedTunnel) && !Net319.publicAddress.startsWith(Net319.localLanIp())) {

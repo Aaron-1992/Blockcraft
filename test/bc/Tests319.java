@@ -647,6 +647,107 @@ final class Tests319 {
          eq(Blocks.GRASS, sbSouth.blocks[Chunk.idx(0, SkyGen.Y_DECK, 0)] & 0xFFFF, "Skyblock South Jungle island generated");
          check(Trades.offers(Trades.BEDWARS_SHOP).length == 6, "Bedwars Item Shop has 6 trades");
          check(Trades.offers(Trades.BEDWARS_ARMOR).length == 6, "Bedwars Gear & Upgrades Shop has 6 trades");
+
+         // 6. Minigame Ephemeral Non-Saving, Waiting Screen UI, Multi-Endpoint VPN Share Code & Bedwars Team/Bed Mechanics
+         check(swWs.isMinigame() && bwWs.isMinigame() && !sbWs.isMinigame(), "Only Skywars and Bedwars are ephemeral minigames");
+
+         Game bwGame = new Game();
+         bwGame.opt = new Options(new java.io.File(java.nio.file.Files.createTempDirectory("bcbw").toFile(), "opt"));
+         bwGame.newSettings = bwWs.copy();
+         bwGame.startWorld(true, "Bedwars Test", 0);
+         check(bwGame.rootDir == null && bwGame.world.dir == null && !bwGame.world.saveEnabled, "Bedwars minigame world has saving disabled and no disk directory");
+         bwGame.saveWorld();
+         check(bwGame.rootDir == null && bwGame.world.dir == null, "saveWorld() on a minigame does not create any save files");
+         eq(SkyGen.STATE_WAITING, SkyGen.matchState, "Minigame initializes in STATE_WAITING pre-game lobby");
+
+         // Verify Screens.waiting layout across window sizes
+         for (int[] sz : TestsUi.SIZES) {
+            GuiRaster gr = new GuiRaster(sz[0] * 3, sz[1] * 3);
+            bwGame.gui = gr;
+            bwGame.fbW = sz[0] * 3;
+            bwGame.fbH = sz[1] * 3;
+            bwGame.winW = sz[0] * 3;
+            bwGame.winH = sz[1] * 3;
+            gr.begin(sz[0] * 3, sz[1] * 3, 3);
+            bwGame.activeBtnsSwap();
+            Screens.waiting(bwGame);
+            bwGame.activeBtns = bwGame.btns;
+            for (int i = 0; i < bwGame.activeBtns.size(); i++) {
+               Game.Btn b = bwGame.activeBtns.get(i);
+               check(b.x >= 0 && b.y >= 0 && b.x + b.w <= gr.w && b.y + b.h <= gr.h, "waiting button inside screen at " + sz[0] + "x" + sz[1]);
+               check(Gui.textWidth(b.label) <= b.w - 6, "waiting label fits button: " + b.label);
+               for (int j = i + 1; j < bwGame.activeBtns.size(); j++) {
+                  check(!TestsUi.overlap(b, bwGame.activeBtns.get(j)), "waiting buttons do not overlap: " + b.label + " vs " + bwGame.activeBtns.get(j).label);
+               }
+            }
+         }
+
+         // Warm Bedwars arena chunks so all 4 team bases and beds exist
+         for (int cx = -3; cx <= 3; cx++) {
+            for (int cz = -3; cz <= 3; cz++) {
+               Chunk ch = bwGame.world.gen.generate(cx, cz);
+               bwGame.world.chunks.put(World.key(cx, cz), ch);
+            }
+         }
+         for (Chunk ch : new java.util.ArrayList<>(bwGame.world.chunks.values())) {
+            bwGame.world.lightChunk(ch);
+         }
+         SkyGen.tickMode(bwGame, bwGame.world);
+         for (int t = 0; t < 4; t++) {
+            check(SkyGen.isTeamBedIntact(bwGame.world, t), "Bedwars Team " + t + " bed is intact at match start");
+         }
+
+         // Verify players cannot break their own bed
+         SkyGen.selectTeam(bwGame, 0, false); // Red Team
+         int[] redFoot = SkyGen.getTeamBedFoot(0);
+         bwGame.breakBlock(redFoot[0], redFoot[1], redFoot[2]);
+         check(SkyGen.isTeamBedIntact(bwGame.world, 0), "Red player cannot break Red Team's own bed");
+
+         // Verify Blue Team player spawns and respawns at Blue Base (0, 65, 42) with Blue Wool, NEVER at Red bed
+         SkyGen.selectTeam(bwGame, 1, false); // Blue Team
+         eq(1, SkyGen.getPlayerTeam(bwGame), "Player team is Blue (1)");
+         int[] blueSp = SkyGen.getTeamSpawnBlock(1);
+         eq(blueSp[0] + 0.5, bwGame.player.x, "Blue player spawns at Blue Base X");
+         eq(blueSp[2] + 0.5, bwGame.player.z, "Blue player spawns at Blue Base Z");
+         bwGame.player.dead = true;
+         bwGame.respawn();
+         check(!bwGame.player.dead && !bwGame.player.spectator, "Blue player respawns alive while Blue bed is intact");
+         eq(blueSp[0] + 0.5, bwGame.player.x, "Blue player respawns at Blue Base X (NOT Red bed)");
+         eq(blueSp[2] + 0.5, bwGame.player.z, "Blue player respawns at Blue Base Z (NOT Red bed)");
+         eq(Blocks.WOOL0 + 11, bwGame.inv[1].id, "Blue player respawns with Blue Wool");
+
+         // Verify Blue player can break Red Team's enemy bed (no bed item dropped!) and Red is eliminated
+         int dropsBefore = bwGame.world.items.size();
+         bwGame.breakBlock(redFoot[0], redFoot[1], redFoot[2]);
+         check(!SkyGen.isTeamBedIntact(bwGame.world, 0), "Enemy Red bed is destroyed when broken by Blue player");
+         eq(dropsBefore, bwGame.world.items.size(), "Breaking a bed in Bedwars does not drop a bed item");
+
+         // Verify a Red player whose bed is destroyed is eliminated into Spectator Mode upon respawn (cannot respawn at Red bed!)
+         SkyGen.myTeam = 0;
+         bwGame.player.dead = true;
+         bwGame.respawn();
+         check(bwGame.player.spectator && bwGame.player.rawMode() == 3, "Red player with destroyed bed enters Spectator Mode on respawn");
+         check(bwGame.bedPos == null, "Eliminated player has bedPos cleared");
+
+         // Verify Multi-Endpoint Share Code & Parallel Join (Radmin VPN / LAN fallback without timing out)
+         int mpPort = 25594;
+         String bwHostMsg = Net319.host(bwGame, mpPort);
+         check(Net319.isHosting(), "Bedwars host started on port " + mpPort + ": " + bwHostMsg);
+         try {
+            String multiRaw = "203.0.113.1:25594,127.0.0.1:" + mpPort;
+            String multiCode = Net319.encodeShareCode(multiRaw);
+            eq(multiRaw, Net319.decodeAddress(multiCode), "Multi-endpoint Share Code round-trips VPN + LAN endpoints");
+            try (java.net.Socket s2 = new java.net.Socket("127.0.0.1", mpPort)) {
+               s2.setSoTimeout(1500);
+               java.io.BufferedReader in2 = new java.io.BufferedReader(new java.io.InputStreamReader(s2.getInputStream()));
+               String assign2 = in2.readLine();
+               check(assign2 != null && assign2.startsWith("ASSIGN "), "Bedwars host sends ASSIGN with team & matchState: " + assign2);
+               String[] ap = assign2.split("\\s+");
+               check(ap.length >= 11 && Integer.parseInt(ap[10]) != 0, "Joining peer is assigned a non-Red team (" + (ap.length >= 11 ? ap[10] : "?") + ")");
+            }
+         } finally {
+            Net319.disconnect(bwGame);
+         }
       });
    }
 }

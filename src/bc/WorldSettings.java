@@ -119,6 +119,10 @@ public final class WorldSettings {
       return this.type == SKYBLOCK || this.type == SKYWARS || this.type == BEDWARS;
    }
 
+   public boolean isMinigame() {
+      return this.type == SKYWARS || this.type == BEDWARS;
+   }
+
    public static int parseType(String s) {
       if (s == null || s.isBlank()) {
          return DEFAULT;

@@ -968,6 +968,10 @@ public final class Game {
                } catch (Exception var14) {
                }
 
+               if (var7.settings != null && var7.settings.isMinigame()) {
+                  deleteDir(var5);
+                  continue;
+               }
                this.worldList.add(var7);
             }
          }
@@ -1056,7 +1060,6 @@ public final class Game {
       File var8 = this.worldDir();
       long var6;
       if (var1) {
-         deleteDir(var8);
          this.worldDisplayName = var5;
          if (var2 != null && !var2.trim().isEmpty()) {
             try {
@@ -1092,8 +1095,6 @@ public final class Game {
          this.worldDisplayName = var4.getProperty("name", this.worldName);
       }
 
-      var8.mkdirs();
-      this.rootDir = var8;
       int startDim = var1 ? Dim.OVERWORLD : (int)d(var4, "dim", 0.0);
       if (!Dim.valid(startDim)) {
          startDim = Dim.OVERWORLD;
@@ -1118,14 +1119,34 @@ public final class Game {
          ws = WorldSettings.load(var4);
       }
 
+      boolean ephemeralMinigame = ws.isMinigame();
+      if (ephemeralMinigame) {
+         deleteDir(var8);
+         this.rootDir = null;
+         SkyGen.myTeam = 0;
+         SkyGen.matchState = SkyGen.STATE_WAITING;
+         SkyGen.resetMatchState();
+      } else {
+         if (var1) {
+            deleteDir(var8);
+         }
+         var8.mkdirs();
+         this.rootDir = var8;
+      }
+
       this.worldSettings = ws;
-      this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD;
-      this.world = new World(var6, Dim.dir(var8, startDim), startDim, ws);
+      this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD && !ephemeralMinigame;
+      this.world = new World(var6, ephemeralMinigame ? null : Dim.dir(var8, startDim), startDim, ws);
+      if (ephemeralMinigame) {
+         this.world.saveEnabled = false;
+      }
       this.world.game = this;
-      this.rend.setLod(this.world);
+      if (this.rend != null) {
+         this.rend.setLod(this.world);
+         this.world.unloadHook = this.rend::onUnload;
+      }
       this.mobs.clear();
       this.targetMob = null;
-      this.world.unloadHook = this.rend::onUnload;
       this.player = new Player();
       Arrays.fill(this.inv, null);
       Arrays.fill(this.armor, null);
@@ -1139,7 +1160,7 @@ public final class Game {
       this.chatTimes.clear();
       this.sayShaderProblems();
       this.bedPos = null;
-      if (var1) {
+      if (var1 || ephemeralMinigame) {
          this.player.setMode(var3);
          this.world.dayTime = 1000L;
          this.world.weather.startFair();
@@ -1154,11 +1175,11 @@ public final class Game {
                this.inv[var11] = new Stack(var10[var11], 64);
             }
          } else if (ws.type == WorldSettings.BEDWARS) {
-            this.inv[0] = new Stack(Items.TOOL_BASE, 1); // Wooden Sword
-            this.inv[1] = new Stack(Blocks.WOOL0 + 14, 32); // Red Team Wool
-            this.armor[0] = new Stack(Items.ARMOR_BASE, 1);
-            this.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
-            this.bedPos = new int[]{0, SkyGen.Y_DECK + 1, -41};
+            SkyGen.giveBedwarsLoadout(this, SkyGen.myTeam);
+            this.bedPos = SkyGen.getTeamBedFoot(SkyGen.myTeam);
+            this.player.yaw = SkyGen.getTeamYaw(SkyGen.myTeam);
+         } else if (ws.type == WorldSettings.SKYWARS) {
+            this.player.yaw = SkyGen.getSkywarsYaw(0);
          }
 
          this.sel = 0;
@@ -1222,7 +1243,9 @@ public final class Game {
          WorldSettings ws = new WorldSettings();
          ws.type = wType;
          this.worldSettings = ws;
+         this.rootDir = null;
          this.bonusPending = false;
+         this.worldDisplayName = WorldSettings.TYPE_NAME[wType] + " (Multiplayer)";
          this.world = new World(seed, null, targetDim, ws);
          this.world.saveEnabled = false;
          this.world.game = this;
@@ -1235,18 +1258,18 @@ public final class Game {
          this.targetMob = null;
          if (this.player == null) {
             this.player = new Player();
-            this.player.setMode(gMode);
-            if (gMode == 1) {
-               int[] startItems = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
-               for (int i = 0; i < startItems.length; i++) {
-                  this.inv[i] = new Stack(startItems[i], 64);
-               }
-            } else if (wType == WorldSettings.BEDWARS) {
-               this.inv[0] = new Stack(Items.TOOL_BASE, 1);
-               this.inv[1] = new Stack(Blocks.WOOL0 + 14, 32);
+         }
+         this.player.setMode(gMode);
+         Arrays.fill(this.inv, null);
+         Arrays.fill(this.armor, null);
+         if (gMode == 1) {
+            int[] startItems = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
+            for (int i = 0; i < startItems.length; i++) {
+               this.inv[i] = new Stack(startItems[i], 64);
             }
-         } else {
-            this.player.setMode(gMode);
+         } else if (wType == WorldSettings.BEDWARS) {
+            int myTeam = SkyGen.getPlayerTeam(this);
+            SkyGen.giveBedwarsLoadout(this, myTeam);
          }
 
          this.cursor = null;
@@ -1259,15 +1282,25 @@ public final class Game {
 
       this.world.dayTime = dayTime;
       this.needSpawn = false;
-      this.spawnXZ = new int[]{(int)Math.floor(sx), (int)Math.floor(sz)};
-      double px = wsIsVoid(wType) ? sx : sx + 1.6;
-      double py = Math.max(4.0, sy);
-      double pz = sz;
-      this.player.setPos(px, py, pz);
-      this.player.yaw = -90.0F;
+      if (wType == WorldSettings.BEDWARS) {
+         int myTeam = SkyGen.getPlayerTeam(this);
+         int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
+         this.spawnXZ = new int[]{sp[0], sp[2]};
+         this.bedPos = SkyGen.getTeamBedFoot(myTeam);
+         this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
+         this.player.yaw = SkyGen.getTeamYaw(myTeam);
+      } else {
+         this.bedPos = null;
+         this.spawnXZ = new int[]{(int)Math.floor(sx), (int)Math.floor(sz)};
+         double px = wsIsVoid(wType) ? sx : sx + 1.6;
+         double py = Math.max(4.0, sy);
+         double pz = sz;
+         this.player.setPos(px, py, pz);
+         this.player.yaw = wType == WorldSettings.SKYWARS ? (float)Math.toDegrees(Math.atan2(sx, -sz)) : -90.0F;
+      }
       this.player.pitch = 0.0F;
       this.player.updateBox();
-      if (this.screen != Game.S.PLAY && this.screen != Game.S.LOADING) {
+      if (this.screen != Game.S.PLAY && this.screen != Game.S.LOADING && this.screen != Game.S.WAITING) {
          this.setScreen(Game.S.LOADING);
       }
    }
@@ -1340,7 +1373,10 @@ public final class Game {
    }
 
    void saveWorld() {
-      if (this.world != null && this.pano == null) {
+      if (this.world != null
+         && this.pano == null
+         && this.world.saveEnabled
+         && (this.world.settings == null || !this.world.settings.isMinigame())) {
          this.world.saveAll();
          this.mobs.save(this.world.dir);
          if (this.world.fight != null) {
@@ -1598,6 +1634,39 @@ public final class Game {
    }
 
    void respawn() {
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         int myTeam = SkyGen.getPlayerTeam(this);
+         boolean bedIntact = SkyGen.isTeamBedIntact(this.world, myTeam);
+         this.player.dead = false;
+         this.player.burn = 0;
+         this.player.health = 20;
+         this.player.food = 20;
+         this.player.sat = 5.0F;
+         this.player.exh = 0.0F;
+         this.player.air = 300;
+         this.player.fallDistance = 0.0F;
+         this.player.invuln = 40;
+         this.deathHandled = false;
+         if (bedIntact) {
+            int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
+            this.spawnXZ = new int[]{sp[0], sp[2]};
+            this.bedPos = SkyGen.getTeamBedFoot(myTeam);
+            this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
+            this.player.yaw = SkyGen.getTeamYaw(myTeam);
+            this.player.pitch = 0.0F;
+            this.player.updateBox();
+            SkyGen.giveBedwarsRespawnKit(this, myTeam);
+            this.say("\u00a7a[Bedwars] Respawned at " + SkyGen.BEDWARS_CODES[myTeam] + SkyGen.BEDWARS_NAMES[myTeam] + " Base\u00a7a!");
+         } else {
+            this.bedPos = null;
+            this.player.setMode(3);
+            this.player.setPos(0.5, SkyGen.Y_DECK + 16.0, 0.5);
+            this.player.updateBox();
+            this.say("\u00a7c\u00a7l[Bedwars] ELIMINATED! \u00a77Your bed was destroyed — spectating match...");
+         }
+         return;
+      }
+
       double[] var1 = null;
       if (this.world.dim != Dim.OVERWORLD) {
          // Update 3.12: whoever dies in the Nether or in the End wakes up at home in the Overworld
@@ -1644,17 +1713,6 @@ public final class Game {
       this.player.invuln = 0;
       this.deathHandled = false;
       this.player.setPos(var1[0], var1[1], var1[2]);
-      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
-         if (SkyGen.isTeamBedIntact(this.world, 0)) {
-            this.inv[0] = new Stack(Items.TOOL_BASE, 1);
-            this.inv[1] = new Stack(Blocks.WOOL0 + 14, 16);
-            this.armor[0] = new Stack(Items.ARMOR_BASE, 1);
-            this.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
-         } else {
-            this.player.setMode(3);
-            this.say("\u00a7c[Bedwars] You have been eliminated! Spectating match...");
-         }
-      }
    }
 
    void setScreen(Game.S var1) {
@@ -2085,6 +2143,14 @@ public final class Game {
                }
                case LOADING:
                   return;
+               case WAITING: {
+                  if (var1 == 256 && var2 == 1) {
+                     this.quitToTitle();
+                  } else if (var1 == 257 && var2 == 1) {
+                     SkyGen.startMatch(this, true);
+                  }
+                  return;
+               }
                case CHAT: {
                   boolean ctrl = (var3 & 10) != 0;
                   if (var1 == 256 && var2 == 1) {
@@ -3536,11 +3602,24 @@ public final class Game {
                      this.player.setPos(this.player.x, this.player.y + 1.0, this.player.z);
                   }
 
-                  this.setScreen(Game.S.PLAY);
+                  if (this.world.settings != null
+                     && this.world.settings.isMinigame()
+                     && SkyGen.matchState == SkyGen.STATE_WAITING
+                     && this.window != 0L
+                     && System.getProperty("bc.auto") == null) {
+                     this.setScreen(Game.S.WAITING);
+                  } else {
+                     this.setScreen(Game.S.PLAY);
+                  }
                }
             }
          } else {
-            boolean var6 = this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.CHAT || this.screen == Game.S.DEAD || Net319.isActive();
+            boolean var6 = this.screen == Game.S.PLAY
+               || this.screen == Game.S.WAITING
+               || this.screen == Game.S.INV
+               || this.screen == Game.S.CHAT
+               || this.screen == Game.S.DEAD
+               || Net319.isActive();
             if (var6) {
                this.acc += var1 * 20.0;
 
@@ -3763,7 +3842,7 @@ public final class Game {
       this.world.tick();
       this.world.fire.particles(this);
       this.Tex_tick();
-      if (this.screen != Game.S.PAUSE) {
+      if (this.screen != Game.S.PAUSE && this.screen != Game.S.WAITING) {
          this.mobs.tick();
       }
 
@@ -3799,7 +3878,7 @@ public final class Game {
          this.sprintToggle = false;
       }
 
-      if (!this.player.dead) {
+      if (!this.player.dead && this.screen != Game.S.WAITING) {
          this.player.tick(this.world, var2, var3, var4, var5, var6);
          this.tickPose();
       }
@@ -4178,6 +4257,9 @@ public final class Game {
       }
 
       if (Blocks.isBed(var1)) {
+         if (this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+            return false;
+         }
          this.sleepAt(this.target.x, this.target.y, this.target.z);
          return true;
       }
@@ -4461,6 +4543,13 @@ public final class Game {
    void breakBlock(int var1, int var2, int var3) {
       int var4 = this.world.getBlock(var1, var2, var3);
       if (Blocks.breakable(var4)) {
+         boolean isBedwars = this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+         int bedTeam = isBedwars && Blocks.isBed(var4) ? SkyGen.getBedTeamAt(var1, var2, var3) : -1;
+         if (isBedwars && bedTeam >= 0 && bedTeam == SkyGen.getPlayerTeam(this) && !this.player.creative) {
+            this.say("\u00a7c[Bedwars] You cannot break your own team's bed!");
+            return;
+         }
+
          int var5 = this.heldId();
          this.spawnBreakParticles(var1, var2, var3, var4, 16);
          boolean var6 = var4 == 69 || var4 == 70 || var4 == 67 || var4 == 68;
@@ -4481,12 +4570,15 @@ public final class Game {
             int var12 = var7 ? var3 - var10 : var3 + var10;
             this.world.setBlock(var11, var2, var12, 0);
             this.meshNow(var11, var2, var12);
-            if (var7 && !this.player.creative) {
+            if (var7 && !this.player.creative && !isBedwars) {
                this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }
 
          this.world.setBlock(var1, var2, var3, 0);
+         if (isBedwars && bedTeam >= 0) {
+            SkyGen.onBedDestroyed(this, this.world, bedTeam, Net319.selfName, true);
+         }
          if (var4 == Blocks313.ICE && !this.player.creative && this.world.getBlock(var1, var2 - 1, var3) != 0) {
             this.world.setBlock(var1, var2, var3, Blocks.WATER); // Update 3.13: broken ice melts to water
          }
@@ -4505,7 +4597,9 @@ public final class Game {
          }
 
          if (!this.player.creative) {
-            this.blockDrops(var1, var2, var3, var4, var5);
+            if (!isBedwars || !Blocks.isBed(var4)) {
+               this.blockDrops(var1, var2, var3, var4, var5);
+            }
             this.player.addExhaustion(0.025F);
             if (Blocks.hardness[var4] > 0.0F) {
                this.damageHeld(Items.isTool(var5) && Items.toolClass(var5) == 4 ? 2 : 1);
@@ -4846,6 +4940,9 @@ public final class Game {
    }
 
    void sleepAt(int var1, int var2, int var3) {
+      if (this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         return;
+      }
       if (this.world.dim != Dim.OVERWORLD) {
          // Update 3.12: a bed in the Nether or the End blows up (as in Minecraft)
          this.world.setBlock(var1, var2, var3, 0);
@@ -5580,6 +5677,9 @@ public final class Game {
          case LOADING:
             Screens.loading(this);
             break;
+         case WAITING:
+            Screens.waiting(this);
+            break;
          case CHAT:
          case INV:
          case PAUSE:
@@ -5659,7 +5759,11 @@ public final class Game {
       this.gui.gradient(0.0F, 0.0F, this.gui.w, this.gui.h, 1615855616, -1600126976);
       float var1 = this.gui.w / 2.0F;
       boolean hc = this.player != null && this.player.hardcore;
-      this.gui.centered(hc ? "Game Over!" : "You died!", var1, 40.0F, -1, true, 3.0F);
+      boolean bwEliminated = this.world != null
+         && this.world.settings != null
+         && this.world.settings.type == WorldSettings.BEDWARS
+         && !SkyGen.isTeamBedIntact(this.world, SkyGen.getPlayerTeam(this));
+      this.gui.centered(hc ? "Game Over!" : (bwEliminated ? "ELIMINATED!" : "You died!"), var1, 40.0F, -1, true, 3.0F);
       if (hc) {
          this.gui.centered("\u00a7cYou cannot respawn in Hardcore Mode!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
          this.button("Spectate World", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
@@ -5668,6 +5772,12 @@ public final class Game {
             this.player.health = 20;
             this.player.setMode(3);
             this.deathHandled = false;
+            this.setScreen(Game.S.PLAY);
+         });
+      } else if (bwEliminated) {
+         this.gui.centered("\u00a7cYour bed was destroyed — you cannot respawn!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
+         this.button("Spectate Match", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+            this.respawn();
             this.setScreen(Game.S.PLAY);
          });
       } else {
@@ -6673,6 +6783,7 @@ public final class Game {
       MULTIPLAYER,
       NEWWORLD,
       LOADING,
+      WAITING,
       PLAY,
       PAUSE,
       INV,

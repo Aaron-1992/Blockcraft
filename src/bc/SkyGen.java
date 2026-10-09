@@ -1,11 +1,21 @@
 package bc;
 
+import java.util.Arrays;
+
 /**
  * World generator and full gameplay engine for {@link WorldSettings#SKYBLOCK}, {@link WorldSettings#SKYWARS},
  * and {@link WorldSettings#BEDWARS} (Update 4.1).
  */
 public final class SkyGen extends Gen {
    public static final int Y_DECK = 64;
+
+   // Minigame lobby / match states
+   public static final int STATE_WAITING = 0;
+   public static final int STATE_PLAYING = 1;
+   public static volatile int matchState = STATE_WAITING;
+   public static volatile int lobbyCountdownTicks = -1;
+   public static volatile int myTeam = 0;
+   public static volatile boolean soloBots = true;
 
    // 8 Skywars spawn island centers (radius 42)
    public static final int[][] SKYWARS_SPAWNS = new int[][]{
@@ -17,7 +27,7 @@ public final class SkyGen extends Gen {
       {24, 0}, {-24, 0}, {0, 24}, {0, -24}
    };
 
-   // 4 Bedwars team base centers: North (Red), South (Blue), West (Green), East (Yellow)
+   // 4 Bedwars team base centers: North (Red=0), South (Blue=1), West (Green=2), East (Yellow=3)
    public static final int[][] BEDWARS_BASES = new int[][]{
       {0, -44}, {0, 44}, {-44, 0}, {44, 0}
    };
@@ -39,11 +49,11 @@ public final class SkyGen extends Gen {
       "5. Nether Pioneer (10 Obsidian)"
    };
    private static final boolean[] sbQuestDone = new boolean[5];
-   private static long lastWorldSeed = Long.MIN_VALUE;
-   private static boolean skyblockStocked;
-   private static boolean skywarsStocked;
+   private static World lastWorldRef = null;
+   private static final boolean[] sbIslandStocked = new boolean[5];
+   private static final boolean[] swIslandStocked = new boolean[13];
    private static boolean skywarsWon;
-   private static boolean bedwarsStocked;
+   private static final boolean[] bwBaseStocked = new boolean[5];
    private static boolean bedwarsWon;
    private static final boolean[] bedKnownIntact = new boolean[]{true, true, true, true};
 
@@ -56,16 +66,216 @@ public final class SkyGen extends Gen {
    }
 
    public static void resetMatchState() {
-      for (int i = 0; i < sbQuestDone.length; i++) {
-         sbQuestDone[i] = false;
-      }
-      skyblockStocked = false;
-      skywarsStocked = false;
+      Arrays.fill(sbQuestDone, false);
+      Arrays.fill(sbIslandStocked, false);
+      Arrays.fill(swIslandStocked, false);
       skywarsWon = false;
-      bedwarsStocked = false;
+      Arrays.fill(bwBaseStocked, false);
       bedwarsWon = false;
-      for (int i = 0; i < 4; i++) {
-         bedKnownIntact[i] = true;
+      Arrays.fill(bedKnownIntact, true);
+      lobbyCountdownTicks = -1;
+   }
+
+   public static int getPlayerTeam(Game g) {
+      int t = myTeam;
+      if (t >= 0 && t < 4) {
+         return t;
+      }
+      if (g != null && g.spawnXZ != null) {
+         for (int i = 0; i < 4; i++) {
+            if (Math.abs(g.spawnXZ[0] - BEDWARS_BASES[i][0]) <= 8 && Math.abs(g.spawnXZ[1] - BEDWARS_BASES[i][1]) <= 8) {
+               myTeam = i;
+               return i;
+            }
+         }
+      }
+      return 0;
+   }
+
+   public static int[] getTeamSpawnBlock(int team) {
+      int t = Math.abs(team) & 3;
+      return new int[]{BEDWARS_BASES[t][0], Y_DECK + 1, BEDWARS_BASES[t][1]};
+   }
+
+   public static float getTeamYaw(int team) {
+      return switch (Math.abs(team) & 3) {
+         case 0 -> 0.0F;    // North base (0, -44) facing South (+Z)
+         case 1 -> 180.0F;  // South base (0, +44) facing North (-Z)
+         case 2 -> -90.0F;  // West base (-44, 0) facing East (+X)
+         default -> 90.0F;  // East base (+44, 0) facing West (-X)
+      };
+   }
+
+   public static float getSkywarsYaw(int idx) {
+      int[] sp = SKYWARS_SPAWNS[Math.abs(idx) % SKYWARS_SPAWNS.length];
+      return (float)Math.toDegrees(Math.atan2(sp[0], -sp[1]));
+   }
+
+   public static int[] getTeamBedFoot(int team) {
+      int t = Math.abs(team) & 3;
+      int bx = BEDWARS_BASES[t][0];
+      int bz = BEDWARS_BASES[t][1];
+      int dirX = Integer.compare(0, bx);
+      int dirZ = Integer.compare(0, bz);
+      return new int[]{bx + dirX * 3, Y_DECK + 1, bz + dirZ * 3};
+   }
+
+   public static int[] getTeamBedHead(int team) {
+      int t = Math.abs(team) & 3;
+      int bx = BEDWARS_BASES[t][0];
+      int bz = BEDWARS_BASES[t][1];
+      int dirX = Integer.compare(0, bx);
+      int dirZ = Integer.compare(0, bz);
+      return new int[]{bx + dirX * 4, Y_DECK + 1, bz + dirZ * 4};
+   }
+
+   public static int getBedTeamAt(int x, int z) {
+      for (int t = 0; t < 4; t++) {
+         int[] f = getTeamBedFoot(t);
+         int[] h = getTeamBedHead(t);
+         if ((x == f[0] && z == f[2]) || (x == h[0] && z == h[2])) {
+            return t;
+         }
+         if (Math.abs(x - BEDWARS_BASES[t][0]) <= 6 && Math.abs(z - BEDWARS_BASES[t][1]) <= 6) {
+            return t;
+         }
+      }
+      return -1;
+   }
+
+   public static int getBedTeamAt(int x, int y, int z) {
+      return getBedTeamAt(x, z);
+   }
+
+   public static void giveBedwarsLoadout(Game g, int team) {
+      if (g == null) {
+         return;
+      }
+      int t = Math.abs(team) & 3;
+      Arrays.fill(g.inv, null);
+      Arrays.fill(g.armor, null);
+      g.inv[0] = new Stack(Items.TOOL_BASE, 1); // Wooden Sword
+      g.inv[1] = new Stack(Blocks.WOOL0 + BEDWARS_COLORS[t], 32); // Team Wool
+      g.armor[0] = new Stack(Items.ARMOR_BASE, 1); // Leather Cap
+      g.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1); // Leather Tunic
+      g.sel = 0;
+   }
+
+   public static void giveBedwarsRespawnKit(Game g, int team) {
+      if (g == null) {
+         return;
+      }
+      int t = Math.abs(team) & 3;
+      g.inv[0] = new Stack(Items.TOOL_BASE, 1);
+      g.inv[1] = new Stack(Blocks.WOOL0 + BEDWARS_COLORS[t], 16);
+      if (g.armor[0] == null) {
+         g.armor[0] = new Stack(Items.ARMOR_BASE, 1);
+      }
+      if (g.armor[1] == null) {
+         g.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
+      }
+      g.sel = 0;
+   }
+
+   public static void selectTeam(Game g, int team, boolean broadcast) {
+      int t = Math.abs(team) & 3;
+      myTeam = t;
+      if (g != null && g.world != null && g.world.settings != null) {
+         if (g.world.settings.type == WorldSettings.BEDWARS) {
+            int[] sp = getTeamSpawnBlock(t);
+            g.spawnXZ = new int[]{sp[0], sp[2]};
+            g.bedPos = isTeamBedIntact(g.world, t) ? getTeamBedFoot(t) : null;
+            if (g.player != null) {
+               g.player.setMode(0);
+               g.player.setPos(sp[0] + 0.5, Y_DECK + 1.0, sp[2] + 0.5);
+               g.player.yaw = getTeamYaw(t);
+               g.player.pitch = 0.0F;
+               g.player.updateBox();
+            }
+            giveBedwarsLoadout(g, t);
+         } else if (g.world.settings.type == WorldSettings.SKYWARS) {
+            int idx = Math.abs(team) % SKYWARS_SPAWNS.length;
+            int[] sp = SKYWARS_SPAWNS[idx];
+            g.spawnXZ = new int[]{sp[0], sp[1]};
+            g.bedPos = null;
+            if (g.player != null) {
+               g.player.setMode(0);
+               g.player.setPos(sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+               g.player.yaw = getSkywarsYaw(idx);
+               g.player.pitch = 0.0F;
+               g.player.updateBox();
+            }
+         }
+      }
+      if (broadcast) {
+         Net319.sendTeamSelect(t);
+      }
+   }
+
+   public static void startMatch(Game g, boolean broadcast) {
+      matchState = STATE_PLAYING;
+      lobbyCountdownTicks = -1;
+      Arrays.fill(swIslandStocked, false);
+      Arrays.fill(bwBaseStocked, false);
+      Arrays.fill(bedKnownIntact, true);
+      skywarsWon = false;
+      bedwarsWon = false;
+      if (g != null && g.world != null && g.world.settings != null) {
+         g.world.items.clear();
+         if (g.mobs != null) {
+            g.mobs.clear();
+         }
+         selectTeam(g, myTeam, false);
+         if (g.player != null) {
+            g.player.dead = false;
+            g.player.health = 20;
+            g.player.food = 20;
+            g.player.sat = 5.0F;
+            g.player.fallDistance = 0.0F;
+         }
+         if (g.screen == Game.S.WAITING) {
+            g.setScreen(Game.S.PLAY);
+         }
+         String modeTitle = g.world.settings.type == WorldSettings.BEDWARS
+            ? "\u00a7e\u00a7l[Bedwars] \u00a7aMatch Started! You are on " + BEDWARS_CODES[myTeam] + BEDWARS_NAMES[myTeam] + " Team\u00a7a! Protect your bed!"
+            : "\u00a76\u00a7l[Skywars] \u00a7aMatch Started! Loot your island chests and conquer the Feast!";
+         g.say(modeTitle);
+      }
+      if (broadcast) {
+         Net319.sendMatchControl("START");
+      }
+   }
+
+   public static void onBedDestroyed(Game g, World w, int team, String breakerName, boolean broadcast) {
+      if (team < 0 || team >= 4) {
+         return;
+      }
+      boolean wasIntact = bedKnownIntact[team];
+      bedKnownIntact[team] = false;
+      if (w != null) {
+         int[] foot = getTeamBedFoot(team);
+         int[] head = getTeamBedHead(team);
+         if (w.chunkAt(foot[0], foot[2]) != null && Decor315.isBed(w.getBlock(foot[0], foot[1], foot[2]))) {
+            w.setBlock(foot[0], foot[1], foot[2], 0);
+         }
+         if (w.chunkAt(head[0], head[2]) != null && Decor315.isBed(w.getBlock(head[0], head[1], head[2]))) {
+            w.setBlock(head[0], head[1], head[2], 0);
+         }
+      }
+      int my = getPlayerTeam(g);
+      if (g != null && my == team) {
+         g.bedPos = null;
+      }
+      if (wasIntact && g != null) {
+         String byWho = (breakerName != null && !breakerName.isBlank()) ? " by \u00a7f" + breakerName : "";
+         if (my == team) {
+            g.say("\u00a7c\u00a7l[Bedwars] YOUR BED WAS DESTROYED" + byWho + "\u00a7c\u00a7l! \u00a77You will no longer respawn!");
+         } else {
+            g.say("\u00a7e[Bedwars] " + BEDWARS_CODES[team] + BEDWARS_NAMES[team] + " Team's Bed \u00a77was destroyed" + byWho + "\u00a77!");
+         }
+      }
+      if (broadcast) {
+         Net319.sendBedDestroyed(team, breakerName);
       }
    }
 
@@ -174,7 +384,8 @@ public final class SkyGen extends Gen {
          return new int[]{SKYWARS_SPAWNS[0][0], Y_DECK + 1, SKYWARS_SPAWNS[0][1]};
       }
       if (this.mode == WorldSettings.BEDWARS) {
-         return new int[]{BEDWARS_BASES[0][0], Y_DECK + 1, BEDWARS_BASES[0][1]};
+         int t = Math.abs(myTeam) & 3;
+         return new int[]{BEDWARS_BASES[t][0], Y_DECK + 1, BEDWARS_BASES[t][1]};
       }
       return new int[]{0, Y_DECK + 1, 0};
    }
@@ -199,181 +410,172 @@ public final class SkyGen extends Gen {
    @Override
    public Chunk generate(int cx, int cz) {
       Chunk ch = new Chunk(cx, cz);
-      int grass = grassColorFor(0.5, 0.5);
-      int foliage = foliageColorFor(0.5, 0.5);
-      for (int i = 0; i < 256; i++) {
-         ch.biome[i] = (byte)Biomes.PLAINS;
-         ch.grassColor[i] = grass;
-         ch.foliageColor[i] = foliage;
-         ch.hm[i] = 0;
+      for (int z = 0; z < 16; z++) {
+         for (int x = 0; x < 16; x++) {
+            int idx = z * 16 + x;
+            ch.biome[idx] = Biomes.PLAINS;
+            ch.grassColor[idx] = Gen.grassColorFor(0.8, 0.4);
+            ch.foliageColor[idx] = Gen.foliageColorFor(0.8, 0.4);
+         }
       }
 
       if (this.mode == WorldSettings.SKYBLOCK) {
-         generateSkyblock(ch, cx, cz);
+         generateSkyblock(ch);
       } else if (this.mode == WorldSettings.SKYWARS) {
-         generateSkywars(ch, cx, cz);
+         generateSkywars(ch);
       } else if (this.mode == WorldSettings.BEDWARS) {
-         generateBedwars(ch, cx, cz);
+         generateBedwars(ch);
       }
 
-      recomputeHeightmap(ch);
+      ch.computeHeightmap();
       return ch;
    }
 
-   private static void setW(Chunk ch, int wx, int y, int wz, int id) {
-      int lx = wx - ch.cx * 16;
-      int lz = wz - ch.cz * 16;
-      if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16 && y >= 0 && y < 256) {
-         ch.blocks[Chunk.idx(lx, y, lz)] = (short)id;
-      }
-   }
-
-   private static void recomputeHeightmap(Chunk ch) {
-      for (int z = 0; z < 16; z++) {
-         for (int x = 0; x < 16; x++) {
-            int top = 0;
-            for (int y = 255; y >= 0; y--) {
-               int id = ch.blocks[Chunk.idx(x, y, z)] & 0xFFFF;
-               if (Blocks.opacity[id] > 0) {
-                  top = y;
-                  break;
-               }
-            }
-            ch.hm[z * 16 + x] = top;
-         }
-      }
-   }
-
-   private void generateSkyblock(Chunk ch, int cx, int cz) {
-      if (Math.abs(cx) > 4 || Math.abs(cz) > 4) {
+   private static void setW(Chunk ch, int wx, int wy, int wz, int id) {
+      if (wy < 0 || wy > 255) {
          return;
       }
-      // 1. Main L-shaped Skyblock island around (0, 64, 0)
+      if ((wx >> 4) == ch.cx && (wz >> 4) == ch.cz) {
+         ch.set(wx & 15, wy, wz & 15, id);
+      }
+   }
+
+   private void generateSkyblock(Chunk ch) {
+      // 1. Classic L-shaped Skyblock starter island around (0, 64, 0)
       for (int wz = -1; wz <= 4; wz++) {
          for (int wx = -1; wx <= 4; wx++) {
-            if (isSkyblockMain(wx, wz)) {
-               setW(ch, wx, Y_DECK - 2, wz, Blocks.DIRT);
-               setW(ch, wx, Y_DECK - 1, wz, Blocks.DIRT);
-               setW(ch, wx, Y_DECK, wz, Blocks.GRASS);
+            if (!isSkyblockMain(wx, wz)) {
+               continue;
             }
+            setW(ch, wx, Y_DECK - 2, wz, Blocks.DIRT);
+            setW(ch, wx, Y_DECK - 1, wz, (wx == 0 && wz == 0) ? Blocks.SAND : Blocks.DIRT);
+            setW(ch, wx, Y_DECK, wz, Blocks.GRASS);
          }
       }
       setW(ch, 0, Y_DECK - 2, 0, Blocks.BEDROCK);
-      // Classic Oak Tree at (1, 65, 3)
-      buildSmallOak(ch, 1, Y_DECK + 1, 3);
-      // Starter Chest at (3, 65, 0) + Crafting Table at (3, 65, 1)
+      buildSmallOak(ch, -1, Y_DECK + 1, 4);
       setW(ch, 3, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
-      setW(ch, 3, Y_DECK + 1, 1, Blocks.CRAFTING_TABLE);
 
-      // 2. East Desert Sand Island at (46..50, 62..64, -2..2)
+      // 2. East Desert Oasis Island around (48, 64, 0)
       for (int wz = -2; wz <= 2; wz++) {
          for (int wx = 46; wx <= 50; wx++) {
             setW(ch, wx, Y_DECK - 2, wz, Blocks.SANDSTONE);
-            setW(ch, wx, Y_DECK - 1, wz, (wx == 48 && wz == 0) ? Blocks.GOLD_ORE : Blocks.SAND);
+            setW(ch, wx, Y_DECK - 1, wz, Blocks.SAND);
             setW(ch, wx, Y_DECK, wz, Blocks.SAND);
          }
       }
       setW(ch, 48, Y_DECK + 1, 0, Blocks.CACTUS);
       setW(ch, 48, Y_DECK + 2, 0, Blocks.CACTUS);
+      setW(ch, 49, Y_DECK, 1, Blocks.WATER);
+      setW(ch, 49, Y_DECK + 1, 0, Blocks.SUGAR_CANE);
       setW(ch, 47, Y_DECK + 1, -1, Blocks.CHEST_LOOT);
 
-      // 3. West Nether/Quartz Shrine Island at (-50..-46, 62..64, -2..2)
+      // 3. West Nether Shrine Island around (-48, 64, 0)
       for (int wz = -2; wz <= 2; wz++) {
          for (int wx = -50; wx <= -46; wx++) {
             setW(ch, wx, Y_DECK - 2, wz, Blocks.OBSIDIAN);
             setW(ch, wx, Y_DECK - 1, wz, Blocks.NETHERRACK);
-            setW(ch, wx, Y_DECK, wz, Blocks.QUARTZ_BLOCK);
+            setW(ch, wx, Y_DECK, wz, (Math.abs(wx + 48) <= 1 && Math.abs(wz) <= 1) ? Blocks.QUARTZ_BLOCK : Blocks.NETHERRACK);
          }
       }
-      setW(ch, -48, Y_DECK + 1, 0, Blocks.GLOWSTONE);
+      setW(ch, -48, Y_DECK + 1, -2, Blocks.OBSIDIAN);
+      setW(ch, -48, Y_DECK + 2, -2, Blocks.OBSIDIAN);
+      setW(ch, -48, Y_DECK + 3, -2, Blocks.GLOWSTONE);
       setW(ch, -47, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
 
-      // 4. North Snowy Taiga & Ice Island at (-2..2, 62..64, -50..-46)
+      // 4. North Snowy Taiga & Quarry Island around (0, 64, -48)
       for (int wz = -50; wz <= -46; wz++) {
          for (int wx = -2; wx <= 2; wx++) {
-            setW(ch, wx, Y_DECK - 2, wz, Blocks.STONE);
-            setW(ch, wx, Y_DECK - 1, wz, (wx == 0 && wz == -48) ? Blocks.DIAMOND_ORE : Blocks313.ICE);
+            setW(ch, wx, Y_DECK - 2, wz, (wx == 0 && wz == -48) ? Blocks.DIAMOND_ORE : Blocks.IRON_ORE);
+            setW(ch, wx, Y_DECK - 1, wz, Blocks313.ICE);
             setW(ch, wx, Y_DECK, wz, Blocks.SNOW);
          }
       }
-      buildSmallOak(ch, 0, Y_DECK + 1, -48);
+      for (int y = 1; y <= 4; y++) {
+         setW(ch, -1, Y_DECK + y, -49, Blocks.LOG_SPRUCE);
+      }
+      for (int lz = -50; lz <= -48; lz++) {
+         for (int lx = -2; lx <= 0; lx++) {
+            setW(ch, lx, Y_DECK + 3, lz, Blocks.LEAVES_SPRUCE);
+            if (lx == -1 || lz == -49) {
+               setW(ch, lx, Y_DECK + 4, lz, Blocks.LEAVES_SPRUCE);
+            }
+         }
+      }
+      setW(ch, -1, Y_DECK + 5, -49, Blocks.LEAVES_SPRUCE);
       setW(ch, 0, Y_DECK + 1, -47, Blocks.CHEST_LOOT);
 
-      // 5. South Jungle & Mushroom Island at (-2..2, 62..64, 46..50)
+      // 5. South Jungle & Mushroom Trader Island around (0, 64, 48)
       for (int wz = 46; wz <= 50; wz++) {
          for (int wx = -2; wx <= 2; wx++) {
-            setW(ch, wx, Y_DECK - 2, wz, Blocks.STONE);
+            setW(ch, wx, Y_DECK - 2, wz, Blocks.STONEBRICK);
             setW(ch, wx, Y_DECK - 1, wz, Blocks.DIRT);
             setW(ch, wx, Y_DECK, wz, Blocks.GRASS);
          }
       }
-      setW(ch, -1, Y_DECK + 1, 48, Blocks.MELON);
-      setW(ch, 1, Y_DECK + 1, 48, Blocks.PUMPKIN);
+      for (int y = 1; y <= 4; y++) {
+         setW(ch, 1, Y_DECK + y, 49, Blocks313.LOG_JUNGLE);
+      }
+      for (int lz = 48; lz <= 50; lz++) {
+         for (int lx = 0; lx <= 2; lx++) {
+            setW(ch, lx, Y_DECK + 4, lz, Blocks.LEAVES_OAK);
+         }
+      }
       setW(ch, -1, Y_DECK + 1, 49, Blocks313.MUSHROOM_RED);
-      setW(ch, 1, Y_DECK + 1, 49, Blocks313.MUSHROOM_BROWN);
+      setW(ch, -2, Y_DECK + 1, 48, Blocks313.MUSHROOM_BROWN);
+      setW(ch, 2, Y_DECK + 1, 47, Blocks.MELON);
+      setW(ch, -2, Y_DECK + 1, 47, Blocks.PUMPKIN);
       setW(ch, 0, Y_DECK + 1, 47, Blocks.CHEST_LOOT);
    }
 
-   private void generateSkywars(Chunk ch, int cx, int cz) {
-      if (Math.abs(cx) > 4 || Math.abs(cz) > 4) {
-         return;
-      }
-
-      // 1. Central Feast Island (radius 11 around 0,0)
-      buildConeIsland(ch, 0, 0, 11.2, 13, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
-      for (int dz = -3; dz <= 3; dz++) {
-         for (int dx = -3; dx <= 3; dx++) {
-            setW(ch, dx, Y_DECK, dz, Blocks.STONEBRICK);
+   private void generateSkywars(Chunk ch) {
+      // 1. Central Feast Island (radius 11)
+      buildConeIsland(ch, 0, 0, 11.2, 10, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
+      for (int dz = -2; dz <= 2; dz++) {
+         for (int dx = -2; dx <= 2; dx++) {
+            if (Math.abs(dx) == 2 && Math.abs(dz) == 2) {
+               for (int y = 1; y <= 3; y++) {
+                  setW(ch, dx, Y_DECK + y, dz, Blocks.STONEBRICK);
+               }
+               setW(ch, dx, Y_DECK + 4, dz, Blocks.GLOWSTONE);
+            } else {
+               setW(ch, dx, Y_DECK, dz, (dx == 0 && dz == 0) ? Blocks.DIAMOND_BLOCK : Blocks.STONEBRICK);
+            }
+            if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2) {
+               setW(ch, dx, Y_DECK + 4, dz, Blocks.SLAB0 + 3);
+            }
          }
       }
-      setW(ch, 0, Y_DECK, 0, Blocks.DIAMOND_BLOCK);
-      setW(ch, 0, Y_DECK + 1, 0, Blocks.GLOWSTONE);
-      for (int[] p : new int[][]{{-3, -3}, {3, -3}, {-3, 3}, {3, 3}}) {
-         for (int y = 1; y <= 4; y++) {
-            setW(ch, p[0], Y_DECK + y, p[1], Blocks.STONEBRICK);
-         }
-      }
-      for (int dz = -3; dz <= 3; dz++) {
-         for (int dx = -3; dx <= 3; dx++) {
-            setW(ch, dx, Y_DECK + 5, dz, Blocks.SLAB0 + 4);
-         }
-      }
-      // 4 Feast Loot Chests
+      setW(ch, 0, Y_DECK + 1, 0, Blocks.CRAFTING_TABLE);
       setW(ch, -2, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
       setW(ch, 2, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
       setW(ch, 0, Y_DECK + 1, -2, Blocks.CHEST_LOOT);
       setW(ch, 0, Y_DECK + 1, 2, Blocks.CHEST_LOOT);
-      buildSmallOak(ch, -7, Y_DECK + 1, -6);
-      buildSmallOak(ch, 7, Y_DECK + 1, 6);
 
       // 2. 4 Mid-Ring Islands
       for (int[] m : SKYWARS_MIDS) {
          buildConeIsland(ch, m[0], m[1], 4.5, 6, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
          setW(ch, m[0], Y_DECK + 1, m[1], Blocks.CHEST_LOOT);
-         setW(ch, m[0], Y_DECK - 1, m[1], Blocks.GOLD_ORE);
-         setW(ch, m[0] + 1, Y_DECK - 1, m[1], Blocks.DIAMOND_ORE);
       }
 
-      // 3. 8 Outer Spawn Islands
+      // 3. 8 Player Spawn Islands
       for (int[] sp : SKYWARS_SPAWNS) {
-         buildConeIsland(ch, sp[0], sp[1], 4.6, 7, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
-         buildSmallOak(ch, sp[0] - 2, Y_DECK + 1, sp[1] - 2);
-         setW(ch, sp[0] + 2, Y_DECK + 1, sp[1], Blocks.CHEST_LOOT);
-         setW(ch, sp[0] + 2, Y_DECK + 1, sp[1] + 1, Blocks.CRAFTING_TABLE);
-         setW(ch, sp[0] + 2, Y_DECK + 1, sp[1] - 1, Blocks.FURNACE);
+         int sx = sp[0];
+         int sz = sp[1];
+         buildConeIsland(ch, sx, sz, 4.6, 7, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
+         buildSmallOak(ch, sx - 2, Y_DECK + 1, sz - 1);
+         setW(ch, sx + 2, Y_DECK + 1, sz, Blocks.CHEST_LOOT);
+         setW(ch, sx + 2, Y_DECK + 1, sz + 1, Blocks.CRAFTING_TABLE);
+         setW(ch, sx + 1, Y_DECK + 1, sz + 2, Blocks.FURNACE);
       }
    }
 
-   private void generateBedwars(Chunk ch, int cx, int cz) {
-      if (Math.abs(cx) > 4 || Math.abs(cz) > 4) {
-         return;
-      }
-
-      // 1. Central Emerald Island
+   private void generateBedwars(Chunk ch) {
+      // 1. Central Emerald Generator Arena (radius 10.5)
       buildConeIsland(ch, 0, 0, 10.5, 9, Blocks.STONEBRICK, Blocks.STONE, Blocks.COBBLE, false);
       for (int dz = -2; dz <= 2; dz++) {
          for (int dx = -2; dx <= 2; dx++) {
-            setW(ch, dx, Y_DECK, dz, Blocks.QUARTZ_BLOCK);
+            setW(ch, dx, Y_DECK, dz, (dx == 0 && dz == 0) ? Blocks.EMERALD_BLOCK : Blocks.QUARTZ_BLOCK);
          }
       }
       setW(ch, -4, Y_DECK, 0, Blocks.EMERALD_BLOCK);
@@ -389,7 +591,7 @@ public final class SkyGen extends Gen {
          setW(ch, d[0], Y_DECK + 3, d[1], Blocks.GLOWSTONE);
       }
 
-      // 3. 4 Team Bases (North=Red, South=Blue, West=Green, East=Yellow)
+      // 3. 4 Symmetrical Team Bases (North=Red, South=Blue, West=Green, East=Yellow)
       for (int t = 0; t < 4; t++) {
          int bx = BEDWARS_BASES[t][0];
          int bz = BEDWARS_BASES[t][1];
@@ -431,12 +633,6 @@ public final class SkyGen extends Gen {
          int facing = dirZ < 0 ? 0 : (dirZ > 0 ? 1 : (dirX > 0 ? 2 : 3));
          setW(ch, bedFootX, Y_DECK + 1, bedFootZ, Decor315.foot(color, facing));
          setW(ch, bedHeadX, Y_DECK + 1, bedHeadZ, Decor315.head(color, facing));
-
-         // Enemy bases (t > 0) have a protective wool defense shell over the bed so solo players can mine/TNT through it!
-         if (t > 0) {
-            setW(ch, bedFootX, Y_DECK + 2, bedFootZ, wool);
-            setW(ch, bedHeadX, Y_DECK + 2, bedHeadZ, wool);
-         }
       }
    }
 
@@ -491,9 +687,9 @@ public final class SkyGen extends Gen {
       }
    }
 
-   private static void putChestItems(World w, int x, int y, int z, Stack... items) {
+   private static boolean putChestItems(World w, int x, int y, int z, Stack... items) {
       if (w.chunkAt(x, z) == null) {
-         return;
+         return false;
       }
       int cur = w.getBlock(x, y, z);
       if (cur == Blocks.CHEST_LOOT || cur == Blocks.CHEST) {
@@ -504,19 +700,15 @@ public final class SkyGen extends Gen {
                te.slots[i] = i < items.length ? items[i] : null;
             }
          }
+         return true;
       }
+      return false;
    }
 
    public static void stockSkyblockChests(Game g, World w) {
-      if (w.chunk(0, 0) == null) {
-         return;
-      }
-      // Starter Island Chest at (3, 65, 0)
-      putChestItems(
-         w,
-         3,
-         Y_DECK + 1,
-         0,
+      // 0: Starter Island Chest at (3, 65, 0)
+      if (!sbIslandStocked[0] && putChestItems(
+         w, 3, Y_DECK + 1, 0,
          new Stack(Blocks313.ICE, 2),
          new Stack(Items.LAVA_BUCKET, 1),
          new Stack(Items.WATER_BUCKET, 1),
@@ -530,83 +722,83 @@ public final class SkyGen extends Gen {
          new Stack(Items.BONE_MEAL, 12),
          new Stack(Items.BREAD, 8),
          new Stack(Blocks.COBBLE, 16)
-      );
-      // East Desert Island Chest at (47, 65, -1)
-      putChestItems(
-         w,
-         47,
-         Y_DECK + 1,
-         -1,
+      )) {
+         sbIslandStocked[0] = true;
+      }
+      // 1: East Desert Island Chest at (47, 65, -1)
+      if (!sbIslandStocked[1] && putChestItems(
+         w, 47, Y_DECK + 1, -1,
          new Stack(Items.GOLD_INGOT, 8),
          new Stack(Blocks.SAND, 32),
          new Stack(Blocks.CACTUS, 4),
          new Stack(Blocks.SUGAR_CANE, 4),
          new Stack(Items.toolId(2, Items.C_PICK), 1),
          new Stack(Items.APPLE, 4)
-      );
-      // West Nether Shrine Chest at (-47, 65, 0)
-      putChestItems(
-         w,
-         -47,
-         Y_DECK + 1,
-         0,
+      )) {
+         sbIslandStocked[1] = true;
+      }
+      // 2: West Nether Shrine Chest at (-47, 65, 0)
+      if (!sbIslandStocked[2] && putChestItems(
+         w, -47, Y_DECK + 1, 0,
          new Stack(Blocks.OBSIDIAN, 10),
          new Stack(Items.FLINT_STEEL, 1),
          new Stack(Items.BLAZE_ROD, 4),
          new Stack(Items.QUARTZ, 16),
          new Stack(Items.GHAST_TEAR, 2),
          new Stack(Blocks.GLOWSTONE, 8)
-      );
-      // North Snowy Taiga Chest at (0, 65, -47)
-      putChestItems(
-         w,
-         0,
-         Y_DECK + 1,
-         -47,
+      )) {
+         sbIslandStocked[2] = true;
+      }
+      // 3: North Snowy Taiga Chest at (0, 65, -47)
+      if (!sbIslandStocked[3] && putChestItems(
+         w, 0, Y_DECK + 1, -47,
          new Stack(Items.DIAMOND, 2),
          new Stack(Blocks.LOG_SPRUCE, 8),
          new Stack(Blocks313.ICE, 8),
          new Stack(Items.BONE, 6),
          new Stack(Items.toolId(2, Items.C_AXE), 1)
-      );
-      // South Jungle & Trader Chest at (0, 65, 47)
-      putChestItems(
-         w,
-         0,
-         Y_DECK + 1,
-         47,
+      )) {
+         sbIslandStocked[3] = true;
+      }
+      // 4: South Jungle & Trader Chest at (0, 65, 47)
+      if (!sbIslandStocked[4] && putChestItems(
+         w, 0, Y_DECK + 1, 47,
          new Stack(Items.EMERALD, 8),
          new Stack(Blocks.BOOKSHELF, 4),
          new Stack(Items.SHEARS, 1),
          new Stack(Items.APPLE, 6),
          new Stack(Items.CAKE, 1)
-      );
-      if (g != null && g.mobs != null && w.chunkAt(0, 48) != null) {
-         boolean hasVillager = false;
-         for (Mobs.Mob m : g.mobs.list) {
-            if (!m.dead && m.type == Mobs.VILLAGER && Math.hypot(m.x - 0.5, m.z - 48.5) < 12.0) {
-               hasVillager = true;
-               break;
+      )) {
+         sbIslandStocked[4] = true;
+         if (g != null && g.mobs != null && w.chunkAt(0, 48) != null) {
+            boolean hasVillager = false;
+            for (Mobs.Mob m : g.mobs.list) {
+               if (!m.dead && m.type == Mobs.VILLAGER && Math.hypot(m.x - 0.5, m.z - 48.5) < 12.0) {
+                  hasVillager = true;
+                  break;
+               }
             }
-         }
-         if (!hasVillager) {
-            Mobs.Mob v = g.mobs.spawn(Mobs.VILLAGER, 0.5, Y_DECK + 1.0, 48.5);
-            if (v != null) {
-               v.color = Trades.FARMER;
+            if (!hasVillager) {
+               Mobs.Mob v = g.mobs.spawn(Mobs.VILLAGER, 0.5, Y_DECK + 1.0, 48.5);
+               if (v != null) {
+                  v.color = Trades.FARMER;
+               }
             }
          }
       }
-      skyblockStocked = true;
    }
 
    public static void stockSkywarsChests(Game g, World w, boolean refill) {
-      if (w.chunk(0, 0) == null) {
-         return;
+      if (refill) {
+         Arrays.fill(swIslandStocked, false);
       }
       // 1. 8 Outer Spawn Island Chests
       for (int i = 0; i < SKYWARS_SPAWNS.length; i++) {
+         if (swIslandStocked[i]) {
+            continue;
+         }
          int[] sp = SKYWARS_SPAWNS[i];
-         putChestItems(
+         if (putChestItems(
             w,
             sp[0] + 2,
             Y_DECK + 1,
@@ -619,15 +811,22 @@ public final class SkyGen extends Gen {
             new Stack(i % 3 == 0 ? Items.ENDER_PEARL : Items.WATER_BUCKET, 1),
             new Stack(Items.BOW, 1),
             new Stack(Items.ARROW, 12)
-         );
-         if (!refill && i > 0 && g != null && g.mobs != null && w.chunkAt(sp[0], sp[1]) != null) {
-            int mobType = (i % 2 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
-            g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+         )) {
+            swIslandStocked[i] = true;
+            if (!refill && i > 0 && soloBots && !Net319.isActive() && g != null && g.mobs != null && w.chunkAt(sp[0], sp[1]) != null) {
+               int mobType = (i % 2 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
+               g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+            }
          }
       }
       // 2. 4 Mid-Ring Island Chests
-      for (int[] m : SKYWARS_MIDS) {
-         putChestItems(
+      for (int j = 0; j < SKYWARS_MIDS.length; j++) {
+         int idx = 8 + j;
+         if (swIslandStocked[idx]) {
+            continue;
+         }
+         int[] m = SKYWARS_MIDS[j];
+         if (putChestItems(
             w,
             m[0],
             Y_DECK + 1,
@@ -640,44 +839,47 @@ public final class SkyGen extends Gen {
             new Stack(Items.FLINT_STEEL, 1),
             new Stack(Items.STEAK, 8),
             new Stack(Blocks.STONEBRICK, 32)
-         );
+         )) {
+            swIslandStocked[idx] = true;
+         }
       }
       // 3. 4 Center Feast Chests
-      int[][] feastChests = new int[][]{{-2, 0}, {2, 0}, {0, -2}, {0, 2}};
-      for (int i = 0; i < feastChests.length; i++) {
-         int[] fc = feastChests[i];
-         putChestItems(
-            w,
-            fc[0],
-            Y_DECK + 1,
-            fc[1],
-            new Stack(Items.toolId(4, i % 2 == 0 ? Items.C_SWORD : Items.C_AXE), 1),
-            new Stack(Items.armorId(3, i % 4), 1),
-            new Stack(Items.ENDER_PEARL, 3),
-            new Stack(Blocks.STONEBRICK, 64),
-            new Stack(Items.STEAK, 12),
-            new Stack(Items.ARROW, 24)
-         );
+      if (!swIslandStocked[12] && w.chunk(0, 0) != null) {
+         int[][] feastChests = new int[][]{{-2, 0}, {2, 0}, {0, -2}, {0, 2}};
+         for (int i = 0; i < feastChests.length; i++) {
+            int[] fc = feastChests[i];
+            putChestItems(
+               w,
+               fc[0],
+               Y_DECK + 1,
+               fc[1],
+               new Stack(Items.toolId(4, i % 2 == 0 ? Items.C_SWORD : Items.C_AXE), 1),
+               new Stack(Items.armorId(3, i % 4), 1),
+               new Stack(Items.ENDER_PEARL, 3),
+               new Stack(Blocks.STONEBRICK, 64),
+               new Stack(Items.STEAK, 12),
+               new Stack(Items.ARROW, 24)
+            );
+         }
+         swIslandStocked[12] = true;
       }
-      skywarsStocked = true;
    }
 
    public static void stockBedwarsWorld(Game g, World w) {
-      if (w.chunk(0, 0) == null) {
-         return;
-      }
-      // Center Emerald Chest
-      putChestItems(
-         w,
-         0,
-         Y_DECK + 1,
-         0,
+      // Center Emerald Chest (slot 4)
+      if (!bwBaseStocked[4] && putChestItems(
+         w, 0, Y_DECK + 1, 0,
          new Stack(Items.EMERALD, 2),
          new Stack(Items.ENDER_PEARL, 1),
          new Stack(Blocks.OBSIDIAN, 4),
          new Stack(Items.STEAK, 4)
-      );
+      )) {
+         bwBaseStocked[4] = true;
+      }
       for (int t = 0; t < 4; t++) {
+         if (bwBaseStocked[t]) {
+            continue;
+         }
          int bx = BEDWARS_BASES[t][0];
          int bz = BEDWARS_BASES[t][1];
          if (w.chunkAt(bx, bz) == null) {
@@ -687,8 +889,10 @@ public final class SkyGen extends Gen {
          int dirZ = Integer.compare(0, bz);
          int sx = bx + (dirX == 0 ? 3 : 0);
          int sz = bz + (dirZ == 0 ? 3 : 0);
+         int ux = bx - (dirX == 0 ? 3 : 0);
+         int uz = bz - (dirZ == 0 ? 3 : 0);
          int wool = Blocks.WOOL0 + BEDWARS_COLORS[t];
-         putChestItems(
+         if (putChestItems(
             w,
             sx,
             Y_DECK + 1,
@@ -699,43 +903,80 @@ public final class SkyGen extends Gen {
             new Stack(Items.toolId(1, Items.C_AXE), 1),
             new Stack(Items.SHEARS, 1),
             new Stack(Items.STEAK, 8)
-         );
-         if (g != null && g.mobs != null) {
-            if (t == 0) {
-               // Spawn Item Shopkeeper & Gear/Upgrades Shopkeeper on player's base
-               Mobs.Mob shop1 = g.mobs.spawn(Mobs.VILLAGER, sx + 0.5, Y_DECK + 1.0, sz - 1.5);
+         )) {
+            bwBaseStocked[t] = true;
+            if (g != null && g.mobs != null) {
+               // Every team base gets both Item Shopkeeper (SMITH) and Upgrades Shopkeeper (PRIEST)!
+               Mobs.Mob shop1 = g.mobs.spawn(Mobs.VILLAGER, sx + dirX * 1.5 + 0.5, Y_DECK + 1.0, sz + dirZ * 1.5 + 0.5);
                if (shop1 != null) {
                   shop1.color = Trades.SMITH;
                }
-               int ux = bx - (dirX == 0 ? 3 : 0);
-               int uz = bz - (dirZ == 0 ? 3 : 0);
-               Mobs.Mob shop2 = g.mobs.spawn(Mobs.VILLAGER, ux + 0.5, Y_DECK + 1.0, uz - 1.5);
+               Mobs.Mob shop2 = g.mobs.spawn(Mobs.VILLAGER, ux + dirX * 1.5 + 0.5, Y_DECK + 1.0, uz + dirZ * 1.5 + 0.5);
                if (shop2 != null) {
                   shop2.color = Trades.PRIEST;
                }
-            } else {
-               // Spawn Defender Guards on enemy team bases
-               g.mobs.spawn(t % 2 == 1 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5, Y_DECK + 1.0, bz + 0.5);
+               // Only spawn AI Defender Guards on unoccupied enemy bases when soloBots is enabled and not in Multiplayer
+               if (soloBots && !Net319.isActive() && t != getPlayerTeam(g)) {
+                  g.mobs.spawn(t % 2 == 1 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5, Y_DECK + 1.0, bz + 0.5);
+               }
             }
          }
       }
-      bedwarsStocked = true;
    }
 
    public static boolean isTeamBedIntact(World w, int team) {
-      if (w == null || team < 0 || team >= 4) {
+      if (w == null || team < 0 || team >= 4 || !bedKnownIntact[team]) {
          return false;
       }
-      int bx = BEDWARS_BASES[team][0];
-      int bz = BEDWARS_BASES[team][1];
-      int dirX = Integer.compare(0, bx);
-      int dirZ = Integer.compare(0, bz);
-      int bedFootX = bx + dirX * 3;
-      int bedFootZ = bz + dirZ * 3;
-      if (w.chunkAt(bedFootX, bedFootZ) == null) {
+      int[] foot = getTeamBedFoot(team);
+      int[] head = getTeamBedHead(team);
+      if (w.chunkAt(foot[0], foot[2]) == null || w.chunkAt(head[0], head[2]) == null) {
          return bedKnownIntact[team];
       }
-      return Decor315.isBed(w.getBlock(bedFootX, Y_DECK + 1, bedFootZ));
+      return Decor315.isBed(w.getBlock(foot[0], foot[1], foot[2])) && Decor315.isBed(w.getBlock(head[0], head[1], head[2]));
+   }
+
+   private static void dropGeneratorItemCapped(World w, double x, double y, double z, int id, int count, int maxNearby) {
+      int existing = 0;
+      for (World.Item it : w.items) {
+         if (it != null && !it.dead && it.id == id && Math.abs(it.x - x) < 2.5 && Math.abs(it.z - z) < 2.5) {
+            existing += it.count;
+            if (existing < maxNearby && it.count + count <= Items.maxStack(id)) {
+               it.count += count;
+               return;
+            }
+         }
+      }
+      if (existing < maxNearby) {
+         w.dropItem(x, y, z, id, count);
+      }
+   }
+
+   /** Runs per-tick waiting lobby countdown and keeps players safely at their spawn island before the match starts. */
+   public static void tickWaitingLobby(Game g, World w) {
+      if (g == null || w == null || w.settings == null || !w.settings.isMinigame()) {
+         return;
+      }
+      // Keep arena chunks (-3..3, -3..3) warming while players wait in the lobby
+      for (int cz = -3; cz <= 3; cz++) {
+         for (int cx = -3; cx <= 3; cx++) {
+            w.getBlock(cx * 16 + 8, Y_DECK, cz * 16 + 8);
+         }
+      }
+      // Auto-start 10-second countdown when hosting and at least 1 friend has joined
+      if (Net319.isHosting() && Net319.peerCount() > 0 && lobbyCountdownTicks < 0) {
+         lobbyCountdownTicks = 200; // 10 seconds
+         g.say("\u00a7a[Lobby] Player joined! Match starting in 10 seconds...");
+      }
+      if (lobbyCountdownTicks > 0) {
+         lobbyCountdownTicks--;
+         if (lobbyCountdownTicks > 0 && lobbyCountdownTicks % 20 == 0 && lobbyCountdownTicks <= 100) {
+            g.say("\u00a7e[Lobby] Match starting in " + (lobbyCountdownTicks / 20) + "...");
+         }
+         if (lobbyCountdownTicks == 0) {
+            startMatch(g, Net319.isHosting());
+         }
+      }
    }
 
    /** Runs per-tick gameplay logic for Skyblock, Skywars, and Bedwars worlds. */
@@ -747,21 +988,24 @@ public final class SkyGen extends Gen {
       if (!w.settings.isVoidMode()) {
          return;
       }
-      if (w.seed != lastWorldSeed) {
-         lastWorldSeed = w.seed;
+      if (w != lastWorldRef) {
+         lastWorldRef = w;
          resetMatchState();
       }
 
+      if (g != null && g.screen == Game.S.WAITING) {
+         tickWaitingLobby(g, w);
+         return;
+      }
+
       // Fast void death so players don't fall endlessly below Y=-18
-      if (g != null && g.player != null && !g.player.dead && !g.player.creative && g.player.y < -18.0) {
+      if (g != null && g.player != null && !g.player.dead && !g.player.creative && !g.player.spectator && g.player.y < -18.0) {
          g.player.hurt(20);
       }
 
       // 1. SKYBLOCK: stock island chests & evaluate Skyblock Progression Quests
       if (type == WorldSettings.SKYBLOCK) {
-         if (!skyblockStocked && w.chunk(0, 0) != null) {
-            stockSkyblockChests(g, w);
-         }
+         stockSkyblockChests(g, w);
          if (g != null && g.player != null && w.tickCount % 20L == 0L) {
             checkSkyblockQuests(g);
          }
@@ -770,18 +1014,16 @@ public final class SkyGen extends Gen {
 
       // 2. SKYWARS: stock chests, periodic chest refills, and victory check
       if (type == WorldSettings.SKYWARS) {
-         if (!skywarsStocked && w.chunk(0, 0) != null) {
-            stockSkywarsChests(g, w, false);
-         }
+         stockSkywarsChests(g, w, false);
          if (w.tickCount > 0L && w.tickCount % 3600L == 0L) {
             stockSkywarsChests(g, w, true);
             if (g != null) {
                g.say("\u00a7b[Skywars] \u00a7eAll island and Feast chests have been REFILLED!");
             }
          }
-         if (!skywarsWon && g != null && g.mobs != null && w.tickCount > 100L && w.tickCount % 40L == 0L) {
-            int raiders = countHostiles(g);
-            if (raiders == 0 && skywarsStocked) {
+         if (!skywarsWon && g != null && w.tickCount > 100L && w.tickCount % 40L == 0L) {
+            int enemies = countHostiles(g) + Net319.aliveEnemyPeers(-1);
+            if (enemies == 0 && swIslandStocked[0] && (soloBots || Net319.peerCount() > 0)) {
                skywarsWon = true;
                g.say("\u00a76\u00a7l[Skywars] VICTORY! \u00a7aYou are the last champion standing! (/sw reset for a new round)");
             }
@@ -791,64 +1033,64 @@ public final class SkyGen extends Gen {
 
       // 3. BEDWARS: stock team bases, resource generators, bed destruction alerts & victory check
       if (type == WorldSettings.BEDWARS) {
-         if (!bedwarsStocked && w.chunk(0, 0) != null) {
-            stockBedwarsWorld(g, w);
-         }
-         if (w.tickCount % 60L == 0L) {
-            for (int t = 0; t < 4; t++) {
-               int bx = BEDWARS_BASES[t][0];
-               int bz = BEDWARS_BASES[t][1];
-               int dirX = Integer.compare(0, bx);
-               int dirZ = Integer.compare(0, bz);
-               double gx = bx - dirX * 4 + 0.5;
-               double gz = bz - dirZ * 4 + 0.5;
-               if (w.chunkAt((int)gx, (int)gz) != null) {
-                  w.dropItem(gx, Y_DECK + 1.2, gz, Items.IRON_INGOT, 1);
-                  w.dropItem(gx, Y_DECK + 1.2, gz, Blocks.WOOL0 + BEDWARS_COLORS[t], 4);
-                  if (w.tickCount % 180L == 0L) {
-                     w.dropItem(gx, Y_DECK + 1.2, gz, Items.GOLD_INGOT, 1);
+         stockBedwarsWorld(g, w);
+         // Only the authoritative instance (Singleplayer or Host) spawns generator item drops to prevent network duplication
+         if (!Net319.isConnected()) {
+            if (w.tickCount % 60L == 0L) {
+               for (int t = 0; t < 4; t++) {
+                  int bx = BEDWARS_BASES[t][0];
+                  int bz = BEDWARS_BASES[t][1];
+                  int dirX = Integer.compare(0, bx);
+                  int dirZ = Integer.compare(0, bz);
+                  double gx = bx - dirX * 4 + 0.5;
+                  double gz = bz - dirZ * 4 + 0.5;
+                  if (w.chunkAt((int)gx, (int)gz) != null) {
+                     dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Items.IRON_INGOT, 1, 48);
+                     dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Blocks.WOOL0 + BEDWARS_COLORS[t], 4, 64);
+                     if (w.tickCount % 180L == 0L) {
+                        dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Items.GOLD_INGOT, 1, 16);
+                     }
                   }
                }
             }
-         }
-         if (w.tickCount % 300L == 0L) {
-            for (int[] d : BEDWARS_DIAMONDS) {
-               if (w.chunkAt(d[0], d[1]) != null) {
-                  w.dropItem(d[0] + 0.5, Y_DECK + 1.2, d[1] + 0.5, Items.DIAMOND, 1);
+            if (w.tickCount % 300L == 0L) {
+               for (int[] d : BEDWARS_DIAMONDS) {
+                  if (w.chunkAt(d[0], d[1]) != null) {
+                     dropGeneratorItemCapped(w, d[0] + 0.5, Y_DECK + 1.2, d[1] + 0.5, Items.DIAMOND, 1, 8);
+                  }
+               }
+            }
+            if (w.tickCount % 500L == 0L) {
+               if (w.chunkAt(0, 0) != null) {
+                  dropGeneratorItemCapped(w, -3.5, Y_DECK + 1.2, 0.5, Items.EMERALD, 1, 8);
+                  dropGeneratorItemCapped(w, 4.5, Y_DECK + 1.2, 0.5, Items.EMERALD, 1, 8);
                }
             }
          }
-         if (w.tickCount % 500L == 0L) {
-            if (w.chunkAt(0, 0) != null) {
-               w.dropItem(-3.5, Y_DECK + 1.2, 0.5, Items.EMERALD, 1);
-               w.dropItem(4.5, Y_DECK + 1.2, 0.5, Items.EMERALD, 1);
-            }
-         }
+
          if (g != null && g.player != null && w.tickCount % 20L == 0L) {
+            int my = getPlayerTeam(g);
             int enemyBeds = 0;
             for (int t = 0; t < 4; t++) {
                boolean intact = isTeamBedIntact(w, t);
                if (bedKnownIntact[t] && !intact) {
-                  bedKnownIntact[t] = false;
-                  if (t == 0) {
-                     g.bedPos = null;
-                     g.say("\u00a7c\u00a7l[Bedwars] YOUR BED WAS DESTROYED! \u00a77You will no longer respawn!");
+                  onBedDestroyed(g, w, t, null, false);
+               }
+               if (t == my) {
+                  if (intact) {
+                     g.bedPos = getTeamBedFoot(my);
+                     g.spawnXZ = new int[]{BEDWARS_BASES[my][0], BEDWARS_BASES[my][1]};
                   } else {
-                     g.say("\u00a7e[Bedwars] " + BEDWARS_CODES[t] + BEDWARS_NAMES[t] + " Team's Bed \u00a77was destroyed!");
+                     g.bedPos = null;
                   }
-               }
-               if (t == 0 && intact) {
-                  int bx = BEDWARS_BASES[0][0];
-                  int bz = BEDWARS_BASES[0][1];
-                  g.bedPos = new int[]{bx, Y_DECK + 1, bz + 3};
-               }
-               if (t > 0 && intact) {
+               } else if (intact) {
                   enemyBeds++;
                }
             }
-            if (!bedwarsWon && bedwarsStocked && enemyBeds == 0 && countHostiles(g) == 0) {
+            int enemyPlayers = Net319.aliveEnemyPeers(my);
+            if (!bedwarsWon && bwBaseStocked[my] && enemyBeds == 0 && countHostiles(g) == 0 && enemyPlayers == 0) {
                bedwarsWon = true;
-               g.say("\u00a76\u00a7l[Bedwars] VICTORY! \u00a7aAll enemy beds and defenders eliminated! (/bw reset to play again)");
+               g.say("\u00a76\u00a7l[Bedwars] VICTORY! \u00a7aAll enemy beds and opponents eliminated! (/bw reset to play again)");
             }
          }
       }
@@ -908,7 +1150,7 @@ public final class SkyGen extends Gen {
       }
    }
 
-   /** Handles /sb, /challenges, /sw, /bw, /shop, and /upgrades commands. */
+   /** Handles /sb, /challenges, /sw, /bw, /shop, /upgrades, and /lobby commands. */
    public static boolean onModeCommand(Game g, String cmd, String[] args) {
       if (g == null || g.world == null) {
          return false;
@@ -922,6 +1164,12 @@ public final class SkyGen extends Gen {
       if (c.equals("/upgrades")) {
          g.menu = new Menu(g, Menu.TRADE, null, Trades.BEDWARS_ARMOR);
          g.setScreen(Game.S.INV);
+         return true;
+      }
+      if (c.equals("/lobby") && g.world.settings != null && g.world.settings.isMinigame()) {
+         matchState = STATE_WAITING;
+         lobbyCountdownTicks = -1;
+         g.setScreen(Game.S.WAITING);
          return true;
       }
       if (c.equals("/sb") || c.equals("/challenges")) {
@@ -943,13 +1191,15 @@ public final class SkyGen extends Gen {
             stockSkywarsChests(g, g.world, true);
             g.say("\u00a7b[Skywars] All chests refilled!");
          } else if (sub.equals("reset")) {
-            skywarsStocked = false;
-            skywarsWon = false;
-            stockSkywarsChests(g, g.world, false);
-            g.say("\u00a7b[Skywars] Match reset! Islands restocked and gladiators spawned.");
+            resetMatchState();
+            startMatch(g, Net319.isHosting());
+            g.say("\u00a7b[Skywars] Match reset! Islands restocked.");
+         } else if (sub.equals("lobby")) {
+            matchState = STATE_WAITING;
+            g.setScreen(Game.S.WAITING);
          } else {
             long rem = (3600L - (g.world.tickCount % 3600L)) / 20L;
-            g.say("\u00a7b[Skywars] Raiders remaining: " + countHostiles(g) + " | Next chest refill in " + rem + "s (/sw refill | /sw reset)");
+            g.say("\u00a7b[Skywars] Opponents remaining: " + (countHostiles(g) + Net319.aliveEnemyPeers(-1)) + " | Next chest refill in " + rem + "s (/sw refill | /sw reset)");
          }
          return true;
       }
@@ -965,6 +1215,18 @@ public final class SkyGen extends Gen {
             g.setScreen(Game.S.INV);
             return true;
          }
+         if (sub.equals("team") && args.length > 2) {
+            String tn = args[2].toLowerCase();
+            int t = tn.startsWith("b") || tn.equals("1") ? 1 : (tn.startsWith("g") || tn.equals("2") ? 2 : (tn.startsWith("y") || tn.equals("3") ? 3 : 0));
+            selectTeam(g, t, true);
+            g.say("\u00a7e[Bedwars] Joined " + BEDWARS_CODES[t] + BEDWARS_NAMES[t] + " Team\u00a7e!");
+            return true;
+         }
+         if (sub.equals("lobby")) {
+            matchState = STATE_WAITING;
+            g.setScreen(Game.S.WAITING);
+            return true;
+         }
          if (sub.equals("reset")) {
             resetMatchState();
             for (int t = 0; t < 4; t++) {
@@ -977,7 +1239,7 @@ public final class SkyGen extends Gen {
                g.world.setBlock(bx + dirX * 3, Y_DECK + 1, bz + dirZ * 3, Decor315.foot(color, facing));
                g.world.setBlock(bx + dirX * 4, Y_DECK + 1, bz + dirZ * 4, Decor315.head(color, facing));
             }
-            stockBedwarsWorld(g, g.world);
+            startMatch(g, Net319.isHosting());
             g.say("\u00a7e[Bedwars] Match reset! All 4 Team Beds restored.");
             return true;
          }
@@ -985,7 +1247,7 @@ public final class SkyGen extends Gen {
          for (int t = 0; t < 4; t++) {
             sb.append(BEDWARS_CODES[t]).append(BEDWARS_NAMES[t]).append(isTeamBedIntact(g.world, t) ? ":\u00a7aBED " : ":\u00a7cOUT ");
          }
-         sb.append("\u00a77(/bw shop | /bw upgrades | /bw reset)");
+         sb.append("\u00a77(/bw shop | /bw upgrades | /bw team <red|blue|green|yellow> | /bw reset)");
          g.say(sb.toString());
          return true;
       }
@@ -994,7 +1256,7 @@ public final class SkyGen extends Gen {
 
    /** Renders the top-right Scoreboard / Quest HUD for Skyblock, Skywars, and Bedwars. */
    public static void drawModeHud(Game g) {
-      if (g == null || g.world == null || g.world.settings == null || g.debug) {
+      if (g == null || g.world == null || g.world.settings == null || g.debug || g.screen == Game.S.WAITING) {
          return;
       }
       int type = g.world.settings.type;
@@ -1023,18 +1285,19 @@ public final class SkyGen extends Gen {
          lines.add("\u00a77Type /sb for quest list");
       } else if (type == WorldSettings.SKYWARS) {
          long rem = (3600L - (g.world.tickCount % 3600L)) / 20L;
-         int raiders = countHostiles(g);
+         int raiders = countHostiles(g) + Net319.aliveEnemyPeers(-1);
          lines.add("\u00a76\u00a7lSKYWARS");
-         lines.add("\u00a7fRaiders Left: " + (raiders > 0 ? "\u00a7c" + raiders : "\u00a7a0 (VICTORY!)"));
+         lines.add("\u00a7fOpponents: " + (raiders > 0 ? "\u00a7c" + raiders : "\u00a7a0 (VICTORY!)"));
          lines.add(String.format("\u00a7fChest Refill: \u00a7b%d:%02d", rem / 60L, rem % 60L));
          lines.add("\u00a77/sw refill | /sw reset");
       } else if (type == WorldSettings.BEDWARS) {
+         int my = getPlayerTeam(g);
          long dRem = (300L - (g.world.tickCount % 300L)) / 20L;
          long eRem = (500L - (g.world.tickCount % 500L)) / 20L;
          lines.add("\u00a7e\u00a7lBEDWARS");
          for (int t = 0; t < 4; t++) {
             boolean bed = isTeamBedIntact(g.world, t);
-            lines.add(BEDWARS_CODES[t] + "[" + BEDWARS_NAMES[t].charAt(0) + "] " + BEDWARS_NAMES[t] + ": " + (bed ? "\u00a7aBED \u2714" : "\u00a7cBROKEN \u2718") + (t == 0 ? " \u00a77(You)" : ""));
+            lines.add(BEDWARS_CODES[t] + "[" + BEDWARS_NAMES[t].charAt(0) + "] " + BEDWARS_NAMES[t] + ": " + (bed ? "\u00a7aBED \u2714" : "\u00a7cBROKEN \u2718") + (t == my ? " \u00a77(You)" : ""));
          }
          lines.add("\u00a7bDiamond: " + dRem + "s \u00a72Emerald: " + eRem + "s");
          lines.add("\u00a77/shop | /upgrades");

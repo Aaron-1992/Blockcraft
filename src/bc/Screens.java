@@ -717,7 +717,10 @@ final class Screens {
          Net319.toggleJoin(g);
          ui.say(Net319.isConnected() ? "Connected to LAN world" : "Not connected");
       });
-      ui.button("Save and Quit to Title", bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
+      String quitLabel = (g.world != null && g.world.settings != null && g.world.settings.isMinigame())
+         ? "Leave Minigame"
+         : "Save and Quit to Title";
+      ui.button(quitLabel, bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
       ui.drawToast();
    }
 
@@ -911,5 +914,124 @@ final class Screens {
       for (int i = 0; i < lines.size() && i < 2; i++) {
          gui.centered(lines.get(i), cx, ty + 11.0F + i * 10.0F, Ui.TEXT, true, 1.0F);
       }
+   }
+
+   // =================================================================== V4.1: Minigame Waiting Room / Lobby Screen
+   static void waiting(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      gui.gradient(0, 0, gui.w, gui.h, 0x6810141C, 0xC006080C);
+      float cx = gui.w / 2.0F;
+      boolean isBedwars = g.world == null || g.world.settings == null || g.world.settings.type == WorldSettings.BEDWARS;
+      ui.title(isBedwars ? "Bedwars Waiting Lobby" : "Skywars Waiting Lobby", 7.0F);
+
+      float pw = Math.min(300.0F, gui.w - 16.0F);
+      float px = cx - pw / 2.0F;
+      float py = 21.0F;
+      float footY = gui.h - 24.0F;
+      float ph = footY - py - 4.0F;
+      ui.panel(px, py, pw, ph);
+
+      float ix = px + 6.0F;
+      float iw = pw - 12.0F;
+      float colW = (iw - 6.0F) / 2.0F;
+      float x1 = ix + colW + 6.0F;
+      float iy = py + 6.0F;
+
+      int totalPlayers = 1 + Net319.peerCount();
+      String statusLine;
+      if (SkyGen.lobbyCountdownTicks > 0) {
+         int secs = (SkyGen.lobbyCountdownTicks + 19) / 20;
+         statusLine = "Match starting in " + secs + "s... (" + totalPlayers + " in lobby)";
+      } else {
+         statusLine = "Waiting for players (" + totalPlayers + "/4) - Ephemeral Match (No Save)";
+      }
+      gui.text(Game.clipText(statusLine, iw), ix, iy, SkyGen.lobbyCountdownTicks > 0 ? 0xFF8FE060 : Ui.GOLD, true);
+
+      String netLine;
+      if (Net319.isHosting()) {
+         netLine = "Host IP: " + Net319.publicAddress + " | Code: " + Net319.shareCode;
+      } else if (Net319.isConnected()) {
+         netLine = "Connected to Host (" + Net319.peerCount() + " peers) - Waiting for start";
+      } else {
+         netLine = "LAN / VPN IP: " + Net319.localLanIp() + ":" + Net319.DEFAULT_PORT + " (Click Host LAN to invite)";
+      }
+      gui.text(Game.clipText(netLine, iw), ix, iy + 12.0F, Ui.TEXT, true);
+
+      int myTeam = SkyGen.getPlayerTeam(g);
+      StringBuilder roster = new StringBuilder("Roster: You [");
+      roster.append(isBedwars ? SkyGen.BEDWARS_NAMES[myTeam] : ("#" + (myTeam + 1))).append("]");
+      for (Net319.Peer p : Net319.peers().values()) {
+         int pt = Math.abs(p.team) & 3;
+         roster.append(", ").append(p.name).append(" [").append(isBedwars ? SkyGen.BEDWARS_NAMES[pt] : ("#" + (pt + 1))).append("]");
+      }
+      gui.text(Game.clipText(roster.toString(), iw), ix, iy + 24.0F, Ui.DIM, true);
+
+      float by0 = iy + 38.0F;
+      float qW = (iw - 12.0F) / 4.0F;
+      for (int t = 0; t < 4; t++) {
+         final int teamIdx = t;
+         boolean sel = (myTeam == t);
+         String lbl = isBedwars
+            ? (sel ? "[" + SkyGen.BEDWARS_NAMES[t] + "]" : SkyGen.BEDWARS_NAMES[t])
+            : (sel ? "[Spawn " + (t + 1) + "]" : "Spawn " + (t + 1));
+         ui.button(lbl, ix + t * (qW + 4.0F), by0, qW, 20.0F, true,
+            isBedwars ? "Join " + SkyGen.BEDWARS_NAMES[t] + " Team base." : "Select spawn island #" + (t + 1) + ".",
+            () -> {
+               SkyGen.selectTeam(g, teamIdx, true);
+               ui.say(isBedwars ? "Selected " + SkyGen.BEDWARS_NAMES[teamIdx] + " Team" : "Selected Spawn #" + (teamIdx + 1));
+            });
+      }
+
+      float by1 = by0 + 24.0F;
+      ui.button("Start Match", ix, by1, colW, 20.0F, true,
+         "Begin the minigame immediately for yourself and all connected players.",
+         () -> SkyGen.startMatch(g, true));
+      ui.button(SkyGen.lobbyCountdownTicks > 0 ? "Cancel Timer" : "Countdown (5s)", x1, by1, colW, 20.0F, true,
+         "Start or cancel a 5-second match start countdown.",
+         () -> {
+            if (SkyGen.lobbyCountdownTicks > 0) {
+               SkyGen.lobbyCountdownTicks = -1;
+               ui.say("Countdown cancelled");
+            } else {
+               SkyGen.lobbyCountdownTicks = 100;
+               ui.say("Match starting in 5 seconds...");
+            }
+         });
+
+      float by2 = by1 + 24.0F;
+      ui.button("Solo Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, by2, colW, 20.0F, true,
+         "When ON in solo play, unoccupied enemy bases spawn AI defenders/raiders.",
+         () -> {
+            SkyGen.soloBots = !SkyGen.soloBots;
+            ui.say("Solo AI Bots: " + (SkyGen.soloBots ? "ON" : "OFF"));
+         });
+      ui.button("Copy Share Code", x1, by2, colW, 20.0F, true,
+         "Copy the Share Code (includes Radmin VPN, LAN, and Worldwide Tunnel endpoints).",
+         () -> {
+            Net319.copyShareCode(g);
+            ui.say("Copied Share Code: " + Net319.shareCode);
+         });
+
+      float by3 = by2 + 24.0F;
+      if (by3 + 20.0F <= py + ph - 2.0F) {
+         ui.button(Net319.isHosting() ? "Stop Host (" + Net319.peerCount() + ")" : "Host LAN / VPN", ix, by3, colW, 20.0F, true,
+            "Open this minigame lobby on LAN / Radmin VPN / Worldwide so friends can join.",
+            () -> {
+               Net319.toggleHost(g);
+               ui.say(Net319.isHosting() ? "Hosting on " + Net319.publicAddress : "Stopped hosting");
+            });
+         ui.button("Multiplayer...", x1, by3, colW, 20.0F, true,
+            "Open Multiplayer settings to join a friend's server or configure ports.",
+            () -> {
+               g.mpReturn = Game.S.WAITING;
+               Screens.openMultiplayer(g);
+            });
+      }
+
+      float bw = Math.min(200.0F, pw);
+      ui.button("Leave Lobby", cx - bw / 2.0F, footY, bw, 20.0F, true, null, g::quitToTitle);
+      ui.drawToast();
    }
 }
