@@ -393,6 +393,15 @@ public final class Renderer {
       this.fogR = this.skyTmp[3];
       this.fogG = this.skyTmp[4];
       this.fogB = this.skyTmp[5];
+      if (ModLoader.isInfdevActive()) {
+         float d = Math.max(0.18F, this.daylight);
+         this.topR = 0.56F * d;
+         this.topG = 0.78F * d;
+         this.topB = 1.00F * d;
+         this.fogR = 0.76F * d;
+         this.fogG = 0.87F * d;
+         this.fogB = 1.00F * d;
+      }
 
       // Update 3.8 - weather: overcast skies are grey and dark, storms darker still, lightning lights everything up
       this.wfx.updateLocal(var3);
@@ -916,7 +925,11 @@ public final class Renderer {
       }
 
       if (skyOn && this.g.opt.clouds && !var6 && !var7 && (!var50 || !this.sh.cloudsOk || !this.sh.sceneActive)) {
-         this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
+         if (ModLoader.isInfdevActive()) {
+            this.drawClouds(var1, var41, var42, var43);
+         } else {
+            this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
+         }
          if (glow) {
             GL11.glColorMask(true, true, true, false);   // the plain clouds switch the colour mask back on
          }
@@ -1374,8 +1387,26 @@ public final class Renderer {
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
+   private static boolean[] infdevCloudGrid;
+
+   private static boolean isInfdevCloudCell(int gx, int gz) {
+      if (infdevCloudGrid == null) {
+         int[] px = Tex.cloudPixels();
+         boolean[] grid = new boolean[64 * 64];
+         for (int z = 0; z < 64; z++) {
+            for (int x = 0; x < 64; x++) {
+               grid[z * 64 + x] = px[(z * 4) * 256 + (x * 4)] != 0;
+            }
+         }
+         infdevCloudGrid = grid;
+      }
+      return infdevCloudGrid[(gz & 63) * 64 + (gx & 63)];
+   }
+
    void drawClouds(float var1, float var2, float var3, float var4) {
-      double var5 = 130.0 - this.camY;
+      boolean infdev = ModLoader.isInfdevActive();
+      double baseAlt = infdev ? 108.0 : 130.0;
+      double var5 = baseAlt - this.camY;
       float var7 = Math.max(250.0F, this.g.opt.renderDistance * 16.0F * 1.4F);
       double var8 = ((float)this.g.world.dayTime + var1) * 0.03;
       double var10 = 3072.0;
@@ -1389,17 +1420,96 @@ public final class Renderer {
       GL11.glEnable(3042);
       GL11.glBlendFunc(770, 771);
       GL11.glDisable(3008);
-      GL11.glColor4f(var20, var20, var20 * 1.0F, 0.82F);
-      GL11.glBegin(7);
-      GL11.glTexCoord2d(var12, var16);
-      GL11.glVertex3d(-var7, var5, -var7);
-      GL11.glTexCoord2d(var14, var16);
-      GL11.glVertex3d(var7, var5, -var7);
-      GL11.glTexCoord2d(var14, var18);
-      GL11.glVertex3d(var7, var5, var7);
-      GL11.glTexCoord2d(var12, var18);
-      GL11.glVertex3d(-var7, var5, var7);
-      GL11.glEnd();
+      if (infdev) {
+         // Classic Minecraft Infdev 4-block-thick 3D blocky clouds at Y=108..112
+         double topY = var5 + 4.0;
+         // Bottom face (0.70 brightness)
+         GL11.glColor4f(var20 * 0.72F, var20 * 0.72F, var20 * 0.76F, 0.85F);
+         GL11.glBegin(7);
+         GL11.glTexCoord2d(var12, var16);
+         GL11.glVertex3d(-var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var16);
+         GL11.glVertex3d(var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var18);
+         GL11.glVertex3d(var7, var5, var7);
+         GL11.glTexCoord2d(var12, var18);
+         GL11.glVertex3d(-var7, var5, var7);
+         GL11.glEnd();
+         // Top face (1.00 brightness)
+         GL11.glColor4f(var20, var20, var20, 0.85F);
+         GL11.glBegin(7);
+         GL11.glTexCoord2d(var12, var16);
+         GL11.glVertex3d(-var7, topY, -var7);
+         GL11.glTexCoord2d(var14, var16);
+         GL11.glVertex3d(var7, topY, -var7);
+         GL11.glTexCoord2d(var14, var18);
+         GL11.glVertex3d(var7, topY, var7);
+         GL11.glTexCoord2d(var12, var18);
+         GL11.glVertex3d(-var7, topY, var7);
+         GL11.glEnd();
+         // 3D extruded side walls around cloud cells near the camera (48x48 block cells matching 3072/64)
+         GL11.glDisable(3553);
+         double cell = 48.0;
+         double worldX = this.camX + var8;
+         int cx0 = (int)Math.floor(worldX / cell);
+         int cz0 = (int)Math.floor(this.camZ / cell);
+         GL11.glBegin(7);
+         for (int dz = -5; dz <= 5; dz++) {
+            for (int dx = -5; dx <= 5; dx++) {
+               int gx = cx0 + dx;
+               int gz = cz0 + dz;
+               if (!isInfdevCloudCell(gx, gz)) {
+                  continue;
+               }
+               double x0 = gx * cell - worldX;
+               double x1 = x0 + cell;
+               double z0 = gz * cell - this.camZ;
+               double z1 = z0 + cell;
+               if (!isInfdevCloudCell(gx - 1, gz)) {
+                  GL11.glColor4f(var20 * 0.90F, var20 * 0.90F, var20 * 0.92F, 0.85F);
+                  GL11.glVertex3d(x0, var5, z0);
+                  GL11.glVertex3d(x0, var5, z1);
+                  GL11.glVertex3d(x0, topY, z1);
+                  GL11.glVertex3d(x0, topY, z0);
+               }
+               if (!isInfdevCloudCell(gx + 1, gz)) {
+                  GL11.glColor4f(var20 * 0.90F, var20 * 0.90F, var20 * 0.92F, 0.85F);
+                  GL11.glVertex3d(x1, var5, z1);
+                  GL11.glVertex3d(x1, var5, z0);
+                  GL11.glVertex3d(x1, topY, z0);
+                  GL11.glVertex3d(x1, topY, z1);
+               }
+               if (!isInfdevCloudCell(gx, gz - 1)) {
+                  GL11.glColor4f(var20 * 0.80F, var20 * 0.80F, var20 * 0.84F, 0.85F);
+                  GL11.glVertex3d(x1, var5, z0);
+                  GL11.glVertex3d(x0, var5, z0);
+                  GL11.glVertex3d(x0, topY, z0);
+                  GL11.glVertex3d(x1, topY, z0);
+               }
+               if (!isInfdevCloudCell(gx, gz + 1)) {
+                  GL11.glColor4f(var20 * 0.80F, var20 * 0.80F, var20 * 0.84F, 0.85F);
+                  GL11.glVertex3d(x0, var5, z1);
+                  GL11.glVertex3d(x1, var5, z1);
+                  GL11.glVertex3d(x1, topY, z1);
+                  GL11.glVertex3d(x0, topY, z1);
+               }
+            }
+         }
+         GL11.glEnd();
+         GL11.glEnable(3553);
+      } else {
+         GL11.glColor4f(var20, var20, var20 * 1.0F, 0.82F);
+         GL11.glBegin(7);
+         GL11.glTexCoord2d(var12, var16);
+         GL11.glVertex3d(-var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var16);
+         GL11.glVertex3d(var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var18);
+         GL11.glVertex3d(var7, var5, var7);
+         GL11.glTexCoord2d(var12, var18);
+         GL11.glVertex3d(-var7, var5, var7);
+         GL11.glEnd();
+      }
       GL11.glDisable(3042);
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }

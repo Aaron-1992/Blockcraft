@@ -120,6 +120,7 @@ public final class ModLoader {
    private static boolean initialized;
    private static boolean cuttingTree;
    private static boolean nightVisionActive;
+   public static volatile Game activeGame;
    private static final Map<String, ModEntry> entries = new LinkedHashMap<>();
    private static final Map<String, double[]> waypoints = new HashMap<>();
    private static int baseRecipeCount = -1;
@@ -704,6 +705,17 @@ public final class ModLoader {
             return true;
          }
       });
+      addCatalog(new ModEntry(
+         "infdev-2010",
+         "Minecraft Infdev (2010 Total Conversion)",
+         "0.31.20100618",
+         "Notch / Blockcraft Retro",
+         "Total Conversion",
+         "Reverts world gen, 3D blocky clouds, sky, lighting, items, food & HUD to Minecraft Infdev (June 2010)!",
+         342000,
+         0xFF63D43E,
+         true
+      ), new InfdevMod());
    }
 
    private static void addCatalog(ModEntry entry, BlockcraftMod impl) {
@@ -981,10 +993,17 @@ public final class ModLoader {
       }
       ModEntry m = entries.get(id);
       if (m != null) {
+         boolean wasEnabled = m.enabled;
          m.installed = true;
          m.enabled = true;
          saveState();
          rebuildActiveModEffects();
+         if (!wasEnabled && m.instance != null) {
+            try {
+               m.instance.onEnable(activeGame);
+            } catch (Throwable ignored) {
+            }
+         }
       }
    }
 
@@ -994,10 +1013,17 @@ public final class ModLoader {
       }
       ModEntry m = entries.get(id);
       if (m != null && m.catalogMod) {
+         boolean wasEnabled = m.enabled;
          m.installed = false;
          m.enabled = false;
          saveState();
          rebuildActiveModEffects();
+         if (wasEnabled && m.instance != null) {
+            try {
+               m.instance.onDisable(activeGame);
+            } catch (Throwable ignored) {
+            }
+         }
       }
    }
 
@@ -1006,10 +1032,24 @@ public final class ModLoader {
          refresh();
       }
       ModEntry m = entries.get(id);
-      if (m != null && m.installed) {
+      if (m != null) {
+         if (en) {
+            m.installed = true;
+         }
+         boolean changed = m.enabled != en;
          m.enabled = en;
          saveState();
          rebuildActiveModEffects();
+         if (changed && m.instance != null) {
+            try {
+               if (en) {
+                  m.instance.onEnable(activeGame);
+               } else {
+                  m.instance.onDisable(activeGame);
+               }
+            } catch (Throwable ignored) {
+            }
+         }
       }
    }
 
@@ -1026,6 +1066,7 @@ public final class ModLoader {
    // ------------------------------------------------------------------ runtime & total-conversion hooks
 
    public static void onGameTick(Game g) {
+      activeGame = g;
       if (!initialized) {
          init();
       }
@@ -1043,6 +1084,7 @@ public final class ModLoader {
    }
 
    public static boolean onCommand(Game g, String cmd, String[] args) {
+      activeGame = g;
       if (!initialized) {
          init();
       }
@@ -1072,8 +1114,19 @@ public final class ModLoader {
             if (args.length >= 2) {
                next = args[1].equalsIgnoreCase("on") || args[1].equalsIgnoreCase("true") || args[1].equals("1");
             }
-            setEnabled("infdev-2010", next);
-            g.chatMsg("[Infdev 2010] Total Conversion is now " + (next ? "ENABLED (create or reload a world for Infdev terrain & Brick Pyramids!)" : "DISABLED"));
+            if (next && !inf.installed) {
+               install("infdev-2010");
+            } else {
+               setEnabled("infdev-2010", next);
+            }
+            g.chatMsg(
+               "[Infdev 2010] Total Conversion is now "
+                  + (
+                     next
+                        ? "ENABLED (applied Infdev 3D clouds, flat lighting, Classic textures & neon grass; create a new world for Infdev terrain & Brick Pyramids!)"
+                        : "DISABLED (restored previous settings)"
+                  )
+            );
             return true;
          }
       }

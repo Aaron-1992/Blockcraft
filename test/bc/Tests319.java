@@ -525,14 +525,26 @@ final class Tests319 {
          check(code.startsWith("BC-"), "Share Code starts with BC-");
          eq("rnkxy.a.pinggy.link:41823", Net319.decodeAddress(code), "Share Code round-trips tunnel host:port");
 
-         // Verify external Minecraft Infdev (2010) JAR mod (mods/infdev-2010.jar)
+         // Verify external Minecraft Infdev (2010) JAR mod (mods/infdev-2010.jar) & automatic Infdev settings preset
          ModLoader.ModEntry infEntry = ModLoader.get("infdev-2010");
+         check(infEntry != null, "infdev-2010 mod is always registered in ModLoader");
          if (infEntry != null) {
+            Game infG = newGame(1);
+            infG.opt = new Options(new java.io.File(System.getProperty("java.io.tmpdir")));
+            ModLoader.activeGame = infG;
             try {
                ModLoader.setEnabled("infdev-2010", true);
                check(ModLoader.isInfdevActive(), "Infdev 2010 total conversion active");
                check(ModLoader.isClassicHudNoHunger(), "Infdev classic no-hunger HUD active");
                eq("Minecraft Infdev", ModLoader.hudWatermark(), "Infdev HUD watermark");
+               check(!infG.opt.shaders, "Infdev disables shaders for classic OpenGL look");
+               check(!infG.opt.smooth, "Infdev enables flat per-face lighting (opt.smooth=false)");
+               check(!infG.opt.bushyLeaves && !Mesher.bushyLeaves, "Infdev disables bushy leaves");
+               check(!Mesher.variation, "Infdev disables block brightness/rotation variation");
+               check(infG.opt.clouds, "Infdev enables 3D blocky clouds");
+               check(!infG.opt.weather && !infG.opt.disasters, "Infdev disables modern weather and disasters");
+               eq(ResourcePacks.ID_CLASSIC, ResourcePacks.activeId(), "Infdev activates Classic 16x16 texture pack");
+               eq(InfdevGen.INFDEV_GREEN, Mesher.tintColor(sbCh, Blocks.GRASS, 0, 0), "Infdev neon-green grass tint applies to all chunks");
                Gen infGen = Dim.makeGen(Dim.OVERWORLD, 12345L, new WorldSettings());
                check(infGen instanceof InfdevGen, "Overworld uses InfdevGen when infdev-2010 mod is enabled");
                Chunk pyrCh = infGen.generate(3, 3); // (48, 48) Brick Pyramid
@@ -543,6 +555,8 @@ final class Tests319 {
                ModLoader.setEnabled("infdev-2010", false);
             }
             check(!ModLoader.isInfdevActive(), "Infdev 2010 cleanly disabled after test");
+            check(infG.opt.smooth, "Disabling Infdev restores smooth lighting");
+            eq(ResourcePacks.ID_DEFAULT, ResourcePacks.activeId(), "Disabling Infdev restores previous resource pack");
          }
 
          // Verify Copy (Ctrl+C), Paste (Ctrl+V), Cut (Ctrl+X) and Up/Down history across Chat & all text fields

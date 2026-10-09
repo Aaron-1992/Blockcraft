@@ -789,6 +789,7 @@ final class Screens {
    static final String[] MOD_TABS = {"Modrinth Catalog", "Installed Mods"};
 
    static void mods(Game g) {
+      ModLoader.activeGame = g;
       Ui ui = g.ui;
       Gui gui = g.gui;
       ui.begin();

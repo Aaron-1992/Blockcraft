@@ -11,7 +11,7 @@ package bc;
  * </ul>
  */
 public final class InfdevGen extends Gen {
-   public static final int INFDEV_GREEN = 0xFF63D43E;
+   public static final int INFDEV_GREEN = 0x63D43E;
    public static final int PYRAMID_X = 48;
    public static final int PYRAMID_Z = 48;
    public static final int PYRAMID_HALF = 16;

@@ -26,6 +26,12 @@ public interface BlockcraftMod {
    default void onInit(ModLoader.Context ctx) {
    }
 
+   default void onEnable(Game game) {
+   }
+
+   default void onDisable(Game game) {
+   }
+
    default void onWorldTick(World world) {
    }
 

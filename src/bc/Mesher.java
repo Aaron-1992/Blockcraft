@@ -219,6 +219,9 @@ public final class Mesher {
    }
 
    static int tintColor(Chunk var0, int var1, int var2, int var3) {
+      if (ModLoader.isInfdevActive() && (Blocks.tint[var1] == 1 || Blocks.tint[var1] == 2)) {
+         return InfdevGen.INFDEV_GREEN;
+      }
       switch (Blocks.tint[var1]) {
          case 1:
             return var0.grassColor[var3 * 16 + var2];

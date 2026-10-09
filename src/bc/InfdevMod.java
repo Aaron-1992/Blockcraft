@@ -13,6 +13,17 @@ package bc;
  * </ul>
  */
 public final class InfdevMod implements BlockcraftMod {
+   private static boolean settingsApplied;
+   private static boolean savedShaders = true;
+   private static boolean savedSmooth = true;
+   private static boolean savedBushy = true;
+   private static boolean savedWeather = true;
+   private static boolean savedDisasters = true;
+   private static boolean savedClouds = true;
+   private static boolean savedVariation = true;
+   private static int savedLeafMode = 1;
+   private static String savedResourcePack = ResourcePacks.ID_DEFAULT;
+
    @Override
    public String id() {
       return "infdev-2010";
@@ -35,7 +46,80 @@ public final class InfdevMod implements BlockcraftMod {
 
    @Override
    public String description() {
-      return "Reverts world gen, items, food healing, HUD, and title screen to Minecraft Infdev (June 2010) with Brick Pyramids!";
+      return "Reverts world gen, settings (3D blocky clouds, flat lighting, Classic textures, neon grass), HUD & survival to Infdev (June 2010)!";
+   }
+
+   @Override
+   public void onEnable(Game g) {
+      applyInfdevSettings(g);
+   }
+
+   @Override
+   public void onDisable(Game g) {
+      restoreSettings(g);
+   }
+
+   public static void applyInfdevSettings(Game g) {
+      if (!settingsApplied) {
+         savedVariation = Mesher.variation;
+         savedLeafMode = Mesher.leafMode;
+         savedResourcePack = ResourcePacks.activeId();
+         if (g != null && g.opt != null) {
+            savedShaders = g.opt.shaders;
+            savedSmooth = g.opt.smooth;
+            savedBushy = g.opt.bushyLeaves;
+            savedWeather = g.opt.weather;
+            savedDisasters = g.opt.disasters;
+            savedClouds = g.opt.clouds;
+            if (g.opt.resourcePack != null && !g.opt.resourcePack.isBlank()) {
+               savedResourcePack = g.opt.resourcePack;
+            }
+         }
+         settingsApplied = true;
+      }
+      // Classic June 2010 Infdev visual & gameplay settings:
+      // - Flat per-face lighting (g.opt.smooth = false, no Beta 1.3 smooth ambient occlusion)
+      // - No shaders, no bushy leaf protrusions, no random block brightness/rotation variation
+      // - Classic 3D blocky clouds enabled at Y=108..112
+      // - Fair Infdev skies (no modern weather or disasters)
+      // - Classic 16x16 texture pack + radioactive neon-green grass/foliage tint (#63D43E)
+      Mesher.bushyLeaves = false;
+      Mesher.variation = false;
+      Mesher.leafMode = 0;
+      if (g != null && g.opt != null) {
+         g.opt.shaders = false;
+         g.opt.smooth = false;
+         g.opt.bushyLeaves = false;
+         g.opt.clouds = true;
+         g.opt.weather = false;
+         g.opt.disasters = false;
+      }
+      ResourcePacks.select(ResourcePacks.ID_CLASSIC, g);
+      if (g != null) {
+         g.remeshAll();
+      }
+   }
+
+   public static void restoreSettings(Game g) {
+      if (!settingsApplied) {
+         return;
+      }
+      settingsApplied = false;
+      Mesher.bushyLeaves = savedBushy;
+      Mesher.variation = savedVariation;
+      Mesher.leafMode = savedLeafMode;
+      if (g != null && g.opt != null) {
+         g.opt.shaders = savedShaders;
+         g.opt.smooth = savedSmooth;
+         g.opt.bushyLeaves = savedBushy;
+         g.opt.clouds = savedClouds;
+         g.opt.weather = savedWeather;
+         g.opt.disasters = savedDisasters;
+      }
+      ResourcePacks.select(savedResourcePack != null ? savedResourcePack : ResourcePacks.ID_DEFAULT, g);
+      if (g != null) {
+         g.remeshAll();
+      }
    }
 
    @Override
@@ -140,7 +224,13 @@ public final class InfdevMod implements BlockcraftMod {
 
    @Override
    public void onGameTick(Game g) {
-      if (g == null || g.player == null) {
+      if (g == null) {
+         return;
+      }
+      if (!settingsApplied || (g.opt != null && (g.opt.smooth || g.opt.shaders || g.opt.bushyLeaves))) {
+         applyInfdevSettings(g);
+      }
+      if (g.player == null) {
          return;
       }
       // In Infdev, there is no hunger drain, no hunger auto-regen, and no sprinting
@@ -162,7 +252,8 @@ public final class InfdevMod implements BlockcraftMod {
          return true;
       }
       if (cmd.equals("/infdev")) {
-         g.chatMsg("[Infdev 2010] Active! Features: Infdev 3D overhangs, Brick Pyramids (/pyramid), neon grass, no hunger bar, instant food heal.");
+         applyInfdevSettings(g);
+         g.chatMsg("[Infdev 2010] Active! Applied Infdev settings (flat lighting, 3D blocky clouds, Classic textures, neon grass, no hunger).");
          return true;
       }
       return false;
