@@ -27,6 +27,7 @@ public final class Player {
    public boolean creative = true;
    public boolean spectator;
    public boolean adventure;
+   public boolean hardcore;
    public int gameMode = 1;
    public int food = 20;
    public float sat = 5.0F;
@@ -61,7 +62,8 @@ public final class Player {
    }
 
    public void setMode(int var1) {
-      this.gameMode = var1;
+      this.hardcore = var1 == 4;
+      this.gameMode = var1 == 4 ? 0 : var1;
       this.creative = var1 == 1 || var1 == 3;
       this.spectator = var1 == 3;
       this.adventure = var1 == 2;
@@ -74,7 +76,25 @@ public final class Player {
       if (var1 == 1 || var1 == 3) {
          this.food = 20;
          this.sat = 5.0F;
+         this.burn = 0;
       }
+   }
+
+   public int rawMode() {
+      return this.hardcore ? 4 : this.gameMode;
+   }
+
+   public String modeName() {
+      if (this.hardcore) {
+         return "Hardcore";
+      }
+      return switch (this.gameMode) {
+         case 0 -> "Survival";
+         case 1 -> "Creative";
+         case 2 -> "Adventure";
+         case 3 -> "Spectator";
+         default -> "Survival";
+      };
    }
 
    public void addExhaustion(float var1) {

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "4.0";
+   public static final String VERSION_STR = "4.1";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -58,6 +58,8 @@ public final class Game {
    final Stack[] armor = new Stack[4];
    Stack cursor;
    final Mobs mobs = new Mobs(this);
+   Mob spectatingMob;
+   boolean spectatorNightVision;
    /** Update 3.12: the advancements of the world that is open. */
    final Adv312 adv = new Adv312();
    Mob targetMob;
@@ -1197,7 +1199,7 @@ public final class Game {
    void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz, int worldType, int gameMode) {
       int targetDim = Dim.valid(dim) ? dim : Dim.OVERWORLD;
       int wType = Math.max(0, Math.min(WorldSettings.TYPES - 1, worldType));
-      int gMode = Math.max(0, Math.min(3, gameMode));
+      int gMode = Math.max(0, Math.min(4, gameMode));
       if (this.world == null
          || this.world.seed != seed
          || this.world.dim != targetDim
@@ -1362,7 +1364,7 @@ public final class Game {
          var1.setProperty("pitch", this.player.pitch + "");
          var1.setProperty("health", Math.max(1, this.player.health) + "");
          var1.setProperty("creative", this.player.creative + "");
-         var1.setProperty("mode", this.player.gameMode + "");
+         var1.setProperty("mode", this.player.rawMode() + "");
          var1.setProperty("food", this.player.food + "");
          var1.setProperty("sat", this.player.sat + "");
          var1.setProperty("flying", this.player.flying + "");
@@ -1642,6 +1644,17 @@ public final class Game {
       this.player.invuln = 0;
       this.deathHandled = false;
       this.player.setPos(var1[0], var1[1], var1[2]);
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         if (SkyGen.isTeamBedIntact(this.world, 0)) {
+            this.inv[0] = new Stack(Items.TOOL_BASE, 1);
+            this.inv[1] = new Stack(Blocks.WOOL0 + 14, 16);
+            this.armor[0] = new Stack(Items.ARMOR_BASE, 1);
+            this.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
+         } else {
+            this.player.setMode(3);
+            this.say("\u00a7c[Bedwars] You have been eliminated! Spectating match...");
+         }
+      }
    }
 
    void setScreen(Game.S var1) {
@@ -1728,6 +1741,10 @@ public final class Game {
          if (this.screen == Game.S.PLAY && this.key(67)) {
             if (var1 != 0.0) {
                this.zoomFactor = Math.max(1.5F, Math.min(12.0F, this.zoomFactor * (var1 > 0.0 ? 1.25F : 0.8F)));
+            }
+         } else if (this.screen == Game.S.PLAY && (this.player.spectator || (this.player.creative && this.player.flying && (this.key(341) || this.key(345))))) {
+            if (var1 != 0.0) {
+               this.player.flySpeed = Math.max(0.01F, Math.min(0.25F, this.player.flySpeed + (float)Math.signum(var1) * 0.01F));
             }
          } else if (this.screen == Game.S.PLAY) {
             if (var1 != 0.0) {
@@ -1881,8 +1898,27 @@ public final class Game {
                               }
 
                               return;
+                           case 70:
+                              if (!this.player.spectator && this.sel != 8) {
+                                 Stack tmp = this.inv[this.sel];
+                                 this.inv[this.sel] = this.inv[8];
+                                 this.inv[8] = tmp;
+                                 this.nameTimer = 40.0F;
+                                 this.equip = 0.0F;
+                              }
+
+                              return;
                            case 76:
                               this.setScreen(Game.S.ADV); // Update 3.12: the advancements
+                              return;
+                           case 78:
+                              if (this.key(292) || (var3 & 2) != 0) {
+                                 int nextM = this.player.spectator ? 1 : 3;
+                                 this.spectatingMob = null;
+                                 this.player.setMode(nextM);
+                                 this.say("Set own game mode to " + this.player.modeName() + " Mode");
+                              }
+
                               return;
                            case 81:
                               this.dropHeld((var3 & 2) != 0);
@@ -1917,14 +1953,27 @@ public final class Game {
                               }
 
                               return;
+                           case 293:
+                              if (this.key(292) || (var3 & 2) != 0) {
+                                 int nextM = (this.player.rawMode() + 1) % 5;
+                                 this.spectatingMob = null;
+                                 this.player.setMode(nextM);
+                                 this.say("Set own game mode to " + this.player.modeName() + " Mode");
+                              }
+
+                              return;
                            case 294:
                               this.view = (this.view + 1) % 3;
                               this.say("Camera: " + new String[]{"first person", "behind you", "in front of you"}[this.view]);
                               return;
                            default:
                               if (var1 >= 49 && var1 <= 57) {
-                                 this.sel = var1 - 49;
-                                 this.nameTimer = 40.0F;
+                                 if (this.player.spectator) {
+                                    this.spectatorAction(var1 - 48);
+                                 } else {
+                                    this.sel = var1 - 49;
+                                    this.nameTimer = 40.0F;
+                                 }
                               }
                         }
                      }
@@ -2282,16 +2331,19 @@ public final class Game {
                         var19 = 2;
                      } else if (var16.equals("3") || var16.startsWith("sp")) {
                         var19 = 3;
+                     } else if (var16.equals("4") || var16.startsWith("h")) {
+                        var19 = 4;
                      }
                   } else {
                      var19 = 0;
                   }
 
                   if (var19 < 0) {
-                     this.say("§cUsage: /gamemode <survival|creative|adventure|spectator>");
+                     this.say("§cUsage: /gamemode <survival|creative|adventure|spectator|hardcore>");
                   } else {
+                     this.spectatingMob = null;
                      this.player.setMode(var19);
-                     String[] var23 = new String[]{"Survival", "Creative", "Adventure", "Spectator"};
+                     String[] var23 = new String[]{"Survival", "Creative", "Adventure", "Spectator", "Hardcore"};
                      this.say("Set own game mode to " + var23[var19] + " Mode");
                   }
                   break;
@@ -2649,11 +2701,19 @@ public final class Game {
                case "mods":
                   ModLoader.onCommand(this, "/mods", var2);
                   break;
+               case "sb":
+               case "challenges":
+               case "sw":
+               case "bw":
+               case "shop":
+               case "upgrades":
+                  SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /host /join /disconnect");
+                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
-                  if (!ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
+                  if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
                      this.say("§cUnknown command. Try /help");
                   }
             }
@@ -3060,7 +3120,16 @@ public final class Game {
    }
 
    void pickBlock() {
-      if (this.player.creative && !this.player.spectator && this.target != null) {
+      if (this.player.spectator) {
+         if (this.targetMob != null) {
+            this.spectatingMob = this.targetMob;
+            this.say("\u00a7b[Spectator] Spectating " + Mobs.NAME[this.targetMob.type] + " (press Shift to exit POV)");
+         } else if (this.target != null) {
+            this.player.setPos(this.target.x + 0.5, this.target.y + 1.0, this.target.z + 0.5);
+         }
+         return;
+      }
+      if (this.target != null) {
          int var1 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
          if (var1 != 0) {
             if (var1 == 70) {
@@ -3081,8 +3150,98 @@ public final class Game {
                   }
                }
 
-               this.inv[this.sel] = new Stack(var1, 64);
-               this.nameTimer = 40.0F;
+               if (this.player.creative) {
+                  this.inv[this.sel] = new Stack(var1, 64);
+                  this.nameTimer = 40.0F;
+               } else {
+                  // V4.1 Survival & Adventure Pick-Block: swap matching stack from main inventory (9..35) into active hotbar slot
+                  for (int i = 9; i < 36; i++) {
+                     if (this.inv[i] != null && this.inv[i].id == var1) {
+                        Stack tmp = this.inv[this.sel];
+                        this.inv[this.sel] = this.inv[i];
+                        this.inv[i] = tmp;
+                        this.nameTimer = 40.0F;
+                        this.equip = 0.0F;
+                        return;
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   void spectatorAction(int action) {
+      if (this.world == null || this.player == null) {
+         return;
+      }
+      switch (action) {
+         case 1 -> {
+            this.spectatingMob = null;
+            double[] st = this.findStand(this.spawnXZ[0], this.spawnXZ[1]);
+            double sy = st != null ? st[1] : 80.0;
+            this.player.setPos(this.spawnXZ[0] + 0.5, sy, this.spawnXZ[1] + 0.5);
+            this.say("\u00a7b[Spectator] Teleported to World Spawn (" + this.spawnXZ[0] + ", " + (int)sy + ", " + this.spawnXZ[1] + ")");
+         }
+         case 2 -> {
+            Mob best = null;
+            double bestD = Double.MAX_VALUE;
+            for (Mob m : this.mobs.list) {
+               if (!m.dead && m != this.spectatingMob) {
+                  double d = Math.hypot(m.x - this.player.x, m.z - this.player.z);
+                  if (d < bestD) {
+                     bestD = d;
+                     best = m;
+                  }
+               }
+            }
+            if (best != null) {
+               this.spectatingMob = best;
+               this.player.setPos(best.x, best.y, best.z);
+               this.say("\u00a7b[Spectator] Spectating " + Mobs.NAME[best.type] + " (HP: " + best.health + ", press Shift to exit POV)");
+            } else {
+               this.say("\u00a77[Spectator] No mobs nearby to spectate.");
+            }
+         }
+         case 3 -> {
+            this.spectatingMob = null;
+            if (this.world.settings != null && this.world.settings.isVoidMode()) {
+               this.player.setPos(0.5, SkyGen.Y_DECK + 4.0, 0.5);
+               this.say("\u00a7b[Spectator] Teleported to Center Island (0, " + (SkyGen.Y_DECK + 4) + ", 0)");
+            } else {
+               this.locateCommand(new String[]{"locate", "village"});
+            }
+         }
+         case 4 -> {
+            this.spectatingMob = null;
+            int bx = (int)Math.floor(this.player.x);
+            int bz = (int)Math.floor(this.player.z);
+            double[] st = this.findStand(bx, bz);
+            double sy = st != null ? st[1] : 90.0;
+            this.player.setPos(bx + 0.5, sy, bz + 0.5);
+            this.say("\u00a7b[Spectator] Teleported to Surface (" + bx + ", " + (int)sy + ", " + bz + ")");
+         }
+         case 5 -> {
+            this.spectatorNightVision = !this.spectatorNightVision;
+            this.say("\u00a7b[Spectator] Night Vision: " + (this.spectatorNightVision ? "\u00a7aON" : "\u00a7cOFF"));
+         }
+         case 6 -> {
+            if (this.spectatingMob != null) {
+               this.spectatingMob = null;
+               this.say("\u00a7b[Spectator] Exited Mob POV.");
+            } else if (this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+               int idx = (int)((this.tickCount / 5) % 4);
+               int[] b = SkyGen.BEDWARS_BASES[idx];
+               this.player.setPos(b[0] + 0.5, SkyGen.Y_DECK + 3.0, b[1] + 0.5);
+               this.say("\u00a7b[Spectator] Teleported to " + SkyGen.BEDWARS_NAMES[idx] + " Base");
+            } else if (this.world.settings != null && this.world.settings.type == WorldSettings.SKYWARS) {
+               int idx = (int)((this.tickCount / 5) % SkyGen.SKYWARS_SPAWNS.length);
+               int[] sp = SkyGen.SKYWARS_SPAWNS[idx];
+               this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 3.0, sp[1] + 0.5);
+               this.say("\u00a7b[Spectator] Teleported to Skywars Island #" + (idx + 1));
+            } else {
+               this.player.flySpeed = 0.05F;
+               this.say("\u00a7b[Spectator] Reset Fly Speed to 100%.");
             }
          }
       }
@@ -3410,7 +3569,7 @@ public final class Game {
    }
 
    boolean key(int var1) {
-      return GLFW.glfwGetKey(this.window, var1) == 1;
+      return this.window != 0L && GLFW.glfwGetKey(this.window, var1) == 1;
    }
 
    /** Update 3.9: the walking / turning state of the body that the third-person view and the skin preview draw. */
@@ -3756,6 +3915,15 @@ public final class Game {
          this.world.fight.tick(this);
       }
 
+      if (this.player.spectator && this.spectatingMob != null) {
+         if (this.spectatingMob.dead || this.player.sneaking) {
+            this.spectatingMob = null;
+         } else {
+            this.player.setPos(this.spectatingMob.x, this.spectatingMob.y, this.spectatingMob.z);
+            this.player.yaw = this.spectatingMob.yaw;
+         }
+      }
+
       this.voidCheck();
    }
 
@@ -3771,27 +3939,23 @@ public final class Game {
    }
 
    void updateTarget() {
-      if (this.player.spectator) {
+      double var1 = Math.toRadians(this.player.yaw);
+      double var3 = Math.toRadians(this.player.pitch);
+      double var5 = -Math.sin(var1) * Math.cos(var3);
+      double var7 = -Math.sin(var3);
+      double var9 = Math.cos(var1) * Math.cos(var3);
+      double var11 = this.player.spectator ? 8.0 : (this.player.creative ? 5.0 : 4.5);
+      this.target = this.world.raycast(this.player.x, this.player.y + this.player.eye, this.player.z, var5, var7, var9, var11);
+      this.targetMob = null;
+      double[] var13 = new double[1];
+      double var14 = this.player.x;
+      double var16 = this.player.y + this.player.eye;
+      double var18 = this.player.z;
+      Mob var20 = this.mobs.pick(var14, var16, var18, var5, var7, var9, this.player.spectator ? 8.0 : (this.player.creative ? 5.0 : 3.0), var13);
+      if (var20 != null && (this.target == null || var13[0] < this.target.t)) {
+         this.targetMob = var20;
+         this.targetMobT = var13[0];
          this.target = null;
-      } else {
-         double var1 = Math.toRadians(this.player.yaw);
-         double var3 = Math.toRadians(this.player.pitch);
-         double var5 = -Math.sin(var1) * Math.cos(var3);
-         double var7 = -Math.sin(var3);
-         double var9 = Math.cos(var1) * Math.cos(var3);
-         double var11 = this.player.creative ? 5.0 : 4.5;
-         this.target = this.world.raycast(this.player.x, this.player.y + this.player.eye, this.player.z, var5, var7, var9, var11);
-         this.targetMob = null;
-         double[] var13 = new double[1];
-         double var14 = this.player.x;
-         double var16 = this.player.y + this.player.eye;
-         double var18 = this.player.z;
-         Mob var20 = this.mobs.pick(var14, var16, var18, var5, var7, var9, this.player.creative ? 5.0 : 3.0, var13);
-         if (var20 != null && (this.target == null || var13[0] < this.target.t)) {
-            this.targetMob = var20;
-            this.targetMobT = var13[0];
-            this.target = null;
-         }
       }
    }
 
@@ -3819,6 +3983,23 @@ public final class Game {
       if (this.player.spectator) {
          this.breakProg = 0.0F;
          this.eatTicks = 0;
+         if (var1 && this.targetMob != null) {
+            this.spectatingMob = this.targetMob;
+            this.say("\u00a7b[Spectator] Spectating " + Mobs.NAME[this.targetMob.type] + " (press Shift to exit POV)");
+         } else if (var2) {
+            if (this.spectatingMob != null) {
+               this.spectatingMob = null;
+               this.say("\u00a7b[Spectator] Returned to free-flight camera.");
+            } else if (this.target != null) {
+               int b = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+               if (b == 69 || b == 70 || b == 67 || b == 68) {
+                  TileEntity te = this.world.getOrCreateTile(this.target.x, this.target.y, this.target.z);
+                  if (te != null) {
+                     this.openMenu((b == 67 || b == 68) ? 2 : 3, te);
+                  }
+               }
+            }
+         }
       } else {
          Stack var3 = this.held();
          int var4 = this.heldId();
@@ -3842,7 +4023,7 @@ public final class Game {
 
          if (!var5 && this.leftDown && this.target != null) {
             int var6 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
-            if (!Blocks.breakable(var6) || this.player.adventure) {
+            if (!Blocks.breakable(var6) || (this.player.adventure && !Items.canAdventureBreak(var4, var6))) {
                this.breakProg = 0.0F;
             } else if (this.player.creative) {
                boolean var7 = Items.isTool(var4) && Items.toolClass(var4) == 4;
@@ -3928,7 +4109,11 @@ public final class Game {
             this.eatTicks = 0;
             if (var4 != 268) {
                this.bowCharge = 0;
-               if (this.rightDown && this.placeDelay <= 0 && this.target != null && !this.player.adventure && this.placeBlock()) {
+               if (this.rightDown
+                  && this.placeDelay <= 0
+                  && this.target != null
+                  && (!this.player.adventure || Items.canAdventurePlace(var4, this.world.getBlock(this.target.x, this.target.y, this.target.z)))
+                  && this.placeBlock()) {
                   this.placeDelay = 4;
                   this.swinging = true;
                   this.swing = 1.0E-4F;
@@ -4005,7 +4190,7 @@ public final class Game {
          return this.carvePumpkin();
       }
 
-      if ((var1 == Blocks.END_FRAME || var1 == Blocks.END_FRAME_EYE) && this.heldId() == Items.EYE_OF_ENDER && !this.player.adventure) {
+      if ((var1 == Blocks.END_FRAME || var1 == Blocks.END_FRAME_EYE) && this.heldId() == Items.EYE_OF_ENDER) {
          return EndPortals.insertEye(this, this.target.x, this.target.y, this.target.z);
       }
 
@@ -4430,21 +4615,25 @@ public final class Game {
    /** Right-click on a mob with an item in hand: shear a sheep, or feed an animal (breeding / growing up). */
    /** Update 3.12: right click on a villager opens its trades. */
    boolean openTrade(Mob v) {
-      this.menu = new Menu(this, Menu.TRADE, null, v.color);
+      int prof = v.color;
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         prof = v.color == Trades.PRIEST ? Trades.BEDWARS_ARMOR : Trades.BEDWARS_SHOP;
+      }
+      this.menu = new Menu(this, Menu.TRADE, null, prof);
       this.setScreen(Game.S.INV);
       return true;
    }
 
    boolean useOnMob(Mob var1, Stack var2) {
-      if (var1.type == Mobs.PARROT && !var1.dead && !this.player.spectator && !this.player.adventure && Mobs312.useParrot(this, var1, var2)) {
+      if (var1.type == Mobs.PARROT && !var1.dead && !this.player.spectator && Mobs312.useParrot(this, var1, var2)) {
          return true;
       }
 
-      if (var1.type == Mobs.VILLAGER && !var1.dead && !this.player.spectator && !this.player.adventure) {
+      if (var1.type == Mobs.VILLAGER && !var1.dead && !this.player.spectator) {
          return this.openTrade(var1);
       }
 
-      if (var2 == null || var1.dead || this.player.adventure || this.player.spectator) {
+      if (var2 == null || var1.dead || this.player.spectator) {
          return false;
       }
 
@@ -4583,7 +4772,7 @@ public final class Game {
       int y = this.target.y;
       int z = this.target.z;
       int id = this.world.getBlock(x, y, z);
-      if (!Blocks.isCake(id) || this.player.food >= 20 || this.player.adventure) {
+      if (!Blocks.isCake(id) || this.player.food >= 20) {
          return false;
       }
 
@@ -4694,7 +4883,25 @@ public final class Game {
    }
 
    boolean useSpecial(Stack var1) {
+      if (this.player.spectator) {
+         return false;
+      }
       int var2 = var1.id;
+      if (Items.isArmor(var2)) {
+         int slot = Items.armorSlot(var2);
+         Stack prev = this.armor[slot];
+         this.armor[slot] = new Stack(var1.id, 1, var1.dmg);
+         if (var1.n > 1) {
+            var1.n--;
+            if (prev != null && !this.addItem(prev)) {
+               this.dropFromPlayer(prev.id, prev.n, prev.dmg);
+            }
+         } else {
+            this.inv[this.sel] = prev;
+         }
+         this.equip = 0.0F;
+         return true;
+      }
       double var3 = Math.toRadians(this.player.yaw);
       double var5 = Math.toRadians(this.player.pitch);
       double var7 = -Math.sin(var3) * Math.cos(var5);
@@ -4702,7 +4909,7 @@ public final class Game {
       double var11 = Math.cos(var3) * Math.cos(var5);
       double var13 = this.player.creative ? 5.0 : 4.5;
       if (var2 == 336 || var2 == 337) {
-         return this.target != null && !this.player.adventure && this.placeSeeds(var1);
+         return this.target != null && this.placeSeeds(var1);
       }
 
       if (var2 == 339) {
@@ -4714,7 +4921,7 @@ public final class Game {
       }
 
       if (var2 == Items.EYE_OF_ENDER) {
-         boolean thrown = !this.player.adventure && EndPortals.throwEye(this, var1);
+         boolean thrown = EndPortals.throwEye(this, var1);
          if (thrown) {
             this.adv.award(this, "story/follow_ender_eye");
          }
@@ -5155,6 +5362,11 @@ public final class Game {
                   return false;
                }
 
+               if (var2 == Blocks.TNT && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+                  this.world.setBlock(var3, var4, var5, 0);
+                  this.world.primeTnt(var3, var4, var5, 60);
+               }
+
                if (tallPlant) {
                   this.world.setBlock(var3, var4 + 1, var5, var2 + 1);
                   this.meshNow(var3, var4 + 1, var5);
@@ -5446,11 +5658,24 @@ public final class Game {
    void drawDead() {
       this.gui.gradient(0.0F, 0.0F, this.gui.w, this.gui.h, 1615855616, -1600126976);
       float var1 = this.gui.w / 2.0F;
-      this.gui.centered("You died!", var1, 40.0F, -1, true, 3.0F);
-      this.button("Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
-         this.respawn();
-         this.setScreen(Game.S.PLAY);
-      });
+      boolean hc = this.player != null && this.player.hardcore;
+      this.gui.centered(hc ? "Game Over!" : "You died!", var1, 40.0F, -1, true, 3.0F);
+      if (hc) {
+         this.gui.centered("\u00a7cYou cannot respawn in Hardcore Mode!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
+         this.button("Spectate World", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+            this.player.dead = false;
+            this.player.burn = 0;
+            this.player.health = 20;
+            this.player.setMode(3);
+            this.deathHandled = false;
+            this.setScreen(Game.S.PLAY);
+         });
+      } else {
+         this.button("Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+            this.respawn();
+            this.setScreen(Game.S.PLAY);
+         });
+      }
       this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, this::quitToTitle);
    }
 
@@ -5735,6 +5960,10 @@ public final class Game {
          }
 
          this.drawHotbar();
+         if (this.player.spectator) {
+            this.drawSpectatorHud();
+         }
+         SkyGen.drawModeHud(this);
          this.drawBossBar();
          this.adv.drawToast(this);
          String wm = ModLoader.hudWatermark();
@@ -5790,6 +6019,9 @@ public final class Game {
 
    void damagePlayer(int var1, double var2, double var4) {
       if (!this.player.creative && !this.player.dead && this.player.invuln <= 0) {
+         if (this.player.hardcore) {
+            var1 = Math.max(1, (var1 * 3 + 1) / 2);
+         }
          int var6 = this.armorPoints();
          float var7 = Math.min(20.0F, Math.max(var6 / 5.0F, var6 - var1 / 2.0F)) / 25.0F;
          int var8 = Math.max(1, Math.round(var1 * (1.0F - var7)));
@@ -5869,9 +6101,18 @@ public final class Game {
                int var6 = this.player.health - var14 * 2;
                int var7 = var6 >= 2 ? 2 : (var6 == 1 ? 1 : 0);
                float var8 = this.player.health <= 4 && (this.tickCount / 2 + var14) % 5 == 0 ? 1.0F : 0.0F;
-               this.gui.heart(var1 + var14 * 8, var12 + var8, 0);
+               float hx = var1 + var14 * 8;
+               float hy = var12 + var8;
+               this.gui.heart(hx, hy, 0);
                if (var7 > 0) {
-                  this.gui.heart(var1 + var14 * 8, var12 + var8, var7);
+                  this.gui.heart(hx, hy, var7);
+                  if (this.player.hardcore) {
+                     // Hardcore Mode heart inner marks
+                     this.gui.rect(hx + 2.0F, hy + 3.0F, 1.0F, 2.0F, 0xFF280000);
+                     if (var7 == 2) {
+                        this.gui.rect(hx + 5.0F, hy + 3.0F, 1.0F, 2.0F, 0xFF280000);
+                     }
+                  }
                }
             }
 
@@ -5915,6 +6156,37 @@ public final class Game {
             this.gui.centered(var13, this.gui.w / 2.0F, var2 - (this.player.creative ? 16 : 38), var16 << 24 | 16777215, true, 1.0F);
          }
       }
+   }
+
+   void drawSpectatorHud() {
+      float cx = this.gui.w / 2.0F;
+      int pct = Math.round(this.player.flySpeed / 0.05F * 100.0F);
+      String pov = this.spectatingMob != null && !this.spectatingMob.dead
+         ? (" | POV: \u00a7e" + Mobs.NAME[this.spectatingMob.type] + " \u00a77(Shift to exit)")
+         : (this.targetMob != null ? (" | Target: \u00a7e" + Mobs.NAME[this.targetMob.type] + " (" + this.targetMob.health + " HP)") : "");
+      if (pov.isEmpty() && this.target != null && this.world != null) {
+         int bid = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+         if (bid > 0) {
+            pov = " | Looking at: \u00a7f" + Items.name(bid);
+         }
+      }
+      String top = String.format(
+         "\u00a7bSPECTATOR \u00a77| Speed: \u00a7f%d%% \u00a77(Scroll) | XYZ: \u00a7f%d, %d, %d\u00a77%s",
+         pct,
+         (int)Math.floor(this.player.x),
+         (int)Math.floor(this.player.y),
+         (int)Math.floor(this.player.z),
+         pov
+      );
+      float tw = Gui.textWidth(Gui.stripCodes(top)) + 10.0F;
+      this.gui.rect(cx - tw / 2.0F, 3.0F, tw, 12.0F, 0x90000000);
+      this.gui.centered(top, cx, 5.0F, 0xFFFFFFFF, true, 1.0F);
+
+      String bar = "\u00a7e[1]\u00a7f Spawn  \u00a7e[2]\u00a7f Mob POV  \u00a7e[3]\u00a7f Center/Village  \u00a7e[4]\u00a7f Surface  \u00a7e[5]\u00a7f NightVis  \u00a7e[6]\u00a7f Next/Reset";
+      float bw = Gui.textWidth(Gui.stripCodes(bar)) + 12.0F;
+      float by = this.gui.h - 16.0F;
+      this.gui.rect(cx - bw / 2.0F, by - 2.0F, bw, 13.0F, 0xA010141C);
+      this.gui.centered(bar, cx, by, 0xFFFFFFFF, true, 1.0F);
    }
 
    /** Update 3.18: the frame timer's panel (Shift+F3), below the F3 text when that is open too. */
@@ -6230,6 +6502,15 @@ public final class Game {
                this.button("<", var3 + this.menu.w - 70.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page > 0, () -> var7.page--);
                this.button(">", var3 + this.menu.w - 56.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page < var5 - 1, () -> var7.page++);
             }
+            this.button("X", var3 + this.menu.w - 42.0F, var4 + 3.0F, 12.0F, 12.0F, true, () -> {
+               if (this.cursor != null) {
+                  this.cursor = null;
+               } else {
+                  for (int i = 0; i < 9; i++) {
+                     this.inv[i] = null;
+                  }
+               }
+            });
 
             if (this.menu.palette.length == 0) {
                this.gui.centered("Nothing found", var3 + this.menu.w / 2.0F, var4 + 52.0F, -9408400, false, 1.0F);

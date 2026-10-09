@@ -155,16 +155,17 @@ public final class Net319 {
    }
 
    public static void cycleMpGameMode() {
-      mpGameMode = (mpGameMode + 1) & 3;
+      mpGameMode = (mpGameMode + 1) % 5;
       statusText = "Multiplayer Game Mode set to " + mpModeName();
    }
 
    public static String mpModeName() {
-      return switch (mpGameMode & 3) {
+      return switch (mpGameMode) {
          case 0 -> "Survival";
          case 1 -> "Creative";
          case 2 -> "Adventure";
-         default -> "Spectator";
+         case 3 -> "Spectator";
+         default -> "Hardcore";
       };
    }
 
@@ -480,7 +481,7 @@ public final class Net319 {
             long dayTime = curW != null ? curW.dayTime : 1000L;
             int wType = curW != null && curW.settings != null ? curW.settings.type : mpWorldType;
             int gMode = hg != null && hg.player != null
-               ? (hg.player.spectator ? 3 : (hg.player.adventure ? 2 : (hg.player.creative ? 1 : 0)))
+               ? hg.player.rawMode()
                : mpGameMode;
             double sx = 8.5;
             double sy = 72.0;

@@ -14,10 +14,13 @@ final class Screens {
    private Screens() {
    }
 
-   static final String[] MODE_NAME = {"Survival", "Creative", "Adventure", "Spectator"};
+   static final String[] MODE_NAME = {"Survival", "Creative", "Adventure", "Spectator", "Hardcore"};
    static final String[] MODE_INFO = {
-      "Gather resources, craft, eat and fight the mobs of the night.", "Unlimited blocks, no damage, and flying (tap Space twice).",
-      "Explore: blocks can be looked at but not broken or placed.", "Fly through walls and watch, invisible and untouchable."
+      "Gather resources, craft, eat and fight the mobs of the night.",
+      "Unlimited blocks, no damage, and flying (tap Space twice; F3+N spectator).",
+      "RPG mode: break blocks only with their proper tool, trade, quest and explore!",
+      "Fly through walls (scroll to change speed, 1-6 teleport bar, click mob POV).",
+      "Hardcore Survival: one life only! Hard mob damage and no respawning."
    };
    static final String[] TIPS = {
       "Double-tap Space to fly in Creative mode.", "Press T to chat and / for commands, e.g. /time set day.", "Press L to see your advancements.",
@@ -288,7 +291,7 @@ final class Screens {
       float ww = Gui.textWidth(when);
       gui.text(when, x + w - ww - 4.0F, y + 4.0F, Ui.FAINT, true);
       gui.text(Game.clipText(wi.name, tw - ww - 8.0F), tx, y + 4.0F, 0xFFFFFFFF, true);
-      gui.text(Game.clipText(MODE_NAME[Math.max(0, Math.min(3, wi.mode))] + "  -  " + wi.settings.typeName(), tw), tx, y + 15.0F, Ui.DIM, true);
+      gui.text(Game.clipText(MODE_NAME[Math.max(0, Math.min(MODE_NAME.length - 1, wi.mode))] + "  -  " + wi.settings.typeName(), tw), tx, y + 15.0F, Ui.DIM, true);
       gui.text(Game.clipText("Seed " + wi.seed, tw), tx, y + 25.0F, Ui.FAINT, true);
       final String dir = wi.dir;
       g.hitbox(x, y, w, h, () -> {
@@ -373,7 +376,7 @@ final class Screens {
 
       float shift = Math.max(0.0F, Math.min(32.0F, (gui.h - 240.0F) * 0.3F)); // taller windows: a bigger map, the buttons move down with it
       float ry = y + 68.0F + shift; // the first row of buttons (both columns line up)
-      ui.button("Game Mode: " + MODE_NAME[g.newMode], x0, ry, colW, 20.0F, true, null, () -> g.newMode = (g.newMode + 1) % 4);
+      ui.button("Game Mode: " + MODE_NAME[g.newMode], x0, ry, colW, 20.0F, true, null, () -> g.newMode = (g.newMode + 1) % MODE_NAME.length);
       ui.toggle("Structures", ws.structures, x0, ry + 24.0F, colW, 20.0F,
          "Villages, strongholds, ruins, temples and the other buildings that generate on their own. The Nether and the End keep theirs.", () -> ws.structures = !ws.structures);
       ui.toggle("Bonus Chest", ws.bonusChest, x0, ry + 48.0F, colW, 20.0F, "A chest with a few starting supplies next to where you appear.", () -> ws.bonusChest = !ws.bonusChest);
@@ -684,7 +687,7 @@ final class Screens {
       float y = Math.max(34.0F, gui.h / 4.0F);
       ui.title("Game Menu", y - 34.0F);
       gui.centered(Game.clipText(g.worldDisplayName, gui.w - 20.0F), cx, y - 22.0F, Ui.TEXT, true, 1.0F);
-      String info = g.worldSettings.typeName() + "  -  " + MODE_NAME[Math.max(0, Math.min(3, g.player == null ? 1 : g.player.gameMode))];
+      String info = g.worldSettings.typeName() + "  -  " + MODE_NAME[Math.max(0, Math.min(MODE_NAME.length - 1, g.player == null ? 1 : g.player.rawMode()))];
       gui.centered(Game.clipText(info, gui.w - 20.0F), cx, y - 11.0F, Ui.DIM, true, 1.0F);
       float bx = cx - bw / 2.0F;
       float third = (bw - 8.0F) / 3.0F;

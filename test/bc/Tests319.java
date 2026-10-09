@@ -597,6 +597,56 @@ final class Tests319 {
          tg.setClipboard("20261009");
          tg.onKey(86, 1, 2); // Ctrl+V into Seed
          eq("20261009", tg.seedField, "Ctrl+V pastes into Seed field");
+
+         // Verify V4.1 All Gamemodes Overhaul: Survival, Creative, Adventure, Spectator, Hardcore & Minigames
+         Game mg = newGame(0);
+         // 1. Survival: Right-click armor quick-equip, F-key quick utility swap, and Survival middle-click pickBlock
+         int ironChest = Items.armorId(1, 1);
+         mg.sel = 0;
+         mg.inv[0] = new Stack(ironChest, 1);
+         check(mg.useSpecial(mg.inv[0]), "Right-clicking armor in Survival equips it");
+         eq(ironChest, mg.armor[1].id, "Iron Chestplate equipped in chest slot");
+         mg.inv[0] = new Stack(Blocks.TORCH, 16);
+         mg.inv[8] = new Stack(Items.BREAD, 8);
+         mg.setScreen(Game.S.PLAY);
+         mg.onKey(70, 1, 0); // F key swaps active slot with utility slot 8
+         eq(Items.BREAD, mg.inv[0].id, "F key swaps utility slot 8 into active slot");
+         eq(Blocks.TORCH, mg.inv[8].id, "F key moves previous active item to slot 8");
+
+         // 2. Adventure Mode: tool-matched breaking, tactical block placement, Villager trading & Cake eating
+         mg.player.setMode(2);
+         check(mg.player.adventure, "Player is in Adventure Mode");
+         check(!Items.canAdventureBreak(0, Blocks.STONE), "Adventure Mode blocks bare-hand stone breaking");
+         check(Items.canAdventureBreak(Items.toolId(1, Items.C_PICK), Blocks.STONE), "Adventure Mode allows Pickaxe to break Stone");
+         check(Items.canAdventureBreak(Items.toolId(1, Items.C_AXE), Blocks.LOG_OAK), "Adventure Mode allows Axe to break Oak Log");
+         check(Items.canAdventureBreak(Items.toolId(1, Items.C_SHOVEL), Blocks.DIRT), "Adventure Mode allows Shovel to break Dirt");
+         check(Items.canAdventureBreak(0, Blocks.TORCH), "Adventure Mode allows breaking 0-hardness Torch");
+         check(Items.canAdventurePlace(Blocks.TORCH, Blocks.STONE), "Adventure Mode allows placing Torch");
+         check(Items.canAdventurePlace(Items.SEEDS, 123), "Adventure Mode allows planting Seeds on Farmland");
+
+         // 3. Spectator Mode: scroll-wheel fly speed & quick-action bar
+         mg.player.setMode(3);
+         check(mg.player.spectator && mg.player.flying, "Spectator mode enables flight");
+         float spd0 = mg.player.flySpeed;
+         mg.onScroll(1.0);
+         check(mg.player.flySpeed > spd0, "Scrolling in Spectator Mode increases fly speed");
+         mg.spectatorAction(5);
+         check(mg.spectatorNightVision, "Spectator action 5 toggles Night Vision");
+         mg.spectatorAction(6);
+         eq(0.05F, mg.player.flySpeed, "Spectator action 6 resets fly speed to 100%");
+
+         // 4. Hardcore Mode: mode 4, /gamemode hardcore, and rawMode()
+         mg.runCommand("/gamemode hardcore");
+         check(mg.player.hardcore && mg.player.gameMode == 0 && mg.player.rawMode() == 4, "/gamemode hardcore activates Hardcore Mode");
+         eq("Hardcore", mg.player.modeName(), "Hardcore modeName()");
+
+         // 5. Skyblock 5 islands & Bedwars Shop / Upgrades
+         Chunk sbNorth = sbGen.generate(0, -3); // North Snowy Taiga island at (0, -48) -> lz=0 in chunk -3
+         eq(Blocks.SNOW, sbNorth.blocks[Chunk.idx(0, SkyGen.Y_DECK, 0)] & 0xFFFF, "Skyblock North Snowy Taiga island generated");
+         Chunk sbSouth = sbGen.generate(0, 3); // South Jungle & Mushroom island at (0, 48) -> lz=0 in chunk 3
+         eq(Blocks.GRASS, sbSouth.blocks[Chunk.idx(0, SkyGen.Y_DECK, 0)] & 0xFFFF, "Skyblock South Jungle island generated");
+         check(Trades.offers(Trades.BEDWARS_SHOP).length == 6, "Bedwars Item Shop has 6 trades");
+         check(Trades.offers(Trades.BEDWARS_ARMOR).length == 6, "Bedwars Gear & Upgrades Shop has 6 trades");
       });
    }
 }

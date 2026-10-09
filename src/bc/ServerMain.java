@@ -71,7 +71,7 @@ public final class ServerMain {
 
       String msg = Net319.startHost(null, w, port);
       System.out.println("================================================================");
-      System.out.println(" Blockcraft V4.0 Dedicated Server");
+      System.out.println(" Blockcraft V4.1 Dedicated Server");
       System.out.println("----------------------------------------------------------------");
       System.out.println(" " + msg);
       System.out.println(" World Type : " + WorldSettings.TYPE_NAME[worldType] + " (" + WorldSettings.TYPE_INFO[worldType] + ")");
@@ -141,6 +141,7 @@ public final class ServerMain {
          case "1", "creative", "c" -> 1;
          case "2", "adventure", "a" -> 2;
          case "3", "spectator", "sp" -> 3;
+         case "4", "hardcore", "hc", "h" -> 4;
          default -> 0;
       };
    }
