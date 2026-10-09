@@ -34,9 +34,8 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.18";
-   /** "3.8": the version without the words, for the title screen and the F3 screen. */
-   public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
+   public static final String VERSION_STR = "4.0";
+   public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
    public Player player;
@@ -54,6 +53,7 @@ public final class Game {
    File root;
    Game.S screen = Game.S.TITLE;
    Game.S optionsReturn = Game.S.TITLE;
+   Game.S mpReturn = Game.S.TITLE;
    final Stack[] inv = new Stack[36];
    final Stack[] armor = new Stack[4];
    Stack cursor;
@@ -122,6 +122,14 @@ public final class Game {
    double[] spawnPos = new double[]{0.0, 80.0, 0.0};
    final StringBuilder chat = new StringBuilder();
    long chatOpenedAt;
+   static String clipboardFallback = "";
+   final ArrayList<String> chatHistory = new ArrayList();
+   int chatHistoryPos = -1;
+   String chatDraft = "";
+   final ArrayList<String> addrHistory = new ArrayList(Arrays.asList("127.0.0.1:25565", "lan"));
+   int addrHistoryPos = -1;
+   final ArrayList<String> seedHistory = new ArrayList();
+   int seedHistoryPos = -1;
    final ArrayList<String> chatLog = new ArrayList();
    final ArrayList<Long> chatTimes = new ArrayList();
    final ArrayList<Game.Particle> particles = new ArrayList();
@@ -185,6 +193,8 @@ public final class Game {
    boolean skinFocus;
    String skinMsg = "";
    Game.S skinReturn = Game.S.TITLE;
+   Game.S packsReturn = Game.S.TITLE;
+   Game.S modsReturn = Game.S.TITLE;
    volatile boolean skinBrowsing;
    /** the game was fullscreen when the file dialog opened: go back to it once the dialog is gone */
    volatile boolean skinRefull;
@@ -256,7 +266,12 @@ public final class Game {
          this.opt.leaves = Math.max(0, Math.min(2, Integer.getInteger("bc.leaves")));
       }
 
+      if (System.getProperty("bc.bushy") != null) {
+         this.opt.bushyLeaves = Boolean.getBoolean("bc.bushy");
+      }
+
       Mesher.leafMode = this.opt.leaves;
+      Mesher.bushyLeaves = this.opt.bushyLeaves;
       if (System.getProperty("bc.guiscale") != null) {
          this.opt.guiScale = Integer.getInteger("bc.guiscale"); // test hook: force the GUI scale (screens must cope with narrow windows)
       }
@@ -341,8 +356,9 @@ public final class Game {
       System.out.println("GL: " + GL11.glGetString(7938) + " / " + this.gpuName);
       // (-Dbc.gpuforce=1, a test hook: behave as if the first process had got the small chip - the Windows smoke test proves with it that the second start works)
       boolean gpuForce = Boolean.getBoolean("bc.gpuforce");
-      if ((gpuChanged || gpuForce) && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
-         // the entry for Windows was written just now but this process already got the small chip: start once more, the new process gets the real one
+      boolean wantDedicated = gpuChanged || gpuForce || this.opt.gpuHigh && GpuPref.windows() && !"off".equals(System.getProperty("bc.gpu"));
+      if (wantDedicated && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
+         // the first process got the integrated processor GPU (e.g. started as javaw.exe before Optimus/PowerXpress saw blockcraft-gpu.exe): relaunch once
          System.out.println("GPU: " + this.gpuName + " is part of the processor; starting again with the high performance preference");
          if (GpuPref.relaunch(this.gpuName)) {
             GLFW.glfwDestroyWindow(this.window);
@@ -375,7 +391,7 @@ public final class Game {
          this.winH = Math.max(1, var4);
       });
       GLFW.glfwSetWindowFocusCallback(this.window, (var1x, var3x) -> {
-         if (!var3x && this.screen == Game.S.PLAY) {
+         if (!var3x && this.screen == Game.S.PLAY && !Net319.isActive()) {
             this.setScreen(Game.S.PAUSE);
          }
       });
@@ -1135,6 +1151,12 @@ public final class Game {
             for (int var11 = 0; var11 < var10.length; var11++) {
                this.inv[var11] = new Stack(var10[var11], 64);
             }
+         } else if (ws.type == WorldSettings.BEDWARS) {
+            this.inv[0] = new Stack(Items.TOOL_BASE, 1); // Wooden Sword
+            this.inv[1] = new Stack(Blocks.WOOL0 + 14, 32); // Red Team Wool
+            this.armor[0] = new Stack(Items.ARMOR_BASE, 1);
+            this.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
+            this.bedPos = new int[]{0, SkyGen.Y_DECK + 1, -41};
          }
 
          this.sel = 0;
@@ -1165,6 +1187,91 @@ public final class Game {
       this.adv.load(this.rootDir); // Update 3.12: advancements (a new world starts with none)
       this.player.updateBox();
       this.setScreen(Game.S.LOADING);
+   }
+
+   /** Update 3.19: synchronizes a multiplayer client into the host's world seed, dimension, time of day, and position near the host. */
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz) {
+      joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, WorldSettings.DEFAULT, 1);
+   }
+
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz, int worldType, int gameMode) {
+      int targetDim = Dim.valid(dim) ? dim : Dim.OVERWORLD;
+      int wType = Math.max(0, Math.min(WorldSettings.TYPES - 1, worldType));
+      int gMode = Math.max(0, Math.min(3, gameMode));
+      if (this.world == null
+         || this.world.seed != seed
+         || this.world.dim != targetDim
+         || this.world.settings == null
+         || this.world.settings.type != wType) {
+         Panorama.stop(this);
+
+         if (this.world != null) {
+            for (Chunk c : this.world.chunks.values()) {
+               c.unloaded = true;
+               if (this.rend != null) {
+                  this.rend.onUnload(c);
+               }
+            }
+
+            this.world.chunks.clear();
+            this.world.shutdown();
+         }
+
+         WorldSettings ws = new WorldSettings();
+         ws.type = wType;
+         this.worldSettings = ws;
+         this.bonusPending = false;
+         this.world = new World(seed, null, targetDim, ws);
+         this.world.saveEnabled = false;
+         this.world.game = this;
+         if (this.rend != null) {
+            this.rend.setLod(this.world);
+            this.world.unloadHook = this.rend::onUnload;
+         }
+
+         this.mobs.clear();
+         this.targetMob = null;
+         if (this.player == null) {
+            this.player = new Player();
+            this.player.setMode(gMode);
+            if (gMode == 1) {
+               int[] startItems = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
+               for (int i = 0; i < startItems.length; i++) {
+                  this.inv[i] = new Stack(startItems[i], 64);
+               }
+            } else if (wType == WorldSettings.BEDWARS) {
+               this.inv[0] = new Stack(Items.TOOL_BASE, 1);
+               this.inv[1] = new Stack(Blocks.WOOL0 + 14, 32);
+            }
+         } else {
+            this.player.setMode(gMode);
+         }
+
+         this.cursor = null;
+         this.menu = null;
+         this.eatTicks = 0;
+         this.bowCharge = 0;
+         this.deathHandled = false;
+         this.particles.clear();
+      }
+
+      this.world.dayTime = dayTime;
+      this.needSpawn = false;
+      this.spawnXZ = new int[]{(int)Math.floor(sx), (int)Math.floor(sz)};
+      double px = wsIsVoid(wType) ? sx : sx + 1.6;
+      double py = Math.max(4.0, sy);
+      double pz = sz;
+      this.player.setPos(px, py, pz);
+      this.player.yaw = -90.0F;
+      this.player.pitch = 0.0F;
+      this.player.updateBox();
+      if (this.screen != Game.S.PLAY && this.screen != Game.S.LOADING) {
+         this.setScreen(Game.S.LOADING);
+      }
+   }
+
+   private static boolean wsIsVoid(int t) {
+      return t == WorldSettings.SKYBLOCK || t == WorldSettings.SKYWARS || t == WorldSettings.BEDWARS;
    }
 
    static void parseStacks(String var0, Stack[] var1) {
@@ -1440,6 +1547,7 @@ public final class Game {
    }
 
    void quitToTitle() {
+      Net319.disconnect(this);
       this.saveWorld();
 
       for (Chunk var2 : this.world.chunks.values()) {
@@ -1654,6 +1762,10 @@ public final class Game {
                this.seedField = this.seedField + (char)var1;
             }
          }
+      } else if (this.screen == Game.S.MULTIPLAYER) {
+         if (var1 >= 32 && var1 < 127 && Net319.serverAddr.length() < 64) {
+            Net319.serverAddr = Net319.serverAddr + (char)var1;
+         }
       } else if (this.screen == Game.S.INV && this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
          if (System.currentTimeMillis() - this.menu.openedAt > 100L) {
             this.menu.typed((char)var1);
@@ -1663,10 +1775,75 @@ public final class Game {
       }
    }
 
+   public String getClipboard() {
+      if (this.window != 0L) {
+         try {
+            String s = GLFW.glfwGetClipboardString(this.window);
+            if (s != null) {
+               clipboardFallback = s;
+               return s;
+            }
+         } catch (Throwable ignored) {
+         }
+      }
+      return clipboardFallback != null ? clipboardFallback : "";
+   }
+
+   public void setClipboard(String s) {
+      String val = s == null ? "" : s;
+      clipboardFallback = val;
+      if (this.window != 0L) {
+         try {
+            GLFW.glfwSetClipboardString(this.window, val);
+         } catch (Throwable ignored) {
+         }
+      }
+   }
+
+   static String sanitizePaste(String raw, int maxLen) {
+      if (raw == null || raw.isEmpty() || maxLen <= 0) {
+         return "";
+      }
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < raw.length() && sb.length() < maxLen; i++) {
+         char c = raw.charAt(i);
+         if (c >= 32 && c < 127) {
+            sb.append(c);
+         }
+      }
+      return sb.toString();
+   }
+
+   static String deleteLastWord(String s) {
+      if (s == null || s.isEmpty()) {
+         return "";
+      }
+      int i = s.length() - 1;
+      while (i >= 0 && s.charAt(i) == ' ') {
+         i--;
+      }
+      while (i >= 0 && s.charAt(i) != ' ') {
+         i--;
+      }
+      return s.substring(0, i + 1);
+   }
+
+   static void recordHistory(ArrayList<String> hist, String val) {
+      if (val == null || val.trim().isEmpty()) {
+         return;
+      }
+      String t = val.trim();
+      if (hist.isEmpty() || !hist.get(hist.size() - 1).equals(t)) {
+         hist.add(t);
+      }
+   }
+
    void openChat(String var1) {
       this.setScreen(Game.S.CHAT);
       this.chat.setLength(0);
       this.chat.append(var1);
+      this.chatDraft = var1;
+      this.chatHistoryPos = this.chatHistory.size();
       this.chatOpenedAt = System.currentTimeMillis();
    }
 
@@ -1763,13 +1940,82 @@ public final class Game {
                   }
 
                   return;
-               case NEWWORLD:
-                  if (var1 == 259) {
-                     if (this.focusField == 0 && this.newName.length() > 0) {
-                        this.newName = this.newName.substring(0, this.newName.length() - 1);
-                     } else if (this.focusField == 1 && this.seedField.length() > 0) {
-                        this.seedField = this.seedField.substring(0, this.seedField.length() - 1);
+               case MULTIPLAYER: {
+                  boolean ctrl = (var3 & 10) != 0;
+                  if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(Net319.serverAddr);
+                  } else if (ctrl && var1 == 88 && var2 == 1) {
+                     this.setClipboard(Net319.serverAddr);
+                     Net319.serverAddr = "";
+                  } else if (ctrl && var1 == 86) {
+                     String paste = sanitizePaste(this.getClipboard(), 64 - Net319.serverAddr.length());
+                     Net319.serverAddr = Net319.serverAddr + paste;
+                  } else if ((var1 == 259 || var1 == 261) && Net319.serverAddr.length() > 0) {
+                     Net319.serverAddr = ctrl
+                        ? deleteLastWord(Net319.serverAddr)
+                        : Net319.serverAddr.substring(0, Net319.serverAddr.length() - 1);
+                  } else if (var1 == 265 && !this.addrHistory.isEmpty()) {
+                     if (this.addrHistoryPos < 0 || this.addrHistoryPos > this.addrHistory.size()) {
+                        this.addrHistoryPos = this.addrHistory.size();
                      }
+                     if (this.addrHistoryPos > 0) {
+                        this.addrHistoryPos--;
+                        Net319.serverAddr = this.addrHistory.get(this.addrHistoryPos);
+                     }
+                  } else if (var1 == 264 && !this.addrHistory.isEmpty()) {
+                     if (this.addrHistoryPos >= 0 && this.addrHistoryPos < this.addrHistory.size() - 1) {
+                        this.addrHistoryPos++;
+                        Net319.serverAddr = this.addrHistory.get(this.addrHistoryPos);
+                     }
+                  } else if (var1 == 256 && var2 == 1) {
+                     this.setScreen(this.mpReturn != null ? this.mpReturn : Game.S.TITLE);
+                  } else if ((var1 == 257 || var1 == 335) && var2 == 1) {
+                     recordHistory(this.addrHistory, Net319.serverAddr);
+                     this.addrHistoryPos = this.addrHistory.size();
+                     Net319.joinFromMenu(this, Net319.serverAddr);
+                  }
+
+                  return;
+               }
+               case NEWWORLD: {
+                  boolean ctrl = (var3 & 10) != 0;
+                  if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(this.focusField == 0 ? this.newName : this.seedField);
+                     return;
+                  }
+                  if (ctrl && var1 == 88 && var2 == 1) {
+                     this.setClipboard(this.focusField == 0 ? this.newName : this.seedField);
+                     if (this.focusField == 0) {
+                        this.newName = "";
+                     } else {
+                        this.seedField = "";
+                     }
+                     return;
+                  }
+                  if (ctrl && var1 == 86) {
+                     if (this.focusField == 0) {
+                        this.newName = this.newName + sanitizePaste(this.getClipboard(), 24 - this.newName.length());
+                     } else {
+                        this.seedField = this.seedField + sanitizePaste(this.getClipboard(), 30 - this.seedField.length());
+                     }
+                     return;
+                  }
+                  if (var1 == 259 || var1 == 261) {
+                     if (this.focusField == 0 && this.newName.length() > 0) {
+                        this.newName = ctrl ? deleteLastWord(this.newName) : this.newName.substring(0, this.newName.length() - 1);
+                     } else if (this.focusField == 1 && this.seedField.length() > 0) {
+                        this.seedField = ctrl ? deleteLastWord(this.seedField) : this.seedField.substring(0, this.seedField.length() - 1);
+                     }
+                  }
+
+                  if (var1 == 265 && var2 == 1) {
+                     if (this.focusField == 1 && !this.seedHistory.isEmpty() && this.seedField.isEmpty()) {
+                        this.seedField = this.seedHistory.get(this.seedHistory.size() - 1);
+                     } else {
+                        this.focusField = 0;
+                     }
+                  } else if (var1 == 264 && var2 == 1) {
+                     this.focusField = 1;
                   }
 
                   if (var1 == 258 && var2 == 1) {
@@ -1782,30 +2028,82 @@ public final class Game {
                   }
 
                   if (var1 == 257 && var2 == 1) {
+                     recordHistory(this.seedHistory, this.seedField);
                      Screens.createWorld(this);
                   }
 
                   return;
+               }
                case LOADING:
                   return;
-               case CHAT:
+               case CHAT: {
+                  boolean ctrl = (var3 & 10) != 0;
                   if (var1 == 256 && var2 == 1) {
                      this.setScreen(Game.S.PLAY);
-                  } else if (var1 == 259 && this.chat.length() > 0) {
-                     this.chat.setLength(this.chat.length() - 1);
+                  } else if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(this.chat.toString());
+                  } else if (ctrl && var1 == 88 && var2 == 1) {
+                     this.setClipboard(this.chat.toString());
+                     this.chat.setLength(0);
+                  } else if (ctrl && var1 == 86) {
+                     String paste = sanitizePaste(this.getClipboard(), 100 - this.chat.length());
+                     this.chat.append(paste);
+                  } else if ((var1 == 259 || var1 == 261) && this.chat.length() > 0) {
+                     if (ctrl) {
+                        String rest = deleteLastWord(this.chat.toString());
+                        this.chat.setLength(0);
+                        this.chat.append(rest);
+                     } else {
+                        this.chat.setLength(this.chat.length() - 1);
+                     }
+                  } else if (var1 == 265 && !this.chatHistory.isEmpty()) {
+                     if (this.chatHistoryPos < 0 || this.chatHistoryPos >= this.chatHistory.size()) {
+                        this.chatDraft = this.chat.toString();
+                        this.chatHistoryPos = this.chatHistory.size();
+                     }
+                     if (this.chatHistoryPos > 0) {
+                        this.chatHistoryPos--;
+                        this.chat.setLength(0);
+                        this.chat.append(this.chatHistory.get(this.chatHistoryPos));
+                     }
+                  } else if (var1 == 264 && !this.chatHistory.isEmpty()) {
+                     if (this.chatHistoryPos >= 0 && this.chatHistoryPos < this.chatHistory.size() - 1) {
+                        this.chatHistoryPos++;
+                        this.chat.setLength(0);
+                        this.chat.append(this.chatHistory.get(this.chatHistoryPos));
+                     } else if (this.chatHistoryPos == this.chatHistory.size() - 1) {
+                        this.chatHistoryPos = this.chatHistory.size();
+                        this.chat.setLength(0);
+                        this.chat.append(this.chatDraft);
+                     }
                   } else if ((var1 == 257 || var1 == 335) && var2 == 1) {
                      String var4 = this.chat.toString().trim();
                      this.setScreen(Game.S.PLAY);
                      if (!var4.isEmpty()) {
+                        recordHistory(this.chatHistory, var4);
+                        this.chatHistoryPos = this.chatHistory.size();
                         this.runCommand(var4);
                      }
                   }
 
                   return;
+               }
                case INV:
                   if (this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
                      // the search tab: letters are for the search field, only Esc closes
-                     if (var2 != 0 && var1 == 259) {
+                     boolean ctrl = (var3 & 10) != 0;
+                     if (ctrl && var1 == 67 && var2 == 1) {
+                        this.setClipboard(this.menu.search.toString());
+                     } else if (ctrl && var1 == 88 && var2 == 1) {
+                        this.setClipboard(this.menu.search.toString());
+                        this.menu.clearSearch();
+                     } else if (ctrl && var1 == 86) {
+                        this.menu.pasteSearch(sanitizePaste(this.getClipboard(), 24 - this.menu.search.length()));
+                     } else if (var1 == 265) {
+                        this.menu.stepSearchHistory(-1);
+                     } else if (var1 == 264) {
+                        this.menu.stepSearchHistory(1);
+                     } else if (var2 != 0 && (var1 == 259 || var1 == 261)) {
                         this.menu.backspace();
                      } else if (var2 == 1 && var1 == 256) {
                         this.setScreen(Game.S.PLAY);
@@ -1832,6 +2130,18 @@ public final class Game {
                case ADV:
                   if (var2 == 1 && (var1 == 256 || var1 == 76)) {
                      this.setScreen(Game.S.PLAY);
+                  }
+
+                  return;
+               case PACKS:
+                  if (var2 == 1 && var1 == 256) {
+                     this.setScreen(this.packsReturn != null ? this.packsReturn : Game.S.TITLE);
+                  }
+
+                  return;
+               case MODS:
+                  if (var2 == 1 && var1 == 256) {
+                     this.setScreen(this.modsReturn != null ? this.modsReturn : Game.S.TITLE);
                   }
 
                   return;
@@ -1951,8 +2261,11 @@ public final class Game {
    }
 
    void runCommand(String var1) {
+      recordHistory(this.chatHistory, var1);
+      this.chatHistoryPos = this.chatHistory.size();
       if (!var1.startsWith("/")) {
          this.say("<Player> " + var1);
+         Net319.sendChat(this, var1);
       } else {
          String[] var2 = var1.substring(1).split("\\s+");
 
@@ -1983,7 +2296,7 @@ public final class Game {
                   }
                   break;
                case "time":
-                  if (var2.length >= 3 && var2[1].equals("set")) {
+                  if (var2.length >= 3 && var2[1].equalsIgnoreCase("set")) {
                      String var15 = var2[2].toLowerCase();
                      long var18;
                      switch (var15) {
@@ -1993,11 +2306,19 @@ public final class Game {
                         case "noon":
                            var18 = 6000L;
                            break;
+                        case "sunset":
+                        case "dusk":
+                           var18 = 12000L;
+                           break;
                         case "night":
                            var18 = 13000L;
                            break;
                         case "midnight":
                            var18 = 18000L;
+                           break;
+                        case "sunrise":
+                        case "dawn":
+                           var18 = 23000L;
                            break;
                         default:
                            var18 = Long.parseLong(var15);
@@ -2005,8 +2326,14 @@ public final class Game {
 
                      this.world.dayTime = var18;
                      this.say("Set the time to " + var18);
+                  } else if (var2.length >= 3 && var2[1].equalsIgnoreCase("add")) {
+                     long delta = Long.parseLong(var2[2]);
+                     this.world.dayTime = Math.max(0L, this.world.dayTime + delta);
+                     this.say("Added " + delta + " to time (now " + this.world.dayTime + ")");
+                  } else if (var2.length == 1 || var2[1].equalsIgnoreCase("query")) {
+                     this.say("Current time is " + this.world.dayTime + " (day " + (this.world.dayTime / 24000L) + ")");
                   } else {
-                     this.say("§cUsage: /time set <day|noon|night|midnight|ticks>");
+                     this.say("§cUsage: /time <set|add|query> <day|noon|sunset|night|midnight|sunrise|ticks>");
                   }
                   break;
                case "tp":
@@ -2120,8 +2447,122 @@ public final class Game {
                   }
                   break;
                case "kill":
-                  this.player.health = 0;
-                  this.player.dead = true;
+                  if (var2.length > 1 && (var2[1].equalsIgnoreCase("mobs") || var2[1].equalsIgnoreCase("all") || var2[1].equalsIgnoreCase("@e"))) {
+                     int removed = this.mobs.list.size();
+                     this.mobs.list.clear();
+                     this.say("Removed " + removed + " mob(s)");
+                  } else {
+                     this.player.health = 0;
+                     this.player.dead = true;
+                  }
+                  break;
+               case "butcher":
+               case "killall":
+                  int butchered = this.mobs.list.size();
+                  this.mobs.list.clear();
+                  this.say("Removed " + butchered + " mob(s)");
+                  break;
+               case "clear":
+                  String clearFilter = var2.length > 1 ? var2[1].toLowerCase().replace('_', ' ') : "";
+                  int cleared = 0;
+                  for (int si = 0; si < this.inv.length; si++) {
+                     Stack st = this.inv[si];
+                     if (st != null && st.n > 0 && (clearFilter.isEmpty() || Items.name(st.id).toLowerCase().contains(clearFilter))) {
+                        cleared += st.n;
+                        this.inv[si] = null;
+                     }
+                  }
+                  this.say("Cleared " + cleared + " item(s) from inventory");
+                  break;
+               case "spawn":
+               case "home":
+                  double[] hxz = this.homeXZ();
+                  int hx = (int)Math.floor(hxz[0]);
+                  int hz = (int)Math.floor(hxz[1]);
+                  double[] stand = this.findStand(hx, hz);
+                  this.player.setPos(stand[0], stand[1], stand[2]);
+                  this.player.fallDistance = 0.0F;
+                  this.say("Teleported to spawn [" + (int)Math.floor(stand[0]) + ", " + (int)Math.floor(stand[1]) + ", " + (int)Math.floor(stand[2]) + "]");
+                  break;
+               case "spawnpoint":
+               case "setspawn":
+                  int spx = var2.length >= 4 ? (int)Math.floor(rel(var2[1], this.player.x)) : (int)Math.floor(this.player.x);
+                  int spy = var2.length >= 4 ? (int)Math.floor(rel(var2[2], this.player.y)) : (int)Math.floor(this.player.y);
+                  int spz = var2.length >= 4 ? (int)Math.floor(rel(var2[3], this.player.z)) : (int)Math.floor(this.player.z);
+                  this.spawnXZ = new int[]{spx, spz};
+                  this.say("Set world spawn point to [" + spx + ", " + spy + ", " + spz + "]");
+                  break;
+               case "top":
+                  int tx = (int)Math.floor(this.player.x);
+                  int tz = (int)Math.floor(this.player.z);
+                  double[] tStand = this.findStand(tx, tz);
+                  this.player.setPos(tStand[0], tStand[1], tStand[2]);
+                  this.player.fallDistance = 0.0F;
+                  this.say("Teleported to surface [" + tx + ", " + (int)Math.floor(tStand[1]) + ", " + tz + "]");
+                  break;
+               case "setblock":
+                  if (var2.length < 5) {
+                     this.say("§cUsage: /setblock <x> <y> <z> <block>");
+                  } else {
+                     int sbx = (int)Math.floor(rel(var2[1], this.player.x));
+                     int sby = (int)Math.floor(rel(var2[2], this.player.y));
+                     int sbz = (int)Math.floor(rel(var2[3], this.player.z));
+                     int bid = resolveBlockArg(var2[4]);
+                     if (bid < 0) {
+                        this.say("§cUnknown block: " + var2[4]);
+                     } else {
+                        this.world.setBlock(sbx, sby, sbz, bid);
+                        if (Redstone319.handlesUpdate(bid)) {
+                           Redstone319.propagate(this.world, sbx, sby, sbz);
+                        }
+                        this.meshNow(sbx, sby, sbz);
+                        this.say("Set block at [" + sbx + ", " + sby + ", " + sbz + "] to [" + (bid == 0 ? "Air" : Items.name(bid)) + "]");
+                     }
+                  }
+                  break;
+               case "fill":
+                  if (var2.length < 8) {
+                     this.say("§cUsage: /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>");
+                  } else {
+                     int fx1 = (int)Math.floor(rel(var2[1], this.player.x));
+                     int fy1 = (int)Math.floor(rel(var2[2], this.player.y));
+                     int fz1 = (int)Math.floor(rel(var2[3], this.player.z));
+                     int fx2 = (int)Math.floor(rel(var2[4], this.player.x));
+                     int fy2 = (int)Math.floor(rel(var2[5], this.player.y));
+                     int fz2 = (int)Math.floor(rel(var2[6], this.player.z));
+                     int x0 = Math.min(fx1, fx2);
+                     int x1 = Math.max(fx1, fx2);
+                     int y0 = Math.max(0, Math.min(fy1, fy2));
+                     int y1 = Math.min(255, Math.max(fy1, fy2));
+                     int z0 = Math.min(fz1, fz2);
+                     int z1 = Math.max(fz1, fz2);
+                     long vol = (long)(x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1);
+                     int bid = resolveBlockArg(var2[7]);
+                     if (bid < 0) {
+                        this.say("§cUnknown block: " + var2[7]);
+                     } else if (vol > 4096L) {
+                        this.say("§cToo many blocks in the specified area (" + vol + " > 4096)");
+                     } else {
+                        int count = 0;
+                        for (int yy = y0; yy <= y1; yy++) {
+                           for (int zz = z0; zz <= z1; zz++) {
+                              for (int xx = x0; xx <= x1; xx++) {
+                                 if (this.world.setBlock(xx, yy, zz, bid)) {
+                                    count++;
+                                 }
+                              }
+                           }
+                        }
+                        this.meshNow(x0, y0, z0);
+                        this.meshNow(x1, y1, z1);
+                        this.say("Filled " + count + " block(s) with [" + (bid == 0 ? "Air" : Items.name(bid)) + "]");
+                     }
+                  }
+                  break;
+               case "locate":
+               case "find":
+               case "locatebiome":
+                  this.locateCommand(var2);
                   break;
                case "heal":
                   this.player.health = 20;
@@ -2165,16 +2606,344 @@ public final class Game {
 
                   this.say("The hand bobs when you walk: " + (this.opt.bobbing ? "on" : "off") + "  (/bobbing on|off)");
                   break;
+               case "host":
+                  int hPort = var2.length > 1 ? Integer.parseInt(var2[1]) : Net319.DEFAULT_PORT;
+                  this.say(Net319.host(this, hPort));
+                  break;
+               case "join":
+               case "connect":
+                  String target = var2.length > 1 ? var2[1] : "lan";
+                  this.say(Net319.join(this, target));
+                  break;
+               case "disconnect":
+               case "leave":
+                  Net319.disconnect(this);
+                  this.say("Disconnected from multiplayer");
+                  break;
+               case "mp":
+               case "peers":
+                  this.say(
+                     Net319.isHosting()
+                        ? "Hosting LAN world (" + Net319.peerCount() + " peer(s) connected)"
+                        : (Net319.isConnected() ? "Connected to multiplayer (" + Net319.peerCount() + " peer(s))" : "Multiplayer inactive (/host [port] or /join [host:port])")
+                  );
+                  break;
+               case "pack":
+               case "resourcepack":
+                  if (var2.length < 2) {
+                     StringBuilder sb = new StringBuilder("Resource Packs (active: " + ResourcePacks.activeId() + "): ");
+                     boolean firstP = true;
+                     for (ResourcePacks.Pack p : ResourcePacks.list()) {
+                        if (!firstP) {
+                           sb.append(", ");
+                        }
+                        sb.append(p.id);
+                        firstP = false;
+                     }
+                     this.say(sb.toString());
+                  } else {
+                     ResourcePacks.select(var2[1], this);
+                     this.say("Activated Resource Pack: " + ResourcePacks.active().title);
+                  }
+                  break;
+               case "mods":
+                  ModLoader.onCommand(this, "/mods", var2);
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /dim /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing");
+                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /host /join /disconnect");
                   break;
                default:
-                  this.say("§cUnknown command. Try /help");
+                  if (!ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
+                     this.say("§cUnknown command. Try /help");
+                  }
             }
          } catch (Exception var12) {
             this.say("§cInvalid arguments");
          }
       }
+   }
+
+   static int resolveBlockArg(String raw) {
+      String q = raw.toLowerCase().trim();
+      if (q.equals("air") || q.equals("0")) {
+         return 0;
+      }
+      try {
+         int id = Integer.parseInt(q);
+         if (id > 0 && id < Blocks.MAX && Blocks.name[id] != null && !Items.isItem(id)) {
+            return id;
+         }
+      } catch (NumberFormatException ignored) {
+      }
+      String norm = q.replace('_', ' ');
+      int partial = -1;
+      for (int id : Blocks.creativeList()) {
+         if (!Items.isItem(id)) {
+            String nm = Items.name(id).toLowerCase();
+            if (nm.equals(norm)) {
+               return id;
+            }
+            if (partial < 0 && nm.contains(norm)) {
+               partial = id;
+            }
+         }
+      }
+      return partial;
+   }
+
+   void locateCommand(String[] args) {
+      if (args.length < 2) {
+         this.say("§cUsage: /locate <village|stronghold|fortress|mineshaft|pyramid|temple|witch_hut|igloo|outpost|biome_name>");
+         return;
+      }
+      boolean forceBiome = args[0].equalsIgnoreCase("locatebiome") || (args.length >= 3 && args[1].equalsIgnoreCase("biome"));
+      String target = (args.length >= 3 && args[1].equalsIgnoreCase("biome") ? args[2] : args[1]).toLowerCase().trim();
+      int px = (int)Math.floor(this.player.x);
+      int pz = (int)Math.floor(this.player.z);
+
+      if (!forceBiome) {
+         switch (target) {
+            case "village":
+            case "villages": {
+               int r0x = Math.floorDiv(px, 320);
+               int r0z = Math.floorDiv(pz, 320);
+               Structs.Village best = null;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 18; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        Structs.Village v = this.world.gen.structs.village(r0x + dx, r0z + dz);
+                        if (v != null && v.valid) {
+                           double d2 = (double)(v.cx - px) * (v.cx - px) + (double)(v.cz - pz) * (v.cz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              best = v;
+                           }
+                        }
+                     }
+                  }
+                  if (best != null && r >= 2) {
+                     break;
+                  }
+               }
+               if (best != null) {
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  this.say("Located Village at [" + best.cx + ", " + best.cy + ", " + best.cz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Village nearby");
+               }
+               return;
+            }
+            case "stronghold":
+            case "portal": {
+               Stronghold sh = Stronghold.nearest(this.world.seed, px, pz);
+               if (sh != null) {
+                  int dist = (int)Math.round(Math.hypot(sh.cx - px, sh.cz - pz));
+                  int sy = sh.plan() != null ? sh.plan().oy : 28;
+                  this.say("Located Stronghold at [" + sh.cx + ", " + sy + ", " + sh.cz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Stronghold");
+               }
+               return;
+            }
+            case "fortress":
+            case "nether_fortress": {
+               NetherFortress nf = new NetherFortress(this.world.seed);
+               int r0x = Math.floorDiv(px, NetherFortress.REG);
+               int r0z = Math.floorDiv(pz, NetherFortress.REG);
+               NetherFortress.Plan best = null;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 12; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        NetherFortress.Plan p = nf.plan(r0x + dx, r0z + dz);
+                        if (p != null && p.present) {
+                           double d2 = (double)(p.ox - px) * (p.ox - px) + (double)(p.oz - pz) * (p.oz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              best = p;
+                           }
+                        }
+                     }
+                  }
+                  if (best != null && r >= 1) {
+                     break;
+                  }
+               }
+               if (best != null) {
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  this.say("Located Nether Fortress at [" + best.ox + ", " + (best.oy + 1) + ", " + best.oz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Nether Fortress nearby");
+               }
+               return;
+            }
+            case "mineshaft":
+            case "shaft": {
+               int r0x = Math.floorDiv(px, 128);
+               int r0z = Math.floorDiv(pz, 128);
+               int bestX = 0;
+               int bestY = 0;
+               int bestZ = 0;
+               boolean foundShaft = false;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 16; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        Structs.Shaft sh = this.world.gen.structs.shaft(r0x + dx, r0z + dz);
+                        if (sh != null && sh.valid && !sh.cs.isEmpty()) {
+                           Structs.Corr c0 = (Structs.Corr)sh.cs.get(0);
+                           int sx = (c0.x0 + c0.x1) / 2;
+                           int sz = (c0.z0 + c0.z1) / 2;
+                           double d2 = (double)(sx - px) * (sx - px) + (double)(sz - pz) * (sz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              bestX = sx;
+                              bestY = c0.y + 1;
+                              bestZ = sz;
+                              foundShaft = true;
+                           }
+                        }
+                     }
+                  }
+                  if (foundShaft && r >= 1) {
+                     break;
+                  }
+               }
+               if (foundShaft) {
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  this.say("Located Mineshaft at [" + bestX + ", " + bestY + ", " + bestZ + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Mineshaft nearby");
+               }
+               return;
+            }
+            case "pyramid":
+            case "desert_pyramid":
+            case "desert_temple":
+            case "temple":
+            case "jungle_temple":
+            case "witch_hut":
+            case "swamp_hut":
+            case "hut":
+            case "igloo":
+            case "outpost":
+            case "watchtower":
+            case "tower":
+            case "landmark":
+            case "structure": {
+               int wantKind = 0;
+               String label = "Landmark";
+               if (target.contains("pyramid") || target.equals("desert_temple")) {
+                  wantKind = Landmarks319.K_PYRAMID;
+                  label = "Desert Pyramid";
+               } else if (target.contains("temple")) {
+                  wantKind = Landmarks319.K_JUNGLE;
+                  label = "Jungle Temple";
+               } else if (target.contains("witch") || target.contains("hut")) {
+                  wantKind = Landmarks319.K_WITCH;
+                  label = "Witch Hut";
+               } else if (target.equals("igloo")) {
+                  wantKind = Landmarks319.K_IGLOO;
+                  label = "Igloo";
+               } else if (target.equals("outpost") || target.equals("watchtower") || target.equals("tower")) {
+                  wantKind = Landmarks319.K_OUTPOST;
+                  label = "Ruined Watchtower";
+               }
+               int r0x = Math.floorDiv(px, Landmarks319.REG);
+               int r0z = Math.floorDiv(pz, Landmarks319.REG);
+               Landmarks319.Site best = null;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 24; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        Landmarks319.Site s = Landmarks319.plan(this.world.gen.structs, r0x + dx, r0z + dz);
+                        if (s != null && (wantKind == 0 || s.kind == wantKind)) {
+                           int cx = s.x0 + s.w / 2;
+                           int cz = s.z0 + s.d / 2;
+                           double d2 = (double)(cx - px) * (cx - px) + (double)(cz - pz) * (cz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              best = s;
+                           }
+                        }
+                     }
+                  }
+                  if (best != null && r >= 2) {
+                     break;
+                  }
+               }
+               if (best != null) {
+                  int cx = best.x0 + best.w / 2;
+                  int cy = best.y0 + 1;
+                  int cz = best.z0 + best.d / 2;
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  String[] kindNames = {"Landmark", "Desert Pyramid", "Jungle Temple", "Witch Hut", "Igloo", "Ruined Watchtower"};
+                  String foundLabel = best.kind >= 1 && best.kind < kindNames.length ? kindNames[best.kind] : label;
+                  this.say("Located " + foundLabel + " at [" + cx + ", " + cy + ", " + cz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find " + label + " nearby");
+               }
+               return;
+            }
+            default:
+               break;
+         }
+      }
+
+      // Biome search
+      String normB = target.replace('_', ' ');
+      if (normB.equals("mesa")) {
+         normB = "badlands";
+      } else if (normB.equals("mountains") || normB.equals("hills")) {
+         normB = "extreme hills";
+      }
+      int wantBiome = -1;
+      for (int b = 0; b < Biomes.N; b++) {
+         String bn = Biomes.NAME[b].toLowerCase();
+         if (bn.equals(normB) || (wantBiome < 0 && bn.contains(normB))) {
+            wantBiome = b;
+            if (bn.equals(normB)) {
+               break;
+            }
+         }
+      }
+      if (wantBiome < 0) {
+         this.say("§cUnknown structure or biome '" + target + "'. Try: village, stronghold, fortress, mineshaft, pyramid, temple, witch_hut, igloo, outpost, or a biome name.");
+         return;
+      }
+
+      int step = 32;
+      for (int r = 0; r <= 150; r++) {
+         for (int dz = -r; dz <= r; dz++) {
+            for (int dx = -r; dx <= r; dx++) {
+               if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                  continue;
+               }
+               int wx = px + dx * step;
+               int wz = pz + dz * step;
+               Gen.Col col = this.world.gen.column(wx, wz);
+               if (col.biome == wantBiome) {
+                  int dist = (int)Math.round(Math.hypot(wx - px, wz - pz));
+                  this.say("Located biome " + Biomes.name(wantBiome) + " at [" + wx + ", " + (col.h + 1) + ", " + wz + "] (" + dist + " blocks away)");
+                  return;
+               }
+            }
+         }
+      }
+      this.say("§cCould not find biome " + Biomes.name(wantBiome) + " within 4800 blocks");
    }
 
    void setCreativeFlight() {
@@ -2229,6 +2998,7 @@ public final class Game {
          var14.vz = Math.cos(var4) * Math.cos(var6) * 0.3;
          var14.vy = -Math.sin(var6) * 0.3 + 0.1;
          var14.delay = 40;
+         Net319.onDropItem(this.world, var14);
       }
    }
 
@@ -2474,8 +3244,8 @@ public final class Game {
       }
 
       int cap = this.opt.maxFps;
-      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.OPTIONS
-         || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
+      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
+         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -2539,6 +3309,10 @@ public final class Game {
          this.pano.update(var1); // Update 3.13: the turning world behind the title and the menus
       }
 
+      if (this.world == null && Net319.isActive()) {
+         Net319.tick(this);
+      }
+
       if (this.world != null) {
          int var3 = (int)Math.floor(this.player.x) >> 4;
          int var4 = (int)Math.floor(this.player.z) >> 4;
@@ -2550,6 +3324,10 @@ public final class Game {
          this.rend.scheduleMeshes(this.world, var5 ? 64 : 48);
          this.rend.uploadMeshes(256, var5 ? 20000000L : 4000000L);
          if (this.screen == Game.S.LOADING) {
+            if (Net319.isActive()) {
+               Net319.tick(this);
+            }
+
             int var16 = 25;
             int var18 = this.world.loadedAround(var3, var4, 2);
             boolean var19 = var18 >= var16;
@@ -2603,7 +3381,7 @@ public final class Game {
                }
             }
          } else {
-            boolean var6 = this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.CHAT || this.screen == Game.S.DEAD;
+            boolean var6 = this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.CHAT || this.screen == Game.S.DEAD || Net319.isActive();
             if (var6) {
                this.acc += var1 * 20.0;
 
@@ -2867,6 +3645,10 @@ public final class Game {
          this.tickPose();
       }
 
+      Redstone319.tick(this);
+      Net319.tick(this);
+      SkyGen.tickMode(this, this.world);
+      ModLoader.onGameTick(this);
       this.adv.tick();
       if (this.tickCount % 10 == 0) {
          this.adv.poll(this);
@@ -3046,7 +3828,10 @@ public final class Game {
          }
 
          boolean var5 = false;
-         if (this.targetMob != null) {
+         if (var1 && Net319.tryAttackPeer(this)) {
+            var5 = true;
+            this.breakProg = 0.0F;
+         } else if (this.targetMob != null) {
             if (var1) {
                this.attackMob(this.targetMob);
             }
@@ -3101,6 +3886,10 @@ public final class Game {
 
          if (!var19 && var2 && this.target != null && (!this.player.sneaking || var3 == null)) {
             var19 = this.useBlock();
+            if (var19) {
+               this.swinging = true;
+               this.swing = 1.0E-4F;
+            }
          }
 
          if (var19) {
@@ -3109,15 +3898,30 @@ public final class Game {
             this.rightDown = false;
             this.swinging = true;
             this.swing = 1.0E-4F;
-         } else if (this.rightDown && var3 != null && Items.isFood(var3.id) && this.player.food < 20 && !this.player.creative) {
-            this.eatTicks++;
-            if (this.eatTicks >= 32) {
+         } else if (this.rightDown
+            && var3 != null
+            && Items.isFood(var3.id)
+            && !this.player.creative
+            && (ModLoader.isClassicHudNoHunger() ? this.player.health < 20 : this.player.food < 20)) {
+            if (ModLoader.isClassicHudNoHunger()) {
+               // Classic Minecraft Infdev: food heals hearts immediately on right-click with no eating delay
                this.eatTicks = 0;
-               this.player.food = Math.min(20, this.player.food + Items.foodPts[var3.id]);
-               this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[var3.id]);
+               this.rightDown = false;
+               this.player.health = Math.min(20, this.player.health + Items.foodPts[var3.id]);
                var3.n--;
                if (var3.n <= 0) {
                   this.inv[this.sel] = null;
+               }
+            } else {
+               this.eatTicks++;
+               if (this.eatTicks >= 32) {
+                  this.eatTicks = 0;
+                  this.player.food = Math.min(20, this.player.food + Items.foodPts[var3.id]);
+                  this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[var3.id]);
+                  var3.n--;
+                  if (var3.n <= 0) {
+                     this.inv[this.sel] = null;
+                  }
                }
             }
          } else {
@@ -3270,6 +4074,10 @@ public final class Game {
                   break;
                case 22:
                   var6 = 260;
+                  break;
+               case 23:
+                  var6 = Redstone319.ITEM_REDSTONE; // Update 3.19: redstone ore gives 4 - 5 redstone dust
+                  var7 = 4 + this.rnd.nextInt(2);
                   break;
                case 24:
                   var6 = Color312.dyeItem(11); // Update 3.12: lapis lazuli ore gives 4 - 8 blue dye
@@ -3497,6 +4305,7 @@ public final class Game {
          if (var4 == Blocks313.ICE && !this.player.creative && this.world.getBlock(var1, var2 - 1, var3) != 0) {
             this.world.setBlock(var1, var2, var3, Blocks.WATER); // Update 3.13: broken ice melts to water
          }
+         ModLoader.onBlockBroken(this.world, var1, var2, var3, var4);
 
          if (Blocks.isDoor(var4)) {
             int var13 = Blocks.isDoorLo(var4) ? var2 + 1 : var2 - 1;
@@ -3519,6 +4328,13 @@ public final class Game {
          }
 
          this.meshNow(var1, var2, var3);
+         if (Redstone319.handlesUpdate(var4)) {
+            Redstone319.propagate(this.world, var1, var2, var3);
+            this.meshNow(var1 + 1, var2, var3);
+            this.meshNow(var1 - 1, var2, var3);
+            this.meshNow(var1, var2, var3 + 1);
+            this.meshNow(var1, var2, var3 - 1);
+         }
          if (Blocks.isLog(var4)) {
             // Update 3.10: cutting through a trunk makes the tree above fall over
             this.world.trees.fell(var1, var2, var3, this.player.x, this.player.z);
@@ -4186,6 +5002,10 @@ public final class Game {
          return this.placeSeeds(var1);
       }
 
+      if (var1 != null && var1.id == Redstone319.ITEM_REDSTONE) {
+         return Redstone319.placeWire(this, var1);
+      }
+
       if (var1 != null && Blocks.isBlockId(var1.id)) {
          int var2 = var1.id;
          int var3 = this.target.x;
@@ -4340,6 +5160,10 @@ public final class Game {
                   this.meshNow(var3, var4 + 1, var5);
                }
 
+               if (Redstone319.handlesUpdate(var2) || var2 == Redstone319.DAYLIGHT_SENSOR) {
+                  Redstone319.propagate(this.world, var3, var4, var5);
+               }
+
                this.meshNow(var3, var4, var5);
                if (!this.player.creative) {
                   var1.n--;
@@ -4382,9 +5206,14 @@ public final class Game {
                double var7 = var2.y - (this.player.y + 0.5);
                if (var3 * var3 + var5 * var5 < 1.44 && Math.abs(var7) < 1.3) {
                   Stack var9 = new Stack(var2.id, var2.count, var2.dmg);
+                  int prevCount = var2.count;
                   this.addItem(var9);
                   if (var9.n <= 0) {
                      var2.dead = true;
+                     Net319.onPickupItem(var2);
+                  } else if (var9.n < prevCount) {
+                     var2.count = var9.n;
+                     Net319.onPickupItem(var2);
                   } else {
                      var2.count = var9.n;
                   }
@@ -4482,11 +5311,21 @@ public final class Game {
          }
 
          this.rend.renderWorld(this.partial, sceneW, sceneH);
-         Perf.mark(Perf.HAND);
          if (var3) {
             this.rend.sh.skyMask(sceneW, sceneH);
+            this.rend.sh.aoPass(sceneW, sceneH);
+            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
+            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
+            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
+               this.rend.sh.underwater = uwTarget;
+            }
+
+            Perf.mark(Perf.POST);
+            this.rend.sh.look = this.opt.look;
+            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
 
+         Perf.mark(Perf.HAND);
          if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {
             float var4 = this.swingPrev + (this.swing - this.swingPrev) * this.partial;
             float var5 = this.rend.brightnessAt(this.world, this.player.x, this.player.y + 1.0, this.player.z);
@@ -4497,26 +5336,14 @@ public final class Game {
                   HAND_SWING != null ? Float.parseFloat(HAND_SWING) : (this.swinging ? var4 : 0.0F),
                   HAND_EAT != null ? Float.parseFloat(HAND_EAT) : (this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F),
                   var5,
-                  sceneW,
-                  sceneH,
+                  this.fbW,
+                  this.fbH,
                   this.pEquip + (this.equip - this.pEquip) * this.partial,
                   (this.player.pitch - (this.pArmPitch + (this.armPitch - this.pArmPitch) * this.partial)) * 0.1F,
                   (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F,
                   this.opt.bobbing ? -(this.pBobDist + (this.bobDist - this.pBobDist) * this.partial) : 0.0F,
                   this.opt.bobbing ? this.pBobAmp + (this.bobAmp - this.pBobAmp) * this.partial : 0.0F
                );
-         }
-
-         if (var3) {
-            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
-            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
-            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
-               this.rend.sh.underwater = uwTarget;
-            }
-
-            Perf.mark(Perf.POST);
-            this.rend.sh.look = this.opt.look;
-            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
       } else {
          GL11.glClearColor(0.0F, 0.0F, 0.0F, 1.0F);
@@ -4531,6 +5358,9 @@ public final class Game {
             break;
          case WORLDS:
             Screens.worlds(this);
+            break;
+         case MULTIPLAYER:
+            Screens.multiplayer(this);
             break;
          case NEWWORLD:
             Screens.newWorld(this);
@@ -4556,6 +5386,12 @@ public final class Game {
          case SKINS:
             this.ui.backdrop(0.5F);
             this.drawSkins();
+            break;
+         case PACKS:
+            Screens.resourcePacks(this);
+            break;
+         case MODS:
+            Screens.mods(this);
             break;
          case OPTIONS:
             Screens.options(this);
@@ -4791,11 +5627,21 @@ public final class Game {
          this.skins.importUser(this.skinField);
       } else if (key == 258 && action == 1) {
          this.skinFocus = !this.skinFocus;
-      } else if (key == 86 && action == 1 && (mods & 2) != 0) {
-         String text = GLFW.glfwGetClipboardString(this.window);
-         File f = this.skins.importFromText(text);
-         if (f != null) {
-            this.importSkin(f);
+      } else if (key == 67 && action == 1 && (mods & 10) != 0 && this.skinFocus) {
+         this.setClipboard(this.skinField);
+      } else if (key == 88 && action == 1 && (mods & 10) != 0 && this.skinFocus) {
+         this.setClipboard(this.skinField);
+         this.skinField = "";
+      } else if (key == 86 && action == 1 && (mods & 10) != 0) {
+         String text = this.getClipboard();
+         if (this.skinFocus && text != null && text.trim().matches("[A-Za-z0-9_]{1,16}")) {
+            String clean = text.trim();
+            this.skinField = (this.skinField + clean).substring(0, Math.min(16, this.skinField.length() + clean.length()));
+         } else {
+            File f = this.skins.importFromText(text);
+            if (f != null) {
+               this.importSkin(f);
+            }
          }
       } else if ((key == 265 || key == 264) && !this.skinFocus) {
          int i = Math.max(0, Math.min(names.size() - 1, (this.skinSel < 0 ? 0 : this.skinSel) + (key == 264 ? 1 : -1)));
@@ -4891,6 +5737,13 @@ public final class Game {
          this.drawHotbar();
          this.drawBossBar();
          this.adv.drawToast(this);
+         String wm = ModLoader.hudWatermark();
+         if (wm != null && !this.debug) {
+            this.gui.text(wm, 4.0F, 4.0F, 0xFFFFFFFF, true, 1.0F);
+         }
+         if (ModLoader.isWaystonesHudActive() && !this.debug && this.world != null) {
+            this.drawWaystonesHud();
+         }
       }
 
       if (this.debug) {
@@ -5023,19 +5876,24 @@ public final class Game {
             }
 
             int var15 = this.armorPoints();
+            boolean infdevHud = ModLoader.isClassicHudNoHunger();
             if (var15 > 0) {
                for (int var17 = 0; var17 < 10; var17++) {
-                  this.gui.armorIcon(var1 + var17 * 8, var12 - 10.0F, var15 - var17 * 2 >= 2 ? 2 : (var15 - var17 * 2 == 1 ? 1 : 0));
+                  float ax = infdevHud ? (var1 + 182.0F - 9.0F - var17 * 8) : (var1 + var17 * 8);
+                  float ay = infdevHud ? var12 : (var12 - 10.0F);
+                  this.gui.armorIcon(ax, ay, var15 - var17 * 2 >= 2 ? 2 : (var15 - var17 * 2 == 1 ? 1 : 0));
                }
             }
 
-            for (int var18 = 0; var18 < 10; var18++) {
-               int var20 = this.player.food - var18 * 2;
-               int var22 = var20 >= 2 ? 2 : (var20 == 1 ? 1 : 0);
-               float var9 = this.player.sat <= 0.0F && this.player.food <= 6 && (this.tickCount / 3 + var18) % 6 == 0 ? 1.0F : 0.0F;
-               this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, 0);
-               if (var22 > 0) {
-                  this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, var22);
+            if (!infdevHud) {
+               for (int var18 = 0; var18 < 10; var18++) {
+                  int var20 = this.player.food - var18 * 2;
+                  int var22 = var20 >= 2 ? 2 : (var20 == 1 ? 1 : 0);
+                  float var9 = this.player.sat <= 0.0F && this.player.food <= 6 && (this.tickCount / 3 + var18) % 6 == 0 ? 1.0F : 0.0F;
+                  this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, 0);
+                  if (var22 > 0) {
+                     this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, var22);
+                  }
                }
             }
 
@@ -5044,7 +5902,8 @@ public final class Game {
 
                for (int var21 = 0; var21 < 10; var21++) {
                   if (var21 < var19) {
-                     this.gui.bubble(var1 + 182.0F - 9.0F - var21 * 8, var12 - 10.0F);
+                     float bx = infdevHud ? (var1 + var21 * 8) : (var1 + 182.0F - 9.0F - var21 * 8);
+                     this.gui.bubble(bx, var12 - 10.0F);
                   }
                }
             }
@@ -5200,19 +6059,135 @@ public final class Game {
          if (var15.isEmpty()) {
             var11 += 5.0F;
          } else {
-            this.gui.rect(1.0F, var11 - 1.0F, Gui.textWidth(var15) + 2, 10.0F, -1873784752);
-            this.gui.text(var15, 2.0F, var11, -2039584, false);
-            var11 += 10.0F;
+            int maxDbgW = Math.max(60, (int)this.gui.w - 6);
+            for (String dbgLine : wrapChatLine(var15, maxDbgW)) {
+               float bw = Math.min(this.gui.w - 2.0F, Gui.textWidth(Gui.stripCodes(dbgLine)) + 2.0F);
+               this.gui.rect(1.0F, var11 - 1.0F, bw, 10.0F, -1873784752);
+               this.gui.text(dbgLine, 2.0F, var11, -2039584, false);
+               var11 += 10.0F;
+            }
          }
       }
+   }
+
+   static java.util.List<String> wrapChatLine(String msg, int maxWidth) {
+      java.util.ArrayList<String> out = new java.util.ArrayList<>();
+      if (msg == null) {
+         out.add("");
+         return out;
+      }
+      int limit = Math.max(24, maxWidth);
+      if (Gui.textWidth(Gui.stripCodes(msg)) <= limit) {
+         out.add(msg);
+         return out;
+      }
+
+      String activeColor = "";
+      StringBuilder cur = new StringBuilder();
+      int i = 0;
+      int n = msg.length();
+      while (i < n) {
+         if (msg.charAt(i) == ' ') {
+            if (cur.length() > activeColor.length()) {
+               String candidate = cur.toString() + " ";
+               if (Gui.textWidth(Gui.stripCodes(candidate)) <= limit) {
+                  cur.append(' ');
+               } else {
+                  out.add(cur.toString());
+                  cur.setLength(0);
+                  cur.append(activeColor);
+               }
+            }
+            i++;
+            continue;
+         }
+
+         int wStart = i;
+         while (i < n && msg.charAt(i) != ' ') {
+            i++;
+         }
+         String word = msg.substring(wStart, i);
+         String nextColor = lastColorCode(word, activeColor);
+
+         if (cur.length() > activeColor.length()) {
+            String candidate = cur.toString() + word;
+            if (Gui.textWidth(Gui.stripCodes(candidate)) <= limit) {
+               cur.append(word);
+               activeColor = nextColor;
+               continue;
+            }
+            out.add(cur.toString());
+            cur.setLength(0);
+            cur.append(activeColor);
+         }
+
+         if (Gui.textWidth(Gui.stripCodes(cur.toString() + word)) <= limit) {
+            cur.append(word);
+            activeColor = nextColor;
+         } else {
+            // Split an overlong token character-by-character while preserving § codes
+            int wi = 0;
+            while (wi < word.length()) {
+               char c = word.charAt(wi);
+               if (c == 167 && wi + 1 < word.length()) {
+                  String code = word.substring(wi, wi + 2);
+                  cur.append(code);
+                  activeColor = code.equalsIgnoreCase("§r") ? "" : code;
+                  wi += 2;
+                  continue;
+               }
+               String cand = cur.toString() + c;
+               if (Gui.textWidth(Gui.stripCodes(cand)) > limit && cur.length() > activeColor.length()) {
+                  out.add(cur.toString());
+                  cur.setLength(0);
+                  cur.append(activeColor);
+               }
+               cur.append(c);
+               wi++;
+            }
+         }
+      }
+
+      if (cur.length() > activeColor.length() || out.isEmpty()) {
+         out.add(cur.toString());
+      }
+      return out;
+   }
+
+   private static String lastColorCode(String s, String current) {
+      String c = current;
+      for (int i = 0; i + 1 < s.length(); i++) {
+         if (s.charAt(i) == 167) {
+            String code = s.substring(i, i + 2);
+            c = code.equalsIgnoreCase("§r") ? "" : code;
+            i++;
+         }
+      }
+      return c;
+   }
+
+   static String clipChatInput(String text, int maxWidth) {
+      if (text == null || text.isEmpty()) {
+         return "";
+      }
+      int limit = Math.max(16, maxWidth);
+      if (Gui.textWidth(Gui.stripCodes(text)) <= limit) {
+         return text;
+      }
+      int start = 0;
+      while (start < text.length() - 1 && Gui.textWidth(Gui.stripCodes(text.substring(start))) > limit) {
+         start++;
+      }
+      return text.substring(start);
    }
 
    void drawChat() {
       long var1 = System.currentTimeMillis();
       float var3 = this.gui.h - 40.0F;
       int var4 = 0;
+      int maxChatW = Math.max(60, (int)Math.min(this.gui.w - 10.0F, 320.0F));
 
-      for (int var5 = this.chatLog.size() - 1; var5 >= 0 && var4 < 10; var5--) {
+      for (int var5 = this.chatLog.size() - 1; var5 >= 0 && var4 < 12 && var3 >= 6.0F; var5--) {
          long var6 = var1 - (Long)this.chatTimes.get(var5);
          if (var6 > 10000L && this.screen != Game.S.CHAT) {
             break;
@@ -5220,15 +6195,20 @@ public final class Game {
 
          float var8 = this.screen == Game.S.CHAT ? 1.0F : Math.max(0.0F, Math.min(1.0F, (float)(10000L - var6) / 2000.0F));
          String var9 = (String)this.chatLog.get(var5);
-         this.gui.rect(2.0F, var3 - 1.0F, Gui.textWidth(Gui.stripCodes(var9)) + 3, 10.0F, (int)(var8 * 100.0F) << 24);
-         this.gui.text(var9, 3.0F, var3, (int)(var8 * 255.0F) << 24 | 16777215, true);
-         var3 -= 10.0F;
-         var4++;
+         java.util.List<String> wrapped = wrapChatLine(var9, maxChatW);
+         for (int li = wrapped.size() - 1; li >= 0 && var4 < 12 && var3 >= 6.0F; li--) {
+            String line = wrapped.get(li);
+            float bw = Math.min(this.gui.w - 4.0F, Gui.textWidth(Gui.stripCodes(line)) + 4.0F);
+            this.gui.rect(2.0F, var3 - 1.0F, bw, 10.0F, (int)(var8 * 100.0F) << 24);
+            this.gui.text(line, 3.0F, var3, (int)(var8 * 255.0F) << 24 | 16777215, true);
+            var3 -= 10.0F;
+            var4++;
+         }
       }
 
       if (this.screen == Game.S.CHAT) {
          this.gui.rect(2.0F, this.gui.h - 14.0F, this.gui.w - 4.0F, 12.0F, Integer.MIN_VALUE);
-         String var10 = this.chat + ((int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : "");
+         String var10 = clipChatInput(this.chat + ((int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : ""), Math.max(20, (int)this.gui.w - 12));
          this.gui.text(var10, 4.0F, this.gui.h - 12.0F, -2039584, false);
       }
    }
@@ -5384,9 +6364,32 @@ public final class Game {
       float alpha = 1.0F;
    }
 
+   public void chatMsg(String msg) {
+      this.say(msg);
+   }
+
+   void drawWaystonesHud() {
+      int px = (int)Math.floor(this.player.x);
+      int py = (int)Math.floor(this.player.y);
+      int pz = (int)Math.floor(this.player.z);
+      float yaw = ((this.player.yaw % 360.0F) + 360.0F) % 360.0F;
+      String[] dirs = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+      String dir = dirs[Math.round(yaw / 45.0F) & 7];
+      long day = this.world.dayTime / 24000L + 1L;
+      String line1 = String.format("XYZ: %d, %d, %d  [%s]", px, py, pz, dir);
+      String line2 = "Day " + day + "  |  " + this.fps + " FPS";
+      float w = Math.max(Gui.textWidth(line1), Gui.textWidth(line2)) + 10.0F;
+      float x = this.gui.w - w - 4.0F;
+      float y = 4.0F;
+      this.gui.rect(x, y, w, 24.0F, 0x9010141A);
+      this.gui.text(line1, x + 5.0F, y + 3.0F, 0xFF8FE060, true);
+      this.gui.text(line2, x + 5.0F, y + 13.0F, 0xFFD6D6E0, true);
+   }
+
    enum S {
       TITLE,
       WORLDS,
+      MULTIPLAYER,
       NEWWORLD,
       LOADING,
       PLAY,
@@ -5396,6 +6399,8 @@ public final class Game {
       CHAT,
       OPTIONS,
       SKINS,
+      PACKS,
+      MODS,
       DEAD;
    }
 

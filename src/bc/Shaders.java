@@ -16,11 +16,16 @@ public final class Shaders {
    public boolean ok;
    public String error = "";
    int pWorld;
+   /** Update 3.19: the terrain and water programs with the extra effects (glow mask, cloud shadows, wet world); 0 while they are not compiled. Effects: LOW uses the programs of Update 3.18 (pWorld / pWater). */
+   int pWorldFx;
+   int pWaterFx;
    int pDepth;
    int pBright;
    int pBlur;
    int pComp;
    int pLod;
+   /** Update 3.19: the LOD program with the cloud shadows (0 = none). */
+   int pLodFx;
    int pCloud;
    int pBlit;
    int pRay;
@@ -94,6 +99,30 @@ public final class Shaders {
    /** Update 3.19: Options.look (see {@link Look}) and Options.fx (0..2), set by the game every frame. */
    public int look = Look.DEFAULT;
    public int fxLevel = 1;
+   /** Update 3.19: ambient occlusion (Effects: HIGH): programs, the half size maps (raw and blurred), whether it works, how strongly it counts this frame. */
+   int pAo;
+   int pAoBlur;
+   int aoFbo;
+   int aoTex;
+   int aoFbo2;
+   int aoTex2;
+   public boolean aoOk;
+   float aoAmt;
+   /** Update 3.19: how wet the world is (0..1, rain on open ground; set by the renderer every frame). */
+   public float wet;
+   /** Update 3.19: the map of the cloud shadows: program, framebuffer, texture, where it was drawn (world x / z of its centre), how strongly it counts (0 = off). */
+   int pCShadow;
+   public boolean cshadowOk;
+   int csFbo;
+   int csTex;
+   double csCx;
+   double csCz;
+   boolean csHave;
+   float csAmt;
+   int csFrame;
+   static final int CS_N = 128;
+   static final float CS_SIZE = 1024.0F;
+   static final float CS_Y = 64.0F;
    float[] emT;
    static final float[] NO_EMIT = new float[32];
    int fw;
@@ -128,9 +157,10 @@ public final class Shaders {
          "#version 120",
          "uniform sampler2D scene;",
          "uniform float emis;               // Update 3.19: 1 = the alpha channel of the scene marks light sources (lava, torches ...): they glow, whatever their brightness",
+         "uniform float emisGain;           // ... and by how much their glow is brighter than the picture can show (needs the 16 bit glow buffers; 1 = no more than the picture)",
          "varying vec2 vUv;",
          "void main(){ vec4 s = texture2D(scene, vUv); vec3 c = s.rgb; float l = min(c.r, min(c.g, c.b));",
-         "  float k = max(smoothstep(0.78, 1.0, l), s.a * emis); gl_FragColor = vec4(c * k, 1.0); }"
+         "  float k = smoothstep(0.78, 1.0, l) + s.a * emis * emisGain; gl_FragColor = vec4(c * k, 1.0); }"
       }
    );
    static final String BLUR_FS = String.join(
@@ -201,20 +231,21 @@ public final class Shaders {
             throw new RuntimeException("OpenGL 3.0 required");
          }
 
-         // Update 3.19: the programs with the extra effects first; a driver that refuses them still gets the programs of Update 3.18
+         // Update 3.19: the programs of Update 3.18 first (Effects: LOW draws with them, and a driver that refuses the effects still gets them) ...
+         this.pWorld = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WORLD_FS);
+         // ... and the programs with the extra effects on top
          this.fxOk = false;
+         this.pWorldFx = 0;
+         this.pWaterFx = 0;
          if (!Boolean.getBoolean("bc.nofx")) {
             try {
-               this.pWorld = this.program(ShaderSrc.WORLD_VS_FX, ShaderSrc.WORLD_FS_FX);
+               this.pWorldFx = this.program(ShaderSrc.WORLD_VS_FX, ShaderSrc.WORLD_FS_FX);
                this.fxOk = true;
             } catch (Throwable fxErr) {
                this.fxOk = false;
+               this.pWorldFx = 0;
                System.err.println("Shader effects disabled (the plain terrain program is used): " + fxErr.getMessage());
             }
-         }
-
-         if (!this.fxOk) {
-            this.pWorld = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WORLD_FS);
          }
 
          this.pDepth = this.program(DEPTH_VS, DEPTH_FS);
@@ -227,16 +258,15 @@ public final class Shaders {
          }
 
          try {
-            try {
-               this.pWater = this.fxOk ? this.program(ShaderSrc.WORLD_VS_FX, ShaderSrc.WATER_FS_FX) : this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
-            } catch (Throwable waterFx) {
-               if (!this.fxOk) {
-                  throw waterFx;
+            this.pWater = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
+            if (this.fxOk) {
+               try {
+                  this.pWaterFx = this.program(ShaderSrc.WORLD_VS_FX, ShaderSrc.WATER_FS_FX);
+               } catch (Throwable waterFx) {
+                  // the terrain program takes the effects but the water program does not: the water keeps the picture of Update 3.18
+                  this.pWaterFx = 0;
+                  System.err.println("Water effects disabled: " + waterFx.getMessage());
                }
-
-               // the terrain program takes the effects but the water program does not: the water keeps the picture of Update 3.18 (its glow mask is then simply missing)
-               System.err.println("Water effects disabled: " + waterFx.getMessage());
-               this.pWater = this.program(ShaderSrc.WORLD_VS, ShaderSrc.WATER_FS);
             }
 
             this.waterOk = true;
@@ -259,6 +289,47 @@ public final class Shaders {
          } catch (Throwable var2) {
             this.cloudsOk = false;
             System.err.println("Volumetric clouds disabled: " + var2.getMessage());
+         }
+
+         this.aoOk = false;
+         if (this.fxOk) {
+            try {
+               this.pAo = this.program(QUAD_VS, ShaderSrc.AO_FS);
+               this.pAoBlur = this.program(QUAD_VS, ShaderSrc.AOBLUR_FS);
+               this.aoOk = true;
+            } catch (Throwable aoErr) {
+               this.aoOk = false;
+               System.err.println("Ambient occlusion disabled: " + aoErr.getMessage());
+            }
+         }
+
+         // Update 3.19: the cloud shadows need the cloud functions and the terrain program with the effects
+         this.cshadowOk = false;
+         if (this.cloudsOk && this.fxOk) {
+            try {
+               if (this.lodOk) {
+                  try {
+                     this.pLodFx = this.program(ShaderSrc.LOD_VS, ShaderSrc.LOD_FS_FX);
+                  } catch (Throwable lodFx) {
+                     this.pLodFx = 0;
+                     System.err.println("LOD cloud shadows disabled: " + lodFx.getMessage());
+                  }
+               }
+
+               this.pCShadow = this.program(QUAD_VS, ShaderSrc.CLOUD_SHADOW_FS);
+               this.csTex = this.tex2d(CS_N, CS_N);
+               this.csFbo = this.fbo(this.csTex);
+               int csStatus = GL30.glCheckFramebufferStatus(36160);
+               GL30.glBindFramebuffer(36160, 0);
+               if (csStatus != 36053) {
+                  throw new RuntimeException("framebuffer incomplete " + csStatus);
+               }
+
+               this.cshadowOk = true;
+            } catch (Throwable csErr) {
+               this.cshadowOk = false;
+               System.err.println("Cloud shadows disabled: " + csErr.getMessage());
+            }
          }
 
          this.shadowTex = GL11.glGenTextures();
@@ -301,6 +372,40 @@ public final class Shaders {
       return var3;
    }
 
+   /** Update 3.19: a texture of the given size that can hold values above 1 (16 bit floating point); the glow of a torch is brighter than the picture can show. */
+   int tex2dHdr(int w, int h) {
+      int tex = GL11.glGenTextures();
+      GL11.glBindTexture(3553, tex);
+      GL11.glTexImage2D(3553, 0, 34842, w, h, 0, 6408, 5126, (ByteBuffer)null);
+      GL11.glTexParameteri(3553, 10241, 9729);
+      GL11.glTexParameteri(3553, 10240, 9729);
+      GL11.glTexParameteri(3553, 10242, 33071);
+      GL11.glTexParameteri(3553, 10243, 33071);
+      return tex;
+   }
+
+   /** Update 3.19: whether the glow buffers are 16 bit floating point (switched off when the driver cannot render into them). */
+   public boolean hdrGlow = !Boolean.getBoolean("bc.nohdr");
+
+   /** Update 3.19: a glow buffer, {texture, framebuffer}: 16 bit floating point if the driver can render into it, 8 bit otherwise. */
+   int[] glowBuffer(int w, int h) {
+      if (this.hdrGlow) {
+         int tex = this.tex2dHdr(w, h);
+         int fb = this.fbo(tex);
+         if (GL30.glCheckFramebufferStatus(36160) == 36053) {
+            return new int[]{tex, fb};
+         }
+
+         GL30.glDeleteFramebuffers(fb);
+         GL11.glDeleteTextures(tex);
+         this.hdrGlow = false;
+         System.err.println("16 bit glow buffers are not available: the glow is limited to the brightness of the picture");
+      }
+
+      int tex = this.tex2d(w, h);
+      return new int[]{tex, this.fbo(tex)};
+   }
+
    int fbo(int var1) {
       int var2 = GL30.glGenFramebuffers();
       GL30.glBindFramebuffer(36160, var2);
@@ -328,6 +433,14 @@ public final class Shaders {
                GL11.glDeleteTextures(this.bloomTex4);
                GL11.glDeleteTextures(this.bloomTex5);
                this.bloomFbo2 = 0;
+            }
+
+            if (this.aoFbo != 0) {
+               GL30.glDeleteFramebuffers(this.aoFbo);
+               GL30.glDeleteFramebuffers(this.aoFbo2);
+               GL11.glDeleteTextures(this.aoTex);
+               GL11.glDeleteTextures(this.aoTex2);
+               this.aoFbo = 0;
             }
 
             if (this.rayFbo != 0) {
@@ -363,23 +476,36 @@ public final class Shaders {
          int var3 = GL30.glCheckFramebufferStatus(36160);
          int var4 = Math.max(1, var1 / 2);
          int var5 = Math.max(1, var2 / 2);
-         this.bloomTex0 = this.tex2d(var4, var5);
-         this.bloomFbo0 = this.fbo(this.bloomTex0);
-         this.bloomTex1 = this.tex2d(var4, var5);
-         this.bloomFbo1 = this.fbo(this.bloomTex1);
+         int[] gb = this.glowBuffer(var4, var5);
+         this.bloomTex0 = gb[0];
+         this.bloomFbo0 = gb[1];
+         gb = this.glowBuffer(var4, var5);
+         this.bloomTex1 = gb[0];
+         this.bloomFbo1 = gb[1];
          // Update 3.19: the wider levels of the glow (quarter and eighth of the scene's size)
          int q4 = Math.max(1, var4 / 2);
          int q5 = Math.max(1, var5 / 2);
          int e4 = Math.max(1, var4 / 4);
          int e5 = Math.max(1, var5 / 4);
-         this.bloomTex2 = this.tex2d(q4, q5);
-         this.bloomFbo2 = this.fbo(this.bloomTex2);
-         this.bloomTex3 = this.tex2d(q4, q5);
-         this.bloomFbo3 = this.fbo(this.bloomTex3);
-         this.bloomTex4 = this.tex2d(e4, e5);
-         this.bloomFbo4 = this.fbo(this.bloomTex4);
-         this.bloomTex5 = this.tex2d(e4, e5);
-         this.bloomFbo5 = this.fbo(this.bloomTex5);
+         gb = this.glowBuffer(q4, q5);
+         this.bloomTex2 = gb[0];
+         this.bloomFbo2 = gb[1];
+         gb = this.glowBuffer(q4, q5);
+         this.bloomTex3 = gb[0];
+         this.bloomFbo3 = gb[1];
+         gb = this.glowBuffer(e4, e5);
+         this.bloomTex4 = gb[0];
+         this.bloomFbo4 = gb[1];
+         gb = this.glowBuffer(e4, e5);
+         this.bloomTex5 = gb[0];
+         this.bloomFbo5 = gb[1];
+         if (this.aoOk) {
+            this.aoTex = this.tex2d(var4, var5);
+            this.aoFbo = this.fbo(this.aoTex);
+            this.aoTex2 = this.tex2d(var4, var5);
+            this.aoFbo2 = this.fbo(this.aoTex2);
+         }
+
          this.cw = var4;
          this.ch = var5;
          this.rayTex = this.tex2d(this.cw, this.ch);
@@ -520,6 +646,10 @@ public final class Shaders {
    public void beginShadow() {
       GL30.glBindFramebuffer(36160, this.shadowFbo);
       GL11.glViewport(0, 0, 2048, 2048);
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(2884);
       GL11.glClear(256);
       GL11.glMatrixMode(5889);
       GL11.glPushMatrix();
@@ -566,7 +696,7 @@ public final class Shaders {
       int var19,
       int var20
    ) {
-      this.useWorldProg(this.pWorld, var1, var2, var4, var6, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19, var20);
+      this.useWorldProg(this.glowOn && this.pWorldFx != 0 ? this.pWorldFx : this.pWorld, var1, var2, var4, var6, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19, var20);
    }
 
    /**
@@ -577,12 +707,13 @@ public final class Shaders {
       float[] mv, double camX, double camY, double camZ, float fogNear, float fogFar, float[] fogCol, float[] skyTop, float[] skyHor, float dayF, boolean shadowOn,
       int leafTile, int grassTile, int flower0, int flower1, int waterTile, int width, int height, float near, float far, int quality
    ) {
-      this.useWorldProg(this.pWater, mv, camX, camY, camZ, true, fogNear, fogFar, fogCol, skyTop, skyHor, dayF, shadowOn, leafTile, grassTile, flower0, flower1, waterTile);
-      this.u1f(this.pWater, "wq", quality);
-      this.u1i(this.pWater, "sceneColor", 3);
-      this.u1i(this.pWater, "sceneDepth", 4);
-      GL20.glUniform2f(this.loc(this.pWater, "invRes"), 1.0F / width, 1.0F / height);
-      GL20.glUniform2f(this.loc(this.pWater, "zNF"), near, far);
+      int wp = this.glowOn && this.pWaterFx != 0 ? this.pWaterFx : this.pWater;
+      this.useWorldProg(wp, mv, camX, camY, camZ, true, fogNear, fogFar, fogCol, skyTop, skyHor, dayF, shadowOn, leafTile, grassTile, flower0, flower1, waterTile);
+      this.u1f(wp, "wq", quality);
+      this.u1i(wp, "sceneColor", 3);
+      this.u1i(wp, "sceneDepth", 4);
+      GL20.glUniform2f(this.loc(wp, "invRes"), 1.0F / width, 1.0F / height);
+      GL20.glUniform2f(this.loc(wp, "zNF"), near, far);
       GL13.glActiveTexture(33987);
       GL11.glBindTexture(3553, this.copyTex);
       GL13.glActiveTexture(33988);
@@ -668,8 +799,16 @@ public final class Shaders {
       this.u1f(prog, "shadowOn", var15 ? 1.0F : 0.0F);
       GL20.glUniform4fv(this.loc(prog, "dynL[0]"), this.dynL);
       GL20.glUniform4fv(this.loc(prog, "dynC[0]"), this.dynC);
-      if (this.fxOk) {
+      if (prog != 0 && (prog == this.pWorldFx || prog == this.pWaterFx)) {
          GL20.glUniform2fv(this.loc(prog, "emT[0]"), this.emissiveTiles());
+         this.u1i(prog, "cloudShadow", 5);
+         GL20.glUniform4f(this.loc(prog, "csP"), (float)(this.csCx - var2), (float)(this.csCz - var6), 1.0F / CS_SIZE, this.csHave ? this.csAmt : 0.0F);
+         float csy = Math.max(this.sunY, 0.15F);
+         GL20.glUniform2f(this.loc(prog, "csSunXZ"), this.sunX / csy, this.sunZ / csy);
+         this.u1f(prog, "csY", CS_Y);
+         this.u1f(prog, "wet", this.glowOn ? this.wet : 0.0F);
+         GL13.glActiveTexture(33989);
+         GL11.glBindTexture(3553, this.csHave ? this.csTex : 0);
       }
 
       GL13.glActiveTexture(33986);
@@ -730,6 +869,8 @@ public final class Shaders {
 
    public void stopWorld() {
       GL20.glUseProgram(0);
+      GL13.glActiveTexture(33989);
+      GL11.glBindTexture(3553, 0);
       GL13.glActiveTexture(33986);
       GL11.glBindTexture(3553, 0);
       GL13.glActiveTexture(33984);
@@ -828,6 +969,61 @@ public final class Shaders {
       }
    }
 
+   /**
+    * Update 3.19: ambient occlusion (Effects: HIGH) - call it after the world is drawn and before the hand clears the depth buffer. Draws the occlusion
+    * map (half the size of the scene) that {@link #endScene} darkens the picture with; {@code aoAmt} stays 0 when it is off.
+    */
+   public void aoPass(int w, int h) {
+      this.aoAmt = 0.0F;
+      if (!this.ok || !this.sceneActive || !this.aoOk || !this.glowOn || this.fxLevel < 2 || this.aoFbo == 0 || this.underwater > 0.6F || this.projM[11] > -0.5F) {
+         return;
+      }
+
+      float near = this.projM[14] / (this.projM[10] - 1.0F);
+      float far = this.projM[14] / (this.projM[10] + 1.0F);
+      int aw = Math.max(1, w / 2);
+      int ah = Math.max(1, h / 2);
+      GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_VIEWPORT_BIT);
+      GL11.glDisable(2929);
+      GL11.glDisable(3042);
+      GL11.glDisable(3008);
+      GL11.glDisable(2884);
+      GL11.glDisable(2912);
+      GL11.glMatrixMode(5889);
+      GL11.glPushMatrix();
+      GL11.glLoadIdentity();
+      GL11.glMatrixMode(5888);
+      GL11.glPushMatrix();
+      GL11.glLoadIdentity();
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      GL13.glActiveTexture(33984);
+      GL30.glBindFramebuffer(36160, this.aoFbo);
+      GL11.glViewport(0, 0, aw, ah);
+      GL20.glUseProgram(this.pAo);
+      this.u1i(this.pAo, "depthTex", 0);
+      GL20.glUniform2f(this.loc(this.pAo, "projScale"), this.projM[0], this.projM[5]);
+      GL20.glUniform2f(this.loc(this.pAo, "zNF"), near, far);
+      GL20.glUniform2f(this.loc(this.pAo, "invRes"), 1.0F / w, 1.0F / h);
+      this.u1f(this.pAo, "radius", 0.9F);
+      GL11.glBindTexture(3553, this.sceneDepth);
+      this.quad();
+      GL30.glBindFramebuffer(36160, this.aoFbo2);
+      GL20.glUseProgram(this.pAoBlur);
+      this.u1i(this.pAoBlur, "aoTex", 0);
+      GL20.glUniform2f(this.loc(this.pAoBlur, "invRes"), 1.0F / aw, 1.0F / ah);
+      GL11.glBindTexture(3553, this.aoTex);
+      this.quad();
+      GL11.glBindTexture(3553, 0);
+      GL20.glUseProgram(0);
+      GL30.glBindFramebuffer(36160, this.sceneFbo);
+      GL11.glMatrixMode(5889);
+      GL11.glPopMatrix();
+      GL11.glMatrixMode(5888);
+      GL11.glPopMatrix();
+      GL11.glPopAttrib();
+      this.aoAmt = 0.85F * (1.0F - this.underwater);
+   }
+
    public void endScene(int var1, int var2, float var3) {
       this.endScene(var1, var2, var1, var2, var3);
    }
@@ -878,16 +1074,20 @@ public final class Shaders {
       int n = Tex.COLS * Tex.COLS;
       boolean[] lit = new boolean[n];
       boolean[] plain = new boolean[n];
+      float[] strength = new float[n];
       for (int id = 1; id < Blocks.MAX; id++) {
          if (Blocks.name[id] == null) {
             continue;
          }
 
+         // small light sources (torches, fire, plants that shine) glow strongly - their halo is all there is to see of them; big surfaces (a lava lake, a wall of glowstone) a lot less
+         float s = id == Blocks.LAVA ? 0.20F : (Blocks.kind[id] == 0 || Blocks.kind[id] == 3 ? 0.50F : 1.0F);
          for (int f = 0; f < 6; f++) {
             int t = Blocks.tiles[id][f];
             if (t >= 0 && t < n) {
                if (Blocks.emit[id] >= 12) {
                   lit[t] = true;
+                  strength[t] = Math.max(strength[t], s);
                } else {
                   plain[t] = true;
                }
@@ -900,7 +1100,7 @@ public final class Shaders {
       for (int t = 0; t < n && k < 16; t++) {
          if (lit[t] && !plain[t]) {
             a[k * 2] = t;
-            a[k * 2 + 1] = 1.0F;
+            a[k * 2 + 1] = strength[t];
             k++;
          }
       }
@@ -939,6 +1139,7 @@ public final class Shaders {
          GL20.glUseProgram(this.pBright);
          this.u1i(this.pBright, "scene", 0);
          this.u1f(this.pBright, "emis", glow ? 1.0F : 0.0F);
+         this.u1f(this.pBright, "emisGain", this.hdrGlow ? 5.0F : 1.0F);
          GL11.glBindTexture(3553, this.sceneTex);
          this.quad();
          this.blurLevel(this.bloomFbo0, this.bloomTex0, this.bloomFbo1, this.bloomTex1, var4, var5, 2);
@@ -960,6 +1161,11 @@ public final class Shaders {
          this.u1i(this.pComp, "bloom", 1);
          this.u1i(this.pComp, "bloom2", 3);
          this.u1i(this.pComp, "bloom3", 4);
+         this.u1i(this.pComp, "aoTex", 5);
+         this.u1f(this.pComp, "aoAmt", this.aoAmt);
+         GL13.glActiveTexture(33989);
+         GL11.glBindTexture(3553, this.aoAmt > 0.0F ? this.aoTex2 : 0);
+         GL13.glActiveTexture(33984);
          int lk = Look.clamp(this.look);
          GL20.glUniform3f(this.loc(this.pComp, "bloomW"), glow ? 0.55F : 1.0F, glow ? 0.40F : 0.0F, glow ? 0.35F : 0.0F);
          GL20.glUniform4f(this.loc(this.pComp, "grA"), Look.A[lk][0], Look.A[lk][1], Look.A[lk][2], Look.A[lk][3]);
@@ -990,6 +1196,8 @@ public final class Shaders {
          GL11.glBindTexture(3553, 0);
          GL13.glActiveTexture(33988);
          GL11.glBindTexture(3553, 0);
+         GL13.glActiveTexture(33989);
+         GL11.glBindTexture(3553, 0);
          GL13.glActiveTexture(33985);
          GL11.glBindTexture(3553, 0);
          GL13.glActiveTexture(33984);
@@ -997,6 +1205,7 @@ public final class Shaders {
          GL11.glPopMatrix();
          GL11.glMatrixMode(5888);
          GL11.glPopMatrix();
+         GL11.glDepthMask(true);
          GL11.glEnable(2929);
       }
    }
@@ -1022,20 +1231,32 @@ public final class Shaders {
    public void useLod(float[] var1, double var2, double var4, double var6, float var8, float var9, float[] var10, float[] var11, float[] var12, boolean var13) {
       if (this.lodOk) {
          this.calcView(var1);
-         GL20.glUseProgram(this.pLod);
-         GL20.glUniformMatrix4fv(this.loc(this.pLod, "invView"), false, this.invViewM);
-         GL20.glUniform3f(this.loc(this.pLod, "camPos"), (float)(var2 % 100000.0), (float)var4, (float)(var6 % 100000.0));
-         this.u1i(this.pLod, "lightmap", 1);
-         GL20.glUniform3f(this.loc(this.pLod, "fogColor"), var10[0], var10[1], var10[2]);
-         GL20.glUniform2f(this.loc(this.pLod, "fogRange"), var8, var9);
-         GL20.glUniform3f(this.loc(this.pLod, "sunDir"), this.sunX, this.sunY, this.sunZ);
+         boolean csLod = this.glowOn && this.pLodFx != 0;
+         int lp = csLod ? this.pLodFx : this.pLod;
+         GL20.glUseProgram(lp);
+         GL20.glUniformMatrix4fv(this.loc(lp, "invView"), false, this.invViewM);
+         GL20.glUniform3f(this.loc(lp, "camPos"), (float)(var2 % 100000.0), (float)var4, (float)(var6 % 100000.0));
+         this.u1i(lp, "lightmap", 1);
+         GL20.glUniform3f(this.loc(lp, "fogColor"), var10[0], var10[1], var10[2]);
+         GL20.glUniform2f(this.loc(lp, "fogRange"), var8, var9);
+         GL20.glUniform3f(this.loc(lp, "sunDir"), this.sunX, this.sunY, this.sunZ);
          float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
-         this.u1f(this.pLod, "sunUp", var14);
-         this.u1f(this.pLod, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
-         this.u1f(this.pLod, "time", (float)Perf.seconds(3600.0));
-         GL20.glUniform3f(this.loc(this.pLod, "skyTop"), var11[0], var11[1], var11[2]);
-         GL20.glUniform3f(this.loc(this.pLod, "skyHor"), var12[0], var12[1], var12[2]);
-         this.u1f(this.pLod, "fancy", var13 ? 1.0F : 0.0F);
+         this.u1f(lp, "sunUp", var14);
+         this.u1f(lp, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
+         this.u1f(lp, "time", (float)Perf.seconds(3600.0));
+         GL20.glUniform3f(this.loc(lp, "skyTop"), var11[0], var11[1], var11[2]);
+         GL20.glUniform3f(this.loc(lp, "skyHor"), var12[0], var12[1], var12[2]);
+         this.u1f(lp, "fancy", var13 ? 1.0F : 0.0F);
+         if (csLod) {
+            this.u1i(lp, "cloudShadow", 5);
+            GL20.glUniform4f(this.loc(lp, "csP"), (float)(this.csCx - var2), (float)(this.csCz - var6), 1.0F / CS_SIZE, this.csHave ? this.csAmt : 0.0F);
+            float csy = Math.max(this.sunY, 0.15F);
+            GL20.glUniform2f(this.loc(lp, "csSunXZ"), this.sunX / csy, this.sunZ / csy);
+            this.u1f(lp, "csY", CS_Y);
+            GL13.glActiveTexture(33989);
+            GL11.glBindTexture(3553, this.csHave ? this.csTex : 0);
+         }
+
          GL13.glActiveTexture(33985);
          GL11.glBindTexture(3553, Tex.lightmap);
          GL13.glActiveTexture(33984);
@@ -1045,6 +1266,11 @@ public final class Shaders {
    public void stopLod() {
       if (this.lodOk) {
          GL20.glUseProgram(0);
+         if (this.glowOn && this.pLodFx != 0) {
+            GL13.glActiveTexture(33989);
+            GL11.glBindTexture(3553, 0);
+            GL13.glActiveTexture(33984);
+         }
       }
    }
 
@@ -1164,6 +1390,96 @@ public final class Shaders {
       GL11.glEnd();
    }
 
+   /** The weather field as the cloud functions of ShaderSrc.CLOUD_DECL need it (wnoise is texture unit 2); shared by the clouds and their shadows. */
+   void weatherUniforms(int prog, WeatherFx fx, double camX, double camY, double camZ) {
+      this.u1i(prog, "wnoise", 2);
+      Weather.Snap sn = fx.snap;
+      GL20.glUniform4f(this.loc(prog, "wOff"), (float)mod9000(sn.oax), (float)mod9000(sn.oaz), (float)mod9000(sn.obx), (float)mod9000(sn.obz));
+      GL20.glUniform4f(this.loc(prog, "wThr"), Weather.C0, Weather.C1, Weather.T0, Weather.T1);
+      GL20.glUniform2f(this.loc(prog, "wRain"), Weather.R0, Weather.R1);
+      GL20.glUniform4f(this.loc(prog, "wFx"), sn.bias, sn.lo, sn.hi, sn.amt);
+      float[] cells = new float[16];
+      for (int i = 0; i < sn.cells.length / 4; i++) {
+         cells[i * 4] = (float)(sn.cells[i * 4] - camX);
+         cells[i * 4 + 1] = (float)(sn.cells[i * 4 + 1] - camZ);
+         cells[i * 4 + 2] = sn.cells[i * 4 + 2];
+         cells[i * 4 + 3] = sn.cells[i * 4 + 3];
+      }
+
+      GL20.glUniform4fv(this.loc(prog, "wCells[0]"), cells);
+      GL20.glUniform4f(this.loc(prog, "wFlash"), fx.flashX - (float)camX, fx.flashY - (float)camY, fx.flashZ - (float)camZ, fx.flashAmt);
+      GL20.glUniform4f(this.loc(prog, "wOnCap"), sn.on ? 1.0F : 0.0F, Weather.FAIR, sn.calmAmt, Weather.FAIR_LO);
+   }
+
+   /**
+    * Update 3.19: draws the map of the cloud shadows (see ShaderSrc.CLOUD_SHADOW_FS) - call it before the terrain is drawn. It is drawn again every third
+    * frame (the clouds drift slowly) and keeps its centre until the player has walked 64 blocks away from it, so the shadows never crawl.
+    * {@code csAmt} (0 = no shadows) is what the terrain program uses.
+    */
+   public void cloudShadows(double camX, double camY, double camZ, WeatherFx fx, boolean overworld, int sceneW, int sceneH) {
+      this.csAmt = 0.0F;
+      if (!this.cshadowOk || !this.ok || !this.sceneActive || !overworld || this.fxLevel < 1 || fx.snap == null || this.sunY < 0.15F) {
+         return;
+      }
+
+      float sy = this.sunY;
+      this.csAmt = Math.max(0.0F, Math.min(1.0F, (sy - 0.15F) / 0.25F)) * 0.92F;
+      boolean recentre = !this.csHave || Math.abs(camX - this.csCx) > 64.0 || Math.abs(camZ - this.csCz) > 64.0;
+      this.csFrame++;
+      if (!recentre && this.csFrame % 3 != 0) {
+         return;
+      }
+
+      if (recentre) {
+         this.csCx = Math.floor(camX / 32.0 + 0.5) * 32.0;
+         this.csCz = Math.floor(camZ / 32.0 + 0.5) * 32.0;
+      }
+
+      GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_VIEWPORT_BIT | GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_CURRENT_BIT);
+      GL11.glDisable(2929);
+      GL11.glDisable(3042);
+      GL11.glDisable(3008);
+      GL11.glDisable(2884);
+      GL11.glDisable(2912);
+      GL11.glColorMask(true, true, true, true);
+      GL11.glMatrixMode(5889);
+      GL11.glPushMatrix();
+      GL11.glLoadIdentity();
+      GL11.glMatrixMode(5888);
+      GL11.glPushMatrix();
+      GL11.glLoadIdentity();
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      GL30.glBindFramebuffer(36160, this.csFbo);
+      GL11.glViewport(0, 0, CS_N, CS_N);
+      GL20.glUseProgram(this.pCShadow);
+      this.u1i(this.pCShadow, "noiseTex", 0);
+      GL20.glUniform3f(this.loc(this.pCShadow, "camPos"), (float)mod9000(camX), (float)camY, (float)mod9000(camZ));
+      this.weatherUniforms(this.pCShadow, fx, camX, camY, camZ);
+      GL20.glUniform3f(this.loc(this.pCShadow, "sunDir"), this.sunX, this.sunY, this.sunZ);
+      GL20.glUniform2f(this.loc(this.pCShadow, "cloudY"), fx.slabLo, fx.slabHi);
+      GL20.glUniform2f(this.loc(this.pCShadow, "csCenter"), (float)(this.csCx - camX), (float)(this.csCz - camZ));
+      this.u1f(this.pCShadow, "csSize", CS_SIZE);
+      GL20.glUniform2f(this.loc(this.pCShadow, "csSun"), this.sunX / sy, this.sunZ / sy);
+      this.u1f(this.pCShadow, "csY", CS_Y);
+      GL13.glActiveTexture(33986);
+      GL11.glBindTexture(3553, this.wnoiseTex);
+      GL13.glActiveTexture(33984);
+      GL11.glBindTexture(3553, this.noiseTex);
+      this.quad();
+      GL13.glActiveTexture(33986);
+      GL11.glBindTexture(3553, 0);
+      GL13.glActiveTexture(33984);
+      GL20.glUseProgram(0);
+      GL30.glBindFramebuffer(36160, this.sceneFbo);
+      GL11.glMatrixMode(5889);
+      GL11.glPopMatrix();
+      GL11.glMatrixMode(5888);
+      GL11.glPopMatrix();
+      GL11.glPopAttrib();
+      GL11.glViewport(0, 0, sceneW, sceneH);
+      this.csHave = true;
+   }
+
    public void renderClouds(
       float[] var1, float[] var2, double var3, double var5, double var7, float[] var9, float[] var10, float[] var11, int var12, int var13, WeatherFx fx
    ) {
@@ -1204,23 +1520,7 @@ public final class Shaders {
          GL20.glUniform2f(this.loc(this.pCloud, "projScale"), var1[0], var1[5]);
          GL20.glUniform3f(this.loc(this.pCloud, "camPos"), (float)mod9000(var3), (float)var5, (float)mod9000(var7));
          this.u1f(this.pCloud, "time", (float)Perf.seconds(3600.0));
-         this.u1i(this.pCloud, "wnoise", 2);
-         Weather.Snap sn = fx.snap;
-         GL20.glUniform4f(this.loc(this.pCloud, "wOff"), (float)mod9000(sn.oax), (float)mod9000(sn.oaz), (float)mod9000(sn.obx), (float)mod9000(sn.obz));
-         GL20.glUniform4f(this.loc(this.pCloud, "wThr"), Weather.C0, Weather.C1, Weather.T0, Weather.T1);
-         GL20.glUniform2f(this.loc(this.pCloud, "wRain"), Weather.R0, Weather.R1);
-         GL20.glUniform4f(this.loc(this.pCloud, "wFx"), sn.bias, sn.lo, sn.hi, sn.amt);
-         float[] cells = new float[16];
-         for (int var30 = 0; var30 < sn.cells.length / 4; var30++) {
-            cells[var30 * 4] = (float)(sn.cells[var30 * 4] - var3);
-            cells[var30 * 4 + 1] = (float)(sn.cells[var30 * 4 + 1] - var7);
-            cells[var30 * 4 + 2] = sn.cells[var30 * 4 + 2];
-            cells[var30 * 4 + 3] = sn.cells[var30 * 4 + 3];
-         }
-
-         GL20.glUniform4fv(this.loc(this.pCloud, "wCells[0]"), cells);
-         GL20.glUniform4f(this.loc(this.pCloud, "wFlash"), fx.flashX - (float)var3, fx.flashY - (float)var5, fx.flashZ - (float)var7, fx.flashAmt);
-         GL20.glUniform4f(this.loc(this.pCloud, "wOnCap"), sn.on ? 1.0F : 0.0F, Weather.FAIR, sn.calmAmt, Weather.FAIR_LO);
+         this.weatherUniforms(this.pCloud, fx, var3, var5, var7);
          GL20.glUniform3f(this.loc(this.pCloud, "sunDir"), this.sunX, this.sunY, this.sunZ);
          GL20.glUniform3f(this.loc(this.pCloud, "sunCol"), var16 * var14, var17 * var14, var18 * var14);
          GL20.glUniform3f(this.loc(this.pCloud, "ambCol"), var20, var21, var22);

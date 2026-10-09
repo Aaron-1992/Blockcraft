@@ -23,6 +23,162 @@ final class TestsGfx {
       options();
       sources();
       emissive();
+      variation();
+   }
+
+   // ------------------------------------------------------------------ variation between blocks (Mesher)
+   /** The opaque vertices (11 floats each: x y z u v r g b a m l) of the section with the ground of the flat test world, built with the given switches. */
+   static float[] meshOf(Game g, boolean variation, boolean legacy) {
+      boolean v0 = Mesher.variation;
+      boolean l0 = Mesher.legacy;
+      Mesher.variation = variation;
+      Mesher.legacy = legacy;
+      try {
+         java.util.Arrays.fill(g.world.chunk(0, 0).grassColor, 0x79C05A);   // the flat test world has no biome colours: the grass would be black
+         Mesher.Result r = Mesher.build(g.world, g.world.chunk(0, 0), GameTests.GROUND >> 4, true);
+         float[] a = new float[r.nO * 11];
+         if (r.opaque != null) {
+            r.opaque.get(0, a);
+            org.lwjgl.system.MemoryUtil.memFree(r.opaque);
+         }
+
+         if (r.trans != null) {
+            org.lwjgl.system.MemoryUtil.memFree(r.trans);
+         }
+
+         return a;
+      } finally {
+         Mesher.variation = v0;
+         Mesher.legacy = l0;
+      }
+   }
+
+   static void variation() {
+      test("variation: the blocks of a meadow differ a little in brightness and their tops are turned - shapes, light and face count stay", () -> {
+         Game g = GameTests.newGame(0);
+         float[] base = meshOf(g, false, false);
+         float[] var = meshOf(g, true, false);
+         check(base.length > 11 * 4 * 100, "the ground has many faces: " + base.length / 11 + " vertices");
+         eq(base.length, var.length, "the same number of vertices");
+         int n = base.length / 11;
+         int differ = 0;
+         int checked = 0;
+         for (int i = 0; i < n; i++) {
+            for (int k = 0; k < 3; k++) {
+               check(base[i * 11 + k] == var[i * 11 + k], "positions are the same");
+            }
+
+            for (int k = 8; k < 11; k++) {
+               check(base[i * 11 + k] == var[i * 11 + k], "alpha, material and light are the same (index " + k + ")");
+            }
+
+            float b = base[i * 11 + 5];
+            if (b > 0.05F) {
+               float ratio = var[i * 11 + 5] / b;
+               check(ratio > 0.85F && ratio < 1.15F, "brightness stays within 15 %: " + ratio);
+               checked++;
+               if (Math.abs(ratio - 1.0F) > 0.004F) {
+                  differ++;
+               }
+
+               // red, green and blue change by the same factor
+               for (int k = 6; k <= 7; k++) {
+                  if (base[i * 11 + k] > 0.05F) {
+                     float rg = var[i * 11 + k] / base[i * 11 + k];
+                     check(Math.abs(rg - ratio) < 0.003F, "the colour keeps its hue: " + rg + " vs " + ratio);
+                  }
+               }
+            }
+         }
+
+         check(checked > 100 && differ > checked / 3, "many vertices got another brightness: " + differ + " of " + checked);
+         // one quad = one factor
+         int sameQuad = 0;
+         for (int q = 0; q + 3 < n; q += 4) {
+            float b0 = base[q * 11 + 5];
+            if (b0 > 0.05F) {
+               float r0 = var[q * 11 + 5] / b0;
+               boolean same = true;
+               for (int k = 1; k < 4; k++) {
+                  float bk = base[(q + k) * 11 + 5];
+                  if (bk > 0.05F && Math.abs(var[(q + k) * 11 + 5] / bk - r0) > 0.003F) {
+                     same = false;
+                  }
+               }
+
+               if (same) {
+                  sameQuad++;
+               }
+            }
+         }
+
+         check(sameQuad > 100, "the four corners of a quad are scaled alike: " + sameQuad);
+         // the tops of the grass: the texture is turned by a quarter turn in some quads, always inside its tile
+         int top = 0;
+         int turned = 0;
+         for (int q = 0; q + 3 < n; q += 4) {
+            boolean flat = true;
+            float y0 = base[q * 11 + 1];
+            for (int k = 1; k < 4; k++) {
+               flat &= base[(q + k) * 11 + 1] == y0;
+            }
+
+            if (!flat || Math.abs(y0 - (GameTests.GROUND + 1 - ((GameTests.GROUND >> 4) << 4))) > 0.001F) {
+               continue;
+            }
+
+            top++;
+            boolean sameOrder = true;
+            java.util.List<String> a = new java.util.ArrayList<>();
+            java.util.List<String> b = new java.util.ArrayList<>();
+            for (int k = 0; k < 4; k++) {
+               a.add(base[(q + k) * 11 + 3] + "," + base[(q + k) * 11 + 4]);
+               b.add(var[(q + k) * 11 + 3] + "," + var[(q + k) * 11 + 4]);
+               sameOrder &= base[(q + k) * 11 + 3] == var[(q + k) * 11 + 3] && base[(q + k) * 11 + 4] == var[(q + k) * 11 + 4];
+            }
+
+            java.util.List<String> sa = new java.util.ArrayList<>(a);
+            java.util.List<String> sb = new java.util.ArrayList<>(b);
+            java.util.Collections.sort(sa);
+            java.util.Collections.sort(sb);
+            check(sa.equals(sb), "a turned top uses the same four texture corners");
+            if (!sameOrder) {
+               turned++;
+            }
+         }
+
+         check(top >= 100, "the flat ground has 16 x 16 grass tops in the section: " + top);
+         check(turned > top / 4 && turned < top, "some, not all tops are turned: " + turned + " of " + top);
+      });
+      test("variation: Update 3.5 compatibility mode (legacy) and -Dbc.novariation give the old picture", () -> {
+         Game g = GameTests.newGame(0);
+         float[] legacyOn = meshOf(g, true, true);
+         float[] legacyOff = meshOf(g, false, true);
+         check(java.util.Arrays.equals(legacyOn, legacyOff), "legacy meshes ignore the variation");
+         float[] a = meshOf(g, false, false);
+         float[] b = meshOf(g, false, false);
+         check(java.util.Arrays.equals(a, b), "building the same section twice gives the same mesh");
+         float[] c = meshOf(g, true, false);
+         float[] d = meshOf(g, true, false);
+         check(java.util.Arrays.equals(c, d), "the variation depends only on the position (a section rebuilt later looks the same)");
+      });
+      test("variation: the brightness table only holds natural kinds and sane amounts", () -> {
+         for (int t = 0; t < Mesher.AMP.length; t++) {
+            check(Mesher.AMP[t] >= 0.0F && Mesher.AMP[t] <= 0.13F, "tile " + t + " varies by " + Mesher.AMP[t]);
+         }
+
+         check(Mesher.ampOf(Tex.GRASS_TOP) > 0.0F && Mesher.ampOf(Tex.LEAVES) > Mesher.ampOf(Tex.GRASS_TOP), "grass varies, leaves more");
+         eq(0.0F, Mesher.ampOf(Tex.PLANKS), "planks are made by hand: no variation");
+         eq(0.0F, Mesher.ampOf(Tex.GLOWSTONE), "light sources keep their brightness");
+         eq(0.0F, Mesher.ampOf(Tex.LAVA), "lava too");
+         eq(0.0F, Mesher.ampOf(-5), "a bad tile number");
+         eq(0.0F, Mesher.ampOf(100000), "a tile number far outside the table");
+         for (int i = 0; i < 2000; i++) {
+            int h = Mesher.hash3(i * 7 - 1000, i % 13, i * 3);
+            float v = (h & 0xFFFF) / 32767.5F - 1.0F;
+            check(v >= -1.0001F && v <= 1.0001F, "hash value in range");
+         }
+      });
    }
 
    // ------------------------------------------------------------------ the looks
@@ -181,6 +337,24 @@ final class TestsGfx {
       return out;
    }
 
+   /** The text of the method that starts with {@code signature}, up to its closing brace. */
+   static String body(String javaSrc, String signature) {
+      int at = javaSrc.indexOf(signature);
+      check(at >= 0, "found " + signature);
+      int open = javaSrc.indexOf('{', at);
+      int depth = 0;
+      for (int i = open; i < javaSrc.length(); i++) {
+         char ch = javaSrc.charAt(i);
+         if (ch == '{') {
+            depth++;
+         } else if (ch == '}' && --depth == 0) {
+            return javaSrc.substring(at, i + 1);
+         }
+      }
+
+      throw new IllegalStateException("no end of " + signature);
+   }
+
    static void sources() {
       test("shader sources: the programs are well formed and the effects programs are the plain ones plus '#define FX'", () -> {
          lint("WORLD_VS", ShaderSrc.WORLD_VS);
@@ -189,14 +363,21 @@ final class TestsGfx {
          lint("WORLD_VS_FX", ShaderSrc.WORLD_VS_FX);
          lint("WORLD_FS_FX", ShaderSrc.WORLD_FS_FX);
          lint("WATER_FS_FX", ShaderSrc.WATER_FS_FX);
+         lint("LOD_FS", ShaderSrc.LOD_FS);
+         lint("LOD_FS_FX", ShaderSrc.LOD_FS_FX);
+         lint("AO_FS", ShaderSrc.AO_FS);
+         lint("AOBLUR_FS", ShaderSrc.AOBLUR_FS);
          lint("COMP_FS", ShaderSrc.COMP_FS);
          lint("CLOUD_FS", ShaderSrc.CLOUD_FS);
+         lint("CLOUD_SHADOW_FS", ShaderSrc.CLOUD_SHADOW_FS);
          lint("BRIGHT_FS", Shaders.BRIGHT_FS);
          lint("BLUR_FS", Shaders.BLUR_FS);
          String def = "#define FX 1\n";
          eq(ShaderSrc.WORLD_FS.length() + def.length(), ShaderSrc.WORLD_FS_FX.length(), "terrain program: only the define is added");
          eq(ShaderSrc.WORLD_VS.length() + def.length(), ShaderSrc.WORLD_VS_FX.length(), "vertex program: only the define is added");
          eq(ShaderSrc.WATER_FS.length() + def.length(), ShaderSrc.WATER_FS_FX.length(), "water program: only the define is added");
+         eq(ShaderSrc.LOD_FS.length() + def.length(), ShaderSrc.LOD_FS_FX.length(), "LOD program: only the define is added");
+         check(ShaderSrc.LOD_FS.contains("#ifdef FX") && !ShaderSrc.LOD_FS.contains("#define FX"), "the cloud shadows of the LOD sit behind #ifdef FX");
          check(ShaderSrc.WORLD_FS_FX.startsWith("#version 120\n" + def), "define right after the version line");
          check(!ShaderSrc.WORLD_FS.contains("#define FX"), "the plain program has no define");
          check(ShaderSrc.WORLD_FS.contains("#ifdef FX") && ShaderSrc.WORLD_VS.contains("#ifdef FX"), "the new code sits behind #ifdef FX");
@@ -226,16 +407,51 @@ final class TestsGfx {
 
          Set<String> world = uniforms(ShaderSrc.WORLD_VS_FX);
          world.addAll(uniforms(ShaderSrc.WORLD_FS_FX));
-         Set<String> prog = names(java, "prog");
-         check(prog.size() >= 20, "the terrain program gets its uniforms: " + prog.size());
+         Set<String> prog = names(body(java, "void useWorldProg("), "prog");
+         check(prog.size() >= 25, "the terrain program gets its uniforms: " + prog.size());
          for (String u : prog) {
             check(world.contains(u), "the terrain program declares " + u);
          }
 
+         Set<String> shadow = uniforms(ShaderSrc.CLOUD_SHADOW_FS);
+         Set<String> sgot = names(java, "this.pCShadow");
+         sgot.addAll(names(body(java, "void weatherUniforms("), "prog"));
+         check(sgot.size() >= 12, "the cloud shadow program gets its uniforms: " + sgot);
+         for (String u : sgot) {
+            check(shadow.contains(u), "CLOUD_SHADOW_FS declares " + u);
+         }
+
+         Set<String> cloud = uniforms(ShaderSrc.CLOUD_FS);
+         for (String u : names(body(java, "void weatherUniforms("), "prog")) {
+            check(cloud.contains(u), "CLOUD_FS declares " + u);
+         }
+
+         check(prog.contains("cloudShadow") && prog.contains("csP") && prog.contains("wet"), "cloud shadows and wetness are handed to the terrain program");
          Set<String> water = uniforms(ShaderSrc.WORLD_VS_FX);
          water.addAll(uniforms(ShaderSrc.WATER_FS_FX));
-         for (String u : names(java, "this.pWater")) {
+         Set<String> wgot = names(body(java, "public void useWater("), "wp");
+         check(wgot.size() >= 5, "the water program gets its uniforms: " + wgot);
+         for (String u : wgot) {
             check(water.contains(u), "the water program declares " + u);
+         }
+
+         Set<String> lod = uniforms(ShaderSrc.LOD_VS);
+         lod.addAll(uniforms(ShaderSrc.LOD_FS_FX));
+         Set<String> lgot = names(body(java, "public void useLod("), "lp");
+         check(lgot.size() >= 12, "the LOD program gets its uniforms: " + lgot);
+         for (String u : lgot) {
+            check(lod.contains(u), "the LOD program declares " + u);
+         }
+
+         check(lgot.contains("cloudShadow") && lgot.contains("csP"), "the cloud shadows are handed to the LOD program");
+         Set<String> ao = uniforms(ShaderSrc.AO_FS);
+         for (String u : names(java, "this.pAo")) {
+            check(ao.contains(u), "AO_FS declares " + u);
+         }
+
+         Set<String> aob = uniforms(ShaderSrc.AOBLUR_FS);
+         for (String u : names(java, "this.pAoBlur")) {
+            check(aob.contains(u), "AOBLUR_FS declares " + u);
          }
 
          check(world.contains("emT") && prog.contains("emT"), "the glowing tiles are handed to the terrain program");
@@ -263,6 +479,21 @@ final class TestsGfx {
          check(tiles.contains(Blocks.tiles[Blocks.TORCH][0]), "torch");
          check(tiles.contains(Blocks.tiles[Blocks.FIRE][0]), "fire");
          check(!tiles.contains(Tex.COBBLE) && !tiles.contains(Tex.STONE) && !tiles.contains(Tex.DIRT), "cobblestone, stone, dirt");
+         // small light sources glow strongly, a lava lake less (its glow would cover half the screen)
+         float lava = 0.0F;
+         float torch = 0.0F;
+         for (int i = 0; i < 16; i++) {
+            check(e[i * 2 + 1] >= 0.0F && e[i * 2 + 1] <= 1.0F, "strength between 0 and 1");
+            if ((int)e[i * 2] == Blocks.tiles[Blocks.LAVA][0] && e[i * 2 + 1] > 0.0F) {
+               lava = e[i * 2 + 1];
+            }
+
+            if ((int)e[i * 2] == Blocks.tiles[Blocks.TORCH][0] && e[i * 2 + 1] > 0.0F) {
+               torch = e[i * 2 + 1];
+            }
+         }
+
+         check(lava > 0.0F && torch > lava, "a torch glows more than lava: " + torch + " vs " + lava);
          // whatever is listed is used by nothing that gives no light
          for (int id = 1; id < Blocks.MAX; id++) {
             if (Blocks.name[id] != null && Blocks.emit[id] < 12) {

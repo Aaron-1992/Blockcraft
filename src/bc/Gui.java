@@ -648,6 +648,10 @@ public class Gui {
          if (Items.isItem(var1)) {
             this.itemIcon(var1, var2, var3, var4);
          } else {
+            if (var1 == Redstone319.PISTON || var1 == Redstone319.STICKY_PISTON || var1 == Redstone319.OBSERVER) {
+               var1++;
+            }
+
             int var5 = Blocks.kind[var1];
             this.quadsBegin();
             if (var5 == 1 || var5 == 7 || Blocks.isLadder(var1) || var1 == 32 || Blocks.isWallTorch(var1) || Blocks313.flatItem(var1)) {
@@ -659,6 +663,17 @@ public class Gui {
                int[] var6 = tintFor(var1);
 
                for (double[] var10 : iconBoxes(var1)) {
+                  int t0 = var10.length > 10 && var10[9] >= 0 ? (int)var10[9] : Blocks.tiles[var1][0];
+                  int t3 = var10.length > 10 && var10[8] >= 0 ? (int)var10[8] : Blocks.tiles[var1][3];
+                  int t4 = var10.length > 10 && var10[8] >= 0 ? (int)var10[8] : Blocks.tiles[var1][4];
+                  int[] bTint = var6;
+                  boolean hasBTint = false;
+                  if (var10.length > 7 && var10[7] >= 0) {
+                     int c = (int)var10[7];
+                     bTint = new int[]{c >> 16 & 255, c >> 8 & 255, c & 255};
+                     hasBTint = true;
+                  }
+
                   float var11 = (float)var10[0];
                   float var12 = (float)var10[3];
                   float var13 = (float)var10[2];
@@ -674,7 +689,7 @@ public class Gui {
                      sy(var3, var4, var12, var14, var16),
                      sy(var3, var4, var11, var14, var16)
                   };
-                  this.face(Blocks.tiles[var1][0], var17, var18, 1.0F, var6, false);
+                  this.face(t0, var17, var18, 1.0F, bTint, hasBTint);
                   float[] var19 = new float[]{
                      sx(var2, var4, var11, var14), sx(var2, var4, var12, var14), sx(var2, var4, var12, var14), sx(var2, var4, var11, var14)
                   };
@@ -684,7 +699,7 @@ public class Gui {
                      sy(var3, var4, var12, var14, var15),
                      sy(var3, var4, var11, var14, var15)
                   };
-                  this.face(Blocks.tiles[var1][3], var19, var20, 0.78F, var6, false);
+                  this.face(t3, var19, var20, 0.78F, bTint, hasBTint);
                   float[] var21 = new float[]{
                      sx(var2, var4, var12, var14), sx(var2, var4, var12, var13), sx(var2, var4, var12, var13), sx(var2, var4, var12, var14)
                   };
@@ -694,7 +709,7 @@ public class Gui {
                      sy(var3, var4, var12, var13, var15),
                      sy(var3, var4, var12, var14, var15)
                   };
-                  this.face(Blocks.tiles[var1][4], var21, var22, 0.58F, var6, false);
+                  this.face(t4, var21, var22, 0.58F, bTint, hasBTint);
                }
             } else {
                int[] var23 = tintFor(var1);

@@ -146,6 +146,9 @@ public final class Items {
    }
 
    public static int maxStack(int var0) {
+      if (isFood(var0) && ModLoader.isClassicHudNoHunger()) {
+         return 1;
+      }
       return var0 >= 256 && var0 < Blocks.EXT0 ? maxStack[var0] : 64;
    }
 
@@ -397,5 +400,6 @@ public final class Items {
       // ---- Update 3.12 ----
       Items312.register();
       Decor315.registerItems();
+      Redstone319.registerItems();
    }
 }

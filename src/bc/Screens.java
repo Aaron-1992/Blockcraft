@@ -42,39 +42,145 @@ final class Screens {
       float top = Math.max(10.0F, gui.h * 0.08F);
       double time = ui.time();
       float bottom = Logo.draw(gui, cx, top, cell, time);
-      gui.centered("JAVA EDITION 1.12  -  UPDATE " + Game.VERSION_STR, cx, bottom + 10.0F, 0xFFD6D6E0, true, 1.0F);
-      if (g.splash != null) {
-         float sw = Gui.textWidth(g.splash);
+      boolean infdev = ModLoader.isInfdevActive();
+      gui.centered(
+         infdev ? "MINECRAFT INFDEV (JUNE 2010)" : ("JAVA EDITION  -  V" + Game.VERSION_STR),
+         cx,
+         bottom + 10.0F,
+         infdev ? 0xFF63D43E : 0xFFD6D6E0,
+         true,
+         1.0F
+      );
+      String splashText = infdev ? "Infdev 2010!" : g.splash;
+      if (splashText != null) {
+         float sw = Gui.textWidth(splashText);
          float sx = Math.min(cx + Logo.width(cell) / 2.0F - 22.0F, gui.w - sw / 2.0F - 12.0F);
          gui.push();
          gui.translate(sx, bottom - 6.0F);
          gui.rotate(-18.0F);
          float pulse = 1.0F + 0.06F * (float)Math.sin(time * 6.0);
          gui.scaleBy(pulse);
-         gui.centered(g.splash, 0.0F, 0.0F, 0xFFFFFF00, true, 1.0F);
+         gui.centered(splashText, 0.0F, 0.0F, 0xFFFFFF00, true, 1.0F);
          gui.pop();
       }
 
       float bw = Math.min(200.0F, gui.w - 40.0F);
       float half = (bw - 4.0F) / 2.0F;
+      float third = (bw - 8.0F) / 3.0F;
       float row = 24.0F;
-      float by = Math.max(bottom + 36.0F, gui.h * 0.46F);
-      by = Math.min(by, gui.h - 18.0F - row * 3.0F - 20.0F);
+      float by = Math.max(bottom + 26.0F, gui.h * 0.45F);
+      by = Math.min(by, gui.h - 16.0F - row * 3.0F - 20.0F);
       float bx = cx - bw / 2.0F;
       ui.button("Singleplayer", bx, by, bw, 20.0F, true, null, () -> openWorlds(g));
-      ui.button("Create New World", bx, by + row, bw, 20.0F, true, null, () -> openNewWorld(g));
-      ui.button("Skins...", bx, by + row * 2, half, 20.0F, true, null, () -> {
+      ui.button("Multiplayer", bx, by + row, half, 20.0F, true, null, () -> {
+         g.mpReturn = Game.S.TITLE;
+         openMultiplayer(g);
+      });
+      ui.button("Mods...", bx + half + 4.0F, by + row, half, 20.0F, true, null, () -> {
+         g.modsReturn = Game.S.TITLE;
+         g.setScreen(Game.S.MODS);
+      });
+      float wSmall = 58.0F;
+      float wOpt = bw - 2.0F * (wSmall + 4.0F);
+      ui.button("Skins", bx, by + row * 2, wSmall, 20.0F, true, null, () -> {
          g.skinReturn = Game.S.TITLE;
          g.setScreen(Game.S.SKINS);
       });
-      ui.button("Options...", bx + half + 4.0F, by + row * 2, half, 20.0F, true, null, () -> {
+      ui.button("Packs", bx + wSmall + 4.0F, by + row * 2, wSmall, 20.0F, true, null, () -> {
+         g.packsReturn = Game.S.TITLE;
+         g.setScreen(Game.S.PACKS);
+      });
+      ui.button("Options...", bx + 2.0F * (wSmall + 4.0F), by + row * 2, wOpt, 20.0F, true, null, () -> {
          g.optionsReturn = Game.S.TITLE;
          g.setScreen(Game.S.OPTIONS);
       });
       ui.button("Quit Game", bx, by + row * 3, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
-      gui.text("Update " + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
+      gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
+   }
+
+   static void openMultiplayer(Game g) {
+      g.focusField = 0;
+      g.setScreen(Game.S.MULTIPLAYER);
+   }
+
+   // =================================================================== V4.0: Multiplayer Screen
+   static void multiplayer(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      float cx = gui.w / 2.0F;
+      ui.title("Multiplayer", 7.0F);
+      float pw = Math.min(300.0F, gui.w - 16.0F);
+      float px = cx - pw / 2.0F;
+      float py = 21.0F;
+      float footY = gui.h - 24.0F;
+      float ph = footY - py - 4.0F;
+      ui.panel(px, py, pw, ph);
+
+      float ix = px + 6.0F;
+      float iw = pw - 12.0F;
+      float colW = (iw - 6.0F) / 2.0F;
+      float x1 = ix + colW + 6.0F;
+      float iy = py + 5.0F;
+      ui.label("Server Address / Share Code", ix, iy, Ui.DIM);
+      ui.field(ix, iy + 9.0F, iw, 16.0F, Net319.serverAddr, "127.0.0.1:25565", g.focusField == 0, () -> g.focusField = 0);
+
+      String stateLine = Net319.isHosting()
+         ? "Hosting " + WorldSettings.TYPE_NAME[Net319.mpWorldType] + " (" + Net319.peerCount() + " online) | Code: " + Net319.shareCode
+         : (Net319.isConnected() ? "Connected (" + Net319.peerCount() + " online)" : Net319.statusText);
+      gui.text(Game.clipText(stateLine, iw), ix, iy + 28.0F, Net319.isActive() ? 0xFF8FE060 : Ui.FAINT, true);
+
+      float by0 = iy + 39.0F;
+      ui.button("Type: " + WorldSettings.TYPE_NAME[Net319.mpWorldType], ix, by0, colW, 20.0F, true,
+         WorldSettings.TYPE_INFO[Net319.mpWorldType],
+         Net319::cycleMpWorldType);
+      ui.button("Mode: " + Net319.mpModeName(), x1, by0, colW, 20.0F, true,
+         "Select game mode for hosted worlds and Server.bat (Survival, Creative, Adventure, Spectator).",
+         Net319::cycleMpGameMode);
+
+      float by1 = by0 + 22.0F;
+      ui.button(Net319.mpWorldwide ? "Access: Worldwide" : "Access: LAN Only", ix, by1, colW, 20.0F, true,
+         "Worldwide opens UPnP + Public TCP Tunnel automatically so friends anywhere on Earth can join without port forwarding.",
+         Net319::toggleMpWorldwide);
+      ui.button("Copy Share Code", x1, by1, colW, 20.0F, true,
+         "Generate and copy a BC-... Share Code that friends anywhere on Earth can paste into Server Address to join.",
+         () -> Net319.copyShareCode(g));
+
+      float by2 = by1 + 22.0F;
+      ui.button("Join Server", ix, by2, colW, 20.0F, true,
+         "Connect to the IP:Port, Public Tunnel URL, or BC-... Share Code entered above.",
+         () -> Net319.joinFromMenu(g, Net319.serverAddr));
+      ui.button("Join LAN", x1, by2, colW, 20.0F, true,
+         "Auto-discover a Blockcraft LAN or local host on your network and join.",
+         () -> Net319.joinFromMenu(g, "lan"));
+
+      float by3 = by2 + 22.0F;
+      ui.button("Start Server.bat", ix, by3, colW, 20.0F, true,
+         "Launches Blockcraft-server.bat with the selected World Type, Game Mode & Worldwide Tunnel and joins it.",
+         () -> Net319.launchServerAndJoin(g));
+      ui.button("Host World", x1, by3, colW, 20.0F, true,
+         "Host a world with the selected World Type & Mode directly and generate a Worldwide Share Code.",
+         () -> Net319.hostFromMenu(g));
+
+      float by4 = by3 + 22.0F;
+      if (by4 + 20.0F <= py + ph - 2.0F) {
+         ui.button("Disconnect", ix, by4, colW, 20.0F, Net319.isActive(),
+            "Disconnect from the active server or stop hosting.",
+            () -> {
+               Net319.disconnect(g);
+               Net319.statusText = "Disconnected.";
+            });
+         ui.button("Reset Port", x1, by4, colW, 20.0F, true,
+            "Reset server address to default localhost (127.0.0.1:25565).",
+            () -> Net319.serverAddr = "127.0.0.1:25565");
+      }
+
+      float bw = Math.min(200.0F, pw);
+      ui.button("Back", cx - bw / 2.0F, footY, bw, 20.0F, true, null, () -> g.setScreen(g.mpReturn != null ? g.mpReturn : Game.S.TITLE));
+      ui.drawToast();
    }
 
    static void openWorlds(Game g) {
@@ -293,6 +399,9 @@ final class Screens {
       float ty = ry;
       ui.button("Type: " + ws.typeName(), x1, ty, colW, 20.0F, true, WorldSettings.TYPE_INFO[ws.type], () -> {
          ws.type = WorldSettings.TYPE_ORDER[(ws.typeIndex() + 1) % WorldSettings.TYPE_ORDER.length];
+         if (ws.isVoidMode()) {
+            g.newMode = 0; // Skyblock, Skywars, and Bedwars default to Survival
+         }
       });
       float iy = ty + 24.0F;
       if (ws.type == WorldSettings.FLAT) {
@@ -322,7 +431,7 @@ final class Screens {
 
    // =================================================================== options
    static final String[] TABS = {"Video", "Graphics", "Gameplay", "Controls"};
-   static final int[] LOD_STEPS = {0, 32, 64, 128, 256};
+   static final int[] LOD_STEPS = {0, 32, 64, 128, 256, 384, 512};
    static final String[][] KEYS = {
       {"W A S D", "Walk"}, {"Space", "Jump / swim"}, {"Space x2", "Fly (Creative)"}, {"Shift", "Sneak"}, {"Ctrl", "Sprint"}, {"Mouse L", "Break / attack"},
       {"Mouse R", "Place / use"}, {"1 - 9", "Choose item"}, {"E", "Inventory"}, {"Q", "Drop item"}, {"T", "Chat"}, {"/", "Command"}, {"L", "Advancements"},
@@ -515,6 +624,12 @@ final class Screens {
          ui.button("Effects: " + new String[]{"\u00a77LOW", "\u00a7aMEDIUM", "\u00a7bHIGH"}[Math.max(0, Math.min(2, o.fx))], x0, oy, colW, 20.0F, true,
             "LOW: the picture of Update 3.18. MEDIUM: lava, fire and torches glow, clouds throw shadows on the land, the ground is wet and shiny in rain. HIGH: also soft shadows in corners and under trees (a little slower). Needs Shaders ON.",
             () -> o.fx = (o.fx + 1) % 3);
+         ui.toggle("Bushy Leaves", o.bushyLeaves, x1, oy, colW, 20.0F,
+            "3D foliage fronds protruding from tree canopies so trees look full and organic instead of flat cubes.", () -> {
+               o.bushyLeaves = !o.bushyLeaves;
+               Mesher.bushyLeaves = o.bushyLeaves;
+               g.remeshAll();
+            });
       }
    }
 
@@ -529,6 +644,20 @@ final class Screens {
       if (shows(oy, row, top, viewH)) {
          ui.toggle("View Bobbing", o.bobbing, x0, oy, colW, 20.0F, "Your hand sways while you walk.", () -> o.bobbing = !o.bobbing);
          ui.toggle("Disasters", o.disasters, x1, oy, colW, 20.0F, "Tornadoes, earthquakes and meteors now and then. /disaster on|off changes it for one world.", () -> o.disasters = !o.disasters);
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Resource Packs...", x0, oy, colW, 20.0F, true,
+            "Switch texture packs (Default V4.0, OG Classic 3.5, Vibrant, Retro 8-Bit, or custom packs in resourcepacks/).", () -> {
+               g.packsReturn = Game.S.OPTIONS;
+               g.setScreen(Game.S.PACKS);
+            });
+         ui.button("Mods (" + ModLoader.activeCount() + ")...", x1, oy, colW, 20.0F, true,
+            "Browse the Modrinth-style Mod Catalog, toggle installed mods, or launch the external Mod Manager.", () -> {
+               g.modsReturn = Game.S.OPTIONS;
+               g.setScreen(Game.S.MODS);
+            });
       }
    }
 
@@ -558,24 +687,190 @@ final class Screens {
       String info = g.worldSettings.typeName() + "  -  " + MODE_NAME[Math.max(0, Math.min(3, g.player == null ? 1 : g.player.gameMode))];
       gui.centered(Game.clipText(info, gui.w - 20.0F), cx, y - 11.0F, Ui.DIM, true, 1.0F);
       float bx = cx - bw / 2.0F;
+      float third = (bw - 8.0F) / 3.0F;
       ui.button("Back to Game", bx, y, bw, 20.0F, true, null, () -> g.setScreen(Game.S.PLAY));
       ui.button("Advancements", bx, y + 28.0F, half, 20.0F, true, null, () -> g.setScreen(Game.S.ADV));
       ui.button("Options...", bx + half + 4.0F, y + 28.0F, half, 20.0F, true, null, () -> {
          g.optionsReturn = Game.S.PAUSE;
          g.setScreen(Game.S.OPTIONS);
       });
-      ui.button("Skins...", bx, y + 52.0F, half, 20.0F, true, null, () -> {
+      ui.button("Skins...", bx, y + 52.0F, third, 20.0F, true, null, () -> {
          g.skinReturn = Game.S.PAUSE;
          g.setScreen(Game.S.SKINS);
       });
-      ui.button("Copy Seed", bx + half + 4.0F, y + 52.0F, half, 20.0F, g.world != null, null, () -> {
-         if (g.window != 0L) {
-            GLFW.glfwSetClipboardString(g.window, Long.toString(g.world.seed));
-         }
-
-         ui.say("Seed " + g.world.seed + " copied");
+      ui.button("Packs...", bx + third + 4.0F, y + 52.0F, third, 20.0F, true, null, () -> {
+         g.packsReturn = Game.S.PAUSE;
+         g.setScreen(Game.S.PACKS);
       });
-      ui.button("Save and Quit to Title", bx, y + 80.0F, bw, 20.0F, true, null, g::quitToTitle);
+      ui.button("Mods...", bx + 2.0F * (third + 4.0F), y + 52.0F, third, 20.0F, true, null, () -> {
+         g.modsReturn = Game.S.PAUSE;
+         g.setScreen(Game.S.MODS);
+      });
+      ui.button(Net319.hostLabel(), bx, y + 76.0F, half, 20.0F, true, null, () -> {
+         Net319.toggleHost(g);
+         ui.say(Net319.isHosting() ? "Hosting on LAN (port " + Net319.DEFAULT_PORT + ")" : "Stopped LAN host");
+      });
+      ui.button(Net319.joinLabel(), bx + half + 4.0F, y + 76.0F, half, 20.0F, true, null, () -> {
+         Net319.toggleJoin(g);
+         ui.say(Net319.isConnected() ? "Connected to LAN world" : "Not connected");
+      });
+      ui.button("Save and Quit to Title", bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
+      ui.drawToast();
+   }
+
+   // =================================================================== Resource Packs screen
+   static void resourcePacks(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      float cx = gui.w / 2.0F;
+      ui.title("Resource Packs", 8.0F);
+      float pw = Math.min(330.0F, gui.w - 20.0F);
+      float px = cx - pw / 2.0F;
+      float py = 24.0F;
+      float footer = 30.0F;
+      float ph = gui.h - py - footer;
+      ui.panel(px, py, pw, ph);
+
+      java.util.List<ResourcePacks.Pack> list = ResourcePacks.list();
+      String activeId = ResourcePacks.activeId();
+      float rowH = 30.0F;
+      float content = list.size() * rowH + 4.0F;
+      ui.beginScroll(px, py, pw, ph, ui.packScroll, content, rowH);
+      for (int i = 0; i < list.size(); i++) {
+         float ry = py + 3.0F + i * rowH - ui.packScroll[0];
+         if (ry < py - 0.5F || ry + rowH - 2.0F > py + ph + 0.5F) {
+            continue;
+         }
+         ResourcePacks.Pack p = list.get(i);
+         boolean isAct = p.id.equalsIgnoreCase(activeId);
+         float rx = px + 4.0F;
+         float rw = pw - 8.0F;
+         float rh = rowH - 2.0F;
+         gui.rect(rx, ry, rw, rh, isAct ? 0xFF4CAF50 : 0xFF3A3C48);
+         gui.rect(rx + 1, ry + 1, rw - 2, rh - 2, isAct ? 0xFF1E2D24 : 0xFF161820);
+         gui.rect(rx + 4, ry + 4, 20, rh - 8.0F, p.badgeColor);
+         gui.centered(p.classicBase ? "OG" : "V4", rx + 14.0F, ry + rh / 2.0F - 4.0F, 0xFFFFFFFF, true, 1.0F);
+
+         float btnW = 54.0F;
+         float tx = rx + 28.0F;
+         float tw = rw - 32.0F - btnW - 6.0F;
+         gui.text(Game.clipText(p.title, tw), tx, ry + 4.0F, 0xFFFFFFFF, true);
+         gui.text(Game.clipText(p.subtitle, tw), tx, ry + 15.0F, Ui.DIM, true);
+
+         final String pid = p.id;
+         final String ptitle = p.title;
+         ui.button(isAct ? "\u00a7aActive" : "Select", rx + rw - btnW - 4.0F, ry + 4.0F, btnW, 20.0F, !isAct,
+            "Apply the '" + ptitle + "' resource pack immediately.",
+            () -> {
+               ResourcePacks.select(pid, g);
+               ui.say("Activated " + ptitle);
+            });
+      }
+      ui.endScroll(px, py, pw, ph, content);
+
+      float by = gui.h - 24.0F;
+      float third = (pw - 8.0F) / 3.0F;
+      ui.button("Refresh", px, by, third, 20.0F, true, "Scan resourcepacks/ for newly added folders or .zip packs.", () -> {
+         ResourcePacks.refresh();
+         ui.say("Refreshed packs (" + ResourcePacks.list().size() + ")");
+      });
+      ui.button("Mods...", px + third + 4.0F, by, third, 20.0F, true, "Open the Modrinth-style Mods manager.", () -> {
+         g.modsReturn = g.packsReturn != null ? g.packsReturn : Game.S.TITLE;
+         g.setScreen(Game.S.MODS);
+      });
+      ui.button("Done", px + 2.0F * (third + 4.0F), by, third, 20.0F, true, null,
+         () -> g.setScreen(g.packsReturn != null ? g.packsReturn : Game.S.TITLE));
+      ui.drawToast();
+   }
+
+   // =================================================================== Mods screen (In-game Modrinth Hub)
+   static final String[] MOD_TABS = {"Modrinth Catalog", "Installed Mods"};
+
+   static void mods(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      float cx = gui.w / 2.0F;
+      float pw = Math.min(330.0F, gui.w - 20.0F);
+      float px = cx - pw / 2.0F;
+      ui.title("Mods (" + ModLoader.activeCount() + " Active)", 7.0F);
+      ui.tabs(MOD_TABS, ui.modTab, px, 20.0F, pw, 16.0F, i -> {
+         ui.modTab = i;
+         ui.modScroll[0] = 0.0F;
+      });
+
+      float py = 40.0F;
+      float footer = 28.0F;
+      float ph = gui.h - py - footer;
+      ui.panel(px, py, pw, ph);
+
+      java.util.List<ModLoader.ModEntry> list = ui.modTab == 0 ? ModLoader.allMods() : ModLoader.installedMods();
+      float rowH = 30.0F;
+      if (list.isEmpty()) {
+         gui.centered("No mods installed yet.", cx, py + ph / 2.0F - 10.0F, Ui.TEXT, true, 1.0F);
+         gui.centered("Open 'Modrinth Catalog' tab to install mods!", cx, py + ph / 2.0F + 2.0F, Ui.DIM, true, 1.0F);
+      } else {
+         float content = list.size() * rowH + 4.0F;
+         ui.beginScroll(px, py, pw, ph, ui.modScroll, content, rowH);
+         for (int i = 0; i < list.size(); i++) {
+            float ry = py + 3.0F + i * rowH - ui.modScroll[0];
+            if (ry < py - 0.5F || ry + rowH - 2.0F > py + ph + 0.5F) {
+               continue;
+            }
+            ModLoader.ModEntry m = list.get(i);
+            float rx = px + 4.0F;
+            float rw = pw - 8.0F;
+            float rh = rowH - 2.0F;
+            boolean active = m.installed && m.enabled;
+            gui.rect(rx, ry, rw, rh, active ? 0xFF1BD96A : 0xFF3A3C48);
+            gui.rect(rx + 1, ry + 1, rw - 2, rh - 2, active ? 0xFF1A2922 : 0xFF161820);
+            gui.rect(rx + 4, ry + 4, 18, rh - 8.0F, m.badgeColor);
+            gui.centered(m.name.substring(0, 1).toUpperCase(), rx + 13.0F, ry + rh / 2.0F - 4.0F, 0xFFFFFFFF, true, 1.0F);
+
+            float btnW = 56.0F;
+            float tx = rx + 26.0F;
+            float tw = rw - 30.0F - btnW - 6.0F;
+            gui.text(Game.clipText(m.name + " v" + m.version + " (" + m.category + ")", tw), tx, ry + 4.0F, 0xFFFFFFFF, true);
+            gui.text(Game.clipText(m.summary, tw), tx, ry + 15.0F, Ui.DIM, true);
+
+            final String mid = m.id;
+            final String mname = m.name;
+            if (!m.installed) {
+               ui.button("Install", rx + rw - btnW - 4.0F, ry + 4.0F, btnW, 20.0F, true,
+                  "Install and enable '" + mname + "'.",
+                  () -> {
+                     ModLoader.install(mid);
+                     ui.say("Installed " + mname);
+                  });
+            } else {
+               ui.button(m.enabled ? "\u00a7aON" : "\u00a7cOFF", rx + rw - btnW - 4.0F, ry + 4.0F, btnW, 20.0F, true,
+                  "Toggle '" + mname + "' ON or OFF.",
+                  () -> {
+                     ModLoader.toggleEnabled(mid);
+                     ui.say(mname + (ModLoader.get(mid).enabled ? " enabled" : " disabled"));
+                  });
+            }
+         }
+         ui.endScroll(px, py, pw, ph, content);
+      }
+
+      float by = gui.h - 24.0F;
+      float third = (pw - 8.0F) / 3.0F;
+      ui.button("Refresh", px, by, third, 20.0F, true, "Reload mods from the mods/ folder.", () -> {
+         ModLoader.refresh();
+         ui.say("Reloaded mods (" + ModLoader.activeCount() + " active)");
+      });
+      ui.button("Desktop Hub", px + third + 4.0F, by, third, 20.0F, true,
+         "Open the standalone Modrinth-style Desktop Mod & Resource Pack Manager window.",
+         () -> {
+            ModManagerMain.openInProcess(g);
+            ui.say("Opened Desktop Mod Manager");
+         });
+      ui.button("Done", px + 2.0F * (third + 4.0F), by, third, 20.0F, true, null,
+         () -> g.setScreen(g.modsReturn != null ? g.modsReturn : Game.S.TITLE));
       ui.drawToast();
    }
 

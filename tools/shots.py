@@ -689,6 +689,15 @@ for _n, _look in (("classic", 0), ("vivid", 1), ("cinematic", 2), ("dreamy", 3))
     SCENES["gfx-look-%s" % _n] = (SCENES["village-folk-sh"][0] + ["-Dbc.look=%d" % _look], True)
 SCENES["gfx-nether-low"] = (SCENES["nether-vista-sh"][0] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
 SCENES["gfx-torch-low"] = (SCENES["mobs-torch-sh"][0] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
+# Update 3.19, part 2: the shadows of the clouds (the camera floats 36 m above the village, looking down), the wet world in rain, ambient occlusion (Effects HIGH)
+_VF = [a for a in SCENES["village-folk-sh"][0] if not a.startswith(("-Dbc.weather=", "-Dbc.lightning=", "-Dbc.look="))]
+_VF_NOMOB = [a for a in _VF if not a.startswith(("-Dbc.summon", "-Dbc.cam=", "-Dbc.time="))]
+SCENES["gfx-cloudshadow"] = (_VF_NOMOB + ["-Dbc.cam=182.5,100,83.5,128,28", "-Dbc.time=4000", "-Dbc.weather=cell:300,0,260", "-Dbc.lightning=off", "-Dbc.look=1"], True)
+SCENES["gfx-cloudshadow-low"] = ([a for a in SCENES["gfx-cloudshadow"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
+SCENES["gfx-cloudshadow-fair"] = (_VF_NOMOB + ["-Dbc.cam=182.5,100,83.5,128,28", "-Dbc.time=4000", "-Dbc.weather=calm", "-Dbc.look=1"], True)
+SCENES["gfx-rain"] = (_VF + ["-Dbc.weather=rain", "-Dbc.lightning=off", "-Dbc.look=1"], True)
+SCENES["gfx-rain-low"] = ([a for a in SCENES["gfx-rain"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
+SCENES["gfx-ao"] = (SCENES["gfx-look-vivid"][0] + ["-Dbc.fx=2"], True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

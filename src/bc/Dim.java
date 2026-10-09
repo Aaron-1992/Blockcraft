@@ -102,11 +102,18 @@ public final class Dim {
          return new EndGen(seed);
       }
 
+      Gen modGen = ModLoader.createModWorldGen(d, seed, st);
+      if (modGen != null) {
+         return modGen;
+      }
+
       Gen g;
       if (st == null || st.type == WorldSettings.CLASSIC) {
          g = new Gen(seed);
       } else if (st.type == WorldSettings.FLAT) {
          g = new FlatGen(seed, st);
+      } else if (st.isVoidMode()) {
+         g = new SkyGen(seed, st);
       } else {
          g = new TerraGen(seed, st);
       }

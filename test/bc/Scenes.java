@@ -34,6 +34,10 @@ final class Scenes {
             g.screen = Game.S.TITLE;
             Screens.title(g);
             break;
+         case "multiplayer":
+            g.screen = Game.S.MULTIPLAYER;
+            Screens.multiplayer(g);
+            break;
          case "worlds":
          case "worlds-long":
          case "worlds-empty": {
@@ -96,6 +100,14 @@ final class Scenes {
             g.screen = Game.S.PAUSE;
             g.worldDisplayName = "My Survival World";
             Screens.pause(g);
+            break;
+         case "packs":
+            g.screen = Game.S.PACKS;
+            Screens.resourcePacks(g);
+            break;
+         case "mods":
+            g.screen = Game.S.MODS;
+            Screens.mods(g);
             break;
          case "loading":
             g.screen = Game.S.LOADING;

@@ -470,12 +470,22 @@ public final class World {
    }
 
    private void propagate(boolean var1) {
+      Chunk lastC = null;
+      int lastCx = Integer.MIN_VALUE;
+      int lastCz = Integer.MIN_VALUE;
       while (!this.addQ.isEmpty()) {
          long var2 = this.addQ.poll();
          int var4 = ux(var2);
          int var5 = uy(var2);
          int var6 = uz(var2);
-         Chunk var7 = this.chunkAt(var4, var6);
+         int cx = var4 >> 4;
+         int cz = var6 >> 4;
+         if (cx != lastCx || cz != lastCz) {
+            lastC = this.chunk(cx, cz);
+            lastCx = cx;
+            lastCz = cz;
+         }
+         Chunk var7 = lastC;
          if (var7 != null) {
             int var8 = this.lightOf(var7, var1, var4 & 15, var5, var6 & 15);
             if (var8 > 1) {
@@ -484,7 +494,19 @@ public final class World {
                   int var11 = var5 + DY[var9];
                   int var12 = var6 + DZ[var9];
                   if (var11 >= 0 && var11 <= 255) {
-                     Chunk var13 = var10 >> 4 == var7.cx && var12 >> 4 == var7.cz ? var7 : this.chunkAt(var10, var12);
+                     int ncx = var10 >> 4;
+                     int ncz = var12 >> 4;
+                     Chunk var13;
+                     if (ncx == cx && ncz == cz) {
+                        var13 = var7;
+                     } else if (ncx == lastCx && ncz == lastCz) {
+                        var13 = lastC;
+                     } else {
+                        var13 = this.chunk(ncx, ncz);
+                        lastC = var13;
+                        lastCx = ncx;
+                        lastCz = ncz;
+                     }
                      if (var13 != null) {
                         int var14 = var10 & 15;
                         int var15 = var12 & 15;
@@ -522,6 +544,9 @@ public final class World {
          var6.setBlk(var2 & 15, var3, var4 & 15, 0);
       }
 
+      Chunk lastC = var6;
+      int lastCx = var6.cx;
+      int lastCz = var6.cz;
       this.remQ.add(pack(var2, var3, var4) | (long)var5 << 60);
 
       while (!this.remQ.isEmpty()) {
@@ -536,7 +561,14 @@ public final class World {
             int var15 = var11 + DY[var13];
             int var16 = var12 + DZ[var13];
             if (var15 >= 0 && var15 <= 255) {
-               Chunk var17 = this.chunkAt(var14, var16);
+               int ncx = var14 >> 4;
+               int ncz = var16 >> 4;
+               if (ncx != lastCx || ncz != lastCz) {
+                  lastC = this.chunk(ncx, ncz);
+                  lastCx = ncx;
+                  lastCz = ncz;
+               }
+               Chunk var17 = lastC;
                if (var17 != null) {
                   int var18 = var14 & 15;
                   int var19 = var16 & 15;
@@ -699,8 +731,17 @@ public final class World {
          this.resetBounds();
          this.touch(var1, var2, var3);
 
+         int oldOp = Blocks.opacity[var8];
+         int newOp = Blocks.opacity[var4];
+         int oldEm = Blocks.emit[var8];
+         int newEm = Blocks.emit[var4];
+
          for (int var9 = 0; var9 < 2; var9++) {
             boolean var10 = var9 == 0;
+            if (var10 ? oldOp == newOp : (oldOp == newOp && oldEm == newEm)) {
+               continue;
+            }
+
             int var11 = this.lightOf(var5, var10, var6, var2, var7);
             if (var11 > 0) {
                this.removeLight(var10, var1, var2, var3, var11);
@@ -748,6 +789,7 @@ public final class World {
          }
 
          this.notifyAround(var1, var2, var3);
+         Net319.onSetBlock(this, var1, var2, var3, var4);
          return true;
       } else {
          return false;
@@ -797,6 +839,7 @@ public final class World {
             }
          }
       }
+      Redstone319.onBlockChanged(this, var1, var2, var3);
    }
 
    public void tick() {
@@ -1300,7 +1343,9 @@ public final class World {
          var10.count = var8;
          var10.dmg = var9;
          var10.spin = this.rnd.nextFloat() * 360.0F;
+         var10.netId = Net319.nextItemId();
          this.items.add(var10);
+         Net319.onDropItem(this, var10);
          return var10;
       } else {
          return null;
@@ -1879,6 +1924,7 @@ public final class World {
       public int dmg;
       public boolean dead;
       public float spin;
+      public long netId;
       /** Update 3.12: an Eye of Ender in flight: it flies from (lx, ly, lz) to above (ax, az) and then drops like any other item. */
       public boolean eye;
       public int eyeT;

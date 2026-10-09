@@ -85,8 +85,9 @@ public final class Renderer {
          this.lod.dispose();
       }
 
-      // Update 3.12: only the Overworld has distant terrain (LOD); the Nether and the End are drawn as far as the view distance goes
-      this.lod = var1 == null || var1.dim != Dim.OVERWORLD ? null : new Lod(this, var1.gen, var1.lodMap);
+      // Update 3.12: only the Overworld has distant terrain (LOD); the Nether, the End, and void modes (Skyblock/Skywars/Bedwars) have open sky/void
+      boolean voidMode = var1 != null && var1.settings != null && var1.settings.isVoidMode();
+      this.lod = var1 == null || var1.dim != Dim.OVERWORLD || voidMode ? null : new Lod(this, var1.gen, var1.lodMap);
    }
 
    public Renderer(Game var1) {
@@ -114,6 +115,15 @@ public final class Renderer {
    public void shutdown() {
       this.meshPool.shutdownNow();
       this.wfx.dispose();
+      if (this.lod != null) {
+         this.lod.dispose();
+      }
+   }
+
+   public static void clearItemGeo() {
+      synchronized (itemGeo) {
+         itemGeo.clear();
+      }
    }
 
    public void onUnload(Chunk var1) {
@@ -671,8 +681,11 @@ public final class Renderer {
       GL11.glViewport(0, 0, var2, var3);
       // Update 3.19: the scene's alpha channel is the glow mask of the light sources (0 everywhere, the terrain pass writes it); nothing else may touch it
       boolean glow = this.shadersOn() && this.sh.sceneActive && this.sh.fxOk && this.g.opt.fx >= 1;
-      this.sh.glowOn = glow;
-      this.sh.fxLevel = this.g.opt.fx;
+      if (this.sh != null) {
+         this.sh.glowOn = glow;
+         this.sh.fxLevel = this.g.opt.fx;
+      }
+
       GL11.glColorMask(true, true, true, true);
       GL11.glClearColor(var41, var42, var43, glow ? 0.0F : 1.0F);
       GL11.glClear(16640);
@@ -709,6 +722,8 @@ public final class Renderer {
          this.drawEndSky();
       }
 
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
       GL11.glEnable(2912);
       GL11.glFogi(2917, 9729);
       GL11.glFogf(2915, var11);
@@ -717,29 +732,6 @@ public final class Renderer {
       float[] var26 = new float[]{var41, var42, var43};
       float[] var27 = new float[]{this.topR, this.topG, this.topB};
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
-      this.sh.sunAtten = this.wfx.sunVis;
-      Perf.mark(Perf.LOD);
-      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
-         GL11.glEnable(2929);
-         GL11.glDepthMask(true);
-         boolean var29 = this.sh.lodOk;
-         if (var29) {
-            boolean var30 = this.shadersOn();
-            if (var30) {
-               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
-            } else {
-               this.sh.setSun(0.0F, 1.0F, 0.0F);
-            }
-
-            this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
-         }
-
-         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
-         if (var29) {
-            this.sh.stopLod();
-         }
-      }
-
       this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.CULL);
       this.vis.clear();
@@ -798,6 +790,15 @@ public final class Renderer {
          } else {
             this.sh.mapValid = false;
          }
+      }
+
+      if (var50 && glow) {
+         // Update 3.19: the shadows of the clouds (a small map, drawn before the terrain that reads it) and the wetness of the world in rain
+         this.sh.wet = this.g.opt.weather ? Math.min(1.0F, this.wfx.rain * 1.15F) * (1.0F - Math.min(1.0F, this.wfx.snowy)) : 0.0F;
+         this.sh.cloudShadows(this.camX, this.camY, this.camZ, this.wfx, skyOn && this.g.opt.clouds, var2, var3);
+      } else if (var50) {
+         this.sh.wet = 0.0F;
+         this.sh.cloudShadows(this.camX, this.camY, this.camZ, this.wfx, false, var2, var3);
       }
 
       Perf.mark(Perf.TERRAIN);
@@ -864,6 +865,33 @@ public final class Renderer {
       }
 
       lightmapUnit(false);
+      Perf.mark(Perf.LOD);
+      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
+         GL11.glEnable(2929);
+         GL11.glDepthMask(true);
+         boolean var29 = this.sh.lodOk;
+         if (var29) {
+            boolean var30 = this.shadersOn();
+            if (var30) {
+               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
+            } else {
+               this.sh.setSun(0.0F, 1.0F, 0.0F);
+            }
+
+            this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
+         }
+
+         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
+         if (var29) {
+            this.sh.stopLod();
+         }
+
+         GL11.glEnable(3008);
+         GL11.glAlphaFunc(516, 0.5F);
+         GL11.glBindTexture(3553, Tex.atlas);
+      }
+
+      this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.ENTITIES);
       // Update 3.11: with shaders on, animals, monsters, items, falling blocks and your own body are lit like the terrain (sun, shade, shadows, torches, fog)
       this.entFogNear = var11;
@@ -987,7 +1015,7 @@ public final class Renderer {
                   for (int var12 = 0; var12 < 16; var12++) {
                      for (int var13 = 0; var13 < 16; var13++) {
                         int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
-                        if (var14 != 0 && Blocks.emit[var14] >= 10) {
+                        if (var14 != 0 && Blocks.emit[var14] >= 7) {
                            float var15 = var10.cx * 16 + var13 + 0.5F;
                            float var16 = var10.cz * 16 + var12 + 0.5F;
                            float var17 = (float)(var15 - this.camX);
@@ -1037,9 +1065,13 @@ public final class Renderer {
    }
 
    static float[] lightColor(int var0) {
-      if (var0 == 25) {
-         return new float[]{1.0F, 0.82F, 0.5F};
-      } else if (Blocks.isLava(var0)) {
+      if (var0 == 25 || var0 == Redstone319.REDSTONE_LAMP_LIT) {
+         return new float[]{1.0F, 0.84F, 0.52F};
+      } else if (var0 == Redstone319.SEA_LANTERN) {
+         return new float[]{0.68F, 0.96F, 1.0F};
+      } else if (var0 == Redstone319.REDSTONE_TORCH) {
+         return new float[]{1.0F, 0.22F, 0.16F};
+      } else if (Blocks.isLava(var0) || var0 == Blocks.MAGMA) {
          return new float[]{1.0F, 0.42F, 0.1F};
       } else if (Blocks.isPortal(var0)) {
          return new float[]{0.62F, 0.3F, 1.0F};
@@ -1135,6 +1167,10 @@ public final class Renderer {
    }
 
    void renderShadowPass(int var1, int var2) {
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(2884);
       this.sh.beginShadow();
       arrays(true);
       GL13.glActiveTexture(33984);
@@ -1707,6 +1743,10 @@ public final class Renderer {
    }
 
    public static void drawBlockModel(int var0, float var1) {
+      if (var0 == Redstone319.PISTON || var0 == Redstone319.STICKY_PISTON || var0 == Redstone319.OBSERVER) {
+         var0++;
+      }
+
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.atlas);
       GL11.glEnable(3008);
@@ -1725,6 +1765,13 @@ public final class Renderer {
             for (int var28 = 0; var28 < 2; var28++) {
                for (int var29 = 0; var29 < 6; var29++) {
                   int var30 = var28 == 0 ? Blocks.tiles[var0][var29] : 2;
+                  if (var28 == 0 && var27.length > 10) {
+                     double ov = var29 == 0 ? var27[9] : (var29 == 1 ? var27[10] : var27[8]);
+                     if (ov >= 0) {
+                        var30 = (int)ov;
+                     }
+                  }
+
                   if (var28 != 1 || var0 == 2 && var29 >= 2) {
                      float var31 = Mesher.SHADE[var29] * var1;
                      float var32 = var31;
@@ -1735,6 +1782,13 @@ public final class Renderer {
                         var32 *= var3[0] / 255.0F;
                         var33 *= var3[1] / 255.0F;
                         var34 *= var3[2] / 255.0F;
+                     }
+
+                     if (var28 == 0 && var27.length > 7 && var27[7] >= 0) {
+                        int c = (int)var27[7];
+                        var32 *= (c >> 16 & 255) / 255.0F;
+                        var33 *= (c >> 8 & 255) / 255.0F;
+                        var34 *= (c & 255) / 255.0F;
                      }
 
                      GL11.glColor3f(var32, var33, var34);
@@ -1811,6 +1865,7 @@ public final class Renderer {
 
    /** Update 3.9: the player's own body (skin, walking, hitting, sneaking) in the third-person views. */
    void drawSelf(float partial) {
+      Net319.drawPeers(this, partial);
       Game g = this.g;
       Player pl = g.player;
       if (g.view == 0 || pl.spectator || pl.dead) {
@@ -2024,6 +2079,12 @@ public final class Renderer {
     * @param swayPitch the hand's lag behind the camera, degrees (already scaled)
     */
    public void renderHand(float partial, Stack item, float swing, float use, float bright, int fbW, int fbH, float equip, float swayPitch, float swayYaw, float bobDist, float bobAmp) {
+      GL11.glDepthMask(true);
+      GL11.glEnable(2929);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(3042);
+      GL11.glDisable(2884);
+      GL11.glColorMask(true, true, true, true);
       GL11.glClear(256);
       GL11.glMatrixMode(5889);
       GL11.glLoadIdentity();
@@ -2034,20 +2095,45 @@ public final class Renderer {
       GL11.glMatrixMode(5888);
       GL11.glLoadIdentity();
       GL11.glDisable(2912);
-      GL11.glEnable(2929);
       float p = 1.0F - equip;
-      if (bobAmp > 0.0F) {
-         // Minecraft's EntityRenderer.applyBobbing: the view (here only the hand) rocks and dips with every step
-         GL11.glTranslatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 0.5F, -Math.abs((float)Math.cos(bobDist * Math.PI) * bobAmp), 0.0F);
-         GL11.glRotatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 3.0F, 0.0F, 0.0F, 1.0F);
-         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.0F, 1.0F, 0.0F, 0.0F);
+      // Smooth equip curve (ease-out)
+      p = p * p * (3.0F - 2.0F * p);
+      // Organic idle breathing + vertical jump/fall inertia + sprint cadence
+      float idleT = (float)Perf.seconds(600.0);
+      float breathX = (float)Math.cos(idleT * 1.15F) * 0.008F;
+      float breathY = (float)Math.sin(idleT * 2.10F) * 0.013F;
+      float breathPitch = (float)Math.cos(idleT * 2.10F) * 1.15F;
+      float breathRoll = (float)Math.sin(idleT * 1.15F) * 0.85F;
+      Player pl = this.g != null ? this.g.player : null;
+      float vyOff = 0.0F;
+      float vyTilt = 0.0F;
+      float sprintPitch = 0.0F;
+      if (pl != null) {
+         vyOff = Math.max(-0.065F, Math.min(0.065F, (float)(-pl.vy * 0.085)));
+         vyTilt = Math.max(-7.5F, Math.min(7.5F, (float)(-pl.vy * 10.5)));
+         if (pl.sprinting && bobAmp > 0.01F) {
+            sprintPitch = -5.5F * Math.min(1.0F, bobAmp * 8.0F);
+         }
       }
 
-      GL11.glRotatef(swayPitch, 1.0F, 0.0F, 0.0F);
-      GL11.glRotatef(swayYaw, 0.0F, 1.0F, 0.0F);
-      boolean entShader = this.shadersOn() && this.sh.entityOk && this.sh.sceneActive;
+      GL11.glTranslatef(breathX, breathY + vyOff, 0.0F);
+      if (bobAmp > 0.0F) {
+         // Minecraft's EntityRenderer.applyBobbing + figure-8 wrist roll
+         float bSin = (float)Math.sin(bobDist * Math.PI);
+         float bCos = (float)Math.cos(bobDist * Math.PI);
+         GL11.glTranslatef(bSin * bobAmp * 0.58F, -Math.abs(bCos * bobAmp) * 1.08F, -Math.abs(bSin * bobAmp) * 0.18F);
+         GL11.glRotatef(bSin * bobAmp * 3.8F, 0.0F, 0.0F, 1.0F);
+         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.6F, 1.0F, 0.0F, 0.0F);
+      }
+
+      float clPitch = Math.max(-14.0F, Math.min(14.0F, swayPitch * 1.35F));
+      float clYaw = Math.max(-16.0F, Math.min(16.0F, swayYaw * 1.35F));
+      GL11.glRotatef(clPitch + breathPitch + vyTilt + sprintPitch, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(clYaw, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef(-clYaw * 0.32F + breathRoll, 0.0F, 0.0F, 1.0F);
+      boolean entShader = this.shadersOn() && this.sh.entityOk;
       if (entShader) {
-         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, this.entFogNear, this.entFogFar, this.entFogCol, this.entShadow, this.lastSky, this.lastBlk);
+         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, 80.0F, 160.0F, this.entFogCol, false, this.lastSky, this.lastBlk);
       }
 
       float s1 = (float)Math.sqrt(swing);
@@ -2069,13 +2155,14 @@ public final class Renderer {
             GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
             GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
          } else {
-            GL11.glTranslatef(-0.4F * (float)Math.sin(s1 * Math.PI), 0.2F * (float)Math.sin(s1 * Math.PI * 2.0), -0.2F * (float)Math.sin(swing * Math.PI));
+            float swArc = (float)Math.sin(s1 * Math.PI);
+            float swSnap = (float)Math.sin(swing * Math.PI);
+            GL11.glTranslatef(-0.42F * swArc, 0.24F * (float)Math.sin(s1 * Math.PI * 2.0), -0.28F * swSnap);
             GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
             float f = (float)Math.sin(swing * swing * Math.PI);
-            GL11.glRotatef(45.0F - f * 20.0F, 0.0F, 1.0F, 0.0F);
-            float f1 = (float)Math.sin(s1 * Math.PI);
-            GL11.glRotatef(f1 * -20.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glRotatef(f1 * -80.0F, 1.0F, 0.0F, 0.0F);
+            GL11.glRotatef(45.0F - f * 24.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(swArc * -24.0F, 0.0F, 0.0F, 1.0F);
+            GL11.glRotatef(swArc * -84.0F, 1.0F, 0.0F, 0.0F);
             GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
          }
 

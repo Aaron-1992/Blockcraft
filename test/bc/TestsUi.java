@@ -17,7 +17,7 @@ import java.util.List;
 final class TestsUi {
    static final int[][] SIZES = {{320, 240}, {343, 240}, {427, 240}, {480, 270}, {515, 360}, {640, 360}, {854, 480}};
    static final String[] SCENES = {
-      "title", "worlds", "worlds-long", "worlds-empty", "newworld", "newworld-flat", "newworld-seed", "newworld-long", "options-0", "options-1", "options-2",
+      "title", "multiplayer", "packs", "mods", "worlds", "worlds-long", "worlds-empty", "newworld", "newworld-flat", "newworld-seed", "newworld-long", "options-0", "options-1", "options-2",
       "options-3", "pause", "loading", "inv-survival", "inv-table", "inv-chest", "inv-furnace", "inv-trade", "inv-creative", "inv-creative-1", "inv-creative-4",
       "inv-search", "inv-search-none", "inv-tip-tool", "inv-tip-ore", "inv-tip-food", "inv-tip-tab"
    };
@@ -213,7 +213,10 @@ final class TestsUi {
       check(find(g, "Back to Game") != null && find(g, "Save and Quit") != null && find(g, "Options") != null && find(g, "Advancements") != null, "the pause menu has its buttons");
       // the title
       g = screen("title");
-      check(find(g, "Singleplayer") != null && find(g, "Options") != null && find(g, "Quit") != null && find(g, "Create New World") != null, "the title has its buttons");
+      check(find(g, "Singleplayer") != null && find(g, "Multiplayer") != null && find(g, "Options") != null && find(g, "Quit") != null, "the title has its buttons");
+      // the multiplayer screen
+      g = screen("multiplayer");
+      check(find(g, "Join Server") != null && find(g, "Join LAN") != null && find(g, "Start Server.bat") != null && find(g, "Host World") != null && find(g, "Back") != null, "the multiplayer screen has its buttons");
    }
 
    static void seeds() throws Exception {

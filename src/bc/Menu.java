@@ -190,10 +190,47 @@ final class Menu {
       this.page = Math.max(0, Math.min(this.pages() - 1, this.page));
    }
 
+   static final ArrayList<String> searchHistory = new ArrayList<>();
+   int searchHistPos = -1;
+
    /** Creative, search tab: a typed character. */
    void typed(char c) {
       if (this.kind == 4 && this.tab == Creative.SEARCH && c >= ' ' && c < 127 && this.search.length() < 24) {
          this.search.append(c);
+         Game.recordHistory(searchHistory, this.search.toString());
+         this.searchHistPos = searchHistory.size();
+         this.page = 0;
+         this.refill();
+      }
+   }
+
+   void pasteSearch(String s) {
+      if (this.kind == 4 && this.tab == Creative.SEARCH && s != null && !s.isEmpty()) {
+         this.search.append(s);
+         Game.recordHistory(searchHistory, this.search.toString());
+         this.searchHistPos = searchHistory.size();
+         this.page = 0;
+         this.refill();
+      }
+   }
+
+   void clearSearch() {
+      if (this.kind == 4 && this.tab == Creative.SEARCH && this.search.length() > 0) {
+         this.search.setLength(0);
+         this.page = 0;
+         this.refill();
+      }
+   }
+
+   void stepSearchHistory(int dir) {
+      if (this.kind == 4 && this.tab == Creative.SEARCH && !searchHistory.isEmpty()) {
+         if (this.searchHistPos < 0 || this.searchHistPos > searchHistory.size()) {
+            this.searchHistPos = searchHistory.size();
+         }
+         int next = Math.max(0, Math.min(searchHistory.size() - 1, this.searchHistPos + dir));
+         this.searchHistPos = next;
+         this.search.setLength(0);
+         this.search.append(searchHistory.get(next));
          this.page = 0;
          this.refill();
       }
