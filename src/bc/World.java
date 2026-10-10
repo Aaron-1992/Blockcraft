@@ -882,22 +882,29 @@ public final class World {
       boolean remoteClientOnly = Net319.isClientConnected() && !Net319.isHosting();
       this.inPassiveTick = true;
       try {
-         int var1 = 0;
+         if (!remoteClientOnly) {
+            int var1 = 0;
 
-         while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
-            for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
-               this.fluidPending.remove(var4);
-               this.fluidUpdate(ux(var4), uy(var4), uz(var4));
-               var1++;
+            while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
+               for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
+                  this.fluidPending.remove(var4);
+                  this.fluidUpdate(ux(var4), uy(var4), uz(var4));
+                  var1++;
+               }
             }
-         }
 
-         int var7 = 0;
+            int var7 = 0;
 
-         while (!this.blockUpdates.isEmpty() && var7++ < 600) {
-            long var8 = (Long)this.blockUpdates.poll();
-            this.blockPending.remove(var8);
-            this.blockUpdate(ux(var8), uy(var8), uz(var8));
+            while (!this.blockUpdates.isEmpty() && var7++ < 600) {
+               long var8 = (Long)this.blockUpdates.poll();
+               this.blockPending.remove(var8);
+               this.blockUpdate(ux(var8), uy(var8), uz(var8));
+            }
+         } else {
+            this.fluidDue.clear();
+            this.fluidPending.clear();
+            this.blockUpdates.clear();
+            this.blockPending.clear();
          }
 
          for (int var9 = 0; var9 < this.fallers.size(); var9++) {
@@ -1656,6 +1663,19 @@ public final class World {
       }
    }
 
+   int cobbleOrSkyblockOre() {
+      if (this.settings != null && this.settings.type == WorldSettings.SKYBLOCK) {
+         int r = this.rnd.nextInt(100);
+         if (r < 12) return Blocks.COAL_ORE;
+         if (r < 19) return Blocks.IRON_ORE;
+         if (r < 22) return Blocks.GOLD_ORE;
+         if (r < 24) return Blocks.REDSTONE_ORE;
+         if (r < 25) return Blocks.LAPIS_ORE;
+         if (r < 26) return Blocks.DIAMOND_ORE;
+      }
+      return 4;
+   }
+
    private void fluidUpdate(int var1, int var2, int var3) {
       int var4 = this.getBlock(var1, var2, var3);
       if (Blocks.isFluid(var4)) {
@@ -1665,7 +1685,7 @@ public final class World {
          int var8 = var5 ? 7 : 3;
          int var9 = var5 ? 5 : 30;
          if (!var5 && this.touchesWater(var1, var2, var3)) {
-            this.setBlock(var1, var2, var3, var6 == 0 ? 26 : 4);
+            this.setBlock(var1, var2, var3, var6 == 0 ? 26 : this.cobbleOrSkyblockOre());
          } else {
             int var10 = this.getBlock(var1, var2 + 1, var3);
             if (var6 > 0) {
@@ -1714,7 +1734,7 @@ public final class World {
                if (!var5 && Blocks.isWater(var17)) {
                   this.setBlock(var1, var2 - 1, var3, 1);
                } else if (var5 && Blocks.isLava(var17)) {
-                  this.setBlock(var1, var2 - 1, var3, Blocks.isLava(var17) && Blocks.fluidLevel(var17) == 0 ? 26 : 4);
+                  this.setBlock(var1, var2 - 1, var3, Blocks.isLava(var17) && Blocks.fluidLevel(var17) == 0 ? 26 : this.cobbleOrSkyblockOre());
                } else {
                   if (!Blocks.isFluid(var17) || Blocks.fluidLevel(var17) != 1) {
                      this.setBlock(var1, var2 - 1, var3, var7 + 1);
@@ -1734,7 +1754,7 @@ public final class World {
                            if (!var5 && Blocks.isWater(var16)) {
                               this.setBlock(var21, var2, var22, 1);
                            } else if (var5 && Blocks.isLava(var16)) {
-                              this.setBlock(var21, var2, var22, Blocks.fluidLevel(var16) == 0 ? 26 : 4);
+                              this.setBlock(var21, var2, var22, Blocks.fluidLevel(var16) == 0 ? 26 : this.cobbleOrSkyblockOre());
                            } else if (!Blocks.isFluid(var16) || !Blocks.sameFluid(var16, var4) || Blocks.fluidLevel(var16) > var18) {
                               this.setBlock(var21, var2, var22, var7 + var18);
                            }

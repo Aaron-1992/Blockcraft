@@ -1668,6 +1668,29 @@ public final class Game {
          return;
       }
 
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.SKYWARS) {
+         int myTeam = SkyGen.getPlayerTeam(this);
+         int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
+         this.player.dead = false;
+         this.player.burn = 0;
+         this.player.health = 20;
+         this.player.food = 20;
+         this.player.sat = 5.0F;
+         this.player.exh = 0.0F;
+         this.player.air = 300;
+         this.player.fallDistance = 0.0F;
+         this.player.invuln = 40;
+         this.deathHandled = false;
+         this.spawnXZ = new int[]{sp[0], sp[2]};
+         this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
+         this.player.yaw = SkyGen.getTeamYaw(myTeam);
+         this.player.pitch = 0.0F;
+         this.player.updateBox();
+         SkyGen.giveSkywarsKit(this, SkyGen.swKit);
+         this.say("§a[Skywars] Respawned at Spawn Island #" + (myTeam + 1) + " with Kit: §e" + SkyGen.SW_KIT_NAMES[SkyGen.swKit] + "§a!");
+         return;
+      }
+
       double[] var1 = null;
       if (this.world.dim != Dim.OVERWORLD) {
          // Update 3.12: whoever dies in the Nether or in the End wakes up at home in the Overworld
@@ -1966,6 +1989,9 @@ public final class Game {
                                  this.equip = 0.0F;
                               }
 
+                              return;
+                           case 71:
+                              Net319.sendWorldPing(this);
                               return;
                            case 76:
                               this.setScreen(Game.S.ADV); // Update 3.12: the advancements
@@ -2380,9 +2406,12 @@ public final class Game {
       recordHistory(this.chatHistory, var1);
       this.chatHistoryPos = this.chatHistory.size();
       if (!var1.startsWith("/")) {
-         this.say("<Player> " + var1);
+         this.say("<" + Net319.selfName + "> " + var1);
          Net319.sendChat(this, var1);
       } else {
+         if (Net319.onNetCommand(this, var1)) {
+            return;
+         }
          String[] var2 = var1.substring(1).split("\\s+");
 
          try {
@@ -3896,6 +3925,7 @@ public final class Game {
       if (this.player.dead && this.screen != Game.S.DEAD) {
          if (!this.deathHandled) {
             this.deathHandled = true;
+            SkyGen.myDeaths++;
             if (!this.player.creative) {
                for (int var7 = 0; var7 < 36; var7++) {
                   if (this.inv[var7] != null) {
@@ -3904,10 +3934,13 @@ public final class Game {
                   }
                }
 
-               for (int var12 = 0; var12 < 4; var12++) {
-                  if (this.armor[var12] != null) {
-                     this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, this.armor[var12].id, this.armor[var12].n, this.armor[var12].dmg);
-                     this.armor[var12] = null;
+               boolean keepBwArmor = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+               if (!keepBwArmor) {
+                  for (int var12 = 0; var12 < 4; var12++) {
+                     if (this.armor[var12] != null) {
+                        this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, this.armor[var12].id, this.armor[var12].n, this.armor[var12].dmg);
+                        this.armor[var12] = null;
+                     }
                   }
                }
             }
@@ -4406,9 +4439,18 @@ public final class Game {
    }
 
    void attackMob(Mob var1) {
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         if (var1.teamTag != null && var1.teamTag.equals("Team:" + SkyGen.BEDWARS_NAMES[SkyGen.getPlayerTeam(this)])) {
+            this.say("§c[Bedwars] That is your own team's Defender!");
+            return;
+         }
+      }
       int var2 = this.heldId();
       boolean var3 = Items.isTool(var2);
       float var4 = var3 ? Items.attackDamage(var2) : 1.0F;
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamSharpness(SkyGen.getPlayerTeam(this))) {
+         var4 += 2.0F;
+      }
       float var5 = 4.0F;
       if (var3) {
          int var6 = Items.toolClass(var2);
@@ -5018,6 +5060,10 @@ public final class Game {
          return !this.player.adventure && Mobs312.throwPearl(this, var1);
       }
 
+      if (var2 == Items.BLAZE_ROD && (this.player.creative || (this.world != null && this.world.settings != null && this.world.settings.isMinigame()))) {
+         return Mobs312.throwFireball(this, var1);
+      }
+
       if (var2 == Items.EYE_OF_ENDER) {
          boolean thrown = EndPortals.throwEye(this, var1);
          if (thrown) {
@@ -5460,9 +5506,9 @@ public final class Game {
                   return false;
                }
 
-               if (var2 == Blocks.TNT && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+               if (var2 == Blocks.TNT && this.world.settings != null && this.world.settings.isMinigame()) {
                   this.world.setBlock(var3, var4, var5, 0);
-                  this.world.primeTnt(var3, var4, var5, 60);
+                  this.world.primeTnt(var3, var4, var5, 55);
                }
 
                if (tallPlant) {
@@ -5765,6 +5811,8 @@ public final class Game {
          && this.world.settings.type == WorldSettings.BEDWARS
          && !SkyGen.isTeamBedIntact(this.world, SkyGen.getPlayerTeam(this));
       this.gui.centered(hc ? "Game Over!" : (bwEliminated ? "ELIMINATED!" : "You died!"), var1, 40.0F, -1, true, 3.0F);
+      long daysLived = this.world != null ? (this.world.dayTime / 24000L + 1L) : 1L;
+      this.gui.centered("§7Day " + daysLived + "  |  Kills: §e" + SkyGen.myKills + "  §7|  Deaths: §c" + Math.max(1, SkyGen.myDeaths), var1, 63.0F, -1, true, 1.0F);
       if (hc) {
          this.gui.centered("\u00a7cYou cannot respawn in Hardcore Mode!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
          this.button("Spectate World", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
@@ -6073,10 +6121,20 @@ public final class Game {
          this.drawHotbar();
          if (this.player.spectator) {
             this.drawSpectatorHud();
+         } else if (this.player.adventure && this.target != null && this.world != null && this.screen == Game.S.PLAY) {
+            int tbid = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+            if (tbid > 0) {
+               boolean canBrk = Items.canAdventureBreak(this.heldId(), tbid);
+               String advHint = (canBrk ? "§a[Can Break: " : "§c[Need Tool: ") + Items.name(tbid) + "]";
+               this.gui.centered(advHint, this.gui.w / 2.0F, this.gui.h - 48.0F, 0xFFFFFFFF, true, 1.0F);
+            }
          }
          SkyGen.drawModeHud(this);
          this.drawBossBar();
          this.adv.drawToast(this);
+         if (this.window != 0L && this.screen == Game.S.PLAY && GLFW.glfwGetKey(this.window, 258) == 1) {
+            Net319.drawTabOverlay(this);
+         }
          String wm = ModLoader.hudWatermark();
          if (wm != null && !this.debug) {
             this.gui.text(wm, 4.0F, 4.0F, 0xFFFFFFFF, true, 1.0F);
@@ -6132,6 +6190,9 @@ public final class Game {
       if (!this.player.creative && !this.player.dead && this.player.invuln <= 0) {
          if (this.player.hardcore) {
             var1 = Math.max(1, (var1 * 3 + 1) / 2);
+         }
+         if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamProtection(SkyGen.getPlayerTeam(this))) {
+            var1 = Math.max(1, Math.round(var1 * 0.8F));
          }
          int var6 = this.armorPoints();
          float var7 = Math.min(20.0F, Math.max(var6 / 5.0F, var6 - var1 / 2.0F)) / 25.0F;

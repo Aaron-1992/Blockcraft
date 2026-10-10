@@ -16,6 +16,26 @@ public final class SkyGen extends Gen {
    public static volatile int lobbyCountdownTicks = -1;
    public static volatile int myTeam = 0;
    public static volatile boolean soloBots = true;
+   public static volatile int swKit = 0;
+   public static volatile int myKills = 0;
+   public static volatile int myDeaths = 0;
+
+   // Skywars Starter Kits
+   public static final String[] SW_KIT_NAMES = new String[]{"Knight", "Archer", "Pyro", "Enderman"};
+   public static final String[] SW_KIT_DESC = new String[]{
+      "Stone Sword + Chain Chestplate + 16 Planks",
+      "Bow + 16 Arrows + Leather Tunic + 16 Cobble",
+      "Iron Axe + 4 Auto-TNT + 2 Fireballs + 16 Bricks",
+      "2 Ender Pearls + Iron Boots + 24 Planks"
+   };
+
+   // Bedwars Team Upgrades bitmask per team (0..3)
+   public static final int UPG_SHARPNESS = 1;
+   public static final int UPG_PROTECTION = 2;
+   public static final int UPG_FORGE = 4;
+   public static final int UPG_HEAL_POOL = 8;
+   public static final int[] teamUpgrades = new int[4];
+   private static final int[] trapCooldown = new int[4];
 
    // 8 Skywars spawn island centers (radius 42)
    public static final int[][] SKYWARS_SPAWNS = new int[][]{
@@ -73,7 +93,123 @@ public final class SkyGen extends Gen {
       Arrays.fill(bwBaseStocked, false);
       bedwarsWon = false;
       Arrays.fill(bedKnownIntact, true);
+      Arrays.fill(teamUpgrades, 0);
+      Arrays.fill(trapCooldown, 0);
+      myKills = 0;
+      myDeaths = 0;
       lobbyCountdownTicks = -1;
+   }
+
+   public static boolean hasTeamSharpness(int team) {
+      return (teamUpgrades[Math.abs(team) & 3] & UPG_SHARPNESS) != 0;
+   }
+
+   public static boolean hasTeamProtection(int team) {
+      return (teamUpgrades[Math.abs(team) & 3] & UPG_PROTECTION) != 0;
+   }
+
+   public static boolean hasTeamForge(int team) {
+      return (teamUpgrades[Math.abs(team) & 3] & UPG_FORGE) != 0;
+   }
+
+   public static boolean hasTeamHealPool(int team) {
+      return (teamUpgrades[Math.abs(team) & 3] & UPG_HEAL_POOL) != 0;
+   }
+
+   public static void setTeamUpgradeMask(Game g, int team, int mask, String msg) {
+      int t = Math.abs(team) & 3;
+      teamUpgrades[t] = mask;
+      if (g != null && msg != null && !msg.isEmpty()) {
+         g.say(msg);
+      }
+   }
+
+   public static boolean unlockNextTeamUpgrade(Game g, int team, boolean broadcast) {
+      int t = Math.abs(team) & 3;
+      int cur = teamUpgrades[t];
+      int nextBit;
+      String upgName;
+      if ((cur & UPG_SHARPNESS) == 0) {
+         nextBit = UPG_SHARPNESS;
+         upgName = "Sharpened Swords (+2 Melee Damage)";
+      } else if ((cur & UPG_PROTECTION) == 0) {
+         nextBit = UPG_PROTECTION;
+         upgName = "Reinforced Armor (+20% Team Defense)";
+      } else if ((cur & UPG_FORGE) == 0) {
+         nextBit = UPG_FORGE;
+         upgName = "Emerald Forge (2x Base Generator Speed)";
+      } else if ((cur & UPG_HEAL_POOL) == 0) {
+         nextBit = UPG_HEAL_POOL;
+         upgName = "Heal Pool & Bed Alarm Trap";
+      } else {
+         if (g != null) {
+            g.say("\u00a76[Bedwars] Your team already has ALL Team Upgrades unlocked!");
+         }
+         return false;
+      }
+      int newMask = cur | nextBit;
+      String msg = "\u00a7b\u00a7l[Team Upgrade] " + BEDWARS_CODES[t] + BEDWARS_NAMES[t] + " Team \u00a7eunlocked \u00a7a" + upgName + "\u00a7e!";
+      setTeamUpgradeMask(g, t, newMask, msg);
+      if (broadcast && Net319.isActive()) {
+         Net319.sendTeamUpgrade(t, newMask, upgName);
+      }
+      return true;
+   }
+
+   public static void giveSkywarsKit(Game g, int kit) {
+      if (g == null) {
+         return;
+      }
+      int k = Math.abs(kit) & 3;
+      swKit = k;
+      Arrays.fill(g.inv, null);
+      Arrays.fill(g.armor, null);
+      switch (k) {
+         case 0 -> { // Knight
+            g.inv[0] = new Stack(Items.toolId(1, Items.C_SWORD), 1);
+            g.inv[1] = new Stack(Blocks.PLANKS, 16);
+            g.inv[2] = new Stack(Items.STEAK, 4);
+            g.armor[1] = new Stack(Items.armorId(1, 1), 1);
+         }
+         case 1 -> { // Archer
+            g.inv[0] = new Stack(Items.BOW, 1);
+            g.inv[1] = new Stack(Items.ARROW, 16);
+            g.inv[2] = new Stack(Blocks.COBBLE, 16);
+            g.inv[3] = new Stack(Items.STEAK, 4);
+            g.armor[1] = new Stack(Items.armorId(0, 1), 1);
+         }
+         case 2 -> { // Pyro
+            g.inv[0] = new Stack(Items.toolId(2, Items.C_AXE), 1);
+            g.inv[1] = new Stack(Blocks.TNT, 4);
+            g.inv[2] = new Stack(Items.BLAZE_ROD, 2);
+            g.inv[3] = new Stack(Blocks.STONEBRICK, 16);
+            g.armor[0] = new Stack(Items.armorId(2, 0), 1);
+         }
+         default -> { // Enderman
+            g.inv[0] = new Stack(Items.toolId(1, Items.C_SWORD), 1);
+            g.inv[1] = new Stack(Items.ENDER_PEARL, 2);
+            g.inv[2] = new Stack(Blocks.PLANKS, 24);
+            g.armor[3] = new Stack(Items.armorId(1, 3), 1);
+         }
+      }
+      g.sel = 0;
+   }
+
+   public static void onArenaKill(Game g, String victimName) {
+      myKills++;
+      if (g == null || g.world == null || g.world.settings == null || g.player == null) {
+         return;
+      }
+      int type = g.world.settings.type;
+      String who = (victimName == null || victimName.isEmpty()) ? "an opponent" : victimName;
+      if (type == WorldSettings.SKYWARS) {
+         g.player.health = Math.min(20, g.player.health + 6);
+         g.say("\u00a7d\u00a7l[Skywars Perk] \u00a7aBulldozer! +6 HP for eliminating \u00a7f" + who + "\u00a7a! (Kills: " + myKills + ")");
+      } else if (type == WorldSettings.BEDWARS) {
+         g.addItem(new Stack(Items.IRON_INGOT, 6));
+         g.addItem(new Stack(Items.GOLD_INGOT, 2));
+         g.say("\u00a7e\u00a7l[Bedwars Bounty] \u00a7aEliminated \u00a7f" + who + "\u00a7a! (+6 Iron, +2 Gold | Kills: " + myKills + ")");
+      }
    }
 
    public static int getPlayerTeam(Game g) {
@@ -174,6 +310,11 @@ public final class SkyGen extends Gen {
       if (g.armor[1] == null) {
          g.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
       }
+      for (int i = 0; i < 4; i++) {
+         if (g.armor[i] != null) {
+            g.armor[i].dmg = 0;
+         }
+      }
       g.sel = 0;
    }
 
@@ -205,6 +346,7 @@ public final class SkyGen extends Gen {
                g.player.pitch = 0.0F;
                g.player.updateBox();
             }
+            giveSkywarsKit(g, swKit);
          }
       }
       if (broadcast) {
@@ -951,7 +1093,10 @@ public final class SkyGen extends Gen {
                }
                // Only spawn AI Defender Guards on unoccupied enemy bases when soloBots is enabled and not in Multiplayer
                if (soloBots && !Net319.isActive() && t != getPlayerTeam(g)) {
-                  g.mobs.spawn(t % 2 == 1 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5, Y_DECK + 1.0, bz + 0.5);
+                  Mobs.Mob guard = g.mobs.spawn(t % 2 == 1 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5, Y_DECK + 1.0, bz + 0.5);
+                  if (guard != null) {
+                     guard.teamTag = "Team:" + BEDWARS_NAMES[t];
+                  }
                }
             }
          }
@@ -1068,10 +1213,23 @@ public final class SkyGen extends Gen {
       // 3. BEDWARS: stock team bases, resource generators, bed destruction alerts & victory check
       if (type == WorldSettings.BEDWARS) {
          stockBedwarsWorld(g, w);
+         long dPeriod = w.tickCount >= 9600L ? 150L : (w.tickCount >= 2400L ? 200L : 300L);
+         long ePeriod = w.tickCount >= 9600L ? 250L : (w.tickCount >= 4800L ? 340L : 500L);
+         if (g != null && w.tickCount == 2400L) {
+            g.say("\u00a7b\u00a7l[Bedwars] Diamond Generators upgraded to Tier II!");
+         } else if (g != null && w.tickCount == 4800L) {
+            g.say("\u00a72\u00a7l[Bedwars] Emerald Generators upgraded to Tier II!");
+         } else if (g != null && w.tickCount == 9600L) {
+            g.say("\u00a76\u00a7l[Bedwars] All Generators reached MAX OVERDRIVE (2x Speed)!");
+         }
          // Only the authoritative instance (Singleplayer or Host) spawns generator item drops to prevent network duplication
          if (!Net319.isConnected()) {
-            if (w.tickCount % 60L == 0L) {
+            if (w.tickCount % 30L == 0L) {
                for (int t = 0; t < 4; t++) {
+                  boolean forge = hasTeamForge(t);
+                  if (!forge && w.tickCount % 60L != 0L) {
+                     continue;
+                  }
                   int bx = BEDWARS_BASES[t][0];
                   int bz = BEDWARS_BASES[t][1];
                   int dirX = Integer.compare(0, bx);
@@ -1080,21 +1238,27 @@ public final class SkyGen extends Gen {
                   double gz = bz - dirZ * 4 + 0.5;
                   if (w.chunkAt((int)gx, (int)gz) != null) {
                      dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Items.IRON_INGOT, 1, 48);
-                     dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Blocks.WOOL0 + BEDWARS_COLORS[t], 4, 64);
-                     if (w.tickCount % 180L == 0L) {
+                     if (w.tickCount % 60L == 0L) {
+                        dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Blocks.WOOL0 + BEDWARS_COLORS[t], 4, 64);
+                     }
+                     long gInt = forge ? 90L : 180L;
+                     if (w.tickCount % gInt == 0L) {
                         dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Items.GOLD_INGOT, 1, 16);
+                     }
+                     if (forge && w.tickCount % 480L == 0L) {
+                        dropGeneratorItemCapped(w, gx, Y_DECK + 1.2, gz, Items.EMERALD, 1, 6);
                      }
                   }
                }
             }
-            if (w.tickCount % 300L == 0L) {
+            if (w.tickCount > 0L && w.tickCount % dPeriod == 0L) {
                for (int[] d : BEDWARS_DIAMONDS) {
                   if (w.chunkAt(d[0], d[1]) != null) {
                      dropGeneratorItemCapped(w, d[0] + 0.5, Y_DECK + 1.2, d[1] + 0.5, Items.DIAMOND, 1, 8);
                   }
                }
             }
-            if (w.tickCount % 500L == 0L) {
+            if (w.tickCount > 0L && w.tickCount % ePeriod == 0L) {
                if (w.chunkAt(0, 0) != null) {
                   dropGeneratorItemCapped(w, -3.5, Y_DECK + 1.2, 0.5, Items.EMERALD, 1, 8);
                   dropGeneratorItemCapped(w, 4.5, Y_DECK + 1.2, 0.5, Items.EMERALD, 1, 8);
@@ -1104,6 +1268,22 @@ public final class SkyGen extends Gen {
 
          if (g != null && g.player != null && w.tickCount % 20L == 0L) {
             int my = getPlayerTeam(g);
+            // Heal Pool & Bed Alarm Trap check for player's team
+            if (hasTeamHealPool(my) && !g.player.dead && !g.player.spectator) {
+               double distBase = Math.hypot(g.player.x - BEDWARS_BASES[my][0], g.player.z - BEDWARS_BASES[my][1]);
+               if (distBase <= 11.0 && w.tickCount % 60L == 0L && g.player.health < 20) {
+                  g.player.health = Math.min(20, g.player.health + 1);
+               }
+               if (trapCooldown[my] > 0) {
+                  trapCooldown[my]--;
+               } else if (isTeamBedIntact(w, my)) {
+                  int[] bf = getTeamBedFoot(my);
+                  if (Net319.enemyPeerNear(w, my, bf[0] + 0.5, bf[1], bf[2] + 0.5, 7.5)) {
+                     trapCooldown[my] = 15;
+                     g.say("\u00a7c\u00a7l[ALARM TRAP] \u00a7eAn enemy player has entered your Bed courtyard!");
+                  }
+               }
+            }
             int enemyBeds = 0;
             for (int t = 0; t < 4; t++) {
                boolean intact = isTeamBedIntact(w, t);
@@ -1207,13 +1387,25 @@ public final class SkyGen extends Gen {
          return true;
       }
       if (c.equals("/sb") || c.equals("/challenges")) {
+         String sub = args.length > 1 ? args[1].toLowerCase() : "";
+         if (sub.equals("home") && g.player != null) {
+            g.player.setPos(0.5, Y_DECK + 1.0, 0.5);
+            g.player.fallDistance = 0.0F;
+            g.player.updateBox();
+            g.say("\u00a7a[Skyblock] Teleported to Starter Island (0, 65, 0)!");
+            return true;
+         }
+         if (sub.equals("islands")) {
+            g.say("\u00a7b[Skyblock Islands]: \u00a7fStarter (0,0) | East Desert (48,0) | West Nether (-48,0) | North Snowy (0,-48) | South Jungle (0,48)");
+            return true;
+         }
          int done = 0;
          for (boolean b : sbQuestDone) {
             if (b) {
                done++;
             }
          }
-         g.say("\u00a7b[Skyblock Quests] (" + done + "/" + SB_QUEST_NAMES.length + " completed):");
+         g.say("\u00a7b[Skyblock Quests] (" + done + "/" + SB_QUEST_NAMES.length + " completed | /sb home | /sb islands):");
          for (int i = 0; i < SB_QUEST_NAMES.length; i++) {
             g.say((sbQuestDone[i] ? " \u00a7a\u2714 " : " \u00a77\u25cb ") + SB_QUEST_NAMES[i]);
          }
@@ -1221,6 +1413,13 @@ public final class SkyGen extends Gen {
       }
       if (c.equals("/sw")) {
          String sub = args.length > 1 ? args[1].toLowerCase() : "status";
+         if (sub.equals("kit") && args.length > 2) {
+            String kn = args[2].toLowerCase();
+            int k = kn.startsWith("a") || kn.equals("1") ? 1 : (kn.startsWith("p") || kn.equals("2") ? 2 : (kn.startsWith("e") || kn.equals("3") ? 3 : 0));
+            giveSkywarsKit(g, k);
+            g.say("\u00a76[Skywars] Selected Kit: \u00a7e" + SW_KIT_NAMES[k] + " \u00a77(" + SW_KIT_DESC[k] + ")");
+            return true;
+         }
          if (sub.equals("refill")) {
             stockSkywarsChests(g, g.world, true);
             g.say("\u00a7b[Skywars] All chests refilled!");
@@ -1233,7 +1432,7 @@ public final class SkyGen extends Gen {
             g.setScreen(Game.S.WAITING);
          } else {
             long rem = (3600L - (g.world.tickCount % 3600L)) / 20L;
-            g.say("\u00a7b[Skywars] Opponents remaining: " + (countHostiles(g) + Net319.aliveEnemyPeers(-1)) + " | Next chest refill in " + rem + "s (/sw refill | /sw reset)");
+            g.say("\u00a7b[Skywars] Kit: " + SW_KIT_NAMES[swKit & 3] + " | Kills: " + myKills + " | Opponents: " + (countHostiles(g) + Net319.aliveEnemyPeers(-1)) + " | Refill in " + rem + "s (/sw kit <knight|archer|pyro|enderman> | /sw reset)");
          }
          return true;
       }
@@ -1247,6 +1446,17 @@ public final class SkyGen extends Gen {
          if (sub.equals("upgrades")) {
             g.menu = new Menu(g, Menu.TRADE, null, Trades.BEDWARS_ARMOR);
             g.setScreen(Game.S.INV);
+            return true;
+         }
+         if (sub.equals("upgrade")) {
+            int my = getPlayerTeam(g);
+            if (g.player != null && (g.player.creative || g.countItem(Items.DIAMOND) >= 4)) {
+               if (unlockNextTeamUpgrade(g, my, true) && !g.player.creative) {
+                  g.removeItems(Items.DIAMOND, 4);
+               }
+            } else {
+               g.say("\u00a7c[Bedwars] Need 4 Diamonds to unlock the next Team Upgrade! (Or buy from Upgrades Shopkeeper)");
+            }
             return true;
          }
          if (sub.equals("team") && args.length > 2) {
@@ -1271,7 +1481,7 @@ public final class SkyGen extends Gen {
          for (int t = 0; t < 4; t++) {
             sb.append(BEDWARS_CODES[t]).append(BEDWARS_NAMES[t]).append(isTeamBedIntact(g.world, t) ? ":\u00a7aBED " : ":\u00a7cOUT ");
          }
-         sb.append("\u00a77(/bw shop | /bw upgrades | /bw team <red|blue|green|yellow> | /bw reset)");
+         sb.append("\u00a77(/bw shop | /bw upgrades | /bw upgrade | /bw team <red|blue|green|yellow> | /bw reset)");
          g.say(sb.toString());
          return true;
       }
@@ -1306,25 +1516,37 @@ public final class SkyGen extends Gen {
          } else {
             lines.add("\u00a76All Quests Complete!");
          }
-         lines.add("\u00a77Type /sb for quest list");
+         lines.add("\u00a77/sb | /sb home | /sb islands");
       } else if (type == WorldSettings.SKYWARS) {
          long rem = (3600L - (g.world.tickCount % 3600L)) / 20L;
          int raiders = countHostiles(g) + Net319.aliveEnemyPeers(-1);
-         lines.add("\u00a76\u00a7lSKYWARS");
-         lines.add("\u00a7fOpponents: " + (raiders > 0 ? "\u00a7c" + raiders : "\u00a7a0 (VICTORY!)"));
+         lines.add("\u00a76\u00a7lSKYWARS \u00a77(" + SW_KIT_NAMES[swKit & 3] + ")");
+         lines.add("\u00a7fOpponents: " + (raiders > 0 ? "\u00a7c" + raiders : "\u00a7a0 (VICTORY!)") + " \u00a77| Kills: \u00a7e" + myKills);
          lines.add(String.format("\u00a7fChest Refill: \u00a7b%d:%02d", rem / 60L, rem % 60L));
-         lines.add("\u00a77/sw refill | /sw reset");
+         lines.add("\u00a77/sw kit | /sw reset");
       } else if (type == WorldSettings.BEDWARS) {
          int my = getPlayerTeam(g);
-         long dRem = (300L - (g.world.tickCount % 300L)) / 20L;
-         long eRem = (500L - (g.world.tickCount % 500L)) / 20L;
-         lines.add("\u00a7e\u00a7lBEDWARS");
+         long dPeriod = g.world.tickCount >= 9600L ? 150L : (g.world.tickCount >= 2400L ? 200L : 300L);
+         long ePeriod = g.world.tickCount >= 9600L ? 250L : (g.world.tickCount >= 4800L ? 340L : 500L);
+         long dRem = (dPeriod - (g.world.tickCount % dPeriod)) / 20L;
+         long eRem = (ePeriod - (g.world.tickCount % ePeriod)) / 20L;
+         String tierStr = g.world.tickCount >= 9600L ? "Max" : (g.world.tickCount >= 4800L ? "Em II" : (g.world.tickCount >= 2400L ? "Dia II" : "Tier I"));
+         lines.add("\u00a7e\u00a7lBEDWARS \u00a77(" + tierStr + ")");
          for (int t = 0; t < 4; t++) {
             boolean bed = isTeamBedIntact(g.world, t);
             lines.add(BEDWARS_CODES[t] + "[" + BEDWARS_NAMES[t].charAt(0) + "] " + BEDWARS_NAMES[t] + ": " + (bed ? "\u00a7aBED \u2714" : "\u00a7cBROKEN \u2718") + (t == my ? " \u00a77(You)" : ""));
          }
-         lines.add("\u00a7bDiamond: " + dRem + "s \u00a72Emerald: " + eRem + "s");
-         lines.add("\u00a77/shop | /upgrades");
+         lines.add("\u00a7bDia: " + dRem + "s \u00a72Em: " + eRem + "s \u00a7eKills: " + myKills);
+         int u = teamUpgrades[my];
+         if (u != 0) {
+            StringBuilder usb = new StringBuilder("\u00a7dUpg:");
+            if ((u & UPG_SHARPNESS) != 0) usb.append(" Sharp");
+            if ((u & UPG_PROTECTION) != 0) usb.append(" Prot");
+            if ((u & UPG_FORGE) != 0) usb.append(" Forge");
+            if ((u & UPG_HEAL_POOL) != 0) usb.append(" Pool");
+            lines.add(usb.toString());
+         }
+         lines.add("\u00a77/shop | /upgrades | Tab");
       }
 
       if (lines.isEmpty()) {

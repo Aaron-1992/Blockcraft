@@ -176,9 +176,9 @@ final class Screens {
                Net319.disconnect(g);
                Net319.statusText = "Disconnected.";
             });
-         ui.button("Reset Port", x1, by4, colW, 20.0F, true,
-            "Reset server address to default localhost (127.0.0.1:25565).",
-            () -> Net319.serverAddr = "127.0.0.1:25565");
+         ui.button("Nick: " + Net319.displayNick(), x1, by4, colW, 20.0F, true,
+            "Cycle your Multiplayer Nickname (or use /nick <name> in-game).",
+            Net319::cyclePresetNick);
       }
 
       float bw = Math.min(200.0F, pw);
@@ -1001,12 +1001,23 @@ final class Screens {
          });
 
       float by2 = by1 + 24.0F;
-      ui.button("Solo Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, by2, colW, 20.0F, true,
-         "When ON in solo play, unoccupied enemy bases spawn AI defenders/raiders.",
-         () -> {
-            SkyGen.soloBots = !SkyGen.soloBots;
-            ui.say("Solo AI Bots: " + (SkyGen.soloBots ? "ON" : "OFF"));
-         });
+      if (isBedwars) {
+         ui.button("Solo Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, by2, colW, 20.0F, true,
+            "When ON in solo play, unoccupied enemy bases spawn AI defenders/raiders.",
+            () -> {
+               SkyGen.soloBots = !SkyGen.soloBots;
+               ui.say("Solo AI Bots: " + (SkyGen.soloBots ? "ON" : "OFF"));
+            });
+      } else {
+         String kitName = SkyGen.SW_KIT_NAMES[SkyGen.swKit & 3];
+         ui.button("Kit: " + kitName, ix, by2, colW, 20.0F, true,
+            "Select your Skywars Starter Kit (" + SkyGen.SW_KIT_DESC[SkyGen.swKit & 3] + ").",
+            () -> {
+               int nextKit = (SkyGen.swKit + 1) & 3;
+               SkyGen.giveSkywarsKit(g, nextKit);
+               ui.say("Kit: " + SkyGen.SW_KIT_NAMES[nextKit] + " (" + SkyGen.SW_KIT_DESC[nextKit] + ")");
+            });
+      }
       ui.button("Copy Share Code", x1, by2, colW, 20.0F, true,
          "Copy the Share Code (includes Radmin VPN, LAN, and Worldwide Tunnel endpoints).",
          () -> {

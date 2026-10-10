@@ -813,6 +813,63 @@ final class Tests319 {
             Net319.disconnect(bwGame);
          }
          check(Net319.editsForDim(Dim.OVERWORLD).isEmpty(), "Disconnecting clears all multiplayer block edits so they never leak to other worlds");
+
+         // 9. V4.1+ Gamemodes & Multiplayer Polish: Bedwars Team Upgrades, Fireballs, Skywars Kits, Skyblock Ore Generator, Nicknames, Pings & Tab Scoreboard
+         SkyGen.resetMatchState();
+         SkyGen.selectTeam(bwGame, 0, false); // Red Team
+         check(!SkyGen.hasTeamSharpness(0) && !SkyGen.hasTeamProtection(0), "Red Team starts with no team upgrades");
+         check(SkyGen.unlockNextTeamUpgrade(bwGame, 0, false), "Unlock 1st team upgrade (Sharpness)");
+         check(SkyGen.hasTeamSharpness(0), "Red Team has Sharpness I");
+         check(SkyGen.unlockNextTeamUpgrade(bwGame, 0, false), "Unlock 2nd team upgrade (Protection)");
+         check(SkyGen.hasTeamProtection(0), "Red Team has Reinforced Armor I");
+         check(SkyGen.unlockNextTeamUpgrade(bwGame, 0, false), "Unlock 3rd team upgrade (Emerald Forge)");
+         check(SkyGen.hasTeamForge(0), "Red Team has Emerald Forge");
+         check(SkyGen.unlockNextTeamUpgrade(bwGame, 0, false), "Unlock 4th team upgrade (Heal Pool & Bed Trap)");
+         check(SkyGen.hasTeamHealPool(0), "Red Team has Heal Pool & Alarm Trap");
+
+         // Verify Bedwars Fireball throwing (Items.BLAZE_ROD)
+         int fbBefore = bwGame.mobs.fireballs.size();
+         bwGame.inv[0] = new Stack(Items.BLAZE_ROD, 2);
+         bwGame.sel = 0;
+         check(Mobs312.throwFireball(bwGame, bwGame.inv[0]), "Throwing a Bedwars Fireball succeeds");
+         eq(fbBefore + 1, bwGame.mobs.fireballs.size(), "Fireball projectile spawned in world");
+         eq(1, bwGame.inv[0].n, "Throwing a Fireball consumes 1 Blaze Rod");
+
+         // Verify Skywars Starter Kits & Bulldozer Kill Perk
+         for (int k = 0; k < 4; k++) {
+            SkyGen.giveSkywarsKit(bwGame, k);
+            eq(k, SkyGen.swKit, "Skywars kit index set to " + k);
+            check(bwGame.inv[0] != null && bwGame.inv[0].n > 0, "Skywars kit " + SkyGen.SW_KIT_NAMES[k] + " grants primary item");
+         }
+         int kills0 = SkyGen.myKills;
+         SkyGen.onArenaKill(bwGame, "TestBot");
+         eq(kills0 + 1, SkyGen.myKills, "onArenaKill increments player kill counter");
+
+         // Verify Skyblock Ore-Generating Cobblestone Generator
+         World sbWorld = new World(12345L, null, Dim.OVERWORLD, sbWs);
+         boolean sawCobble = false;
+         boolean sawOre = false;
+         for (int i = 0; i < 200; i++) {
+            int genId = sbWorld.cobbleOrSkyblockOre();
+            if (genId == Blocks.COBBLE) sawCobble = true;
+            if (genId == Blocks.COAL_ORE || genId == Blocks.IRON_ORE || genId == Blocks.GOLD_ORE || genId == Blocks.DIAMOND_ORE || genId == Blocks.REDSTONE_ORE || genId == Blocks.LAPIS_ORE) {
+               sawOre = true;
+            }
+         }
+         check(sawCobble && sawOre, "Skyblock cobblestone generator produces both cobblestone and ores");
+         sbWorld.shutdown();
+
+         // Verify Multiplayer /nick, /ping, rich POSE, and Tab Scoreboard rendering
+         bwGame.runCommand("/nick ArenaChamp");
+         eq("ArenaChamp", Net319.selfName, "/nick updates player multiplayer nickname");
+         String richPose = Net319.formatLocalPose(bwGame);
+         check(richPose.startsWith("POSE ") && richPose.split("\\s+").length >= 21, "formatLocalPose includes 21 tokens (health, armor, mode, ping, kills, deaths, team)");
+         Net319.sendWorldPing(bwGame);
+         GuiRaster tabGr = new GuiRaster(854, 480);
+         bwGame.gui = tabGr;
+         tabGr.begin(854, 480, 2);
+         Net319.drawTabOverlay(bwGame);
+         check(tabGr.textExtent[2] > tabGr.textExtent[0], "Tab Scoreboard overlay renders panels and player stats");
       });
    }
 }

@@ -66,23 +66,25 @@ final class Trades {
             return new Trade[]{t(Items.COAL, 16, e, 1), t(Items.IRON_INGOT, 4, e, 1), t(e, 5, Items.toolId(2, Items.C_AXE), 1), t(e, 7, Items.toolId(2, Items.C_SWORD), 1), t(e, 9, Items.armorId(1, 1), 1), t(e, 13, Items.toolId(4, Items.C_PICK), 1)};
          case BUTCHER:
             return new Trade[]{t(Items.RAW_PORK, 14, e, 1), t(Items.RAW_CHICKEN, 14, e, 1), t(Items.RAW_BEEF, 10, e, 1), t(e, 1, Items.COOKED_PORK, 5), t(e, 1, Items.COOKED_CHICKEN, 4), t(e, 2, Items.STEAK, 4)};
-         case BEDWARS_SHOP:
+         case BEDWARS_SHOP: {
+            int woolColor = SkyGen.BEDWARS_COLORS[Math.abs(SkyGen.myTeam) & 3];
             return new Trade[]{
-               t(Items.IRON_INGOT, 4, Blocks.WOOL0 + 14, 16),
+               t(Items.IRON_INGOT, 4, Blocks.WOOL0 + woolColor, 16),
                t(Items.IRON_INGOT, 12, Blocks.SANDSTONE, 16),
                t(Items.IRON_INGOT, 10, Items.toolId(1, Items.C_SWORD), 1),
                t(Items.GOLD_INGOT, 6, Items.toolId(2, Items.C_SWORD), 1),
-               t(Items.GOLD_INGOT, 4, Blocks.TNT, 1),
+               t(Items.GOLD_INGOT, 3, Items.BLAZE_ROD, 1),
                t(Items.EMERALD, 4, Items.toolId(4, Items.C_SWORD), 1)
             };
+         }
          case BEDWARS_ARMOR:
             return new Trade[]{
-               t(Items.IRON_INGOT, 24, Items.armorId(1, 1), 1),
-               t(Items.GOLD_INGOT, 12, Items.BOW, 1),
+               t(Items.IRON_INGOT, 20, Items.armorId(1, 1), 1),
+               t(Items.GOLD_INGOT, 4, Blocks.TNT, 2),
+               t(Items.GOLD_INGOT, 10, Items.BOW, 1),
                t(Items.GOLD_INGOT, 2, Items.ARROW, 8),
-               t(Items.GOLD_INGOT, 3, Items.STEAK, 2),
                t(Items.EMERALD, 2, Items.ENDER_PEARL, 1),
-               t(Items.DIAMOND, 4, Items.armorId(3, 1), 1)
+               t(Items.DIAMOND, 4, Items.BOOK, 1)
             };
          default:
             return new Trade[0];
@@ -104,6 +106,23 @@ final class Trades {
          g.removeItems(t.a, t.an);
          if (t.bn > 0) {
             g.removeItems(t.b, t.bn);
+         }
+      }
+
+      if (g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS) {
+         if (t.out == Items.BOOK && t.a == Items.DIAMOND) {
+            SkyGen.unlockNextTeamUpgrade(g, SkyGen.getPlayerTeam(g), true);
+            g.adv.award(g, "adventure/trade");
+            return true;
+         }
+         if (Items.isArmor(t.out)) {
+            int tier = (t.out - Items.ARMOR_BASE) / 4;
+            for (int slot = 1; slot <= 3; slot++) {
+               g.armor[slot] = new Stack(Items.armorId(tier, slot), 1);
+            }
+            g.say("\u00a7a[Bedwars Shop] Equipped permanent " + (tier >= 3 ? "Diamond" : "Iron") + " Armor!");
+            g.adv.award(g, "adventure/trade");
+            return true;
          }
       }
 

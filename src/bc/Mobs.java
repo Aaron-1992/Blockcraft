@@ -226,12 +226,13 @@ public final class Mobs {
          }
 
          this.timer++;
+         Mobs312.tickFireballs(this, var1, var2);
          if (!remoteClientOnly || !Net319.hostHasMobSync) {
             if (this.timer % 20 == 3) {
                this.tickSpawners(var1, var2);
             }
 
-            if (this.timer % 20 == 0) {
+            if (this.timer % 20 == 0 && (var1.settings == null || !var1.settings.isMinigame())) {
                if (var1.dim == Dim.OVERWORLD) {
                   this.spawnHostile(var1, var2, var3);
                } else {
@@ -239,13 +240,11 @@ public final class Mobs {
                }
             }
 
-            if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD) {
+            if (this.timer % 40 == 7 && var1.dim == Dim.OVERWORLD && (var1.settings == null || !var1.settings.isMinigame())) {
                this.spawnPassive(var1, var2);
                Mobs312.spawnVillagers(this, var1, var2);
                Mobs312.spawnParrots(this, var1, var2);
             }
-
-            Mobs312.tickFireballs(this, var1, var2);
          }
 
          if (Net319.isHosting() && this.timer % 2 == 0) {
@@ -356,6 +355,8 @@ public final class Mobs {
 
       if (!var1.dead) {
          if ((var1.type == 4 || var1.type == 5)
+            && (var2.settings == null || !var2.settings.isMinigame())
+            && (var1.teamTag == null || !var1.teamTag.startsWith("Team:"))
             && var4 > 0.7
             && !var1.inWater
             && var2.getSky(var5, (int)Math.floor(var1.y + 1.5), var6) >= 15
@@ -959,6 +960,9 @@ public final class Mobs {
             this.kill(var1);
             if (var9) {
                this.g.adv.killed(this.g, var1); // Update 3.12: advancements
+               if (this.g.world != null && this.g.world.settings != null && this.g.world.settings.isMinigame() && hostile(var1.type)) {
+                  SkyGen.onArenaKill(this.g, var1.teamTag != null && !var1.teamTag.isEmpty() ? var1.teamTag : NAME[var1.type]);
+               }
             }
          }
 
@@ -1435,6 +1439,7 @@ public final class Mobs {
       public int attackAnim;
       /** Update 3.12: a free number for the mob's own mind (an End crystal: which pillar it sits on) and the phase of a boss. */
       public int tag;
+      public String teamTag;
       public int phase;
       public int phaseT;
       public int tpCd;

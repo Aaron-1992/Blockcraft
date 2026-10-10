@@ -64,9 +64,18 @@ public final class Net319 {
       boolean onGround = true;
       boolean hurt;
       boolean spectator;
+      boolean fly;
       int team = -1;
+      int health = 20;
+      int armorPts = 0;
+      int gameMode = 0;
+      int pingMs = 1;
+      int kills = 0;
+      int deaths = 0;
       float swing = -1.0F;
       float pswing = -1.0F;
+      float eat = 0.0F;
+      float bow = 0.0F;
       int heldId;
       int skinIdx;
       float age;
@@ -75,6 +84,28 @@ public final class Net319 {
          this.id = id;
          this.name = name;
          this.team = Math.max(0, (id - 1) & 3);
+      }
+   }
+
+   static final class WorldPing {
+      final int senderId;
+      final String senderName;
+      final int team;
+      final int dim;
+      final double x;
+      final double y;
+      final double z;
+      int ticks;
+
+      WorldPing(int senderId, String senderName, int team, int dim, double x, double y, double z, int ticks) {
+         this.senderId = senderId;
+         this.senderName = senderName;
+         this.team = team;
+         this.dim = dim;
+         this.x = x;
+         this.y = y;
+         this.z = z;
+         this.ticks = ticks;
       }
    }
 
@@ -121,12 +152,19 @@ public final class Net319 {
    private static volatile Conn clientConn;
    private static final CopyOnWriteArrayList<Conn> hostConns = new CopyOnWriteArrayList<>();
    private static final ConcurrentHashMap<Integer, Peer> peers = new ConcurrentHashMap<>();
+   private static final CopyOnWriteArrayList<WorldPing> worldPings = new CopyOnWriteArrayList<>();
    private static final ConcurrentHashMap<Integer, ConcurrentHashMap<Long, Integer>> editsByDim = new ConcurrentHashMap<>();
    private static final ConcurrentHashMap<Integer, ConcurrentHashMap<Long, String>> tilesByDim = new ConcurrentHashMap<>();
    private static final ConcurrentLinkedQueue<String> inbox = new ConcurrentLinkedQueue<>();
    private static int nextConnId = 2;
    public static int selfId = 1;
    public static String selfName = "Player" + (int)(System.currentTimeMillis() % 900 + 100);
+   public static String customNick = "";
+   public static volatile int myPingMs = 1;
+   private static int presetNickIdx = 0;
+   private static final String[] PRESET_NICKS = new String[]{
+      "Builder", "RedKnight", "SkyKing", "BedBreaker", "Explorer", "CreeperSlayer", "VoidWalker", "Architect"
+   };
    private static boolean applyingRemote = false;
    public static volatile boolean hostHasMobSync = false;
    private static int[][] peerSkins;
@@ -181,6 +219,38 @@ public final class Net319 {
       statusText = mpWorldwide
          ? "Worldwide Relay/UPnP ON — Friends anywhere on Earth can join via Share Code"
          : "LAN-Only Mode — Only players on your local network can join";
+   }
+
+   public static void cyclePresetNick() {
+      String nick = PRESET_NICKS[presetNickIdx % PRESET_NICKS.length] + (10 + (int)(System.currentTimeMillis() % 89));
+      presetNickIdx = (presetNickIdx + 1) % PRESET_NICKS.length;
+      setNickname(null, nick);
+      statusText = "Multiplayer Nickname set to " + selfName + " (or type /nick <name> in-game)";
+   }
+
+   public static void setNickname(Game g, String name) {
+      String clean = sanitizeName(name == null ? "" : name.trim());
+      if (clean.isEmpty()) {
+         return;
+      }
+      String oldName = selfName;
+      customNick = clean;
+      selfName = clean;
+      if (isActive() && !clean.equals(oldName)) {
+         String pkt = "CHAT * " + oldName + " is now known as " + clean;
+         if (hosting) {
+            broadcastExcept(0, pkt);
+         } else if (clientConnected && clientConn != null) {
+            clientConn.send(pkt);
+         }
+      }
+      if (g != null) {
+         g.say("§a[Multiplayer] §fYour nickname is now §e" + selfName);
+      }
+   }
+
+   public static String displayNick() {
+      return customNick != null && !customNick.isEmpty() ? customNick : selfName;
    }
 
    /** Encodes a host:port endpoint into a compact, copy-pasteable Share Code (e.g. BC-...). */
@@ -342,6 +412,7 @@ public final class Net319 {
    public static void clearWorldState() {
       editsByDim.clear();
       tilesByDim.clear();
+      worldPings.clear();
       hostHasMobSync = false;
    }
 
@@ -419,7 +490,8 @@ public final class Net319 {
          hostGame = g;
          hosting = true;
          selfId = 1;
-         selfName = "Host";
+         selfName = (customNick != null && !customNick.isEmpty()) ? customNick : "Host";
+         myPingMs = 1;
       } catch (IOException e) {
          return "§cCould not host on port " + port + ": " + e.getMessage();
       }
@@ -648,6 +720,9 @@ public final class Net319 {
                   if (!SkyGen.isTeamBedIntact(curW, t)) {
                      c.send("BED " + t + " Server");
                   }
+                  if (SkyGen.teamUpgrades[t] != 0) {
+                     c.send("UPG " + t + " " + SkyGen.teamUpgrades[t] + " Server");
+                  }
                }
             }
             if (hg != null && hg.player != null && curW != null) {
@@ -778,8 +853,8 @@ public final class Net319 {
                continue;
             }
 
-            if (line.equals("PING")) {
-               c.send("PONG");
+            if (line.equals("PING") || line.startsWith("PING ")) {
+               c.send(line.length() > 5 ? ("PONG " + line.substring(5).trim()) : "PONG");
             } else if (line.startsWith("HELLO ")) {
                String[] p = line.split("\\s+", 3);
                if (p.length >= 3) {
@@ -791,15 +866,19 @@ public final class Net319 {
                || line.startsWith("BLOCK ")
                || line.startsWith("CHAT ")
                || line.startsWith("HIT ")
+               || line.startsWith("KILL ")
                || line.startsWith("DROP ")
                || line.startsWith("PICKUP ")
                || line.startsWith("BED ")
+               || line.startsWith("UPG ")
                || line.startsWith("TEAM ")
                || line.startsWith("MATCH ")
                || line.startsWith("TILE ")
                || line.startsWith("MOB_HIT ")
                || line.startsWith("MOB_ACT ")
                || line.startsWith("ARROW ")
+               || line.startsWith("FBALL ")
+               || line.startsWith("WPING ")
                || line.startsWith("TNT ")
                || line.startsWith("EXPLODE ")
                || line.startsWith("MODS ")
@@ -976,7 +1055,7 @@ public final class Net319 {
             clientConnected = true;
             activePort = connectedPort;
             selfId = 0;
-            selfName = "Peer" + (int)(System.currentTimeMillis() % 900 + 100);
+            selfName = (customNick != null && !customNick.isEmpty()) ? customNick : ("Peer" + (int)(System.currentTimeMillis() % 900 + 100));
             c.send("HELLO 0 " + selfName);
             Thread rt = new Thread(() -> readLoopClient(c), "bc-net-reader");
             rt.setDaemon(true);
@@ -1633,6 +1712,90 @@ public final class Net319 {
       }
    }
 
+   public static void sendTeamUpgrade(int team, int mask, String buyer) {
+      if (!isActive()) {
+         return;
+      }
+      String pkt = "UPG " + (Math.abs(team) & 3) + " " + mask + " " + sanitizeName(buyer == null ? selfName : buyer);
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static void sendFireball(double x, double y, double z, double vx, double vy, double vz) {
+      if (!isActive()) {
+         return;
+      }
+      int dim = hostGame != null && hostGame.world != null ? hostGame.world.dim : 0;
+      String pkt = String.format(Locale.ROOT, "FBALL %d %d %.3f %.3f %.3f %.4f %.4f %.4f", selfId, dim, x, y, z, vx, vy, vz);
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static boolean enemyPeerNear(World w, int myTeam, double x, double y, double z, double radius) {
+      if (w == null || peers.isEmpty()) {
+         return false;
+      }
+      double r2 = radius * radius;
+      for (Peer p : peers.values()) {
+         if (p.dim == w.dim && !p.spectator && p.team != myTeam) {
+            double dx = p.x - x;
+            double dy = p.y - y;
+            double dz = p.z - z;
+            if (dx * dx + dy * dy + dz * dz <= r2) {
+               return true;
+            }
+         }
+      }
+      return false;
+   }
+
+   public static void sendWorldPing(Game g) {
+      if (g == null || g.player == null || g.world == null) {
+         return;
+      }
+      Player pl = g.player;
+      double yawR = Math.toRadians(pl.yaw);
+      double pitchR = Math.toRadians(pl.pitch);
+      double cp = Math.cos(pitchR);
+      double dx = -Math.sin(yawR) * cp;
+      double dy = -Math.sin(pitchR);
+      double dz = Math.cos(yawR) * cp;
+      double ox = pl.x;
+      double oy = pl.y + pl.eye;
+      double oz = pl.z;
+      World.Hit hit = g.world.raycast(ox, oy, oz, dx, dy, dz, 64.0);
+      double px;
+      double py;
+      double pz;
+      if (hit != null) {
+         px = hit.x + 0.5;
+         py = hit.y + 1.0;
+         pz = hit.z + 0.5;
+      } else {
+         px = ox + dx * 16.0;
+         py = oy + dy * 16.0;
+         pz = oz + dz * 16.0;
+      }
+      int team = SkyGen.getPlayerTeam(g);
+      worldPings.removeIf(wp -> wp.senderId == selfId);
+      worldPings.add(new WorldPing(selfId, selfName, team, g.world.dim, px, py, pz, 180));
+      g.say(String.format(Locale.ROOT, "§b[Ping] §f%s marked §e(%d, %d, %d)", selfName, (int)Math.floor(px), (int)Math.floor(py), (int)Math.floor(pz)));
+      if (isActive()) {
+         String pkt = String.format(Locale.ROOT, "WPING %d %s %d %d %.2f %.2f %.2f", selfId, selfName, team, g.world.dim, px, py, pz);
+         if (hosting) {
+            broadcastExcept(0, pkt);
+         } else if (clientConnected && clientConn != null) {
+            clientConn.send(pkt);
+         }
+      }
+   }
+
    // ------------------------------------------------------------------ V4.0: Dropped Item Synchronization
    static String formatDropPacket(World.Item it) {
       return String.format(
@@ -1789,10 +1952,17 @@ public final class Net319 {
       if (hit == null) {
          return false;
       }
+      if (g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS && hit.team == SkyGen.getPlayerTeam(g)) {
+         g.say("§c[Bedwars] You cannot attack your own teammate!");
+         return false;
+      }
 
       int held = g.heldId();
       boolean isTool = Items.isTool(held);
       float baseDmg = isTool ? Items.attackDamage(held) : 1.0F;
+      if (g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamSharpness(SkyGen.getPlayerTeam(g))) {
+         baseDmg += 2.0F;
+      }
       float speed = 4.0F;
       if (isTool) {
          int tc = Items.toolClass(held);
@@ -1849,25 +2019,21 @@ public final class Net319 {
       }
    }
 
-   // ------------------------------------------------------------------ Per-tick processing & pose sync
-   public static void tick(Game g) {
-      processInbox(g != null ? g.world : null, g);
-      if (!isActive() || g == null || g.player == null || g.world == null) {
-         return;
-      }
-
-      // Broadcast our own pose at 20 Hz
+   static String formatLocalPose(Game g) {
       Player pl = g.player;
       int flags = (pl.sneaking ? 1 : 0)
          | (pl.sprinting ? 2 : 0)
          | (pl.inWater ? 4 : 0)
          | (pl.onGround ? 8 : 0)
          | (pl.hurtTime > 0 ? 16 : 0)
-         | ((pl.dead || pl.spectator) ? 32 : 0);
+         | ((pl.dead || pl.spectator) ? 32 : 0)
+         | (pl.flying ? 64 : 0)
+         | (g.eatTicks > 0 ? 128 : 0)
+         | (g.bowCharge > 0 ? 256 : 0);
       float sw = g.swinging ? g.swing : -1.0F;
-      String poseLine = String.format(
+      return String.format(
          Locale.ROOT,
-         "POSE %d %s %.3f %.3f %.3f %.2f %.2f %.2f %d %.3f %d %d %d",
+         "POSE %d %s %.3f %.3f %.3f %.2f %.2f %.2f %d %.3f %d %d %d %d %d %d %d %d %d %d",
          selfId,
          selfName,
          pl.x,
@@ -1880,9 +2046,34 @@ public final class Net319 {
          sw,
          g.heldId(),
          Math.abs(selfName.hashCode()) & 1,
-         g.world.dim
+         g.world.dim,
+         pl.health,
+         g.armorPoints(),
+         pl.rawMode(),
+         myPingMs,
+         SkyGen.myKills,
+         SkyGen.myDeaths,
+         SkyGen.getPlayerTeam(g)
       );
+   }
+
+   // ------------------------------------------------------------------ Per-tick processing & pose sync
+   public static void tick(Game g) {
+      for (int i = worldPings.size() - 1; i >= 0; i--) {
+         WorldPing wp = worldPings.get(i);
+         if (--wp.ticks <= 0) {
+            worldPings.remove(i);
+         }
+      }
+      processInbox(g != null ? g.world : null, g);
+      if (!isActive() || g == null || g.player == null || g.world == null) {
+         return;
+      }
+
+      // Broadcast our own pose at 20 Hz
+      String poseLine = formatLocalPose(g);
       if (hosting) {
+         myPingMs = 1;
          broadcastExcept(0, poseLine);
          if (g.tickCount % 40 == 0) {
             broadcastExcept(0, "TIME " + g.world.dayTime);
@@ -1905,7 +2096,7 @@ public final class Net319 {
       } else if (clientConnected && clientConn != null) {
          clientConn.send(poseLine);
          if (g.tickCount % 40 == 0) {
-            clientConn.send("PING");
+            clientConn.send("PING " + System.currentTimeMillis());
          }
       }
 
@@ -1948,7 +2139,7 @@ public final class Net319 {
                   if (p.length >= 5) {
                      clearWorldState();
                      selfId = Integer.parseInt(p[1]);
-                     selfName = "Player" + selfId;
+                     selfName = (customNick != null && !customNick.isEmpty()) ? customNick : ("Player" + selfId);
                      long seed = Long.parseLong(p[2]);
                      int dim = Integer.parseInt(p[3]);
                      long dayTime = Long.parseLong(p[4]);
@@ -1972,28 +2163,66 @@ public final class Net319 {
                         clientConn.send("HELLO " + selfId + " " + selfName);
                         clientConn.send("TEAM " + selfId + " " + SkyGen.myTeam);
                         if (g != null && g.player != null && g.world != null) {
-                           Player pl = g.player;
-                           int flags = (pl.sneaking ? 1 : 0) | (pl.sprinting ? 2 : 0) | (pl.inWater ? 4 : 0) | (pl.onGround ? 8 : 0);
-                           clientConn.send(
-                              String.format(
-                                 Locale.ROOT,
-                                 "POSE %d %s %.3f %.3f %.3f %.2f %.2f %.2f %d %.3f %d %d %d",
-                                 selfId,
-                                 selfName,
-                                 pl.x,
-                                 pl.y,
-                                 pl.z,
-                                 pl.yaw,
-                                 pl.pitch,
-                                 pl.yaw,
-                                 flags,
-                                 -1.0F,
-                                 g.heldId(),
-                                 Math.abs(selfName.hashCode()) & 1,
-                                 g.world.dim
-                              )
-                           );
+                           clientConn.send(formatLocalPose(g));
                         }
+                     }
+                  }
+               }
+               case "PONG" -> {
+                  if (p.length >= 2) {
+                     long sent = Long.parseLong(p[1]);
+                     myPingMs = (int)Math.max(1L, Math.min(999L, System.currentTimeMillis() - sent));
+                  }
+               }
+               case "UPG" -> {
+                  if (p.length >= 3) {
+                     int team = Integer.parseInt(p[1]);
+                     int mask = Integer.parseInt(p[2]);
+                     String buyer = p.length >= 4 ? p[3] : "Teammate";
+                     SkyGen.setTeamUpgradeMask(g, team, mask, buyer);
+                  }
+               }
+               case "FBALL" -> {
+                  if (p.length >= 9 && w != null && g != null && g.mobs != null) {
+                     int sender = Integer.parseInt(p[1]);
+                     int fdim = Integer.parseInt(p[2]);
+                     if (sender != selfId && w.dim == fdim) {
+                        Mobs312.Fireball fb = new Mobs312.Fireball();
+                        fb.big = true;
+                        fb.fromPlayer = true;
+                        fb.remote = true;
+                        fb.x = fb.px = fb.lx = Double.parseDouble(p[3]);
+                        fb.y = fb.py = fb.ly = Double.parseDouble(p[4]);
+                        fb.z = fb.pz = fb.lz = Double.parseDouble(p[5]);
+                        fb.vx = Double.parseDouble(p[6]);
+                        fb.vy = Double.parseDouble(p[7]);
+                        fb.vz = Double.parseDouble(p[8]);
+                        g.mobs.fireballs.add(fb);
+                     }
+                  }
+               }
+               case "WPING" -> {
+                  if (p.length >= 8 && g != null) {
+                     int sid = Integer.parseInt(p[1]);
+                     if (sid != selfId) {
+                        String sname = p[2];
+                        int steam = Integer.parseInt(p[3]);
+                        int sdim = Integer.parseInt(p[4]);
+                        double px = Double.parseDouble(p[5]);
+                        double py = Double.parseDouble(p[6]);
+                        double pz = Double.parseDouble(p[7]);
+                        worldPings.removeIf(wp -> wp.senderId == sid);
+                        worldPings.add(new WorldPing(sid, sname, steam, sdim, px, py, pz, 180));
+                        g.say(String.format(Locale.ROOT, "§b[Ping] §f%s marked §e(%d, %d, %d)", sname, (int)Math.floor(px), (int)Math.floor(py), (int)Math.floor(pz)));
+                     }
+                  }
+               }
+               case "KILL" -> {
+                  if (p.length >= 3 && g != null) {
+                     String killer = p[1];
+                     String victim = p[2];
+                     if (killer.equalsIgnoreCase(selfName)) {
+                        SkyGen.onArenaKill(g, victim);
                      }
                   }
                }
@@ -2317,10 +2546,34 @@ public final class Net319 {
                      peer.onGround = (flags & 8) != 0;
                      peer.hurt = (flags & 16) != 0;
                      peer.spectator = (flags & 32) != 0;
+                     peer.fly = (flags & 64) != 0;
+                     peer.eat = (flags & 128) != 0 ? 0.5F : 0.0F;
+                     peer.bow = (flags & 256) != 0 ? 0.85F : 0.0F;
                      peer.swing = Float.parseFloat(p[10]);
                      peer.heldId = Integer.parseInt(p[11]);
                      peer.skinIdx = Integer.parseInt(p[12]);
                      peer.dim = p.length >= 14 ? Integer.parseInt(p[13]) : 0;
+                     if (p.length >= 15) {
+                        peer.health = Integer.parseInt(p[14]);
+                     }
+                     if (p.length >= 16) {
+                        peer.armorPts = Integer.parseInt(p[15]);
+                     }
+                     if (p.length >= 17) {
+                        peer.gameMode = Integer.parseInt(p[16]);
+                     }
+                     if (p.length >= 18) {
+                        peer.pingMs = Integer.parseInt(p[17]);
+                     }
+                     if (p.length >= 19) {
+                        peer.kills = Integer.parseInt(p[18]);
+                     }
+                     if (p.length >= 20) {
+                        peer.deaths = Integer.parseInt(p[19]);
+                     }
+                     if (p.length >= 21) {
+                        peer.team = Math.abs(Integer.parseInt(p[20])) & 3;
+                     }
                   }
                }
                case "DROP" -> {
@@ -2403,13 +2656,18 @@ public final class Net319 {
                         boolean wasDead = g.player.dead;
                         g.damagePlayer(dmg, ax, az);
                         if (!wasDead && g.player.dead) {
+                           SkyGen.myDeaths++;
                            String deathMsg = selfName + " was slain by " + atkName;
                            g.say("§e" + deathMsg);
                            String chatPkt = "CHAT * " + deathMsg;
+                           String killPkt = "KILL " + sanitizeName(atkName) + " " + sanitizeName(selfName);
                            if (hosting) {
+                              inbox.add(killPkt);
                               broadcastExcept(0, chatPkt);
+                              broadcastExcept(0, killPkt);
                            } else if (clientConnected && clientConn != null) {
                               clientConn.send(chatPkt);
+                              clientConn.send(killPkt);
                            }
                         }
                      } else {
@@ -2426,21 +2684,35 @@ public final class Net319 {
       }
    }
 
-   // ------------------------------------------------------------------ 3D rendering of remote peers
+   private static float wrapDeg(float a) {
+      while (a > 180.0F) {
+         a -= 360.0F;
+      }
+      while (a < -180.0F) {
+         a += 360.0F;
+      }
+      return a;
+   }
+
+   // ------------------------------------------------------------------ 3D rendering of remote peers & tactical pings
    static PlayerModel.Pose pose(Peer p, float partial) {
       PlayerModel.Pose out = new PlayerModel.Pose();
-      out.bodyYaw = p.pyaw + (p.yaw - p.pyaw) * partial;
-      out.headYaw = 0.0F;
+      out.bodyYaw = p.pyaw + wrapDeg(p.yaw - p.pyaw) * partial;
+      float hy = p.pheadYaw + wrapDeg(p.headYaw - p.pheadYaw) * partial;
+      out.headYaw = Math.max(-55.0F, Math.min(55.0F, wrapDeg(hy - out.bodyYaw)));
       out.headPitch = p.ppitch + (p.pitch - p.ppitch) * partial;
       out.limb = p.limb;
       out.amp = p.pamp + (p.amp - p.pamp) * partial;
       out.swing = p.swing;
+      out.eat = p.eat;
+      out.bow = p.bow;
       out.sneak = p.sneak;
       out.sprint = p.sprint;
-      out.air = !p.onGround;
+      out.fly = p.fly ? 1.0F : 0.0F;
+      out.air = !p.onGround && !p.fly;
       out.sneakK = p.sneak ? 1.0F : 0.0F;
       out.sprintK = p.sprint ? 1.0F : 0.0F;
-      out.airK = p.onGround ? 0.0F : 1.0F;
+      out.airK = (p.onGround || p.fly) ? 0.0F : 1.0F;
       out.swim = p.swim ? 1.0F : 0.0F;
       out.hurt = p.hurt ? 1.0F : 0.0F;
       out.age = p.age + partial;
@@ -2457,11 +2729,15 @@ public final class Net319 {
    }
 
    static void drawPeers(Renderer r, float partial) {
-      if (peers.isEmpty() || r == null || r.g == null || r.g.world == null) {
+      if (r == null || r.g == null || r.g.world == null) {
+         return;
+      }
+      if (peers.isEmpty() && worldPings.isEmpty()) {
          return;
       }
 
       World w = r.g.world;
+      boolean isMinigame = w.settings != null && w.settings.isMinigame();
       GL11.glEnable(2929);
       GL11.glDepthMask(true);
       GL11.glDisable(2884);
@@ -2477,14 +2753,80 @@ public final class Net319 {
          GL11.glPushMatrix();
          GL11.glTranslated(x - r.camX, y - r.camY, z - r.camZ);
          PlayerModel.draw(skinPixels(p.skinIdx), false, pose(p, partial), bright);
-         drawNameTag(r, p.name, p.sneak ? 1.98F : 2.16F);
+         String tag = p.name;
+         int col = 0xFFFFFF;
+         if (isMinigame && p.team >= 0 && p.team < 4) {
+            String[] badge = new String[]{"[RED] ", "[BLU] ", "[GRN] ", "[YEL] "};
+            int[] rgb = new int[]{0xFF5555, 0x55AAFF, 0x55FF55, 0xFFFF55};
+            tag = badge[p.team] + p.name;
+            col = rgb[p.team];
+         }
+         if (p.gameMode != 1 && p.gameMode != 3) {
+            tag = tag + " (" + Math.max(0, p.health) + "HP)";
+         }
+         drawNameTag(r, tag, p.sneak ? 1.98F : 2.16F, col, p.gameMode != 1 && p.gameMode != 3 ? (p.health / 20.0F) : -1.0F);
          GL11.glPopMatrix();
+      }
+
+      for (WorldPing wp : worldPings) {
+         if (wp.dim != w.dim) {
+            continue;
+         }
+         drawWorldPingBeacon(r, wp);
       }
 
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
-   private static void drawNameTag(Renderer r, String name, float yOff) {
+   private static void drawWorldPingBeacon(Renderer r, WorldPing wp) {
+      boolean wasEnt = r.sh != null && r.sh.entityOn;
+      if (wasEnt) {
+         r.sh.stopEntity();
+      }
+      int[] rgb = new int[]{0xFF5555, 0x55AAFF, 0x55FF55, 0xFFFF55};
+      int c = wp.team >= 0 && wp.team < 4 ? rgb[wp.team] : 0x55FFFF;
+      float cr = ((c >> 16) & 0xFF) / 255.0F;
+      float cg = ((c >> 8) & 0xFF) / 255.0F;
+      float cb = (c & 0xFF) / 255.0F;
+      GL11.glPushMatrix();
+      GL11.glTranslated(wp.x - r.camX, wp.y - r.camY, wp.z - r.camZ);
+      GL11.glDisable(3553);
+      GL11.glEnable(3042);
+      GL11.glBlendFunc(770, 771);
+      GL11.glDepthMask(false);
+      float w = 0.14F;
+      float h = 14.0F;
+      GL11.glColor4f(cr, cg, cb, 0.48F);
+      GL11.glBegin(7);
+      GL11.glVertex3f(-w, 0.0F, -w);
+      GL11.glVertex3f(w, 0.0F, -w);
+      GL11.glVertex3f(w, h, -w);
+      GL11.glVertex3f(-w, h, -w);
+      GL11.glVertex3f(-w, 0.0F, w);
+      GL11.glVertex3f(w, 0.0F, w);
+      GL11.glVertex3f(w, h, w);
+      GL11.glVertex3f(-w, h, w);
+      GL11.glVertex3f(-w, 0.0F, -w);
+      GL11.glVertex3f(-w, 0.0F, w);
+      GL11.glVertex3f(-w, h, w);
+      GL11.glVertex3f(-w, h, -w);
+      GL11.glVertex3f(w, 0.0F, -w);
+      GL11.glVertex3f(w, 0.0F, w);
+      GL11.glVertex3f(w, h, w);
+      GL11.glVertex3f(w, h, -w);
+      GL11.glEnd();
+      GL11.glDepthMask(true);
+      GL11.glDisable(3042);
+      GL11.glEnable(3553);
+      int dist = (int)Math.round(Math.sqrt((wp.x - r.camX) * (wp.x - r.camX) + (wp.y - r.camY) * (wp.y - r.camY) + (wp.z - r.camZ) * (wp.z - r.camZ)));
+      drawNameTag(r, "[! " + wp.senderName + " " + dist + "m]", 2.4F, c, -1.0F);
+      GL11.glPopMatrix();
+      if (wasEnt) {
+         r.sh.useEntity(r.mv, r.camX, r.camY, r.camZ, r.entFogNear, r.entFogFar, r.entFogCol, r.entShadow, r.lastSky, r.lastBlk);
+      }
+   }
+
+   private static void drawNameTag(Renderer r, String name, float yOff, int rgbColor, float hpFrac) {
       if (name == null || name.isEmpty() || Tex.fontTex == 0) {
          return;
       }
@@ -2507,16 +2849,39 @@ public final class Net319 {
       GL11.glEnable(3042);
       GL11.glBlendFunc(770, 771);
       GL11.glDepthMask(false);
-      GL11.glColor4f(0.0F, 0.0F, 0.0F, 0.42F);
+      float boxH = hpFrac >= 0.0F ? 13.0F : 9.0F;
+      GL11.glColor4f(0.0F, 0.0F, 0.0F, 0.48F);
       GL11.glBegin(7);
       GL11.glVertex3f(x0 - 2.0F, -1.0F, 0.01F);
       GL11.glVertex3f(x0 + tw + 2.0F, -1.0F, 0.01F);
-      GL11.glVertex3f(x0 + tw + 2.0F, 9.0F, 0.01F);
-      GL11.glVertex3f(x0 - 2.0F, 9.0F, 0.01F);
+      GL11.glVertex3f(x0 + tw + 2.0F, boxH, 0.01F);
+      GL11.glVertex3f(x0 - 2.0F, boxH, 0.01F);
       GL11.glEnd();
+      if (hpFrac >= 0.0F) {
+         float f = Math.max(0.0F, Math.min(1.0F, hpFrac));
+         float barW = Math.max(24.0F, tw);
+         float bx0 = -barW * 0.5F;
+         GL11.glColor4f(0.2F, 0.05F, 0.05F, 0.8F);
+         GL11.glBegin(7);
+         GL11.glVertex3f(bx0, 9.5F, 0.005F);
+         GL11.glVertex3f(bx0 + barW, 9.5F, 0.005F);
+         GL11.glVertex3f(bx0 + barW, 11.8F, 0.005F);
+         GL11.glVertex3f(bx0, 11.8F, 0.005F);
+         GL11.glEnd();
+         GL11.glColor4f(f > 0.5F ? 0.2F : 0.95F, f > 0.25F ? 0.9F : 0.2F, 0.2F, 0.92F);
+         GL11.glBegin(7);
+         GL11.glVertex3f(bx0, 9.5F, 0.0F);
+         GL11.glVertex3f(bx0 + barW * f, 9.5F, 0.0F);
+         GL11.glVertex3f(bx0 + barW * f, 11.8F, 0.0F);
+         GL11.glVertex3f(bx0, 11.8F, 0.0F);
+         GL11.glEnd();
+      }
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.fontTex);
-      GL11.glColor4f(1.0F, 1.0F, 1.0F, 0.95F);
+      float cr = ((rgbColor >> 16) & 0xFF) / 255.0F;
+      float cg = ((rgbColor >> 8) & 0xFF) / 255.0F;
+      float cb = (rgbColor & 0xFF) / 255.0F;
+      GL11.glColor4f(cr, cg, cb, 0.96F);
       float cx = x0;
       float invW = 1.0F / (Tex.fontCols * Tex.fontCellW);
       float invH = 1.0F / (6 * Tex.fontCellH);
@@ -2549,6 +2914,195 @@ public final class Net319 {
       if (wasEnt) {
          r.sh.useEntity(r.mv, r.camX, r.camY, r.camZ, r.entFogNear, r.entFogFar, r.entFogCol, r.entShadow, r.lastSky, r.lastBlk);
       }
+   }
+
+   // ------------------------------------------------------------------ V4.1: Multiplayer Commands & Tab Scoreboard Overlay
+   public static boolean onNetCommand(Game g, String cmd) {
+      if (g == null || cmd == null) {
+         return false;
+      }
+      String[] parts = cmd.trim().split("\\s+", 3);
+      if (parts.length == 0) {
+         return false;
+      }
+      String root = parts[0].toLowerCase(Locale.ROOT);
+      if ("/nick".equals(root) || "/name".equals(root)) {
+         if (parts.length >= 2 && !parts[1].isBlank()) {
+            setNickname(g, parts[1]);
+         } else {
+            cyclePresetNick();
+            g.say("§a[Multiplayer] §fYour nickname is now §e" + selfName + " §7(Usage: /nick <name>)");
+         }
+         return true;
+      }
+      if ("/ping".equals(root)) {
+         sendWorldPing(g);
+         g.say("§a[Network] §fLatency: §e" + myPingMs + " ms §7| Role: " + (hosting ? "Host" : (clientConnected ? "Client" : "Local")));
+         return true;
+      }
+      if ("/list".equals(root) || "/players".equals(root) || "/who".equals(root)) {
+         StringBuilder sb = new StringBuilder();
+         sb.append("§a[Players (").append(1 + peers.size()).append(")] §f").append(selfName).append(" (You, ").append(myPingMs).append("ms)");
+         for (Peer p : peers.values()) {
+            sb.append(", §e").append(p.name).append(" §7(").append(p.health).append("HP, ").append(p.pingMs).append("ms)");
+         }
+         g.say(sb.toString());
+         return true;
+      }
+      if ("/tp".equals(root) && parts.length == 2) {
+         String targetName = parts[1].trim();
+         for (Peer p : peers.values()) {
+            if (p.name.equalsIgnoreCase(targetName)) {
+               if (g.world != null && p.dim != g.world.dim) {
+                  g.switchDimension(p.dim, p.x, p.z, 1);
+               }
+               if (g.player != null) {
+                  g.player.setPos(p.x, p.y, p.z);
+                  g.player.vx = g.player.vy = g.player.vz = 0.0;
+                  g.player.fallDistance = 0.0F;
+               }
+               g.say("§aTeleported to " + p.name + " (" + (int)p.x + ", " + (int)p.y + ", " + (int)p.z + ")");
+               return true;
+            }
+         }
+      }
+      if (("/msg".equals(root) || "/w".equals(root) || "/tell".equals(root)) && parts.length >= 3) {
+         String targetName = parts[1].trim();
+         String text = parts[2].trim();
+         g.say("§d[You -> " + targetName + "] §f" + text);
+         sendChat(g, "§d[Whisper to " + targetName + "] §f" + text);
+         return true;
+      }
+      return false;
+   }
+
+   private static String shortModeBadge(int rawMode) {
+      return switch (rawMode) {
+         case 1 -> "§bCREA";
+         case 2 -> "§eADV";
+         case 3 -> "§7SPEC";
+         case 4 -> "§cHARD";
+         default -> "§aSURV";
+      };
+   }
+
+   /** Draws the Multiplayer &amp; Minigame Tab Scoreboard overlay when the player holds TAB in-game. */
+   public static void drawTabOverlay(Game g) {
+      if (g == null || g.gui == null || g.world == null || g.player == null) {
+         return;
+      }
+      Gui gui = g.gui;
+      World w = g.world;
+      int wType = w.settings != null ? w.settings.type : WorldSettings.DEFAULT;
+      boolean isBedwars = wType == WorldSettings.BEDWARS;
+      boolean isSkywars = wType == WorldSettings.SKYWARS;
+      boolean isMinigame = w.settings != null && w.settings.isMinigame();
+
+      int rows = 1 + peers.size();
+      int extraBots = 0;
+      if (isMinigame && g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m != null && !m.dead && m.teamTag != null && m.teamTag.startsWith("Team:")) {
+               extraBots++;
+            }
+         }
+      }
+      int totalRows = Math.min(10, rows + extraBots);
+      float boxW = 316.0F;
+      float headerH = isBedwars ? 38.0F : 26.0F;
+      float boxH = headerH + 14.0F + totalRows * 12.0F + 14.0F;
+      float x0 = (gui.w - boxW) * 0.5F;
+      float y0 = 18.0F;
+
+      gui.rect(x0, y0, boxW, boxH, -1056964608);
+      gui.rect(x0, y0, boxW, 14.0F, -1040187392);
+
+      String title = isBedwars
+         ? "§c§lBEDWARS §fARENA SCOREBOARD"
+         : (isSkywars
+            ? "§e§lSKYWARS §fARENA SCOREBOARD"
+            : (wType == WorldSettings.SKYBLOCK ? "§b§lSKYBLOCK §fISLAND SCOREBOARD" : "§a§lBLOCKCRAFT §fMULTIPLAYER SCOREBOARD"));
+      String roleStr = hosting
+         ? ("§aHosting (" + (1 + peers.size()) + " online)")
+         : (clientConnected ? ("§bConnected (" + myPingMs + "ms)") : "§7Local Session");
+      gui.text(title + "  §7— " + roleStr, x0 + 6.0F, y0 + 3.0F, -1, true);
+
+      String sub = "§7World: §f" + WorldSettings.TYPE_NAME[wType]
+         + "  §7| Mode: " + shortModeBadge(g.player.rawMode())
+         + (shareCode != null && !shareCode.isBlank() ? ("  §7| Code: §b" + shareCode) : "");
+      gui.text(sub, x0 + 6.0F, y0 + 15.0F, -1, true);
+
+      if (isBedwars) {
+         StringBuilder bw = new StringBuilder("§7Teams: ");
+         for (int t = 0; t < 4; t++) {
+            boolean bed = SkyGen.isTeamBedIntact(w, t);
+            int upg = SkyGen.teamUpgrades[t];
+            String uStr = (upg != 0)
+               ? ("+" + ((upg & 1) != 0 ? "S" : "") + ((upg & 2) != 0 ? "P" : "") + ((upg & 4) != 0 ? "F" : "") + ((upg & 8) != 0 ? "H" : ""))
+               : "";
+            bw.append(SkyGen.BEDWARS_CODES[t])
+               .append(SkyGen.BEDWARS_NAMES[t])
+               .append(bed ? "§a[BED]" : "§c[X]")
+               .append("§b")
+               .append(uStr)
+               .append("  ");
+         }
+         gui.text(bw.toString(), x0 + 6.0F, y0 + 26.0F, -1, true);
+      }
+
+      float colY = y0 + headerH;
+      gui.rect(x0 + 4.0F, colY, boxW - 8.0F, 12.0F, 1073741824);
+      gui.text("§ePlayer", x0 + 8.0F, colY + 2.0F, -1, true);
+      gui.text("§eMode", x0 + 118.0F, colY + 2.0F, -1, true);
+      gui.text("§eHP / Armor", x0 + 162.0F, colY + 2.0F, -1, true);
+      gui.text("§eK / D", x0 + 230.0F, colY + 2.0F, -1, true);
+      gui.text("§ePing", x0 + 274.0F, colY + 2.0F, -1, true);
+
+      float ry = colY + 13.0F;
+      int myTeam = SkyGen.getPlayerTeam(g);
+      String myPrefix = isMinigame ? (SkyGen.BEDWARS_CODES[myTeam] + "[" + SkyGen.BEDWARS_NAMES[myTeam].substring(0, 3).toUpperCase(Locale.ROOT) + "] §f") : "§f";
+      gui.text(myPrefix + selfName + " §7(You)", x0 + 8.0F, ry, -1, true);
+      gui.text(shortModeBadge(g.player.rawMode()), x0 + 118.0F, ry, -1, true);
+      gui.text("§c" + g.player.health + "HP §7/ §9" + g.armorPoints() + "AP", x0 + 162.0F, ry, -1, true);
+      gui.text("§a" + SkyGen.myKills + " §7/ §c" + SkyGen.myDeaths, x0 + 230.0F, ry, -1, true);
+      gui.text((myPingMs < 60 ? "§a" : (myPingMs < 150 ? "§e" : "§c")) + myPingMs + "ms", x0 + 274.0F, ry, -1, true);
+      ry += 12.0F;
+
+      int drawn = 1;
+      for (Peer p : peers.values()) {
+         if (drawn >= totalRows) {
+            break;
+         }
+         int pt = Math.abs(p.team) & 3;
+         String pfx = isMinigame ? (SkyGen.BEDWARS_CODES[pt] + "[" + SkyGen.BEDWARS_NAMES[pt].substring(0, 3).toUpperCase(Locale.ROOT) + "] §f") : "§f";
+         gui.text(pfx + p.name, x0 + 8.0F, ry, -1, true);
+         gui.text(shortModeBadge(p.gameMode), x0 + 118.0F, ry, -1, true);
+         gui.text("§c" + p.health + "HP §7/ §9" + p.armorPts + "AP", x0 + 162.0F, ry, -1, true);
+         gui.text("§a" + p.kills + " §7/ §c" + p.deaths, x0 + 230.0F, ry, -1, true);
+         gui.text((p.pingMs < 60 ? "§a" : (p.pingMs < 150 ? "§e" : "§c")) + p.pingMs + "ms", x0 + 274.0F, ry, -1, true);
+         ry += 12.0F;
+         drawn++;
+      }
+
+      if (isMinigame && g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (drawn >= totalRows) {
+               break;
+            }
+            if (m != null && !m.dead && m.teamTag != null && m.teamTag.startsWith("Team:")) {
+               String tName = m.teamTag.substring(5);
+               gui.text("§7[BOT] §f" + tName + " Defender", x0 + 8.0F, ry, -1, true);
+               gui.text("§eAI", x0 + 118.0F, ry, -1, true);
+               gui.text("§c" + m.health + "HP", x0 + 162.0F, ry, -1, true);
+               gui.text("§7-", x0 + 230.0F, ry, -1, true);
+               gui.text("§aAI", x0 + 274.0F, ry, -1, true);
+               ry += 12.0F;
+               drawn++;
+            }
+         }
+      }
+
+      gui.text("§7Tip: Press §eG§7 to place a 3D Tactical Ping Marker  |  §e/nick <name>§7  |  §e/tp <player>", x0 + 8.0F, y0 + boxH - 11.0F, -1, true);
    }
 
    private static String sanitizeName(String s) {
