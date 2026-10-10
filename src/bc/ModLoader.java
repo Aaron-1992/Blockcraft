@@ -824,7 +824,36 @@ public final class ModLoader {
       };
    }
 
-   /** Format: outId,outCount:in1,in2,... */
+   /** Resolves either a numeric ID or an item/block name (e.g. "diamond", "rotten_flesh", "cobblestone") to a valid ID. */
+   public static int resolveItemOrBlockId(String arg) {
+      if (arg == null || arg.isBlank()) {
+         return 0;
+      }
+      String q = arg.trim();
+      try {
+         int id = Integer.parseInt(q);
+         return isValidItemOrBlockId(id) ? id : 0;
+      } catch (NumberFormatException ignored) {
+      }
+      int blk = resolveBlockId(q, -1);
+      if (blk > 0) {
+         return blk;
+      }
+      String norm = q.toLowerCase(Locale.ROOT).replace('_', ' ');
+      for (int id = 1; id < Blocks.EXT0; id++) {
+         if (isValidItemOrBlockId(id) && Items.name(id).equalsIgnoreCase(norm)) {
+            return id;
+         }
+      }
+      for (int id = 1; id < Blocks.EXT0; id++) {
+         if (isValidItemOrBlockId(id) && Items.name(id).toLowerCase(Locale.ROOT).contains(norm)) {
+            return id;
+         }
+      }
+      return 0;
+   }
+
+   /** Format: outIdOrName,outCount:in1,in2,... */
    private static void parseShapelessRule(Context ctx, String spec) {
       int colon = spec.indexOf(':');
       if (colon <= 0) {
@@ -832,14 +861,14 @@ public final class ModLoader {
       }
       String[] outParts = spec.substring(0, colon).split(",");
       String[] inParts = spec.substring(colon + 1).split(",");
-      int outId = parseInt(outParts[0], 0);
+      int outId = resolveItemOrBlockId(outParts[0]);
       int outCount = outParts.length >= 2 ? parseInt(outParts[1], 1) : 1;
       if (outId <= 0 || inParts.length == 0) {
          return;
       }
       int[] ins = new int[inParts.length];
       for (int i = 0; i < inParts.length; i++) {
-         ins[i] = parseInt(inParts[i], 0);
+         ins[i] = resolveItemOrBlockId(inParts[i]);
          if (ins[i] <= 0) {
             return;
          }
@@ -847,15 +876,15 @@ public final class ModLoader {
       ctx.addShapelessRecipe(outId, outCount, ins);
    }
 
-   /** Format: inId:outId,outCount */
+   /** Format: inIdOrName:outIdOrName,outCount */
    private static void parseSmeltRule(Context ctx, String spec) {
       int colon = spec.indexOf(':');
       if (colon <= 0) {
          return;
       }
-      int inId = parseInt(spec.substring(0, colon), 0);
+      int inId = resolveItemOrBlockId(spec.substring(0, colon));
       String[] outParts = spec.substring(colon + 1).split(",");
-      int outId = parseInt(outParts[0], 0);
+      int outId = resolveItemOrBlockId(outParts[0]);
       int outCount = outParts.length >= 2 ? parseInt(outParts[1], 1) : 1;
       if (inId > 0 && outId > 0) {
          ctx.addSmelting(inId, outId, outCount);
@@ -879,6 +908,25 @@ public final class ModLoader {
                      Class<?> c = Class.forName(mc.trim(), true, cl);
                      if (BlockcraftMod.class.isAssignableFrom(c)) {
                         found.add((BlockcraftMod)c.getDeclaredConstructor().newInstance());
+                     }
+                  }
+               }
+               if (found.isEmpty()) {
+                  ZipEntry propEntry = jf.getEntry("mod.properties");
+                  if (propEntry != null) {
+                     Properties props = new Properties();
+                     try (InputStream in = jf.getInputStream(propEntry)) {
+                        props.load(in);
+                     }
+                     String mc = props.getProperty("mainClass", props.getProperty("modClass", "")).trim();
+                     if (!mc.isEmpty()) {
+                        Class<?> c = Class.forName(mc, true, cl);
+                        if (BlockcraftMod.class.isAssignableFrom(c)) {
+                           found.add((BlockcraftMod)c.getDeclaredConstructor().newInstance());
+                        }
+                     } else {
+                        registerDeclarativeProps(jarPath, props);
+                        return;
                      }
                   }
                }
@@ -1254,6 +1302,20 @@ public final class ModLoader {
          }
       }
       return false;
+   }
+
+   public static void onBlockPlaced(World w, int x, int y, int z, int id) {
+      if (!initialized) {
+         init();
+      }
+      for (ModEntry m : entries.values()) {
+         if (m.installed && m.enabled && m.instance != null) {
+            try {
+               m.instance.onBlockPlaced(w, x, y, z, id);
+            } catch (Throwable ignored) {
+            }
+         }
+      }
    }
 
    public static void onBlockBroken(World w, int x, int y, int z, int oldId) {

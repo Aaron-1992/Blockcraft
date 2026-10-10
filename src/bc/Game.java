@@ -5505,6 +5505,7 @@ public final class Game {
                if (!this.world.setBlock(var3, var4, var5, var2)) {
                   return false;
                }
+               ModLoader.onBlockPlaced(this.world, var3, var4, var5, var2);
 
                if (var2 == Blocks.TNT && this.world.settings != null && this.world.settings.isMinigame()) {
                   this.world.setBlock(var3, var4, var5, 0);

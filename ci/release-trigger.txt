@@ -1,2 +1,2 @@
 4.1
-2026-10-10T01:00:00Z-gamemodes-multiplayer-upgrade
+2026-10-10T02:00:00Z-modding-docs

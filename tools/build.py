@@ -191,6 +191,12 @@ def build_patch_zip(ver, exe_path, jar_path, mod_jar_path=None):
             add(z, "Blockcraft/" + n, data)
         if mod_jar_path and os.path.isfile(mod_jar_path):
             add(z, "Blockcraft/mods/infdev-2010.jar", open(mod_jar_path, "rb").read())
+        mod_readme = os.path.join(ROOT, "mods", "README.txt")
+        if os.path.isfile(mod_readme):
+            add(z, "Blockcraft/mods/README.txt", open(mod_readme, "rb").read())
+        mod_doc = os.path.join(ROOT, "docs", "MODDING.md")
+        if os.path.isfile(mod_doc):
+            add(z, "Blockcraft/MODDING.md", open(mod_doc, "rb").read())
     print("[build] %s  (%.2f MB)" % (os.path.relpath(out, ROOT), os.path.getsize(out) / 1e6))
     return out
 
@@ -227,6 +233,12 @@ def build_full_zip(ver, exe_path, jar_path, mod_jar_path=None):
         rep["Blockcraft/" + n] = (data, 0o644)
     if mod_jar_path and os.path.isfile(mod_jar_path):
         rep["Blockcraft/mods/infdev-2010.jar"] = (open(mod_jar_path, "rb").read(), 0o644)
+    mod_readme = os.path.join(ROOT, "mods", "README.txt")
+    if os.path.isfile(mod_readme):
+        rep["Blockcraft/mods/README.txt"] = (open(mod_readme, "rb").read(), 0o644)
+    mod_doc = os.path.join(ROOT, "docs", "MODDING.md")
+    if os.path.isfile(mod_doc):
+        rep["Blockcraft/MODDING.md"] = (open(mod_doc, "rb").read(), 0o644)
     return compose_full_zip(out, rep)
 
 
