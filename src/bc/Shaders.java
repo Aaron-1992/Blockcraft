@@ -23,6 +23,7 @@ public final class Shaders {
    int pBright;
    int pBlur;
    int pComp;
+   int pCompHorror;
    int pLod;
    /** Update 3.19: the LOD program with the cloud shadows (0 = none). */
    int pLodFx;
@@ -60,6 +61,68 @@ public final class Shaders {
          "void main(){ float d = texture2D(depth, vUv).r; vec3 c = texture2D(scene, vUv).rgb;",
          "  float sky = step(0.999985, d); float l = dot(c, vec3(0.299, 0.587, 0.114));",
          "  float m = sky * (0.45 + 0.55 * smoothstep(0.45, 0.95, l)); gl_FragColor = vec4(vec3(m), 1.0); }"
+      }
+   );
+   static final String HORROR_COMP_FS = String.join(
+      "\n",
+      new CharSequence[]{
+         "#version 120",
+         "uniform sampler2D scene;",
+         "uniform sampler2D bloom;",
+         "uniform sampler2D bloom2;",
+         "uniform sampler2D bloom3;",
+         "uniform vec3 bloomW;",
+         "uniform sampler2D aoTex;",
+         "uniform float aoAmt;",
+         "uniform vec4 grA;",
+         "uniform vec4 grB;",
+         "uniform vec3 grS;",
+         "uniform vec3 grH;",
+         "uniform sampler2D rays;",
+         "uniform float strength;",
+         "uniform float uw;",
+         "uniform float time;",
+         "uniform float rayAmt;",
+         "uniform float horrorPanic;",
+         "uniform float horrorBlackout;",
+         "uniform vec2 sunUv;",
+         "uniform vec3 rayCol;",
+         "uniform vec2 invRes;",
+         "varying vec2 vUv;",
+         "void main(){",
+         "  vec2 uv = vUv;",
+         "  float trackWave = sin(uv.y * 22.0 - time * 3.8) * sin(uv.y * 79.0 + time * 14.0);",
+         "  float glitchBand = smoothstep(0.92, 0.995, sin(uv.y * 6.5 - time * 2.4));",
+         "  uv.x += (0.0007 + 0.0055 * horrorPanic) * trackWave * (0.25 + 0.75 * glitchBand);",
+         "  uv = clamp(uv, vec2(0.002), vec2(0.998));",
+         "  vec2 ca = (uv - vec2(0.5)) * (0.0028 + 0.0095 * horrorPanic);",
+         "  float rCh = texture2D(scene, clamp(uv + ca, vec2(0.001), vec2(0.999))).r;",
+         "  float gCh = texture2D(scene, uv).g;",
+         "  float bCh = texture2D(scene, clamp(uv - ca, vec2(0.001), vec2(0.999))).b;",
+         "  vec3 c = vec3(rCh, gCh, bCh);",
+         "  if(aoAmt > 0.001){ float ao = texture2D(aoTex, uv).r; c *= mix(1.0, ao, aoAmt); }",
+         "  vec3 b = texture2D(bloom, uv).rgb * bloomW.x + texture2D(bloom2, uv).rgb * bloomW.y + texture2D(bloom3, uv).rgb * bloomW.z;",
+         "  c += b * (0.42 + 0.30 * strength);",
+         "  float lum = dot(c, vec3(0.299, 0.587, 0.114));",
+         "  c = mix(vec3(lum), c, grA.z);",
+         "  float shW = clamp(1.0 - lum * 2.0, 0.0, 1.0);",
+         "  float hiW = clamp(lum * 2.0 - 1.0, 0.0, 1.0);",
+         "  c *= mix(vec3(1.0), grS, shW) * mix(vec3(1.0), grH, hiW);",
+         "  c = c * grA.x;",
+         "  c = clamp((c - 0.5) * grA.y + 0.5, 0.0, 2.0);",
+         "  c = c / (1.0 + 0.22 * c);",
+         "  float scan = 0.5 + 0.5 * sin(vUv.y / max(0.0005, invRes.y) * 3.14159);",
+         "  c *= 1.0 - (0.055 + 0.055 * horrorPanic) * scan;",
+         "  vec2 d = vUv - vec2(0.5);",
+         "  float r2 = dot(d, d);",
+         "  float pulse = 0.5 + 0.5 * sin(time * (4.0 + 8.0 * horrorPanic));",
+         "  float vig = clamp(1.0 - r2 * (0.55 + 0.45 * horrorPanic + 0.25 * horrorBlackout), 0.12, 1.0);",
+         "  vec3 vigCol = mix(vec3(0.0), vec3(0.22, 0.015, 0.02), horrorPanic * pulse);",
+         "  c = mix(vigCol, c, vig);",
+         "  float g = fract(sin(dot(floor(vUv / max(vec2(0.0005), invRes)) + floor(time * 24.0), vec2(12.9898, 78.233))) * 43758.5453) - 0.5;",
+         "  c = clamp(c + vec3(g * grB.y), 0.0, 1.0);",
+         "  gl_FragColor = vec4(c, 1.0);",
+         "}"
       }
    );
    public boolean lodOk;
@@ -278,6 +341,11 @@ public final class Shaders {
          this.pBright = this.program(QUAD_VS, BRIGHT_FS);
          this.pBlur = this.program(QUAD_VS, BLUR_FS);
          this.pComp = this.program(QUAD_VS, ShaderSrc.COMP_FS);
+         try {
+            this.pCompHorror = this.program(QUAD_VS, HORROR_COMP_FS);
+         } catch (Throwable horrorErr) {
+            this.pCompHorror = 0;
+         }
          this.pRay = this.program(QUAD_VS, RAY_FS);
 
          try {
@@ -1156,32 +1224,45 @@ public final class Shaders {
 
          GL30.glBindFramebuffer(36160, 0);
          GL11.glViewport(0, 0, outW, outH);
-         GL20.glUseProgram(this.pComp);
-         this.u1i(this.pComp, "scene", 0);
-         this.u1i(this.pComp, "bloom", 1);
-         this.u1i(this.pComp, "bloom2", 3);
-         this.u1i(this.pComp, "bloom3", 4);
-         this.u1i(this.pComp, "aoTex", 5);
-         this.u1f(this.pComp, "aoAmt", this.aoAmt);
+         boolean horror = BackroomsStalkerMod.isActive();
+         int compProg = (horror && this.pCompHorror != 0) ? this.pCompHorror : this.pComp;
+         GL20.glUseProgram(compProg);
+         this.u1i(compProg, "scene", 0);
+         this.u1i(compProg, "bloom", 1);
+         this.u1i(compProg, "bloom2", 3);
+         this.u1i(compProg, "bloom3", 4);
+         this.u1i(compProg, "aoTex", 5);
+         this.u1f(compProg, "aoAmt", horror ? Math.max(0.85F, this.aoAmt) : this.aoAmt);
          GL13.glActiveTexture(33989);
          GL11.glBindTexture(3553, this.aoAmt > 0.0F ? this.aoTex2 : 0);
          GL13.glActiveTexture(33984);
          int lk = Look.clamp(this.look);
-         GL20.glUniform3f(this.loc(this.pComp, "bloomW"), glow ? 0.55F : 1.0F, glow ? 0.40F : 0.0F, glow ? 0.35F : 0.0F);
-         GL20.glUniform4f(this.loc(this.pComp, "grA"), Look.A[lk][0], Look.A[lk][1], Look.A[lk][2], Look.A[lk][3]);
-         GL20.glUniform4f(this.loc(this.pComp, "grB"), Look.A[lk][4], Look.A[lk][5], Look.A[lk][6], 0.0F);
-         GL20.glUniform3f(this.loc(this.pComp, "grS"), Look.SHADOW[lk][0], Look.SHADOW[lk][1], Look.SHADOW[lk][2]);
-         GL20.glUniform3f(this.loc(this.pComp, "grH"), Look.HIGH[lk][0], Look.HIGH[lk][1], Look.HIGH[lk][2]);
-         this.u1f(this.pComp, "strength", var3);
-         this.u1f(this.pComp, "uw", this.underwater);
-         this.u1f(this.pComp, "time", (float)Perf.seconds(3600.0));
-         this.u1i(this.pComp, "rays", 2);
-         this.u1f(this.pComp, "rayAmt", this.rayAmt);
-         GL20.glUniform2f(this.loc(this.pComp, "sunUv"), this.sunU, this.sunV);
-         GL20.glUniform3f(this.loc(this.pComp, "rayCol"), this.rayCol[0], this.rayCol[1], this.rayCol[2]);
+         if (horror) {
+            float panic = BackroomsStalkerMod.getPanicLevel();
+            GL20.glUniform3f(this.loc(compProg, "bloomW"), glow ? 0.72F : 1.0F, glow ? 0.55F : 0.0F, glow ? 0.48F : 0.0F);
+            GL20.glUniform4f(this.loc(compProg, "grA"), 1.04F - panic * 0.12F, 1.18F + panic * 0.22F, 0.82F - panic * 0.25F, 0.06F);
+            GL20.glUniform4f(this.loc(compProg, "grB"), 0.52F + panic * 0.28F, 0.055F + panic * 0.065F, 0.55F, 0.0F);
+            GL20.glUniform3f(this.loc(compProg, "grS"), 0.85F + panic * 0.25F, 0.88F - panic * 0.35F, 0.68F - panic * 0.30F);
+            GL20.glUniform3f(this.loc(compProg, "grH"), 1.10F + panic * 0.15F, 1.02F - panic * 0.25F, 0.74F - panic * 0.25F);
+            this.u1f(compProg, "horrorPanic", panic);
+            this.u1f(compProg, "horrorBlackout", BackroomsStalkerMod.isBlackout() ? 1.0F : 0.0F);
+         } else {
+            GL20.glUniform3f(this.loc(compProg, "bloomW"), glow ? 0.55F : 1.0F, glow ? 0.40F : 0.0F, glow ? 0.35F : 0.0F);
+            GL20.glUniform4f(this.loc(compProg, "grA"), Look.A[lk][0], Look.A[lk][1], Look.A[lk][2], Look.A[lk][3]);
+            GL20.glUniform4f(this.loc(compProg, "grB"), Look.A[lk][4], Look.A[lk][5], Look.A[lk][6], 0.0F);
+            GL20.glUniform3f(this.loc(compProg, "grS"), Look.SHADOW[lk][0], Look.SHADOW[lk][1], Look.SHADOW[lk][2]);
+            GL20.glUniform3f(this.loc(compProg, "grH"), Look.HIGH[lk][0], Look.HIGH[lk][1], Look.HIGH[lk][2]);
+         }
+         this.u1f(compProg, "strength", var3);
+         this.u1f(compProg, "uw", this.underwater);
+         this.u1f(compProg, "time", (float)Perf.seconds(3600.0));
+         this.u1i(compProg, "rays", 2);
+         this.u1f(compProg, "rayAmt", this.rayAmt);
+         GL20.glUniform2f(this.loc(compProg, "sunUv"), this.sunU, this.sunV);
+         GL20.glUniform3f(this.loc(compProg, "rayCol"), this.rayCol[0], this.rayCol[1], this.rayCol[2]);
          GL13.glActiveTexture(33986);
          GL11.glBindTexture(3553, this.rayTex);
-         GL20.glUniform2f(this.loc(this.pComp, "invRes"), 1.0F / var1, 1.0F / var2);
+         GL20.glUniform2f(this.loc(compProg, "invRes"), 1.0F / var1, 1.0F / var2);
          GL13.glActiveTexture(33987);
          GL11.glBindTexture(3553, glow ? this.bloomTex2 : this.bloomTex0);
          GL13.glActiveTexture(33988);

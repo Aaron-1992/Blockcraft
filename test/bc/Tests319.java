@@ -878,6 +878,7 @@ final class Tests319 {
             double origY = bwGame.player.y;
             bwGame.runCommand("/backrooms");
             check(ModLoader.get("backrooms-stalker").enabled, "/backrooms auto-enables backrooms-stalker mod");
+            check(BackroomsStalkerMod.isActive() && bwGame.opt.shaders, "/backrooms enables horror shaders and atmosphere");
             eq(BackroomsStalkerMod.POCKET_FLOOR_Y + 1, (int)Math.floor(bwGame.player.y), "Player teleported into Backrooms Level 0 labyrinth");
             int px = (int)Math.floor(bwGame.player.x);
             int pz = (int)Math.floor(bwGame.player.z);
@@ -886,7 +887,20 @@ final class Tests319 {
             check(brGen instanceof BackroomsGen, "Overworld uses BackroomsGen when backrooms-stalker mod is enabled");
             Chunk brCh = brGen.generate(0, 0);
             eq(BackroomsGen.CARPET_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen places damp carpet at Y=64");
+            eq(Blocks.AIR, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y + 1, 0)] & 0xFFFF, "BackroomsGen has open interior room at Y=65");
+            // Verify findStand places player INSIDE the Backrooms at Y=65 (not on top of the bedrock roof at Y=72)
+            Gen prevGen = bwGame.world.gen;
+            bwGame.world.gen = brGen;
+            double[] stand = bwGame.findStand(0, 0);
+            eq(BackroomsGen.FLOOR_Y + 1, (int)Math.round(stand[1]), "findStand spawns player INSIDE Backrooms at Y=65");
+            bwGame.world.gen = prevGen;
+            // Verify custom 3D Stalker Entity & Horror Fog/Shader helpers
+            bwGame.runCommand("/stalker");
+            check(BackroomsStalkerMod.getStalker() != null && BackroomsStalkerMod.isStalkerMob(BackroomsStalkerMod.getStalker()), "Custom 3D Stalker entity spawned with STALKER_TAG");
+            float[] fogCol = BackroomsStalkerMod.getFogColor(1.0F);
+            check(fogCol[0] > 0.3F && BackroomsStalkerMod.getFogFar() <= 25.0F, "Backrooms yellow-ochre fog color and close fog distance active");
             bwGame.runCommand("/stalker blackout");
+            check(BackroomsStalkerMod.isBlackout(), "/stalker blackout triggers ceiling light blackout");
             bwGame.runCommand("/backrooms leave");
             eq((int)Math.floor(origY), (int)Math.floor(bwGame.player.y), "/backrooms leave restores player position");
          } finally {

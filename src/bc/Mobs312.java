@@ -347,7 +347,7 @@ final class Mobs312 {
 
    /** A mob was hurt. */
    static void hurt(Mobs ms, Mob m, int dmg, boolean byPlayer) {
-      if (m.dead) {
+      if (m.dead || BackroomsStalkerMod.isStalkerMob(m)) {
          return;
       }
 
@@ -438,6 +438,10 @@ final class Mobs312 {
 
    /** Calm until you look it in the face (or hit it); then it blinks about and hits hard. Water hurts it. */
    private static void enderman(Mobs ms, Mob m, World w, Player p, boolean target, double dx, double dz, double dy, double d2, double d3, Intent in) {
+      if (BackroomsStalkerMod.isStalkerMob(m)) {
+         BackroomsStalkerMod.stepStalkerIntent(ms, m, w, p, dx, dz, dy, d2, d3, in);
+         return;
+      }
       if (m.tpCd > 0) {
          m.tpCd--;
       }

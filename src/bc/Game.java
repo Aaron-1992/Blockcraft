@@ -1167,7 +1167,8 @@ public final class Game {
          this.world.weather.startFair();
          int[] var16 = this.world.gen.findSpawn();
          this.spawnXZ = new int[]{var16[0], var16[2]};
-         this.player.setPos(var16[0] + 0.5, 200.0, var16[2] + 0.5);
+         double startY = (this.world.gen instanceof BackroomsGen) ? (BackroomsGen.FLOOR_Y + 1.0) : 200.0;
+         this.player.setPos(var16[0] + 0.5, startY, var16[2] + 0.5);
          this.needSpawn = true;
          if (var3 == 1) {
             int[] var10 = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
@@ -1604,6 +1605,27 @@ public final class Game {
    }
 
    double[] findStand(int var1, int var2) {
+      if (this.world != null && this.world.gen instanceof BackroomsGen) {
+         int fy = BackroomsGen.FLOOR_Y;
+         for (int r = 0; r <= 10; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+               for (int dz = -r; dz <= r; dz++) {
+                  if (Math.max(Math.abs(dx), Math.abs(dz)) == r) {
+                     int bx = var1 + dx;
+                     int bz = var2 + dz;
+                     if (this.world.isLoaded(bx, bz)) {
+                        if (this.world.getBlock(bx, fy + 1, bz) == Blocks.AIR
+                           && this.world.getBlock(bx, fy + 2, bz) == Blocks.AIR) {
+                           return new double[]{bx + 0.5, fy + 1.0, bz + 0.5};
+                        }
+                     }
+                  }
+               }
+            }
+         }
+         return new double[]{var1 + 0.5, fy + 1.0, var2 + 0.5};
+      }
+
       for (int var3 = 0; var3 <= 10; var3++) {
          for (int var4 = -var3; var4 <= var3; var4++) {
             for (int var5 = -var3; var5 <= var3; var5++) {
@@ -6139,6 +6161,9 @@ public final class Game {
          String wm = ModLoader.hudWatermark();
          if (wm != null && !this.debug) {
             this.gui.text(wm, 4.0F, 4.0F, 0xFFFFFFFF, true, 1.0F);
+         }
+         if (BackroomsStalkerMod.isActive()) {
+            BackroomsStalkerMod.drawHudOverlay(this);
          }
          if (ModLoader.isWaystonesHudActive() && !this.debug && this.world != null) {
             this.drawWaystonesHud();

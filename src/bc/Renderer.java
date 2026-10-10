@@ -402,6 +402,15 @@ public final class Renderer {
          this.fogG = 0.87F * d;
          this.fogB = 1.00F * d;
       }
+      if (BackroomsStalkerMod.isActive()) {
+         float[] bfc = BackroomsStalkerMod.getFogColor((float)Perf.seconds(1.0E9));
+         this.topR = this.fogR = bfc[0];
+         this.topG = this.fogG = bfc[1];
+         this.topB = this.fogB = bfc[2];
+         this.daylight = BackroomsStalkerMod.isBlackout() ? 0.12F : 0.35F;
+         this.skyLightFactor = this.daylight;
+         return;
+      }
 
       // Update 3.8 - weather: overcast skies are grey and dark, storms darker still, lightning lights everything up
       this.wfx.updateLocal(var3);
@@ -447,10 +456,16 @@ public final class Renderer {
          ambient = Math.max(ambient, AMBIENT_HOOK); // test hook -Dbc.ambient=0.8: caves and the night can be photographed
       }
 
-      if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient) {
+      if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient || BackroomsStalkerMod.isActive()) {
          float[] tint = Dim.ambientTint(this.g.world == null ? Dim.OVERWORLD : this.g.world.dim);
-         Tex.ambG = tint[0];
-         Tex.ambB = tint[1];
+         if (BackroomsStalkerMod.isActive()) {
+            float panic = BackroomsStalkerMod.getPanicLevel();
+            Tex.ambG = 0.90F - panic * 0.45F;
+            Tex.ambB = 0.54F - panic * 0.35F;
+         } else {
+            Tex.ambG = tint[0];
+            Tex.ambB = tint[1];
+         }
          GL13.glActiveTexture(33985);
          Tex.updateLightmap(this.skyLightFactor, ambient, var1);
          GL13.glActiveTexture(33984);
@@ -634,12 +649,12 @@ public final class Renderer {
       }
 
       // Update 3.12: the Nether and the End have no sky: nothing of the sky is drawn, and being "under ground" does not darken the fog
-      final boolean skyOn = var5.dim == Dim.OVERWORLD;
+      final boolean skyOn = var5.dim == Dim.OVERWORLD && !BackroomsStalkerMod.isActive();
       if (!skyOn) {
          var11 = 1.0F;
       }
 
-      this.caveF = this.caveF + (var11 - this.caveF) * 0.04F;
+      this.caveF = BackroomsStalkerMod.isActive() ? 1.0F : (this.caveF + (var11 - this.caveF) * 0.04F);
       float var12 = 0.04F + 0.96F * this.caveF;
       this.fogR *= var12;
       this.fogG *= var12;
@@ -663,6 +678,10 @@ public final class Renderer {
       if (var5.dim == Dim.NETHER) {
          var12 = Math.min(var12, 104.0F); // the thick red haze of the Nether
          var11 = var12 * 0.1F;
+      }
+      if (BackroomsStalkerMod.isActive()) {
+         var11 = BackroomsStalkerMod.getFogNear();
+         var12 = BackroomsStalkerMod.getFogFar();
       }
       // Update 3.8: rain and storms pull the haze in close
       float wxFog = Math.min(1.0F, this.wfx.rain * 0.9F + this.wfx.storm * 0.1F);
@@ -1122,6 +1141,45 @@ public final class Renderer {
          this.sh.dynC[2] = var15[2] * var16;
          this.sh.dynC[3] = 1.0F;
          var1 = 1;
+      } else if (BackroomsStalkerMod.isActive()) {
+         // Camcorder handheld flashlight beam projected ahead of the player
+         float flk = 1.0F + 0.08F * (float)Math.sin(var2 * 47.0F) * BackroomsStalkerMod.getPanicLevel();
+         if (BackroomsStalkerMod.isBlackout() && ((int)(var2 * 18.0F) & 3) == 0) {
+            flk *= 0.35F;
+         }
+         float fdx = -this.mv[2];
+         float fdy = -this.mv[6];
+         float fdz = -this.mv[10];
+         this.sh.dynL[0] = fdx * 1.65F;
+         this.sh.dynL[1] = fdy * 1.65F - 0.1F;
+         this.sh.dynL[2] = fdz * 1.65F;
+         this.sh.dynL[3] = 8.5F * flk;
+         this.sh.dynC[0] = 1.0F * flk;
+         this.sh.dynC[1] = 0.91F * flk;
+         this.sh.dynC[2] = 0.62F * flk;
+         this.sh.dynC[3] = 1.0F;
+         var1 = 1;
+      }
+
+      if (BackroomsStalkerMod.isActive() && var1 < 8) {
+         Mobs.Mob stalker = BackroomsStalkerMod.getStalker();
+         if (stalker != null) {
+            double sx = stalker.x - this.camX;
+            double sy = stalker.y + 2.1 - this.camY;
+            double sz = stalker.z - this.camZ;
+            if (sx * sx + sy * sy + sz * sz < 1200.0) {
+               float pulse = 0.75F + 0.25F * (float)Math.sin(var2 * 14.0F);
+               this.sh.dynL[var1 * 4] = (float)sx;
+               this.sh.dynL[var1 * 4 + 1] = (float)sy;
+               this.sh.dynL[var1 * 4 + 2] = (float)sz;
+               this.sh.dynL[var1 * 4 + 3] = (BackroomsStalkerMod.getPhase() == BackroomsStalkerMod.PHASE_CHASE ? 11.5F : 7.5F) * pulse;
+               this.sh.dynC[var1 * 4] = 1.0F * pulse;
+               this.sh.dynC[var1 * 4 + 1] = 0.07F * pulse;
+               this.sh.dynC[var1 * 4 + 2] = 0.05F * pulse;
+               this.sh.dynC[var1 * 4 + 3] = 1.0F;
+               var1++;
+            }
+         }
       }
 
       for (Item var19 : this.g.world.items) {

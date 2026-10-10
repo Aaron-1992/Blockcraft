@@ -206,7 +206,7 @@ public final class Mobs {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;
                double var10 = var6 * var6 + var8 * var8;
-               if (Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || var5.tamed || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
+               if (Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || BackroomsStalkerMod.isStalkerMob(var5) || var5.tamed || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
                   if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
                      this.tickMob(var5, var1, var2, var3);
                      if (var5.y < -20.0) {
@@ -1199,6 +1199,9 @@ public final class Mobs {
    }
 
    void spawnHostile(World var1, Player var2, float var3) {
+      if (var1 != null && var1.gen instanceof BackroomsGen) {
+         return;
+      }
       if (!var2.dead) {
          if (var2.gameMode == 3) {
          }
@@ -1265,6 +1268,9 @@ public final class Mobs {
    }
 
    void spawnPassive(World var1, Player var2) {
+      if (var1 != null && var1.gen instanceof BackroomsGen) {
+         return;
+      }
       if (this.count(false) < 28) {
          for (int var3 = 0; var3 < 6; var3++) {
             double var4 = this.rnd.nextDouble() * Math.PI * 2.0;

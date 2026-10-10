@@ -1,2 +1,2 @@
 4.1
-2026-10-10T20:30:00Z-backrooms-stalker-mod
+# Backrooms & Stalker v2.0: VHS Horror Shader, Dynamic Yellow/Crimson Fog & Lighting, Inside-Backrooms 6-Zone WorldGen, and Custom 3D Stalker Entity
