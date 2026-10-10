@@ -171,6 +171,7 @@ final class TexPaint319 {
 
       // Bushy leaf frond tile (Update 3.19 graphics overhaul)
       Tex.blit(BUSHY_FROND, bushyFrond());
+      Tex.blit(BackroomsStalkerMod.T_ALMOND_WATER, BackroomsStalkerMod.almondWaterSprite());
       Redstone319.paint();
       bevelItemSprites();
    }

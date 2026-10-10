@@ -886,19 +886,37 @@ final class Tests319 {
             Gen brGen = Dim.makeGen(Dim.OVERWORLD, 999L, new WorldSettings());
             check(brGen instanceof BackroomsGen, "Overworld uses BackroomsGen when backrooms-stalker mod is enabled");
             Chunk brCh = brGen.generate(0, 0);
-            eq(BackroomsGen.CARPET_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen places damp carpet at Y=64");
-            eq(Blocks.AIR, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y + 1, 0)] & 0xFFFF, "BackroomsGen has open interior room at Y=65");
-            // Verify findStand places player INSIDE the Backrooms at Y=65 (not on top of the bedrock roof at Y=72)
+            eq(BackroomsGen.CARPET_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 0 places damp carpet at Y=64");
+            eq(Blocks.AIR, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y + 1, 0)] & 0xFFFF, "BackroomsGen Level 0 has open interior room at Y=65");
+            eq(Blocks.QUARTZ_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.POOL_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 37 Poolrooms has quartz floor at Y=82");
+            eq(Blocks.COBBLE, brCh.blocks[Chunk.idx(0, BackroomsGen.L2_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 2 Pipe Dreams has cobble floor at Y=30");
+            eq(Blocks.WOOL0 + 14, brCh.blocks[Chunk.idx(0, BackroomsGen.RUN_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level ! has crimson carpet floor at Y=14");
+            // Verify findable Almond Water item (269) & Hiding Spots
+            eq("Almond Water", Items.name(BackroomsStalkerMod.ALMOND_WATER), "Almond Water item (269) registered when mod is active");
+            Stack awStack = new Stack(BackroomsStalkerMod.ALMOND_WATER, 2);
+            bwGame.player.health = 10;
+            check(BackroomsStalkerMod.drinkAlmondWater(bwGame, awStack) && bwGame.player.health == 16 && awStack.n == 1, "Drinking Almond Water restores +6 health and sanity");
+            // Verify under-desk hiding cubby detection
+            int deskX = px + 3;
+            int deskY = BackroomsStalkerMod.POCKET_FLOOR_Y + 1;
+            int deskZ = pz + 1;
+            bwGame.player.setPos(deskX + 0.5, deskY, deskZ + 0.5);
+            bwGame.player.sneaking = true;
+            check(BackroomsStalkerMod.checkPlayerHidden(bwGame.world, bwGame.player), "Crouching under an office desk cubby hides the player from the Stalker");
+            bwGame.player.sneaking = false;
+            // Verify findStand places player INSIDE the Backrooms at Y=65 (not on top of the bedrock roof)
             Gen prevGen = bwGame.world.gen;
             bwGame.world.gen = brGen;
             double[] stand = bwGame.findStand(0, 0);
             eq(BackroomsGen.FLOOR_Y + 1, (int)Math.round(stand[1]), "findStand spawns player INSIDE Backrooms at Y=65");
+            bwGame.runCommand("/backrooms poolrooms");
+            eq(BackroomsGen.POOL_FLOOR_Y + 1, (int)Math.floor(bwGame.player.y), "/backrooms poolrooms teleports player to separate Level 37 Poolrooms");
             bwGame.world.gen = prevGen;
             // Verify custom 3D Stalker Entity & Horror Fog/Shader helpers
             bwGame.runCommand("/stalker");
             check(BackroomsStalkerMod.getStalker() != null && BackroomsStalkerMod.isStalkerMob(BackroomsStalkerMod.getStalker()), "Custom 3D Stalker entity spawned with STALKER_TAG");
             float[] fogCol = BackroomsStalkerMod.getFogColor(1.0F);
-            check(fogCol[0] > 0.3F && BackroomsStalkerMod.getFogFar() <= 25.0F, "Backrooms yellow-ochre fog color and close fog distance active");
+            check(fogCol[0] > 0.2F && BackroomsStalkerMod.getFogFar() <= 40.0F, "Backrooms per-level fog color and fog distance active");
             bwGame.runCommand("/stalker blackout");
             check(BackroomsStalkerMod.isBlackout(), "/stalker blackout triggers ceiling light blackout");
             bwGame.runCommand("/backrooms leave");

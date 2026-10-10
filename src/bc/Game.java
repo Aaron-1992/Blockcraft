@@ -4303,6 +4303,9 @@ public final class Game {
 
    boolean useBlock() {
       int var1 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+      if (BackroomsStalkerMod.isActive() && BackroomsStalkerMod.onUseBlock(this, this.target.x, this.target.y, this.target.z, var1)) {
+         return true;
+      }
       if (Shapes.use(this, this.target.x, this.target.y, this.target.z, var1)) {
          return true;
       }
@@ -4360,6 +4363,10 @@ public final class Game {
    }
 
    void blockDrops(int var1, int var2, int var3, int var4, int var5) {
+      if (BackroomsStalkerMod.isActive() && var4 == Blocks313.ICE && this.world.getBlock(var1, var2 - 1, var3) == Blocks.QUARTZ_BLOCK) {
+         this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, BackroomsStalkerMod.ALMOND_WATER, 2);
+         return;
+      }
       if (Items.canHarvest(var5, var4)) {
          int var6 = Blocks.drop[var4];
          int var7 = 1;
@@ -5049,6 +5056,9 @@ public final class Game {
          return false;
       }
       int var2 = var1.id;
+      if (var2 == BackroomsStalkerMod.ALMOND_WATER && BackroomsStalkerMod.drinkAlmondWater(this, var1)) {
+         return true;
+      }
       if (Items.isArmor(var2)) {
          int slot = Items.armorSlot(var2);
          Stack prev = this.armor[slot];

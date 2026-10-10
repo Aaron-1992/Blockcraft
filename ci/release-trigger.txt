@@ -1,2 +1,2 @@
 4.1
-# Backrooms & Stalker v2.0: VHS Horror Shader, Dynamic Yellow/Crimson Fog & Lighting, Inside-Backrooms 6-Zone WorldGen, and Custom 3D Stalker Entity
+# Backrooms & Stalker v2.1: Balanced Stalker AI, Physical Findable Almond Water on Desks/Coolers, 5 Separate Prettier Levels, and Hiding Lockers/Under-Desk Cubbies
