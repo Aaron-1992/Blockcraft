@@ -24,6 +24,17 @@ public class BackroomsStalkerMod implements BlockcraftMod {
    public static final int ALMOND_WATER = 269;
    public static final int T_ALMOND_WATER = 742;
 
+   // Custom 3D Block Model IDs (registered in Shapes/Blocks when mod is active)
+   public static final int B_DESK = 2010;
+   public static final int B_LOCKER_LOW = 2011;
+   public static final int B_LOCKER_HIGH = 2012;
+   public static final int B_WATER_COOLER = 2013;
+   public static final int B_COOLER_JUG = 2014;
+   public static final int B_EXIT_LOW = 2015;
+   public static final int B_EXIT_HIGH = 2016;
+   private static boolean customBlocksRegistered = false;
+   private int exitCooldown = 0;
+
    public static final int PHASE_STALK = 0;
    public static final int PHASE_FROZEN = 1;
    public static final int PHASE_AMBUSH = 2;
@@ -164,6 +175,7 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       Items.maxStack[ALMOND_WATER] = 16;
       Items.foodPts[ALMOND_WATER] = 6;
       Items.foodSat[ALMOND_WATER] = 8.0F;
+      registerCustomBlocks();
    }
 
    public static void unregisterAlmondWaterItem() {
@@ -172,6 +184,187 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       Items.maxStack[ALMOND_WATER] = 0;
       Items.foodPts[ALMOND_WATER] = 0;
       Items.foodSat[ALMOND_WATER] = 0.0F;
+      unregisterCustomBlocks();
+   }
+
+   public static void unregisterCustomBlocks() {
+      if (!customBlocksRegistered) {
+         return;
+      }
+      for (int id = B_DESK; id <= B_EXIT_HIGH; id++) {
+         Blocks.name[id] = null;
+         Blocks.solid[id] = false;
+         Blocks.opaque[id] = false;
+         Blocks.opacity[id] = 0;
+         Blocks.emit[id] = 0;
+         Blocks.hardness[id] = 0.0F;
+         Blocks.drop[id] = 0;
+         Blocks.kind[id] = 0;
+         Blocks.coll[id] = null;
+         Blocks.collMulti[id] = null;
+         Blocks.box[id] = new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
+         for (int f = 0; f < 6; f++) {
+            Blocks.tiles[id][f] = 0;
+         }
+         Shapes.model(id, null);
+      }
+      customBlocksRegistered = false;
+   }
+
+   /**
+    * Registers the 7 custom 3D multi-box models ({@link Shapes#K_SHAPE}) for 3D Office Desks,
+    * 3D Steel Hiding Lockers, 3D Almond Water Coolers, and 3D Illuminated Level Exit Doors.
+    */
+   public static void registerCustomBlocks() {
+      if (customBlocksRegistered) {
+         return;
+      }
+      customBlocksRegistered = true;
+
+      int oakPlank = Blocks.tiles[Blocks.PLANKS][0];
+      int birchPlank = Blocks.tiles[Blocks313.PLANKS_BIRCH][0];
+      int darkWood = Blocks.tiles[Blocks.LOG_SPRUCE][2];
+      int ironTile = Color312.T_IRON;
+      int quartzTile = Blocks.tiles[Blocks.QUARTZ_BLOCK][0];
+      int iceTile = Blocks.tiles[Blocks313.ICE][0];
+      int lanternTile = Redstone319.T_SEA_LANTERN;
+
+      // 1. 3D OFFICE DESK (B_DESK = 2010):
+      //    Tabletop sits at y = 13..16 (0.8125..1.0), leaving y = 0..0.8125 open so crouching players (height 0.72) crawl right under!
+      defModelBlock(B_DESK, "Office Desk", oakPlank, 1.5F, 0);
+      Shapes.model(B_DESK, new double[][]{
+         Shapes.tiles(Shapes.px(0.0, 13.0, 0.0, 16.0, 16.0, 16.0), birchPlank, oakPlank, birchPlank),
+         Shapes.tiles(Shapes.px(1.0, 11.5, 1.0, 15.0, 13.0, 15.0), darkWood, darkWood, darkWood),
+         Shapes.tiles(Shapes.px(2.5, 3.5, 1.0, 13.5, 11.5, 2.5), birchPlank, birchPlank, birchPlank),
+         Shapes.tiles(Shapes.px(1.0, 0.0, 1.0, 3.0, 11.5, 3.0), darkWood, darkWood, darkWood),
+         Shapes.tiles(Shapes.px(13.0, 0.0, 1.0, 15.0, 11.5, 3.0), darkWood, darkWood, darkWood),
+         Shapes.tiles(Shapes.px(1.0, 0.0, 13.0, 3.0, 11.5, 15.0), darkWood, darkWood, darkWood),
+         Shapes.tiles(Shapes.px(13.0, 0.0, 13.0, 15.0, 11.5, 15.0), darkWood, darkWood, darkWood)
+      });
+      Blocks.coll[B_DESK] = new double[]{0.0, 0.8125, 0.0, 1.0, 1.0, 1.0};
+      Blocks.box[B_DESK] = new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
+
+      // 2. 3D STEEL HIDING LOCKER (B_LOCKER_LOW = 2011, B_LOCKER_HIGH = 2012):
+      //    Hollow 3D cabinet with louvered upper vent slits and chrome handle.
+      defModelBlock(B_LOCKER_LOW, "Hiding Locker", ironTile, 2.0F, 0);
+      Shapes.model(B_LOCKER_LOW, new double[][]{
+         Shapes.tint(Shapes.px(1.0, 0.0, 1.0, 15.0, 1.5, 15.0), 0x707C88),
+         Shapes.tint(Shapes.px(1.0, 1.5, 1.0, 2.5, 16.0, 15.0), 0x7C8894),
+         Shapes.tint(Shapes.px(13.5, 1.5, 1.0, 15.0, 16.0, 15.0), 0x7C8894),
+         Shapes.tint(Shapes.px(2.5, 1.5, 1.0, 13.5, 16.0, 2.5), 0x687480),
+         Shapes.tint(Shapes.px(2.5, 1.5, 13.5, 4.5, 16.0, 15.0), 0x8896A4),
+         Shapes.tint(Shapes.px(11.5, 1.5, 13.5, 13.5, 16.0, 15.0), 0x8896A4),
+         Shapes.tint(Shapes.px(4.5, 1.5, 13.8, 11.5, 14.5, 14.8), 0x94A2B0),
+         Shapes.tint(Shapes.px(10.2, 11.0, 14.8, 11.5, 15.0, 15.8), 0xF0F4F8)
+      });
+      double[][] lockerWalls = new double[][]{
+         {0.0, 0.0, 0.0, 0.14, 1.0, 1.0},
+         {0.86, 0.0, 0.0, 1.0, 1.0, 1.0},
+         {0.14, 0.0, 0.0, 0.86, 1.0, 0.14}
+      };
+      Blocks.coll[B_LOCKER_LOW] = new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
+      Blocks.collMulti[B_LOCKER_LOW] = lockerWalls;
+      Blocks.box[B_LOCKER_LOW] = new double[]{0.0625, 0.0, 0.0625, 0.9375, 1.0, 0.9375};
+
+      defModelBlock(B_LOCKER_HIGH, "Hiding Locker Top", ironTile, 2.0F, 0);
+      Shapes.model(B_LOCKER_HIGH, new double[][]{
+         Shapes.tint(Shapes.px(0.5, 14.0, 0.5, 15.5, 16.0, 15.5), 0x707C88),
+         Shapes.tint(Shapes.px(1.0, 0.0, 1.0, 2.5, 14.0, 15.0), 0x7C8894),
+         Shapes.tint(Shapes.px(13.5, 0.0, 1.0, 15.0, 14.0, 15.0), 0x7C8894),
+         Shapes.tint(Shapes.px(2.5, 0.0, 1.0, 13.5, 14.0, 2.5), 0x687480),
+         Shapes.tint(Shapes.px(2.5, 0.0, 13.5, 4.5, 14.0, 15.0), 0x8896A4),
+         Shapes.tint(Shapes.px(11.5, 0.0, 13.5, 13.5, 14.0, 15.0), 0x8896A4),
+         Shapes.tint(Shapes.px(4.5, 0.0, 13.8, 11.5, 4.5, 14.8), 0x94A2B0),
+         Shapes.tint(Shapes.px(4.5, 6.0, 13.8, 11.5, 7.5, 14.8), 0x94A2B0),
+         Shapes.tint(Shapes.px(4.5, 9.0, 13.8, 11.5, 10.5, 14.8), 0x94A2B0),
+         Shapes.tint(Shapes.px(4.5, 12.0, 13.8, 11.5, 14.0, 14.8), 0x94A2B0)
+      });
+      Blocks.coll[B_LOCKER_HIGH] = new double[]{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
+      Blocks.collMulti[B_LOCKER_HIGH] = lockerWalls;
+      Blocks.box[B_LOCKER_HIGH] = new double[]{0.0625, 0.0, 0.0625, 0.9375, 1.0, 0.9375};
+
+      // 3. 3D ALMOND WATER COOLER & JUG (B_WATER_COOLER = 2013, B_COOLER_JUG = 2014)
+      defModelBlock(B_WATER_COOLER, "Almond Water Cooler", quartzTile, 1.2F, 4);
+      Shapes.model(B_WATER_COOLER, new double[][]{
+         Shapes.px(3.0, 0.0, 3.0, 13.0, 15.0, 13.0),
+         Shapes.tint(Shapes.px(4.0, 8.0, 12.6, 12.0, 9.5, 14.2), 0x505860),
+         Shapes.tint(Shapes.px(5.2, 11.2, 13.0, 6.8, 13.2, 14.6), 0x3598FF),
+         Shapes.tint(Shapes.px(9.2, 11.2, 13.0, 10.8, 13.2, 14.6), 0xFF4242),
+         Shapes.tint(Shapes.px(4.5, 15.0, 4.5, 11.5, 16.0, 11.5), 0xD8E4EC)
+      });
+      Blocks.coll[B_WATER_COOLER] = new double[]{0.1875, 0.0, 0.1875, 0.8125, 1.0, 0.8125};
+      Blocks.box[B_WATER_COOLER] = new double[]{0.1875, 0.0, 0.1875, 0.8125, 1.0, 0.8125};
+
+      defModelBlock(B_COOLER_JUG, "Almond Water Jug", iceTile, 0.8F, 6);
+      Shapes.model(B_COOLER_JUG, new double[][]{
+         Shapes.tint(Shapes.px(6.0, 0.0, 6.0, 10.0, 1.5, 10.0), 0x78D8FF),
+         Shapes.tint(Shapes.px(4.2, 1.5, 4.2, 11.8, 12.0, 11.8), 0x8CE2FF),
+         Shapes.tint(Shapes.px(6.0, 12.0, 6.0, 10.0, 13.5, 10.0), 0x60C8F8)
+      });
+      Blocks.coll[B_COOLER_JUG] = new double[]{0.26, 0.0, 0.26, 0.74, 0.85, 0.74};
+      Blocks.box[B_COOLER_JUG] = new double[]{0.26, 0.0, 0.26, 0.74, 0.85, 0.74};
+
+      // 4. 3D ILLUMINATED LEVEL EXIT DOOR & OVERHEAD EXIT SIGN (B_EXIT_LOW = 2015, B_EXIT_HIGH = 2016)
+      defModelBlock(B_EXIT_LOW, "Level Exit Door", lanternTile, -1.0F, 15);
+      Shapes.model(B_EXIT_LOW, new double[][]{
+         Shapes.tint(Shapes.tiles(Shapes.px(0.0, 0.0, 4.0, 2.5, 16.0, 12.0), ironTile, ironTile, ironTile), 0x48525C),
+         Shapes.tint(Shapes.tiles(Shapes.px(13.5, 0.0, 4.0, 16.0, 16.0, 12.0), ironTile, ironTile, ironTile), 0x48525C),
+         Shapes.tint(Shapes.px(2.5, 0.0, 6.5, 13.5, 16.0, 9.5), 0x45FF88),
+         Shapes.tint(Shapes.tiles(Shapes.px(3.5, 10.0, 9.5, 12.5, 11.5, 11.0), ironTile, ironTile, ironTile), 0xE8F0F8),
+         Shapes.tint(Shapes.tiles(Shapes.px(3.5, 10.0, 5.0, 12.5, 11.5, 6.5), ironTile, ironTile, ironTile), 0xE8F0F8)
+      });
+      Blocks.coll[B_EXIT_LOW] = null;
+      Blocks.box[B_EXIT_LOW] = new double[]{0.0, 0.0, 0.25, 1.0, 1.0, 0.75};
+
+      defModelBlock(B_EXIT_HIGH, "Level Exit Sign", lanternTile, -1.0F, 15);
+      Shapes.model(B_EXIT_HIGH, new double[][]{
+         Shapes.tint(Shapes.tiles(Shapes.px(0.0, 0.0, 4.0, 2.5, 16.0, 12.0), ironTile, ironTile, ironTile), 0x48525C),
+         Shapes.tint(Shapes.tiles(Shapes.px(13.5, 0.0, 4.0, 16.0, 16.0, 12.0), ironTile, ironTile, ironTile), 0x48525C),
+         Shapes.tint(Shapes.tiles(Shapes.px(0.0, 13.0, 3.5, 16.0, 16.0, 12.5), ironTile, ironTile, ironTile), 0x48525C),
+         Shapes.tint(Shapes.px(2.5, 0.0, 6.5, 13.5, 13.0, 9.5), 0x45FF88),
+         Shapes.tint(Shapes.px(3.0, 12.5, 12.0, 13.0, 15.8, 15.0), 0x50FF90),
+         Shapes.tint(Shapes.px(3.0, 12.5, 1.0, 13.0, 15.8, 4.0), 0x50FF90)
+      });
+      Blocks.coll[B_EXIT_HIGH] = null;
+      Blocks.box[B_EXIT_HIGH] = new double[]{0.0, 0.0, 0.25, 1.0, 1.0, 0.75};
+   }
+
+   private static void defModelBlock(int id, String name, int tile, float hard, int emit) {
+      Blocks.def(id, name, hard, false, tile);
+      Blocks.solid[id] = true;
+      Blocks.opaque[id] = false;
+      Blocks.opacity[id] = 0;
+      Blocks.emit[id] = emit;
+      Blocks.drop[id] = id;
+   }
+
+   /**
+    * Returns true if the player's bounding box is currently underneath a 3D Office Desk ({@link #B_DESK})
+    * or a 1-block crawlspace so releasing Shift while under a desk keeps the player safely crouched.
+    */
+   public static boolean mustStayCrouched(World w, Player p) {
+      if (w == null || p == null) {
+         return false;
+      }
+      int by = (int)Math.floor(p.y);
+      double r = 0.29;
+      int x0 = (int)Math.floor(p.x - r);
+      int x1 = (int)Math.floor(p.x + r);
+      int z0 = (int)Math.floor(p.z - r);
+      int z1 = (int)Math.floor(p.z + r);
+      for (int x = x0; x <= x1; x++) {
+         for (int z = z0; z <= z1; z++) {
+            int b = w.getBlock(x, by, z);
+            if (b == B_DESK) {
+               return true;
+            }
+            int above = w.getBlock(x, by + 1, z);
+            if (b == Blocks.AIR && above != Blocks.AIR && above != B_LOCKER_HIGH && above != B_EXIT_HIGH && Blocks.solid[above] && Blocks.coll[above] != null) {
+               return true;
+            }
+         }
+      }
+      return false;
    }
 
    /**
@@ -197,15 +390,66 @@ public class BackroomsStalkerMod implements BlockcraftMod {
    }
 
    /**
-    * Right-click handler for Backrooms interactive blocks:
-    * - Almond Water Coolers ({@code ICE} on {@code QUARTZ_BLOCK}) dispense Almond Water bottles!
-    * - Inter-Level Elevator Kiosks ({@code LADDER} over {@code SEA_LANTERN}) travel between Backrooms Levels!
+    * Right-click handler for Backrooms interactive 3D models & blocks:
+    * - 3D Office Desks ({@link #B_DESK}): crouch & crawl directly underneath the desk!
+    * - 3D Steel Hiding Lockers ({@link #B_LOCKER_LOW}, {@link #B_LOCKER_HIGH}): step inside / step out of the locker!
+    * - 3D Almond Water Coolers ({@link #B_WATER_COOLER}, {@link #B_COOLER_JUG}, or {@code ICE} on {@code QUARTZ_BLOCK}): dispense 2x Almond Water!
+    * - 3D Illuminated Level Exit Doors ({@link #B_EXIT_LOW}, {@link #B_EXIT_HIGH}): advance to the next Backrooms Level!
     */
    public static boolean onUseBlock(Game g, int x, int y, int z, int id) {
       if (!active || g == null || g.world == null || g.player == null) {
          return false;
       }
-      // 1. Almond Water Cooler Dispenser
+      // 1. 3D Illuminated Level Exit Door (B_EXIT_LOW / B_EXIT_HIGH)
+      if (id == B_EXIT_LOW || id == B_EXIT_HIGH) {
+         if (instance != null) {
+            instance.useExitDoor(g);
+         }
+         return true;
+      }
+
+      // 2. 3D Steel Hiding Locker (B_LOCKER_LOW / B_LOCKER_HIGH)
+      if (id == B_LOCKER_LOW || id == B_LOCKER_HIGH) {
+         int baseY = (id == B_LOCKER_HIGH) ? (y - 1) : y;
+         double dx = g.player.x - (x + 0.5);
+         double dz = g.player.z - (z + 0.5);
+         if (dx * dx + dz * dz < 0.35) {
+            g.player.setPos(x + 0.5, baseY, z + 1.35);
+            g.toast("Hiding Locker", "Stepped out of the Hiding Locker.");
+         } else {
+            g.player.setPos(x + 0.5, baseY, z + 0.5);
+            g.player.vx = g.player.vy = g.player.vz = 0.0;
+            g.toast("Hiding inside 3D Locker!", "You are undetectable through the vent slits.");
+            g.say("§b[Backrooms] §7You stepped inside the §f3D Steel Hiding Locker§7. Right-click again to step out.");
+         }
+         return true;
+      }
+
+      // 3. 3D Office Desk (B_DESK) -> Crouch & crawl underneath the desk!
+      if (id == B_DESK) {
+         g.player.sneaking = true;
+         g.player.updateBox();
+         g.player.setPos(x + 0.5, y, z + 0.5);
+         g.player.vx = g.player.vy = g.player.vz = 0.0;
+         g.toast("Under 3D Office Desk", "Crouched underneath the desk — Stalker cannot see you!");
+         return true;
+      }
+
+      // 4. 3D Almond Water Cooler Dispenser (B_WATER_COOLER / B_COOLER_JUG or legacy ICE on QUARTZ_BLOCK)
+      if (id == B_WATER_COOLER || id == B_COOLER_JUG) {
+         int baseY = (id == B_COOLER_JUG) ? (y - 1) : y;
+         if (g.world.getBlock(x, baseY + 1, z) == B_COOLER_JUG) {
+            g.world.setBlock(x, baseY + 1, z, Blocks.AIR);
+            g.meshNow(x, baseY + 1, z);
+         }
+         Stack bottle = new Stack(ALMOND_WATER, 2);
+         if (!g.addItem(bottle)) {
+            g.world.dropItem(x + 0.5, baseY + 1.1, z + 0.5, ALMOND_WATER, 2);
+         }
+         g.toast("Almond Water Dispenser", "Collected 2x Almond Water bottles!");
+         g.say("§b[Backrooms] §7Dispensed §f2x Almond Water§7 from the 3D Water Cooler.");
+         return true;
+      }
       if (id == Blocks313.ICE && g.world.getBlock(x, y - 1, z) == Blocks.QUARTZ_BLOCK) {
          g.world.setBlock(x, y, z, Blocks.GLASS);
          g.meshNow(x, y, z);
@@ -221,17 +465,53 @@ public class BackroomsStalkerMod implements BlockcraftMod {
          return onUseBlock(g, x, y + 1, z, Blocks313.ICE);
       }
 
-      // 2. Inter-Level Elevator Kiosk (Ladder or Sea Lantern in BackroomsGen)
+      // 5. Legacy Inter-Level Elevator Kiosk
       if ((id == Blocks.LADDER && g.world.getBlock(x, y - 1, z) == Redstone319.SEA_LANTERN)
          || (id == Redstone319.SEA_LANTERN && g.world.getBlock(x, y + 1, z) == Blocks.LADDER)) {
-         if (instance != null && g.world.gen instanceof BackroomsGen) {
-            int curLvl = BackroomsGen.levelForY(g.player.y);
-            int nextLvl = (curLvl + 1) % 4; // Cycles Level 0 -> Level 1 -> Level 2 -> Poolrooms -> Level 0
-            instance.teleportToLevel(g, nextLvl);
+         if (instance != null) {
+            instance.useExitDoor(g);
             return true;
          }
       }
       return false;
+   }
+
+   /** Advances the player through a 3D Level Exit Door to the next Backrooms Level (or escapes the Pocket Backrooms). */
+   public void useExitDoor(Game g) {
+      if (g == null || g.world == null || g.player == null) {
+         return;
+      }
+      this.exitCooldown = 60;
+      if (!(g.world.gen instanceof BackroomsGen) && this.inPocketBackrooms) {
+         // In Pocket Backrooms, upgrade worldgen or transition levels seamlessly
+         g.world.gen = new BackroomsGen(g.world.seed, g.world.settings);
+         this.inPocketBackrooms = false;
+         teleportToLevel(g, BackroomsGen.LEVEL_1);
+         return;
+      }
+      int curLvl = BackroomsGen.levelForY(g.player.y);
+      int nextLvl;
+      switch (curLvl) {
+         case BackroomsGen.LEVEL_0:
+            nextLvl = BackroomsGen.LEVEL_1;
+            break;
+         case BackroomsGen.LEVEL_1:
+            nextLvl = BackroomsGen.LEVEL_2;
+            break;
+         case BackroomsGen.LEVEL_2:
+            nextLvl = BackroomsGen.LEVEL_RUN;
+            break;
+         case BackroomsGen.LEVEL_RUN:
+            nextLvl = BackroomsGen.LEVEL_POOLROOMS;
+            break;
+         case BackroomsGen.LEVEL_POOLROOMS:
+         default:
+            nextLvl = BackroomsGen.LEVEL_0;
+            sanity = 100;
+            g.player.health = 20;
+            break;
+      }
+      teleportToLevel(g, nextLvl);
    }
 
    /**
@@ -314,12 +594,12 @@ public class BackroomsStalkerMod implements BlockcraftMod {
 
    @Override
    public String version() {
-      return "2.1.0";
+      return "2.2.0";
    }
 
    @Override
    public String description() {
-      return "5 Separate Backrooms Levels, Findable Almond Water, Hiding Lockers/Desks, VHS Shader & 3D Stalker Entity.";
+      return "5 Pretty Backrooms Levels, 3D Desks (Crawl Under!), 3D Hiding Lockers, 3D Water Coolers, Exits on All Levels & Stalker.";
    }
 
    @Override
@@ -732,19 +1012,33 @@ public class BackroomsStalkerMod implements BlockcraftMod {
             }
          }
       }
-      // Welcome Supply Desk with Under-Desk Hiding Cubby at (cx + 3, cz..cz+1)
-      w.setBlock(cx + 3, baseY + 1, cz, Blocks.FENCE);
-      w.setBlock(cx + 3, baseY + 2, cz, Blocks.PLANKS);
-      w.setBlock(cx + 3, baseY + 1, cz + 1, Blocks.AIR); // Open hiding cubby under desk!
-      w.setBlock(cx + 3, baseY + 2, cz + 1, Blocks.PLANKS);
-      // Almond Water Cooler at (cx - 3, cz)
-      w.setBlock(cx - 3, baseY + 1, cz, Blocks.QUARTZ_BLOCK);
-      w.setBlock(cx - 3, baseY + 2, cz, Blocks313.ICE);
+      // Welcome 3D Office Desk at (cx + 3, cz..cz+1) — hold Shift to crawl right underneath the 3D desk!
+      w.setBlock(cx + 3, baseY + 1, cz, B_DESK);
+      w.setBlock(cx + 3, baseY + 1, cz + 1, B_DESK);
+      // Pair of 3D Hiding Lockers flush against the wall at (cx - 2..cx - 1, cz - 4)
+      w.setBlock(cx - 2, baseY + 1, cz - 4, B_LOCKER_LOW);
+      w.setBlock(cx - 2, baseY + 2, cz - 4, B_LOCKER_HIGH);
+      w.setBlock(cx - 1, baseY + 1, cz - 4, B_LOCKER_LOW);
+      w.setBlock(cx - 1, baseY + 2, cz - 4, B_LOCKER_HIGH);
+      // 3D Almond Water Cooler at (cx - 3, cz)
+      w.setBlock(cx - 3, baseY + 1, cz, B_WATER_COOLER);
+      w.setBlock(cx - 3, baseY + 2, cz, B_COOLER_JUG);
+      // 3D Illuminated Level Exit Door at (cx, cz + 16)
+      for (int ex = -1; ex <= 1; ex++) {
+         for (int ez = -1; ez <= 1; ez++) {
+            w.setBlock(cx + ex, baseY, cz + 16 + ez, Blocks.WOOL0 + 5);
+            for (int y = baseY + 1; y <= baseY + 3; y++) {
+               w.setBlock(cx + ex, y, cz + 16 + ez, Blocks.AIR);
+            }
+         }
+      }
+      w.setBlock(cx, baseY + 1, cz + 16, B_EXIT_LOW);
+      w.setBlock(cx, baseY + 2, cz + 16, B_EXIT_HIGH);
    }
 
    /**
-    * Checks whether the player is currently hidden inside a Hiding Locker, Under-Desk Cubby,
-    * Pipe Alcove, or crouching behind cover.
+    * Checks whether the player is currently hidden underneath a 3D Office Desk ({@link #B_DESK}),
+    * inside a 3D Steel Hiding Locker ({@link #B_LOCKER_LOW}/{@link #B_LOCKER_HIGH}), or in a 3-walled alcove.
     */
    public static boolean checkPlayerHidden(World w, Player p) {
       if (w == null || p == null) {
@@ -754,12 +1048,30 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       int by = (int)Math.floor(p.y);
       int bz = (int)Math.floor(p.z);
 
-      // 1. Under-Desk Cubby or Low Ceiling Alcove: solid block directly above head (by + 2) while crouching,
-      //    or enclosed locker roof at (by + 3) with 3 surrounding walls!
+      int here = w.getBlock(bx, by, bz);
+      int head = w.getBlock(bx, by + 1, bz);
+
+      // 1. Directly underneath a 3D Office Desk (B_DESK) or inside a 3D Steel Hiding Locker (B_LOCKER_LOW/HIGH)
+      if (here == B_DESK || here == B_LOCKER_LOW || head == B_LOCKER_HIGH) {
+         return true;
+      }
+
+      // 2. Crouching beside a 3D Office Desk or 3D Locker, or under a solid block at (by + 1) or (by + 2)
+      int overhead1 = w.getBlock(bx, by + 1, bz);
       int overhead2 = w.getBlock(bx, by + 2, bz);
       int overhead3 = w.getBlock(bx, by + 3, bz);
-      if (p.sneaking && overhead2 != Blocks.AIR && Blocks.solid[overhead2]) {
-         return true;
+      if (p.sneaking) {
+         if ((overhead1 != Blocks.AIR && Blocks.solid[overhead1]) || (overhead2 != Blocks.AIR && Blocks.solid[overhead2])) {
+            return true;
+         }
+         for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+               int nb = w.getBlock(bx + dx, by, bz + dz);
+               if (nb == B_DESK || nb == B_LOCKER_LOW) {
+                  return true;
+               }
+            }
+         }
       }
 
       // Count solid walls around the player at body/head height
@@ -769,11 +1081,9 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       if (Blocks.solid[w.getBlock(bx, by + 1, bz + 1)]) wallsAround++;
       if (Blocks.solid[w.getBlock(bx, by + 1, bz - 1)]) wallsAround++;
 
-      // 2. Inside a 3-walled Hiding Locker / Closet Booth / Pipe Alcove
       if (wallsAround >= 3) {
          return true;
       }
-      // 3. Crouching in a 2-walled corner or behind a desk with a low roof
       if (p.sneaking && (wallsAround >= 2 || (overhead3 != Blocks.AIR && overhead3 != Blocks.SANDSTONE && overhead3 != Blocks.GLOWSTONE))) {
          return true;
       }
@@ -781,8 +1091,8 @@ public class BackroomsStalkerMod implements BlockcraftMod {
    }
 
    /**
-    * Periodically spawns physical, findable Almond Water bottles on top of nearby Supply Desks & Warehouse Shelves
-    * so the player can find Almond Water naturally in the world without random chests!
+    * Periodically spawns physical, findable Almond Water bottles on top of nearby 3D Office Desks ({@link #B_DESK})
+    * and Warehouse Supply Shelves so the player can find Almond Water naturally in the world!
     */
    private void tickFindableAlmondWater(Game g) {
       if ((g.tickCount % 35) != 0 || g.world == null || g.player == null) {
@@ -800,6 +1110,18 @@ public class BackroomsStalkerMod implements BlockcraftMod {
                int wy = py + dy;
                int wz = pz + dz;
                int b = w.getBlock(wx, wy, wz);
+               if (b == B_DESK && w.getBlock(wx, wy + 1, wz) == Blocks.AIR) {
+                  long key = ((long)(wx & 0x3FFFFFF) << 38) | ((long)(wz & 0x3FFFFFF) << 12) | (wy & 0xFFF);
+                  if (this.stockedTables.add(key)) {
+                     World.Item dropped = w.dropItem(wx + 0.5, wy + 1.08, wz + 0.5, ALMOND_WATER, 1, 0);
+                     if (dropped != null) {
+                        dropped.vx = 0.0;
+                        dropped.vy = 0.0;
+                        dropped.vz = 0.0;
+                     }
+                     return;
+                  }
+               }
                if (b == Blocks.PLANKS && w.getBlock(wx, wy + 1, wz) == Blocks.AIR) {
                   int below = w.getBlock(wx, wy - 1, wz);
                   if (below == Blocks.FENCE || below == Blocks.BOOKSHELF) {
@@ -834,6 +1156,21 @@ public class BackroomsStalkerMod implements BlockcraftMod {
 
       if (g.world.gen instanceof BackroomsGen) {
          ensurePlayerInsideBackrooms(g);
+      }
+
+      // Check if player walked into a 3D Illuminated Level Exit Door (B_EXIT_LOW / B_EXIT_HIGH)
+      if (this.exitCooldown > 0) {
+         this.exitCooldown--;
+      } else {
+         int bx = (int)Math.floor(g.player.x);
+         int by = (int)Math.floor(g.player.y);
+         int bz = (int)Math.floor(g.player.z);
+         int b0 = g.world.getBlock(bx, by, bz);
+         int b1 = g.world.getBlock(bx, by + 1, bz);
+         if (b0 == B_EXIT_LOW || b0 == B_EXIT_HIGH || b1 == B_EXIT_LOW || b1 == B_EXIT_HIGH) {
+            useExitDoor(g);
+            return;
+         }
       }
 
       // Update Hiding Spot status
@@ -1525,10 +1862,12 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       String recStr = (recBlink ? "§c● REC " : "§8○ REC ") + "§e" + levelTitle;
       gui.text(recStr, 16.0F, 15.0F, 0xFFFFFFFF, true, 1.0F);
 
-      // 4. Sanity, Heart Rate & Stealth Hiding Readout
+      // 4. Sanity, Heart Rate, Exit Beacon Distance & Stealth Hiding Readout
+      int[] exitXZ = BackroomsGen.nearestExitXZ(g.player != null ? g.player.x : 0.0, g.player != null ? g.player.z : 0.0);
+      int exitDist = g.player != null ? (int)Math.round(Math.hypot(exitXZ[0] - g.player.x, exitXZ[1] - g.player.z)) : 24;
       String sanCol = sanity > 60 ? "§a" : (sanity > 30 ? "§e" : "§c");
       String bpmCol = heartbeatBpm > 135 ? "§c" : (heartbeatBpm > 100 ? "§e" : "§f");
-      String stealthTag = playerCurrentlyHidden ? "  §8|  §b[HIDING — UNDETECTABLE]" : "";
+      String stealthTag = playerCurrentlyHidden ? "  §8|  §b[HIDING — UNDETECTABLE]" : ("  §8|  §aEXIT: §f" + exitDist + "m");
       String status = "§7SANITY: " + sanCol + sanity + "%  §8|  §7BPM: " + bpmCol + heartbeatBpm + " ♥" + stealthTag;
       gui.text(status, 16.0F, 27.0F, 0xFFFFFFFF, true, 1.0F);
 

@@ -1,26 +1,18 @@
 package bc;
 
 /**
- * Multi-Level Backrooms World Generator.
+ * Multi-Level Backrooms World Generator (v2.2).
  * <p>
- * Generates 5 separate, full-world Backrooms levels at distinct vertical strata so each level has
- * its own cohesive, detailed architecture across the entire infinite X/Z plane:
+ * Generates 5 separate, full-world Backrooms levels at distinct vertical strata, each featuring:
  * <ul>
- *   <li><b>Level 37 — The Poolrooms</b> ({@code Y = 82..90}): Serene white quartz atrium, raised tiled walkways,
- *       sunken turquoise water pools, fluted columns, and cyan sea-lantern skylight coffers.</li>
- *   <li><b>Level 0 — The Lobby</b> ({@code Y = 64..71}): Pretty mono-yellow wallpapered rooms with oak baseboard
- *       wainscoting, birch crown molding, fluted corner pilasters, acoustic ceiling tiles, office desks
- *       (with under-desk hiding cubbies &amp; Almond Water on top), Hiding Lockers, and Water Coolers.</li>
- *   <li><b>Level 1 — The Habitable Zone (Warehouse)</b> ({@code Y = 46..53}): Industrial concrete/stonebrick
- *       warehouse halls, heavy 2x2 pillars, wooden supply shelves with Almond Water, and Hiding Booths.</li>
- *   <li><b>Level 2 — Pipe Dreams</b> ({@code Y = 30..36}): Claustrophobic brick &amp; stonebrick maintenance
- *       tunnels with overhead steam pipes, recessed pipe-alcove hiding spots, and dim amber lights.</li>
- *   <li><b>Level "!" — Run For Your Life</b> ({@code Y = 14..20}): Endless crimson hospital corridor with
- *       red carpet, white quartz lower walls, side hiding alcoves, Almond Water tables, and redstone alarms.</li>
+ *   <li>Cohesive, detailed level architecture (baseboards, crown moldings, pilasters, coffered ceilings)</li>
+ *   <li>Well-placed <b>3D Office Desks</b> ({@link BackroomsStalkerMod#B_DESK}) you can physically crawl underneath</li>
+ *   <li>Well-placed <b>3D Hiding Lockers</b> ({@link BackroomsStalkerMod#B_LOCKER_LOW} / {@link BackroomsStalkerMod#B_LOCKER_HIGH}) flush against walls</li>
+ *   <li>Well-placed <b>3D Almond Water Coolers</b> ({@link BackroomsStalkerMod#B_WATER_COOLER} / {@link BackroomsStalkerMod#B_COOLER_JUG})</li>
+ *   <li>Dedicated <b>3D Illuminated Level Exit Doors</b> ({@link BackroomsStalkerMod#B_EXIT_LOW} / {@link BackroomsStalkerMod#B_EXIT_HIGH}) on EVERY level</li>
  * </ul>
  */
 public class BackroomsGen extends Gen {
-   // Level 0 ("The Lobby") default constants
    public static final int FLOOR_Y = 64;
    public static final int CEIL_Y = 71;
    public static final int CARPET_BLOCK = Blocks.WOOL0 + 4;
@@ -60,6 +52,7 @@ public class BackroomsGen extends Gen {
       if (settings != null) {
          this.settings = settings;
       }
+      BackroomsStalkerMod.registerCustomBlocks();
    }
 
    private static long cellHash(long seed, int x, int z) {
@@ -69,7 +62,6 @@ public class BackroomsGen extends Gen {
       return h ^ (h >>> 31);
    }
 
-   /** Returns which Backrooms Level (0..4) corresponds to a vertical Y coordinate. */
    public static int levelForY(double y) {
       if (y >= POOL_FLOOR_Y - 3) {
          return LEVEL_POOLROOMS;
@@ -116,6 +108,25 @@ public class BackroomsGen extends Gen {
       }
    }
 
+   /** Returns the nearest Level Exit coordinates (wx, wz) for a player at (px, pz). Exits repeat on a 48-block grid at (0, 24 + 48*k). */
+   public static int[] nearestExitXZ(double px, double pz) {
+      int gx = (int)Math.round(px / 48.0) * 48;
+      int gz = (int)Math.round((pz - 24.0) / 48.0) * 48 + 24;
+      return new int[]{gx, gz};
+   }
+
+   private static boolean isExitVestibule(int wx, int wz) {
+      int ex = Math.floorMod(wx + 24, 48) - 24;
+      int ez = Math.floorMod(wz - 24 + 24, 48) - 24;
+      return Math.abs(ex) <= 2 && Math.abs(ez) <= 2;
+   }
+
+   private static boolean isExitDoorPos(int wx, int wz) {
+      int ex = Math.floorMod(wx + 24, 48) - 24;
+      int ez = Math.floorMod(wz - 24 + 24, 48) - 24;
+      return ex == 0 && ez == 0;
+   }
+
    public static int zoneAt(long seed, int wx, int wz) {
       int rx = Math.floorDiv(wx, 32);
       int rz = Math.floorDiv(wz, 32);
@@ -146,6 +157,7 @@ public class BackroomsGen extends Gen {
 
    @Override
    public Chunk generate(int cx, int cz) {
+      BackroomsStalkerMod.registerCustomBlocks();
       Chunk c = new Chunk(cx, cz);
       for (int i = 0; i < 256; i++) {
          c.biome[i] = (byte)Biomes.DESERT;
@@ -159,89 +171,102 @@ public class BackroomsGen extends Gen {
             int wx = wx0 + lx;
             int wz = wz0 + lz;
 
-            // Fill solid stone/bedrock strata between separate levels
             setBlk(c, lx, 0, lz, Blocks.BEDROCK);
             for (int y = 1; y <= POOL_CEIL_Y + 1; y++) {
                setBlk(c, lx, y, lz, Blocks.STONE);
             }
 
-            // Generate each separate Backrooms Level at its own vertical stratum
             generateLevelRun(c, lx, lz, wx, wz);
             generateLevel2(c, lx, lz, wx, wz);
             generateLevel1(c, lx, lz, wx, wz);
             generateLevel0(c, lx, lz, wx, wz);
             generatePoolrooms(c, lx, lz, wx, wz);
 
-            // Seal top cap above Poolrooms with Bedrock so 0 sky light ever leaks in
             setBlk(c, lx, POOL_CEIL_Y + 1, lz, Blocks.BEDROCK);
          }
       }
       return c;
    }
 
+   /** Places the universal Starting Lobby furniture & Level Exit Vestibule for any level. */
+   private boolean placeLobbyOrExit(Chunk c, int lx, int lz, int wx, int wz, int fy, int cy) {
+      // 1. Level Exit Vestibule every 48 blocks (guaranteed at (0, 24), (0, -24), (48, 24), etc.)
+      if (isExitVestibule(wx, wz)) {
+         int ex = Math.floorMod(wx + 24, 48) - 24;
+         int ez = Math.floorMod(wz - 24 + 24, 48) - 24;
+         // Emerald/Green carpet approach pad
+         setBlk(c, lx, fy, lz, (Math.abs(ex) <= 1 && Math.abs(ez) <= 1) ? (Blocks.WOOL0 + 5) : Blocks313.PLANKS_BIRCH);
+         setBlk(c, lx, cy, lz, Redstone319.SEA_LANTERN);
+         if (isExitDoorPos(wx, wz)) {
+            setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_EXIT_LOW);
+            setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_EXIT_HIGH);
+         } else if (Math.abs(ex) == 1 && ez == 0) {
+            // Framed archway pillars flanking the 3D Exit Door
+            for (int y = fy + 1; y <= fy + 3; y++) {
+               setBlk(c, lx, y, lz, Blocks.QUARTZ_BLOCK);
+            }
+         }
+         return true;
+      }
+
+      // 2. Starting Lobby around (0, 0) on every Level:
+      //    - 2-block 3D Office Desk at (wx = 3, wz = 0..1) that you can crouch & crawl right underneath!
+      //    - Pair of 3D Hiding Lockers flush against the wall at (wx = -2..-1, wz = -4)
+      //    - 3D Almond Water Cooler at (wx = -3, wz = 0)
+      if (Math.abs(wx) <= 4 && Math.abs(wz) <= 4) {
+         if (wx == 3 && (wz == 0 || wz == 1)) {
+            setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
+         } else if ((wx == -2 || wx == -1) && wz == -4) {
+            setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_LOCKER_LOW);
+            setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_LOCKER_HIGH);
+         } else if (wx == -3 && wz == 0) {
+            setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_WATER_COOLER);
+            setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_COOLER_JUG);
+         }
+         return true;
+      }
+      return false;
+   }
+
    // ====================================================================================================
-   // LEVEL 0 — "THE LOBBY" (Y = 64..71): Pretty Mono-Yellow Wallpaper, Baseboards, Offices & Hiding Spots
+   // LEVEL 0 — "THE LOBBY" (Y = 64..71): Pretty Mono-Yellow Wallpaper, Moldings, 3D Desks & 3D Lockers
    // ====================================================================================================
    private void generateLevel0(Chunk c, int lx, int lz, int wx, int wz) {
       int fy = L0_FLOOR_Y;
       int cy = L0_CEIL_Y;
 
       setBlk(c, lx, fy - 1, lz, Blocks.BEDROCK);
-      setBlk(c, lx, fy, lz, CARPET_BLOCK);
+
+      // 12x12 Architectural Room Grid
+      int rx = Math.floorMod(wx, 12);
+      int rz = Math.floorMod(wz, 12);
+      int roomX = Math.floorDiv(wx, 12);
+      int roomZ = Math.floorDiv(wz, 12);
+      long rh = cellHash(this.seed ^ 0x9E3779B97F4A7C15L, roomX, roomZ);
+      int roomStyle = (int)Math.floorMod(rh, 5L);
+
+      // Pretty bordered carpet floor: warm brown runner border along room perimeter (rx==1,11 or rz==1,11)
+      boolean carpetBorder = (rx == 1 || rx == 11 || rz == 1 || rz == 11) && rx != 0 && rz != 0;
+      setBlk(c, lx, fy, lz, carpetBorder ? (Blocks.WOOL0 + 12) : CARPET_BLOCK);
+
       for (int y = fy + 1; y < cy; y++) {
          setBlk(c, lx, y, lz, Blocks.AIR);
       }
 
-      // Pretty coffered acoustic ceiling: Birch Planks framing Sandstone panels + 2x2 Glowstone lights
-      int cmx = Math.floorMod(wx, 8);
-      int cmz = Math.floorMod(wz, 8);
-      boolean lightPanel = (cmx == 3 || cmx == 4) && (cmz == 3 || cmz == 4);
-      boolean ceilingGridFrame = cmx == 0 || cmz == 0;
-      int cellX = Math.floorDiv(wx, 8);
-      int cellZ = Math.floorDiv(wz, 8);
-      long cellH = cellHash(this.seed, cellX, cellZ);
-      boolean spawnLobby = Math.abs(wx) <= 5 && Math.abs(wz) <= 5;
-
+      // Coffered Acoustic Ceiling with Birch Beams & 2x2 Recessed Fluorescent Light Panels
+      boolean lightPanel = (rx == 5 || rx == 6) && (rz == 5 || rz == 6);
+      boolean ceilingBeam = rx == 0 || rz == 0 || rx == 6 || rz == 6;
       if (lightPanel) {
-         boolean working = spawnLobby || (cellH & 15L) != 0L;
+         boolean working = Math.abs(wx) <= 8 && Math.abs(wz) <= 8 || (rh & 15L) != 0L;
          setBlk(c, lx, cy, lz, working ? Blocks.GLOWSTONE : Blocks.GLASS);
       } else {
-         setBlk(c, lx, cy, lz, ceilingGridFrame ? Blocks313.PLANKS_BIRCH : Blocks.SANDSTONE);
+         setBlk(c, lx, cy, lz, ceilingBeam ? Blocks313.PLANKS_BIRCH : Blocks.SANDSTONE);
       }
       setBlk(c, lx, cy + 1, lz, Blocks.BEDROCK);
 
-      // Starting Lobby around (0, 0) with a Welcome Supply Desk & Water Cooler (no random junk chest!)
-      if (spawnLobby) {
-         // Carpet border runner around the spawn room
-         if (Math.abs(wx) == 4 || Math.abs(wz) == 4) {
-            setBlk(c, lx, fy, lz, Blocks.WOOL0 + 12); // Warm brown carpet border
-         }
-         // Welcome Desk at (3, 0..1) with an under-desk hiding cubby and Almond Water on top
-         if (wx == 3 && (wz == 0 || wz == 1)) {
-            setBlk(c, lx, fy + 1, lz, wz == 0 ? Blocks.FENCE : Blocks.AIR); //wz==1 is open under-desk hiding cubby!
-            setBlk(c, lx, fy + 2, lz, Blocks.PLANKS);
-         }
-         // Almond Water Cooler at (-3, 0)
-         if (wx == -3 && wz == 0) {
-            setBlk(c, lx, fy + 1, lz, Blocks.QUARTZ_BLOCK);
-            setBlk(c, lx, fy + 2, lz, Blocks313.ICE);
-         }
-         // Hiding Locker Booth at (-4, -4..-3)
-         if (wx == -4 && wz == -4) {
-            setBlk(c, lx, fy + 1, lz, Blocks.PLANKS);
-            setBlk(c, lx, fy + 2, lz, Blocks.PLANKS);
-            setBlk(c, lx, fy + 3, lz, Blocks.PLANKS);
-         }
+      if (placeLobbyOrExit(c, lx, lz, wx, wz, fy, cy)) {
          return;
       }
-
-      // 10x10 Architectural Room Grid for spacious, pretty rooms
-      int rx = Math.floorMod(wx, 10);
-      int rz = Math.floorMod(wz, 10);
-      int roomX = Math.floorDiv(wx, 10);
-      int roomZ = Math.floorDiv(wz, 10);
-      long rh = cellHash(this.seed ^ 0x9E3779B97F4A7C15L, roomX, roomZ);
-      int roomStyle = (int)Math.floorMod(rh, 5L); // 0..2: Wallpapered Rooms/Offices, 3: Pillar Gallery, 4: Lounge
 
       boolean isWall = false;
       boolean isDoor = false;
@@ -249,30 +274,32 @@ public class BackroomsGen extends Gen {
       boolean isPilaster = false;
 
       if (roomStyle == 3) {
-         // Symmetric Louvered Pillar Gallery: 2x2 fluted pillars with oak baseboards
-         if ((rx == 2 || rx == 3 || rx == 7 || rx == 8) && (rz == 2 || rz == 3 || rz == 7 || rz == 8)) {
+         // Grand Fluted Pillar Gallery: 2x2 columns at (3..4, 3..4) and (8..9, 8..9)
+         if (((rx == 3 || rx == 4) || (rx == 8 || rx == 9)) && ((rz == 3 || rz == 4) || (rz == 8 || rz == 9))) {
             isWall = true;
-            isPilaster = (rx == 2 || rx == 8) && (rz == 2 || rz == 8);
+            isPilaster = (rx == 3 || rx == 9) && (rz == 3 || rz == 9);
          }
       } else {
          boolean westWall = (rh & 3L) != 0L;
          boolean northWall = ((rh >>> 2) & 3L) != 0L;
          if (rx == 0 && westWall) {
             isWall = true;
-            int dp = 3 + (int)Math.floorMod(rh >>> 8, 3L);
-            if (rz == dp || rz == dp + 1) {
+            if (rz >= 5 && rz <= 7) {
                isDoor = true;
-            } else if ((rz == 7 || rz == 8) && ((rh >>> 12) & 3L) == 0L) {
+            } else if ((rz == 3 || rz == 9) && ((rh >>> 8) & 1L) == 0L) {
                isWindow = true;
+            } else if (rz == 4 || rz == 8) {
+               isPilaster = true;
             }
          }
          if (rz == 0 && northWall) {
             isWall = true;
-            int dp = 3 + (int)Math.floorMod(rh >>> 14, 3L);
-            if (rx == dp || rx == dp + 1) {
+            if (rx >= 5 && rx <= 7) {
                isDoor = true;
-            } else if ((rx == 7 || rx == 8) && ((rh >>> 18) & 3L) == 0L) {
+            } else if ((rx == 3 || rx == 9) && ((rh >>> 10) & 1L) == 0L) {
                isWindow = true;
+            } else if (rx == 4 || rx == 8) {
+               isPilaster = true;
             }
          }
          if (rx == 0 && rz == 0) {
@@ -285,7 +312,6 @@ public class BackroomsGen extends Gen {
 
       if (isWall) {
          if (isDoor) {
-            // Pretty birch wood threshold under every doorway
             setBlk(c, lx, fy, lz, Blocks313.PLANKS_BIRCH);
          }
          for (int y = fy + 1; y < cy; y++) {
@@ -294,10 +320,8 @@ public class BackroomsGen extends Gen {
             } else if (isWindow && (y == fy + 2 || y == fy + 3)) {
                setBlk(c, lx, y, lz, Blocks.GLASS);
             } else if (y == fy + 1) {
-               // Baseboard wainscoting
                setBlk(c, lx, y, lz, isPilaster ? Blocks.LOG_BIRCH : Blocks.PLANKS);
             } else if (y == cy - 1) {
-               // Crown molding
                setBlk(c, lx, y, lz, Blocks313.PLANKS_BIRCH);
             } else {
                setBlk(c, lx, y, lz, isPilaster ? Blocks.LOG_BIRCH : Blocks.SANDSTONE);
@@ -306,48 +330,31 @@ public class BackroomsGen extends Gen {
          return;
       }
 
-      // ---- INTERIOR FURNISHINGS, HIDING SPOTS & FINDABLE ALMOND WATER ----
-      // 1. Hiding Locker Booth in corners (rx = 1..2, rz = 1..2) of rooms where (rh & 7) == 0
-      if ((rh & 7L) == 0L && rx >= 1 && rx <= 2 && rz >= 1 && rz <= 2) {
-         // 1x1 interior hiding spot at (rx=1, rz=1) surrounded by oak locker walls, entry at (rx=2, rz=1)
-         if (rx == 1 && rz == 1) {
-            // Inside the Hiding Locker: dark oak floor & overhead locker roof at fy+3
-            setBlk(c, lx, fy, lz, Blocks.PLANKS);
-            setBlk(c, lx, fy + 3, lz, Blocks.PLANKS);
-         } else if (rx == 2 && rz == 1) {
-            // Locker doorway with header at fy+3
-            setBlk(c, lx, fy + 3, lz, Blocks.PLANKS);
-         } else {
-            // Solid locker side walls
-            for (int y = fy + 1; y <= fy + 3; y++) {
-               setBlk(c, lx, y, lz, Blocks.LOG_OAK);
-            }
-         }
+      // ---- WELL-PLACED 3D FURNITURE MODELS (Flush against walls, never blocking walkways!) ----
+      boolean hasNorthWall = roomStyle != 3 && ((rh >>> 2) & 3L) != 0L;
+      boolean hasWestWall = roomStyle != 3 && (rh & 3L) != 0L;
+
+      // 1. Pair of 3D Hiding Lockers flush against the solid North Wall at (rx = 2..3, rz = 1)
+      if (hasNorthWall && (rx == 2 || rx == 3) && rz == 1) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_LOCKER_LOW);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_LOCKER_HIGH);
          return;
       }
 
-      // 2. Office Supply Desk with Under-Desk Hiding Cubby & Almond Water on top
-      if (roomStyle == 1 && rx >= 5 && rx <= 7 && rz == 5) {
-         if (rx == 5 || rx == 7) {
-            setBlk(c, lx, fy + 1, lz, Blocks.FENCE);
-         } else {
-            // rx == 6: Open under-desk crawl cubby at fy+1 (crouch here to hide!)
-            setBlk(c, lx, fy + 1, lz, Blocks.AIR);
-         }
-         setBlk(c, lx, fy + 2, lz, Blocks.PLANKS);
+      // 2. 2-block-wide 3D Executive Office Desk at (rx = 8..9, rz = 2) or (rx = 2, rz = 8..9)
+      if ((roomStyle == 0 || roomStyle == 1) && (rx == 8 || rx == 9) && rz == 2) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
+         return;
+      }
+      if ((roomStyle == 2 || roomStyle == 4) && rx == 2 && (rz == 8 || rz == 9)) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
          return;
       }
 
-      // 3. Almond Water Cooler Dispenser in lounges
-      if (roomStyle == 4 && rx == 5 && rz == 2) {
-         setBlk(c, lx, fy + 1, lz, Blocks.QUARTZ_BLOCK);
-         setBlk(c, lx, fy + 2, lz, Blocks313.ICE);
-      }
-
-      // 4. Inter-Level Stairwell / Service Elevator Kiosk every 60 blocks (plus at (15, 5))
-      if ((wx == 15 && wz == 5) || (Math.floorMod(wx, 60) == 5 && Math.floorMod(wz, 60) == 5)) {
-         setBlk(c, lx, fy, lz, Redstone319.SEA_LANTERN);
-         setBlk(c, lx, fy + 1, lz, Blocks.LADDER);
+      // 3. 3D Almond Water Cooler placed neatly against the West Wall at (rx = 1, rz = 2)
+      if (hasWestWall && rx == 1 && rz == 2 && (rh & 1L) == 0L) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_WATER_COOLER);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_COOLER_JUG);
       }
    }
 
@@ -359,54 +366,55 @@ public class BackroomsGen extends Gen {
       int cy = L1_CEIL_Y;
 
       setBlk(c, lx, fy - 1, lz, Blocks.BEDROCK);
-      boolean lane = Math.floorMod(wx, 12) == 6 || Math.floorMod(wz, 12) == 6;
-      setBlk(c, lx, fy, lz, lane ? Blocks.COBBLE : Blocks.STONE);
-      for (int y = fy + 1; y < cy; y++) {
-         setBlk(c, lx, y, lz, Blocks.AIR);
-      }
-
-      int mx = Math.floorMod(wx, 8);
-      int mz = Math.floorMod(wz, 8);
-      boolean light = (mx == 3 || mx == 4) && mz == 4;
-      setBlk(c, lx, cy, lz, light ? Blocks.GLOWSTONE : Blocks.STONEBRICK);
-      setBlk(c, lx, cy + 1, lz, Blocks.BEDROCK);
-
-      if (Math.abs(wx) <= 4 && Math.abs(wz) <= 4) {
-         if (wx == 3 && wz == 0) {
-            setBlk(c, lx, fy + 1, lz, Blocks.QUARTZ_BLOCK);
-            setBlk(c, lx, fy + 2, lz, Blocks313.ICE);
-         }
-         return;
-      }
 
       int rx = Math.floorMod(wx, 12);
       int rz = Math.floorMod(wz, 12);
       long rh = cellHash(this.seed ^ 0x11112222L, Math.floorDiv(wx, 12), Math.floorDiv(wz, 12));
 
-      // Concrete/Stonebrick 2x2 warehouse pillars
+      boolean lane = rx == 5 || rx == 6 || rz == 5 || rz == 6;
+      setBlk(c, lx, fy, lz, lane ? Redstone319.POLISHED_ANDESITE : Blocks.STONE);
+      for (int y = fy + 1; y < cy; y++) {
+         setBlk(c, lx, y, lz, Blocks.AIR);
+      }
+
+      boolean light = (rx == 5 || rx == 6) && (rz == 5 || rz == 6);
+      boolean girder = rx == 0 || rz == 0;
+      setBlk(c, lx, cy, lz, light ? Blocks.GLOWSTONE : (girder ? Redstone319.CHISELED_STONEBRICK : Blocks.STONEBRICK));
+      setBlk(c, lx, cy + 1, lz, Blocks.BEDROCK);
+
+      if (placeLobbyOrExit(c, lx, lz, wx, wz, fy, cy)) {
+         return;
+      }
+
+      // Heavy 2x2 Warehouse Pillars at (rx = 0..1, rz = 0..1)
       if ((rx == 0 || rx == 1) && (rz == 0 || rz == 1)) {
          for (int y = fy + 1; y < cy; y++) {
-            setBlk(c, lx, y, lz, Blocks.STONEBRICK);
+            setBlk(c, lx, y, lz, (y == fy + 1 || y == cy - 1) ? Redstone319.CHISELED_STONEBRICK : Blocks.STONEBRICK);
          }
          return;
       }
 
-      // Warehouse Supply Shelving Racks & Under-Shelf Hiding Cubbies
-      if ((rh & 3L) == 0L && rx >= 4 && rx <= 8 && rz == 3) {
-         setBlk(c, lx, fy + 1, lz, (rx == 5 || rx == 7) ? Blocks.AIR : Blocks.BOOKSHELF);
-         setBlk(c, lx, fy + 2, lz, Blocks.PLANKS);
-         setBlk(c, lx, fy + 3, lz, Blocks.BOOKSHELF);
+      // Partition wall along rx == 0 with wide bay doorway at rz = 4..7
+      if (rx == 0 && (rh & 3L) != 0L && (rz < 4 || rz > 7)) {
+         for (int y = fy + 1; y < cy; y++) {
+            setBlk(c, lx, y, lz, y == fy + 1 ? Redstone319.POLISHED_ANDESITE : Blocks.STONEBRICK);
+         }
+         return;
       }
 
-      // Hiding Locker Booth in Warehouse
-      if ((rh & 7L) == 1L && rx >= 9 && rx <= 10 && rz >= 9 && rz <= 10) {
-         if (rx == 9 && rz == 9) {
-            setBlk(c, lx, fy + 3, lz, Blocks.STONEBRICK);
-         } else if (!(rx == 10 && rz == 9)) {
-            for (int y = fy + 1; y <= fy + 3; y++) {
-               setBlk(c, lx, y, lz, Blocks.STONEBRICK);
-            }
-         }
+      // Well-placed 3D Desks, 3D Lockers & 3D Water Coolers in Level 1 Warehouse
+      if ((rx == 3 || rx == 4) && rz == 2) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
+      } else if ((rx == 8 || rx == 9) && rz == 2) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_LOCKER_LOW);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_LOCKER_HIGH);
+      } else if (rx == 2 && rz == 9 && (rh & 1L) == 0L) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_WATER_COOLER);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_COOLER_JUG);
+      } else if ((rh & 3L) == 0L && (rx == 8 || rx == 9 || rx == 10) && rz == 9) {
+         // Warehouse supply rack
+         setBlk(c, lx, fy + 1, lz, Blocks.BOOKSHELF);
+         setBlk(c, lx, fy + 2, lz, Blocks.PLANKS);
       }
    }
 
@@ -418,41 +426,50 @@ public class BackroomsGen extends Gen {
       int cy = L2_CEIL_Y;
 
       setBlk(c, lx, fy - 1, lz, Blocks.BEDROCK);
-      setBlk(c, lx, fy, lz, Blocks.COBBLE);
+      int rx = Math.floorMod(wx, 12);
+      int rz = Math.floorMod(wz, 12);
+
+      setBlk(c, lx, fy, lz, (rx == 5 || rx == 6 || rz == 5 || rz == 6) ? Redstone319.POLISHED_ANDESITE : Blocks.COBBLE);
       for (int y = fy + 1; y < cy; y++) {
          setBlk(c, lx, y, lz, Blocks.AIR);
       }
 
-      int rx = Math.floorMod(wx, 8);
-      int rz = Math.floorMod(wz, 8);
-      boolean light = rx == 4 && rz == 4;
+      boolean light = (rx == 5 || rx == 6) && (rz == 5 || rz == 6);
       setBlk(c, lx, cy, lz, light ? Blocks.GLOWSTONE : Blocks.STONEBRICK);
       setBlk(c, lx, cy + 1, lz, Blocks.BEDROCK);
 
-      if (Math.abs(wx) <= 3 && Math.abs(wz) <= 3) {
+      if (placeLobbyOrExit(c, lx, lz, wx, wz, fy, cy)) {
          return;
       }
 
-      // Narrow maintenance corridors along X and Z with recessed hiding alcoves
-      boolean corrX = rz >= 2 && rz <= 5;
-      boolean corrZ = rx >= 2 && rx <= 5;
+      boolean corrX = rz >= 3 && rz <= 8;
+      boolean corrZ = rx >= 3 && rx <= 8;
       if (!corrX && !corrZ) {
-         // Carve a 1x1 Hiding Pipe Alcove at (rx=1, rz=3)
-         if (rx == 1 && rz == 3) {
-            setBlk(c, lx, fy + 3, lz, Blocks.BRICKS);
-            return;
-         }
          for (int y = fy + 1; y < cy; y++) {
             setBlk(c, lx, y, lz, y == fy + 1 ? Blocks.STONEBRICK : Blocks.BRICKS);
          }
-      } else if (rx == 2 || rz == 2) {
-         // Overhead steam pipe conduit along corridor ceiling edge
+         return;
+      }
+
+      // Overhead steam pipe conduits along tunnel ceiling edges
+      if ((rx == 3 || rx == 8) && !corrX || (rz == 3 || rz == 8) && !corrZ) {
          setBlk(c, lx, cy - 1, lz, Blocks.LOG_SPRUCE);
+      }
+
+      // Well-placed 3D Hiding Lockers, 3D Maintenance Desks & 3D Water Coolers recessed against tunnel walls
+      if (rx == 3 && rz == 1) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_LOCKER_LOW);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_LOCKER_HIGH);
+      } else if ((rx == 7 || rx == 8) && rz == 3 && !corrZ) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
+      } else if (rx == 8 && rz == 1) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_WATER_COOLER);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_COOLER_JUG);
       }
    }
 
    // ====================================================================================================
-   // LEVEL 37 — "THE POOLROOMS" (Y = 82..90): White Quartz Tiles, Walkways & Sunken Pools
+   // LEVEL 37 — "THE POOLROOMS" (Y = 82..90): White Quartz Atrium, Walkways, Pools & 3D Furniture
    // ====================================================================================================
    private void generatePoolrooms(Chunk c, int lx, int lz, int wx, int wz) {
       int fy = POOL_FLOOR_Y;
@@ -465,71 +482,89 @@ public class BackroomsGen extends Gen {
       int rz = Math.floorMod(wz, 12);
       long rh = cellHash(this.seed ^ 0x37373737L, Math.floorDiv(wx, 12), Math.floorDiv(wz, 12));
 
-      // Dry tiled walkways around the perimeter of each 12x12 atrium, sunken water pool in the middle
-      boolean dryWalkway = (Math.abs(wx) <= 3 && Math.abs(wz) <= 3)
-         || rx <= 2 || rx >= 10 || rz <= 2 || rz >= 10;
+      boolean dryWalkway = (Math.abs(wx) <= 5 && Math.abs(wz) <= 5)
+         || isExitVestibule(wx, wz)
+         || rx <= 3 || rx >= 9 || rz <= 3 || rz >= 9;
       setBlk(c, lx, fy, lz, dryWalkway ? Blocks.QUARTZ_BLOCK : Blocks.WATER);
 
       for (int y = fy + 1; y < cy; y++) {
          setBlk(c, lx, y, lz, Blocks.AIR);
       }
 
-      // Vaulted ceiling with glowing Sea Lantern skylight coffers
       boolean skylight = rx >= 4 && rx <= 7 && rz >= 4 && rz <= 7;
       setBlk(c, lx, cy, lz, skylight ? Redstone319.SEA_LANTERN : Blocks.QUARTZ_BLOCK);
 
-      if (Math.abs(wx) <= 3 && Math.abs(wz) <= 3) {
+      if (placeLobbyOrExit(c, lx, lz, wx, wz, fy, cy)) {
          return;
       }
 
-      // Fluted white quartz columns & arched partition walls
-      boolean pillar = (rx == 2 || rx == 9) && (rz == 2 || rz == 9);
+      boolean pillar = (rx == 3 || rx == 9) && (rz == 3 || rz == 9);
       boolean wall = (rx == 0 && (rh & 3L) == 0L && (rz < 4 || rz > 7))
          || (rz == 0 && ((rh >>> 2) & 3L) == 0L && (rx < 4 || rx > 7));
       if (pillar || wall) {
          for (int y = fy + 1; y < cy; y++) {
             setBlk(c, lx, y, lz, Blocks.QUARTZ_BLOCK);
          }
-      } else if (rx == 1 && rz == 5 && (rh & 7L) == 0L) {
-         // Poolrooms Almond Water Cooler
-         setBlk(c, lx, fy + 1, lz, Blocks.QUARTZ_BLOCK);
-         setBlk(c, lx, fy + 2, lz, Blocks313.ICE);
+         return;
+      }
+
+      // Poolside 3D Locker Cabanas, 3D Tables & 3D Almond Water Coolers on the dry walkways
+      if (rx == 1 && (rz == 2 || rz == 3) && (rh & 3L) == 0L) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
+      } else if (rx == 2 && rz == 1 && (rh & 3L) == 1L) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_LOCKER_LOW);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_LOCKER_HIGH);
+      } else if (rx == 1 && rz == 8 && (rh & 3L) == 2L) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_WATER_COOLER);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_COOLER_JUG);
       }
    }
 
    // ====================================================================================================
-   // LEVEL "!" — "RUN FOR YOUR LIFE" (Y = 14..20): Crimson Emergency Hospital Corridor
+   // LEVEL "!" — "RUN FOR YOUR LIFE" (Y = 14..20): Crimson Hospital Corridor with Desks, Lockers & Exits
    // ====================================================================================================
    private void generateLevelRun(Chunk c, int lx, int lz, int wx, int wz) {
       int fy = RUN_FLOOR_Y;
       int cy = RUN_CEIL_Y;
 
       setBlk(c, lx, fy - 1, lz, Blocks.BEDROCK);
-      setBlk(c, lx, fy, lz, Blocks.WOOL0 + 14); // Blood-crimson carpet
+      int rx = Math.floorMod(wx + 12, 24) - 12;
+      int rz = Math.floorMod(wz, 12);
+
+      // Crimson carpet center runner with white quartz hospital borders
+      boolean redRunner = Math.abs(rx) <= 2 || (rz >= 4 && rz <= 7);
+      setBlk(c, lx, fy, lz, redRunner ? (Blocks.WOOL0 + 14) : Blocks.QUARTZ_BLOCK);
       for (int y = fy + 1; y < cy; y++) {
          setBlk(c, lx, y, lz, Blocks.AIR);
       }
 
-      int rz = Math.floorMod(wz, 8);
-      setBlk(c, lx, cy, lz, Blocks.BRICKS);
+      setBlk(c, lx, cy, lz, (rz == 5 || rz == 6) ? Blocks.GLOWSTONE : Blocks.BRICKS);
       setBlk(c, lx, cy + 1, lz, Blocks.BEDROCK);
 
-      // Main hospital corridor runs along Z around X = -4..4, plus cross-corridors every 16 blocks
-      int rx = Math.floorMod(wx + 8, 16) - 8;
-      boolean inHallX = Math.abs(rx) <= 3;
-      boolean inHallZ = Math.abs(rz - 4) <= 2;
+      if (placeLobbyOrExit(c, lx, lz, wx, wz, fy, cy)) {
+         return;
+      }
+
+      boolean inHallX = Math.abs(rx) <= 4;
+      boolean inHallZ = rz >= 3 && rz <= 8;
 
       if (!inHallX && !inHallZ) {
-         // Carve side hospital hiding alcoves at rx == 4, rz == 1
-         if (Math.abs(rx) == 4 && rz == 1) {
-            setBlk(c, lx, fy + 3, lz, Blocks.BRICKS);
-            return;
-         }
          for (int y = fy + 1; y < cy; y++) {
             setBlk(c, lx, y, lz, y == fy + 1 ? Blocks.QUARTZ_BLOCK : Blocks.BRICKS);
          }
-      } else if (Math.abs(rx) == 3 && rz == 0) {
-         // Emergency Redstone alarm light & Almond Water table
+         return;
+      }
+
+      // Hospital Corridor 3D Desks, 3D Lockers, 3D Water Coolers & Emergency Redstone Torches along the side walls (|rx| == 4)
+      if (rx == -4 && (rz == 1 || rz == 2)) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_DESK);
+      } else if (rx == 4 && rz == 1) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_LOCKER_LOW);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_LOCKER_HIGH);
+      } else if (rx == 4 && rz == 10) {
+         setBlk(c, lx, fy + 1, lz, BackroomsStalkerMod.B_WATER_COOLER);
+         setBlk(c, lx, fy + 2, lz, BackroomsStalkerMod.B_COOLER_JUG);
+      } else if (Math.abs(rx) == 4 && rz == 0) {
          setBlk(c, lx, fy + 1, lz, Redstone319.REDSTONE_TORCH);
       }
    }

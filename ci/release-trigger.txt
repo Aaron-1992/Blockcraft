@@ -1,2 +1,2 @@
 4.1
-# Backrooms & Stalker v2.1: Balanced Stalker AI, Physical Findable Almond Water on Desks/Coolers, 5 Separate Prettier Levels, and Hiding Lockers/Under-Desk Cubbies
+# Backrooms & Stalker v2.2: 3D Desk, 3D Hiding Locker, 3D Water Cooler & 3D Level Exit Door Models, Physical Under-Desk Crouch Crawling, Prettier All-Level Architecture, and Exits on All 5 Levels

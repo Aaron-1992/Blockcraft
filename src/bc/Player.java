@@ -107,6 +107,9 @@ public final class Player {
    }
 
    public double height() {
+      if (BackroomsStalkerMod.isActive() && this.sneaking) {
+         return 0.72;
+      }
       return this.sneaking ? 1.65 : 1.8;
    }
 
@@ -138,7 +141,7 @@ public final class Player {
          this.tickSpectator(var2, var3, var4, var5, var6);
       } else {
          boolean var7 = this.sneaking;
-         this.sneaking = var5 && !this.flying;
+         this.sneaking = (var5 || (BackroomsStalkerMod.isActive() && BackroomsStalkerMod.mustStayCrouched(var1, this))) && !this.flying;
          if (this.sneaking != var7) {
             this.updateBox();
          }
@@ -225,7 +228,7 @@ public final class Player {
             }
          }
 
-         float var11 = this.sneaking ? 1.54F : 1.62F;
+         float var11 = this.sneaking ? (BackroomsStalkerMod.isActive() ? 0.62F : 1.54F) : 1.62F;
          this.eye = this.eye + (var11 - this.eye) * 0.5F;
          if (!this.creative) {
             if (this.inLava && this.invuln == 0) {

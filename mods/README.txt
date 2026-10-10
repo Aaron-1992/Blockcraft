@@ -11,9 +11,10 @@ Blockcraft's ModLoader automatically detects and loads it!
                            classic HUD (no hunger bar), and instant food healing (/infdev).
    backrooms-stalker.jar - VHS Analog Horror Shader, 5 Separate Prettier Backrooms Levels
                            (Level 0 Lobby, Level 1 Warehouse, Level 2 Pipe Dreams, Level 37
-                           Poolrooms, Level ! Run), physical findable Almond Water bottles on
-                           desks & water coolers, Hiding Lockers & Under-Desk Cubbies, and
-                           balanced 3D Stalker Entity (/backrooms level 0|1|2|poolrooms|run).
+                           Poolrooms, Level ! Run), custom 3D Office Desks (hold Shift to
+                           physically crawl underneath!), 3D Steel Hiding Lockers, 3D Almond
+                           Water Coolers, 3D Illuminated Level Exit Doors on every level,
+                           and balanced 3D Stalker Entity (/backrooms level 0|1|2|poolrooms|run).
 
 2. Zero-Code Declarative .bcmod / .properties Example (save as mods/my-mod.bcmod):
    id=my-mod

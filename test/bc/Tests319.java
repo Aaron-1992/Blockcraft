@@ -891,18 +891,35 @@ final class Tests319 {
             eq(Blocks.QUARTZ_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.POOL_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 37 Poolrooms has quartz floor at Y=82");
             eq(Blocks.COBBLE, brCh.blocks[Chunk.idx(0, BackroomsGen.L2_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 2 Pipe Dreams has cobble floor at Y=30");
             eq(Blocks.WOOL0 + 14, brCh.blocks[Chunk.idx(0, BackroomsGen.RUN_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level ! has crimson carpet floor at Y=14");
-            // Verify findable Almond Water item (269) & Hiding Spots
+            // Verify 3D Block Models (Desks, Lockers, Water Coolers, and Level Exit Doors across ALL 5 Levels)
+            check(Shapes.isModel(BackroomsStalkerMod.B_DESK) && Blocks.kind[BackroomsStalkerMod.B_DESK] == Shapes.K_SHAPE, "3D Office Desk model (B_DESK) registered in Shapes");
+            check(Shapes.isModel(BackroomsStalkerMod.B_LOCKER_LOW) && Shapes.isModel(BackroomsStalkerMod.B_LOCKER_HIGH), "3D Steel Hiding Locker models registered in Shapes");
+            check(Shapes.isModel(BackroomsStalkerMod.B_WATER_COOLER) && Shapes.isModel(BackroomsStalkerMod.B_COOLER_JUG), "3D Almond Water Cooler models registered in Shapes");
+            check(Shapes.isModel(BackroomsStalkerMod.B_EXIT_LOW) && Shapes.isModel(BackroomsStalkerMod.B_EXIT_HIGH), "3D Illuminated Level Exit Door models registered in Shapes");
+
+            // Verify Level Exit Doors are generated at (0, 24) on ALL 5 Backrooms Levels
+            Chunk exitCh = brGen.generate(0, 1); // chunk (0, 1) covers wz = 16..31, so lz = 8 is wz = 24
+            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.L0_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 0 has 3D Exit Door at (0, 24)");
+            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.L1_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 1 has 3D Exit Door at (0, 24)");
+            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.L2_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 2 has 3D Exit Door at (0, 24)");
+            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.POOL_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 37 Poolrooms has 3D Exit Door at (0, 24)");
+            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.RUN_FLOOR_Y + 1, 8)] & 0xFFFF, "Level ! has 3D Exit Door at (0, 24)");
+
+            // Verify findable Almond Water item (269) & Physical Under-Desk Crouching / Hiding Spots
             eq("Almond Water", Items.name(BackroomsStalkerMod.ALMOND_WATER), "Almond Water item (269) registered when mod is active");
             Stack awStack = new Stack(BackroomsStalkerMod.ALMOND_WATER, 2);
             bwGame.player.health = 10;
             check(BackroomsStalkerMod.drinkAlmondWater(bwGame, awStack) && bwGame.player.health == 16 && awStack.n == 1, "Drinking Almond Water restores +6 health and sanity");
-            // Verify under-desk hiding cubby detection
+            // Verify physical under-desk crouching (height 0.72 < 0.8125 tabletop) and hiding detection
             int deskX = px + 3;
             int deskY = BackroomsStalkerMod.POCKET_FLOOR_Y + 1;
             int deskZ = pz + 1;
+            eq(BackroomsStalkerMod.B_DESK, bwGame.world.getBlock(deskX, deskY, deskZ), "3D Office Desk placed at welcome lobby");
             bwGame.player.setPos(deskX + 0.5, deskY, deskZ + 0.5);
             bwGame.player.sneaking = true;
-            check(BackroomsStalkerMod.checkPlayerHidden(bwGame.world, bwGame.player), "Crouching under an office desk cubby hides the player from the Stalker");
+            check(bwGame.player.height() < Blocks.coll[BackroomsStalkerMod.B_DESK][1], "Crouching player height (0.72) fits physically underneath 3D Desk tabletop (0.8125)");
+            check(BackroomsStalkerMod.mustStayCrouched(bwGame.world, bwGame.player), "mustStayCrouched keeps player crouched while under 3D Desk");
+            check(BackroomsStalkerMod.checkPlayerHidden(bwGame.world, bwGame.player), "Crouching under a 3D Office Desk hides the player from the Stalker");
             bwGame.player.sneaking = false;
             // Verify findStand places player INSIDE the Backrooms at Y=65 (not on top of the bedrock roof)
             Gen prevGen = bwGame.world.gen;

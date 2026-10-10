@@ -107,7 +107,7 @@ final class Shapes {
    /** Makes the block a K_SHAPE block that is drawn as the given boxes (see {@link #px}). */
    static void model(int id, double[][] boxes) {
       MODEL[id] = boxes;
-      Blocks.kind[id] = K_SHAPE;
+      Blocks.kind[id] = boxes == null ? 0 : K_SHAPE;
    }
 
    static double[][] modelBoxes(int id) {
@@ -488,7 +488,7 @@ final class Shapes {
          return new double[][]{trapBox(trap(trapKind(id), false, false, 0))};
       }
 
-      if (id >= 1900 && id <= 2008 && isModel(id)) {
+      if (id >= 1900 && id <= 2020 && isModel(id)) {
          return MODEL[id];
       }
 
