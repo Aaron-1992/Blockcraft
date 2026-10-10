@@ -891,19 +891,22 @@ final class Tests319 {
             eq(Blocks.QUARTZ_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.POOL_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 37 Poolrooms has quartz floor at Y=82");
             eq(Blocks.COBBLE, brCh.blocks[Chunk.idx(0, BackroomsGen.L2_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level 2 Pipe Dreams has cobble floor at Y=30");
             eq(Blocks.WOOL0 + 14, brCh.blocks[Chunk.idx(0, BackroomsGen.RUN_FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen Level ! has crimson carpet floor at Y=14");
-            // Verify 3D Block Models (Desks, Lockers, Water Coolers, and Level Exit Doors across ALL 5 Levels)
+            // Verify 3D Block Models (Desks, Lockers, Water Coolers, Level Exit Doors, Waterslides, Chairs, Vending & Valve Pipes)
             check(Shapes.isModel(BackroomsStalkerMod.B_DESK) && Blocks.kind[BackroomsStalkerMod.B_DESK] == Shapes.K_SHAPE, "3D Office Desk model (B_DESK) registered in Shapes");
             check(Shapes.isModel(BackroomsStalkerMod.B_LOCKER_LOW) && Shapes.isModel(BackroomsStalkerMod.B_LOCKER_HIGH), "3D Steel Hiding Locker models registered in Shapes");
             check(Shapes.isModel(BackroomsStalkerMod.B_WATER_COOLER) && Shapes.isModel(BackroomsStalkerMod.B_COOLER_JUG), "3D Almond Water Cooler models registered in Shapes");
             check(Shapes.isModel(BackroomsStalkerMod.B_EXIT_LOW) && Shapes.isModel(BackroomsStalkerMod.B_EXIT_HIGH), "3D Illuminated Level Exit Door models registered in Shapes");
+            check(Shapes.isModel(BackroomsStalkerMod.B_POOL_SLIDE) && Shapes.isModel(BackroomsStalkerMod.B_OFFICE_CHAIR), "3D Poolrooms Waterslide & 3D Swivel Chair models registered in Shapes");
+            check(Shapes.isModel(BackroomsStalkerMod.B_VENDING) && Shapes.isModel(BackroomsStalkerMod.B_VALVE_PIPE), "3D Vending Machine & 3D Steam Valve Pipe models registered in Shapes");
 
-            // Verify Level Exit Doors are generated at (0, 24) on ALL 5 Backrooms Levels
-            Chunk exitCh = brGen.generate(0, 1); // chunk (0, 1) covers wz = 16..31, so lz = 8 is wz = 24
-            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.L0_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 0 has 3D Exit Door at (0, 24)");
-            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.L1_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 1 has 3D Exit Door at (0, 24)");
-            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.L2_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 2 has 3D Exit Door at (0, 24)");
-            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.POOL_FLOOR_Y + 1, 8)] & 0xFFFF, "Level 37 Poolrooms has 3D Exit Door at (0, 24)");
-            eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(0, BackroomsGen.RUN_FLOOR_Y + 1, 8)] & 0xFFFF, "Level ! has 3D Exit Door at (0, 24)");
+            // Verify Randomized Level Exit Doors are generated on ALL 5 Backrooms Levels
+            int[] levels = {BackroomsGen.LEVEL_0, BackroomsGen.LEVEL_1, BackroomsGen.LEVEL_2, BackroomsGen.LEVEL_POOLROOMS, BackroomsGen.LEVEL_RUN};
+            for (int lvl : levels) {
+               int[] exXZ = BackroomsGen.exitDoorXZInSector(brGen.seed, lvl, 0, 0);
+               Chunk exitCh = brGen.generate(exXZ[0] >> 4, exXZ[1] >> 4);
+               int fy = BackroomsGen.floorYForLevel(lvl);
+               eq(BackroomsStalkerMod.B_EXIT_LOW, exitCh.blocks[Chunk.idx(exXZ[0] & 15, fy + 1, exXZ[1] & 15)] & 0xFFFF, "Randomized 3D Exit Door generated for level " + lvl);
+            }
 
             // Verify findable Almond Water item (269) & Physical Under-Desk Crouching / Hiding Spots
             eq("Almond Water", Items.name(BackroomsStalkerMod.ALMOND_WATER), "Almond Water item (269) registered when mod is active");

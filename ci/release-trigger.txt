@@ -1,2 +1,2 @@
 4.1
-# Backrooms & Stalker v2.2: 3D Desk, 3D Hiding Locker, 3D Water Cooler & 3D Level Exit Door Models, Physical Under-Desk Crouch Crawling, Prettier All-Level Architecture, and Exits on All 5 Levels
+# Backrooms & Stalker v2.3: Completely Randomized Room Layouts Across All 5 Levels, Poolrooms 3D Waterslides, 3D Office Chairs, 3D Vending Machines, 3D Steam Valve Pipes & Randomized Exits

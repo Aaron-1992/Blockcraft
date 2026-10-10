@@ -9,12 +9,13 @@ Blockcraft's ModLoader automatically detects and loads it!
    infdev-2010.jar       - Reverts Blockcraft to Minecraft Infdev (June 2010): craggy overhangs,
                            Brick Pyramids, 3D blocky clouds, flat lighting, neon-green grass,
                            classic HUD (no hunger bar), and instant food healing (/infdev).
-   backrooms-stalker.jar - VHS Analog Horror Shader, 5 Separate Prettier Backrooms Levels
-                           (Level 0 Lobby, Level 1 Warehouse, Level 2 Pipe Dreams, Level 37
-                           Poolrooms, Level ! Run), custom 3D Office Desks (hold Shift to
-                           physically crawl underneath!), 3D Steel Hiding Lockers, 3D Almond
-                           Water Coolers, 3D Illuminated Level Exit Doors on every level,
-                           and balanced 3D Stalker Entity (/backrooms level 0|1|2|poolrooms|run).
+   backrooms-stalker.jar - VHS Analog Horror Shader, 5 Completely Randomized Backrooms
+                           Levels (Level 0 Lobby, Level 1 Warehouse, Level 2 Pipe Dreams,
+                           Level 37 Poolrooms with rideable 3D Fiberglass Waterslides!,
+                           Level ! Run), custom 3D Office Desks (hold Shift to crawl under!),
+                           3D Swivel Chairs, 3D Steel Hiding Lockers, 3D Almond Water Coolers,
+                           3D Glowing Vending Machines, 3D Steam Valve Pipes, 3D Illuminated
+                           Level Exit Doors on every level, and balanced 3D Stalker Entity.
 
 2. Zero-Code Declarative .bcmod / .properties Example (save as mods/my-mod.bcmod):
    id=my-mod

@@ -32,8 +32,13 @@ public class BackroomsStalkerMod implements BlockcraftMod {
    public static final int B_COOLER_JUG = 2014;
    public static final int B_EXIT_LOW = 2015;
    public static final int B_EXIT_HIGH = 2016;
+   public static final int B_POOL_SLIDE = 2017;
+   public static final int B_OFFICE_CHAIR = 2018;
+   public static final int B_VENDING = 2019;
+   public static final int B_VALVE_PIPE = 2020;
    private static boolean customBlocksRegistered = false;
    private int exitCooldown = 0;
+   private int slideToastCooldown = 0;
 
    public static final int PHASE_STALK = 0;
    public static final int PHASE_FROZEN = 1;
@@ -191,7 +196,7 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       if (!customBlocksRegistered) {
          return;
       }
-      for (int id = B_DESK; id <= B_EXIT_HIGH; id++) {
+      for (int id = B_DESK; id <= B_VALVE_PIPE; id++) {
          Blocks.name[id] = null;
          Blocks.solid[id] = false;
          Blocks.opaque[id] = false;
@@ -327,6 +332,60 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       });
       Blocks.coll[B_EXIT_HIGH] = null;
       Blocks.box[B_EXIT_HIGH] = new double[]{0.0, 0.0, 0.25, 1.0, 1.0, 0.75};
+
+      // 5. 3D POOLROOMS FIBERGLASS WATERSLIDE CHUTE (B_POOL_SLIDE = 2017)
+      //    Glossy aqua-cyan trough with curved sidewalls, stepped slide bed, and water film.
+      defModelBlock(B_POOL_SLIDE, "Poolrooms Waterslide", quartzTile, 1.0F, 6);
+      Shapes.model(B_POOL_SLIDE, new double[][]{
+         Shapes.tint(Shapes.px(1.5, 0.0, 0.0, 14.5, 3.5, 16.0), 0x38D4F2),
+         Shapes.tint(Shapes.px(2.5, 3.5, 0.0, 13.5, 7.0, 8.0), 0x48E2FC),
+         Shapes.tint(Shapes.tiles(Shapes.px(3.0, 3.5, 8.0, 13.0, 4.3, 16.0), iceTile, iceTile, iceTile), 0x80F4FF),
+         Shapes.tint(Shapes.px(0.0, 0.0, 0.0, 2.5, 13.0, 16.0), 0x22B8DC),
+         Shapes.tint(Shapes.px(13.5, 0.0, 0.0, 16.0, 13.0, 16.0), 0x22B8DC),
+         Shapes.tint(Shapes.px(0.0, 13.0, 0.0, 3.0, 14.5, 16.0), 0x70F0FF),
+         Shapes.tint(Shapes.px(13.0, 13.0, 0.0, 16.0, 14.5, 16.0), 0x70F0FF)
+      });
+      Blocks.coll[B_POOL_SLIDE] = new double[]{0.0, 0.0, 0.0, 1.0, 0.25, 1.0};
+      Blocks.box[B_POOL_SLIDE] = new double[]{0.0, 0.0, 0.0, 1.0, 0.875, 1.0};
+
+      // 6. 3D SWIVEL OFFICE CHAIR (B_OFFICE_CHAIR = 2018)
+      defModelBlock(B_OFFICE_CHAIR, "Swivel Office Chair", ironTile, 1.0F, 0);
+      Shapes.model(B_OFFICE_CHAIR, new double[][]{
+         Shapes.tint(Shapes.px(3.0, 0.0, 7.0, 13.0, 1.8, 9.0), 0x2C3036),
+         Shapes.tint(Shapes.px(7.0, 0.0, 3.0, 9.0, 1.8, 13.0), 0x2C3036),
+         Shapes.tint(Shapes.px(7.0, 1.8, 7.0, 9.0, 6.8, 9.0), 0x50565E),
+         Shapes.tint(Shapes.px(3.0, 6.8, 3.0, 13.0, 8.8, 13.0), 0x3C4858),
+         Shapes.tint(Shapes.px(3.5, 8.8, 11.0, 12.5, 15.5, 13.0), 0x3C4858),
+         Shapes.tint(Shapes.px(2.0, 8.5, 4.5, 3.5, 11.5, 11.5), 0x282E36),
+         Shapes.tint(Shapes.px(12.5, 8.5, 4.5, 14.0, 11.5, 11.5), 0x282E36)
+      });
+      Blocks.coll[B_OFFICE_CHAIR] = new double[]{0.1875, 0.0, 0.1875, 0.8125, 0.55, 0.8125};
+      Blocks.box[B_OFFICE_CHAIR] = new double[]{0.125, 0.0, 0.1875, 0.875, 0.96, 0.8125};
+
+      // 7. 3D GLOWING BACKROOMS VENDING MACHINE (B_VENDING = 2019)
+      defModelBlock(B_VENDING, "Almond Water Vending Machine", ironTile, 2.0F, 11);
+      Shapes.model(B_VENDING, new double[][]{
+         Shapes.tint(Shapes.px(1.0, 0.0, 1.0, 15.0, 16.0, 13.5), 0x323A46),
+         Shapes.tint(Shapes.tiles(Shapes.px(2.5, 5.0, 13.2, 11.5, 14.5, 14.6), lanternTile, lanternTile, lanternTile), 0x80F0FF),
+         Shapes.tint(Shapes.px(3.0, 11.5, 14.2, 11.0, 12.5, 14.9), 0xFF9838),
+         Shapes.tint(Shapes.px(3.0, 8.5, 14.2, 11.0, 9.5, 14.9), 0x45E890),
+         Shapes.tint(Shapes.px(12.0, 7.0, 13.5, 14.0, 13.0, 14.8), 0xD83838),
+         Shapes.tint(Shapes.px(2.5, 1.2, 13.2, 11.5, 3.8, 14.8), 0x1A1E24)
+      });
+      Blocks.coll[B_VENDING] = new double[]{0.0625, 0.0, 0.0625, 0.9375, 1.0, 0.9375};
+      Blocks.box[B_VENDING] = new double[]{0.0625, 0.0, 0.0625, 0.9375, 1.0, 0.9375};
+
+      // 8. 3D INDUSTRIAL STEAM PIPE & RED WHEEL VALVE (B_VALVE_PIPE = 2020)
+      defModelBlock(B_VALVE_PIPE, "Steam Valve Pipe", ironTile, 1.8F, 0);
+      Shapes.model(B_VALVE_PIPE, new double[][]{
+         Shapes.tint(Shapes.px(4.5, 0.0, 4.5, 11.5, 16.0, 11.5), 0x626A72),
+         Shapes.tint(Shapes.px(3.5, 2.0, 3.5, 12.5, 4.0, 12.5), 0x484E54),
+         Shapes.tint(Shapes.px(3.5, 12.0, 3.5, 12.5, 14.0, 12.5), 0x484E54),
+         Shapes.tint(Shapes.px(7.0, 7.0, 11.5, 9.0, 9.0, 14.5), 0x8A929A),
+         Shapes.tint(Shapes.px(4.5, 5.0, 14.2, 11.5, 11.0, 15.6), 0xE02C2C)
+      });
+      Blocks.coll[B_VALVE_PIPE] = new double[]{0.25, 0.0, 0.25, 0.75, 1.0, 0.75};
+      Blocks.box[B_VALVE_PIPE] = new double[]{0.22, 0.0, 0.22, 0.78, 1.0, 0.98};
    }
 
    private static void defModelBlock(int id, String name, int tile, float hard, int emit) {
@@ -465,7 +524,68 @@ public class BackroomsStalkerMod implements BlockcraftMod {
          return onUseBlock(g, x, y + 1, z, Blocks313.ICE);
       }
 
-      // 5. Legacy Inter-Level Elevator Kiosk
+      // 5. 3D Poolrooms Fiberglass Waterslide (B_POOL_SLIDE) -> Climb to top & ride the slide!
+      if (id == B_POOL_SLIDE) {
+         int topX = x;
+         int topY = y;
+         int topZ = z;
+         for (int step = 0; step < 8; step++) {
+            boolean foundHigher = false;
+            int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+            for (int[] d : dirs) {
+               if (g.world.getBlock(topX + d[0], topY + 1, topZ + d[1]) == B_POOL_SLIDE) {
+                  topX += d[0];
+                  topY += 1;
+                  topZ += d[1];
+                  foundHigher = true;
+                  break;
+               }
+            }
+            if (!foundHigher) {
+               break;
+            }
+         }
+         g.player.setPos(topX + 0.5, topY + 0.35, topZ + 0.5);
+         g.toast("Poolrooms Waterslide!", "Sliding down into the heated aqua lagoon!");
+         return true;
+      }
+
+      // 6. 3D Swivel Office Chair (B_OFFICE_CHAIR) -> Sit down & duck low behind desks!
+      if (id == B_OFFICE_CHAIR) {
+         g.player.sneaking = true;
+         g.player.updateBox();
+         g.player.setPos(x + 0.5, y + 0.45, z + 0.5);
+         g.player.vx = g.player.vy = g.player.vz = 0.0;
+         g.toast("Swivel Office Chair", "Seated low behind the desk.");
+         return true;
+      }
+
+      // 7. 3D Glowing Almond Water Vending Machine (B_VENDING)
+      if (id == B_VENDING) {
+         Stack bottle = new Stack(ALMOND_WATER, 1);
+         if (!g.addItem(bottle)) {
+            g.world.dropItem(x + 0.5, y + 0.5, z + 0.5, ALMOND_WATER, 1);
+         }
+         sanity = Math.min(100, sanity + 10);
+         g.toast("Vending Machine", "Dispensed an ice-cold Almond Water bottle!");
+         g.say("§b[Backrooms] §7The humming vending machine clunks and drops §f1x Almond Water§7.");
+         return true;
+      }
+
+      // 8. 3D Industrial Steam Valve Pipe (B_VALVE_PIPE) -> Release steam to distract the Stalker!
+      if (id == B_VALVE_PIPE) {
+         for (int i = 0; i < 10; i++) {
+            g.portalParticle(x + 0.5 + (Math.random() - 0.5) * 0.6, y + 0.5 + (Math.random() - 0.5) * 0.6, z + 0.5 + (Math.random() - 0.5) * 0.6, 0.85F, 0.90F, 0.95F);
+         }
+         if (stalkerMob != null && !stalkerMob.dead && stalkerPhase != PHASE_CHASE) {
+            stalkerCooldown = Math.max(stalkerCooldown, 500);
+            stareTicks = 0;
+         }
+         g.toast("Steam Valve Released", "Loud steam hiss echoes down the pipes, distracting nearby entities!");
+         return true;
+      }
+
+      // 9. Legacy Inter-Level Elevator Kiosk
       if ((id == Blocks.LADDER && g.world.getBlock(x, y - 1, z) == Redstone319.SEA_LANTERN)
          || (id == Redstone319.SEA_LANTERN && g.world.getBlock(x, y + 1, z) == Blocks.LADDER)) {
          if (instance != null) {
@@ -594,12 +714,12 @@ public class BackroomsStalkerMod implements BlockcraftMod {
 
    @Override
    public String version() {
-      return "2.2.0";
+      return "2.3.0";
    }
 
    @Override
    public String description() {
-      return "5 Pretty Backrooms Levels, 3D Desks (Crawl Under!), 3D Hiding Lockers, 3D Water Coolers, Exits on All Levels & Stalker.";
+      return "5 Randomized Backrooms Levels, Poolrooms 3D Waterslides, 3D Desks/Chairs/Lockers/Vending/Valves, Exits & Stalker.";
    }
 
    @Override
@@ -1170,6 +1290,42 @@ public class BackroomsStalkerMod implements BlockcraftMod {
          if (b0 == B_EXIT_LOW || b0 == B_EXIT_HIGH || b1 == B_EXIT_LOW || b1 == B_EXIT_HIGH) {
             useExitDoor(g);
             return;
+         }
+      }
+
+      // Check if player is riding a 3D Poolrooms Waterslide (B_POOL_SLIDE)
+      if (this.slideToastCooldown > 0) {
+         this.slideToastCooldown--;
+      }
+      {
+         int bx = (int)Math.floor(g.player.x);
+         int by = (int)Math.floor(g.player.y);
+         int bz = (int)Math.floor(g.player.z);
+         int atFeet = g.world.getBlock(bx, by, bz);
+         int belowFeet = g.world.getBlock(bx, by - 1, bz);
+         if (atFeet == B_POOL_SLIDE || belowFeet == B_POOL_SLIDE) {
+            int sy = (atFeet == B_POOL_SLIDE) ? by : (by - 1);
+            int[][] dirs = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+            double slideDX = 0.0;
+            double slideDZ = 0.0;
+            for (int[] d : dirs) {
+               int nbLow = g.world.getBlock(bx + d[0], sy - 1, bz + d[1]);
+               int nbSame = g.world.getBlock(bx + d[0], sy, bz + d[1]);
+               if (nbLow == B_POOL_SLIDE || nbLow == Blocks.WATER || nbSame == Blocks.WATER) {
+                  slideDX = d[0];
+                  slideDZ = d[1];
+                  break;
+               }
+            }
+            if (slideDX != 0.0 || slideDZ != 0.0) {
+               g.player.vx = slideDX * 0.34;
+               g.player.vz = slideDZ * 0.34;
+               sanity = Math.min(100, sanity + 1);
+               if (this.slideToastCooldown == 0) {
+                  this.slideToastCooldown = 70;
+                  g.toast("Waterslide!", "Gliding down the Poolrooms chute!");
+               }
+            }
          }
       }
 
@@ -1863,7 +2019,8 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       gui.text(recStr, 16.0F, 15.0F, 0xFFFFFFFF, true, 1.0F);
 
       // 4. Sanity, Heart Rate, Exit Beacon Distance & Stealth Hiding Readout
-      int[] exitXZ = BackroomsGen.nearestExitXZ(g.player != null ? g.player.x : 0.0, g.player != null ? g.player.z : 0.0);
+      long wSeed = (g.world != null) ? g.world.seed : 0L;
+      int[] exitXZ = BackroomsGen.nearestExitXZ(wSeed, lvl, g.player != null ? g.player.x : 0.0, g.player != null ? g.player.z : 0.0);
       int exitDist = g.player != null ? (int)Math.round(Math.hypot(exitXZ[0] - g.player.x, exitXZ[1] - g.player.z)) : 24;
       String sanCol = sanity > 60 ? "§a" : (sanity > 30 ? "§e" : "§c");
       String bpmCol = heartbeatBpm > 135 ? "§c" : (heartbeatBpm > 100 ? "§e" : "§f");
