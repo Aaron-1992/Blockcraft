@@ -276,16 +276,20 @@ public final class ModLoader {
          }
          files.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)));
          for (Path p : files) {
-            String fn = p.getFileName().toString().toLowerCase(Locale.ROOT);
-            if (fn.equals("mods-state.properties") || fn.equals("readme.txt")) {
+            if (!Files.isRegularFile(p)) {
                continue;
             }
-            if (fn.endsWith(".bcmod") || fn.endsWith(".properties")) {
-               loadDeclarativeModFile(p);
-            } else if (fn.endsWith(".zip")) {
-               loadZipModFile(p);
-            } else if (fn.endsWith(".jar")) {
-               loadJarModFile(p);
+            String fn = p.getFileName().toString().toLowerCase(Locale.ROOT);
+            if (fn.equals("mods-state.properties") || fn.equals("readme.txt") || fn.startsWith(".")) {
+               continue;
+            }
+            if (fn.endsWith(".bcmod")
+               || fn.endsWith(".properties")
+               || fn.endsWith(".zip")
+               || fn.endsWith(".jar")
+               || fn.endsWith(".java")
+               || fn.endsWith(".txt")) {
+               loadAnyModFile(p);
             }
          }
       }
@@ -716,11 +720,117 @@ public final class ModLoader {
          0xFF63D43E,
          true
       ), new InfdevMod());
+      addCatalog(new ModEntry(
+         "backrooms-stalker",
+         "The Backrooms & Stalker (Level 0)",
+         "1.2.0",
+         "Backrooms Team",
+         "Horror / Dimension",
+         "Endless Level 0 yellow wallpaper labyrinth, buzzing fluorescent blackouts, /backrooms noclip, and the Stalker entity (/stalker)!",
+         289400,
+         0xFFD4AF37,
+         true
+      ), new BackroomsStalkerMod());
    }
 
    private static void addCatalog(ModEntry entry, BlockcraftMod impl) {
       entry.instance = impl;
       entries.put(entry.id, entry);
+   }
+
+   private static String stripModExtension(String fn) {
+      String s = fn;
+      for (String ext : new String[]{".jar.txt", ".zip.txt", ".bcmod.txt", ".properties.txt", ".java.txt", ".jar", ".zip", ".bcmod", ".properties", ".java", ".txt"}) {
+         if (s.toLowerCase(Locale.ROOT).endsWith(ext)) {
+            return s.substring(0, s.length() - ext.length());
+         }
+      }
+      int dot = s.lastIndexOf('.');
+      return dot > 0 ? s.substring(0, dot) : s;
+   }
+
+   private static void loadAnyModFile(Path p) {
+      try {
+         byte[] head = new byte[4];
+         int n;
+         try (InputStream in = Files.newInputStream(p)) {
+            n = in.read(head);
+         }
+         // ZIP / JAR magic header PK\x03\x04 (even if saved as .jar.txt or .zip.txt on Windows)
+         if (n == 4 && head[0] == 0x50 && head[1] == 0x4B && head[2] == 0x03 && head[3] == 0x04) {
+            loadJarModFile(p);
+            return;
+         }
+         String text = Files.readString(p, StandardCharsets.UTF_8);
+         loadTextOrJavaModFile(p, text);
+      } catch (Throwable t) {
+         System.err.println("ModLoader: failed to inspect " + p + ": " + t);
+      }
+   }
+
+   private static void loadTextOrJavaModFile(Path p, String text) {
+      if (text == null || text.isBlank()) {
+         return;
+      }
+      String fn = p.getFileName().toString();
+      String baseId = stripModExtension(fn).toLowerCase(Locale.ROOT);
+      boolean looksLikeJava = text.contains("implements BlockcraftMod")
+         || (text.contains("class ") && text.contains("public String id("));
+
+      if (looksLikeJava) {
+         Properties extracted = new Properties();
+         String parsedId = extractJavaReturnString(text, "id");
+         String parsedName = extractJavaReturnString(text, "name");
+         String parsedVer = extractJavaReturnString(text, "version");
+         String parsedAuthor = extractJavaReturnString(text, "author");
+         String parsedDesc = extractJavaReturnString(text, "description");
+         extracted.setProperty("id", parsedId != null ? parsedId : baseId);
+         if (parsedName != null) {
+            extracted.setProperty("name", parsedName);
+         }
+         if (parsedVer != null) {
+            extracted.setProperty("version", parsedVer);
+         }
+         if (parsedAuthor != null) {
+            extracted.setProperty("author", parsedAuthor);
+         }
+         if (parsedDesc != null) {
+            extracted.setProperty("description", parsedDesc);
+         }
+         registerDeclarativeProps(p, extracted);
+         return;
+      }
+
+      Properties props = new Properties();
+      try {
+         props.load(new StringReader(text));
+      } catch (IOException e) {
+         return;
+      }
+      registerDeclarativeProps(p, props);
+   }
+
+   private static String extractJavaReturnString(String src, String methodName) {
+      int mIdx = src.indexOf(" " + methodName + "()");
+      if (mIdx < 0) {
+         mIdx = src.indexOf("\t" + methodName + "()");
+      }
+      if (mIdx < 0) {
+         return null;
+      }
+      int retIdx = src.indexOf("return", mIdx);
+      if (retIdx < 0 || retIdx - mIdx > 160) {
+         return null;
+      }
+      int q1 = src.indexOf('"', retIdx);
+      if (q1 < 0 || q1 - retIdx > 60) {
+         return null;
+      }
+      int q2 = src.indexOf('"', q1 + 1);
+      if (q2 < 0 || q2 - q1 > 300) {
+         return null;
+      }
+      return src.substring(q1 + 1, q2);
    }
 
    private static void loadDeclarativeModFile(Path p) {
@@ -734,43 +844,30 @@ public final class ModLoader {
    }
 
    private static void loadZipModFile(Path zipPath) {
-      try (ZipFile zf = new ZipFile(zipPath.toFile())) {
-         ZipEntry ze = zf.getEntry("mod.properties");
-         if (ze == null) {
-            ze = zf.getEntry("bcmod.properties");
-         }
-         if (ze == null) {
-            return;
-         }
-         Properties props = new Properties();
-         try (InputStream in = zf.getInputStream(ze)) {
-            props.load(new StringReader(new String(in.readAllBytes(), StandardCharsets.UTF_8)));
-         }
-         registerDeclarativeProps(zipPath, props);
-      } catch (IOException ignored) {
-      }
+      loadJarModFile(zipPath);
    }
 
    private static void registerDeclarativeProps(Path source, Properties props) {
       String fn = source.getFileName().toString();
-      int dot = fn.lastIndexOf('.');
-      String fallbackId = (dot > 0 ? fn.substring(0, dot) : fn).toLowerCase(Locale.ROOT);
+      String fallbackId = stripModExtension(fn).toLowerCase(Locale.ROOT);
       String id = props.getProperty("id", fallbackId).trim();
-      String name = props.getProperty("name", id);
-      String ver = props.getProperty("version", "1.0.0");
-      String author = props.getProperty("author", "Community");
-      String cat = props.getProperty("category", "Custom Mod");
-      String desc = props.getProperty("description", "Custom declarative mod (" + fn + ")");
-      ModEntry entry = new ModEntry(id, name, ver, author, cat, desc, 1, 0xFF26A69A, false);
+      boolean isBackrooms = id.contains("backrooms") || id.contains("stalker") || fallbackId.contains("backrooms") || fallbackId.contains("stalker");
+      BackroomsStalkerMod backroomsDelegate = isBackrooms ? new BackroomsStalkerMod() : null;
+      String name = props.getProperty("name", backroomsDelegate != null ? backroomsDelegate.name() : id);
+      String ver = props.getProperty("version", backroomsDelegate != null ? backroomsDelegate.version() : "1.0.0");
+      String author = props.getProperty("author", backroomsDelegate != null ? backroomsDelegate.author() : "Community");
+      String cat = props.getProperty("category", backroomsDelegate != null ? "Horror / Dimension" : "Custom Mod");
+      String desc = props.getProperty("description", backroomsDelegate != null ? backroomsDelegate.description() : ("Custom declarative mod (" + fn + ")"));
+      ModEntry entry = new ModEntry(id, name, ver, author, cat, desc, 1, backroomsDelegate != null ? 0xFFD4AF37 : 0xFF26A69A, false);
       entry.sourcePath = source;
       entry.installed = true;
       entry.enabled = true;
       entry.declProps.putAll(props);
-      entry.instance = createDeclarativeInstance(entry);
+      entry.instance = createDeclarativeInstance(entry, backroomsDelegate);
       entries.put(id, entry);
    }
 
-   private static BlockcraftMod createDeclarativeInstance(ModEntry entry) {
+   private static BlockcraftMod createDeclarativeInstance(ModEntry entry, BlockcraftMod delegate) {
       return new BlockcraftMod() {
          @Override
          public String id() {
@@ -799,6 +896,9 @@ public final class ModLoader {
 
          @Override
          public void onInit(Context ctx) {
+            if (delegate != null) {
+               delegate.onInit(ctx);
+            }
             for (String key : entry.declProps.stringPropertyNames()) {
                String val = entry.declProps.getProperty(key, "").trim();
                if (key.startsWith("shapeless.")) {
@@ -807,6 +907,37 @@ public final class ModLoader {
                   parseSmeltRule(ctx, val);
                }
             }
+         }
+
+         @Override
+         public void onEnable(Game g) {
+            if (delegate != null) {
+               delegate.onEnable(g);
+            }
+         }
+
+         @Override
+         public void onDisable(Game g) {
+            if (delegate != null) {
+               delegate.onDisable(g);
+            }
+         }
+
+         @Override
+         public void onGameTick(Game g) {
+            if (delegate != null) {
+               delegate.onGameTick(g);
+            }
+         }
+
+         @Override
+         public Gen createWorldGen(int dim, long seed, WorldSettings settings) {
+            return delegate != null ? delegate.createWorldGen(dim, seed, settings) : null;
+         }
+
+         @Override
+         public String hudWatermark() {
+            return delegate != null ? delegate.hudWatermark() : null;
          }
 
          @Override
@@ -819,7 +950,7 @@ public final class ModLoader {
                   return true;
                }
             }
-            return false;
+            return delegate != null && delegate.onCommand(g, cmd, args);
          }
       };
    }
@@ -913,6 +1044,9 @@ public final class ModLoader {
                }
                if (found.isEmpty()) {
                   ZipEntry propEntry = jf.getEntry("mod.properties");
+                  if (propEntry == null) {
+                     propEntry = jf.getEntry("bcmod.properties");
+                  }
                   if (propEntry != null) {
                      Properties props = new Properties();
                      try (InputStream in = jf.getInputStream(propEntry)) {
@@ -927,6 +1061,39 @@ public final class ModLoader {
                      } else {
                         registerDeclarativeProps(jarPath, props);
                         return;
+                     }
+                  }
+               }
+               if (found.isEmpty()) {
+                  // Fallback 1: Scan all .class entries inside the archive for any concrete BlockcraftMod implementation
+                  var en = jf.entries();
+                  while (en.hasMoreElements()) {
+                     ZipEntry ze = en.nextElement();
+                     String name = ze.getName();
+                     if (name.endsWith(".class") && !name.contains("$") && !name.startsWith("META-INF/")) {
+                        String cn = name.substring(0, name.length() - 6).replace('/', '.');
+                        try {
+                           Class<?> c = Class.forName(cn, false, cl);
+                           if (BlockcraftMod.class.isAssignableFrom(c) && !c.isInterface() && !java.lang.reflect.Modifier.isAbstract(c.getModifiers())) {
+                              found.add((BlockcraftMod)c.getDeclaredConstructor().newInstance());
+                           }
+                        } catch (Throwable ignored) {
+                        }
+                     }
+                  }
+               }
+               if (found.isEmpty()) {
+                  // Fallback 2: If the archive contains a .java or .bcmod/.properties file without compiled classes
+                  var en = jf.entries();
+                  while (en.hasMoreElements()) {
+                     ZipEntry ze = en.nextElement();
+                     String name = ze.getName().toLowerCase(Locale.ROOT);
+                     if (!ze.isDirectory() && (name.endsWith(".java") || name.endsWith(".bcmod") || name.endsWith(".properties") || name.endsWith(".txt"))) {
+                        try (InputStream in = jf.getInputStream(ze)) {
+                           String txt = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                           loadTextOrJavaModFile(jarPath, txt);
+                           return;
+                        }
                      }
                   }
                }
@@ -1289,6 +1456,16 @@ public final class ModLoader {
                   )
             );
             return true;
+         }
+      }
+      if (cmd.equalsIgnoreCase("/backrooms") || cmd.equalsIgnoreCase("/stalker")) {
+         ModEntry br = entries.get("backrooms-stalker");
+         if (br != null && (!br.installed || !br.enabled)) {
+            if (!br.installed) {
+               install("backrooms-stalker");
+            } else {
+               setEnabled("backrooms-stalker", true);
+            }
          }
       }
       for (ModEntry m : entries.values()) {

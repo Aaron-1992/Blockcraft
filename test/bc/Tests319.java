@@ -870,6 +870,28 @@ final class Tests319 {
          tabGr.begin(854, 480, 2);
          Net319.drawTabOverlay(bwGame);
          check(tabGr.textExtent[2] > tabGr.textExtent[0], "Tab Scoreboard overlay renders panels and player stats");
+
+         // Verify Backrooms Stalker Mod (mods/backrooms-stalker.jar & .jar.txt support)
+         ModLoader.ModEntry brEntry = ModLoader.get("backrooms-stalker");
+         check(brEntry != null, "backrooms-stalker mod is registered in ModLoader");
+         try {
+            double origY = bwGame.player.y;
+            bwGame.runCommand("/backrooms");
+            check(ModLoader.get("backrooms-stalker").enabled, "/backrooms auto-enables backrooms-stalker mod");
+            eq(BackroomsStalkerMod.POCKET_FLOOR_Y + 1, (int)Math.floor(bwGame.player.y), "Player teleported into Backrooms Level 0 labyrinth");
+            int px = (int)Math.floor(bwGame.player.x);
+            int pz = (int)Math.floor(bwGame.player.z);
+            eq(BackroomsGen.CARPET_BLOCK, bwGame.world.getBlock(px, BackroomsStalkerMod.POCKET_FLOOR_Y, pz), "Backrooms damp yellow carpet floor placed");
+            Gen brGen = Dim.makeGen(Dim.OVERWORLD, 999L, new WorldSettings());
+            check(brGen instanceof BackroomsGen, "Overworld uses BackroomsGen when backrooms-stalker mod is enabled");
+            Chunk brCh = brGen.generate(0, 0);
+            eq(BackroomsGen.CARPET_BLOCK, brCh.blocks[Chunk.idx(0, BackroomsGen.FLOOR_Y, 0)] & 0xFFFF, "BackroomsGen places damp carpet at Y=64");
+            bwGame.runCommand("/stalker blackout");
+            bwGame.runCommand("/backrooms leave");
+            eq((int)Math.floor(origY), (int)Math.floor(bwGame.player.y), "/backrooms leave restores player position");
+         } finally {
+            ModLoader.setEnabled("backrooms-stalker", false);
+         }
       });
    }
 }

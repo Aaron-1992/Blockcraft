@@ -166,6 +166,22 @@ def build_infdev_mod_jar(classes_dir):
     return mod_jar
 
 
+def build_backrooms_mod_jar(classes_dir):
+    """Packages the Backrooms & Stalker horror mod into mods/backrooms-stalker.jar."""
+    mod_jar = os.path.join(ROOT, "mods", "backrooms-stalker.jar")
+    os.makedirs(os.path.dirname(mod_jar), exist_ok=True)
+    with zipfile.ZipFile(mod_jar, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        add(z, "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\r\nMod-Class: bc.BackroomsStalkerMod\r\n\r\n")
+        add(z, "META-INF/services/bc.BlockcraftMod", "bc.BackroomsStalkerMod\n")
+        bc_dir = os.path.join(classes_dir, "bc")
+        if os.path.isdir(bc_dir):
+            for fn in sorted(os.listdir(bc_dir)):
+                if fn.startswith("Backrooms") and fn.endswith(".class"):
+                    add(z, "bc/" + fn, open(os.path.join(bc_dir, fn), "rb").read())
+    print("[build] %s  (%.1f KB)" % (os.path.relpath(mod_jar, ROOT), os.path.getsize(mod_jar) / 1e3))
+    return mod_jar
+
+
 def build_patch_zip(ver, exe_path, jar_path, mod_jar_path=None):
     out = os.path.join(ROOT, "releases", "Blockcraft-UPDATE%s-patch.zip" % ver)
     os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -191,6 +207,9 @@ def build_patch_zip(ver, exe_path, jar_path, mod_jar_path=None):
             add(z, "Blockcraft/" + n, data)
         if mod_jar_path and os.path.isfile(mod_jar_path):
             add(z, "Blockcraft/mods/infdev-2010.jar", open(mod_jar_path, "rb").read())
+        br_jar = os.path.join(ROOT, "mods", "backrooms-stalker.jar")
+        if os.path.isfile(br_jar):
+            add(z, "Blockcraft/mods/backrooms-stalker.jar", open(br_jar, "rb").read())
         mod_readme = os.path.join(ROOT, "mods", "README.txt")
         if os.path.isfile(mod_readme):
             add(z, "Blockcraft/mods/README.txt", open(mod_readme, "rb").read())
@@ -233,6 +252,9 @@ def build_full_zip(ver, exe_path, jar_path, mod_jar_path=None):
         rep["Blockcraft/" + n] = (data, 0o644)
     if mod_jar_path and os.path.isfile(mod_jar_path):
         rep["Blockcraft/mods/infdev-2010.jar"] = (open(mod_jar_path, "rb").read(), 0o644)
+    br_jar = os.path.join(ROOT, "mods", "backrooms-stalker.jar")
+    if os.path.isfile(br_jar):
+        rep["Blockcraft/mods/backrooms-stalker.jar"] = (open(br_jar, "rb").read(), 0o644)
     mod_readme = os.path.join(ROOT, "mods", "README.txt")
     if os.path.isfile(mod_readme):
         rep["Blockcraft/mods/README.txt"] = (open(mod_readme, "rb").read(), 0o644)
@@ -259,6 +281,7 @@ def main():
     build_jar(classes, jar)
     build_exe(jar, exe)
     mod_jar = build_infdev_mod_jar(classes)
+    build_backrooms_mod_jar(classes)
     if a.patch:
         build_patch_zip(ver, exe, jar, mod_jar)
     if a.full:
