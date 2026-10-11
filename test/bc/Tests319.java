@@ -1236,6 +1236,29 @@ final class Tests319 {
             }
          }
          eq(5, tumbleRound2Bots, "Starting a new Tumble round (startMatch / resetArenaMap) respawns all 5 TumbleBot competitors");
+
+         // Verify players stay eliminated / go to Spectator Mode when they die in Tumble, Battle, or Bedwars without a bed!
+         bwGame.player.hurt(100);
+         SkyGen.onLocalPlayerDied(bwGame);
+         check(SkyGen.localEliminated, "Dying in Tumble marks localEliminated = true");
+         bwGame.respawn();
+         check(bwGame.player.spectator && bwGame.player.rawMode() == 3, "Calling respawn() in Tumble puts eliminated player into Spectator Mode");
+         bwGame.player.setMode(0);
+         SkyGen.tickMode(bwGame, bwGame.world);
+         check(bwGame.player.spectator, "tickMode enforces Spectator Mode while localEliminated is true during an active round");
+
+         // Verify starting a new round clears localEliminated and restores Survival mode (mode 0)
+         SkyGen.startMatch(bwGame, false);
+         check(!SkyGen.localEliminated && !bwGame.player.spectator && bwGame.player.rawMode() == 0,
+            "Starting a new round clears localEliminated and restores player to Survival mode");
+
+         // Verify Multiplayer compatibility: remote map votes & remote match overview sync
+         SkyGen.onRemoteMapVote(2, WorldSettings.MAP_CAVERN);
+         SkyGen.onRemoteMapVote(3, WorldSettings.MAP_CAVERN);
+         eq(WorldSettings.MAP_CAVERN, SkyGen.winningVotedMap(0), "Multiplayer peer map votes are tallied into winningVotedMap");
+         SkyGen.onRemoteMatchOverview(bwGame, "PeerChamp_(Champion!)", "Tumble", "Cavern", 62);
+         check(SkyGen.showingOverview && "PeerChamp (Champion!)".equals(SkyGen.lastRoundFirst),
+            "Multiplayer MATCH OVERVIEW packet syncs Post-Match Overview screen and winner");
          bwGame.world.settings.type = WorldSettings.BEDWARS;
 
          // Verify LOD high-detail splitDistance extends further and scales dynamically with render distance

@@ -202,9 +202,14 @@ public final class Mobs {
                double dx = var5.x - var5.px;
                double dz = var5.z - var5.pz;
                float step = (float)Math.min(0.6, Math.hypot(dx, dz));
-               var5.walkAmp += (Math.min(1.0F, step * 4.5F) - var5.walkAmp) * 0.45F;
-               var5.walk += step * 2.5F;
-               var5.moving = step > 0.01F;
+               if (SkyGen.isMinigameBot(var5)) {
+                  var5.walkAmp += (Math.min(1.15F, step * 8.5F) - var5.walkAmp) * 0.48F;
+                  var5.walk += step * 4.5F;
+               } else {
+                  var5.walkAmp += (Math.min(1.0F, step * 4.5F) - var5.walkAmp) * 0.45F;
+                  var5.walk += step * 2.5F;
+               }
+               var5.moving = var5.moving || step > 0.01F;
             } else {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;

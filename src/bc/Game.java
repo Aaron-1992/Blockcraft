@@ -1672,7 +1672,7 @@ public final class Game {
    void respawn() {
       if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
          int myTeam = SkyGen.getPlayerTeam(this);
-         boolean bedIntact = SkyGen.isTeamBedIntact(this.world, myTeam);
+         boolean bedIntact = SkyGen.isTeamBedIntact(this.world, myTeam) && !SkyGen.localEliminated;
          this.player.dead = false;
          this.player.burn = 0;
          this.player.health = 20;
@@ -1694,23 +1694,20 @@ public final class Game {
             SkyGen.giveBedwarsRespawnKit(this, myTeam);
             this.say("\u00a7a[Bedwars] Respawned at " + SkyGen.BEDWARS_CODES[myTeam] + SkyGen.BEDWARS_NAMES[myTeam] + " Base\u00a7a!");
          } else {
+            SkyGen.localEliminated = true;
             this.bedPos = null;
             this.player.setMode(3);
             this.player.setPos(0.5, SkyGen.Y_DECK + 16.0, 0.5);
             this.player.updateBox();
-            this.say("\u00a7c\u00a7l[Bedwars] ELIMINATED! \u00a77Your bed was destroyed — spectating match...");
+            this.say("\u00a7c\u00a7l[Bedwars] ELIMINATED! \u00a77Your bed was destroyed — spectating match until next round...");
          }
          return;
       }
 
       if (this.world != null && this.world.settings != null && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE)) {
-         if (!Net319.isClientConnected()) {
-            // In singleplayer / host mode, respawning after dying in Battle or Tumble starts a fresh round with all AI bots respawned!
-            SkyGen.startMatch(this, true);
-            return;
-         }
          boolean isTumble = this.world.settings.type == WorldSettings.TUMBLE;
-         int myTeam = SkyGen.getPlayerTeam(this);
+         SkyGen.localEliminated = true;
+         this.bedPos = null;
          this.player.dead = false;
          this.player.burn = 0;
          this.player.health = 20;
@@ -1721,27 +1718,14 @@ public final class Game {
          this.player.fallDistance = 0.0F;
          this.player.invuln = 40;
          this.deathHandled = false;
-         if (isTumble) {
-            double ang = (Math.abs(myTeam) % 8) * (Math.PI / 4.0);
-            int sx = (int)Math.round(Math.cos(ang) * 12.0);
-            int sz = (int)Math.round(Math.sin(ang) * 12.0);
-            this.spawnXZ = new int[]{sx, sz};
-            this.player.setPos(sx + 0.5, SkyGen.Y_DECK + 1.0, sz + 0.5);
-            this.player.yaw = (float)Math.toDegrees(Math.atan2(sx, -sz));
-            this.player.pitch = 12.0F;
-            this.player.updateBox();
-            SkyGen.giveTumbleLoadout(this);
-            this.say("\u00a7b[Tumble] Respawned on the top layer with " + SkyGen.TUMBLE_MODE_NAMES[SkyGen.tumbleWeaponMode % 3] + "!");
-         } else {
-            int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
-            this.spawnXZ = new int[]{sp[0], sp[2]};
-            this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
-            this.player.yaw = SkyGen.getTeamYaw(myTeam);
-            this.player.pitch = 0.0F;
-            this.player.updateBox();
-            SkyGen.giveSkywarsKit(this, SkyGen.swKit);
-            this.say("\u00a76[Battle] Respawned at Podium #" + (myTeam + 1) + " with Item Set: \u00a7e" + SkyGen.SW_KIT_NAMES[SkyGen.swKit] + "\u00a76!");
-         }
+         this.player.setMode(3);
+         this.player.setPos(0.5, SkyGen.Y_DECK + 14.0, 0.5);
+         this.player.updateBox();
+         this.say(
+            isTumble
+               ? "\u00a7b\u00a7l[Tumble] ELIMINATED! \u00a77You cannot respawn this round — spectating match..."
+               : "\u00a76\u00a7l[Battle] ELIMINATED! \u00a77You cannot respawn this round — spectating match..."
+         );
          return;
       }
 
@@ -4040,6 +4024,7 @@ public final class Game {
          if (!this.deathHandled) {
             this.deathHandled = true;
             SkyGen.myDeaths++;
+            SkyGen.onLocalPlayerDied(this);
             if (!this.player.creative) {
                for (int var7 = 0; var7 < 36; var7++) {
                   if (this.inv[var7] != null) {
@@ -6051,11 +6036,15 @@ public final class Game {
       this.gui.gradient(0.0F, 0.0F, this.gui.w, this.gui.h, 1615855616, -1600126976);
       float var1 = this.gui.w / 2.0F;
       boolean hc = this.player != null && this.player.hardcore;
+      boolean isRoundMode = this.world != null
+         && this.world.settings != null
+         && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE);
       boolean bwEliminated = this.world != null
          && this.world.settings != null
          && this.world.settings.type == WorldSettings.BEDWARS
          && !SkyGen.isTeamBedIntact(this.world, SkyGen.getPlayerTeam(this));
-      this.gui.centered(hc ? "Game Over!" : (bwEliminated ? "ELIMINATED!" : "You died!"), var1, 40.0F, -1, true, 3.0F);
+      boolean roundEliminated = bwEliminated || isRoundMode || SkyGen.localEliminated;
+      this.gui.centered(hc ? "Game Over!" : (roundEliminated ? "ELIMINATED!" : "You died!"), var1, 40.0F, -1, true, 3.0F);
       long daysLived = this.world != null ? (this.world.dayTime / 24000L + 1L) : 1L;
       this.gui.centered("§7Day " + daysLived + "  |  Kills: §e" + SkyGen.myKills + "  §7|  Deaths: §c" + Math.max(1, SkyGen.myDeaths), var1, 63.0F, -1, true, 1.0F);
       if (hc) {
@@ -6068,28 +6057,28 @@ public final class Game {
             this.deathHandled = false;
             this.setScreen(Game.S.PLAY);
          });
-      } else if (bwEliminated) {
-         this.gui.centered("\u00a7cYour bed was destroyed — you cannot respawn!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
-         this.button("Play New Round", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 98.0F, 20.0F, true, () -> {
-            SkyGen.startMatch(this, true);
-         });
-         this.button("Spectate", var1 + 2.0F, this.gui.h / 2.0F - 10.0F, 98.0F, 20.0F, true, () -> {
+      } else if (roundEliminated) {
+         String elimMsg = bwEliminated
+            ? "\u00a7cYour bed was destroyed — you cannot respawn!"
+            : "\u00a7cYou were eliminated — you cannot respawn this round!";
+         this.gui.centered(elimMsg, var1, 74.0F, 0xFFFF5555, true, 1.0F);
+         this.button("Spectate Match", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
             this.respawn();
             this.setScreen(Game.S.PLAY);
          });
       } else {
-         boolean isRoundMode = this.world != null
-            && this.world.settings != null
-            && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE);
-         this.button(isRoundMode ? "Play New Round" : "Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+         this.button("Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
             this.respawn();
             this.setScreen(Game.S.PLAY);
          });
       }
       boolean isMinigame = this.world != null && this.world.settings != null && this.world.settings.isMinigame();
-      if (isMinigame) {
-         this.button("Match Overview & Lobby", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, () -> {
+      if (isMinigame && !Net319.isClientConnected()) {
+         this.button("Overview & Lobby", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 98.0F, 20.0F, true, () -> {
             SkyGen.openMatchOverview(this, false);
+         });
+         this.button("New Round", var1 + 2.0F, this.gui.h / 2.0F + 14.0F, 98.0F, 20.0F, true, () -> {
+            SkyGen.startMatch(this, true);
          });
          this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 38.0F, 200.0F, 20.0F, true, this::quitToTitle);
       } else {

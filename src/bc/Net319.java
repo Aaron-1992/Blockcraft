@@ -64,6 +64,7 @@ public final class Net319 {
       boolean onGround = true;
       boolean hurt;
       boolean spectator;
+      boolean eliminated;
       boolean fly;
       int team = -1;
       int health = 20;
@@ -447,11 +448,37 @@ public final class Net319 {
    public static int aliveEnemyPeers(int myTeam) {
       int c = 0;
       for (Peer p : peers.values()) {
-         if (!p.spectator && (myTeam < 0 || p.team != myTeam)) {
+         if (!p.spectator && !p.eliminated && p.health > 0 && p.gameMode != 1 && p.gameMode != 3 && (myTeam < 0 || p.team != myTeam)) {
             c++;
          }
       }
       return c;
+   }
+
+   public static int aliveTeamPeers(int team) {
+      int c = 0;
+      for (Peer p : peers.values()) {
+         if (!p.spectator && !p.eliminated && p.health > 0 && p.gameMode != 1 && p.gameMode != 3 && p.team == team) {
+            c++;
+         }
+      }
+      return c;
+   }
+
+   public static boolean isTeamOccupiedByPeer(int team) {
+      for (Peer p : peers.values()) {
+         if (p.team == team) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   public static void clearPeersEliminated() {
+      for (Peer p : peers.values()) {
+         p.eliminated = false;
+         p.spectator = false;
+      }
    }
 
    public static int pickAvailableTeam(int cid) {
@@ -697,10 +724,11 @@ public final class Net319 {
                sz = first.z;
             }
 
+            int mapId = curW != null && curW.settings != null ? curW.settings.mapId : 0;
             c.send(
                String.format(
                   Locale.ROOT,
-                  "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d",
+                  "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d %d %d %d %d",
                   cid,
                   seed,
                   dim,
@@ -711,7 +739,11 @@ public final class Net319 {
                   wType,
                   gMode,
                   assignedTeam,
-                  SkyGen.matchState
+                  SkyGen.matchState,
+                  mapId,
+                  SkyGen.swKit,
+                  SkyGen.tumbleWeaponMode,
+                  SkyGen.soloBots ? 1 : 0
                )
             );
             c.send("TEAM 1 " + SkyGen.myTeam);
@@ -873,6 +905,7 @@ public final class Net319 {
                || line.startsWith("UPG ")
                || line.startsWith("TEAM ")
                || line.startsWith("MATCH ")
+               || line.startsWith("ELIM ")
                || line.startsWith("TILE ")
                || line.startsWith("MOB_HIT ")
                || line.startsWith("MOB_ACT ")
@@ -1607,10 +1640,14 @@ public final class Net319 {
          | (m.ignited ? 8 : 0)
          | (m.hurtTime > 0 ? 16 : 0)
          | (m.attackAnim > 0 ? 32 : 0)
-         | (m.dead ? 64 : 0);
+         | (m.dead ? 64 : 0)
+         | SkyGen.getBotNetFlags(m);
+      String tagToken = (m.teamTag == null || m.teamTag.isEmpty())
+         ? "-"
+         : m.teamTag.replace(':', '~').replace(' ', '_');
       return String.format(
          Locale.ROOT,
-         "%d:%d:%.2f:%.2f:%.2f:%.1f:%.1f:%.1f:%d:%d:%d:%d:%d:%d:%d",
+         "%d:%d:%.2f:%.2f:%.2f:%.1f:%.1f:%.1f:%d:%d:%d:%d:%d:%d:%d:%s:%d",
          m.netId,
          m.type,
          m.x,
@@ -1625,7 +1662,9 @@ public final class Net319 {
          flags,
          m.swell,
          m.size,
-         m.variant
+         m.variant,
+         tagToken,
+         SkyGen.getBotGearTier(m)
       );
    }
 
@@ -1701,10 +1740,22 @@ public final class Net319 {
    }
 
    public static void sendMatchControl(String action) {
+      if (!isActive() || action == null || action.isBlank()) {
+         return;
+      }
+      String pkt = "MATCH " + action.trim();
+      if (hosting) {
+         broadcastExcept(0, pkt);
+      } else if (clientConnected && clientConn != null) {
+         clientConn.send(pkt);
+      }
+   }
+
+   public static void sendEliminated(int team) {
       if (!isActive()) {
          return;
       }
-      String pkt = "MATCH " + action;
+      String pkt = "ELIM " + selfId + " " + sanitizeName(selfName) + " " + (Math.abs(team) & 3);
       if (hosting) {
          broadcastExcept(0, pkt);
       } else if (clientConnected && clientConn != null) {
@@ -2026,10 +2077,11 @@ public final class Net319 {
          | (pl.inWater ? 4 : 0)
          | (pl.onGround ? 8 : 0)
          | (pl.hurtTime > 0 ? 16 : 0)
-         | ((pl.dead || pl.spectator) ? 32 : 0)
+         | ((pl.dead || pl.spectator || SkyGen.localEliminated) ? 32 : 0)
          | (pl.flying ? 64 : 0)
          | (g.eatTicks > 0 ? 128 : 0)
-         | (g.bowCharge > 0 ? 256 : 0);
+         | (g.bowCharge > 0 ? 256 : 0)
+         | (SkyGen.localEliminated ? 512 : 0);
       float sw = g.swinging ? g.swing : -1.0F;
       return String.format(
          Locale.ROOT,
@@ -2150,11 +2202,25 @@ public final class Net319 {
                      int gMode = p.length >= 10 ? Integer.parseInt(p[9]) : 1;
                      int assignedTeam = p.length >= 11 ? Integer.parseInt(p[10]) : Math.max(0, (selfId - 1) & 3);
                      int hostMatchState = p.length >= 12 ? Integer.parseInt(p[11]) : SkyGen.STATE_PLAYING;
+                     int hostMapId = p.length >= 13 ? Integer.parseInt(p[12]) : 0;
+                     if (p.length >= 14) {
+                        SkyGen.swKit = Math.max(0, Math.min(3, Integer.parseInt(p[13])));
+                     }
+                     if (p.length >= 15) {
+                        SkyGen.tumbleWeaponMode = Math.max(0, Math.min(2, Integer.parseInt(p[14])));
+                     }
+                     if (p.length >= 16) {
+                        SkyGen.soloBots = Integer.parseInt(p[15]) != 0;
+                     }
                      SkyGen.myTeam = Math.abs(assignedTeam) & 3;
                      SkyGen.matchState = hostMatchState;
                      if (g != null) {
                         g.joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, wType, gMode);
                         w = g.world;
+                        if (w != null && w.settings != null && w.settings.mapId != hostMapId) {
+                           w.settings.mapId = hostMapId;
+                           SkyGen.resetArenaMap(g, w, false);
+                        }
                      } else if (w != null) {
                         w.dayTime = dayTime;
                      }
@@ -2258,16 +2324,71 @@ public final class Net319 {
                      }
                   }
                }
+               case "ELIM" -> {
+                  if (p.length >= 3) {
+                     int pid = Integer.parseInt(p[1]);
+                     String pname = p[2];
+                     int pteam = p.length >= 4 ? (Math.abs(Integer.parseInt(p[3])) & 3) : 0;
+                     if (pid != selfId) {
+                        Peer peer = peers.computeIfAbsent(pid, k -> new Peer(k, pname));
+                        peer.eliminated = true;
+                        peer.spectator = true;
+                        if (g != null && w != null && w.settings != null) {
+                           if (w.settings.type == WorldSettings.BEDWARS) {
+                              g.say("§e§l[FINAL KILL] " + SkyGen.BEDWARS_CODES[pteam] + pname + " §7was permanently eliminated!");
+                           } else {
+                              g.say("§c[Eliminated] §e" + pname + " §7is out for this round and is now spectating!");
+                           }
+                        }
+                     }
+                  }
+               }
                case "MATCH" -> {
                   if (p.length >= 2 && g != null) {
                      String act = p[1].toUpperCase(Locale.ROOT);
                      if ("START".equals(act)) {
+                        clearPeersEliminated();
+                        if (p.length >= 3 && w != null && w.settings != null) {
+                           w.settings.mapId = Math.abs(Integer.parseInt(p[2])) & 3;
+                        }
+                        if (p.length >= 4) {
+                           SkyGen.swKit = Math.max(0, Math.min(3, Integer.parseInt(p[3])));
+                        }
+                        if (p.length >= 5) {
+                           SkyGen.tumbleWeaponMode = Math.max(0, Math.min(2, Integer.parseInt(p[4])));
+                        }
+                        if (p.length >= 6) {
+                           SkyGen.soloBots = Integer.parseInt(p[5]) != 0;
+                        }
                         SkyGen.startMatch(g, false);
                      } else if ("RESET".equals(act)) {
+                        clearPeersEliminated();
+                        if (p.length >= 3 && w != null && w.settings != null) {
+                           w.settings.mapId = Math.abs(Integer.parseInt(p[2])) & 3;
+                        }
                         SkyGen.resetArenaMap(g, w, false);
+                     } else if ("OVERVIEW".equals(act)) {
+                        String champ = p.length >= 3 ? p[2] : "Champion";
+                        String modeName = p.length >= 4 ? p[3] : "Battle";
+                        String mapName = p.length >= 5 ? p[4] : "Cove";
+                        int durSec = p.length >= 6 ? Integer.parseInt(p[5]) : 45;
+                        SkyGen.onRemoteMatchOverview(g, champ, modeName, mapName, durSec);
                      } else if ("WAIT".equals(act) || "LOBBY".equals(act)) {
+                        clearPeersEliminated();
+                        if (p.length >= 3 && w != null && w.settings != null) {
+                           w.settings.mapId = Math.abs(Integer.parseInt(p[2])) & 3;
+                           SkyGen.resetArenaMap(g, w, false);
+                        }
+                        SkyGen.showingOverview = false;
                         SkyGen.matchState = SkyGen.STATE_WAITING;
+                        SkyGen.lobbyCountdownTicks = 240;
                         g.setScreen(Game.S.WAITING);
+                     } else if ("VOTE".equals(act) && p.length >= 4) {
+                        int voterId = Integer.parseInt(p[2]);
+                        int votedMap = Integer.parseInt(p[3]);
+                        if (voterId != selfId) {
+                           SkyGen.onRemoteMapVote(voterId, votedMap);
+                        }
                      }
                   }
                }
@@ -2422,6 +2543,11 @@ public final class Net319 {
                               m.swell = mswell;
                               m.size = msize;
                               m.variant = mvar;
+                              if (f.length >= 16) {
+                                 m.teamTag = "-".equals(f[15]) ? null : f[15].replace('~', ':').replace('_', ' ');
+                              }
+                              int gTier = f.length >= 17 ? Integer.parseInt(f[16]) : 0;
+                              SkyGen.applyRemoteBotState(m, mflags, gTier);
                            }
                         }
                         if (isLast) {
@@ -2549,6 +2675,7 @@ public final class Net319 {
                      peer.fly = (flags & 64) != 0;
                      peer.eat = (flags & 128) != 0 ? 0.5F : 0.0F;
                      peer.bow = (flags & 256) != 0 ? 0.85F : 0.0F;
+                     peer.eliminated = (flags & 512) != 0;
                      peer.swing = Float.parseFloat(p[10]);
                      peer.heldId = Integer.parseInt(p[11]);
                      peer.skinIdx = Integer.parseInt(p[12]);

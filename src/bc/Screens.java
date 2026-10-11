@@ -774,13 +774,13 @@ final class Screens {
          ui.say(Net319.isConnected() ? "Connected to LAN world" : "Not connected");
       });
       boolean isMg = g.world != null && g.world.settings != null && g.world.settings.isMinigame();
-      if (isMg) {
+      if (isMg && !Net319.isClientConnected()) {
          ui.button("New Round", bx, y + 104.0F, half, 20.0F, true,
             "Reset the arena map and start a fresh round with all AI competitors respawned.",
             () -> SkyGen.startMatch(g, true));
          ui.button("Leave Minigame", bx + half + 4.0F, y + 104.0F, half, 20.0F, true, null, g::quitToTitle);
       } else {
-         ui.button("Save and Quit to Title", bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
+         ui.button(isMg ? "Leave Minigame" : "Save and Quit to Title", bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
       }
       ui.drawToast();
    }

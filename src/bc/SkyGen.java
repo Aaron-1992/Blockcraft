@@ -37,6 +37,9 @@ public final class SkyGen extends Gen {
    // Post-Match Overview & Inter-Round Lobby Map Voting State
    public static volatile boolean showingOverview = false;
    public static volatile boolean lastRoundWon = true;
+   public static volatile boolean localEliminated = false;
+   public static volatile boolean pendingOverviewWon = true;
+   public static volatile String pendingOverviewChamp = null;
    public static volatile int overviewCountdownTicks = -1;
    public static volatile int victoryTransitionTicks = -1;
    public static volatile String lastRoundMode = "Battle";
@@ -50,6 +53,7 @@ public final class SkyGen extends Gen {
    public static volatile int myMapVote = -1;
    public static final int[] mapVotes = new int[]{1, 1, 0, 1};
    private static final int[] aiMapVotes = new int[]{1, 1, 0, 1};
+   private static final java.util.concurrent.ConcurrentHashMap<Integer, Integer> peerMapVotes = new java.util.concurrent.ConcurrentHashMap<>();
 
    public static final String[] BOT_NAMES = new String[]{
       "Valkyrie", "BlazeKing", "Shadow", "Frostbite", "Nova", "Titan", "Aegis", "Zephyr"
@@ -170,18 +174,49 @@ public final class SkyGen extends Gen {
       myKills = 0;
       myDeaths = 0;
       myBedsBroken = 0;
+      localEliminated = false;
+      pendingOverviewWon = true;
+      pendingOverviewChamp = null;
       victoryTransitionTicks = -1;
       lobbyCountdownTicks = -1;
+   }
+
+   /** Returns true if a player who dies in the current minigame mode is permanently eliminated for this round. */
+   public static boolean shouldStayEliminated(Game g) {
+      if (g == null || g.world == null || g.world.settings == null) {
+         return false;
+      }
+      int type = g.world.settings.type;
+      if (type == WorldSettings.BATTLE || type == WorldSettings.TUMBLE) {
+         return true;
+      }
+      if (type == WorldSettings.BEDWARS) {
+         return !isTeamBedIntact(g.world, getPlayerTeam(g));
+      }
+      return false;
+   }
+
+   /** Called when the local player dies in-game; marks localEliminated if they cannot respawn this round and notifies peers. */
+   public static void onLocalPlayerDied(Game g) {
+      if (shouldStayEliminated(g)) {
+         localEliminated = true;
+         if (Net319.isActive()) {
+            Net319.sendEliminated(getPlayerTeam(g));
+         }
+      }
    }
 
    public static void initMapVoting(Game g) {
       int curMap = (g != null && g.world != null && g.world.settings != null) ? (g.world.settings.mapId & 3) : 0;
       long seed = System.nanoTime() ^ (g != null && g.world != null ? g.world.tickCount : 17L);
       Arrays.fill(aiMapVotes, 0);
-      // 3 AI lobby competitors cast votes across the 4 maps
-      for (int i = 0; i < 3; i++) {
-         int pick = (int)(Math.abs(seed + i * 31L + curMap) & 3);
-         aiMapVotes[pick]++;
+      peerMapVotes.clear();
+      if (soloBots) {
+         // 3 AI lobby competitors cast votes across the 4 maps
+         for (int i = 0; i < 3; i++) {
+            int pick = (int)(Math.abs(seed + i * 31L + curMap) & 3);
+            aiMapVotes[pick]++;
+         }
       }
       if (myMapVote < 0 || myMapVote >= 4) {
          myMapVote = curMap;
@@ -189,9 +224,19 @@ public final class SkyGen extends Gen {
       recomputeMapVotes();
    }
 
+   public static void onRemoteMapVote(int peerId, int mapIdx) {
+      peerMapVotes.put(peerId, Math.abs(mapIdx) & 3);
+      recomputeMapVotes();
+   }
+
    private static void recomputeMapVotes() {
       for (int m = 0; m < 4; m++) {
-         mapVotes[m] = aiMapVotes[m] + (myMapVote == m ? 2 : 0);
+         mapVotes[m] = (soloBots ? aiMapVotes[m] : 0) + (myMapVote == m ? 2 : 0);
+      }
+      for (Integer v : peerMapVotes.values()) {
+         if (v != null && v >= 0 && v < 4) {
+            mapVotes[v] += 2;
+         }
       }
    }
 
@@ -211,14 +256,21 @@ public final class SkyGen extends Gen {
       int m = Math.abs(mapIdx) & 3;
       myMapVote = m;
       recomputeMapVotes();
+      if (Net319.isActive()) {
+         Net319.sendMatchControl("VOTE " + Net319.selfId + " " + m);
+      }
       int win = winningVotedMap(m);
-      if (applyPreview && g != null && g.world != null && g.world.settings != null && g.world.settings.mapId != win) {
+      if (applyPreview && !Net319.isClientConnected() && g != null && g.world != null && g.world.settings != null && g.world.settings.mapId != win) {
          g.world.settings.mapId = win;
          resetArenaMap(g, g.world, true);
       }
    }
 
    public static void openMatchOverview(Game g, boolean won) {
+      openMatchOverview(g, won, null, Net319.isHosting());
+   }
+
+   public static void openMatchOverview(Game g, boolean won, String customChamp, boolean broadcast) {
       if (g == null) {
          return;
       }
@@ -230,11 +282,41 @@ public final class SkyGen extends Gen {
       lastRoundKills = myKills;
       lastRoundBedsBroken = myBedsBroken;
       lastRoundDurationSec = w != null ? Math.max(5, (int)(w.tickCount / 20L)) : 45;
-      lastRoundFirst = won ? "You (Champion!)" : BOT_NAMES[0] + " (AI Champion)";
-      lastRoundSecond = won ? BOT_NAMES[0] : "You (Runner-Up)";
+      String champ = (customChamp != null && !customChamp.isBlank())
+         ? customChamp
+         : (won ? (Net319.isActive() ? Net319.selfName + " (Champion!)" : "You (Champion!)") : BOT_NAMES[0] + " (Champion)");
+      lastRoundFirst = champ;
+      lastRoundSecond = won ? BOT_NAMES[0] : (Net319.isActive() ? Net319.selfName : "You (Runner-Up)");
       lastRoundThird = BOT_NAMES[1];
       showingOverview = true;
       overviewCountdownTicks = 180; // 9 seconds on overview before auto-transitioning to Lobby
+      victoryTransitionTicks = -1;
+      matchState = STATE_WAITING;
+      initMapVoting(g);
+      g.setScreen(Game.S.WAITING);
+      if (broadcast && Net319.isHosting()) {
+         String safeChamp = champ.replace(' ', '_');
+         Net319.sendMatchControl("OVERVIEW " + safeChamp + " " + lastRoundMode + " " + lastRoundMap + " " + lastRoundDurationSec);
+      }
+   }
+
+   public static void onRemoteMatchOverview(Game g, String champToken, String modeName, String mapName, int durSec) {
+      if (g == null) {
+         return;
+      }
+      String champ = champToken == null ? "Champion" : champToken.replace('_', ' ');
+      boolean iWon = champ.toLowerCase().startsWith(Net319.selfName.toLowerCase());
+      lastRoundMode = modeName != null ? modeName : "Battle";
+      lastRoundMap = mapName != null ? mapName : "Cove";
+      lastRoundWon = iWon;
+      lastRoundKills = myKills;
+      lastRoundBedsBroken = myBedsBroken;
+      lastRoundDurationSec = Math.max(5, durSec);
+      lastRoundFirst = champ;
+      lastRoundSecond = iWon ? BOT_NAMES[0] : Net319.selfName;
+      lastRoundThird = BOT_NAMES[1];
+      showingOverview = true;
+      overviewCountdownTicks = 180;
       victoryTransitionTicks = -1;
       matchState = STATE_WAITING;
       initMapVoting(g);
@@ -248,13 +330,16 @@ public final class SkyGen extends Gen {
       matchState = STATE_WAITING;
       if (g != null) {
          initMapVoting(g);
-         if (g.world != null && g.world.settings != null) {
+         if (g.world != null && g.world.settings != null && !Net319.isClientConnected()) {
             g.world.settings.mapId = winningVotedMap(g.world.settings.mapId);
             resetArenaMap(g, g.world, true);
          }
          lobbyCountdownTicks = 240; // 12-second lobby countdown for the next round (while voting on maps!)
          g.setScreen(Game.S.WAITING);
          g.say("\u00a7e[Lobby] Returned to lobby! Vote for the next Arena Map — new round starts in 12s!");
+         if (Net319.isHosting() && g.world != null && g.world.settings != null) {
+            Net319.sendMatchControl("LOBBY " + g.world.settings.mapId);
+         }
       }
    }
 
@@ -666,7 +751,8 @@ public final class SkyGen extends Gen {
          }
       }
       if (broadcast && Net319.isActive()) {
-         Net319.sendMatchControl("RESET");
+         int mapIdx = (targetW != null && targetW.settings != null) ? targetW.settings.mapId : 0;
+         Net319.sendMatchControl("RESET " + mapIdx);
       }
    }
 
@@ -674,7 +760,7 @@ public final class SkyGen extends Gen {
       showingOverview = false;
       overviewCountdownTicks = -1;
       victoryTransitionTicks = -1;
-      if (g != null && g.world != null && g.world.settings != null && myMapVote >= 0) {
+      if (g != null && g.world != null && g.world.settings != null && myMapVote >= 0 && !Net319.isClientConnected()) {
          g.world.settings.mapId = winningVotedMap(g.world.settings.mapId);
       }
       resetArenaMap(g, g != null ? g.world : null, false);
@@ -697,8 +783,9 @@ public final class SkyGen extends Gen {
          };
          g.say(modeTitle);
       }
-      if (broadcast) {
-         Net319.sendMatchControl("START");
+      if (broadcast && Net319.isActive()) {
+         int mapIdx = (g != null && g.world != null && g.world.settings != null) ? g.world.settings.mapId : 0;
+         Net319.sendMatchControl("START " + mapIdx + " " + swKit + " " + tumbleWeaponMode + " " + (soloBots ? 1 : 0));
       }
    }
 
@@ -1710,8 +1797,9 @@ public final class SkyGen extends Gen {
          if (w.tickCount < 20L && countHostiles(g) == 0) {
             Arrays.fill(swBotSpawned, false);
          }
+         int myPodium = Math.abs(getPlayerTeam(g)) % SKYWARS_SPAWNS.length;
          for (int i = 1; i < SKYWARS_SPAWNS.length; i++) {
-            if (!swBotSpawned[i]) {
+            if (!swBotSpawned[i] && i != myPodium && !Net319.isTeamOccupiedByPeer(i)) {
                swBotSpawned[i] = true;
                spawnBattleBotAtPodium(g, w, i);
             }
@@ -1719,7 +1807,7 @@ public final class SkyGen extends Gen {
       } else if (type == WorldSettings.BEDWARS) {
          int myTeamIdx = getPlayerTeam(g);
          for (int t = 0; t < 4; t++) {
-            if (t == myTeamIdx || !isTeamBedIntact(w, t)) {
+            if (t == myTeamIdx || Net319.isTeamOccupiedByPeer(t) || !isTeamBedIntact(w, t)) {
                continue;
             }
             for (int role = 0; role <= 1; role++) {
@@ -1927,7 +2015,7 @@ public final class SkyGen extends Gen {
                   shop2.color = Trades.PRIEST;
                }
                // Spawn 2 Smart AI Bots per unoccupied enemy base: Defender (#0) + Bridger/Raider (#1)!
-               if (soloBots && !Net319.isClientConnected() && t != getPlayerTeam(g)) {
+               if (soloBots && !Net319.isClientConnected() && t != getPlayerTeam(g) && !Net319.isTeamOccupiedByPeer(t)) {
                   spawnBedwarsTeamBot(g, t, 0);
                   spawnBedwarsTeamBot(g, t, 1);
                }
@@ -1952,6 +2040,38 @@ public final class SkyGen extends Gen {
          return false;
       }
       return m.teamTag.startsWith("BattleBot:") || m.teamTag.startsWith("TumbleBot:") || m.teamTag.startsWith("Team:");
+   }
+
+   public static int getBotNetFlags(Mobs.Mob m) {
+      if (m == null) {
+         return 0;
+      }
+      int bSlot = Math.abs(m.netId) & 31;
+      return (m.onGround ? 128 : 0)
+         | (m.moving ? 256 : 0)
+         | (botHoldingBlockTicks[bSlot] > 0 ? 512 : 0)
+         | (botEatTicks[bSlot] > 0 ? 1024 : 0)
+         | (botBowDrawTicks[bSlot] > 0 ? 2048 : 0);
+   }
+
+   public static int getBotGearTier(Mobs.Mob m) {
+      if (m == null) {
+         return 0;
+      }
+      return botGearTier[Math.abs(m.netId) & 31];
+   }
+
+   public static void applyRemoteBotState(Mobs.Mob m, int flags, int gearTier) {
+      if (m == null) {
+         return;
+      }
+      int bSlot = Math.abs(m.netId) & 31;
+      m.onGround = (flags & 128) != 0;
+      m.moving = (flags & 256) != 0;
+      botHoldingBlockTicks[bSlot] = (flags & 512) != 0 ? 6 : 0;
+      botEatTicks[bSlot] = (flags & 1024) != 0 ? 9 : 0;
+      botBowDrawTicks[bSlot] = (flags & 2048) != 0 ? 10 : 0;
+      botGearTier[bSlot] = Math.max(0, Math.min(4, gearTier));
    }
 
    public static String botDisplayName(Mobs.Mob m) {
@@ -2489,6 +2609,20 @@ public final class SkyGen extends Gen {
                hasRival = true;
             }
          }
+         for (Net319.Peer peer : Net319.peers().values()) {
+            if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0 && peer.gameMode != 1 && peer.gameMode != 3 && Math.abs(peer.y - bot.y) < 4.5) {
+               double d = Math.hypot(peer.x - bot.x, peer.z - bot.z);
+               if (d < bestDist) {
+                  bestDist = d;
+                  targX = peer.x;
+                  targY = peer.y;
+                  targZ = peer.z;
+                  targVx = peer.x - peer.px;
+                  targVz = peer.z - peer.pz;
+                  hasRival = true;
+               }
+            }
+         }
          for (Mobs.Mob other : mobs.list) {
             if (other != null && other != bot && !other.dead && Mobs.hostile(other.type) && Math.abs(other.y - bot.y) < 4.5) {
                double d = Math.hypot(other.x - bot.x, other.z - bot.z);
@@ -2578,8 +2712,9 @@ public final class SkyGen extends Gen {
       //  2. BATTLE AI: Surroundings-Aware Chest/Item Looting, Dynamic Bridging, Lead Bow & Crit Combos
       // ====================================================================
       if (mode == WorldSettings.BATTLE) {
-         // Scan surroundings for nearest human player OR rival BattleBot first so the bot knows if it is safe to loot!
+         // Scan surroundings for nearest human player, multiplayer peer, OR rival BattleBot first so the bot knows if it is safe to loot!
          Mobs.Mob rivalBot = null;
+         int targetPeerId = -1;
          double targX = 0.5;
          double targY = Y_DECK + 1.0;
          double targZ = 0.5;
@@ -2598,6 +2733,23 @@ public final class SkyGen extends Gen {
                targVx = player.vx;
                targVz = player.vz;
                targetIsPlayer = true;
+               targetPeerId = -1;
+            }
+         }
+         for (Net319.Peer peer : Net319.peers().values()) {
+            if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0 && peer.gameMode != 1 && peer.gameMode != 3) {
+               double d = Math.hypot(peer.x - bot.x, peer.z - bot.z);
+               if (d < bestDist) {
+                  bestDist = d;
+                  targX = peer.x;
+                  targY = peer.y;
+                  targZ = peer.z;
+                  targVx = peer.x - peer.px;
+                  targVz = peer.z - peer.pz;
+                  targetIsPlayer = false;
+                  targetPeerId = peer.id;
+                  rivalBot = null;
+               }
             }
          }
          for (Mobs.Mob other : mobs.list) {
@@ -2612,6 +2764,7 @@ public final class SkyGen extends Gen {
                   targVx = other.vx;
                   targVz = other.vz;
                   targetIsPlayer = false;
+                  targetPeerId = -1;
                }
             }
          }
@@ -2700,6 +2853,8 @@ public final class SkyGen extends Gen {
             SoundEngine.playHit(w, targX, targY + 1.0, targZ, isCrit);
             if (targetIsPlayer && mobs.g != null) {
                mobs.g.damagePlayer(dmg, bot.x, bot.z);
+            } else if (targetPeerId > 0) {
+               Net319.sendHit(targetPeerId, dmg, bot.x, bot.z, botDisplayName(bot));
             } else if (rivalBot != null) {
                mobs.hurtMob(rivalBot, dmg, bot.x, bot.z, 0.44, false);
                if (rivalBot.dead && mobs.g != null) {
@@ -2717,6 +2872,11 @@ public final class SkyGen extends Gen {
                double arcY = targY + 1.1 + bestDist * 0.04;
                if (targetIsPlayer) {
                   mobs.shootAtPos(bot, leadX, arcY, leadZ);
+               } else if (targetPeerId > 0) {
+                  mobs.shootAtPos(bot, leadX, arcY, leadZ);
+                  if (mobs.rnd.nextInt(3) != 0) {
+                     Net319.sendHit(targetPeerId, 3, bot.x, bot.z, botDisplayName(bot));
+                  }
                } else if (rivalBot != null) {
                   mobs.shootAtPos(bot, leadX, arcY, leadZ);
                   if (mobs.rnd.nextInt(3) != 0) {
@@ -2744,9 +2904,10 @@ public final class SkyGen extends Gen {
          int baseX = BEDWARS_BASES[myBotTeam][0];
          int baseZ = BEDWARS_BASES[myBotTeam][1];
 
-         // 3a. Scan surroundings for nearby enemy player or enemy team bot first so the bot knows threat proximity!
+         // 3a. Scan surroundings for nearby enemy player, enemy multiplayer peer, or enemy team bot first so the bot knows threat proximity!
          int humanTeam = mobs.g != null ? getPlayerTeam(mobs.g) : 0;
          Mobs.Mob enemyBot = null;
+         int enemyPeerId = -1;
          double enemyX = baseX + 0.5;
          double enemyY = Y_DECK + 1.0;
          double enemyZ = baseZ + 0.5;
@@ -2761,6 +2922,21 @@ public final class SkyGen extends Gen {
                enemyY = player.y;
                enemyZ = player.z;
                enemyIsPlayer = true;
+               enemyPeerId = -1;
+            }
+         }
+         for (Net319.Peer peer : Net319.peers().values()) {
+            if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0 && peer.gameMode != 1 && peer.gameMode != 3 && peer.team != myBotTeam) {
+               double d = Math.hypot(peer.x - bot.x, peer.z - bot.z);
+               if (d < enemyDist) {
+                  enemyDist = d;
+                  enemyX = peer.x;
+                  enemyY = peer.y;
+                  enemyZ = peer.z;
+                  enemyIsPlayer = false;
+                  enemyPeerId = peer.id;
+                  enemyBot = null;
+               }
             }
          }
          for (Mobs.Mob other : mobs.list) {
@@ -2775,6 +2951,7 @@ public final class SkyGen extends Gen {
                      enemyY = other.y;
                      enemyZ = other.z;
                      enemyIsPlayer = false;
+                     enemyPeerId = -1;
                   }
                }
             }
@@ -2959,6 +3136,8 @@ public final class SkyGen extends Gen {
             SoundEngine.playHit(w, enemyX, enemyY + 1.0, enemyZ, false);
             if (enemyIsPlayer && mobs.g != null) {
                mobs.g.damagePlayer(dmg, bot.x, bot.z);
+            } else if (enemyPeerId > 0) {
+               Net319.sendHit(enemyPeerId, dmg, bot.x, bot.z, botDisplayName(bot));
             } else if (enemyBot != null) {
                mobs.hurtMob(enemyBot, dmg, bot.x, bot.z, 0.42, false);
             }
@@ -3056,13 +3235,18 @@ public final class SkyGen extends Gen {
          return;
       }
 
-      // Celebratory 1.5s victory transition before opening the Post-Match Overview screen!
+      // Celebratory 1.5s victory/round-end transition before opening the Post-Match Overview screen!
       if (victoryTransitionTicks > 0) {
          victoryTransitionTicks--;
          if (victoryTransitionTicks == 0 && g != null) {
-            openMatchOverview(g, true);
+            openMatchOverview(g, pendingOverviewWon, pendingOverviewChamp, Net319.isHosting());
             return;
          }
+      }
+
+      // Enforce that a player who was eliminated in this round stays dead or in Spectator Mode until the next round starts!
+      if (localEliminated && g != null && g.player != null && !g.player.dead && !g.player.spectator) {
+         g.player.setMode(3);
       }
 
       // Fast void death so players don't fall endlessly below Y=-18
@@ -3095,13 +3279,22 @@ public final class SkyGen extends Gen {
                }
             }
          }
-         if (!tumbleWon && g != null && w.tickCount > 80L && w.tickCount % 30L == 0L) {
+         if (!tumbleWon && !Net319.isClientConnected() && g != null && w.tickCount > 80L && w.tickCount % 30L == 0L) {
             int enemies = countHostiles(g) + Net319.aliveEnemyPeers(-1);
-            if (enemies == 0 && (tumbleSpawnedBots || Net319.peerCount() > 0)) {
+            boolean iAmAlive = !localEliminated && g.player != null && !g.player.dead && !g.player.spectator;
+            if (iAmAlive && enemies == 0 && (tumbleSpawnedBots || Net319.peerCount() > 0)) {
                tumbleWon = true;
+               pendingOverviewWon = true;
+               pendingOverviewChamp = Net319.isActive() ? Net319.selfName + " (Champion!)" : "You (Champion!)";
                victoryTransitionTicks = 30;
                SoundEngine.playMinigameSound("mg_win");
                g.say("\u00a7b\u00a7l[Tumble] VICTORY! \u00a7aYou outlasted every rival above the lava! Opening Match Overview...");
+            } else if (!iAmAlive && enemies <= 1) {
+               tumbleWon = true;
+               pendingOverviewWon = false;
+               pendingOverviewChamp = survivingCompetitorName(g, -1);
+               victoryTransitionTicks = 30;
+               g.say("\u00a7b\u00a7l[Tumble] ROUND OVER! \u00a7e" + pendingOverviewChamp + " \u00a77won the round! Opening Match Overview...");
             }
          }
          return;
@@ -3146,13 +3339,22 @@ public final class SkyGen extends Gen {
                g.say("\u00a7c[Showdown] Move toward the center shrine!");
             }
          }
-         if (!skywarsWon && g != null && w.tickCount > 100L && w.tickCount % 40L == 0L) {
+         if (!skywarsWon && !Net319.isClientConnected() && g != null && w.tickCount > 100L && w.tickCount % 40L == 0L) {
             int enemies = countHostiles(g) + Net319.aliveEnemyPeers(-1);
-            if (enemies == 0 && swIslandStocked[0] && (soloBots || Net319.peerCount() > 0)) {
+            boolean iAmAlive = !localEliminated && g.player != null && !g.player.dead && !g.player.spectator;
+            if (iAmAlive && enemies == 0 && swIslandStocked[0] && (soloBots || Net319.peerCount() > 0)) {
                skywarsWon = true;
+               pendingOverviewWon = true;
+               pendingOverviewChamp = Net319.isActive() ? Net319.selfName + " (Champion!)" : "You (Champion!)";
                victoryTransitionTicks = 30;
                SoundEngine.playMinigameSound("mg_win");
                g.say("\u00a76\u00a7l[Battle] VICTORY! \u00a7aYou are the last champion standing! Opening Match Overview...");
+            } else if (!iAmAlive && swIslandStocked[0] && enemies <= 1) {
+               skywarsWon = true;
+               pendingOverviewWon = false;
+               pendingOverviewChamp = survivingCompetitorName(g, -1);
+               victoryTransitionTicks = 30;
+               g.say("\u00a76\u00a7l[Battle] ROUND OVER! \u00a7e" + pendingOverviewChamp + " \u00a77won the Battle! Opening Match Overview...");
             }
          }
          return;
@@ -3170,7 +3372,7 @@ public final class SkyGen extends Gen {
             for (int slot = 0; slot < 8; slot++) {
                int team = slot >> 1;
                int role = slot & 1;
-               if (team == myTeamIdx) {
+               if (team == myTeamIdx || Net319.isTeamOccupiedByPeer(team)) {
                   bwBotRespawnTicks[slot] = 0;
                   continue;
                }
@@ -3286,14 +3488,63 @@ public final class SkyGen extends Gen {
                }
             }
             int enemyPlayers = Net319.aliveEnemyPeers(my);
-            if (!bedwarsWon && bwBaseStocked[my] && enemyBeds == 0 && countHostiles(g) == 0 && enemyPlayers == 0) {
-               bedwarsWon = true;
-               victoryTransitionTicks = 30;
-               SoundEngine.playMinigameSound("mg_win");
-               g.say("\u00a76\u00a7l[Bedwars] VICTORY! \u00a7aAll enemy beds and opponents eliminated! Opening Match Overview...");
+            boolean myTeamAlive = (!localEliminated && !g.player.dead && !g.player.spectator) || isTeamBedIntact(w, my) || Net319.aliveTeamPeers(my) > 0;
+            if (!bedwarsWon && !Net319.isClientConnected() && bwBaseStocked[my]) {
+               if (myTeamAlive && enemyBeds == 0 && countHostiles(g) == 0 && enemyPlayers == 0) {
+                  bedwarsWon = true;
+                  pendingOverviewWon = true;
+                  pendingOverviewChamp = BEDWARS_NAMES[my] + " Team (Champions!)";
+                  victoryTransitionTicks = 30;
+                  SoundEngine.playMinigameSound("mg_win");
+                  g.say("\u00a76\u00a7l[Bedwars] VICTORY! \u00a7aAll enemy beds and opponents eliminated! Opening Match Overview...");
+               } else if (!myTeamAlive && countSurvivingBedwarsTeams(g, w, my) <= 1) {
+                  bedwarsWon = true;
+                  pendingOverviewWon = false;
+                  pendingOverviewChamp = survivingCompetitorName(g, my);
+                  victoryTransitionTicks = 30;
+                  g.say("\u00a76\u00a7l[Bedwars] ROUND OVER! \u00a7e" + pendingOverviewChamp + " \u00a77won the match! Opening Match Overview...");
+               }
             }
          }
       }
+   }
+
+   private static int countSurvivingBedwarsTeams(Game g, World w, int excludeTeam) {
+      int count = 0;
+      for (int t = 0; t < 4; t++) {
+         if (t == excludeTeam) {
+            continue;
+         }
+         boolean alive = isTeamBedIntact(w, t) || Net319.aliveTeamPeers(t) > 0;
+         if (!alive && g != null && g.mobs != null) {
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m != null && !m.dead && botTeamIndex(m) == t) {
+                  alive = true;
+                  break;
+               }
+            }
+         }
+         if (alive) {
+            count++;
+         }
+      }
+      return count;
+   }
+
+   private static String survivingCompetitorName(Game g, int myTeam) {
+      for (Net319.Peer p : Net319.peers().values()) {
+         if (p != null && !p.spectator && !p.eliminated && p.health > 0 && (myTeam < 0 || p.team != myTeam)) {
+            return p.name + " (Champion!)";
+         }
+      }
+      if (g != null && g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m != null && !m.dead && Mobs.hostile(m.type)) {
+               return botDisplayName(m) + " (Champion)";
+            }
+         }
+      }
+      return BOT_NAMES[0] + " (Champion)";
    }
 
    private static int countHostiles(Game g) {
