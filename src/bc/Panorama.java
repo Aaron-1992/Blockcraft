@@ -29,6 +29,8 @@ public final class Panorama {
       this.g = g;
    }
 
+   static volatile double[] cachedDefaultVista;
+
    /** Starts the panorama (the place is searched on a worker thread: the first frames show the plain menu background). */
    static void start(Game g) {
       if (g.pano != null || "off".equals(System.getProperty("bc.pano"))) {
@@ -37,10 +39,17 @@ public final class Panorama {
 
       Panorama p = new Panorama(g);
       g.pano = p;
+      double[] cached = cachedDefaultVista;
+      if (cached != null) {
+         p.vista = cached;
+         return;
+      }
       Thread t = new Thread(() -> {
          WorldSettings ws = new WorldSettings();
          p.gen = Dim.makeGen(Dim.OVERWORLD, SEED, ws);
-         p.vista = pick(p.gen);
+         double[] picked = pick(p.gen);
+         cachedDefaultVista = picked;
+         p.vista = picked;
       }, "panorama-vista");
       t.setDaemon(true);
       t.start();
@@ -54,16 +63,21 @@ public final class Panorama {
       }
 
       g.pano = null;
-      if (p.installed && p.world != null && g.world == p.world) {
-         for (Chunk c : p.world.chunks.values()) {
-            c.unloaded = true;
-            g.rend.onUnload(c);
+      if (p.installed && p.world != null) {
+         if (g.rend != null) {
+            g.rend.clearWorldMeshes(p.world);
+         } else {
+            for (Chunk c : p.world.chunks.values()) {
+               c.unloaded = true;
+            }
          }
 
          p.world.chunks.clear();
          p.world.shutdown();
-         g.world = null;
-         g.player = null;
+         if (g.world == p.world) {
+            g.world = null;
+            g.player = null;
+         }
       }
    }
 
@@ -87,6 +101,9 @@ public final class Panorama {
       this.g.world = w;
       this.g.player = this.cam;
       this.g.rend.setLod(w);
+      int cx = (int)Math.floor(v[1]) >> 4;
+      int cz = (int)Math.floor(v[3]) >> 4;
+      w.updateChunks(cx, cz, Math.min(4, this.g.opt.renderDistance), 64, 12000000L);
       this.installed = true;
       this.installedAt = System.nanoTime();
    }

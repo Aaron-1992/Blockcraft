@@ -1419,6 +1419,25 @@ final class Tests319 {
          } finally {
             lodTest.dispose();
          }
+
+         // Verify 3D gun classification & two-handed tactical aiming pose in PlayerAnim
+         check(Renderer.isGun(Redstone319.PISTOL) && Renderer.isGun(Redstone319.MACHINE_GUN) && Renderer.isGun(Redstone319.SNIPER_RIFLE), "PISTOL, MACHINE_GUN, and SNIPER_RIFLE are classified as 3D guns");
+         check(!Renderer.isGun(Redstone319.MURDER_KNIFE) && !Renderer.isGun(Items.BOW), "Non-gun weapons are not classified as 3D guns");
+         PlayerModel.Pose gunPose = new PlayerModel.Pose();
+         gunPose.held = Redstone319.MACHINE_GUN;
+         PlayerAnim.Joints gunJoints = PlayerAnim.solve(gunPose);
+         check(gunJoints.sh[0] > 65.0F && gunJoints.sh[1] > 60.0F, "Holding a 3D gun raises both right and left arms into a two-handed tactical aiming stance");
+
+         // Verify stuck arrows preserve non-zero flight heading vector so MobRender.drawArrows keeps incoming orientation
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 2, Blocks.STONE);
+         bwGame.mobs.arrows.clear();
+         bwGame.mobs.shootGunArrow(0.5, SkyGen.Y_DECK + 2.5, 0.5, 0.0, 0.0, 1.0, 3.2F, 6, true);
+         eq(1, bwGame.mobs.arrows.size(), "Spawned high-speed bullet arrow toward stone wall");
+         Mobs.Arrow shotAr = bwGame.mobs.arrows.get(0);
+         boolean removedOnWall = bwGame.mobs.tickArrow(shotAr, bwGame.world, bwGame.player);
+         check(!removedOnWall && shotAr.stuck, "Bullet arrow embeds in solid wall on impact without disappearing immediately");
+         check(shotAr.vz > 0.0, "Embedded arrow preserves non-zero flight heading vector for 3D rendering");
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 2, 0);
       });
    }
 }

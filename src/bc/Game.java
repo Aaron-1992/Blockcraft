@@ -1055,6 +1055,13 @@ public final class Game {
 
    void startWorld(boolean var1, String var2, int var3) {
       Panorama.stop(this); // Update 3.13: the turning world behind the menus makes room for the real one
+      if (this.world != null) {
+         if (this.rend != null) {
+            this.rend.clearWorldMeshes(this.world);
+         }
+         this.world.shutdown();
+         this.world = null;
+      }
       Properties var4 = new Properties();
       String var5 = this.newName;
       if (var1) {
@@ -1618,15 +1625,18 @@ public final class Game {
          Net319.disconnect(this);
       }
       this.saveWorld();
-
-      for (Chunk var2 : this.world.chunks.values()) {
-         var2.unloaded = true;
-         this.rend.onUnload(var2);
+      if (this.world != null) {
+         if (this.rend != null) {
+            this.rend.clearWorldMeshes(this.world);
+         } else {
+            for (Chunk var2 : this.world.chunks.values()) {
+               var2.unloaded = true;
+            }
+         }
+         this.world.chunks.clear();
+         this.world.shutdown();
+         this.world = null;
       }
-
-      this.world.chunks.clear();
-      this.world.shutdown();
-      this.world = null;
       this.player = null;
       this.target = null;
       this.setScreen(Game.S.TITLE);
@@ -3586,13 +3596,20 @@ public final class Game {
             var5 = 0.25;
          }
 
-         GLFW.glfwPollEvents();
-         this.update(var5);
-         if (System.getProperty("bc.auto") != null) {
-            this.autoTest();
-         }
+         try {
+            GLFW.glfwPollEvents();
+            this.update(var5);
+            if (System.getProperty("bc.auto") != null) {
+               this.autoTest();
+            }
 
-         this.render();
+            this.render();
+         } catch (Throwable varErr) {
+            varErr.printStackTrace();
+            if (System.getProperty("bc.test") != null) {
+               throw varErr;
+            }
+         }
          if (this.autoShotNow) {
             this.screenshot();
             System.out.println("AUTO screenshot; chunks=" + (this.world == null ? 0 : this.world.chunks.size()) + " fps=" + this.fps);
@@ -3776,12 +3793,14 @@ public final class Game {
                }
             }
          } else {
-            boolean var6 = this.screen == Game.S.PLAY
-               || this.screen == Game.S.WAITING
-               || this.screen == Game.S.INV
-               || this.screen == Game.S.CHAT
-               || this.screen == Game.S.DEAD
-               || Net319.isActive();
+            boolean isPanoWorld = this.pano != null && this.world == this.pano.world;
+            boolean var6 = !isPanoWorld
+               && (this.screen == Game.S.PLAY
+                  || this.screen == Game.S.WAITING
+                  || this.screen == Game.S.INV
+                  || this.screen == Game.S.CHAT
+                  || this.screen == Game.S.DEAD
+                  || Net319.isActive());
             if (var6) {
                this.acc += var1 * 20.0;
 

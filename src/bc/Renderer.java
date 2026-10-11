@@ -1893,7 +1893,186 @@ public final class Renderer {
       return var1;
    }
 
+   public static boolean isGun(int id) {
+      return id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE;
+   }
+
+   private static void gunBox(float x0, float y0, float z0, float x1, float y1, float z1, int rgb, float bright) {
+      float r = ((rgb >> 16) & 255) / 255.0F;
+      float g = ((rgb >> 8) & 255) / 255.0F;
+      float b = (rgb & 255) / 255.0F;
+      // Top (+Y)
+      float s0 = bright * 1.00F;
+      GL11.glColor3f(r * s0, g * s0, b * s0);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y1, z0);
+      GL11.glVertex3f(x0, y1, z1);
+      GL11.glVertex3f(x1, y1, z1);
+      GL11.glVertex3f(x1, y1, z0);
+      // Bottom (-Y)
+      float s1 = bright * 0.56F;
+      GL11.glColor3f(r * s1, g * s1, b * s1);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y0, z1);
+      GL11.glVertex3f(x0, y0, z0);
+      GL11.glVertex3f(x1, y0, z0);
+      GL11.glVertex3f(x1, y0, z1);
+      // Front/Muzzle (+X)
+      float s2 = bright * 0.88F;
+      GL11.glColor3f(r * s2, g * s2, b * s2);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x1, y0, z1);
+      GL11.glVertex3f(x1, y0, z0);
+      GL11.glVertex3f(x1, y1, z0);
+      GL11.glVertex3f(x1, y1, z1);
+      // Rear/Butt (-X)
+      float s3 = bright * 0.74F;
+      GL11.glColor3f(r * s3, g * s3, b * s3);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y0, z0);
+      GL11.glVertex3f(x0, y0, z1);
+      GL11.glVertex3f(x0, y1, z1);
+      GL11.glVertex3f(x0, y1, z0);
+      // Right Side (+Z)
+      float s4 = bright * 0.82F;
+      GL11.glColor3f(r * s4, g * s4, b * s4);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y0, z1);
+      GL11.glVertex3f(x1, y0, z1);
+      GL11.glVertex3f(x1, y1, z1);
+      GL11.glVertex3f(x0, y1, z1);
+      // Left Side (-Z)
+      float s5 = bright * 0.78F;
+      GL11.glColor3f(r * s5, g * s5, b * s5);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x1, y0, z0);
+      GL11.glVertex3f(x0, y0, z0);
+      GL11.glVertex3f(x0, y1, z0);
+      GL11.glVertex3f(x1, y1, z0);
+   }
+
+   /** Renders a multi-box 3D firearm model for PISTOL (459), MACHINE_GUN (460), and SNIPER_RIFLE (461). */
+   public static void drawGunModel3D(int id, float bright) {
+      boolean prevCull = GL11.glIsEnabled(2884);
+      GL11.glDisable(2884);
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, SkyGen.whiteTex());
+      GL11.glDisable(3008);
+      GL11.glBegin(7);
+
+      if (id == Redstone319.PISTOL) {
+         // 1. Angled Ergonomic Polymer Grip & Magazine Baseplate
+         gunBox(-0.27F, -0.36F, -0.052F, -0.09F, -0.18F, 0.052F, 0x242830, bright);
+         gunBox(-0.24F, -0.20F, -0.052F, -0.06F, -0.02F, 0.052F, 0x282C35, bright);
+         gunBox(-0.23F, -0.32F, -0.060F, -0.11F, -0.06F, 0.060F, 0x1A1D24, bright); // Textured side grip panels
+         gunBox(-0.29F, -0.40F, -0.058F, -0.08F, -0.36F, 0.058F, 0x15181E, bright); // Flared mag baseplate
+         // 2. Trigger Guard & Curved Steel Trigger
+         gunBox(-0.06F, -0.14F, -0.022F, 0.09F, -0.115F, 0.022F, 0x2C313A, bright);
+         gunBox(0.065F, -0.14F, -0.022F, 0.09F, -0.02F, 0.022F, 0x2C313A, bright);
+         gunBox(-0.02F, -0.11F, -0.015F, 0.02F, -0.03F, 0.015F, 0x9098A6, bright); // Silver trigger
+         // 3. Lower Receiver Frame & Under-Barrel Tactical Laser/Light Module
+         gunBox(-0.28F, -0.03F, -0.054F, 0.34F, 0.04F, 0.054F, 0x353B46, bright);
+         gunBox(0.09F, -0.095F, -0.042F, 0.29F, -0.03F, 0.042F, 0x22262E, bright); // Under-barrel tac-laser housing
+         gunBox(0.285F, -0.082F, -0.026F, 0.305F, -0.042F, 0.026F, 0xFF3830, 1.0F); // Glowing red laser lens
+         // 4. Machined Gunmetal Upper Slide, Ejection Port & Rear Hammer
+         gunBox(-0.30F, 0.04F, -0.062F, 0.36F, 0.155F, 0.062F, 0x626C7C, bright);
+         gunBox(-0.28F, 0.145F, -0.048F, 0.34F, 0.165F, 0.048F, 0x7A8596, bright); // Top slide bevel highlight
+         gunBox(-0.05F, 0.09F, 0.010F, 0.11F, 0.160F, 0.065F, 0xC8D0DC, bright); // Silver barrel hood / ejection port
+         gunBox(-0.33F, 0.065F, -0.020F, -0.29F, 0.125F, 0.020F, 0x454C58, bright); // Rear hammer spur
+         // Rear slide serrations
+         gunBox(-0.25F, 0.055F, -0.066F, -0.23F, 0.14F, 0.066F, 0x3E4450, bright);
+         gunBox(-0.20F, 0.055F, -0.066F, -0.18F, 0.14F, 0.066F, 0x3E4450, bright);
+         gunBox(-0.15F, 0.055F, -0.066F, -0.13F, 0.14F, 0.066F, 0x3E4450, bright);
+         // 5. Extended Threaded Barrel & Dark Bore
+         gunBox(0.36F, 0.068F, -0.032F, 0.44F, 0.132F, 0.032F, 0x3C424E, bright);
+         gunBox(0.435F, 0.082F, -0.020F, 0.446F, 0.118F, 0.020F, 0x0E1014, bright); // Muzzle bore
+         // 6. Glowing Tritium 3-Dot Iron Sights
+         gunBox(-0.28F, 0.162F, -0.048F, -0.22F, 0.195F, -0.016F, 0x262A32, bright);
+         gunBox(-0.28F, 0.162F, 0.016F, -0.22F, 0.195F, 0.048F, 0x262A32, bright);
+         gunBox(-0.285F, 0.172F, -0.038F, -0.275F, 0.188F, -0.024F, 0x50FF78, 1.0F); // Left rear tritium dot
+         gunBox(-0.285F, 0.172F, 0.024F, -0.275F, 0.188F, 0.038F, 0x50FF78, 1.0F);  // Right rear tritium dot
+         gunBox(0.29F, 0.162F, -0.016F, 0.34F, 0.198F, 0.016F, 0x262A32, bright);    // Front sight blade
+         gunBox(0.285F, 0.175F, -0.012F, 0.305F, 0.195F, 0.012F, 0x50FF78, 1.0F);    // Front tritium dot
+      } else if (id == Redstone319.MACHINE_GUN) {
+         // 1. Tactical Collapsible Buttstock & Rubber Recoil Pad
+         gunBox(-0.54F, -0.18F, -0.052F, -0.48F, 0.08F, 0.052F, 0x181B20, bright);  // Rubberized shoulder pad
+         gunBox(-0.48F, -0.06F, -0.044F, -0.24F, 0.075F, 0.044F, 0x2A2F38, bright); // Upper stock tube
+         gunBox(-0.48F, -0.14F, -0.032F, -0.26F, -0.09F, 0.032F, 0x383E4A, bright); // Lower stock strut
+         // 2. Heavy Steel Upper & Lower Receiver
+         gunBox(-0.24F, -0.045F, -0.066F, 0.17F, 0.140F, 0.066F, 0x464E5C, bright);
+         gunBox(-0.22F, 0.010F, -0.070F, 0.14F, 0.115F, 0.070F, 0x586272, bright);  // Receiver side stamping
+         gunBox(-0.04F, 0.055F, 0.010F, 0.11F, 0.120F, 0.074F, 0xB8C2D0, bright);   // Steel bolt carrier in ejection port
+         gunBox(0.08F, 0.085F, 0.066F, 0.14F, 0.115F, 0.125F, 0x282C34, bright);    // Side charging handle
+         gunBox(-0.14F, 0.015F, -0.076F, -0.06F, 0.045F, 0.076F, 0xD83830, bright); // Red fire-selector switch
+         // 3. Ergonomic Pistol Grip & Trigger Guard
+         gunBox(-0.21F, -0.35F, -0.048F, -0.07F, -0.045F, 0.048F, 0x22262E, bright);
+         gunBox(-0.07F, -0.14F, -0.022F, 0.02F, -0.115F, 0.022F, 0x2E333D, bright);
+         gunBox(-0.04F, -0.115F, -0.015F, -0.01F, -0.045F, 0.015F, 0x9098A6, bright);
+         // 4. Curved 30-Round Banana Magazine (2 stepped boxes + brass ammo window)
+         gunBox(-0.01F, -0.23F, -0.044F, 0.12F, -0.045F, 0.044F, 0x262B34, bright);
+         gunBox(0.02F, -0.43F, -0.042F, 0.15F, -0.22F, 0.042F, 0x20252D, bright);
+         gunBox(0.045F, -0.36F, -0.046F, 0.095F, -0.12F, 0.046F, 0xD8A438, bright); // Brass 5.56mm ammo window stripe!
+         // 5. Ventilated Quad-Rail Handguard & Vertical Tactical Foregrip
+         gunBox(0.17F, -0.025F, -0.058F, 0.41F, 0.120F, 0.058F, 0x343A45, bright);
+         gunBox(0.20F, 0.025F, -0.064F, 0.38F, 0.075F, 0.064F, 0x22262E, bright);   // Side Picatinny rail & cooling vents
+         gunBox(0.23F, -0.26F, -0.038F, 0.31F, -0.025F, 0.038F, 0x1E222A, bright);  // Vertical tactical foregrip
+         // 6. Rifled Barrel, Front Sight Post & Slotted Flash Hider
+         gunBox(0.41F, 0.025F, -0.030F, 0.56F, 0.085F, 0.030F, 0x525A68, bright);
+         gunBox(0.50F, 0.012F, -0.042F, 0.59F, 0.098F, 0.042F, 0x2C313A, bright);   // Slotted muzzle brake / flash hider
+         gunBox(0.36F, 0.120F, -0.018F, 0.40F, 0.195F, 0.018F, 0x2C313A, bright);   // Front iron sight tower
+         // 7. Top Picatinny Rail & 3D Holographic Red-Dot Reflex Sight
+         gunBox(-0.20F, 0.140F, -0.038F, 0.35F, 0.165F, 0.038F, 0x2A2F38, bright);
+         gunBox(-0.14F, 0.165F, -0.052F, 0.04F, 0.195F, 0.052F, 0x1E222A, bright);  // Holo sight base
+         gunBox(-0.12F, 0.195F, -0.052F, 0.02F, 0.270F, -0.036F, 0x282D36, bright); // Holo sight left wall
+         gunBox(-0.12F, 0.195F, 0.036F, 0.02F, 0.270F, 0.052F, 0x282D36, bright);   // Holo sight right wall
+         gunBox(-0.12F, 0.254F, -0.052F, 0.02F, 0.272F, 0.052F, 0x282D36, bright);  // Holo sight top hood
+         gunBox(-0.06F, 0.218F, -0.014F, -0.03F, 0.242F, 0.014F, 0xFF3830, 1.0F);   // Glowing red holographic reticle dot!
+      } else if (id == Redstone319.SNIPER_RIFLE) {
+         // 1. AWP Olive-Drab Tactical Stock, Adjustable Cheek Rest & Rubber Buttpad
+         gunBox(-0.64F, -0.19F, -0.058F, -0.58F, 0.085F, 0.058F, 0x181B20, bright); // Heavy rubber recoil pad
+         gunBox(-0.58F, -0.15F, -0.054F, -0.20F, 0.080F, 0.054F, 0x3A5834, bright); // Olive-drab AWP stock body
+         gunBox(-0.46F, 0.080F, -0.048F, -0.26F, 0.135F, 0.048F, 0x22262E, bright); // Black adjustable cheek rest
+         // 2. Olive-Drab Sniper Chassis & Pistol Grip
+         gunBox(-0.20F, -0.055F, -0.062F, 0.32F, 0.080F, 0.062F, 0x44663C, bright);
+         gunBox(-0.22F, -0.33F, -0.048F, -0.09F, -0.055F, 0.048F, 0x2E4628, bright);
+         // 3. Heavy Detachable Box Magazine (.338 Lapua)
+         gunBox(-0.03F, -0.26F, -0.046F, 0.14F, -0.055F, 0.046F, 0x242830, bright);
+         gunBox(-0.04F, -0.28F, -0.050F, 0.15F, -0.25F, 0.050F, 0x181B20, bright);
+         // 4. Machined Steel Bolt-Action Receiver & Protruding Bolt Handle
+         gunBox(-0.18F, 0.080F, -0.056F, 0.22F, 0.155F, 0.056F, 0x586272, bright);
+         gunBox(-0.05F, 0.095F, 0.010F, 0.12F, 0.150F, 0.062F, 0xC8D2DE, bright);   // Polished steel bolt body
+         gunBox(-0.12F, 0.095F, 0.056F, -0.06F, 0.130F, 0.145F, 0x909AA8, bright);  // Protruding bolt handle & knob
+         // 5. Long Free-Floating Fluted Bull Barrel & Dual-Baffle Tank Muzzle Brake
+         gunBox(0.32F, 0.048F, -0.032F, 0.68F, 0.112F, 0.032F, 0x4E5664, bright);
+         gunBox(0.65F, 0.028F, -0.056F, 0.76F, 0.132F, 0.056F, 0x2C313A, bright);   // Heavy rectangular muzzle brake
+         // 6. Folded Front Bipod Legs Under Fore-End
+         gunBox(0.18F, -0.125F, -0.068F, 0.38F, -0.055F, -0.028F, 0x262A32, bright);
+         gunBox(0.18F, -0.125F, 0.028F, 0.38F, -0.055F, 0.068F, 0x262A32, bright);
+         // 7. Dual Scope Rings & Large 3D Telescopic Sniper Scope (8x)
+         gunBox(-0.13F, 0.155F, -0.036F, -0.07F, 0.210F, 0.036F, 0x22262E, bright); // Rear scope mount ring
+         gunBox(0.07F, 0.155F, -0.036F, 0.13F, 0.210F, 0.036F, 0x22262E, bright);   // Front scope mount ring
+         gunBox(-0.22F, 0.205F, -0.044F, 0.24F, 0.288F, 0.044F, 0x262B34, bright);  // Main scope tube
+         gunBox(-0.31F, 0.190F, -0.056F, -0.20F, 0.302F, 0.056F, 0x1E222A, bright); // Rear eyepiece bell
+         gunBox(0.22F, 0.182F, -0.064F, 0.34F, 0.310F, 0.064F, 0x1E222A, bright);   // Front objective bell
+         gunBox(-0.03F, 0.288F, -0.028F, 0.03F, 0.328F, 0.028F, 0x383E4A, bright);  // Top elevation turret knob
+         gunBox(-0.03F, 0.225F, 0.044F, 0.03F, 0.270F, 0.082F, 0x383E4A, bright);   // Side windage turret knob
+         gunBox(0.335F, 0.198F, -0.048F, 0.346F, 0.294F, 0.048F, 0x48E8FF, 1.0F);   // Glowing cyan coated front lens
+         gunBox(-0.315F, 0.205F, -0.040F, -0.305F, 0.286F, 0.040F, 0x48E8FF, 1.0F); // Glowing cyan rear eyepiece lens
+      }
+
+      GL11.glEnd();
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      GL11.glBindTexture(3553, Tex.atlas);
+      if (prevCull) {
+         GL11.glEnable(2884);
+      }
+   }
+
    public static void drawItemModel(int var0, float var1) {
+      if (isGun(var0)) {
+         drawGunModel3D(var0, var1);
+         return;
+      }
       drawSprite(itemGeometry(var0), var1, null);
    }
 
@@ -2342,47 +2521,72 @@ public final class Renderer {
          PlayerModel.drawArmFirstPerson(this.g.skinPixels(), this.g.skinSlim(), bright, swing, p);
       } else {
          int id = item.id;
-         if (use >= 0.0F) {
-            float f = 32.0F * (1.0F - use) + 1.0F; // ticks left
-            float f1 = f / 32.0F;
-            if (f1 < 0.8F) {
-               GL11.glTranslatef(0.0F, Math.abs((float)Math.cos(f / 4.0F * Math.PI) * 0.1F), 0.0F);
+         if (isGun(id)) {
+            int maxCd = id == Redstone319.SNIPER_RIFLE ? 22 : (id == Redstone319.PISTOL ? 7 : 3);
+            float cd = Math.max(0.0F, SkyGen.playerGunCooldown - partial);
+            float recoil = cd > maxCd - 3.5F ? Math.min(1.0F, (cd - (maxCd - 3.5F)) / 3.0F) : 0.0F;
+            boolean flash = SkyGen.playerGunCooldown >= maxCd - 1;
+            GL11.glTranslatef(0.46F, -0.36F + p * -0.45F + recoil * 0.045F, -0.68F + recoil * 0.11F);
+            GL11.glRotatef(-84.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(4.0F + recoil * 12.0F, 0.0F, 0.0F, 1.0F);
+            float gunScale = id == Redstone319.SNIPER_RIFLE ? 0.78F : (id == Redstone319.MACHINE_GUN ? 0.74F : 0.68F);
+            GL11.glScalef(gunScale, gunScale, gunScale);
+            drawGunModel3D(id, bright);
+            if (flash) {
+               float mx = id == Redstone319.SNIPER_RIFLE ? 0.78F : (id == Redstone319.MACHINE_GUN ? 0.60F : 0.46F);
+               float my = id == Redstone319.SNIPER_RIFLE ? 0.08F : (id == Redstone319.MACHINE_GUN ? 0.055F : 0.10F);
+               GL11.glEnable(3553);
+               GL11.glBindTexture(3553, SkyGen.whiteTex());
+               GL11.glBegin(7);
+               gunBox(mx, my - 0.09F, -0.015F, mx + 0.16F, my + 0.09F, 0.015F, 0xFFE868, 1.0F);
+               gunBox(mx, my - 0.015F, -0.09F, mx + 0.16F, my + 0.015F, 0.09F, 0xFF9828, 1.0F);
+               gunBox(mx - 0.02F, my - 0.045F, -0.045F, mx + 0.08F, my + 0.045F, 0.045F, 0xFFFFFF, 1.0F);
+               GL11.glEnd();
+               GL11.glBindTexture(3553, Tex.atlas);
             }
-
-            float f3 = 1.0F - (float)Math.pow(f1, 27.0);
-            GL11.glTranslatef(f3 * 0.6F, f3 * -0.5F, 0.0F);
-            GL11.glRotatef(f3 * 90.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(f3 * 10.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
          } else {
-            float swArc = (float)Math.sin(s1 * Math.PI);
-            float swSnap = (float)Math.sin(swing * Math.PI);
-            GL11.glTranslatef(-0.42F * swArc, 0.24F * (float)Math.sin(s1 * Math.PI * 2.0), -0.28F * swSnap);
-            GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
-            float f = (float)Math.sin(swing * swing * Math.PI);
-            GL11.glRotatef(45.0F - f * 24.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(swArc * -24.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glRotatef(swArc * -84.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
-         }
+            if (use >= 0.0F) {
+               float f = 32.0F * (1.0F - use) + 1.0F; // ticks left
+               float f1 = f / 32.0F;
+               if (f1 < 0.8F) {
+                  GL11.glTranslatef(0.0F, Math.abs((float)Math.cos(f / 4.0F * Math.PI) * 0.1F), 0.0F);
+               }
 
-         if (Items.isItem(id) || flatBlock(id)) {
-            // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
-            GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
-            GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(25.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glScalef(0.68F, 0.68F, 0.68F);
-            if (Items.isItem(id)) {
-               drawItemModel(id, bright);
+               float f3 = 1.0F - (float)Math.pow(f1, 27.0);
+               GL11.glTranslatef(f3 * 0.6F, f3 * -0.5F, 0.0F);
+               GL11.glRotatef(f3 * 90.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(f3 * 10.0F, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
             } else {
-               drawFlatBlock(id, bright);
+               float swArc = (float)Math.sin(s1 * Math.PI);
+               float swSnap = (float)Math.sin(swing * Math.PI);
+               GL11.glTranslatef(-0.42F * swArc, 0.24F * (float)Math.sin(s1 * Math.PI * 2.0), -0.28F * swSnap);
+               GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
+               float f = (float)Math.sin(swing * swing * Math.PI);
+               GL11.glRotatef(45.0F - f * 24.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(swArc * -24.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glRotatef(swArc * -84.0F, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
             }
-         } else {
-            // block/block, "firstperson_righthand": rotation [0, 45, 0], scale 0.4
-            GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glScalef(0.4F, 0.4F, 0.4F);
-            drawBlockModel(id, bright);
+
+            if (Items.isItem(id) || flatBlock(id)) {
+               // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
+               GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
+               GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(25.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glScalef(0.68F, 0.68F, 0.68F);
+               if (Items.isItem(id)) {
+                  drawItemModel(id, bright);
+               } else {
+                  drawFlatBlock(id, bright);
+               }
+            } else {
+               // block/block, "firstperson_righthand": rotation [0, 45, 0], scale 0.4
+               GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glScalef(0.4F, 0.4F, 0.4F);
+               drawBlockModel(id, bright);
+            }
          }
       }
 

@@ -151,7 +151,13 @@ public final class Mobs {
          boolean remoteClientOnly = Net319.isClientConnected() && !Net319.isHosting();
 
          for (int var4 = this.list.size() - 1; var4 >= 0; var4--) {
+            if (var4 >= this.list.size()) {
+               continue;
+            }
             Mobs.Mob var5 = (Mobs.Mob)this.list.get(var4);
+            if (var5 == null) {
+               continue;
+            }
             if (var5.still) {
                // Update 3.17 test hook (bc.still): a mob that stands still for the screenshot, only its animation clock runs
                var5.age++;
@@ -172,7 +178,11 @@ public final class Mobs {
                   if (SkyGen.isMinigameBot(var5)) {
                      SkyGen.onBotKilled(this.g, var5);
                   }
-                  this.list.remove(var4);
+                  if (var4 < this.list.size() && this.list.get(var4) == var5) {
+                     this.list.remove(var4);
+                  } else {
+                     this.list.remove(var5);
+                  }
                   Mobs312.removed(this, var5, var1);
                }
             } else if (remoteClientOnly && var5.remoteSynced) {
@@ -223,18 +233,32 @@ public final class Mobs {
                         if (isBot) {
                            SkyGen.onBotKilled(this.g, var5);
                         }
-                        this.list.remove(var4);
+                        if (var4 < this.list.size() && this.list.get(var4) == var5) {
+                           this.list.remove(var4);
+                        } else {
+                           this.list.remove(var5);
+                        }
                      }
                   }
-               } else {
+               } else if (var4 < this.list.size() && this.list.get(var4) == var5) {
                   this.list.remove(var4);
+               } else {
+                  this.list.remove(var5);
                }
             }
          }
 
          for (int var12 = this.arrows.size() - 1; var12 >= 0; var12--) {
-            if (this.tickArrow((Mobs.Arrow)this.arrows.get(var12), var1, var2)) {
-               this.arrows.remove(var12);
+            if (var12 >= this.arrows.size()) {
+               continue;
+            }
+            Mobs.Arrow ar = (Mobs.Arrow)this.arrows.get(var12);
+            if (ar == null || this.tickArrow(ar, var1, var2)) {
+               if (var12 < this.arrows.size() && this.arrows.get(var12) == ar) {
+                  this.arrows.remove(var12);
+               } else {
+                  this.arrows.remove(ar);
+               }
             }
          }
 
@@ -819,27 +843,41 @@ public final class Mobs {
          return true;
       }
 
-      for (int var4 = 0; var4 < 4; var4++) {
-         var1.x = var1.x + var1.vx / 4.0;
-         var1.y = var1.y + var1.vy / 4.0;
-         var1.z = var1.z + var1.vz / 4.0;
+      double spd = Math.sqrt(var1.vx * var1.vx + var1.vy * var1.vy + var1.vz * var1.vz);
+      int steps = Math.max(4, Math.min(20, (int)Math.ceil(spd * 4.0)));
+      double sx = var1.vx / steps;
+      double sy = var1.vy / steps;
+      double sz = var1.vz / steps;
+
+      for (int var4 = 0; var4 < steps; var4++) {
+         var1.x = var1.x + sx;
+         var1.y = var1.y + sy;
+         var1.z = var1.z + sz;
          int var5 = var2.getBlock((int)Math.floor(var1.x), (int)Math.floor(var1.y), (int)Math.floor(var1.z));
          if (var5 != 0 && Blocks.coll[var5] != null) {
+            var1.x -= sx * 0.6;
+            var1.y -= sy * 0.6;
+            var1.z -= sz * 0.6;
             var1.stuck = true;
             var1.life = 1140;
-            var1.vx = var1.vy = var1.vz = 0.0;
+            // Preserve non-zero heading vector so MobRender.drawArrows keeps the incoming flight angle
+            var1.vx *= 0.001;
+            var1.vy *= 0.001;
+            var1.vz *= 0.001;
             return false;
          }
 
          if (var1.fromPlayer) {
-            for (Mobs.Mob var7 : this.list) {
-               if (!var7.dead
-                  && var1.x > var7.bb[0] - 0.1
-                  && var1.x < var7.bb[3] + 0.1
-                  && var1.y > var7.bb[1] - 0.1
-                  && var1.y < var7.bb[4] + 0.1
-                  && var1.z > var7.bb[2] - 0.1
-                  && var1.z < var7.bb[5] + 0.1) {
+            for (int mobIdx = 0; mobIdx < this.list.size(); mobIdx++) {
+               Mobs.Mob var7 = (Mobs.Mob)this.list.get(mobIdx);
+               if (var7 != null
+                  && !var7.dead
+                  && var1.x > var7.bb[0] - 0.12
+                  && var1.x < var7.bb[3] + 0.12
+                  && var1.y > var7.bb[1] - 0.12
+                  && var1.y < var7.bb[4] + 0.12
+                  && var1.z > var7.bb[2] - 0.12
+                  && var1.z < var7.bb[5] + 0.12) {
                   if (!var1.remote) {
                      if (var2.settings != null && var2.settings.type == WorldSettings.MURDER && SkyGen.isMinigameBot(var7)) {
                         SkyGen.onMurderArrowHitBot(this.g, var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz);
@@ -847,11 +885,27 @@ public final class Mobs {
                         this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.4, true);
                      }
                   }
+                  if (var1.life <= 2) {
+                     var1.stuck = true;
+                     var1.life = 1198;
+                     var1.vx *= 0.001;
+                     var1.vy *= 0.001;
+                     var1.vz *= 0.001;
+                     return false;
+                  }
                   return true;
                }
             }
             if (!var1.remote && Net319.isActive()) {
                if (Net319.tryArrowHitPeer(this.g, var1.x, var1.y, var1.z, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz)) {
+                  if (var1.life <= 2) {
+                     var1.stuck = true;
+                     var1.life = 1198;
+                     var1.vx *= 0.001;
+                     var1.vy *= 0.001;
+                     var1.vz *= 0.001;
+                     return false;
+                  }
                   return true;
                }
             }
@@ -864,17 +918,27 @@ public final class Mobs {
                && var1.z > var3.bb[2]
                && var1.z < var3.bb[5]) {
                this.g.damagePlayer((int)var1.damage, var1.x - var1.vx, var1.z - var1.vz);
+               if (var1.life <= 2) {
+                  var1.stuck = true;
+                  var1.life = 1198;
+                  var1.vx *= 0.001;
+                  var1.vy *= 0.001;
+                  var1.vz *= 0.001;
+                  return false;
+               }
                return true;
             }
             if (var1.life > 3 && var2.settings != null && var2.settings.isMinigame()) {
-               for (Mobs.Mob var7 : this.list) {
-                  if (!var7.dead
-                     && var1.x > var7.bb[0] - 0.1
-                     && var1.x < var7.bb[3] + 0.1
-                     && var1.y > var7.bb[1] - 0.1
-                     && var1.y < var7.bb[4] + 0.1
-                     && var1.z > var7.bb[2] - 0.1
-                     && var1.z < var7.bb[5] + 0.1) {
+               for (int mobIdx = 0; mobIdx < this.list.size(); mobIdx++) {
+                  Mobs.Mob var7 = (Mobs.Mob)this.list.get(mobIdx);
+                  if (var7 != null
+                     && !var7.dead
+                     && var1.x > var7.bb[0] - 0.12
+                     && var1.x < var7.bb[3] + 0.12
+                     && var1.y > var7.bb[1] - 0.12
+                     && var1.y < var7.bb[4] + 0.12
+                     && var1.z > var7.bb[2] - 0.12
+                     && var1.z < var7.bb[5] + 0.12) {
                      if (!var1.remote) {
                         this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.35, false);
                      }
@@ -1155,8 +1219,12 @@ public final class Mobs {
          }
       }
 
-      for (Mobs.Mob var28 : this.list) {
-         if (var28 != var8 && !var28.dead) {
+      for (int blastIdx = this.list.size() - 1; blastIdx >= 0; blastIdx--) {
+         if (blastIdx >= this.list.size()) {
+            continue;
+         }
+         Mobs.Mob var28 = (Mobs.Mob)this.list.get(blastIdx);
+         if (var28 != null && var28 != var8 && !var28.dead) {
             double var29 = Math.sqrt((var28.x - var1) * (var28.x - var1) + (var28.z - var5) * (var28.z - var5));
             if (var29 < var25 - 1.0) {
                this.hurtMob(var28, (int)(1.0 + 14.0 * (1.0 - var29 / (var25 - 1.0))), var1, var5, 0.8, false);

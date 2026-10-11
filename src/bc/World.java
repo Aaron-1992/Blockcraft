@@ -136,21 +136,22 @@ public final class World {
    }
 
    public Chunk chunk(int var1, int var2) {
-      if (FastChunkCache.LAST_WORLD == this) {
+      FastChunkCache cache = FastChunkCache.TL.get();
+      if (cache.lastWorld == this) {
          int slot = (var1 * 31 + var2) & 255;
-         Chunk c = FastChunkCache.CHUNKS[slot];
+         Chunk c = cache.chunks[slot];
          if (c != null && !c.unloaded && c.cx == var1 && c.cz == var2) {
             return c;
          }
          c = (Chunk)this.chunks.get(key(var1, var2));
          if (c != null && !c.unloaded) {
-            FastChunkCache.CHUNKS[slot] = c;
+            cache.chunks[slot] = c;
          }
          return c;
       }
       Chunk c = (Chunk)this.chunks.get(key(var1, var2));
       if (c != null && !c.unloaded) {
-         FastChunkCache.switchWorld(this, c, (var1 * 31 + var2) & 255);
+         cache.switchWorld(this, c, (var1 * 31 + var2) & 255);
       }
       return c;
    }
@@ -987,6 +988,9 @@ public final class World {
 
          for (int var9 = 0; var9 < this.fallers.size(); var9++) {
             World.Falling var12 = (World.Falling)this.fallers.get(var9);
+            if (var12 == null) {
+               continue;
+            }
             var12.px = var12.x;
             var12.py = var12.y;
             var12.pz = var12.z;
@@ -997,7 +1001,7 @@ public final class World {
             }
          }
 
-         this.fallers.removeIf(var0 -> var0.dead);
+         this.fallers.removeIf(var0 -> var0 == null || var0.dead);
          if (!remoteClientOnly) {
             this.tickCrops();
             this.fire.tick();
@@ -1011,11 +1015,14 @@ public final class World {
             this.weather.tick();
          }
 
-         for (World.Item var13 : this.items) {
-            this.tickItem(var13);
+         for (int itemIdx = 0; itemIdx < this.items.size(); itemIdx++) {
+            World.Item var13 = (World.Item)this.items.get(itemIdx);
+            if (var13 != null) {
+               this.tickItem(var13);
+            }
          }
 
-         this.items.removeIf(var0 -> var0.dead);
+         this.items.removeIf(var0 -> var0 == null || var0.dead);
          if (!this.tiles.isEmpty()) {
             for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
                if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
@@ -2141,19 +2148,35 @@ public final class World {
 }
 
 final class FastChunkCache {
-   static final Chunk[] CHUNKS = new Chunk[256];
-   static volatile World LAST_WORLD;
+   static final java.util.concurrent.ConcurrentLinkedQueue<java.lang.ref.WeakReference<FastChunkCache>> ALL =
+      new java.util.concurrent.ConcurrentLinkedQueue<>();
+   static final ThreadLocal<FastChunkCache> TL = ThreadLocal.withInitial(() -> {
+      FastChunkCache c = new FastChunkCache();
+      ALL.add(new java.lang.ref.WeakReference<>(c));
+      return c;
+   });
 
-   static synchronized void clear() {
-      LAST_WORLD = null;
-      Arrays.fill(CHUNKS, null);
+   final Chunk[] chunks = new Chunk[256];
+   World lastWorld;
+
+   static void clear() {
+      java.util.Iterator<java.lang.ref.WeakReference<FastChunkCache>> it = ALL.iterator();
+      while (it.hasNext()) {
+         FastChunkCache c = it.next().get();
+         if (c == null) {
+            it.remove();
+         } else {
+            c.lastWorld = null;
+            Arrays.fill(c.chunks, null);
+         }
+      }
    }
 
-   static synchronized void switchWorld(World w, Chunk c, int slot) {
-      if (LAST_WORLD != w) {
-         Arrays.fill(CHUNKS, null);
-         LAST_WORLD = w;
+   void switchWorld(World w, Chunk c, int slot) {
+      if (this.lastWorld != w) {
+         Arrays.fill(this.chunks, null);
+         this.lastWorld = w;
       }
-      CHUNKS[slot] = c;
+      this.chunks[slot] = c;
    }
 }

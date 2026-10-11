@@ -1,4 +1,5 @@
 tag=v4.2
-title=Blockcraft Update 4.2 — CS2 Strike, Murder Mystery, Console Edition Battle/Tumble/Bedwars, Smart 3D Tactical AI & Persistent Multiplayer
-notes=Update 4.2 adds CS2 Strike (Counter-Terrorists vs Terrorists with arrow-firing Machine Guns, Pistols, Snipers, TNT Frag Grenades & C4 Bomb Sites A/B), Murder Mystery (Murderer with concealed/throwable Knife, Sheriff with Pistol & Innocents collecting 5 Gold Ingots), strict AI inventory & vertical pillar building, persistent Multiplayer across gamemode/world switches without disconnecting players, Spectator Mode elimination, and polished HUDs & menus.
+title=Blockcraft Update 4.2 — CS2 Strike, Murder Mystery, 3D Firearms, High-Visibility Projectiles, Title Screen LOD & Crash/Performance Fixes
+notes=Update 4.2 adds CS2 Strike & Murder Mystery, multi-part 3D firearm models (Pistol, Machine Gun, Sniper Rifle) with first-person recoil & muzzle flash and two-handed third-person aiming, shader-safe 3D projectiles & bullet tracers, direct quadtree LOD traversal fixing Title Screen Panorama LOD & horizon performance, multi-skin OpenGL texture caching in PlayerModel, and thread-safe FastChunkCache/Mobs/World/Net319 crash fixes.
+
 

@@ -162,16 +162,32 @@ final class PlayerModel {
       box(x0 - inflate, y0 - inflate, z0 - inflate, x0 + w + inflate, y0 + h + inflate, z0 + d + inflate, u2, v2, (int)Math.round(w), (int)Math.round(h), (int)Math.round(d), bright);
    }
 
+   static final java.util.IdentityHashMap<int[], Integer> TEX_CACHE = new java.util.IdentityHashMap<>();
+
    static int texture(int[] px) {
-      if (texFor != px) {
-         if (texId != 0) {
-            GL11.glDeleteTextures(texId);
-         }
-
-         texId = Tex.upload(Skins.SIZE, Skins.SIZE, px, false, false);
-         texFor = px;
+      if (px == null) {
+         return 0;
       }
-
+      if (texFor == px && texId != 0) {
+         return texId;
+      }
+      Integer cached = TEX_CACHE.get(px);
+      if (cached != null) {
+         texId = cached;
+         texFor = px;
+         return texId;
+      }
+      if (TEX_CACHE.size() >= 64) {
+         for (Integer oldId : TEX_CACHE.values()) {
+            if (oldId != null && oldId != 0) {
+               GL11.glDeleteTextures(oldId);
+            }
+         }
+         TEX_CACHE.clear();
+      }
+      texId = Tex.upload(Skins.SIZE, Skins.SIZE, px, false, false);
+      texFor = px;
+      TEX_CACHE.put(px, texId);
       return texId;
    }
 
@@ -422,14 +438,21 @@ final class PlayerModel {
       GL11.glRotatef(180.0F, 0.0F, 1.0F, 0.0F);
       GL11.glTranslatef(1.0F, 2.0F, -10.0F); // 1/16, 0.125, -0.625 blocks
       if (id >= 256 || Renderer.flatBlock(id)) {
+         boolean isGun = Renderer.isGun(id);
          boolean handheld = id >= 256
-            && (Items.isTool(id) || id == 256 || id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE || id == Redstone319.MURDER_KNIFE);
+            && (Items.isTool(id) || id == 256 || isGun || id == Redstone319.MURDER_KNIFE);
          if (id == 268) { // the bow
             GL11.glTranslatef(-1.0F, -2.0F, 2.5F);
             GL11.glRotatef(-80.0F, 1.0F, 0.0F, 0.0F);
             GL11.glRotatef(260.0F, 0.0F, 1.0F, 0.0F);
             GL11.glRotatef(-40.0F, 0.0F, 0.0F, 1.0F);
             GL11.glScalef(0.9F * 16.0F, 0.9F * 16.0F, 0.9F * 16.0F);
+         } else if (isGun) {
+            GL11.glTranslatef(0.0F, 3.4F, 1.4F);
+            GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(8.0F, 0.0F, 0.0F, 1.0F);
+            float gunScale = id == Redstone319.SNIPER_RIFLE ? 0.92F : (id == Redstone319.MACHINE_GUN ? 0.86F : 0.78F);
+            GL11.glScalef(gunScale * 16.0F, gunScale * 16.0F, gunScale * 16.0F);
          } else if (handheld) {
             GL11.glTranslatef(0.0F, 4.0F, 0.5F);
             GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);

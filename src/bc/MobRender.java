@@ -767,31 +767,37 @@ public final class MobRender {
          return;
       }
 
-      GL11.glDisable(3553);
-      for (Mobs312.Fireball f : ms.fireballs) {
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, SkyGen.whiteTex());
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      for (int fbIdx = 0; fbIdx < ms.fireballs.size(); fbIdx++) {
+         Mobs312.Fireball f = ms.fireballs.get(fbIdx);
+         if (f == null) {
+            continue;
+         }
          double x = f.px + (f.x - f.px) * partial - rend.camX;
          double y = f.py + (f.y - f.py) * partial - rend.camY;
          double z = f.pz + (f.z - f.pz) * partial - rend.camZ;
-         float s = f.pearl ? 0.13F : (f.dragon ? 0.5F : (f.big ? 0.42F : 0.2F));
+         float s = f.pearl ? 0.16F : (f.dragon ? 0.52F : (f.big ? 0.45F : 0.24F));
          GL11.glPushMatrix();
          GL11.glTranslated(x, y, z);
          GL11.glRotatef((f.life + partial) * 23.0F, 1.0F, 0.6F, 0.3F);
          for (int layer = 0; layer < 2; layer++) {
-            float h = layer == 0 ? s : s * 0.55F;
+            float h = layer == 0 ? s : s * 0.58F;
             if (layer == 0) {
                if (f.pearl) {
-                  GL11.glColor3f(0.08F, 0.42F, 0.36F);
+                  GL11.glColor3f(0.12F, 0.55F, 0.48F);
                } else if (f.dragon) {
-                  GL11.glColor3f(0.65F, 0.18F, 0.95F);
+                  GL11.glColor3f(0.72F, 0.24F, 0.98F);
                } else {
-                  GL11.glColor3f(1.0F, 0.45F, 0.06F);
+                  GL11.glColor3f(1.0F, 0.48F, 0.08F);
                }
             } else if (f.pearl) {
-               GL11.glColor3f(0.55F, 0.95F, 0.82F);
+               GL11.glColor3f(0.62F, 0.98F, 0.88F);
             } else if (f.dragon) {
-               GL11.glColor3f(1.0F, 0.75F, 1.0F);
+               GL11.glColor3f(1.0F, 0.80F, 1.0F);
             } else {
-               GL11.glColor3f(1.0F, 0.9F, 0.35F);
+               GL11.glColor3f(1.0F, 0.94F, 0.42F);
             }
 
             GL11.glBegin(7);
@@ -804,6 +810,7 @@ public final class MobRender {
                   float vx = axis == 0 ? sign * h : (axis == 1 ? u : u);
                   float vy = axis == 1 ? sign * h : v;
                   float vz = axis == 2 ? sign * h : (axis == 0 ? u : v);
+                  GL11.glTexCoord2f(0.5F, 0.5F);
                   GL11.glVertex3f(vx, vy, vz);
                }
             }
@@ -815,26 +822,36 @@ public final class MobRender {
       }
 
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, Tex.atlas);
    }
 
    static void drawArrows(Mobs var0, Renderer var1, float var2) {
       if (!var0.arrows.isEmpty()) {
-         GL11.glDisable(3553);
+         GL11.glEnable(3553);
+         GL11.glBindTexture(3553, SkyGen.whiteTex());
+         GL11.glTexCoord2f(0.5F, 0.5F);
 
-         for (Arrow var4 : var0.arrows) {
+         for (int arIdx = 0; arIdx < var0.arrows.size(); arIdx++) {
+            Arrow var4 = var0.arrows.get(arIdx);
+            if (var4 == null) {
+               continue;
+            }
             double var5 = var4.px + (var4.x - var4.px) * var2 - var1.camX;
             double var7 = var4.py + (var4.y - var4.py) * var2 - var1.camY;
             double var9 = var4.pz + (var4.z - var4.pz) * var2 - var1.camZ;
             double var11 = var4.vx;
             double var13 = var4.vy;
             double var15 = var4.vz;
-            if (var4.stuck) {
+            double rawSpd = Math.sqrt(var11 * var11 + var13 * var13 + var15 * var15);
+            if (var4.stuck && rawSpd < 1.0E-6) {
                var11 = var4.x - var4.px;
-               var13 = 0.0;
-               var15 = 0.0;
-               var11 = 0.001;
-               var13 = -0.002;
+               var13 = var4.y - var4.py;
+               var15 = var4.z - var4.pz;
+               if (var11 * var11 + var13 * var13 + var15 * var15 < 1.0E-6) {
+                  var11 = 0.001;
+                  var13 = -0.002;
+                  var15 = 0.0;
+               }
             }
 
             double var17 = Math.sqrt(var11 * var11 + var13 * var13 + var15 * var15);
@@ -857,25 +874,44 @@ public final class MobRender {
                double var27 = var13 * var23 - var15 * var21;
                double var29 = var15 * var19 - var11 * var23;
                double var31 = var11 * var21 - var13 * var19;
-               double var33 = 0.6;
-               double var35 = 0.025;
+               boolean highVel = rawSpd > 1.8 || (var4.stuck && var4.life >= 1196);
+               double var33 = 0.68;
+               double var35 = highVel ? 0.048 : 0.040;
+               double tipLen = 0.14;
 
                for (int var37 = 0; var37 < 2; var37++) {
                   double var38 = var37 == 0 ? var19 : var27;
                   double var40 = var37 == 0 ? var21 : var29;
                   double var42 = var37 == 0 ? var23 : var31;
+                  // 1. Main 3D shaft + steel broadhead tip
                   GL11.glBegin(7);
-                  GL11.glColor3f(0.55F, 0.4F, 0.22F);
+                  if (highVel) {
+                     GL11.glColor3f(1.0F, 0.86F, 0.36F);
+                  } else {
+                     GL11.glColor3f(0.62F, 0.45F, 0.25F);
+                  }
+                  GL11.glTexCoord2f(0.5F, 0.5F);
                   GL11.glVertex3d(var5 - var11 * var33 + var38 * var35, var7 - var13 * var33 + var40 * var35, var9 - var15 * var33 + var42 * var35);
                   GL11.glVertex3d(var5 - var11 * var33 - var38 * var35, var7 - var13 * var33 - var40 * var35, var9 - var15 * var33 - var42 * var35);
-                  GL11.glColor3f(0.7F, 0.7F, 0.72F);
-                  GL11.glVertex3d(var5 - var38 * var35, var7 - var40 * var35, var9 - var42 * var35);
-                  GL11.glVertex3d(var5 + var38 * var35, var7 + var40 * var35, var9 + var42 * var35);
+                  if (highVel) {
+                     GL11.glColor3f(1.0F, 0.98F, 0.78F);
+                  } else {
+                     GL11.glColor3f(0.85F, 0.87F, 0.90F);
+                  }
+                  GL11.glVertex3d(var5 + var11 * tipLen - var38 * var35, var7 + var13 * tipLen - var40 * var35, var9 + var15 * tipLen - var42 * var35);
+                  GL11.glVertex3d(var5 + var11 * tipLen + var38 * var35, var7 + var13 * tipLen + var40 * var35, var9 + var15 * tipLen + var42 * var35);
                   GL11.glEnd();
+
+                  // 2. Fletching feathers / glowing tracer tail
                   GL11.glBegin(7);
-                  GL11.glColor3f(0.92F, 0.92F, 0.92F);
-                  double var44 = 0.1;
-                  double var46 = 0.08;
+                  if (highVel) {
+                     GL11.glColor3f(1.0F, 0.72F, 0.22F);
+                  } else {
+                     GL11.glColor3f(0.95F, 0.95F, 0.97F);
+                  }
+                  double var44 = 0.14;
+                  double var46 = 0.105;
+                  GL11.glTexCoord2f(0.5F, 0.5F);
                   GL11.glVertex3d(var5 - var11 * var33 + var38 * var46, var7 - var13 * var33 + var40 * var46, var9 - var15 * var33 + var42 * var46);
                   GL11.glVertex3d(var5 - var11 * var33 - var38 * var46, var7 - var13 * var33 - var40 * var46, var9 - var15 * var33 - var42 * var46);
                   GL11.glVertex3d(
@@ -889,11 +925,35 @@ public final class MobRender {
                      var9 - var15 * (var33 - var44) + var42 * var46
                   );
                   GL11.glEnd();
+
+                  // 3. Bright tracer streak for in-flight arrows & bullets
+                  if (!var4.stuck || var4.life >= 1196) {
+                     double trailLen = highVel ? Math.min(2.6, Math.max(1.2, rawSpd * 0.65)) : 1.05;
+                     double tw = highVel ? 0.030 : 0.018;
+                     GL11.glBegin(7);
+                     if (highVel) {
+                        GL11.glColor3f(1.0F, 0.92F, 0.48F);
+                     } else {
+                        GL11.glColor3f(0.92F, 0.90F, 0.82F);
+                     }
+                     GL11.glTexCoord2f(0.5F, 0.5F);
+                     GL11.glVertex3d(var5 - var38 * tw, var7 - var40 * tw, var9 - var42 * tw);
+                     GL11.glVertex3d(var5 + var38 * tw, var7 + var40 * tw, var9 + var42 * tw);
+                     if (highVel) {
+                        GL11.glColor3f(1.0F, 0.52F, 0.12F);
+                     } else {
+                        GL11.glColor3f(0.68F, 0.66F, 0.58F);
+                     }
+                     GL11.glVertex3d(var5 - var11 * trailLen + var38 * (tw * 0.35), var7 - var13 * trailLen + var40 * (tw * 0.35), var9 - var15 * trailLen + var42 * (tw * 0.35));
+                     GL11.glVertex3d(var5 - var11 * trailLen - var38 * (tw * 0.35), var7 - var13 * trailLen - var40 * (tw * 0.35), var9 - var15 * trailLen - var42 * (tw * 0.35));
+                     GL11.glEnd();
+                  }
                }
             }
          }
 
-         GL11.glEnable(3553);
+         GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+         GL11.glBindTexture(3553, Tex.atlas);
       }
    }
 

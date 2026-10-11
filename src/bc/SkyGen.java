@@ -182,6 +182,20 @@ public final class SkyGen extends Gen {
    private static final boolean[] bwBotInitialSpawned = new boolean[8];
    private static boolean bedwarsWon;
    private static final boolean[] bedKnownIntact = new boolean[]{true, true, true, true};
+   private static int whiteGlTex;
+
+   public static int whiteTex() {
+      if (whiteGlTex == 0) {
+         whiteGlTex = org.lwjgl.opengl.GL11.glGenTextures();
+         org.lwjgl.opengl.GL11.glBindTexture(3553, whiteGlTex);
+         java.nio.ByteBuffer bb = org.lwjgl.BufferUtils.createByteBuffer(4);
+         bb.put((byte)-1).put((byte)-1).put((byte)-1).put((byte)-1).flip();
+         org.lwjgl.opengl.GL11.glTexParameteri(3553, 10241, 9728);
+         org.lwjgl.opengl.GL11.glTexParameteri(3553, 10240, 9728);
+         org.lwjgl.opengl.GL11.glTexImage2D(3553, 0, 6408, 1, 1, 0, 6408, 5121, bb);
+      }
+      return whiteGlTex;
+   }
 
    private final int mode;
    private final int mapId;
@@ -705,9 +719,6 @@ public final class SkyGen extends Gen {
       if (hv == null) {
          return;
       }
-      f.px = f.x;
-      f.py = f.y;
-      f.pz = f.z;
       double nx = f.x + hv[0];
       double nz = f.z + hv[1];
       int by = (int)Math.floor(f.y + 0.2);
@@ -741,7 +752,11 @@ public final class SkyGen extends Gen {
          }
       }
       if (g.mobs != null) {
-         for (Mobs.Mob m : g.mobs.list) {
+         for (int i = g.mobs.list.size() - 1; i >= 0; i--) {
+            if (i >= g.mobs.list.size()) {
+               continue;
+            }
+            Mobs.Mob m = g.mobs.list.get(i);
             if (m != null && !m.dead) {
                double d = Math.sqrt((m.x - gx) * (m.x - gx) + (m.y + 0.9 - gy) * (m.y + 0.9 - gy) + (m.z - gz) * (m.z - gz));
                if (d < radius) {
@@ -832,7 +847,7 @@ public final class SkyGen extends Gen {
          playerGunCooldown = 12;
          SoundEngine.playThrow(g.world, p.x, p.y + p.eye, p.z);
          SoundEngine.play3D(g.world, "tnt_prime", p.x, p.y + p.eye, p.z, 0.8F, 1.25F);
-         g.world.throwTntGrenade(sx, sy, sz, dx * 0.92, dy * 0.75 + 0.18, dz * 0.92, 35);
+         g.world.throwTntGrenade(p.x + dx * 0.65, sy - 0.45, p.z + dz * 0.65, dx * 0.92, dy * 0.75 + 0.14, dz * 0.92, 35);
          if (!p.creative) {
             held.n--;
             if (held.n <= 0 && g.inv[g.sel] == held) {
@@ -3825,7 +3840,7 @@ public final class SkyGen extends Gen {
             bot.attackAnim = 8;
             double dx = (leadX - bot.x) / bestDist;
             double dz = (leadZ - bot.z) / bestDist;
-            w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 1.4, bot.z + dz * 0.7, dx * 0.65, 0.32, dz * 0.65, 45);
+            w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 0.95, bot.z + dz * 0.7, dx * 0.65, 0.30, dz * 0.65, 45);
          } else if (hasBowAndAmmo && bestDist >= 2.5 && bestDist < 18.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
             if (bot.cd > 0 && bot.cd <= 16) {
                botBowDrawTicks[botSlot] = 17 - bot.cd;
@@ -4228,7 +4243,7 @@ public final class SkyGen extends Gen {
                bot.attackAnim = 8;
                double dx = (leadX - bot.x) / enemyDist;
                double dz = (leadZ - bot.z) / enemyDist;
-               w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 1.45, bot.z + dz * 0.7, dx * 0.68, 0.30, dz * 0.68, 42);
+               w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 0.95, bot.z + dz * 0.7, dx * 0.68, 0.28, dz * 0.68, 42);
             }
             // 2. Fire Gun (Machine Gun / Pistol / Sniper Rifle) ONLY if botArrows[botSlot] > 0!
             else if (botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0 && enemyDist >= 2.2 && enemyDist <= 28.0 && hasLOS && bot.cd <= 0) {

@@ -845,26 +845,38 @@ public final class Net319 {
                   c.send(tilePkt);
                }
             }
-            if (curW != null && !curW.tiles.isEmpty()) {
-               for (TileEntity te : new ArrayList<TileEntity>(curW.tiles.values())) {
-                  c.send(formatTilePacket(curW.dim, te));
-               }
-            }
-
-            if (curW != null) {
-               for (World.Item it : curW.items) {
-                  if (it != null && !it.dead && it.count > 0) {
-                     if (it.netId == 0L) {
-                        it.netId = nextItemId();
+            try {
+               if (curW != null && !curW.tiles.isEmpty()) {
+                  for (TileEntity te : new ArrayList<TileEntity>(curW.tiles.values())) {
+                     if (te != null) {
+                        c.send(formatTilePacket(curW.dim, te));
                      }
-
-                     c.send(formatDropPacket(it));
                   }
                }
+            } catch (Throwable ignored) {
             }
 
-            if (hg != null && hg.mobs != null && curW != null) {
-               sendMobsToConn(c, curW, hg.mobs);
+            try {
+               if (curW != null) {
+                  for (int i = 0; i < curW.items.size(); i++) {
+                     World.Item it = curW.items.get(i);
+                     if (it != null && !it.dead && it.count > 0) {
+                        if (it.netId == 0L) {
+                           it.netId = nextItemId();
+                        }
+
+                        c.send(formatDropPacket(it));
+                     }
+                  }
+               }
+            } catch (Throwable ignored) {
+            }
+
+            try {
+               if (hg != null && hg.mobs != null && curW != null) {
+                  sendMobsToConn(c, curW, hg.mobs);
+               }
+            } catch (Throwable ignored) {
             }
 
             Thread rt = new Thread(() -> readLoopHost(c), "bc-net-client-" + cid);
@@ -872,6 +884,7 @@ public final class Net319 {
             rt.start();
          } catch (IOException e) {
             break;
+         } catch (Throwable ignored) {
          }
       }
    }
@@ -1754,7 +1767,17 @@ public final class Net319 {
 
    private static ArrayList<String> buildMobSnapshots(World w, Mobs mobs) {
       ArrayList<String> out = new ArrayList<>();
-      ArrayList<Mobs.Mob> snap = new ArrayList<>(mobs.list);
+      ArrayList<Mobs.Mob> snap = new ArrayList<>();
+      for (int i = 0; i < mobs.list.size(); i++) {
+         try {
+            Mobs.Mob m = mobs.list.get(i);
+            if (m != null) {
+               snap.add(m);
+            }
+         } catch (IndexOutOfBoundsException ignored) {
+            break;
+         }
+      }
       int total = snap.size();
       if (total == 0) {
          out.add("MOBS " + w.dim + " 1 0");

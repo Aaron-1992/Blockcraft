@@ -102,7 +102,7 @@ public final class Lod {
    }
 
    void request(Lod.Tile var1) {
-      if (var1.state == 0 && this.inflight.get() < 16) {
+      if (var1.state == 0 && this.inflight.get() < 32) {
          var1.state = 1;
          this.inflight.incrementAndGet();
          this.pool.execute(() -> {
@@ -1104,7 +1104,7 @@ public final class Lod {
       long start = System.nanoTime();
 
       Lod.Tile var2;
-      while (var1 < 12 && (var1 == 0 || System.nanoTime() - start < 4000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
+      while (var1 < 24 && (var1 == 0 || System.nanoTime() - start < 6000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
          var1++;
          if (this.dead) {
             var2.data = null;
@@ -1274,57 +1274,46 @@ public final class Lod {
    void visit(int var1, int var2, int var3) {
       double var4 = this.nearest(var1, var2, var3);
       if (!(var4 > this.maxDist)) {
-         if (var3 != 32 || !this.insideInner(var1, var2, var3) || !this.covered(var1, var2)) {
-            if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.72F + 28.0F)) {
-               // (Update 3.11 / 4.2: high-detail LOD rings reach much further and scale dynamically with render distance)
-               boolean var6 = var3 > 32 && var4 < this.splitDistance(var3);
-               if (!var6) {
-                  Lod.Tile var16 = this.tile(var3, var1, var2);
-                  var16.lastUse = this.frame;
-                  if (!ready(var16)) {
-                     this.request(var16);
-                  } else {
-                     this.drawList.add(this.refresh(var16));
-                  }
+         if (var3 == 32 && this.covered(var1, var2)) {
+            return;
+         }
+         if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.72F + 28.0F)) {
+            boolean var6 = var3 > 32 && var4 < this.splitDistance(var3);
+            if (!var6) {
+               Lod.Tile var16 = this.tile(var3, var1, var2);
+               var16.lastUse = this.frame;
+               if (ready(var16)) {
+                  this.drawList.add(this.refresh(var16));
                } else {
-                  int var7 = var3 / 2;
-                  int[][] var8 = new int[][]{{var1, var2}, {var1 + var7, var2}, {var1, var2 + var7}, {var1 + var7, var2 + var7}};
-                  boolean var9 = true;
-
-                  for (int[] var13 : var8) {
-                     if (!(var13[0] + var7 <= this.cx - this.maxDist)
-                        && !(var13[0] >= this.cx + this.maxDist)
-                        && !(var13[1] + var7 <= this.cz - this.maxDist)
-                        && !(var13[1] >= this.cz + this.maxDist)
-                        && (var7 != 32 || !this.insideInner(var13[0], var13[1], var7) || !this.covered(var13[0], var13[1]))) {
-                        Lod.Tile var14 = this.tile(var7, var13[0], var13[1]);
-                        if (!ready(var14)) {
-                           var9 = false;
-                           this.request(var14);
-                        }
-
-                        var14.lastUse = this.frame;
+                  this.request(var16);
+                  if (var3 < 1024) {
+                     int pSize = var3 * 2;
+                     int px0 = Math.floorDiv(var1, pSize) * pSize;
+                     int pz0 = Math.floorDiv(var2, pSize) * pSize;
+                     Lod.Tile anc = (Lod.Tile)this.tiles.get(key(pSize, px0, pz0));
+                     if (anc != null && ready(anc) && this.nearest(px0, pz0, pSize) >= this.innerHalf && !this.drawList.contains(anc)) {
+                        anc.lastUse = this.frame;
+                        this.drawList.add(anc);
                      }
                   }
-
-                  Lod.Tile var17 = this.tile(var3, var1, var2);
-                  var17.lastUse = this.frame;
-                  if (var9) {
-                     for (int[] var24 : var8) {
-                        this.visit(var24[0], var24[1], var7);
+               }
+            } else {
+               int var7 = var3 / 2;
+               int[][] var8 = new int[][]{{var1, var2}, {var1 + var7, var2}, {var1, var2 + var7}, {var1 + var7, var2 + var7}};
+               // Sort the 4 quadrants nearest-first to the camera so foreground LOD rings build first
+               for (int i = 0; i < 3; i++) {
+                  for (int j = i + 1; j < 4; j++) {
+                     double di = this.nearest(var8[i][0], var8[i][1], var7);
+                     double dj = this.nearest(var8[j][0], var8[j][1], var7);
+                     if (dj < di) {
+                        int[] tmp = var8[i];
+                        var8[i] = var8[j];
+                        var8[j] = tmp;
                      }
-                  } else if (!ready(var17)) {
-                     this.request(var17);
-
-                     for (int[] var25 : var8) {
-                        Lod.Tile var15 = this.tile(var7, var25[0], var25[1]);
-                        if (ready(var15)) {
-                           this.visit(var25[0], var25[1], var7);
-                        }
-                     }
-                  } else {
-                     this.drawList.add(var17);
                   }
+               }
+               for (int[] child : var8) {
+                  this.visit(child[0], child[1], var7);
                }
             }
          }
