@@ -38,6 +38,10 @@ final class Mobs312 {
       boolean dragon;
       /** An ender pearl the player threw: it arcs down and takes the player where it lands. */
       boolean pearl;
+      /** True when thrown by a player (e.g. Bedwars/Skywars Fireball). */
+      boolean fromPlayer;
+      /** True when spawned from a remote multiplayer packet. */
+      boolean remote;
       /** The last position that was free of blocks (where a pearl lands). */
       double lx;
       double ly;
@@ -343,7 +347,7 @@ final class Mobs312 {
 
    /** A mob was hurt. */
    static void hurt(Mobs ms, Mob m, int dmg, boolean byPlayer) {
-      if (m.dead) {
+      if (m.dead || BackroomsStalkerMod.isStalkerMob(m)) {
          return;
       }
 
@@ -434,6 +438,10 @@ final class Mobs312 {
 
    /** Calm until you look it in the face (or hit it); then it blinks about and hits hard. Water hurts it. */
    private static void enderman(Mobs ms, Mob m, World w, Player p, boolean target, double dx, double dz, double dy, double d2, double d3, Intent in) {
+      if (BackroomsStalkerMod.isStalkerMob(m)) {
+         BackroomsStalkerMod.stepStalkerIntent(ms, m, w, p, dx, dz, dy, d2, d3, in);
+         return;
+      }
       if (m.tpCd > 0) {
          m.tpCd--;
       }
@@ -1008,6 +1016,45 @@ final class Mobs312 {
       return true;
    }
 
+   /** Right click with a Blaze Rod (Fireball in Bedwars/Skywars/Creative): launches an explosive fireball! */
+   static boolean throwFireball(Game g, Stack held) {
+      Player p = g.player;
+      if (g.world == null || g.mobs == null || p.dead || p.spectator) {
+         return false;
+      }
+
+      for (Fireball o : g.mobs.fireballs) {
+         if (o.fromPlayer && !o.remote && o.life < 12) {
+            return false;
+         }
+      }
+
+      double yaw = Math.toRadians(p.yaw);
+      double pitch = Math.toRadians(p.pitch);
+      double dx = -Math.sin(yaw) * Math.cos(pitch);
+      double dy = -Math.sin(pitch);
+      double dz = Math.cos(yaw) * Math.cos(pitch);
+      Fireball f = new Fireball();
+      f.big = true;
+      f.fromPlayer = true;
+      f.x = f.px = f.lx = p.x + dx * 0.9;
+      f.y = f.py = f.ly = p.y + p.eye - 0.15 + dy * 0.9;
+      f.z = f.pz = f.lz = p.z + dz * 0.9;
+      f.vx = dx * 0.85;
+      f.vy = dy * 0.85;
+      f.vz = dz * 0.85;
+      g.mobs.fireballs.add(f);
+      Net319.sendFireball(f.x, f.y, f.z, f.vx, f.vy, f.vz);
+      if (!p.creative) {
+         held.n--;
+         if (held.n <= 0) {
+            g.inv[g.sel] = null;
+         }
+      }
+
+      return true;
+   }
+
    /** Where the player's feet fit around a point where a pearl came to rest (null: nowhere, the pearl is lost). */
    static double[] pearlSpot(World w, double x, double y, double z) {
       double[][] around = {{0, 0}, {0.35, 0}, {-0.35, 0}, {0, 0.35}, {0, -0.35}, {0.6, 0.6}, {-0.6, 0.6}, {0.6, -0.6}, {-0.6, -0.6}};
@@ -1130,11 +1177,11 @@ final class Mobs312 {
             int id = w.getBlock(bx, by, bz);
             if (id != 0 && Blocks.coll[id] != null) {
                boom = true;
-            } else if (!f.pearl && ms.targetable(p) && f.x > p.bb[0] - 0.25 && f.x < p.bb[3] + 0.25 && f.y > p.bb[1] - 0.25 && f.y < p.bb[4] + 0.25 && f.z > p.bb[2] - 0.25 && f.z < p.bb[5] + 0.25) {
+            } else if (!f.pearl && !(f.fromPlayer && !f.remote && f.life < 6) && ms.targetable(p) && f.x > p.bb[0] - 0.25 && f.x < p.bb[3] + 0.25 && f.y > p.bb[1] - 0.25 && f.y < p.bb[4] + 0.25 && f.z > p.bb[2] - 0.25 && f.z < p.bb[5] + 0.25) {
                boom = true;
             } else {
                for (Mob o : ms.list) {
-                  if (!o.dead && (f.pearl || o.type != Mobs.GHAST && o.type != Mobs.BLAZE) && !(f.dragon && (o.type == Mobs.ENDER_DRAGON || o.type == Mobs.END_CRYSTAL)) && f.x > o.bb[0] && f.x < o.bb[3] && f.y > o.bb[1] && f.y < o.bb[4] && f.z > o.bb[2] && f.z < o.bb[5]) {
+                  if (!o.dead && (f.pearl || f.fromPlayer || o.type != Mobs.GHAST && o.type != Mobs.BLAZE) && !(f.dragon && (o.type == Mobs.ENDER_DRAGON || o.type == Mobs.END_CRYSTAL)) && f.x > o.bb[0] && f.x < o.bb[3] && f.y > o.bb[1] && f.y < o.bb[4] && f.z > o.bb[2] && f.z < o.bb[5]) {
                      boom = true;
                      break;
                   }
@@ -1228,8 +1275,19 @@ final class Mobs312 {
          double dz = p.z - f.z;
          double d = Math.sqrt(dx * dx + dy * dy + dz * dz);
          if (f.big && d < 4.0) {
-            p.invuln = 0;
-            ms.g.damagePlayer(Math.max(1, (int)Math.round(7.0 * (1.0 - d / 4.0))), f.x, f.z);
+            if (f.fromPlayer && !f.remote) {
+               // Bedwars Fireball Jump impulse!
+               double hd = Math.hypot(dx, dz);
+               if (hd > 0.05) {
+                  p.vx += dx / hd * 0.65;
+                  p.vz += dz / hd * 0.65;
+               }
+               p.vy = Math.max(p.vy, 0.56);
+               p.hurt(2);
+            } else {
+               p.invuln = 0;
+               ms.g.damagePlayer(Math.max(1, (int)Math.round(7.0 * (1.0 - d / 4.0))), f.x, f.z);
+            }
          } else if (!f.big && d < 1.4) {
             p.invuln = 0;
             ms.g.damagePlayer(5, f.x, f.z);
@@ -1239,11 +1297,15 @@ final class Mobs312 {
          }
       }
 
+      if (f.fromPlayer && !f.remote && Net319.isActive()) {
+         Net319.tryArrowHitPeer(ms.g, f.x, f.y, f.z, 6, f.x - f.vx, f.z - f.vz);
+      }
+
       for (Mob o : ms.list) {
-         if (!o.dead && o.type != Mobs.GHAST && o.type != Mobs.BLAZE) {
+         if (!o.dead && (f.fromPlayer || o.type != Mobs.GHAST && o.type != Mobs.BLAZE)) {
             double d = Math.sqrt((o.x - f.x) * (o.x - f.x) + (o.z - f.z) * (o.z - f.z) + (o.y - f.y) * (o.y - f.y));
-            if (d < (f.big ? 3.0 : 1.5)) {
-               ms.hurtMob(o, f.big ? 6 : 4, f.x, f.z, 0.5, false);
+            if (d < (f.big ? 3.2 : 1.5)) {
+               ms.hurtMob(o, f.big ? 6 : 4, f.x, f.z, 0.55, f.fromPlayer && !f.remote);
             }
          }
       }

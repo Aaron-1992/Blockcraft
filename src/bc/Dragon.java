@@ -31,14 +31,18 @@ final class Dragon {
    }
 
    private static void face(Mob m, double dx, double dz, double dy, float turn) {
+      float leadYaw = m.yaw;
       if (dx * dx + dz * dz > 1.0E-6) {
          float target = Mobs.angleTo(dx, dz);
-         m.yaw += Math.max(-turn, Math.min(turn, Mobs.wrap(target - m.yaw)));
+         float diff = Mobs.wrap(target - m.yaw);
+         m.yaw += Math.max(-turn, Math.min(turn, diff));
          m.dirYaw = m.yaw;
+         leadYaw = m.yaw + Math.max(-42.0F, Math.min(42.0F, diff * 0.65F));
       }
 
-      m.headYaw = m.yaw;
-      m.headPitch = (float)Math.max(-35.0, Math.min(35.0, -Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz) + 1.0E-6)) * 0.6));
+      m.headYaw += Mobs.wrap(leadYaw - m.headYaw) * 0.35F;
+      float targetPitch = (float)Math.max(-35.0, Math.min(35.0, -Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz) + 1.0E-6)) * 0.75));
+      m.headPitch += (targetPitch - m.headPitch) * 0.35F;
    }
 
    static void tick(Mobs ms, Mob m, World w, Player p) {
@@ -139,8 +143,17 @@ final class Dragon {
             m.vx = m.vy = m.vz = 0.0;
             if (target) {
                double dx = p.x - px;
+               double dy = (p.y + 1.0) - (py + 2.0);
                double dz = p.z - pz;
-               m.yaw += Math.max(-4.0F, Math.min(4.0F, Mobs.wrap(Mobs.angleTo(dx, dz) - m.yaw)));
+               float toPlayer = Mobs.angleTo(dx, dz);
+               m.yaw += Math.max(-4.0F, Math.min(4.0F, Mobs.wrap(toPlayer - m.yaw)));
+               float relYaw = Math.max(-50.0F, Math.min(50.0F, Mobs.wrap(toPlayer - m.yaw)));
+               m.headYaw += Mobs.wrap(m.yaw + relYaw - m.headYaw) * 0.3F;
+               float toPitch = (float)Math.max(-30.0, Math.min(30.0, -Math.toDegrees(Math.atan2(dy, Math.hypot(dx, dz) + 1.0E-6))));
+               m.headPitch += (toPitch - m.headPitch) * 0.25F;
+            } else {
+               m.headYaw += Mobs.wrap(m.yaw - m.headYaw) * 0.2F;
+               m.headPitch *= 0.85F;
             }
 
             // the breath: a pool of purple smoke in front of the dragon, and one where you stand

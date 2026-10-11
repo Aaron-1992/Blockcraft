@@ -35,6 +35,12 @@ public final class Mesher {
    public static volatile int leafMode = Integer.getInteger("bc.leaves", 1);
 
    /**
+    * Update 3.19: 3D crossed diagonal foliage fronds protruding from exposed canopy leaf blocks. Defaults to false for headless unit tests that
+    * count exact cube faces; {@link Game} and {@link Screens} sync it with {@link Options#bushyLeaves} (which defaults to true).
+    */
+   public static volatile boolean bushyLeaves = Boolean.getBoolean("bc.bushy");
+
+   /**
     * Update 3.11: faces are drawn from their front side only (GL back-face culling, like Minecraft), so everything that has to be seen from
     * both sides - plants, crops, flames, the top of a water or lava surface - gets a second quad that faces the other way, and the test that
     * decides whether the face of a box lies against a neighbouring block now looks at the right side for the z faces (before, a thin door
@@ -70,12 +76,33 @@ public final class Mesher {
    }
 
    public static Mesher.Result build(World var0, Chunk var1, int var2, boolean var3) {
+      short[] cblocks = var1.blocks;
+      int secStart = var2 << 12;
+      int secEnd = secStart + 4096;
+      boolean anyBlock = false;
+      for (int i = secStart; i < secEnd; i++) {
+         if (cblocks[i] != 0) {
+            anyBlock = true;
+            break;
+         }
+      }
+
+      if (!anyBlock) {
+         Mesher.Result empty = new Mesher.Result();
+         empty.conn = CaveCull.ALL;
+         return empty;
+      }
+
       Mesher.Scratch var4 = (Mesher.Scratch)TL.get();
       var4.o.clear();
       var4.t.clear();
       int var5 = var1.cx * 16;
       int var6 = var2 * 16;
       int var7 = var1.cz * 16;
+      var4.ox = var5;
+      var4.oy = var6;
+      var4.oz = var7;
+      var4.rot = 0;
       Chunk[] var8 = new Chunk[9];
 
       for (int var9 = -1; var9 <= 1; var9++) {
@@ -192,6 +219,9 @@ public final class Mesher {
    }
 
    static int tintColor(Chunk var0, int var1, int var2, int var3) {
+      if (ModLoader.isInfdevActive() && (Blocks.tint[var1] == 1 || Blocks.tint[var1] == 2)) {
+         return InfdevGen.INFDEV_GREEN;
+      }
       switch (Blocks.tint[var1]) {
          case 1:
             return var0.grassColor[var3 * 16 + var2];
@@ -223,12 +253,13 @@ public final class Mesher {
 
       for (int var10 = 0; var10 < 4; var10++) {
          int var11 = var3 ? var10 + 1 & 3 : var10;
+         int var12 = var0.rot == 0 ? var11 : var11 + var0.rot & 3;
          var1.v(
             var0.qx[var11],
             var0.qy[var11],
             var0.qz[var11],
-            var6 + (var7 - var6) * var0.qu[var11],
-            var8 + (var9 - var8) * var0.qv[var11],
+            var6 + (var7 - var6) * var0.qu[var12],
+            var8 + (var9 - var8) * var0.qv[var12],
             var0.qr[var11],
             var0.qg[var11],
             var0.qb[var11],
@@ -322,6 +353,16 @@ public final class Mesher {
                continue;
             }
 
+            if (!legacy && var5 == Redstone319.SLIME_BLOCK) {
+               if (var18 != var5) {
+                  int tile = Blocks.tiles[var5][var15];
+                  quad(var0, var15, var2, var3, var4, var17, var12, tile, 1.0F, 1.0F, 1.0F, 0.78F, var6, 0.0F, var14);
+                  emit(var0, var0.t, tile, flipFor(var0));
+               }
+
+               continue;
+            }
+
             boolean var19 = Blocks.tint[var5] == 1;
             float var20 = 1.0F;
             float var21 = 1.0F;
@@ -333,16 +374,266 @@ public final class Mesher {
                var22 = (var13 & 0xFF) / 255.0F;
             }
 
-            quad(var0, var15, var2, var3, var4, var17, var12, var23, var20, var21, var22, 1.0F, var6, 0.0F, var14);
+            // Update 3.19: every block is a little lighter or darker than its neighbours, and the top of ground blocks is turned by a random quarter turn
+            float jit = 1.0F;
+            if (variation && !legacy) {
+               int hh = hash3(var0.ox + var2, var0.oy + var3, var0.oz + var4);
+               jit = 1.0F + ((hh & 0xFFFF) / 32767.5F - 1.0F) * ampOf(var23);
+               var0.rot = turnsOf(var23, var15, hh);
+            }
+
+            if (!legacy && var5 >= 1900 && var5 <= 2008) {
+               var0.rot = Redstone319.faceRot(var5, var15);
+            }
+
+            quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * jit, var21 * jit, var22 * jit, 1.0F, var6, 0.0F, var14);
+            if (!legacy && Blocks.emit[var5] > 0) {
+               float selfBl = lu(Blocks.emit[var5]);
+               for (int k = 0; k < 4; k++) {
+                  if (var0.ql[k] < selfBl) {
+                     var0.ql[k] = selfBl;
+                  }
+               }
+            }
+
             emit(var0, var0.o, var23, flipFor(var0));
+            var0.rot = 0;
             if (var19 && var15 >= 2) {
                float var24 = (var13 >> 16 & 0xFF) / 255.0F;
                float var25 = (var13 >> 8 & 0xFF) / 255.0F;
                float var26 = (var13 & 0xFF) / 255.0F;
-               quad(var0, var15, var2, var3, var4, var17, var12, 2, var24, var25, var26, 1.0F, var6, 0.002F, var14);
+               quad(var0, var15, var2, var3, var4, var17, var12, 2, var24 * jit, var25 * jit, var26 * jit, 1.0F, var6, 0.002F, var14);
                emit(var0, var0.o, 2, flipFor(var0));
             }
          }
+      }
+
+      if (!legacy && var5 == Redstone319.SLIME_BLOCK) {
+         Shapes.emitBox(var0, var2, var3, var4, var5, new double[]{0.1875, 0.1875, 0.1875, 0.8125, 0.8125, 0.8125, 0.0}, 0, var0.o, 1.0F);
+      }
+
+      if (bushyLeaves && !legacy && Blocks.isLeaves(var5) && !enclosed(var7, var9, var10, var11)) {
+         bushyFronds(var0, var2, var3, var4, var9, var10, var11, var13);
+      }
+   }
+
+   static void bushyFronds(Mesher.Scratch s, int x, int y, int z, int px, int py, int pz, int tint) {
+      int maxSky = 0;
+      int maxBlk = 0;
+      int[] fSky = new int[6];
+      int[] fBlk = new int[6];
+      boolean[] fOpen = new boolean[6];
+      for (int f = 0; f < 6; f++) {
+         int nb = ci(px + FN[f][0], py + FN[f][1], pz + FN[f][2]);
+         int id = s.B[nb] & 0xFFFF;
+         if (!Blocks.opaque[id]) {
+            int lv = s.L[nb] & 255;
+            int sl = lv >> 4 & 15;
+            int bl = lv & 15;
+            fOpen[f] = true;
+            fSky[f] = sl;
+            fBlk[f] = bl;
+            if (sl > maxSky) {
+               maxSky = sl;
+            }
+
+            if (bl > maxBlk) {
+               maxBlk = bl;
+            }
+         }
+      }
+
+      int hh = hash3(s.ox + x, s.oy + y, s.oz + z);
+      float jit = variation ? 1.0F + ((hh & 0xFFFF) / 32767.5F - 1.0F) * AMP[TexPaint319.BUSHY_FROND] : 1.0F;
+      float cr = (tint >> 16 & 0xFF) / 255.0F * jit;
+      float cg = (tint >> 8 & 0xFF) / 255.0F * jit;
+      float cb = (tint & 0xFF) / 255.0F * jit;
+      float cx = x + 0.5F + (((hh >>> 4) & 15) / 7.5F - 1.0F) * 0.08F;
+      float cy = y + 0.5F + (((hh >>> 8) & 15) / 7.5F - 1.0F) * 0.07F;
+      float cz = z + 0.5F + (((hh >>> 12) & 15) / 7.5F - 1.0F) * 0.08F;
+      float ang = (((hh >>> 16) & 31) / 15.5F - 1.0F) * 0.34F;
+      float r = 1.06F;
+      float hy = 0.88F;
+      s.rot = 0;
+      s.ao[0] = s.ao[1] = s.ao[2] = s.ao[3] = 1.0F;
+      for (int p = 0; p < 3; p++) {
+         if (p < 2) {
+            double a = (p == 0 ? 0.7853982 : 2.3561945) + ang;
+            float rx = (float)Math.cos(a) * r;
+            float rz = (float)Math.sin(a) * r;
+            float tilt = (p == 0 ? 1.0F : -1.0F) * (((hh >>> 21) & 7) - 3.5F) * 0.045F;
+            s.qx[0] = cx - rx - tilt;
+            s.qy[0] = cy - hy;
+            s.qz[0] = cz - rz + tilt;
+            s.qx[1] = cx + rx - tilt;
+            s.qy[1] = cy - hy;
+            s.qz[1] = cz + rz + tilt;
+            s.qx[2] = cx + rx + tilt;
+            s.qy[2] = cy + hy;
+            s.qz[2] = cz + rz - tilt;
+            s.qx[3] = cx - rx + tilt;
+            s.qy[3] = cy + hy;
+            s.qz[3] = cz - rz - tilt;
+         } else {
+            // 3rd tilted canopy crown plane pitching across the leaf block for lush 3D volume from above and below
+            double a = 1.5707963 + ang * 0.8;
+            float rx = (float)Math.cos(a) * 1.02F;
+            float rz = (float)Math.sin(a) * 1.02F;
+            float px2 = -rz * 0.62F;
+            float pz2 = rx * 0.62F;
+            float py2 = 0.68F;
+            s.qx[0] = cx - rx - px2;
+            s.qy[0] = cy - py2;
+            s.qz[0] = cz - rz - pz2;
+            s.qx[1] = cx + rx - px2;
+            s.qy[1] = cy - py2;
+            s.qz[1] = cz + rz - pz2;
+            s.qx[2] = cx + rx + px2;
+            s.qy[2] = cy + py2;
+            s.qz[2] = cz + rz + pz2;
+            s.qx[3] = cx - rx + px2;
+            s.qy[3] = cy + py2;
+            s.qz[3] = cz - rz + pz2;
+         }
+
+         s.qu[0] = 0.0F;
+         s.qv[0] = 1.0F;
+         s.qu[1] = 1.0F;
+         s.qv[1] = 1.0F;
+         s.qu[2] = 1.0F;
+         s.qv[2] = 0.0F;
+         s.qu[3] = 0.0F;
+         s.qv[3] = 0.0F;
+         for (int k = 0; k < 4; k++) {
+            int fy = s.qy[k] >= y + 0.5F ? 0 : 1;
+            int fz = s.qz[k] >= z + 0.5F ? 3 : 2;
+            int fx = s.qx[k] >= x + 0.5F ? 4 : 5;
+            float sumSky = maxSky;
+            float sumBlk = maxBlk;
+            int cnt = 1;
+            int occ = 0;
+            int[] faces = {fy, fz, fx};
+            for (int f : faces) {
+               if (fOpen[f]) {
+                  sumSky += fSky[f];
+                  sumBlk += fBlk[f];
+                  cnt++;
+               } else {
+                  occ++;
+               }
+            }
+
+            float vSky = Math.max(maxSky * 0.85F, sumSky / cnt);
+            float vBlk = Math.max(maxBlk * 0.85F, sumBlk / cnt);
+            float ao = 1.0F - occ * 0.06F;
+            float sh = (k < 2 ? 0.78F : 0.96F) * ao;
+            s.qr[k] = cr * sh;
+            s.qg[k] = cg * sh;
+            s.qb[k] = cb * sh;
+            s.qa[k] = 1.0F;
+            // qm is sky light (vLm.x), ql is block light (vLm.y)
+            s.qm[k] = lu(vSky);
+            s.ql[k] = lu(vBlk);
+         }
+
+         emit(s, s.o, TexPaint319.BUSHY_FROND, false);
+         emitBack(s, s.o, TexPaint319.BUSHY_FROND);
+      }
+   }
+
+   /**
+    * Update 3.19: variation between blocks. Brightness: every block of the natural kinds (grass, dirt, sand, gravel, stone, leaves, snow ...) gets
+    * its own brightness, within a few percent (leaves: a little more), by its position - so a meadow no longer looks like one stamp repeated; the
+    * top of ground blocks (and every face of leaves) is also turned by a random quarter turn. It only changes colours and texture coordinates:
+    * the shapes, the light and the number of faces are the same. {@code -Dbc.novariation=true} switches it off (so does {@link #legacy}).
+    */
+   public static volatile boolean variation = !Boolean.getBoolean("bc.novariation");
+   static final float[] AMP = new float[1024];
+
+   static {
+      AMP[Tex.GRASS_TOP] = 0.075F;
+      AMP[Tex.DIRT] = 0.06F;
+      AMP[Tex.STONE] = 0.05F;
+      AMP[Tex.COBBLE] = 0.04F;
+      AMP[Tex.SAND] = 0.045F;
+      AMP[Tex.GRAVEL] = 0.065F;
+      AMP[Tex.LEAVES] = 0.12F;
+      AMP[Tex.SNOW] = 0.025F;
+      AMP[Tex.SANDSTONE_SIDE] = 0.035F;
+      AMP[Tex.SANDSTONE_TOP] = 0.035F;
+      AMP[Tex.BEDROCK] = 0.05F;
+      AMP[Tex.MOSSY] = 0.04F;
+      AMP[Tex.COAL] = 0.03F;
+      AMP[Tex.IRON] = 0.03F;
+      AMP[Tex.GOLD] = 0.03F;
+      AMP[Tex.DIAMOND] = 0.03F;
+      AMP[Tex.REDSTONE] = 0.03F;
+      AMP[Tex.LAPIS] = 0.03F;
+      AMP[TexArt312.NETHERRACK] = 0.06F;
+      AMP[TexArt312.SOUL_SAND] = 0.05F;
+      AMP[TexArt312.END_STONE] = 0.04F;
+      AMP[TexArt313.GRANITE] = 0.04F;
+      AMP[TexArt313.DIORITE] = 0.04F;
+      AMP[TexArt313.ANDESITE] = 0.04F;
+      AMP[TexArt313.RED_SAND] = 0.045F;
+      AMP[TexArt313.PODZOL_TOP] = 0.065F;
+      AMP[TexArt313.MYCELIUM_TOP] = 0.065F;
+      AMP[TexArt313.COARSE_DIRT] = 0.065F;
+      AMP[TexArt313.LEAVES0] = 0.12F;
+      AMP[TexArt313.LEAVES0 + 1] = 0.12F;
+      AMP[TexArt313.LEAVES0 + 2] = 0.12F;
+      AMP[TexArt312.QUARTZ_ORE] = 0.04F;
+      AMP[Color312.T_EMERALD_ORE] = 0.03F;
+      AMP[Color312.T_CLAY] = 0.045F;
+      AMP[Color312.T_TERRACOTTA] = 0.035F;
+      for (int i = 0; i < 16; i++) {
+         AMP[Color312.T_POWDER0 + i] = 0.04F;
+      }
+
+      AMP[TexPaint319.BUSHY_FROND] = 0.12F;
+   }
+
+   static int hash3(int x, int y, int z) {
+      int h = x * 0x27D4EB2D + y * 0x165667B1 + z * 0x9E3779B1;
+      h ^= h >>> 15;
+      h *= 0x85EBCA6B;
+      h ^= h >>> 13;
+      h *= 0xC2B2AE35;
+      h ^= h >>> 16;
+      return h;
+   }
+
+   /** How much the brightness of a block with this face tile may vary (0.075 = +-7.5 %). */
+   static float ampOf(int tile) {
+      return tile >= 0 && tile < AMP.length ? AMP[tile] : 0.0F;
+   }
+
+   /** The quarter turns of the texture of face {@code face} of a block with this tile: the tops of the ground kinds, every face of leaves. */
+   static int turnsOf(int tile, int face, int hh) {
+      switch (tile) {
+         case Tex.LEAVES:
+         case TexArt313.LEAVES0:
+         case TexArt313.LEAVES0 + 1:
+         case TexArt313.LEAVES0 + 2:
+            return (hh >>> 18) + face * 3 & 3;
+         case Tex.GRASS_TOP:
+         case Tex.DIRT:
+         case Tex.STONE:
+         case Tex.SAND:
+         case Tex.GRAVEL:
+         case Tex.SNOW:
+         case Tex.COBBLE:
+         case TexArt312.NETHERRACK:
+         case TexArt312.SOUL_SAND:
+         case TexArt312.END_STONE:
+         case TexArt313.RED_SAND:
+         case TexArt313.PODZOL_TOP:
+         case TexArt313.MYCELIUM_TOP:
+         case TexArt313.COARSE_DIRT:
+         case Color312.T_CLAY:
+            return face == 0 ? hh >>> 20 & 3 : 0;
+         default:
+            return 0;
       }
    }
 
@@ -1103,5 +1394,10 @@ public final class Mesher {
       final float[] ql = new float[4];
       final float[] qm = new float[4];
       final float[] ao = new float[4];
+      /** Update 3.19: the world position of the section's corner (for the variation between blocks) and the quarter turns of the next quad's texture. */
+      int ox;
+      int oy;
+      int oz;
+      int rot;
    }
 }

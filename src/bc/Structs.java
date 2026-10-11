@@ -13,6 +13,7 @@ public final class Structs {
    static Chunk C;
    final ConcurrentHashMap<Long, Structs.Village> villageCache = new ConcurrentHashMap();
    final ConcurrentHashMap<Long, Structs.Shaft> shaftCache = new ConcurrentHashMap();
+   final ConcurrentHashMap<Long, Object> landmarkCache = new ConcurrentHashMap();
 
    public Structs(Gen var1, long var2) {
       this.gen = var1;
@@ -59,6 +60,7 @@ public final class Structs {
    public void apply(Chunk var1) {
       try {
          this.villages(var1);
+         Landmarks319.apply(this, var1);
          this.dungeons(var1);
          this.mineshafts(var1);
       } catch (RuntimeException var3) {

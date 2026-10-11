@@ -146,6 +146,9 @@ public final class Items {
    }
 
    public static int maxStack(int var0) {
+      if (isFood(var0) && ModLoader.isClassicHudNoHunger()) {
+         return 1;
+      }
       return var0 >= 256 && var0 < Blocks.EXT0 ? maxStack[var0] : 64;
    }
 
@@ -245,6 +248,53 @@ public final class Items {
 
       int var2 = toolClass(var0);
       return var2 != Blocks.mineClass[var1] ? false : TIER_LEVEL[toolTier(var0)] >= Blocks.harvestLevel[var1];
+   }
+
+   /**
+    * V4.1 Adventure Mode: blocks can be broken when holding the matching tool category
+    * (Pickaxe for stone/ores, Axe for wood/chests, Shovel for dirt/sand/gravel, Shears/Sword for foliage/wool),
+    * or when the block has 0 hardness (torches, flowers, crops, redstone, TNT).
+    */
+   public static boolean canAdventureBreak(int heldId, int blockId) {
+      if (blockId <= 0 || blockId >= Blocks.MAX || !Blocks.breakable(blockId)) {
+         return false;
+      }
+      if (Blocks.hardness[blockId] == 0.0F) {
+         return true;
+      }
+      if (heldId == SHEARS && (Blocks.isLeaves(blockId) || (blockId >= Blocks.WOOL0 && blockId < Blocks.WOOL0 + 16) || Blocks313.shearable(blockId) || blockId == Blocks.TALLGRASS)) {
+         return true;
+      }
+      return effective(heldId, blockId) && canHarvest(heldId, blockId);
+   }
+
+   /**
+    * V4.1 Adventure Mode: allows placing adventure-utility blocks (Torches, Ladders, TNT, Chests,
+    * Crafting Tables, Furnaces, Beds, Doors, Cake, Levers, Redstone Torches, and Seeds on Farmland).
+    */
+   public static boolean canAdventurePlace(int itemId, int targetBlockId) {
+      if (plantBlock(itemId) != 0) {
+         return Blocks.isFarmland(targetBlockId);
+      }
+      return switch (itemId) {
+         case Blocks.TORCH,
+            Blocks.LADDER,
+            Blocks.TNT,
+            Blocks.CRAFTING_TABLE,
+            Blocks.FURNACE,
+            Blocks.CHEST,
+            Blocks.CAKE,
+            BED,
+            DOOR,
+            CAKE,
+            WATER_BUCKET,
+            LAVA_BUCKET,
+            Redstone319.LEVER_OFF,
+            Redstone319.REDSTONE_TORCH,
+            Redstone319.ITEM_REDSTONE,
+            Redstone319.REPEATER_OFF -> true;
+         default -> Decor315.isBedItem(itemId);
+      };
    }
 
    public static int breakTicks(int var0, int var1, boolean var2, boolean var3) {
@@ -397,5 +447,6 @@ public final class Items {
       // ---- Update 3.12 ----
       Items312.register();
       Decor315.registerItems();
+      Redstone319.registerItems();
    }
 }

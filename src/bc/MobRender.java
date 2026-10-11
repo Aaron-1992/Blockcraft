@@ -501,6 +501,11 @@ public final class MobRender {
    }
 
    static void drawMob(Mob var0, World var1, Renderer var2, float var3, double var4, double var6, double var8) {
+      if (BackroomsStalkerMod.isStalkerMob(var0)) {
+         BackroomsStalkerMod.drawStalkerEntity(var0, var1, var2, var3, var4, var6, var8);
+         return;
+      }
+
       if (RigDraw.draw(var0, var1, var2, var3, var4, var6, var8)) {
          return; // Update 3.17: this mob has one of the new jointed models (see Rigs317)
       }

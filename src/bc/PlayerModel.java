@@ -279,16 +279,17 @@ final class PlayerModel {
       s.translate(0.0F, -12.0F, 0.0F);
       layered(s, -4.0F, 12.0F, -2.0F, 8, 12, 4, 16, 16, 16, 32, 0.25F, bright);
       s.translate(0.0F, j.chest, 0.0F);
-      // arms: pivot at the shoulders (the body's tilt carries them), the elbow 6 pixels below
+      // arms: pivot at the shoulders (the body's tilt carries them), the elbow 6 pixels below; the top of the shoulder sits 2 pixels above the pivot (flush with y = 24)
       for (int side = 0; side < 2; side++) {
          s.push();
          s.translate(side == 0 ? -5.0F : 5.0F, 22.0F, 0.0F);
          s.rotate(-j.sh[side], 1.0F, 0.0F, 0.0F); // a forward swing is a negative angle about +x for a hanging limb
          s.rotate((side == 0 ? -1.0F : 1.0F) * j.abd[side], 0.0F, 0.0F, 1.0F);
+         s.translate(0.0F, 2.0F, 0.0F);
          if (side == 0) {
             final int held = p.held;
             limb(s, slim ? -2.0F : -3.0F, -2.0F, aw, 4, 40, 16, 40, 32, bright, -j.el[side], held > 0 ? () -> {
-               s.translate(0.0F, 6.0F, 0.0F); // the item is placed relative to the shoulder
+               s.translate(0.0F, 4.0F, 0.0F); // the item is placed relative to the shoulder
                s.held(held, slim, bright);
             } : null);
          } else {
@@ -463,10 +464,17 @@ final class PlayerModel {
     */
    static void drawArmFirstPerson(int[] px, boolean slim, float bright, float swing, float equipInv) {
       float f1 = (float)Math.sqrt(swing);
-      GL11.glTranslatef(-0.3F * (float)Math.sin(f1 * Math.PI) + 0.64000005F, 0.4F * (float)Math.sin(f1 * Math.PI * 2.0) - 0.6F + equipInv * -0.6F, -0.4F * (float)Math.sin(swing * Math.PI) - 0.71999997F);
+      float arc = (float)Math.sin(f1 * Math.PI);
+      float punch = (float)Math.sin(swing * Math.PI);
+      GL11.glTranslatef(
+         -0.36F * arc + 0.64000005F,
+         0.44F * (float)Math.sin(f1 * Math.PI * 2.0) - 0.6F + equipInv * -0.6F,
+         -0.50F * punch - 0.71999997F
+      );
       GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-      GL11.glRotatef((float)Math.sin(f1 * Math.PI) * 70.0F, 0.0F, 1.0F, 0.0F);
-      GL11.glRotatef((float)Math.sin(swing * swing * Math.PI) * -20.0F, 0.0F, 0.0F, 1.0F);
+      GL11.glRotatef(arc * 74.0F, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef((float)Math.sin(swing * swing * Math.PI) * -26.0F, 0.0F, 0.0F, 1.0F);
+      GL11.glRotatef(punch * -14.0F, 1.0F, 0.0F, 0.0F);
       GL11.glTranslatef(-1.0F, 3.6F, 3.5F);
       GL11.glRotatef(120.0F, 0.0F, 0.0F, 1.0F);
       GL11.glRotatef(200.0F, 1.0F, 0.0F, 0.0F);
@@ -480,6 +488,10 @@ final class PlayerModel {
 
    /** The right arm alone for the first-person view (empty hand): origin at the shoulder, hanging down along -y. */
    static void drawArm(int[] px, boolean slim, float bright) {
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
+      GL11.glDisable(3042);
+      GL11.glDisable(2884);
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, texture(px));
       GL11.glTexEnvi(8960, 8704, 8448);

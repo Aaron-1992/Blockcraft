@@ -13,13 +13,24 @@ public final class WorldSettings {
    public static final int FLAT = 2;
    public static final int LARGE = 3;
    public static final int AMPLIFIED = 4;
-   public static final int TYPES = 5;
+   public static final int SKYBLOCK = 5;
+   public static final int SKYWARS = 6;
+   public static final int BEDWARS = 7;
+   public static final int TYPES = 8;
    /** The order of the "World Type" button (the new default first, the classic generator last). */
-   public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, CLASSIC};
-   public static final String[] TYPE_NAME = new String[]{"Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified"};
+   public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, SKYBLOCK, SKYWARS, BEDWARS, CLASSIC};
+   public static final String[] TYPE_NAME = new String[]{
+      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Skyblock", "Skywars", "Bedwars"
+   };
    public static final String[] TYPE_INFO = new String[]{
-      "The terrain of Update 3.5 - 3.12", "Oceans, rivers, 28 biomes, canyons and mountains", "A flat world with nothing in it",
-      "The same biomes, four times as big", "Towering mountains and deep valleys"
+      "The terrain of Update 3.5 - 3.12",
+      "Oceans, rivers, 28 biomes, canyons and mountains",
+      "A flat world with nothing in it",
+      "The same biomes, four times as big",
+      "Towering mountains and deep valleys",
+      "Survive on a floating island in the void with a tree, ice and lava",
+      "Eight spawn islands around a rich central feast island in the sky",
+      "Four team bases with beds and resource generators around an emerald arena"
    };
    public static final int FLAT_PRESETS = 4;
    public static final String[] FLAT_NAME = new String[]{"Grassland", "Desert", "Snowy", "Sandstone"};
@@ -102,5 +113,54 @@ public final class WorldSettings {
       }
 
       return 0;
+   }
+
+   public boolean isVoidMode() {
+      return this.type == SKYBLOCK || this.type == SKYWARS || this.type == BEDWARS;
+   }
+
+   public boolean isMinigame() {
+      return this.type == SKYWARS || this.type == BEDWARS;
+   }
+
+   public static int parseType(String s) {
+      if (s == null || s.isBlank()) {
+         return DEFAULT;
+      }
+      String q = s.trim().toLowerCase();
+      try {
+         int v = Integer.parseInt(q);
+         if (v >= 0 && v < TYPES) {
+            return v;
+         }
+      } catch (NumberFormatException ignored) {
+      }
+      switch (q) {
+         case "classic":
+         case "old":
+         case "infdev":
+            return CLASSIC;
+         case "flat":
+         case "superflat":
+            return FLAT;
+         case "large":
+         case "large_biomes":
+         case "largebiomes":
+            return LARGE;
+         case "amplified":
+         case "amp":
+            return AMPLIFIED;
+         case "skyblock":
+         case "sb":
+            return SKYBLOCK;
+         case "skywars":
+         case "sw":
+            return SKYWARS;
+         case "bedwars":
+         case "bw":
+            return BEDWARS;
+         default:
+            return DEFAULT;
+      }
    }
 }
