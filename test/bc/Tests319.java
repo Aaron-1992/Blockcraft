@@ -944,6 +944,24 @@ final class Tests319 {
          } finally {
             ModLoader.setEnabled("backrooms-stalker", false);
          }
+
+         // 9. Normal-game Minecraft features (Prismarine, Purpur, Bone Block, Golden Apple/Carrot, Cookie, Stew, Compass, Clock, Fire Charge) & World Gen recommendation
+         eq("Prismarine", Blocks.name[Redstone319.PRISMARINE], "Prismarine block registered");
+         eq("Prismarine Bricks", Blocks.name[Redstone319.PRISMARINE_BRICKS], "Prismarine Bricks block registered");
+         eq("Dark Prismarine", Blocks.name[Redstone319.DARK_PRISMARINE], "Dark Prismarine block registered");
+         eq("Purpur Block", Blocks.name[Redstone319.PURPUR_BLOCK], "Purpur Block registered");
+         eq("Purpur Pillar", Blocks.name[Redstone319.PURPUR_PILLAR], "Purpur Pillar registered");
+         eq("Bone Block", Blocks.name[Redstone319.BONE_BLOCK], "Bone Block registered");
+         eq("Golden Apple", Items.name(Redstone319.GOLDEN_APPLE), "Golden Apple item registered");
+         eq("Golden Carrot", Items.name(Redstone319.GOLDEN_CARROT), "Golden Carrot item registered");
+         eq("Cookie", Items.name(Redstone319.COOKIE), "Cookie item registered");
+         eq("Mushroom Stew", Items.name(Redstone319.MUSHROOM_STEW), "Mushroom Stew item registered");
+         eq("Bowl", Items.name(Redstone319.BOWL), "Bowl item registered");
+         eq("Compass", Items.name(Redstone319.COMPASS), "Compass item registered");
+         eq("Clock", Items.name(Redstone319.CLOCK), "Clock item registered");
+         eq("Fire Charge", Items.name(Redstone319.FIRE_CHARGE), "Fire Charge item registered");
+         check(bwGame.useSpecial(new Stack(Redstone319.COMPASS, 1)), "Compass right-click displays Spawn direction and distance");
+         check(bwGame.useSpecial(new Stack(Redstone319.CLOCK, 1)), "Clock right-click displays Day, Time and Weather");
       });
    }
 }

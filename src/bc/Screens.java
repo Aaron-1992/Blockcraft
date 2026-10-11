@@ -415,7 +415,9 @@ final class Screens {
       }
 
       float rightEnd = ui.paragraph(WorldSettings.TYPE_INFO[ws.type], x1, iy, colW, Ui.DIM, 3);
-      float seedInfoY = Math.max(leftEnd, rightEnd) + 4.0F;
+      float recY = Math.max(leftEnd, rightEnd) + 2.0F;
+      gui.text("Large Biomes recommended", x0, recY, 0xFFE8D068, true);
+      float seedInfoY = recY + 12.0F;
       String sd = g.seedField.trim().isEmpty() ? "Random seed: " + ui.randomSeed : "Seed: " + seedValue(g);
       if (seedInfoY + 10.0F < gui.h - 56.0F) {
          gui.text(Game.clipText(sd, colW * 2 + gap), x0, seedInfoY, Ui.FAINT, true);

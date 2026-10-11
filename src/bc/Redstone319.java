@@ -44,6 +44,12 @@ final class Redstone319 {
    static final int CRACKED_STONEBRICK = 1949;
    static final int SLIME_BLOCK = 1950;
    static final int SEA_LANTERN = 1951;
+   static final int PRISMARINE = 1952;
+   static final int PRISMARINE_BRICKS = 1953;
+   static final int DARK_PRISMARINE = 1954;
+   static final int PURPUR_BLOCK = 1955;
+   static final int PURPUR_PILLAR = 1956;
+   static final int BONE_BLOCK = 1957;
 
    // ---- V4.0 Redstone expansion (1960..2008) ----
    /** Redstone Repeater OFF (4 horizontal facings 0=N(-Z), 1=S(+Z), 2=E(+X), 3=W(-X)): 1960..1963. */
@@ -69,8 +75,16 @@ final class Redstone319 {
    static final int OBSERVER_ON = 2005;
 
    static final int ITEM_REDSTONE = 450;
+   static final int GOLDEN_APPLE = 451;
+   static final int GOLDEN_CARROT = 452;
+   static final int COOKIE = 453;
+   static final int MUSHROOM_STEW = 454;
+   static final int BOWL = 455;
+   static final int COMPASS = 456;
+   static final int CLOCK = 457;
+   static final int FIRE_CHARGE = 458;
 
-   // Atlas tiles (643..671)
+   // Atlas tiles (643..687)
    static final int T_REDSTONE_BLOCK = 643;
    static final int T_LAMP_OFF = 644;
    static final int T_LAMP_ON = 645;
@@ -100,6 +114,22 @@ final class Redstone319 {
    static final int T_DAYLIGHT_TOP = 669;
    static final int T_NOTE_BLOCK = 670;
    static final int T_OBSERVER_FRONT = 671;
+   static final int T_GOLDEN_APPLE = 672;
+   static final int T_GOLDEN_CARROT = 673;
+   static final int T_COOKIE = 674;
+   static final int T_MUSHROOM_STEW = 675;
+   static final int T_BOWL = 676;
+   static final int T_COMPASS = 677;
+   static final int T_CLOCK = 678;
+   static final int T_FIRE_CHARGE = 679;
+   static final int T_PRISMARINE = 680;
+   static final int T_PRISMARINE_BRICKS = 681;
+   static final int T_DARK_PRISMARINE = 682;
+   static final int T_PURPUR_BLOCK = 683;
+   static final int T_PURPUR_TOP = 684;
+   static final int T_PURPUR_PILLAR = 685;
+   static final int T_BONE_TOP = 686;
+   static final int T_BONE_SIDE = 687;
 
    private static final int[] HDX = {0, 0, 1, -1};
    private static final int[] HDZ = {-1, 1, 0, 0};
@@ -116,6 +146,23 @@ final class Redstone319 {
 
    static void registerItems() {
       Items.defTile(ITEM_REDSTONE, "Redstone Dust", T_REDSTONE_DUST);
+      Items.defTile(GOLDEN_APPLE, "Golden Apple", T_GOLDEN_APPLE);
+      Items.foodPts[GOLDEN_APPLE] = 4;
+      Items.foodSat[GOLDEN_APPLE] = 9.6F;
+      Items.defTile(GOLDEN_CARROT, "Golden Carrot", T_GOLDEN_CARROT);
+      Items.foodPts[GOLDEN_CARROT] = 6;
+      Items.foodSat[GOLDEN_CARROT] = 14.4F;
+      Items.defTile(COOKIE, "Cookie", T_COOKIE);
+      Items.foodPts[COOKIE] = 2;
+      Items.foodSat[COOKIE] = 0.4F;
+      Items.defTile(MUSHROOM_STEW, "Mushroom Stew", T_MUSHROOM_STEW);
+      Items.foodPts[MUSHROOM_STEW] = 6;
+      Items.foodSat[MUSHROOM_STEW] = 7.2F;
+      Items.maxStack[MUSHROOM_STEW] = 1;
+      Items.defTile(BOWL, "Bowl", T_BOWL);
+      Items.defTile(COMPASS, "Compass", T_COMPASS);
+      Items.defTile(CLOCK, "Clock", T_CLOCK);
+      Items.defTile(FIRE_CHARGE, "Fire Charge", T_FIRE_CHARGE);
    }
 
    private static void cube(int id, String name, float hardness, int tile, int mineClass, boolean needTool) {
@@ -402,6 +449,14 @@ final class Redstone319 {
       cube(SLIME_BLOCK, "Slime Block", 0.0F, T_SLIME, 0, false);
       cube(SEA_LANTERN, "Sea Lantern", 0.3F, T_SEA_LANTERN, 0, false);
       Blocks.emit[SEA_LANTERN] = 15;
+      cube(PRISMARINE, "Prismarine", 1.5F, T_PRISMARINE, 1, true);
+      cube(PRISMARINE_BRICKS, "Prismarine Bricks", 1.5F, T_PRISMARINE_BRICKS, 1, true);
+      cube(DARK_PRISMARINE, "Dark Prismarine", 1.5F, T_DARK_PRISMARINE, 1, true);
+      cube(PURPUR_BLOCK, "Purpur Block", 1.5F, T_PURPUR_BLOCK, 1, true);
+      cube(PURPUR_PILLAR, "Purpur Pillar", 1.5F, T_PURPUR_PILLAR, 1, true);
+      Blocks.faces(PURPUR_PILLAR, T_PURPUR_TOP, T_PURPUR_TOP, T_PURPUR_PILLAR);
+      cube(BONE_BLOCK, "Bone Block", 2.0F, T_BONE_SIDE, 1, true);
+      Blocks.faces(BONE_BLOCK, T_BONE_TOP, T_BONE_TOP, T_BONE_SIDE);
    }
 
    private static int T_SMOOTH_STONE() {
@@ -639,6 +694,20 @@ final class Redstone319 {
       list.add(CRACKED_STONEBRICK);
       list.add(SLIME_BLOCK);
       list.add(SEA_LANTERN);
+      list.add(PRISMARINE);
+      list.add(PRISMARINE_BRICKS);
+      list.add(DARK_PRISMARINE);
+      list.add(PURPUR_BLOCK);
+      list.add(PURPUR_PILLAR);
+      list.add(BONE_BLOCK);
+      list.add(GOLDEN_APPLE);
+      list.add(GOLDEN_CARROT);
+      list.add(COOKIE);
+      list.add(MUSHROOM_STEW);
+      list.add(BOWL);
+      list.add(COMPASS);
+      list.add(CLOCK);
+      list.add(FIRE_CHARGE);
    }
 
    static boolean isRedstoneUtility(int id) {
@@ -686,6 +755,21 @@ final class Redstone319 {
       Recipes.smelt.put(Blocks.STONEBRICK, new Stack(CRACKED_STONEBRICK, 1));
       Recipes.smelt.put(23, new Stack(ITEM_REDSTONE, 4));
       Recipes.shaped(SEA_LANTERN, 1, new String[]{"QGQ", "GGG", "QGQ"}, 'Q', Items.QUARTZ, 'G', Blocks.GLOWSTONE);
+      Recipes.shaped(PRISMARINE, 4, new String[]{"CC", "CD"}, 'C', Blocks.COBBLE, 'D', Items.DYE1 + 8);
+      Recipes.shaped(PRISMARINE_BRICKS, 4, new String[]{"PP", "PP"}, 'P', PRISMARINE);
+      Recipes.shaped(DARK_PRISMARINE, 8, new String[]{"PPP", "PDP", "PPP"}, 'P', PRISMARINE, 'D', Items.DYE1 + 14);
+      Recipes.shaped(PURPUR_BLOCK, 4, new String[]{"EE", "ED"}, 'E', Blocks.END_STONE, 'D', Items.DYE1 + 9);
+      Recipes.shaped(PURPUR_PILLAR, 2, new String[]{"P", "P"}, 'P', PURPUR_BLOCK);
+      Recipes.shaped(BONE_BLOCK, 1, new String[]{"BBB", "BBB", "BBB"}, 'B', Items.BONE_MEAL);
+      Recipes.shapeless(Items.BONE_MEAL, 9, BONE_BLOCK);
+      Recipes.shaped(GOLDEN_APPLE, 1, new String[]{"GGG", "GAG", "GGG"}, 'G', Items.GOLD_INGOT, 'A', Items.APPLE);
+      Recipes.shaped(GOLDEN_CARROT, 1, new String[]{"NNN", "NCN", "NNN"}, 'N', Items.GOLD_NUGGET, 'C', Items.CARROT);
+      Recipes.shaped(COOKIE, 8, new String[]{"WCW"}, 'W', Items.WHEAT, 'C', Items.DYE1 + 11);
+      Recipes.shaped(BOWL, 4, new String[]{"P P", " P "}, 'P', Blocks.PLANKS);
+      Recipes.shapeless(MUSHROOM_STEW, 1, Blocks313.MUSHROOM_BROWN, Blocks313.MUSHROOM_RED, BOWL);
+      Recipes.shaped(COMPASS, 1, new String[]{" I ", "IRI", " I "}, 'I', Items.IRON_INGOT, 'R', ITEM_REDSTONE);
+      Recipes.shaped(CLOCK, 1, new String[]{" G ", "GRG", " G "}, 'G', Items.GOLD_INGOT, 'R', ITEM_REDSTONE);
+      Recipes.shapeless(FIRE_CHARGE, 3, Items.BLAZE_POWDER, Items.COAL, Items.GUNPOWDER);
    }
 
    // ------------------------------------------------------------------ Redstone logic
@@ -1528,6 +1612,37 @@ final class Redstone319 {
       Tex.blit(T_CRACKED_STONEBRICK, crackedStoneBrick());
       Tex.blit(T_SLIME, slimeBlock());
       Tex.blit(T_SEA_LANTERN, seaLantern());
+      Tex.blit(T_GOLDEN_APPLE, goldenAppleItem());
+      Tex.blit(T_GOLDEN_CARROT, goldenCarrotItem());
+      Tex.blit(T_COOKIE, cookieItem());
+      Tex.blit(T_MUSHROOM_STEW, mushroomStewItem());
+      Tex.blit(T_BOWL, bowlItem());
+      Tex.blit(T_COMPASS, compassItem());
+      Tex.blit(T_CLOCK, clockItem());
+      Tex.blit(T_FIRE_CHARGE, fireChargeItem());
+      Tex.blit(T_PRISMARINE, prismarineTile());
+      Tex.blit(T_PRISMARINE_BRICKS, prismarineBricksTile());
+      Tex.blit(T_DARK_PRISMARINE, darkPrismarineTile());
+      Tex.blit(T_PURPUR_BLOCK, purpurBlockTile());
+      Tex.blit(T_PURPUR_TOP, purpurTopTile());
+      Tex.blit(T_PURPUR_PILLAR, purpurPillarTile());
+      Tex.blit(T_BONE_TOP, boneTopTile());
+      Tex.blit(T_BONE_SIDE, boneSideTile());
+   }
+
+   static int[] sprite(int id) {
+      return switch (id) {
+         case ITEM_REDSTONE -> redstoneDustItem();
+         case GOLDEN_APPLE -> goldenAppleItem();
+         case GOLDEN_CARROT -> goldenCarrotItem();
+         case COOKIE -> cookieItem();
+         case MUSHROOM_STEW -> mushroomStewItem();
+         case BOWL -> bowlItem();
+         case COMPASS -> compassItem();
+         case CLOCK -> clockItem();
+         case FIRE_CHARGE -> fireChargeItem();
+         default -> null;
+      };
    }
 
    private static int[] lamp(boolean lit) {
@@ -1880,5 +1995,227 @@ final class Redstone319 {
       }
 
       return p;
+   }
+
+   private static int[] prismarineTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 680);
+            boolean crack = ((x * 5 + y * 3) % 7 == 0) || ((x + y * 2) % 9 == 0);
+            int base = crack ? 0x3D6E64 : (n > 0.62F ? 0x7ABBB0 : (n > 0.35F ? 0x5FA094 : 0x4E887D));
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.94F + n * 0.12F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] prismarineBricksTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         int row = y / 4;
+         int off = (row & 1) * 4;
+         boolean hJoint = (y & 3) == 0;
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 681);
+            boolean vJoint = ((x + off) & 7) == 0;
+            boolean hi = (y & 3) == 1 && !vJoint;
+            int base = (hJoint || vJoint) ? 0x38645B : (hi ? 0x7EC0B4 : 0x5E9F93);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.94F + n * 0.12F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] darkPrismarineTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         boolean hGrid = (y & 3) == 0;
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 682);
+            boolean vGrid = (x & 3) == 0;
+            boolean hi = (x & 3) == 1 && (y & 3) == 1;
+            int base = (hGrid || vGrid) ? 0x1F3B34 : (hi ? 0x436E63 : 0x2F544B);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.94F + n * 0.12F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] purpurBlockTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         boolean hSeam = (y & 7) == 0;
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 683);
+            boolean vSeam = (x & 7) == 0;
+            boolean hi = (x & 7) == 1 || (y & 7) == 1;
+            int base = (hSeam || vSeam) ? 0x7E567E : (hi ? 0xBC92BC : 0xA67AA6);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.95F + n * 0.10F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] purpurTopTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 684);
+            int d = Math.max(Math.abs(x - 7), Math.abs(y - 7));
+            int base = (d == 7 || d == 4) ? 0x7A527A : (d == 6 || d == 3 ? 0xBC92BC : 0xA478A4);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.95F + n * 0.10F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] purpurPillarTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 685);
+            boolean groove = (x & 3) == 0;
+            boolean ridge = (x & 3) == 2;
+            int base = (y == 0 || y == 15 || groove) ? 0x7A527A : (ridge ? 0xBC92BC : 0xA478A4);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.95F + n * 0.10F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] boneTopTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 686);
+            int d = Math.max(Math.abs(x - 7), Math.abs(y - 7));
+            int base = d >= 7 ? 0xB8B29E : (d == 5 || d == 2 ? 0xCEC8B4 : 0xE5E1D0);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.96F + n * 0.08F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] boneSideTile() {
+      int[] p = new int[256];
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            float n = TexPaint.fbm(x, y, 687);
+            boolean seam = x == 0 || x == 15 || x == 5 || x == 10;
+            boolean cap = y == 0 || y == 15;
+            int base = (seam || cap) ? 0xC2BCAA : ((x == 2 || x == 7 || x == 12) ? 0xEDEAE0 : 0xDEDAC8);
+            p[y * 16 + x] = TexPaint.mul(TexPaint.c(base), 0.96F + n * 0.08F);
+         }
+      }
+
+      return p;
+   }
+
+   private static int[] goldenAppleItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.line(8, 2, 9, 4, 0x6B4423);
+      cv.rect(9, 2, 2, 2, 0x48962A);
+      cv.ell(7.5, 9.0, 4.8, 4.6, 0xD89614);
+      cv.ell(7.5, 8.8, 4.0, 3.8, 0xF7C622);
+      cv.ell(6.2, 7.5, 1.8, 1.6, 0xFFF394);
+      cv.set(5, 6, 0xFFFFFF);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] goldenCarrotItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.line(11, 3, 13, 2, 0x48962A);
+      cv.line(11, 4, 14, 4, 0x58B436);
+      cv.line(10, 3, 10, 1, 0x58B436);
+      for (int i = 0; i < 9; i++) {
+         int r = Math.max(1, 3 - i / 3);
+         cv.ell(10 - i * 0.8, 5 + i * 0.8, r, r, i % 2 == 0 ? 0xF5C220 : 0xD89412);
+      }
+      cv.set(9, 5, 0xFFF5A0);
+      cv.set(7, 7, 0xFFF5A0);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] cookieItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 8.0, 5.2, 4.8, 0xB87333);
+      cv.ell(7.5, 7.8, 4.2, 3.8, 0xD28A47);
+      int chip = 0x4A2511;
+      cv.set(6, 6, chip);
+      cv.set(9, 6, chip);
+      cv.set(5, 9, chip);
+      cv.set(8, 8, chip);
+      cv.set(10, 9, chip);
+      cv.set(7, 10, chip);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] bowlItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 9.5, 5.5, 3.6, 0x7A5230);
+      cv.ell(7.5, 8.5, 5.2, 2.5, 0x9C6B3E);
+      cv.ell(7.5, 7.8, 4.2, 1.6, 0x56381E);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] mushroomStewItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 9.5, 5.5, 3.6, 0x7A5230);
+      cv.ell(7.5, 8.5, 5.2, 2.5, 0x9C6B3E);
+      cv.ell(7.5, 7.8, 4.3, 1.8, 0xCE7E62);
+      cv.set(6, 7, 0xE89B7E);
+      cv.set(8, 8, 0xC83C2B);
+      cv.set(9, 7, 0xFFFFFF);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] compassItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 8.0, 5.6, 5.2, 0x74787E);
+      cv.ell(7.5, 8.0, 4.4, 4.0, 0xA8AEB6);
+      cv.ell(7.5, 8.0, 3.4, 3.0, 0x262A30);
+      cv.line(7, 8, 7, 5, 0xE82820);
+      cv.line(8, 8, 8, 5, 0xFF4438);
+      cv.line(7, 9, 7, 10, 0xD8DCE2);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] clockItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 8.0, 5.6, 5.2, 0xB88614);
+      cv.ell(7.5, 8.0, 4.5, 4.1, 0xF4C424);
+      cv.ell(7.5, 8.0, 3.2, 2.8, 0x2C4888);
+      cv.set(6, 6, 0xFCE868);
+      cv.set(7, 6, 0xFCE868);
+      cv.set(9, 9, 0xFCE868);
+      cv.line(7, 8, 9, 7, 0xFFF6A8);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] fireChargeItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 8.0, 5.4, 5.2, 0x2E1C16);
+      cv.ell(7.5, 8.0, 4.4, 4.2, 0x6E2614);
+      cv.ell(7.2, 7.8, 3.1, 2.9, 0xDC6218);
+      cv.ell(6.8, 7.4, 1.8, 1.7, 0xF8B828);
+      cv.set(6, 6, 0xFFF8A8);
+      cv.set(9, 9, 0xF8B828);
+      cv.shade();
+      return cv.p;
    }
 }

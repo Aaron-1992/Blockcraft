@@ -1,2 +1,2 @@
 4.1
-# Backrooms & Stalker v2.3: Completely Randomized Room Layouts Across All 5 Levels, Poolrooms 3D Waterslides, 3D Office Chairs, 3D Vending Machines, 3D Steam Valve Pipes & Randomized Exits
+# Blockcraft V4.1: Normal Game Minecraft Features (Prismarine, Purpur, Bone Block, Golden Apple, Golden Carrot, Cookie, Mushroom Stew, Bowl, Compass, Clock, Fire Charge) & Large Biomes Recommended World Gen UI

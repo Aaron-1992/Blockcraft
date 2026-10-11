@@ -3415,6 +3415,17 @@ public final class Game {
 
       if (Items.isFood(id)) {
          var4.add("§6Restores " + Items.foodPts[id] / 2.0F + " hunger");
+         if (id == Redstone319.GOLDEN_APPLE) {
+            var4.add("§e+4 Hearts Regeneration (eat anytime)");
+         } else if (id == Redstone319.GOLDEN_CARROT) {
+            var4.add("§e+1 Heart Regeneration");
+         }
+      } else if (id == Redstone319.COMPASS) {
+         var4.add("§7Right-click to check World Spawn direction");
+      } else if (id == Redstone319.CLOCK) {
+         var4.add("§7Right-click to check Day, Time & Weather");
+      } else if (id == Redstone319.FIRE_CHARGE) {
+         var4.add("§7Right-click to ignite fire or launch fireball");
       }
 
       int fuel = Recipes.fuelTime(new Stack(id, 1));
@@ -4218,25 +4229,38 @@ public final class Game {
             && var3 != null
             && Items.isFood(var3.id)
             && !this.player.creative
-            && (ModLoader.isClassicHudNoHunger() ? this.player.health < 20 : this.player.food < 20)) {
+            && (var3.id == Redstone319.GOLDEN_APPLE || (ModLoader.isClassicHudNoHunger() ? this.player.health < 20 : this.player.food < 20))) {
+            int eatenId = var3.id;
             if (ModLoader.isClassicHudNoHunger()) {
                // Classic Minecraft Infdev: food heals hearts immediately on right-click with no eating delay
                this.eatTicks = 0;
                this.rightDown = false;
-               this.player.health = Math.min(20, this.player.health + Items.foodPts[var3.id]);
+               int heal = eatenId == Redstone319.GOLDEN_APPLE ? 8 : Items.foodPts[eatenId];
+               this.player.health = Math.min(20, this.player.health + heal);
                var3.n--;
                if (var3.n <= 0) {
                   this.inv[this.sel] = null;
+               }
+               if (eatenId == Redstone319.MUSHROOM_STEW && !this.addItem(new Stack(Redstone319.BOWL, 1))) {
+                  this.dropFromPlayer(Redstone319.BOWL, 1, 0);
                }
             } else {
                this.eatTicks++;
                if (this.eatTicks >= 32) {
                   this.eatTicks = 0;
-                  this.player.food = Math.min(20, this.player.food + Items.foodPts[var3.id]);
-                  this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[var3.id]);
+                  this.player.food = Math.min(20, this.player.food + Items.foodPts[eatenId]);
+                  this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[eatenId]);
+                  if (eatenId == Redstone319.GOLDEN_APPLE) {
+                     this.player.health = Math.min(20, this.player.health + 8);
+                  } else if (eatenId == Redstone319.GOLDEN_CARROT) {
+                     this.player.health = Math.min(20, this.player.health + 2);
+                  }
                   var3.n--;
                   if (var3.n <= 0) {
                      this.inv[this.sel] = null;
+                  }
+                  if (eatenId == Redstone319.MUSHROOM_STEW && !this.addItem(new Stack(Redstone319.BOWL, 1))) {
+                     this.dropFromPlayer(Redstone319.BOWL, 1, 0);
                   }
                }
             }
@@ -5093,6 +5117,64 @@ public final class Game {
       }
 
       if (var2 == Items.BLAZE_ROD && (this.player.creative || (this.world != null && this.world.settings != null && this.world.settings.isMinigame()))) {
+         return Mobs312.throwFireball(this, var1);
+      }
+
+      if (var2 == Redstone319.COMPASS && this.world != null) {
+         double dx = this.spawnXZ[0] + 0.5 - this.player.x;
+         double dz = this.spawnXZ[1] + 0.5 - this.player.z;
+         int dist = (int)Math.round(Math.hypot(dx, dz));
+         String[] dirs = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+         int dirIdx = Math.floorMod((int)Math.round(((this.player.yaw % 360.0F + 360.0F) % 360.0F) / 45.0F), 8);
+         this.say(
+            "§e[Compass] §fFacing: §b"
+               + dirs[dirIdx]
+               + " §7| §fSpawn: §a("
+               + this.spawnXZ[0]
+               + ", "
+               + this.spawnXZ[1]
+               + ") §7(§e"
+               + dist
+               + "m§7) §7| §fPos: §b("
+               + (int)Math.floor(this.player.x)
+               + ", "
+               + (int)Math.floor(this.player.y)
+               + ", "
+               + (int)Math.floor(this.player.z)
+               + ")"
+         );
+         return true;
+      }
+
+      if (var2 == Redstone319.CLOCK && this.world != null) {
+         long ticks = this.world.dayTime;
+         long day = ticks / 24000L + 1L;
+         int tod = (int)(ticks % 24000L);
+         int totalMin = ((tod + 6000) % 24000) * 1440 / 24000;
+         int hh = totalMin / 60;
+         int mm = totalMin % 60;
+         String phase = tod < 1000 ? "Sunrise" : (tod < 11000 ? "Day" : (tod < 13000 ? "Sunset" : "Night"));
+         String weather = this.world.weather != null ? this.world.weather.describe(this.player.x, this.player.z) : "Clear";
+         this.say(String.format("§6[Clock] §fDay §e%d §7| §fTime: §e%02d:%02d §7(§b%s§7) | §fWeather: §b%s", day, hh, mm, phase, weather));
+         return true;
+      }
+
+      if (var2 == Redstone319.FIRE_CHARGE && this.world != null && !this.player.adventure) {
+         if (this.target != null) {
+            int fx = this.target.x + this.target.nx;
+            int fy = this.target.y + this.target.ny;
+            int fz = this.target.z + this.target.nz;
+            if (this.world.fire.ignite(fx, fy, fz)) {
+               this.meshNow(fx, fy, fz);
+               if (!this.player.creative) {
+                  var1.n--;
+                  if (var1.n <= 0) {
+                     this.inv[this.sel] = null;
+                  }
+               }
+               return true;
+            }
+         }
          return Mobs312.throwFireball(this, var1);
       }
 

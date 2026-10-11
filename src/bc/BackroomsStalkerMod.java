@@ -851,7 +851,9 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       applyHorrorSettings(g);
 
       if (g != null && g.world != null && g.player != null) {
-         if (!(g.world.gen instanceof BackroomsGen) && g.world.dim == Dim.OVERWORLD) {
+         if (!(g.world.gen instanceof BackroomsGen)
+            && g.world.dim == Dim.OVERWORLD
+            && (g.world.settings == null || !g.world.settings.isVoidMode())) {
             g.world.gen = new BackroomsGen(g.world.seed, g.world.settings);
          }
          if (g.world.gen instanceof BackroomsGen) {
@@ -924,8 +926,9 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       if (c.equals("/backrooms")) {
          active = true;
          applyHorrorSettings(g);
-         if (args != null && args.length >= 1) {
-            String sub = args[0].toLowerCase();
+         int a0 = (args != null && args.length > 0 && (args[0].equalsIgnoreCase("backrooms") || args[0].equalsIgnoreCase("/backrooms"))) ? 1 : 0;
+         if (args != null && args.length > a0) {
+            String sub = args[a0].toLowerCase();
             if (sub.equals("leave") || sub.equals("exit") || sub.equals("escape")) {
                leaveBackrooms(g);
                return true;
@@ -935,8 +938,8 @@ public class BackroomsStalkerMod implements BlockcraftMod {
                g.say("§e[Backrooms] §7Infinite Backrooms worldgen for new worlds: " + (this.worldGenEnabled ? "§aON" : "§cOFF"));
                return true;
             }
-            if (sub.equals("level") && args.length >= 2) {
-               sub = args[1].toLowerCase();
+            if (sub.equals("level") && args.length > a0 + 1) {
+               sub = args[a0 + 1].toLowerCase();
             }
             if (sub.equals("0") || sub.equals("lobby")) {
                teleportToLevel(g, BackroomsGen.LEVEL_0);
@@ -962,8 +965,6 @@ public class BackroomsStalkerMod implements BlockcraftMod {
          if (g.world != null && g.world.gen instanceof BackroomsGen) {
             ensurePlayerInsideBackrooms(g);
             g.toast(getLevelTitle(this.currentLevel), "Use /backrooms level 0|1|2|poolrooms|run to switch levels!");
-         } else if (this.inPocketBackrooms) {
-            leaveBackrooms(g);
          } else {
             enterBackrooms(g);
          }
@@ -973,8 +974,9 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       if (c.equals("/stalker")) {
          active = true;
          applyHorrorSettings(g);
-         if (args != null && args.length >= 1) {
-            String sub = args[0].toLowerCase();
+         int a0 = (args != null && args.length > 0 && (args[0].equalsIgnoreCase("stalker") || args[0].equalsIgnoreCase("/stalker"))) ? 1 : 0;
+         if (args != null && args.length > a0) {
+            String sub = args[a0].toLowerCase();
             if (sub.equals("calm") || sub.equals("despawn") || sub.equals("off")) {
                restoreFlickeredLights(g);
                despawnStalker(g);
@@ -1014,9 +1016,11 @@ public class BackroomsStalkerMod implements BlockcraftMod {
       if (g == null || g.world == null || g.player == null) {
          return;
       }
-      this.returnX = g.player.x;
-      this.returnY = g.player.y;
-      this.returnZ = g.player.z;
+      if (!this.inPocketBackrooms) {
+         this.returnX = g.player.x;
+         this.returnY = g.player.y;
+         this.returnZ = g.player.z;
+      }
       this.inPocketBackrooms = true;
       this.currentLevel = BackroomsGen.LEVEL_0;
 
