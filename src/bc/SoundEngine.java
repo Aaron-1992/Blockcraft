@@ -195,21 +195,23 @@ public final class SoundEngine {
    // Animal Crossing dynamic music state
    private static volatile String currentMusicKey = "ac_kk_bossa";
    private static volatile String targetMusicKey = "ac_kk_bossa";
+   private static String pendingMusicKey = "ac_kk_bossa";
+   private static int pendingMusicTicks = 0;
    private static volatile double musicPos = 0.0;
    private static volatile float musicFade = 1.0F;
-   private static volatile int acChordStep = 0;
-   private static volatile double acNotePhase = 0.0;
-   private static volatile double acMarimbaPhase = 0.0;
-   private static volatile float acPluckEnv = 0.0F;
-   private static volatile int acTickCounter = 0;
+   private static volatile int musicPauseSamples = 0;
 
    // Footstep & ambient tracking
    private static double stepDistAcc = 0.0;
    private static double prevPlayerX = Double.NaN;
    private static double prevPlayerY = Double.NaN;
    private static double prevPlayerZ = Double.NaN;
+   private static double prevPlayerVy = 0.0;
+   private static double fallStartY = Double.NaN;
    private static boolean wasOnGround = true;
    private static boolean wasInWater = false;
+   private static int worldSettleTicks = 0;
+   private static int stepCooldownTicks = 0;
    private static int ambientTick = 0;
    private static int digSoundCooldown = 0;
    private static String lastPlayedSound = "";
@@ -338,16 +340,17 @@ public final class SoundEngine {
       }
       BANK.put("thunder", new Sample("thunder", sr, thunder));
 
-      // 4. Rain Patter Loop (soft realistic raindrop impacts)
-      short[] rain = new short[(int)(sr * 1.6)];
+      // 4. Rain Patter Loop (soft realistic raindrop impacts with smooth fade-in/out)
+      short[] rain = new short[(int)(sr * 1.8)];
       double rlp = 0.0;
       for (int i = 0; i < rain.length; i++) {
-         double n = (tr.nextDouble() * 2.0 - 1.0) * 0.35;
+         double env = Math.sin(Math.PI * i / (double)rain.length);
+         double n = (tr.nextDouble() * 2.0 - 1.0) * 0.30;
          if (tr.nextInt(90) == 0) {
-            n += (tr.nextDouble() * 2.0 - 1.0) * 0.85;
+            n += (tr.nextDouble() * 2.0 - 1.0) * 0.70;
          }
          rlp += 0.22 * (n - rlp);
-         rain[i] = (short)(Math.max(-1.0, Math.min(1.0, rlp)) * 14000.0);
+         rain[i] = (short)(Math.max(-1.0, Math.min(1.0, rlp * env)) * 12000.0);
       }
       BANK.put("rain_loop", new Sample("rain_loop", sr, rain));
 
@@ -817,6 +820,10 @@ public final class SoundEngine {
 
    /** Plays a block mining / hitting sound at (x, y, z). */
    public static void playBlockDig(World w, int blockId, int x, int y, int z) {
+      if (digSoundCooldown > 0) {
+         return;
+      }
+      digSoundCooldown = 4;
       String mat = blockMaterialCategory(blockId);
       String key = switch (mat) {
          case "wood" -> "dig_wood_" + (1 + RND.nextInt(2));
@@ -827,7 +834,7 @@ public final class SoundEngine {
          case "metal" -> "dig_metal_1";
          default -> "dig_stone_" + (1 + RND.nextInt(2));
       };
-      play3D(w, key, x + 0.5, y + 0.5, z + 0.5, 0.65F, 0.90F + RND.nextFloat() * 0.18F);
+      play3D(w, key, x + 0.5, y + 0.5, z + 0.5, 0.55F, 0.90F + RND.nextFloat() * 0.16F);
    }
 
    /** Plays a block breaking sound at (x, y, z). */
@@ -860,6 +867,15 @@ public final class SoundEngine {
       play3D(w, "note_harp", x + 0.5, y + 0.5, z + 0.5, 1.0F, pitch);
    }
 
+   private static boolean isSamplePlaying(String key) {
+      for (Voice v : ACTIVE_VOICES) {
+         if (!v.finished && v.sample != null && key.equals(v.sample.name)) {
+            return true;
+         }
+      }
+      return false;
+   }
+
    /** Selects the appropriate Animal Crossing music track for the current game screen, time of day, and weather. */
    public static String selectAnimalCrossingMusic(Game g) {
       if (g == null) {
@@ -868,20 +884,30 @@ public final class SoundEngine {
       if (g.screen == Game.S.CREDITS) {
          return "ac_cafe";
       }
-      if (g.screen == Game.S.TITLE || g.world == null || g.player == null) {
+      if (g.pano != null
+         || g.screen == Game.S.TITLE
+         || g.screen == Game.S.WORLDS
+         || g.screen == Game.S.NEWWORLD
+         || g.screen == Game.S.MULTIPLAYER
+         || g.screen == Game.S.PACKS
+         || g.screen == Game.S.MODS
+         || g.screen == Game.S.SKINS
+         || g.screen == Game.S.LOADING
+         || g.world == null
+         || g.player == null) {
          return "ac_kk_bossa";
       }
       if (BackroomsStalkerMod.isActive()) {
          return ""; // Backrooms uses eerie fluorescent hum & stalker audio instead of cozy music
       }
 
-      // Check weather first (just like Animal Crossing switches to Rainy/Snowy arrangements!)
+      // Check active precipitation first (require actual steady rain/snow, not brief light cloud transitions)
       if (g.world.weather != null && g.world.dim == Dim.OVERWORLD) {
          String desc = g.world.weather.describe(g.player.x, g.player.z).toLowerCase();
-         if (desc.contains("snow")) {
+         if (desc.equals("snow") || desc.equals("blizzard")) {
             return "ac_snow";
          }
-         if (desc.contains("rain") || desc.contains("thunder") || desc.contains("storm")) {
+         if (desc.equals("rain") || desc.equals("thunderstorm")) {
             return "ac_rain";
          }
       }
@@ -895,7 +921,7 @@ public final class SoundEngine {
       } else if (tod < 14000) {
          return "ac_sunset"; // 05:00 PM - 08:00 PM: 5 PM Golden Hour Sunset
       } else {
-         return "ac_night"; // 08:00 PM - 06:00 AM: 11 PM Starry Night
+         return "ac_night"; // 08:00 PM - 06:00 AM: 1 AM Starry Night
       }
    }
 
@@ -909,14 +935,68 @@ public final class SoundEngine {
          setVolumes(g.opt.soundVolume, g.opt.musicVolume, g.opt.realAcoustics);
       }
 
-      targetMusicKey = selectAnimalCrossingMusic(g);
-      if (currentMusicKey.isEmpty() && !targetMusicKey.isEmpty()) {
-         currentMusicKey = targetMusicKey;
-         musicPos = 0.0;
+      String desiredMusic = selectAnimalCrossingMusic(g);
+      boolean immediateSwitch = desiredMusic.isEmpty()
+         || desiredMusic.equals("ac_kk_bossa")
+         || desiredMusic.equals("ac_cafe")
+         || currentMusicKey.equals("ac_kk_bossa")
+         || currentMusicKey.equals("ac_cafe")
+         || currentMusicKey.isEmpty();
+      if (immediateSwitch) {
+         targetMusicKey = desiredMusic;
+         pendingMusicKey = desiredMusic;
+         pendingMusicTicks = 0;
+         if (currentMusicKey.isEmpty() && !targetMusicKey.isEmpty()) {
+            currentMusicKey = targetMusicKey;
+            musicPos = 0.0;
+            musicPauseSamples = 0;
+         }
+      } else if (!desiredMusic.equals(targetMusicKey)) {
+         if (desiredMusic.equals(pendingMusicKey)) {
+            pendingMusicTicks++;
+            if (pendingMusicTicks >= 60) { // 3 seconds of stability before switching in-game track
+               targetMusicKey = desiredMusic;
+               pendingMusicTicks = 0;
+            }
+         } else {
+            pendingMusicKey = desiredMusic;
+            pendingMusicTicks = 1;
+         }
+      } else {
+         pendingMusicKey = desiredMusic;
+         pendingMusicTicks = 0;
       }
 
-      if (g.world == null || g.player == null) {
+      // Never run world sounds on Title/Menu Panorama screens or when no real world is active
+      if (g.pano != null
+         || g.world == null
+         || g.player == null
+         || g.screen == Game.S.TITLE
+         || g.screen == Game.S.WORLDS
+         || g.screen == Game.S.NEWWORLD
+         || g.screen == Game.S.MULTIPLAYER
+         || g.screen == Game.S.LOADING
+         || g.screen == Game.S.CREDITS
+         || g.screen == Game.S.WAITING) {
+         ACTIVE_VOICES.removeIf(v -> v.positional);
+         DELAYED_QUEUE.clear();
+         prevPlayerX = Double.NaN;
+         worldSettleTicks = 0;
          return;
+      }
+
+      if (g.screen == Game.S.PAUSE || g.screen == Game.S.DEAD) {
+         prevPlayerX = g.player.x;
+         prevPlayerY = g.player.y;
+         prevPlayerZ = g.player.z;
+         return;
+      }
+
+      if (digSoundCooldown > 0) {
+         digSoundCooldown--;
+      }
+      if (stepCooldownTicks > 0) {
+         stepCooldownTicks--;
       }
 
       Player p = g.player;
@@ -953,85 +1033,134 @@ public final class SoundEngine {
       }
 
       // Player footsteps, landing & water wading splashes
-      if (!Double.isNaN(prevPlayerX) && !p.spectator && !p.dead) {
-         double dx = p.x - prevPlayerX;
-         double dz = p.z - prevPlayerZ;
-         double horiz = Math.hypot(dx, dz);
-         int feetBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y + 0.1), (int)Math.floor(p.z));
-         boolean inWater = Blocks.isWater(feetBlock);
-         if (inWater && !wasInWater) {
-            play3D(w, "step_water_" + (1 + RND.nextInt(3)), p.x, p.y, p.z, 0.75F, 0.95F + RND.nextFloat() * 0.15F);
-         }
-         wasInWater = inWater;
-
-         int groundBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.15), (int)Math.floor(p.z));
-         if (p.onGround && !wasOnGround && groundBlock != 0) {
-            playFootstep(w, groundBlock, p.x, p.y, p.z, 0.90F);
-         }
+      int feetBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y + 0.1), (int)Math.floor(p.z));
+      boolean inWater = Blocks.isWater(feetBlock);
+      if (Double.isNaN(prevPlayerX)) {
+         prevPlayerX = p.x;
+         prevPlayerY = p.y;
+         prevPlayerZ = p.z;
+         prevPlayerVy = p.vy;
+         fallStartY = p.y;
          wasOnGround = p.onGround;
+         wasInWater = inWater;
+         worldSettleTicks = 15;
+         stepDistAcc = 0.0;
+         return;
+      }
 
-         if ((p.onGround || inWater) && horiz > 0.005 && horiz < 1.5) {
+      double dx = p.x - prevPlayerX;
+      double dy = p.y - prevPlayerY;
+      double dz = p.z - prevPlayerZ;
+      double horiz = Math.hypot(dx, dz);
+
+      // Teleport / respawn grace period
+      if (horiz > 1.2 || Math.abs(dy) > 1.8) {
+         prevPlayerX = p.x;
+         prevPlayerY = p.y;
+         prevPlayerZ = p.z;
+         prevPlayerVy = p.vy;
+         fallStartY = p.y;
+         wasOnGround = p.onGround;
+         wasInWater = inWater;
+         worldSettleTicks = 12;
+         stepDistAcc = 0.0;
+         return;
+      }
+
+      if (worldSettleTicks > 0) {
+         worldSettleTicks--;
+         prevPlayerX = p.x;
+         prevPlayerY = p.y;
+         prevPlayerZ = p.z;
+         prevPlayerVy = p.vy;
+         fallStartY = p.y;
+         wasOnGround = p.onGround;
+         wasInWater = inWater;
+         return;
+      }
+
+      if (!p.spectator && !p.dead && !p.flying) {
+         if (inWater && !wasInWater && prevPlayerVy < -0.12) {
+            play3D(w, "step_water_" + (1 + RND.nextInt(3)), p.x, p.y, p.z, 0.65F, 0.95F + RND.nextFloat() * 0.15F);
+            stepCooldownTicks = 8;
+         }
+
+         if (!p.onGround) {
+            if (wasOnGround || p.y > fallStartY) {
+               fallStartY = p.y;
+            }
+         } else if (!wasOnGround) {
+            double fallen = fallStartY - p.y;
+            int groundBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.2), (int)Math.floor(p.z));
+            if (fallen >= 0.75 && prevPlayerVy < -0.20 && groundBlock != 0 && !Blocks.isFluid(groundBlock)) {
+               playFootstep(w, groundBlock, p.x, p.y, p.z, 0.80F);
+               stepCooldownTicks = 6;
+               stepDistAcc = 0.0;
+            }
+            fallStartY = p.y;
+         }
+
+         if ((p.onGround || inWater) && horiz > 0.015 && horiz < 1.2) {
             stepDistAcc += horiz;
-            double stride = inWater ? 1.85 : (p.sneaking ? 1.55 : 1.38);
-            if (stepDistAcc >= stride) {
+            double stride = inWater ? 1.95 : (p.sneaking ? 1.65 : (p.sprinting ? 1.55 : 1.45));
+            if (stepDistAcc >= stride && stepCooldownTicks == 0) {
                stepDistAcc = 0.0;
                if (inWater) {
-                  play3D(w, "step_water_" + (1 + RND.nextInt(3)), p.x, p.y, p.z, 0.48F, 0.92F + RND.nextFloat() * 0.16F);
-               } else if (groundBlock != 0) {
-                  playFootstep(w, groundBlock, p.x, p.y, p.z, p.sneaking ? 0.25F : 0.65F);
+                  play3D(w, "step_water_" + (1 + RND.nextInt(3)), p.x, p.y, p.z, 0.42F, 0.92F + RND.nextFloat() * 0.16F);
+                  stepCooldownTicks = 10;
+               } else {
+                  int groundBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.2), (int)Math.floor(p.z));
+                  if (groundBlock == 0) {
+                     groundBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.6), (int)Math.floor(p.z));
+                  }
+                  if (groundBlock != 0 && !Blocks.isFluid(groundBlock)) {
+                     playFootstep(w, groundBlock, p.x, p.y, p.z, p.sneaking ? 0.22F : 0.58F);
+                     stepCooldownTicks = p.sprinting ? 6 : (p.sneaking ? 11 : 8);
+                  }
                }
             }
+         } else if (horiz < 0.005) {
+            stepDistAcc = 0.0;
          }
+      } else {
+         stepDistAcc = 0.0;
+         fallStartY = p.y;
       }
+
+      wasInWater = inWater;
+      wasOnGround = p.onGround;
       prevPlayerX = p.x;
       prevPlayerY = p.y;
       prevPlayerZ = p.z;
+      prevPlayerVy = p.vy;
 
-      // Block mining progress sound
-      if (digSoundCooldown > 0) {
-         digSoundCooldown--;
-      }
-      if (g.leftDown && g.target != null && g.breakProg > 0.0F && digSoundCooldown == 0) {
-         int bid = w.getBlock(g.target.x, g.target.y, g.target.z);
-         if (bid != 0) {
-            playBlockDig(w, bid, g.target.x, g.target.y, g.target.z);
-            digSoundCooldown = 5;
-         }
-      }
-
-      // Environmental ambience (flowing water, bubbling lava, crackling fire, rain patter)
-      if ((ambientTick % 18) == 0) {
+      // Subtle environmental ambience (only every 40 ticks = 2.0s, and never overlapping existing ambient clips)
+      if ((ambientTick % 40) == 0) {
          int px = (int)Math.floor(p.x);
          int py = (int)Math.floor(p.y);
          int pz = (int)Math.floor(p.z);
-         for (int i = 0; i < 6; i++) {
-            int bx = px + RND.nextInt(15) - 7;
-            int by = py + RND.nextInt(9) - 4;
-            int bz = pz + RND.nextInt(15) - 7;
+         for (int i = 0; i < 5; i++) {
+            int bx = px + RND.nextInt(13) - 6;
+            int by = py + RND.nextInt(7) - 3;
+            int bz = pz + RND.nextInt(13) - 6;
             int id = w.getBlock(bx, by, bz);
-            if (id == 194) { // Fire
-               play3D(w, "fire_crackle", bx + 0.5, by + 0.5, bz + 0.5, 0.45F, 0.90F + RND.nextFloat() * 0.20F);
+            if (id == 194 && !isSamplePlaying("fire_crackle")) { // Fire
+               play3D(w, "fire_crackle", bx + 0.5, by + 0.5, bz + 0.5, 0.35F, 0.92F + RND.nextFloat() * 0.16F);
                break;
-            } else if (Blocks.isLava(id)) {
-               play3D(w, "lava_pop", bx + 0.5, by + 0.5, bz + 0.5, 0.40F, 0.85F + RND.nextFloat() * 0.25F);
+            } else if (Blocks.isLava(id) && !isSamplePlaying("lava_pop")) {
+               play3D(w, "lava_pop", bx + 0.5, by + 0.5, bz + 0.5, 0.30F, 0.88F + RND.nextFloat() * 0.20F);
                break;
-            } else if (Blocks.isWater(id) && Blocks.fluidLevel(id) > 0) {
-               play3D(w, "water_flow", bx + 0.5, by + 0.5, bz + 0.5, 0.35F, 0.92F + RND.nextFloat() * 0.16F);
+            } else if (Blocks.isWater(id) && Blocks.fluidLevel(id) > 0 && !isSamplePlaying("water_flow")) {
+               play3D(w, "water_flow", bx + 0.5, by + 0.5, bz + 0.5, 0.25F, 0.94F + RND.nextFloat() * 0.12F);
                break;
             }
          }
 
-         if (w.weather != null && w.dim == Dim.OVERWORLD) {
-            String wd = w.weather.describe(p.x, p.z).toLowerCase();
-            if (wd.contains("rain") || wd.contains("thunder") || wd.contains("storm")) {
-               double rx = p.x + (RND.nextDouble() - 0.5) * 6.0;
-               double rz = p.z + (RND.nextDouble() - 0.5) * 6.0;
-               play3D(w, "rain_loop", rx, p.y + 2.0, rz, 0.28F, 0.95F + RND.nextFloat() * 0.10F);
-               if (wd.contains("thunder") && RND.nextInt(18) == 0) {
-                  double tx = p.x + (RND.nextDouble() - 0.5) * 120.0;
-                  double tz = p.z + (RND.nextDouble() - 0.5) * 120.0;
-                  play3DMoving(w, "thunder", tx, p.y + 28.0, tz, 0.0, 0.0, 0.0, 1.35F, 0.85F + RND.nextFloat() * 0.20F, true);
-               }
+         if (w.weather != null && w.dim == Dim.OVERWORLD && !isSamplePlaying("rain_loop")) {
+            if (w.weather.rainingAt(px, py + 2, pz)) {
+               double rx = p.x + (RND.nextDouble() - 0.5) * 4.0;
+               double rz = p.z + (RND.nextDouble() - 0.5) * 4.0;
+               play3D(w, "rain_loop", rx, p.y + 2.0, rz, 0.22F, 0.96F + RND.nextFloat() * 0.08F);
             }
          }
       }
@@ -1185,17 +1314,18 @@ public final class SoundEngine {
                }
             }
 
-            // 3. Mix Animal Crossing Music Stream + Warm Acoustic Nylon Guitar / Marimba Layer
+            // 3. Mix Animal Crossing Music Stream (single active track at a time, full-length with natural pause between loops)
             float mVol = masterMusicVol;
             if (mVol > 0.001F) {
                if (!currentMusicKey.equals(targetMusicKey)) {
-                  musicFade = Math.max(0.0F, musicFade - 0.015F);
+                  musicFade = Math.max(0.0F, musicFade - 0.012F);
                   if (musicFade <= 0.001F) {
                      currentMusicKey = targetMusicKey;
                      musicPos = 0.0;
+                     musicPauseSamples = 0;
                   }
                } else if (musicFade < 1.0F) {
-                  musicFade = Math.min(1.0F, musicFade + 0.015F);
+                  musicFade = Math.min(1.0F, musicFade + 0.012F);
                }
 
                Sample mus = currentMusicKey.isEmpty() ? null : BANK.get(currentMusicKey);
@@ -1203,36 +1333,27 @@ public final class SoundEngine {
                   short[] mpcm = mus.pcm;
                   int mlen = mpcm.length;
                   double mStep = mus.sampleRate / (double)MIX_RATE;
-                  float effVol = mVol * musicFade * 0.42F;
+                  float effVol = mVol * musicFade * 0.44F;
 
                   for (int i = 0; i < frames; i++) {
-                     int idx0 = (int)musicPos % mlen;
-                     int idx1 = (idx0 + 1) % mlen;
-                     float frac = (float)(musicPos - Math.floor(musicPos));
+                     if (musicPauseSamples > 0) {
+                        musicPauseSamples--;
+                        continue;
+                     }
+                     int idx0 = (int)musicPos;
+                     if (idx0 >= mlen) {
+                        musicPos = 0.0;
+                        musicPauseSamples = MIX_RATE * 4; // 4-second natural breathing pause after the full song finishes
+                        continue;
+                     }
+                     int idx1 = Math.min(mlen - 1, idx0 + 1);
+                     float frac = (float)(musicPos - idx0);
                      float s = (mpcm[idx0] * (1.0F - frac) + mpcm[idx1] * frac) / 32768.0F;
 
-                     // Subtle Animal Crossing acoustic marimba/guitar harmonic shimmer
-                     acTickCounter++;
-                     if (acTickCounter >= MIX_RATE / 2) {
-                        acTickCounter = 0;
-                        acChordStep = (acChordStep + 1) % 16;
-                        acPluckEnv = 0.12F;
-                     }
-                     int[] chord = AC_CHORDS[(acChordStep / 4) % AC_CHORDS.length];
-                     int midi = chord[acChordStep % chord.length];
-                     double freq = 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
-                     acNotePhase += freq / MIX_RATE;
-                     if (acNotePhase >= 1.0) acNotePhase -= 1.0;
-                     acPluckEnv *= 0.99985F;
-                     float acLayer = (float)Math.sin(2.0 * Math.PI * acNotePhase) * acPluckEnv;
-
-                     float musSample = (s + acLayer) * effVol;
+                     float musSample = s * effVol;
                      mixL[i] += musSample;
                      mixR[i] += musSample;
                      musicPos += mStep;
-                     if (musicPos >= mlen) {
-                        musicPos -= mlen;
-                     }
                   }
                }
             }

@@ -968,6 +968,8 @@ final class Tests319 {
          check(SoundEngine.loadedSampleCount() >= 72, "Soundbank loaded >= 72 real sound effects & Animal Crossing tracks (" + SoundEngine.loadedSampleCount() + ")");
          check(SoundEngine.hasSample("step_grass_1") && SoundEngine.hasSample("dig_stone_1") && SoundEngine.hasSample("break_block_1") && SoundEngine.hasSample("tnt_explode"), "Real surface footsteps, block dig/break, and explosion samples loaded");
          check(SoundEngine.hasSample("ac_morning") && SoundEngine.hasSample("ac_afternoon") && SoundEngine.hasSample("ac_sunset") && SoundEngine.hasSample("ac_night") && SoundEngine.hasSample("ac_rain") && SoundEngine.hasSample("ac_snow") && SoundEngine.hasSample("ac_kk_bossa") && SoundEngine.hasSample("ac_cafe"), "All 8 Animal Crossing hourly, weather, and K.K. Slider tracks loaded");
+         SoundEngine.Sample morningSample = SoundEngine.getSample("ac_morning");
+         check(morningSample != null && morningSample.pcm.length >= morningSample.sampleRate * 80, "Animal Crossing tracks are full-length (>80s, not truncated)");
 
          // Verify Animal Crossing dynamic music selection by screen, time of day, and weather
          bwGame.screen = Game.S.TITLE;

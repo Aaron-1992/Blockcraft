@@ -5258,7 +5258,7 @@ public final class Game {
             int var22 = Blocks.isWater(var21) ? 283 : 284;
             this.world.setBlock(var19.x, var19.y, var19.z, 0);
             this.meshNow(var19.x, var19.y, var19.z);
-            SoundEngine.play3D(this.world, Blocks.isWater(var21) ? "water_flow" : "lava_pop", var19.x + 0.5, var19.y + 0.5, var19.z + 0.5, 0.85F, 1.0F);
+            SoundEngine.play3D(this.world, Blocks.isWater(var21) ? "step_water_1" : "lava_fizz", var19.x + 0.5, var19.y + 0.5, var19.z + 0.5, 0.80F, 1.0F);
             var1.n--;
             if (var1.n <= 0) {
                this.inv[this.sel] = new Stack(var22, 1);
@@ -5338,7 +5338,7 @@ public final class Game {
          if (var16 >= 0 && var16 <= 255 && Blocks.replaceable[this.world.getBlock(var15, var16, var17)]) {
             this.world.setBlock(var15, var16, var17, var2 == 283 ? 50 : 58);
             this.meshNow(var15, var16, var17);
-            SoundEngine.play3D(this.world, var2 == 283 ? "water_flow" : "lava_pop", var15 + 0.5, var16 + 0.5, var17 + 0.5, 0.85F, 1.0F);
+            SoundEngine.play3D(this.world, var2 == 283 ? "step_water_1" : "lava_fizz", var15 + 0.5, var16 + 0.5, var17 + 0.5, 0.80F, 1.0F);
             if (!this.player.creative) {
                this.inv[this.sel] = new Stack(282, 1);
             }

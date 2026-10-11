@@ -734,13 +734,15 @@ public final class Weather {
       b.top = baseAlt(s.storm(x, z)) + 16.0;
       b.life = 22;
       b.seg = boltGeometry(this.rnd.nextLong(), x, b.top, z, b.ground);
-      SoundEngine.play3DMoving(this.world, "thunder", x, b.ground, z, 0.0, 0.0, 0.0, 1.8F, 0.88F + this.rnd.nextFloat() * 0.16F, true);
       Game g = this.world == null ? null : this.world.game;
       if (allowEffects && g != null && g.player != null) {
          double dx = x - g.player.x;
          double dz = z - g.player.z;
          if (dx * dx + dz * dz < 140.0 * 140.0 && this.world.isLoaded((int)Math.floor(x), (int)Math.floor(z))) {
             b.real = true;
+            if (g.pano == null) {
+               SoundEngine.play3DMoving(this.world, "thunder", x, b.ground, z, 0.0, 0.0, 0.0, 1.8F, 0.88F + this.rnd.nextFloat() * 0.16F, true);
+            }
             this.strikeEffects(g, (int)Math.floor(x), gy, (int)Math.floor(z));
          }
       }
