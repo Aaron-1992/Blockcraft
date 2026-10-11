@@ -58,9 +58,12 @@ public final class SkyGen extends Gen {
    private static final int[] bwBotRespawnTicks = new int[8];
    /** Bedwars AI bridge progress per team (0..32 blocks outward from base). */
    private static final int[] bwTeamBridgeStep = new int[4];
-   /** Per-bot Golden Apple heal count & Ender Pearl cooldown indexed by (bot.netId & 31). */
+   /** Per-bot Golden Apple heal count, Ender Pearl cooldown, Gear Tier & Looting state indexed by (bot.netId & 31). */
    private static final int[] botHealsUsed = new int[32];
    private static final int[] botPearlCooldown = new int[32];
+   private static final int[] botGearTier = new int[32];
+   private static final int[] botResources = new int[32];
+   private static final int[] botHoldingBlockTicks = new int[32];
 
    // Battle Item Sets / Kits & Tumble Weapon Modes
    public static final String[] SW_KIT_NAMES = new String[]{"Normal", "High Power", "Archer", "Pyro"};
@@ -155,6 +158,9 @@ public final class SkyGen extends Gen {
       Arrays.fill(bwTeamBridgeStep, 0);
       Arrays.fill(botHealsUsed, 0);
       Arrays.fill(botPearlCooldown, 0);
+      Arrays.fill(botGearTier, 0);
+      Arrays.fill(botResources, 0);
+      Arrays.fill(botHoldingBlockTicks, 0);
       myKills = 0;
       myDeaths = 0;
       myBedsBroken = 0;
@@ -1645,6 +1651,9 @@ public final class SkyGen extends Gen {
       if (w == null) {
          return;
       }
+      if (!sbIslandStocked[0]) {
+         w.ensureArenaChunksLoaded();
+      }
       // Stock supply chest at (3, Y_DECK + 1, 0) with Tumble Shovels & Snowballs
       if (!sbIslandStocked[0] && putChestItems(
          w, 3, Y_DECK + 1, 0,
@@ -1679,6 +1688,9 @@ public final class SkyGen extends Gen {
    }
 
    public static void stockSkywarsChests(Game g, World w, boolean refill) {
+      if (w != null && !swIslandStocked[0]) {
+         w.ensureArenaChunksLoaded();
+      }
       if (refill) {
          Arrays.fill(swIslandStocked, false);
       }
@@ -1769,7 +1781,10 @@ public final class SkyGen extends Gen {
       int bx = BEDWARS_BASES[t][0];
       int bz = BEDWARS_BASES[t][1];
       if (g.world != null) {
-         g.world.getBlock(bx, Y_DECK, bz);
+         g.world.ensureChunkLoaded(bx >> 4, bz >> 4);
+         if (g.world.getBlock(bx, Y_DECK, bz) == 0) {
+            g.world.setBlock(bx, Y_DECK, bz, Blocks.STONEBRICK);
+         }
       }
       double ox = role == 0 ? 0.5 : -0.5;
       double oz = role == 0 ? -0.5 : 0.5;
@@ -1778,10 +1793,16 @@ public final class SkyGen extends Gen {
          String bName = BOT_NAMES[(t * 2 + role) % BOT_NAMES.length];
          bot.teamTag = "Team:" + BEDWARS_NAMES[t] + ":" + role + ":" + bName;
          bot.variant = role;
+         int bSlot = Math.abs(bot.netId) & 31;
+         botHealsUsed[bSlot] = 0;
+         botPearlCooldown[bSlot] = 0;
       }
    }
 
    public static void stockBedwarsWorld(Game g, World w) {
+      if (w != null && !bwBaseStocked[0]) {
+         w.ensureArenaChunksLoaded();
+      }
       // Center Emerald Chest (slot 4)
       if (!bwBaseStocked[4] && putChestItems(
          w, 0, Y_DECK + 1, 0,
@@ -1894,21 +1915,27 @@ public final class SkyGen extends Gen {
          return Items.toolId(1, Items.C_SWORD);
       }
       int type = w.settings.type;
+      int bSlot = Math.abs(bot.netId) & 31;
       if (type == WorldSettings.TUMBLE) {
          return (tumbleWeaponMode % 3) == 2 ? Blocks.SNOW : Items.toolId(4, Items.C_SHOVEL);
       }
       if (type == WorldSettings.BEDWARS) {
+         int t = Math.max(0, botTeamIndex(bot));
          int role = bot.variant & 1;
-         if (role == 1 && bot.age % 80 < 25) {
-            int t = Math.max(0, botTeamIndex(bot));
+         if (botHoldingBlockTicks[bSlot] > 0 || (role == 1 && bot.age % 70 < 18)) {
             return Blocks.WOOL0 + BEDWARS_COLORS[t];
          }
-         return Items.toolId(Math.min(3, 1 + (bot.age > 1200 ? 1 : 0)), Items.C_SWORD);
+         int tier = Math.min(4, 1 + Math.max(botGearTier[bSlot], bot.age > 1200 ? 1 : 0));
+         return Items.toolId(tier, Items.C_SWORD);
+      }
+      if (botHoldingBlockTicks[bSlot] > 0) {
+         return Blocks.STONEBRICK;
       }
       if (bot.type == Mobs.SKELETON) {
          return Items.BOW;
       }
-      return Items.toolId(Math.min(4, 1 + Math.max(0, bot.variant)), Items.C_SWORD);
+      int tier = Math.min(4, 1 + Math.max(bot.variant, botGearTier[bSlot]));
+      return Items.toolId(tier, Items.C_SWORD);
    }
 
    public static void drawBotPlayer(Mobs.Mob bot, World w, Renderer r, float partial, double x, double y, double z) {
@@ -1986,6 +2013,183 @@ public final class SkyGen extends Gen {
       return false;
    }
 
+   /** Returns true if chest at (cx, cy, cz) exists and still has at least one item stack inside. */
+   private static boolean hasChestItemsAt(World w, int cx, int cy, int cz) {
+      int id = w.getBlock(cx, cy, cz);
+      if (id != Blocks.CHEST && id != Blocks.CHEST_LOOT) {
+         return false;
+      }
+      TileEntity te = w.tileAt(cx, cy, cz);
+      if (te == null || te.slots == null) {
+         return id == Blocks.CHEST_LOOT;
+      }
+      for (Stack st : te.slots) {
+         if (st != null && st.n > 0) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   /** Consumes up to 3 item stacks from chest at (cx, cy, cz) and upgrades the bot's gear tier & health. */
+   private static void lootChestAt(Mobs.Mob bot, World w, int cx, int cy, int cz) {
+      int bSlot = Math.abs(bot.netId) & 31;
+      TileEntity te = w.getOrCreateTile(cx, cy, cz);
+      int taken = 0;
+      if (te != null && te.slots != null) {
+         for (int i = 0; i < te.slots.length && taken < 3; i++) {
+            if (te.slots[i] != null && te.slots[i].n > 0) {
+               te.slots[i] = null;
+               taken++;
+            }
+         }
+      }
+      bot.variant = Math.min(3, bot.variant + 1);
+      botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
+      botResources[bSlot] += 4;
+      bot.health = Math.min(20, bot.health + 4);
+      bot.attackAnim = 8;
+      SoundEngine.play3D(w, "chest_open", cx + 0.5, cy + 0.5, cz + 0.5, 0.72F, 1.0F);
+   }
+
+   /**
+    * Evaluates the bot's surroundings for safety (no enemy within dangerRadius, solid footing beneath) and,
+    * when safe, scans for nearby dropped generator/loot items or unlooted chests to collect!
+    * Returns a [targetX, targetY, targetZ] loot waypoint if safe looting is in progress, or null otherwise.
+    */
+   private static double[] trySmartLootSurroundings(
+      Mobs mobs, Mobs.Mob bot, World w, Player player, int myBotTeam, double nearestEnemyDist, double enemyX, double enemyZ
+   ) {
+      // 1. Surroundings safety check: never stop to loot if an enemy is within 7.5 blocks or if falling!
+      if (nearestEnemyDist < 7.5 || !bot.onGround) {
+         return null;
+      }
+      int bSlot = Math.abs(bot.netId) & 31;
+
+      // 2. Scan for nearby dropped items (Emeralds, Diamonds, Gold, Iron, Wool, Weapons) on safe ground
+      World.Item bestItem = null;
+      double bestItemScore = 999.0;
+      for (World.Item it : w.items) {
+         if (it == null || it.dead || it.count <= 0) {
+            continue;
+         }
+         double d = Math.hypot(it.x - bot.x, it.z - bot.z);
+         if (d > 13.5 || Math.abs(it.y - bot.y) > 4.5) {
+            continue;
+         }
+         // Check if an enemy is closer to the item (unsafe to contest!)
+         if (Math.hypot(it.x - enemyX, it.z - enemyZ) < 5.5) {
+            continue;
+         }
+         if (!hasFootingAt(w, (int)Math.floor(it.x), (int)Math.floor(it.y), (int)Math.floor(it.z))) {
+            continue;
+         }
+         double priority = d;
+         if (it.id == Items.EMERALD || it.id == Items.DIAMOND || it.id == Redstone319.GOLDEN_APPLE) {
+            priority -= 5.0; // High priority for Emeralds, Diamonds & Golden Apples!
+         } else if (it.id == Items.GOLD_INGOT || it.id == Items.ENDER_PEARL) {
+            priority -= 3.0;
+         }
+         if (priority < bestItemScore) {
+            bestItemScore = priority;
+            bestItem = it;
+         }
+      }
+      if (bestItem != null) {
+         double dItem = Math.hypot(bestItem.x - bot.x, bestItem.z - bot.z);
+         if (dItem <= 1.95) {
+            // Pick up the item!
+            int id = bestItem.id;
+            int cnt = bestItem.count;
+            bestItem.dead = true;
+            bot.attackAnim = 6;
+            botResources[bSlot] += cnt;
+            if (id == Items.EMERALD || id == Items.DIAMOND) {
+               botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
+               if (w.settings.type == WorldSettings.BEDWARS && myBotTeam >= 0 && botResources[bSlot] >= 4) {
+                  unlockNextTeamUpgrade(mobs.g, myBotTeam, true);
+               }
+            } else if (id == Items.GOLD_INGOT && botResources[bSlot] >= 6) {
+               botGearTier[bSlot] = Math.min(3, Math.max(botGearTier[bSlot], 2));
+            }
+            SoundEngine.play3D(w, "item_pop", bot.x, bot.y + 1.0, bot.z, 0.55F, 1.15F);
+         } else {
+            return new double[]{bestItem.x, bestItem.y, bestItem.z};
+         }
+      }
+
+      // 3. Scan nearby surroundings (within 9 blocks) for unlooted Chests on safe ground
+      int bbx = (int)Math.floor(bot.x);
+      int bby = (int)Math.floor(bot.y);
+      int bbz = (int)Math.floor(bot.z);
+      int bestCx = 0, bestCy = -1, bestCz = 0;
+      double bestChestD = 999.0;
+      for (int dz = -9; dz <= 9; dz++) {
+         for (int dx = -9; dx <= 9; dx++) {
+            for (int dy = -2; dy <= 3; dy++) {
+               int cx = bbx + dx;
+               int cy = bby + dy;
+               int cz = bbz + dz;
+               if (hasChestItemsAt(w, cx, cy, cz)) {
+                  double d = Math.hypot(cx + 0.5 - bot.x, cz + 0.5 - bot.z);
+                  if (d < bestChestD && Math.hypot(cx + 0.5 - enemyX, cz + 0.5 - enemyZ) > 6.0) {
+                     bestChestD = d;
+                     bestCx = cx;
+                     bestCy = cy;
+                     bestCz = cz;
+                  }
+               }
+            }
+         }
+      }
+      if (bestCy >= 0) {
+         if (bestChestD <= 2.55) {
+            lootChestAt(bot, w, bestCx, bestCy, bestCz);
+         } else {
+            return new double[]{bestCx + 0.5, bestCy, bestCz + 0.5};
+         }
+      }
+      return null;
+   }
+
+   /**
+    * Dynamically places a 2-wide bridge at Y_DECK (or current deck height) along the bot's path toward (tx, tz)
+    * whenever there is open void ahead, allowing AI bots to bridge to Center, Diamond Islands, and ANY Enemy Bed!
+    */
+   private static void bridgeTowardTarget(Mobs.Mob bot, World w, double tx, double tz, int bridgeBlockId) {
+      double dx = tx - bot.x;
+      double dz = tz - bot.z;
+      double dist = Math.hypot(dx, dz);
+      if (dist < 1.8) {
+         return;
+      }
+      double ux = dx / dist;
+      double uz = dz / dist;
+      int bSlot = Math.abs(bot.netId) & 31;
+      int bridgeY = Y_DECK;
+      int perpX = Math.abs(ux) >= Math.abs(uz) ? 0 : 1;
+      int perpZ = Math.abs(ux) >= Math.abs(uz) ? 1 : 0;
+
+      // Ensure footing directly under the bot and 1..2 blocks ahead along (ux, uz)
+      for (int step = 0; step <= 2; step++) {
+         int bx = (int)Math.floor(bot.x + ux * step * 0.95);
+         int bz = (int)Math.floor(bot.z + uz * step * 0.95);
+         if (!hasFootingAt(w, bx, (int)Math.floor(bot.y), bz)) {
+            if (w.chunkAt(bx, bz) != null && w.getBlock(bx, bridgeY, bz) == 0) {
+               w.setBlock(bx, bridgeY, bz, bridgeBlockId);
+               bot.attackAnim = 6;
+               botHoldingBlockTicks[bSlot] = 14;
+               SoundEngine.playBlockPlace(w, bridgeBlockId, bx, bridgeY, bz);
+            }
+            int sx = bx + perpX;
+            int sz = bz + perpZ;
+            if (w.chunkAt(sx, sz) != null && w.getBlock(sx, bridgeY, sz) == 0) {
+               w.setBlock(sx, bridgeY, sz, bridgeBlockId);
+            }
+         }
+      }
+   }
+
    /** Steers a minigame bot toward (tx, tz) while climbing steps/terraces, using Slime Jump Pads, and parkour-jumping gaps! */
    private static void steerBotSafely(Mobs.Mob bot, World w, double tx, double tz, BotIntent out, double baseSpeed) {
       steerBotSafely3D(bot, w, tx, bot.y, tz, out, baseSpeed);
@@ -2046,40 +2250,40 @@ public final class SkyGen extends Gen {
          bot.vy = Mobs.JUMP;
       }
 
-      // Check footing 1.5 blocks ahead; if missing, check if 2.8 blocks ahead has footing (parkour jump!) or scan left/right angles
-      double fx1 = bot.x - Math.sin(rad) * 1.4;
-      double fz1 = bot.z + Math.cos(rad) * 1.4;
-      boolean nearOk = hasFootingAt(w, (int)Math.floor(fx1), by, (int)Math.floor(fz1));
-      if (!nearOk) {
-         double fxJump = bot.x - Math.sin(rad) * 2.9;
-         double fzJump = bot.z + Math.cos(rad) * 2.9;
-         if (bot.onGround && dist > 2.0 && hasFootingAt(w, (int)Math.floor(fxJump), by, (int)Math.floor(fzJump))) {
-            bot.vy = Mobs.JUMP * 1.08;
-            nearOk = true;
-         } else {
-            // Scan alternative steering angles (+/- 30, 60, 95, 135 deg) to stay on bridges/islands
-            float[] offsets = new float[]{30.0F, -30.0F, 60.0F, -60.0F, 95.0F, -95.0F, 135.0F, -135.0F};
-            for (float off : offsets) {
-               float candYaw = desiredYaw + off;
-               double crad = Math.toRadians(candYaw);
-               int cx = (int)Math.floor(bot.x - Math.sin(crad) * 1.6);
-               int cz = (int)Math.floor(bot.z + Math.cos(crad) * 1.6);
-               if (hasFootingAt(w, cx, by, cz)) {
-                  desiredYaw = candYaw;
-                  nearOk = true;
-                  break;
-               }
+      // Surroundings-aware multi-angle raycast: score candidate angles by continuous footing (1..3 blocks ahead) & target alignment!
+      float[] offsets = new float[]{0.0F, 22.0F, -22.0F, 45.0F, -45.0F, 70.0F, -70.0F, 95.0F, -95.0F, 130.0F, -130.0F};
+      float bestYaw = desiredYaw;
+      int bestSafetyScore = -1;
+      for (float off : offsets) {
+         float candYaw = desiredYaw + off;
+         double crad = Math.toRadians(candYaw);
+         double sx = -Math.sin(crad);
+         double sz = Math.cos(crad);
+         boolean ok1 = hasFootingAt(w, (int)Math.floor(bot.x + sx * 1.15), by, (int)Math.floor(bot.z + sz * 1.15));
+         boolean ok2 = hasFootingAt(w, (int)Math.floor(bot.x + sx * 2.15), by, (int)Math.floor(bot.z + sz * 2.15));
+         boolean ok3 = hasFootingAt(w, (int)Math.floor(bot.x + sx * 3.10), by, (int)Math.floor(bot.z + sz * 3.10));
+         if (ok1) {
+            int score = 100 - (int)(Math.abs(off) * 0.65F) + (ok2 ? 35 : 0) + (ok3 ? 20 : 0);
+            if (score > bestSafetyScore) {
+               bestSafetyScore = score;
+               bestYaw = candYaw;
             }
+         } else if (Math.abs(off) <= 25.0F && bot.onGround && dist > 2.2 && (ok2 || ok3)) {
+            // Parkour jump across a 1-2 block gap with confirmed landing on the far side!
+            bot.vy = Mobs.JUMP * 1.08;
+            bestSafetyScore = 90;
+            bestYaw = candYaw;
+            break;
          }
       }
 
-      if (!nearOk) {
+      if (bestSafetyScore < 0) {
          bot.dirYaw = Mobs.wrap(desiredYaw + 180.0F);
          out.moving = false;
          return;
       }
-      bot.dirYaw = desiredYaw;
-      out.headYaw = desiredYaw;
+      bot.dirYaw = bestYaw;
+      out.headYaw = bestYaw;
       out.moving = true;
       out.speedMul = baseSpeed;
    }
@@ -2130,6 +2334,9 @@ public final class SkyGen extends Gen {
       int botSlot = Math.abs(bot.netId) & 31;
       if (botPearlCooldown[botSlot] > 0) {
          botPearlCooldown[botSlot]--;
+      }
+      if (botHoldingBlockTicks[botSlot] > 0) {
+         botHoldingBlockTicks[botSlot]--;
       }
 
       // Tactical Golden Apple Self-Healing: Battle & Bedwars bots eat a Golden Apple when HP <= 10!
@@ -2258,49 +2465,10 @@ public final class SkyGen extends Gen {
       }
 
       // ====================================================================
-      //  2. BATTLE AI: Multi-Level Chest Looting, Jump Pads, Lead Bow & Crit Combos
+      //  2. BATTLE AI: Surroundings-Aware Chest/Item Looting, Dynamic Bridging, Lead Bow & Crit Combos
       // ====================================================================
       if (mode == WorldSettings.BATTLE) {
-         // During Grace Period (first 15s) or before looting a chest, rush to nearest chest & equip gear!
-         if (battleGraceTicks > 0 || (bot.variant == 0 && bot.age < 260)) {
-            double cx = 0.5;
-            double cz = 0.5;
-            if (Math.hypot(bot.x, bot.z) > 22.0) {
-               // Rush toward nearest mid-ring chest or center feast chest
-               double bestC = 999.0;
-               for (int[] m : SKYWARS_MIDS) {
-                  double d = Math.hypot(bot.x - m[0], bot.z - m[1]);
-                  if (d < bestC) {
-                     bestC = d;
-                     cx = m[0] + 0.5;
-                     cz = m[1] + 0.5;
-                  }
-               }
-               if (Math.hypot(bot.x - cx, bot.z - cz) < 2.4) {
-                  bot.variant = Math.max(bot.variant, 1);
-                  bot.attackAnim = 6;
-                  cx = 0.5;
-                  cz = 0.5;
-               }
-            } else if (Math.hypot(bot.x, bot.z) < 3.6 && bot.variant < 2) {
-               bot.variant = 2; // Looted central feast!
-               bot.health = Math.min(24, bot.health + 4);
-               bot.attackAnim = 8;
-               SoundEngine.play3D(w, "chest_open", bot.x, bot.y + 1.0, bot.z, 0.65F, 1.0F);
-            }
-            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, cx, cz);
-            steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.24);
-            return out;
-         }
-
-         // Showdown active: if outside center courtyard, urgently sprint to center!
-         if (showdownActive && Math.hypot(bot.x, bot.z) > 16.0) {
-            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, 0.5, 0.5);
-            steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.34);
-            return out;
-         }
-
-         // Free-For-All Target Acquisition: nearest human player OR rival BattleBot!
+         // Scan surroundings for nearest human player OR rival BattleBot first so the bot knows if it is safe to loot!
          Mobs.Mob rivalBot = null;
          double targX = 0.5;
          double targY = Y_DECK + 1.0;
@@ -2338,7 +2506,49 @@ public final class SkyGen extends Gen {
             }
          }
 
+         // Check surroundings: if it is safe (or during Grace Period), loot nearby chests & dropped items!
+         double effectiveEnemyDist = battleGraceTicks > 0 ? 999.0 : bestDist;
+         double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, effectiveEnemyDist, targX, targZ);
+         if (lootGoal != null) {
+            double[] wpLoot = nextArenaBridgeWaypoint(w, bot.x, bot.z, lootGoal[0], lootGoal[2]);
+            bridgeTowardTarget(bot, w, wpLoot[0], wpLoot[1], Blocks.STONEBRICK);
+            steerBotSafely3D(bot, w, wpLoot[0], lootGoal[1], wpLoot[1], out, 1.24);
+            return out;
+         }
+
+         // During Grace Period (first 15s) or if unequipped (variant == 0) and safe, advance toward Mid / Center Feast chests!
+         if (battleGraceTicks > 0 || (bot.variant == 0 && bestDist > 10.0)) {
+            double cx = 0.5;
+            double cz = 0.5;
+            if (Math.hypot(bot.x, bot.z) > 22.0 && Math.abs(Math.abs(bot.x) - Math.abs(bot.z)) > 8.0) {
+               double bestC = 999.0;
+               for (int[] m : SKYWARS_MIDS) {
+                  if (hasChestItemsAt(w, m[0], Y_DECK + 1, m[1])) {
+                     double d = Math.hypot(bot.x - m[0], bot.z - m[1]);
+                     if (d < bestC) {
+                        bestC = d;
+                        cx = m[0] + 0.5;
+                        cz = m[1] + 0.5;
+                     }
+                  }
+               }
+            }
+            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, cx, cz);
+            bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
+            steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.24);
+            return out;
+         }
+
+         // Showdown active: if outside center courtyard, urgently sprint & bridge to center!
+         if (showdownActive && Math.hypot(bot.x, bot.z) > 16.0) {
+            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, 0.5, 0.5);
+            bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
+            steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.34);
+            return out;
+         }
+
          double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, targX, targZ);
+         bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
          boolean isArcher = bot.type == Mobs.SKELETON;
          if (isArcher && bestDist < 11.5 && bestDist > 3.5 && wp[0] == targX && wp[1] == targZ) {
             // Archer strafes at mid-range and seeks high ground while firing bow
@@ -2372,7 +2582,7 @@ public final class SkyGen extends Gen {
 
          // Combat execution (Melee Crit Sword/Axe or Lead-Predicted Ranged Bow against BOTH Player and Rival Bots!)
          boolean isCrit = !bot.onGround && bot.vy < -0.05;
-         int dmg = 3 + Math.min(2, Math.max(0, bot.variant)) + (isCrit ? 1 : 0);
+         int dmg = 3 + Math.min(3, Math.max(bot.variant, botGearTier[botSlot])) + (isCrit ? 1 : 0);
          if (bestDist < 2.25 && Math.abs(targY - bot.y) < 2.4 && bot.cd <= 0) {
             bot.cd = 16;
             bot.attackAnim = 8;
@@ -2406,84 +2616,19 @@ public final class SkyGen extends Gen {
       }
 
       // ====================================================================
-      //  3. BEDWARS AI: 2-Layer Bed Defense, Staircase Bridging, TNT Raiding & Team Combat
+      //  3. BEDWARS AI: Surroundings-Safe Resource/Chest Looting, Dynamic Bridging & Multi-Team Bed Raiding
       // ====================================================================
       if (mode == WorldSettings.BEDWARS) {
          int myBotTeam = botTeamIndex(bot);
          if (myBotTeam < 0 || myBotTeam >= 4) {
             return null;
          }
-         int role = bot.variant & 1; // 0 = Defender / Engineer, 1 = Bridger / Bed Raider
+         int role = bot.variant & 1; // 0 = Defender / Support Raider, 1 = Primary Bridger / Bed Raider
          int woolId = Blocks.WOOL0 + BEDWARS_COLORS[myBotTeam];
          int baseX = BEDWARS_BASES[myBotTeam][0];
          int baseZ = BEDWARS_BASES[myBotTeam][1];
 
-         // 3a. Defender Bot (#0): Fortifies own team Bed with 2-layer End Stone + Team Wool defense shell!
-         if (role == 0 && isTeamBedIntact(w, myBotTeam) && bot.age % 22 == 5) {
-            int[] bf = getTeamBedFoot(myBotTeam);
-            int[] bh = getTeamBedHead(myBotTeam);
-            int[][] innerShell = new int[][]{
-               {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
-               {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
-               {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
-            };
-            boolean placed = false;
-            for (int[] co : innerShell) {
-               if (w.chunkAt(co[0], co[2]) != null && w.getBlock(co[0], co[1], co[2]) == 0) {
-                  int defBlock = bot.age > 400 ? Blocks.END_STONE : woolId;
-                  w.setBlock(co[0], co[1], co[2], defBlock);
-                  bot.attackAnim = 6;
-                  SoundEngine.playBlockPlace(w, defBlock, co[0], co[1], co[2]);
-                  placed = true;
-                  break;
-               }
-            }
-            if (!placed && bot.age > 600) {
-               // Outer Wool layer on top of End Stone shell
-               int[][] outerCap = new int[][]{{bf[0], bf[1] + 2, bf[2]}, {bh[0], bh[1] + 2, bh[2]}};
-               for (int[] co : outerCap) {
-                  if (w.chunkAt(co[0], co[2]) != null && w.getBlock(co[0], co[1], co[2]) == 0) {
-                     w.setBlock(co[0], co[1], co[2], woolId);
-                     bot.attackAnim = 6;
-                     SoundEngine.playBlockPlace(w, woolId, co[0], co[1], co[2]);
-                     break;
-                  }
-               }
-            }
-         }
-
-         // 3b. Bridger / Raider Bot (#1): Actively builds a 2-wide Team Wool bridge with stepped arches toward Center!
-         if (role == 1 && bot.age % 12 == 0) {
-            int dirX = Integer.compare(0, baseX);
-            int dirZ = Integer.compare(0, baseZ);
-            int step = bwTeamBridgeStep[myBotTeam];
-            if (step < 30) {
-               int brX = baseX + dirX * (6 + step);
-               int brZ = baseZ + dirZ * (6 + step);
-               int archY = (step >= 10 && step <= 18) ? 1 : 0;
-               if (w.chunkAt(brX, brZ) != null) {
-                  if (w.getBlock(brX, Y_DECK, brZ) == 0) {
-                     w.setBlock(brX, Y_DECK, brZ, woolId);
-                     bot.attackAnim = 6;
-                     SoundEngine.playBlockPlace(w, woolId, brX, Y_DECK, brZ);
-                  }
-                  if (archY > 0 && w.getBlock(brX, Y_DECK + archY, brZ) == 0) {
-                     w.setBlock(brX, Y_DECK + archY, brZ, woolId);
-                  }
-                  int sideX = brX + (dirX == 0 ? 1 : 0);
-                  int sideZ = brZ + (dirZ == 0 ? 1 : 0);
-                  if (w.getBlock(sideX, Y_DECK, sideZ) == 0) {
-                     w.setBlock(sideX, Y_DECK, sideZ, woolId);
-                  }
-                  if (archY > 0 && w.getBlock(sideX, Y_DECK + archY, sideZ) == 0) {
-                     w.setBlock(sideX, Y_DECK + archY, sideZ, woolId);
-                  }
-                  bwTeamBridgeStep[myBotTeam] = step + 1;
-               }
-            }
-         }
-
-         // 3c. Scan for nearby enemy player or enemy team bot
+         // 3a. Scan surroundings for nearby enemy player or enemy team bot first so the bot knows threat proximity!
          int humanTeam = mobs.g != null ? getPlayerTeam(mobs.g) : 0;
          Mobs.Mob enemyBot = null;
          double enemyX = baseX + 0.5;
@@ -2519,81 +2664,187 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // Defender (#0) stays within 16 blocks of base unless its bed is broken; Raider (#1) advances along bridges toward enemy beds!
+         // 3b. Defender Bot (#0): Fortifies own team Bed with 2-layer End Stone + Team Wool defense shell when near base!
+         boolean ownBedIntact = isTeamBedIntact(w, myBotTeam);
+         boolean ownBedFortified = true;
+         if (ownBedIntact) {
+            int[] bf = getTeamBedFoot(myBotTeam);
+            int[] bh = getTeamBedHead(myBotTeam);
+            int[][] innerShell = new int[][]{
+               {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
+               {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
+               {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
+            };
+            for (int[] co : innerShell) {
+               if (w.getBlock(co[0], co[1], co[2]) == 0) {
+                  ownBedFortified = false;
+                  if (role == 0 && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.0 && bot.age % 16 == 3) {
+                     int defBlock = (bot.age > 360 || botGearTier[botSlot] >= 2) ? Blocks.END_STONE : woolId;
+                     w.setBlock(co[0], co[1], co[2], defBlock);
+                     bot.attackAnim = 6;
+                     botHoldingBlockTicks[botSlot] = 12;
+                     SoundEngine.playBlockPlace(w, defBlock, co[0], co[1], co[2]);
+                  }
+                  break;
+               }
+            }
+         }
+
+         // 3c. Background bridge progression from team base toward Center (0, 0) so routes open up steadily
+         if (role == 1 && bot.age % 10 == 0) {
+            int dirX = Integer.compare(0, baseX);
+            int dirZ = Integer.compare(0, baseZ);
+            int step = bwTeamBridgeStep[myBotTeam];
+            if (step < 32) {
+               int brX = baseX + dirX * (6 + step);
+               int brZ = baseZ + dirZ * (6 + step);
+               if (w.chunkAt(brX, brZ) != null) {
+                  if (w.getBlock(brX, Y_DECK, brZ) == 0) {
+                     w.setBlock(brX, Y_DECK, brZ, woolId);
+                     bot.attackAnim = 6;
+                     botHoldingBlockTicks[botSlot] = 10;
+                     SoundEngine.playBlockPlace(w, woolId, brX, Y_DECK, brZ);
+                  }
+                  int sideX = brX + (dirX == 0 ? 1 : 0);
+                  int sideZ = brZ + (dirZ == 0 ? 1 : 0);
+                  if (w.getBlock(sideX, Y_DECK, sideZ) == 0) {
+                     w.setBlock(sideX, Y_DECK, sideZ, woolId);
+                  }
+                  bwTeamBridgeStep[myBotTeam] = step + 1;
+               }
+            }
+         }
+
+         // 3d. Surroundings-Safe Looting: if no enemy is threatening (enemyDist > 8.5), collect nearby generator drops or chests!
+         if (enemyDist > 8.5) {
+            double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, myBotTeam, enemyDist, enemyX, enemyZ);
+            if (lootGoal != null && (role == 0 || Math.hypot(lootGoal[0] - bot.x, lootGoal[2] - bot.z) <= 8.0)) {
+               bridgeTowardTarget(bot, w, lootGoal[0], lootGoal[2], woolId);
+               steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.22);
+               return out;
+            }
+         }
+
+         // 3e. Decide Strategic Objective: Defend Base vs Raid Enemy Beds!
          double goalX = baseX + 0.5;
+         double goalY = Y_DECK + 1.0;
          double goalZ = baseZ + 0.5;
-         if (role == 0 && isTeamBedIntact(w, myBotTeam)) {
-            if (enemyDist <= 16.0) {
+
+         // Check if an enemy is invading our team's base right now
+         int[] ownBf = getTeamBedFoot(myBotTeam);
+         boolean baseUnderAttack = ownBedIntact && Math.hypot(enemyX - ownBf[0], enemyZ - ownBf[2]) <= 15.0;
+
+         if (role == 0 && ownBedIntact && (!ownBedFortified || baseUnderAttack)) {
+            if (baseUnderAttack || enemyDist <= 14.0) {
                goalX = enemyX;
+               goalY = enemyY;
                goalZ = enemyZ;
             } else {
-               int[] bf = getTeamBedFoot(myBotTeam);
-               double patrolAng = (bot.age * 0.04) + myBotTeam;
-               goalX = bf[0] + 0.5 + Math.cos(patrolAng) * 2.5;
-               goalZ = bf[2] + 0.5 + Math.sin(patrolAng) * 2.5;
+               double patrolAng = (bot.age * 0.05) + myBotTeam;
+               goalX = ownBf[0] + 0.5 + Math.cos(patrolAng) * 2.2;
+               goalZ = ownBf[2] + 0.5 + Math.sin(patrolAng) * 2.2;
             }
          } else {
-            // Raider (#1) or Defender whose bed is gone: target nearest intact enemy Bed, or nearest enemy fighter!
+            // Raider (#1), or Defender (#0) whose bed is already fortified or destroyed: actively go for Enemy Beds!
             int targetBedTeam = -1;
-            double bestBedD = 999.0;
+            double bestBedScore = 999.0;
             for (int t = 0; t < 4; t++) {
                if (t != myBotTeam && isTeamBedIntact(w, t)) {
                   int[] bf = getTeamBedFoot(t);
-                  double d = Math.hypot(bf[0] - bot.x, bf[2] - bot.z);
-                  if (d < bestBedD) {
-                     bestBedD = d;
+                  double d = Math.hypot(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z);
+                  // Slight priority bonus for raiding the human player's bed or the closest intact enemy bed
+                  double score = d - (t == humanTeam ? 8.0 : 0.0);
+                  if (score < bestBedScore) {
+                     bestBedScore = score;
                      targetBedTeam = t;
                   }
                }
             }
-            if (enemyDist <= 9.0) {
+
+            if (enemyDist <= 7.0) {
+               // Immediate threat in melee/close range: engage enemy fighter!
                goalX = enemyX;
+               goalY = enemyY;
                goalZ = enemyZ;
             } else if (targetBedTeam >= 0) {
                int[] bf = getTeamBedFoot(targetBedTeam);
-               // Route via center island (0, 0) if on different axis
-               if (Math.hypot(bot.x, bot.z) > 12.0 && (bot.x * bf[0] + bot.z * bf[2]) <= 0.0) {
+               int[] bh = getTeamBedHead(targetBedTeam);
+               double distToBed = Math.min(
+                  Math.hypot(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z),
+                  Math.hypot(bh[0] + 0.5 - bot.x, bh[2] + 0.5 - bot.z)
+               );
+               double distToCenter = Math.hypot(bot.x, bot.z);
+               boolean inTargetCorridor = (bf[0] == 0 && Math.abs(bot.x) <= 6.5 && (bot.z * bf[2]) >= -4.0)
+                  || (bf[2] == 0 && Math.abs(bot.z) <= 6.5 && (bot.x * bf[0]) >= -4.0);
+
+               // Safe Cardinal Routing: Base -> Center (0, 0) -> Target Enemy Base!
+               if (distToCenter > 10.5 && !inTargetCorridor) {
                   goalX = 0.5;
                   goalZ = 0.5;
                } else {
                   goalX = bf[0] + 0.5;
                   goalZ = bf[2] + 0.5;
                }
-               // If Raider has reached the enemy Bed, mine any defense block and destroy the enemy Bed!
-               if (bestBedD <= 3.2 && bot.cd <= 0) {
-                  bot.cd = 25;
+
+               // If within 4.8 blocks of the enemy Bed, mine through any defense blocks and destroy the Bed!
+               if (distToBed <= 4.8 && bot.cd <= 0) {
+                  bot.cd = 20;
                   bot.attackAnim = 8;
-                  int coverId = w.getBlock(bf[0], bf[1] + 1, bf[2]);
-                  if (coverId != 0 && !Decor315.isBed(coverId)) {
-                     if (mobs.g != null) {
-                        mobs.g.spawnBreakParticles(bf[0], bf[1] + 1, bf[2], coverId, 8);
+                  out.headYaw = Mobs.angleTo(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z);
+                  out.headPitch = 22.0F;
+                  int[][] defenseChecks = new int[][]{
+                     {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
+                     {bf[0], bf[1] + 2, bf[2]}, {bh[0], bh[1] + 2, bh[2]},
+                     {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
+                     {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
+                  };
+                  boolean minedDefense = false;
+                  for (int[] dc : defenseChecks) {
+                     int cid = w.getBlock(dc[0], dc[1], dc[2]);
+                     if (cid != 0 && !Decor315.isBed(cid) && cid != Blocks.BEDROCK) {
+                        if (mobs.g != null) {
+                           mobs.g.spawnBreakParticles(dc[0], dc[1], dc[2], cid, 8);
+                        }
+                        SoundEngine.playBlockBreak(w, cid, dc[0], dc[1], dc[2]);
+                        w.setBlock(dc[0], dc[1], dc[2], 0);
+                        minedDefense = true;
+                        break;
                      }
-                     SoundEngine.playBlockBreak(w, coverId, bf[0], bf[1] + 1, bf[2]);
-                     w.setBlock(bf[0], bf[1] + 1, bf[2], 0);
-                  } else {
+                  }
+                  if (!minedDefense) {
                      SoundEngine.playBlockBreak(w, Blocks.PLANKS, bf[0], bf[1], bf[2]);
                      onBedDestroyed(mobs.g, w, targetBedTeam, botDisplayName(bot), true);
                   }
                }
             } else if (enemyDist < 200.0) {
-               goalX = enemyX;
-               goalZ = enemyZ;
+               // All enemy beds are broken: hunt down remaining enemy players/bots via Center!
+               double distToCenter = Math.hypot(bot.x, bot.z);
+               if (distToCenter > 11.0 && (bot.x * enemyX + bot.z * enemyZ) <= 0.0) {
+                  goalX = 0.5;
+                  goalZ = 0.5;
+               } else {
+                  goalX = enemyX;
+                  goalY = enemyY;
+                  goalZ = enemyZ;
+               }
             }
          }
 
-         steerBotSafely(bot, w, goalX, goalZ, out, 1.18);
+         // Dynamically build Team Wool bridges across any void gap along our route to (goalX, goalZ)!
+         bridgeTowardTarget(bot, w, goalX, goalZ, woolId);
+         steerBotSafely3D(bot, w, goalX, goalY, goalZ, out, 1.22);
 
          // Melee combat against enemy player or enemy team bot
-         if (enemyDist < 2.2 && Math.abs(enemyY - bot.y) < 2.2 && bot.cd <= 0) {
-            bot.cd = 18;
+         if (enemyDist < 2.35 && Math.abs(enemyY - bot.y) < 2.4 && bot.cd <= 0) {
+            bot.cd = 16;
             bot.attackAnim = 8;
-            int dmg = 3 + (hasTeamSharpness(myBotTeam) ? 2 : 0);
+            int dmg = 3 + Math.min(2, botGearTier[botSlot]) + (hasTeamSharpness(myBotTeam) ? 2 : 0);
             SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
             SoundEngine.playHit(w, enemyX, enemyY + 1.0, enemyZ, false);
             if (enemyIsPlayer && mobs.g != null) {
                mobs.g.damagePlayer(dmg, bot.x, bot.z);
             } else if (enemyBot != null) {
-               mobs.hurtMob(enemyBot, dmg, bot.x, bot.z, 0.4, false);
+               mobs.hurtMob(enemyBot, dmg, bot.x, bot.z, 0.42, false);
             }
          }
          return out;
@@ -2635,12 +2886,8 @@ public final class SkyGen extends Gen {
       if (g == null || w == null || w.settings == null || !w.settings.isMinigame()) {
          return;
       }
-      // Keep arena chunks (-3..3, -3..3) warming while players wait in the lobby
-      for (int cz = -3; cz <= 3; cz++) {
-         for (int cx = -3; cx <= 3; cx++) {
-            w.getBlock(cx * 16 + 8, Y_DECK, cz * 16 + 8);
-         }
-      }
+      // Ensure all 9x9 arena chunks (-4..4 x -4..4) are generated and resident while players wait in the lobby
+      w.ensureArenaChunksLoaded();
       if (showingOverview) {
          if (overviewCountdownTicks > 0) {
             overviewCountdownTicks--;
@@ -2812,8 +3059,10 @@ public final class SkyGen extends Gen {
                      bwBotRespawnTicks[slot] = 0;
                   } else if (--bwBotRespawnTicks[slot] == 0) {
                      spawnBedwarsTeamBot(g, team, role);
+                     String bName = BOT_NAMES[(team * 2 + role) % BOT_NAMES.length];
+                     g.say("\u00a77[Bedwars] " + BEDWARS_CODES[team] + "[" + BEDWARS_NAMES[team].toUpperCase() + "] " + bName + " \u00a77has respawned at " + BEDWARS_NAMES[team] + " Base!");
                   }
-               } else if (w.tickCount % 20L == 0L && bwBaseStocked[team] && isTeamBedIntact(w, team)) {
+               } else if (w.tickCount % 10L == 0L && bwBaseStocked[team] && isTeamBedIntact(w, team)) {
                   // Watchdog: if an enemy team's bed is intact and its role bot died/vanished without a running timer, respawn it!
                   boolean alive = false;
                   for (Mobs.Mob m : g.mobs.list) {
@@ -2823,7 +3072,7 @@ public final class SkyGen extends Gen {
                      }
                   }
                   if (!alive) {
-                     bwBotRespawnTicks[slot] = 80; // Respawn in 4 seconds
+                     bwBotRespawnTicks[slot] = 60; // Respawn in 3 seconds
                   }
                }
             }

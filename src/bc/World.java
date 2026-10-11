@@ -243,6 +243,7 @@ public final class World {
    }
 
    public void updateChunks(int var1, int var2, int var3, int var4, long var5) {
+      boolean isVoidArena = this.settings != null && this.settings.isVoidMode();
       int var7 = this.requested.size();
       int var8 = genThreads() * 4;
       long var9 = System.nanoTime();
@@ -273,7 +274,8 @@ public final class World {
          }
 
          this.requested.remove(key(var22.cx, var22.cz));
-         if (Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
+         boolean inArenaBounds = isVoidArena && Math.abs(var22.cx) <= 4 && Math.abs(var22.cz) <= 4;
+         if (inArenaBounds || Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
             this.chunks.put(key(var22.cx, var22.cz), var22);
             this.fire.scanChunk(var22);
             this.lightChunk(var22);
@@ -292,6 +294,9 @@ public final class World {
       }
 
       for (Chunk var23 : this.chunks.values()) {
+         if (isVoidArena && Math.abs(var23.cx) <= 4 && Math.abs(var23.cz) <= 4) {
+            continue; // Never unload active minigame arena chunks (-4..4 x -4..4)
+         }
          if (Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3) {
             if (var23.modified) {
                this.saveChunk(var23);
@@ -301,6 +306,40 @@ public final class World {
             var23.unloaded = true;
             if (this.unloadHook != null) {
                this.unloadHook.accept(var23);
+            }
+         }
+      }
+   }
+
+   /** Synchronously ensures that chunk (cx, cz) is generated, lit, and resident in this.chunks. */
+   public Chunk ensureChunkLoaded(int cx, int cz) {
+      Chunk existing = this.chunk(cx, cz);
+      if (existing != null) {
+         return existing;
+      }
+      long k = key(cx, cz);
+      this.requested.remove(k);
+      Chunk fresh = this.gen.generate(cx, cz);
+      fresh.modified = false;
+      fresh.unloaded = false;
+      Net319.applyEditsToChunk(this, fresh);
+      this.chunks.put(k, fresh);
+      this.lightChunk(fresh);
+      for (Section s : fresh.sections) {
+         s.dirty = true;
+      }
+      return fresh;
+   }
+
+   /** Ensures all 9x9 minigame arena chunks (-4..4 x -4..4) are resident so AI bots, beds, and chests never unload. */
+   public void ensureArenaChunksLoaded() {
+      if (this.settings == null || !this.settings.isVoidMode()) {
+         return;
+      }
+      for (int cz = -4; cz <= 4; cz++) {
+         for (int cx = -4; cx <= 4; cx++) {
+            if (this.chunk(cx, cz) == null) {
+               this.ensureChunkLoaded(cx, cz);
             }
          }
       }

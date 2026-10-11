@@ -1,1 +1,1 @@
-v4.2-ai-respawn-fix-vertical-arenas-lod-scaling
+v4.2-ai-surroundings-looting-bridging-respawn-fix

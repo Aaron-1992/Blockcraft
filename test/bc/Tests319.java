@@ -1110,16 +1110,39 @@ final class Tests319 {
          SkyGen.enterInterRoundLobby(bwGame);
          check(!SkyGen.showingOverview && SkyGen.lobbyCountdownTicks > 0, "Transitioning from Overview enters Inter-Round Waiting Lobby with active countdown");
 
+         // Verify all 9x9 arena chunks stay permanently loaded even at minimum Render Distance (RD=2)
+         bwGame.world.updateChunks(0, -3, 2, 4);
+         check(bwGame.world.chunk(0, 3) != null && bwGame.world.chunk(-3, 0) != null && bwGame.world.chunk(3, 0) != null,
+            "All enemy Bedwars base chunks stay resident regardless of player render distance");
+
          // Verify Bedwars AI Bot Respawn when Bed is Intact vs Permanent Elimination when Bed is Destroyed
          SkyGen.startMatch(bwGame, false);
          Mobs.Mob blueBot = null;
+         Mobs.Mob blueRaider = null;
          for (Mobs.Mob m : bwGame.mobs.list) {
             if (SkyGen.botTeamIndex(m) == 1 && (m.variant & 1) == 0) {
                blueBot = m;
-               break;
+            } else if (SkyGen.botTeamIndex(m) == 1 && (m.variant & 1) == 1) {
+               blueRaider = m;
             }
          }
-         check(blueBot != null, "Blue Team Defender AI bot spawned at match start");
+         check(blueBot != null && blueRaider != null, "Blue Team Defender and Raider AI bots spawned at match start");
+
+         // Verify AI surroundings-safe item looting & dynamic bridge building toward enemy beds
+         bwGame.world.dropItem(blueRaider.x + 1.0, blueRaider.y, blueRaider.z, Items.EMERALD, 2);
+         for (int tick = 0; tick < 25; tick++) {
+            bwGame.world.tickCount++;
+            bwGame.mobs.tick();
+            SkyGen.tickMode(bwGame, bwGame.world);
+         }
+         boolean pickedUpEmerald = true;
+         for (World.Item it : bwGame.world.items) {
+            if (it != null && !it.dead && it.id == Items.EMERALD && Math.hypot(it.x - blueRaider.x, it.z - blueRaider.z) < 2.5) {
+               pickedUpEmerald = false;
+            }
+         }
+         check(pickedUpEmerald, "AI bot safely loots nearby dropped Emerald when no enemy is threatening");
+
          bwGame.mobs.hurtMob(blueBot, 100, 0.0, 0.0, 0.0, true);
          check(blueBot.dead, "Blue Team Defender AI bot died from fatal damage");
          for (int tick = 0; tick < 105; tick++) {
