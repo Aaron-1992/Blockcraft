@@ -210,6 +210,9 @@ public final class Mobs {
                   if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
                      this.tickMob(var5, var1, var2, var3);
                      if (var5.y < -20.0) {
+                        if (SkyGen.isMinigameBot(var5)) {
+                           SkyGen.onBotKilled(this.g, var5);
+                        }
                         this.list.remove(var4);
                      }
                   }
@@ -393,7 +396,15 @@ public final class Mobs {
          double var24 = Math.sqrt(var22 * var22 + var20 * var20);
          float var26 = var1.yaw;
          float var27 = 0.0F;
-         switch (var1.type) {
+         if (SkyGen.isMinigameBot(var1)) {
+            SkyGen.BotIntent bi = SkyGen.tickBotAI(this, var1, var2, var3);
+            if (bi != null) {
+               var12 = bi.moving;
+               var13 *= bi.speedMul;
+               var26 = bi.headYaw;
+               var27 = bi.headPitch;
+            }
+         } else switch (var1.type) {
             case 4:
                if (var15 && var24 < 24.0) {
                   var1.hasTarget = true;
@@ -722,13 +733,17 @@ public final class Mobs {
    }
 
    void shoot(Mobs.Mob var1, Player var2) {
+      this.shootAtPos(var1, var2.x, var2.y + 1.2, var2.z);
+   }
+
+   void shootAtPos(Mobs.Mob var1, double tx, double ty, double tz) {
       Mobs.Arrow var3 = new Mobs.Arrow();
       var3.x = var1.x;
       var3.y = var1.y + 1.5;
       var3.z = var1.z;
-      double var4 = var2.x - var3.x;
-      double var6 = var2.y + 1.2 - var3.y;
-      double var8 = var2.z - var3.z;
+      double var4 = tx - var3.x;
+      double var6 = ty - var3.y;
+      double var8 = tz - var3.z;
       double var10 = Math.sqrt(var4 * var4 + var8 * var8);
       var6 += var10 * 0.12;
       double var12 = Math.sqrt(var4 * var4 + var6 * var6 + var8 * var8);
@@ -961,7 +976,7 @@ public final class Mobs {
             if (var9) {
                this.g.adv.killed(this.g, var1); // Update 3.12: advancements
                if (this.g.world != null && this.g.world.settings != null && this.g.world.settings.isMinigame() && hostile(var1.type)) {
-                  SkyGen.onArenaKill(this.g, var1.teamTag != null && !var1.teamTag.isEmpty() ? var1.teamTag : NAME[var1.type]);
+                  SkyGen.onArenaKill(this.g, SkyGen.botDisplayName(var1));
                }
             }
          }
@@ -975,6 +990,9 @@ public final class Mobs {
    void kill(Mobs.Mob var1) {
       var1.dead = true;
       var1.deathTime = 0;
+      if (SkyGen.isMinigameBot(var1)) {
+         SkyGen.onBotKilled(this.g, var1);
+      }
       World var2 = this.g.world;
       boolean var3 = var1.burn > 0;
       if (var1.babyAge > 0) {

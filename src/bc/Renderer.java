@@ -2061,10 +2061,16 @@ public final class Renderer {
          double var5 = var4.x + var4.vx * var1;
          double var7 = var4.y + var4.vy * var1;
          double var9 = var4.z + var4.vz * var1;
+         double dx = var5 - this.camX;
+         double dy = var7 - this.camY;
+         double dz = var9 - this.camZ;
+         if (dx * dx + dy * dy + dz * dz > 4096.0 || !this.visible((float)dx, (float)dy + 0.25F, (float)dz, 0.65F)) {
+            continue;
+         }
          float var11 = this.brightnessAt(var2, var5, var7 + 0.2, var9);
          float var12 = (float)(Math.sin((var4.age + var1) / 10.0) * 0.1 + 0.1);
          GL11.glPushMatrix();
-         GL11.glTranslated(var5 - this.camX, var7 - this.camY + 0.25 + var12, var9 - this.camZ);
+         GL11.glTranslated(dx, dy + 0.25 + var12, dz);
          GL11.glRotatef(var4.spin + var1 * 3.0F, 0.0F, 1.0F, 0.0F);
          float var13 = Blocks.isBlockId(var4.id) && Blocks.kind[var4.id] == 0 ? 0.25F : 0.35F;
          if (Items.isItem(var4.id)) {
@@ -2085,13 +2091,19 @@ public final class Renderer {
          double fx = Double.isNaN(var15.px) ? var15.x : var15.px + (var15.x - var15.px) * var1;
          double fy = Double.isNaN(var15.px) ? var15.y : var15.py + (var15.y - var15.py) * var1;
          double fz = Double.isNaN(var15.px) ? var15.z : var15.pz + (var15.z - var15.pz) * var1;
+         double fdx = fx - this.camX;
+         double fdy = fy - this.camY;
+         double fdz = fz - this.camZ;
+         if (fdx * fdx + fdy * fdy + fdz * fdz > 6400.0 || !this.visible((float)fdx, (float)fdy + 0.5F, (float)fdz, 0.85F)) {
+            continue;
+         }
          float var16 = this.brightnessAt(var2, fx, fy + 0.5, fz);
          if (var15.fuse > 0 && var15.fuse / 5 % 2 == 0) {
             var16 = 3.0F;
          }
 
          GL11.glPushMatrix();
-         GL11.glTranslated(fx - this.camX, fy - this.camY + 0.5, fz - this.camZ);
+         GL11.glTranslated(fdx, fdy + 0.5, fdz);
          if (var15.fuse > 0 && var15.fuse < 10) {
             // (the swelling of a TNT about to blow used to be applied before the translation, which also scaled its position)
             float var6 = 1.0F + (10 - var15.fuse) * 0.03F;

@@ -1,10 +1,21 @@
 package bc;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import org.lwjgl.opengl.GL11;
 
 /**
- * World generator and full gameplay engine for {@link WorldSettings#SKYBLOCK}, {@link WorldSettings#SKYWARS},
- * and {@link WorldSettings#BEDWARS} (Update 4.1).
+ * World generator and full gameplay & AI engine for {@link WorldSettings#TUMBLE}, {@link WorldSettings#BATTLE},
+ * and {@link WorldSettings#BEDWARS} (Update 4.2).
  */
 public final class SkyGen extends Gen {
    public static final int Y_DECK = 64;
@@ -19,6 +30,16 @@ public final class SkyGen extends Gen {
    public static volatile int swKit = 0;
    public static volatile int myKills = 0;
    public static volatile int myDeaths = 0;
+   /** Optional custom prebuilt map folder name inside maps/<name> or saves/<name>. */
+   public static volatile String customMapName = null;
+
+   public static final String[] BOT_NAMES = new String[]{
+      "Valkyrie", "BlazeKing", "Shadow", "Frostbite", "Nova", "Titan", "Aegis", "Zephyr"
+   };
+   /** Bedwars AI respawn timers: [team * 2 + roleIdx] -> ticks until respawn (0 = alive or permanently eliminated). */
+   private static final int[] bwBotRespawnTicks = new int[8];
+   /** Bedwars AI bridge progress per team (0..32 blocks outward from base). */
+   private static final int[] bwTeamBridgeStep = new int[4];
 
    // Battle Item Sets / Kits & Tumble Weapon Modes
    public static final String[] SW_KIT_NAMES = new String[]{"Normal", "High Power", "Archer", "Pyro"};
@@ -107,6 +128,8 @@ public final class SkyGen extends Gen {
       Arrays.fill(bedKnownIntact, true);
       Arrays.fill(teamUpgrades, 0);
       Arrays.fill(trapCooldown, 0);
+      Arrays.fill(bwBotRespawnTicks, 0);
+      Arrays.fill(bwTeamBridgeStep, 0);
       myKills = 0;
       myDeaths = 0;
       lobbyCountdownTicks = -1;
@@ -714,8 +737,85 @@ public final class SkyGen extends Gen {
          generateBedwars(ch);
       }
 
+      loadCustomChunkIfPresent(ch);
       ch.computeHeightmap();
       return ch;
+   }
+
+   /** If a custom prebuilt map folder is active (or a matching folder in maps/ exists), overlays its saved chunk blocks. */
+   private void loadCustomChunkIfPresent(Chunk ch) {
+      File dir = resolvePrebuiltMapDir(this.mode, this.mapId);
+      if (dir == null) {
+         return;
+      }
+      File cf = new File(dir, "c." + ch.cx + "." + ch.cz + ".gz");
+      if (!cf.isFile()) {
+         return;
+      }
+      try (DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new FileInputStream(cf))))) {
+         Chunk.readBlocks(in, ch.blocks);
+      } catch (Exception ignored) {
+      }
+   }
+
+   public static File resolvePrebuiltMapDir(int mode, int mapId) {
+      if (customMapName != null && !customMapName.isBlank()) {
+         File f1 = new File("maps/" + customMapName);
+         if (f1.isDirectory()) {
+            return f1;
+         }
+         File f2 = new File("saves/" + customMapName);
+         if (f2.isDirectory()) {
+            return f2;
+         }
+      }
+      String modeSlug = mode == WorldSettings.TUMBLE ? "tumble" : (mode == WorldSettings.BEDWARS ? "bedwars" : "battle");
+      String mapSlug = WorldSettings.MAP_NAMES[Math.max(0, Math.min(WorldSettings.MAP_COUNT - 1, mapId))].toLowerCase();
+      File autoDir = new File("maps/" + modeSlug + "_" + mapSlug);
+      if (autoDir.isDirectory()) {
+         return autoDir;
+      }
+      return null;
+   }
+
+   public static boolean saveCustomArenaMap(World w, String name) {
+      if (w == null || name == null || name.isBlank()) {
+         return false;
+      }
+      String safe = name.trim().replaceAll("[^a-zA-Z0-9_\\-]", "_");
+      File dir = new File("maps/" + safe);
+      dir.mkdirs();
+      int saved = 0;
+      for (Chunk ch : w.chunks.values()) {
+         if (ch == null) {
+            continue;
+         }
+         File cf = new File(dir, "c." + ch.cx + "." + ch.cz + ".gz");
+         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(cf))))) {
+            Chunk.writeBlocks(out, ch.blocks);
+            saved++;
+         } catch (Exception e) {
+            return false;
+         }
+      }
+      return saved > 0;
+   }
+
+   public static ArrayList<String> listCustomMaps() {
+      ArrayList<String> res = new ArrayList<>();
+      File dir = new File("maps");
+      if (dir.isDirectory()) {
+         File[] children = dir.listFiles();
+         if (children != null) {
+            Arrays.sort(children, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+            for (File f : children) {
+               if (f.isDirectory()) {
+                  res.add(f.getName());
+               }
+            }
+         }
+      }
+      return res;
    }
 
    private static void setW(Chunk ch, int wx, int wy, int wz, int id) {
@@ -728,7 +828,7 @@ public final class SkyGen extends Gen {
    }
 
    private void generateSkyblock(Chunk ch) {
-      // Console Edition TUMBLE Mini Game: 3 destructible layers suspended over a boiling Lava Cauldron inside a themed Colosseum!
+      // Console Edition TUMBLE Mini Game with 4 Geometrically & Architecturally Distinct Maps!
       int minX = ch.cx * 16;
       int minZ = ch.cz * 16;
       if (minX > 32 || minX + 15 < -32 || minZ > 32 || minZ + 15 < -32) {
@@ -752,55 +852,115 @@ public final class SkyGen extends Gen {
          for (int lx = 0; lx < 16; lx++) {
             int wx = minX + lx;
             double d = Math.hypot(wx, wz);
+            int ax = Math.abs(wx);
+            int az = Math.abs(wz);
+            int maxC = Math.max(ax, az);
             int ring = ((int)Math.floor(d / 3.2)) & 3;
             int checker = (wx + wz) & 1;
 
-            // 1. Boiling Lava Cauldron at Y_DECK - 14 over Bedrock floor at Y_DECK - 15
-            if (d <= 22.2) {
+            // 1. Boiling Lava Cauldron at Y_DECK - 14 over Bedrock floor at Y_DECK - 15 + Map-Specific Colosseum Architecture
+            boolean inColosseum = this.mapId == WorldSettings.MAP_TEMPLE ? (maxC <= 21) : (d <= 22.2);
+            boolean inLavaBasin = this.mapId == WorldSettings.MAP_TEMPLE ? (maxC <= 19) : (d <= 20.8);
+            if (inColosseum) {
                setW(ch, wx, Y_DECK - 15, wz, Blocks.BEDROCK);
-               if (d <= 20.8) {
+               if (inLavaBasin) {
                   setW(ch, wx, Y_DECK - 14, wz, Blocks.LAVA);
                   setW(ch, wx, Y_DECK - 13, wz, Blocks.LAVA);
                } else {
-                  for (int y = Y_DECK - 14; y <= Y_DECK + 5; y++) {
+                  int wallTop = this.mapId == WorldSettings.MAP_TEMPLE ? (Y_DECK + 7 - (maxC - 20) * 2) : (Y_DECK + 5);
+                  for (int y = Y_DECK - 14; y <= wallTop; y++) {
                      setW(ch, wx, y, wz, (y == Y_DECK + 1 || y == Y_DECK - 5 || y == Y_DECK - 10) ? trimMat : wallMat);
                   }
                   if (((wx * 7 + wz * 13) & 7) == 0) {
-                     setW(ch, wx, Y_DECK + 6, wz, Blocks.GLOWSTONE);
+                     setW(ch, wx, wallTop + 1, wz, Blocks.GLOWSTONE);
                   }
                }
             }
+            // Cavern map: subterranean stalactite cavern dome overhead
+            if (this.mapId == WorldSettings.MAP_CAVERN && d <= 20.0 && ((wx * 17 + wz * 29) & 15) == 0) {
+               setW(ch, wx, Y_DECK + 11, wz, Blocks.STONE);
+               setW(ch, wx, Y_DECK + 10, wz, Blocks.MOSSY_COBBLE);
+               setW(ch, wx, Y_DECK + 9, wz, Blocks.GLOWSTONE);
+            }
 
-            // 2. Three Destructible Tumble Layers: Layer 1 (Y_DECK), Layer 2 (Y_DECK - 5), Layer 3 (Y_DECK - 10)
-            if (d <= 18.5) {
-               int b1;
-               int b2;
-               int b3;
-               switch (this.mapId) {
-                  case WorldSettings.MAP_CRUCIBLE -> {
-                     b1 = ring == 0 ? Blocks.NETHER_BRICKS : (ring == 1 ? Blocks.NETHERRACK : (checker == 0 ? Blocks.QUARTZ_ORE : Blocks.NETHERRACK));
-                     b2 = ring == 0 ? Blocks.GLOWSTONE : (ring == 1 ? Blocks.SOUL_SAND : Blocks.COAL_BLOCK);
-                     b3 = ring == 0 ? Blocks.OBSIDIAN : (checker == 0 ? Redstone319.REDSTONE_BLOCK : (Blocks.GLASS0 + 14));
+            // 2. Three Destructible Tumble Layers with Distinct Geometries per Map!
+            switch (this.mapId) {
+               case WorldSettings.MAP_CRUCIBLE -> {
+                  // Crucible: Volcanic Star / Spoked Hex-Plate Geometry with Magma Fissure Gaps!
+                  boolean onSpoke = ax <= 2 || az <= 2 || Math.abs(ax - az) <= 2;
+                  boolean hasL1 = d <= 11.5 || (d <= 18.2 && onSpoke) || (d >= 15.2 && d <= 18.2);
+                  boolean hasL2 = d <= 18.0 && !((ax == 6 || az == 6) && d > 8.5 && d < 14.5 && !onSpoke);
+                  boolean hasL3 = d <= 17.5 && (d <= 8.5 || d >= 10.2 || onSpoke);
+                  if (hasL1) {
+                     int b1 = ring == 0 ? Blocks.NETHER_BRICKS : (onSpoke ? Blocks.OBSIDIAN : (checker == 0 ? Blocks.QUARTZ_ORE : Blocks.NETHERRACK));
+                     setW(ch, wx, Y_DECK, wz, b1);
                   }
-                  case WorldSettings.MAP_CAVERN -> {
-                     b1 = ring == 0 ? Blocks313.MYCELIUM : (ring == 1 ? Blocks313.MUSH_BLOCK_RED : (ring == 2 ? Blocks313.MUSH_BLOCK_BROWN : Blocks.MOSSY_COBBLE));
-                     b2 = ring == 0 ? Blocks.DIAMOND_ORE : (ring == 1 ? Blocks.GOLD_ORE : (ring == 2 ? Blocks.IRON_ORE : Blocks.COAL_ORE));
-                     b3 = ring == 0 ? Blocks313.PACKED_ICE : (checker == 0 ? Blocks313.ICE : (Blocks.GLASS0 + 11));
+                  if (hasL2) {
+                     int b2 = ring == 0 ? Blocks.GLOWSTONE : (ring == 1 ? Blocks.SOUL_SAND : Blocks.COAL_BLOCK);
+                     setW(ch, wx, Y_DECK - 5, wz, b2);
                   }
-                  case WorldSettings.MAP_TEMPLE -> {
-                     b1 = ring == 0 ? Blocks.SNOW : (ring == 1 ? (Blocks.WOOL0 + 14) : (ring == 2 ? Blocks.WOOL0 : (Blocks.WOOL0 + 5)));
-                     b2 = ring == 0 ? Redstone319.SLIME_BLOCK : (ring == 1 ? Blocks.HAY_BALE : Blocks.SANDSTONE);
-                     b3 = ring == 0 ? Blocks.GOLD_BLOCK : (checker == 0 ? Redstone319.SEA_LANTERN : Blocks.GLASS);
-                  }
-                  default -> { // Cove / Classic Tumble
-                     b1 = (wx == 0 && wz == 0) ? Blocks.GRASS : (ring == 0 ? Blocks.GRASS : (ring == 1 ? Blocks313.COARSE_DIRT : (ring == 2 ? Blocks313.PODZOL : Blocks.PLANKS)));
-                     b2 = ring == 0 ? Redstone319.SEA_LANTERN : (ring == 1 ? Blocks.SANDSTONE : (ring == 2 ? Blocks313.RED_SANDSTONE : Blocks.CLAY));
-                     b3 = ring == 0 ? Blocks.DIAMOND_ORE : (ring == 1 ? Blocks.GOLD_ORE : (ring == 2 ? Blocks.IRON_ORE : Blocks.COBBLE));
+                  if (hasL3) {
+                     int b3 = ring == 0 ? Blocks.OBSIDIAN : (checker == 0 ? Redstone319.REDSTONE_BLOCK : (Blocks.GLASS0 + 14));
+                     setW(ch, wx, Y_DECK - 10, wz, b3);
                   }
                }
-               setW(ch, wx, Y_DECK, wz, b1);
-               setW(ch, wx, Y_DECK - 5, wz, b2);
-               setW(ch, wx, Y_DECK - 10, wz, b3);
+               case WorldSettings.MAP_CAVERN -> {
+                  // Cavern: 5 Overlapping Giant Mushroom Cap Discs (L1), Ore Quarry Ring (L2), Slippery Packed-Ice Rink (L3)!
+                  boolean centerCap = d <= 9.2;
+                  boolean lobeCap = Math.hypot(ax - 9, az - 9) <= 6.2 || Math.hypot(ax - 12, az) <= 5.2 || Math.hypot(ax, az - 12) <= 5.2;
+                  if (centerCap || lobeCap) {
+                     int b1 = centerCap
+                        ? (ring == 0 ? Blocks313.MYCELIUM : Blocks313.MUSH_BLOCK_RED)
+                        : (((wx > 0) ^ (wz > 0)) ? Blocks313.MUSH_BLOCK_BROWN : Blocks313.MUSH_BLOCK_RED);
+                     if (((ax + az) & 3) == 0 && d > 4.0) {
+                        b1 = Blocks313.MUSH_STEM;
+                     }
+                     setW(ch, wx, Y_DECK, wz, b1);
+                  }
+                  if (d <= 18.2 && !(d > 9.5 && d < 11.2 && ax > 2 && az > 2)) {
+                     int b2 = ring == 0 ? Blocks.DIAMOND_ORE : (ring == 1 ? Blocks.GOLD_ORE : (ring == 2 ? Blocks.IRON_ORE : Blocks.MOSSY_COBBLE));
+                     setW(ch, wx, Y_DECK - 5, wz, b2);
+                  }
+                  if (d <= 18.5) {
+                     int b3 = ring == 0 ? Blocks313.PACKED_ICE : (checker == 0 ? Blocks313.ICE : (Blocks.GLASS0 + 11));
+                     setW(ch, wx, Y_DECK - 10, wz, b3);
+                  }
+               }
+               case WorldSettings.MAP_TEMPLE -> {
+                  // Temple: Square/Mayan Stepped Pyramid Terraces with Bouncy Slime Trampolines on Layer 2!
+                  boolean sq1 = maxC <= 16 && (ax + az) <= 26;
+                  boolean sq2 = maxC <= 17 && !((ax == 9 || az == 9) && ax > 3 && az > 3);
+                  boolean sq3 = maxC <= 18;
+                  if (sq1) {
+                     int mRing = (maxC / 3) & 3;
+                     int b1 = mRing == 0 ? Blocks.GOLD_BLOCK : (mRing == 1 ? (Blocks.WOOL0 + 14) : (mRing == 2 ? Blocks.SANDSTONE : (Blocks.WOOL0 + 4)));
+                     setW(ch, wx, Y_DECK, wz, b1);
+                  }
+                  if (sq2) {
+                     int b2 = (ax <= 5 && az <= 5) || ((ax & 3) == 0 && (az & 3) == 0)
+                        ? Redstone319.SLIME_BLOCK
+                        : (checker == 0 ? Blocks.HAY_BALE : Blocks.SANDSTONE);
+                     setW(ch, wx, Y_DECK - 5, wz, b2);
+                  }
+                  if (sq3) {
+                     int b3 = (ax == az || ax == 0 || az == 0) ? Blocks.GOLD_BLOCK : (checker == 0 ? Redstone319.SEA_LANTERN : Blocks.GLASS);
+                     setW(ch, wx, Y_DECK - 10, wz, b3);
+                  }
+               }
+               default -> {
+                  // Cove: Shipwreck Wheel Spokes & Concentric Pirate Decks!
+                  boolean wheelGap = d > 9.8 && d < 12.2 && ax > 2 && az > 2 && Math.abs(ax - az) > 2;
+                  if (d <= 18.5 && !wheelGap) {
+                     int b1 = (wx == 0 && wz == 0) ? Blocks.GRASS : (ring == 0 ? Blocks.GRASS : (ring == 1 ? Blocks313.COARSE_DIRT : (ring == 2 ? Blocks313.PODZOL : Blocks.PLANKS)));
+                     setW(ch, wx, Y_DECK, wz, b1);
+                  }
+                  if (d <= 18.5) {
+                     int b2 = ring == 0 ? Redstone319.SEA_LANTERN : (ring == 1 ? Blocks.SANDSTONE : (ring == 2 ? Blocks313.RED_SANDSTONE : Blocks.PLANKS));
+                     int b3 = ring == 0 ? Blocks.DIAMOND_ORE : (ring == 1 ? Blocks.GOLD_ORE : (ring == 2 ? Blocks.IRON_ORE : Blocks.COBBLE));
+                     setW(ch, wx, Y_DECK - 5, wz, b2);
+                     setW(ch, wx, Y_DECK - 10, wz, b3);
+                  }
+               }
             }
          }
       }
@@ -811,11 +971,11 @@ public final class SkyGen extends Gen {
    }
 
    private void generateSkywars(Chunk ch) {
-      // Console Edition BATTLE Mini Game Arena with 4 distinct Maps: Cove (0), Crucible (1), Cavern (2), Temple (3)!
+      // Console Edition BATTLE Mini Game Arena with 4 Architecturally Distinct Maps: Cove (0), Crucible (1), Cavern (2), Temple (3)!
       int topId = switch (this.mapId) {
          case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHERRACK;
          case WorldSettings.MAP_CAVERN -> Blocks.MOSSY_COBBLE;
-         case WorldSettings.MAP_TEMPLE -> Blocks.GRASS;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
          default -> Blocks.GRASS;
       };
       int midId = switch (this.mapId) {
@@ -833,12 +993,68 @@ public final class SkyGen extends Gen {
       int bridgeId = switch (this.mapId) {
          case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
          case WorldSettings.MAP_CAVERN -> Blocks.STONEBRICK;
-         case WorldSettings.MAP_TEMPLE -> Blocks.MOSSY_COBBLE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
          default -> Blocks.PLANKS;
       };
 
-      // 1. Central Battle Courtyard / Shrine (radius 11.2)
-      buildConeIsland(ch, 0, 0, 11.2, 10, topId, midId, coreId, true);
+      // 1. Central Battle Courtyard / Map-Specific Centerpiece
+      buildConeIsland(ch, 0, 0, 11.5, 10, topId, midId, coreId, true);
+      if (this.mapId == WorldSettings.MAP_COVE) {
+         // Cove: Giant Pirate Galleon Ship Deck & Masts across the center island
+         for (int dz = -4; dz <= 4; dz++) {
+            for (int dx = -8; dx <= 8; dx++) {
+               if (Math.abs(dz) <= 3 || Math.abs(dx) <= 5) {
+                  setW(ch, dx, Y_DECK, dz, Blocks.PLANKS);
+                  if (Math.abs(dz) == 4 || Math.abs(dx) == 8) {
+                     setW(ch, dx, Y_DECK + 1, dz, Blocks.FENCE);
+                  }
+               }
+            }
+         }
+         for (int y = 1; y <= 7; y++) {
+            setW(ch, -5, Y_DECK + y, 0, Blocks.LOG_OAK);
+            setW(ch, 5, Y_DECK + y, 0, Blocks.LOG_OAK);
+         }
+         for (int sz = -3; sz <= 3; sz++) {
+            setW(ch, -5, Y_DECK + 5, sz, Blocks.WOOL0);
+            setW(ch, -5, Y_DECK + 6, sz, Blocks.WOOL0 + 14);
+            setW(ch, 5, Y_DECK + 5, sz, Blocks.WOOL0);
+            setW(ch, 5, Y_DECK + 6, sz, Blocks.WOOL0 + 14);
+         }
+      } else if (this.mapId == WorldSettings.MAP_CRUCIBLE) {
+         // Crucible: Nether Citadel Fortress with 4 Obsidian Corner Battlement Towers & Lava Channels
+         int[][] towers = new int[][]{{-6, -6}, {6, -6}, {-6, 6}, {6, 6}};
+         for (int[] t : towers) {
+            for (int y = 1; y <= 5; y++) {
+               setW(ch, t[0], Y_DECK + y, t[1], y == 5 ? Blocks.GLOWSTONE : Blocks.NETHER_BRICKS);
+               setW(ch, t[0] + (t[0] < 0 ? 1 : -1), Y_DECK + y, t[1], Blocks.OBSIDIAN);
+            }
+         }
+      } else if (this.mapId == WorldSettings.MAP_CAVERN) {
+         // Cavern: Central Glowing Crystal Geode & Upper Mushroom Canopy Ring
+         for (int ang = 0; ang < 8; ang++) {
+            int cx = (int)Math.round(Math.cos(ang * Math.PI / 4.0) * 7.0);
+            int cz = (int)Math.round(Math.sin(ang * Math.PI / 4.0) * 7.0);
+            for (int y = 1; y <= 4; y++) {
+               setW(ch, cx, Y_DECK + y, cz, y == 4 ? Blocks313.PACKED_ICE : Blocks.MOSSY_COBBLE);
+            }
+         }
+      } else if (this.mapId == WorldSettings.MAP_TEMPLE) {
+         // Temple: Stepped Aztec Ziggurat Terrace around the Central Shrine
+         for (int dz = -7; dz <= 7; dz++) {
+            for (int dx = -7; dx <= 7; dx++) {
+               int distM = Math.max(Math.abs(dx), Math.abs(dz));
+               if (distM >= 4 && distM <= 7 && Math.abs(dx) > 1 && Math.abs(dz) > 1) {
+                  int stepH = 8 - distM;
+                  for (int y = 1; y <= stepH; y++) {
+                     setW(ch, dx, Y_DECK + y, dz, y == stepH ? Blocks.GOLD_BLOCK : Blocks.SANDSTONE);
+                  }
+               }
+            }
+         }
+      }
+
+      // Central Feast Shrine (kept consistent across all maps for gameplay & test invariants)
       for (int dz = -2; dz <= 2; dz++) {
          for (int dx = -2; dx <= 2; dx++) {
             if (Math.abs(dx) == 2 && Math.abs(dz) == 2) {
@@ -860,7 +1076,7 @@ public final class SkyGen extends Gen {
       setW(ch, 0, Y_DECK + 1, -2, Blocks.CHEST_LOOT);
       setW(ch, 0, Y_DECK + 1, 2, Blocks.CHEST_LOOT);
 
-      // 2. Connected Console Edition Arena Walkways & Map Landmarks
+      // 2. Map-Specific Walkways, Bridges, Sunken Lagoons & Environmental Architecture
       int minX = ch.cx * 16;
       int minZ = ch.cz * 16;
       for (int lz = 0; lz < 16; lz++) {
@@ -868,35 +1084,52 @@ public final class SkyGen extends Gen {
          for (int lx = 0; lx < 16; lx++) {
             int wx = minX + lx;
             double d = Math.hypot(wx, wz);
-            // Cardinal and diagonal walkways connecting the 8 spawn podiums to the mid-ring and central chests
-            boolean cardinalBridge = (Math.abs(wx) <= 1 && Math.abs(wz) >= 10 && Math.abs(wz) <= 38)
-               || (Math.abs(wz) <= 1 && Math.abs(wx) >= 10 && Math.abs(wx) <= 38);
-            boolean diagBridge = Math.abs(Math.abs(wx) - Math.abs(wz)) <= 1 && Math.abs(wx) >= 8 && Math.abs(wx) <= 27;
-            boolean ringWalkway = d >= 22.5 && d <= 25.2;
+            int ax = Math.abs(wx);
+            int az = Math.abs(wz);
+            boolean cardinalBridge = (ax <= 1 && az >= 10 && az <= 38) || (az <= 1 && ax >= 10 && ax <= 38);
+            boolean diagBridge = Math.abs(ax - az) <= 1 && ax >= 8 && ax <= 27;
+            boolean ringWalkway = this.mapId == WorldSettings.MAP_TEMPLE
+               ? (Math.max(ax, az) >= 22 && Math.max(ax, az) <= 25)
+               : (d >= 22.5 && d <= 25.2);
             if (cardinalBridge || diagBridge || ringWalkway) {
                setW(ch, wx, Y_DECK - 1, wz, bridgeId);
-               if (this.mapId == WorldSettings.MAP_CRUCIBLE && ((wx + wz) & 7) == 0) {
+               if (this.mapId == WorldSettings.MAP_CRUCIBLE && ((wx + wz) & 3) == 0) {
                   setW(ch, wx, Y_DECK - 1, wz, Blocks.OBSIDIAN);
+               } else if (this.mapId == WorldSettings.MAP_TEMPLE && ((wx + wz) & 5) == 0) {
+                  setW(ch, wx, Y_DECK - 1, wz, Blocks.MOSSY_COBBLE);
                }
             }
-            // Map-specific environmental hazards & landmarks
-            if (this.mapId == WorldSettings.MAP_CRUCIBLE && d >= 12.0 && d <= 21.5 && !cardinalBridge && !diagBridge) {
+            // Map-specific lower basins & upper canopies
+            if (this.mapId == WorldSettings.MAP_COVE && d >= 11.5 && d <= 22.0 && !cardinalBridge && !diagBridge) {
+               // Sunken Pirate Lagoon with Coral/Sea-Lantern Reefs below the boardwalks
+               setW(ch, wx, Y_DECK - 5, wz, ((wx + wz) & 7) == 0 ? Redstone319.SEA_LANTERN : Blocks.SAND);
+               setW(ch, wx, Y_DECK - 4, wz, Blocks.WATER);
+            } else if (this.mapId == WorldSettings.MAP_CRUCIBLE && d >= 12.0 && d <= 21.5 && !cardinalBridge && !diagBridge) {
+               // Boiling Nether Lava Moat
                setW(ch, wx, Y_DECK - 5, wz, Blocks.NETHER_BRICKS);
                setW(ch, wx, Y_DECK - 4, wz, Blocks.LAVA);
-            } else if (this.mapId == WorldSettings.MAP_CAVERN && d <= 36.0 && ((wx * 19 + wz * 31) & 31) == 0) {
-               setW(ch, wx, Y_DECK + 11, wz, Blocks.STONE);
-               setW(ch, wx, Y_DECK + 10, wz, Blocks.COBBLE);
-               setW(ch, wx, Y_DECK + 9, wz, Blocks.GLOWSTONE);
+            } else if (this.mapId == WorldSettings.MAP_CAVERN && d <= 38.0) {
+               // Subterranean Cavern Ceiling Dome & Stalactites
+               int domeY = Y_DECK + 13 - (int)(d * 0.12);
+               if (((wx * 19 + wz * 31) & 7) == 0) {
+                  setW(ch, wx, domeY, wz, Blocks.STONE);
+                  if (((wx + wz) & 15) == 0) {
+                     setW(ch, wx, domeY - 1, wz, Blocks.GLOWSTONE);
+                  }
+               }
+            } else if (this.mapId == WorldSettings.MAP_TEMPLE && (ax == 14 || az == 14) && ax <= 14 && az <= 14 && ((wx + wz) & 3) == 0) {
+               // Ancient Jungle Ruin Arches
+               setW(ch, wx, Y_DECK, wz, Blocks.MOSSY_COBBLE);
+               setW(ch, wx, Y_DECK + 1, wz, Blocks.SANDSTONE);
             }
          }
       }
 
       // 3. 4 Mid-Ring Landmarks & Chests
       for (int[] m : SKYWARS_MIDS) {
-         buildConeIsland(ch, m[0], m[1], 4.5, 6, topId, midId, coreId, true);
+         buildConeIsland(ch, m[0], m[1], 4.8, 6, topId, midId, coreId, true);
          setW(ch, m[0], Y_DECK + 1, m[1], Blocks.CHEST_LOOT);
          if (this.mapId == WorldSettings.MAP_COVE) {
-            // Pirate Shipwreck Mast & Sail on Mid Islands
             for (int y = 1; y <= 5; y++) {
                setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks.LOG_OAK);
             }
@@ -905,11 +1138,11 @@ public final class SkyGen extends Gen {
                setW(ch, m[0] + 1 + sx, Y_DECK + 3, m[1] + 1, Blocks.WOOL0 + 14);
             }
          } else if (this.mapId == WorldSettings.MAP_CRUCIBLE) {
-            // Nether Blaze Brazier Towers
-            setW(ch, m[0] + 1, Y_DECK + 1, m[1] + 1, Blocks.NETHER_BRICKS);
-            setW(ch, m[0] + 1, Y_DECK + 2, m[1] + 1, Blocks.GLOWSTONE);
+            for (int y = 1; y <= 4; y++) {
+               setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks.NETHER_BRICKS);
+            }
+            setW(ch, m[0] + 1, Y_DECK + 5, m[1] + 1, Blocks.GLOWSTONE);
          } else if (this.mapId == WorldSettings.MAP_CAVERN) {
-            // Giant Glowing Cavern Mushrooms
             for (int y = 1; y <= 3; y++) {
                setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks313.MUSH_STEM);
             }
@@ -919,9 +1152,8 @@ public final class SkyGen extends Gen {
                }
             }
          } else if (this.mapId == WorldSettings.MAP_TEMPLE) {
-            // Stepped Jungle Temple Pillars with Vines
             for (int y = 1; y <= 4; y++) {
-               setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks.MOSSY_COBBLE);
+               setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks.SANDSTONE);
             }
             setW(ch, m[0] + 1, Y_DECK + 5, m[1] + 1, Blocks.GOLD_BLOCK);
          }
@@ -934,6 +1166,12 @@ public final class SkyGen extends Gen {
          buildConeIsland(ch, sx, sz, 4.6, 7, topId, midId, coreId, true);
          if (this.mapId == WorldSettings.MAP_COVE || this.mapId == WorldSettings.MAP_TEMPLE) {
             buildSmallOak(ch, sx - 2, Y_DECK + 1, sz - 1);
+         } else if (this.mapId == WorldSettings.MAP_CRUCIBLE) {
+            setW(ch, sx - 2, Y_DECK + 1, sz - 1, Blocks.NETHER_BRICKS);
+            setW(ch, sx - 2, Y_DECK + 2, sz - 1, Blocks.GLOWSTONE);
+         } else if (this.mapId == WorldSettings.MAP_CAVERN) {
+            setW(ch, sx - 2, Y_DECK + 1, sz - 1, Blocks313.MUSH_STEM);
+            setW(ch, sx - 2, Y_DECK + 2, sz - 1, Blocks313.MUSH_BLOCK_BROWN);
          }
          setW(ch, sx, Y_DECK, sz, Blocks.GOLD_BLOCK);
          setW(ch, sx + 2, Y_DECK + 1, sz, Blocks.CHEST_LOOT);
@@ -943,8 +1181,28 @@ public final class SkyGen extends Gen {
    }
 
    private void generateBedwars(Chunk ch) {
-      // 1. Central Emerald Generator Arena (radius 10.5)
-      buildConeIsland(ch, 0, 0, 10.5, 9, Blocks.STONEBRICK, Blocks.STONE, Blocks.COBBLE, false);
+      // BEDWARS with 4 Architecturally Distinct Maps: Cove (0), Crucible (1), Cavern (2), Temple (3)!
+      int centerTop = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
+         case WorldSettings.MAP_CAVERN -> Blocks.MOSSY_COBBLE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
+         default -> Blocks.STONEBRICK;
+      };
+      int centerMid = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.OBSIDIAN;
+         case WorldSettings.MAP_CAVERN -> Blocks.STONE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
+         default -> Blocks.STONE;
+      };
+      int baseFloor = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
+         case WorldSettings.MAP_CAVERN -> Blocks.MOSSY_COBBLE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
+         default -> Blocks.STONEBRICK;
+      };
+
+      // 1. Central Emerald Generator Arena (radius 10.5) with Map-Specific Landmarks
+      buildConeIsland(ch, 0, 0, 10.5, 9, centerTop, centerMid, Blocks.COBBLE, false);
       for (int dz = -2; dz <= 2; dz++) {
          for (int dx = -2; dx <= 2; dx++) {
             setW(ch, dx, Y_DECK, dz, (dx == 0 && dz == 0) ? Blocks.EMERALD_BLOCK : Blocks.QUARTZ_BLOCK);
@@ -956,11 +1214,45 @@ public final class SkyGen extends Gen {
       setW(ch, 4, Y_DECK + 3, 0, Blocks.GLOWSTONE);
       setW(ch, 0, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
 
+      if (this.mapId == WorldSettings.MAP_CRUCIBLE) {
+         int[][] pillars = new int[][]{{-6, -6}, {6, -6}, {-6, 6}, {6, 6}};
+         for (int[] p : pillars) {
+            for (int y = 1; y <= 4; y++) {
+               setW(ch, p[0], Y_DECK + y, p[1], y == 4 ? Blocks.GLOWSTONE : Blocks.OBSIDIAN);
+            }
+         }
+      } else if (this.mapId == WorldSettings.MAP_CAVERN) {
+         int[][] crystals = new int[][]{{-5, -5}, {5, -5}, {-5, 5}, {5, 5}};
+         for (int[] c : crystals) {
+            for (int y = 1; y <= 3; y++) {
+               setW(ch, c[0], Y_DECK + y, c[1], Blocks313.PACKED_ICE);
+            }
+            setW(ch, c[0], Y_DECK + 4, c[1], Blocks.GLOWSTONE);
+         }
+      } else if (this.mapId == WorldSettings.MAP_TEMPLE) {
+         int[][] obelisks = new int[][]{{-6, -6}, {6, -6}, {-6, 6}, {6, 6}};
+         for (int[] ob : obelisks) {
+            for (int y = 1; y <= 4; y++) {
+               setW(ch, ob[0], Y_DECK + y, ob[1], y == 4 ? Blocks.GOLD_BLOCK : Blocks.SANDSTONE);
+            }
+         }
+      }
+
       // 2. 4 Diamond Generator Islands
       for (int[] d : BEDWARS_DIAMONDS) {
-         buildConeIsland(ch, d[0], d[1], 4.2, 5, Blocks.STONEBRICK, Blocks.STONE, Blocks.COBBLE, false);
+         buildConeIsland(ch, d[0], d[1], 4.4, 5, centerTop, centerMid, Blocks.COBBLE, false);
          setW(ch, d[0], Y_DECK, d[1], Blocks.DIAMOND_BLOCK);
          setW(ch, d[0], Y_DECK + 3, d[1], Blocks.GLOWSTONE);
+         if (this.mapId == WorldSettings.MAP_CRUCIBLE) {
+            setW(ch, d[0] + 2, Y_DECK + 1, d[1] + 2, Blocks.NETHER_BRICKS);
+            setW(ch, d[0] + 2, Y_DECK + 2, d[1] + 2, Blocks.GLOWSTONE);
+         } else if (this.mapId == WorldSettings.MAP_CAVERN) {
+            setW(ch, d[0] + 2, Y_DECK + 1, d[1] + 2, Blocks313.MUSH_STEM);
+            setW(ch, d[0] + 2, Y_DECK + 2, d[1] + 2, Blocks313.MUSH_BLOCK_RED);
+         } else if (this.mapId == WorldSettings.MAP_TEMPLE) {
+            setW(ch, d[0] + 2, Y_DECK + 1, d[1] + 2, Blocks.SANDSTONE);
+            setW(ch, d[0] + 2, Y_DECK + 2, d[1] + 2, Blocks.GOLD_BLOCK);
+         }
       }
 
       // 3. 4 Symmetrical Team Bases (North=Red, South=Blue, West=Green, East=Yellow)
@@ -976,10 +1268,18 @@ public final class SkyGen extends Gen {
 
          for (int dz = -hd; dz <= hd; dz++) {
             for (int dx = -hw; dx <= hw; dx++) {
-               setW(ch, bx + dx, Y_DECK - 2, bz + dz, Blocks.STONE);
-               setW(ch, bx + dx, Y_DECK - 1, bz + dz, Blocks.STONEBRICK);
+               setW(ch, bx + dx, Y_DECK - 2, bz + dz, centerMid);
+               setW(ch, bx + dx, Y_DECK - 1, bz + dz, baseFloor);
                boolean border = Math.abs(dx) == hw || Math.abs(dz) == hd;
-               setW(ch, bx + dx, Y_DECK, bz + dz, border ? wool : Blocks.STONEBRICK);
+               setW(ch, bx + dx, Y_DECK, bz + dz, border ? wool : baseFloor);
+            }
+         }
+         // Back citadel wall / canopy arch behind generator
+         for (int s = -2; s <= 2; s++) {
+            int wx = bx - dirX * hw + (dirX == 0 ? s : 0);
+            int wz = bz - dirZ * hd + (dirZ == 0 ? s : 0);
+            for (int y = 1; y <= 3; y++) {
+               setW(ch, wx, Y_DECK + y, wz, Math.abs(s) == 2 ? wool : baseFloor);
             }
          }
 
@@ -1103,7 +1403,7 @@ public final class SkyGen extends Gen {
       )) {
          sbIslandStocked[0] = true;
       }
-      // Spawn Tumble Competitor Bots around the ring in solo mode
+      // Spawn 5 Named Tumble AI Competitors around the ring in solo mode
       if (!tumbleSpawnedBots && soloBots && !Net319.isActive() && g != null && g.mobs != null && w.chunk(0, 0) != null) {
          tumbleSpawnedBots = true;
          for (int i = 1; i < 6; i++) {
@@ -1112,7 +1412,9 @@ public final class SkyGen extends Gen {
             double bz = Math.sin(ang) * 11.0 + 0.5;
             Mobs.Mob bot = g.mobs.spawn(i % 2 == 0 ? Mobs.SKELETON : Mobs.ZOMBIE, bx, Y_DECK + 1.0, bz);
             if (bot != null) {
-               bot.teamTag = "TumbleBot:" + i;
+               String bName = BOT_NAMES[i % BOT_NAMES.length];
+               bot.teamTag = "TumbleBot:" + i + ":" + bName;
+               bot.variant = i;
             }
          }
       }
@@ -1126,7 +1428,7 @@ public final class SkyGen extends Gen {
       if (refill) {
          Arrays.fill(swIslandStocked, false);
       }
-      // 1. 8 Outer Spawn Island Chests
+      // 1. 8 Outer Spawn Island Chests + 7 Named Battle AI Fighters on Podiums 1..7
       for (int i = 0; i < SKYWARS_SPAWNS.length; i++) {
          if (swIslandStocked[i]) {
             continue;
@@ -1148,8 +1450,13 @@ public final class SkyGen extends Gen {
          )) {
             swIslandStocked[i] = true;
             if (!refill && i > 0 && soloBots && !Net319.isActive() && g != null && g.mobs != null && w.chunkAt(sp[0], sp[1]) != null) {
-               int mobType = (i % 2 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
-               g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+               int mobType = (i % 3 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
+               Mobs.Mob bot = g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+               if (bot != null) {
+                  String bName = BOT_NAMES[i % BOT_NAMES.length];
+                  bot.teamTag = "BattleBot:" + i + ":" + bName;
+                  bot.variant = 0; // Looting tier 0..2
+               }
             }
          }
       }
@@ -1196,6 +1503,23 @@ public final class SkyGen extends Gen {
             );
          }
          swIslandStocked[12] = true;
+      }
+   }
+
+   private static void spawnBedwarsTeamBot(Game g, int team, int role) {
+      if (g == null || g.mobs == null) {
+         return;
+      }
+      int t = Math.abs(team) & 3;
+      int bx = BEDWARS_BASES[t][0];
+      int bz = BEDWARS_BASES[t][1];
+      double ox = role == 0 ? 0.5 : -0.5;
+      double oz = role == 0 ? -0.5 : 0.5;
+      Mobs.Mob bot = g.mobs.spawn(role == 0 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5 + ox, Y_DECK + 1.0, bz + 0.5 + oz);
+      if (bot != null) {
+         String bName = BOT_NAMES[(t * 2 + role) % BOT_NAMES.length];
+         bot.teamTag = "Team:" + BEDWARS_NAMES[t] + ":" + role + ":" + bName;
+         bot.variant = role;
       }
    }
 
@@ -1249,16 +1573,643 @@ public final class SkyGen extends Gen {
                if (shop2 != null) {
                   shop2.color = Trades.PRIEST;
                }
-               // Only spawn AI Defender Guards on unoccupied enemy bases when soloBots is enabled and not in Multiplayer
+               // Spawn 2 Smart AI Bots per unoccupied enemy base: Defender (#0) + Bridger/Raider (#1)!
                if (soloBots && !Net319.isActive() && t != getPlayerTeam(g)) {
-                  Mobs.Mob guard = g.mobs.spawn(t % 2 == 1 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5, Y_DECK + 1.0, bz + 0.5);
-                  if (guard != null) {
-                     guard.teamTag = "Team:" + BEDWARS_NAMES[t];
-                  }
+                  spawnBedwarsTeamBot(g, t, 0);
+                  spawnBedwarsTeamBot(g, t, 1);
                }
             }
          }
       }
+   }
+
+   // ================================================================================
+   //  V4.2 Minigame Smart AI Competitors (Player Rendering, Bridge Pathfinding & Combat)
+   // ================================================================================
+
+   public static final class BotIntent {
+      public boolean moving;
+      public double speedMul = 1.0;
+      public float headYaw;
+      public float headPitch;
+   }
+
+   public static boolean isMinigameBot(Mobs.Mob m) {
+      if (m == null || m.teamTag == null) {
+         return false;
+      }
+      return m.teamTag.startsWith("BattleBot:") || m.teamTag.startsWith("TumbleBot:") || m.teamTag.startsWith("Team:");
+   }
+
+   public static String botDisplayName(Mobs.Mob m) {
+      if (m == null || m.teamTag == null || m.teamTag.isEmpty()) {
+         return "Rival";
+      }
+      String[] parts = m.teamTag.split(":");
+      if (m.teamTag.startsWith("Team:") && parts.length >= 2) {
+         String teamName = parts[1];
+         String nick = parts.length >= 4 ? parts[3] : (parts.length >= 3 ? parts[2] : (teamName + " Bot"));
+         return "[" + teamName.toUpperCase() + "] " + nick;
+      }
+      if (parts.length >= 3) {
+         return parts[2];
+      }
+      return m.teamTag;
+   }
+
+   public static int botTeamIndex(Mobs.Mob m) {
+      if (m == null || m.teamTag == null) {
+         return -1;
+      }
+      if (m.teamTag.startsWith("Team:")) {
+         for (int t = 0; t < 4; t++) {
+            if (m.teamTag.startsWith("Team:" + BEDWARS_NAMES[t])) {
+               return t;
+            }
+         }
+      }
+      return -1;
+   }
+
+   public static int botHeldItem(Mobs.Mob bot, World w) {
+      if (bot == null || w == null || w.settings == null) {
+         return Items.toolId(1, Items.C_SWORD);
+      }
+      int type = w.settings.type;
+      if (type == WorldSettings.TUMBLE) {
+         return (tumbleWeaponMode % 3) == 2 ? Blocks.SNOW : Items.toolId(4, Items.C_SHOVEL);
+      }
+      if (type == WorldSettings.BEDWARS) {
+         int role = bot.variant & 1;
+         if (role == 1 && bot.age % 80 < 25) {
+            int t = Math.max(0, botTeamIndex(bot));
+            return Blocks.WOOL0 + BEDWARS_COLORS[t];
+         }
+         return Items.toolId(Math.min(3, 1 + (bot.age > 1200 ? 1 : 0)), Items.C_SWORD);
+      }
+      if (bot.type == Mobs.SKELETON) {
+         return Items.BOW;
+      }
+      return Items.toolId(Math.min(4, 1 + Math.max(0, bot.variant)), Items.C_SWORD);
+   }
+
+   public static void drawBotPlayer(Mobs.Mob bot, World w, Renderer r, float partial, double x, double y, double z) {
+      if (bot == null || r == null || w == null) {
+         return;
+      }
+      float bright = r.brightnessAt(w, x, y + 1.0, z);
+      PlayerModel.Pose pose = new PlayerModel.Pose();
+      pose.bodyYaw = MobRender.lerpAngle(bot.pyaw, bot.yaw, partial);
+      float hy = MobRender.lerpAngle(bot.pheadYaw, bot.headYaw, partial);
+      pose.headYaw = Math.max(-55.0F, Math.min(55.0F, Mobs.wrap(hy - pose.bodyYaw)));
+      pose.headPitch = bot.pheadPitch + (bot.headPitch - bot.pheadPitch) * partial;
+      pose.limb = bot.pwalk + (bot.walk - bot.pwalk) * partial;
+      pose.amp = bot.pwalkAmp + (bot.walkAmp - bot.pwalkAmp) * partial;
+      pose.swing = bot.attackAnim > 0 ? (1.0F - bot.attackAnim / 8.0F) : 0.0F;
+      pose.sprint = bot.moving;
+      pose.sprintK = bot.moving ? 1.0F : 0.0F;
+      pose.air = !bot.onGround;
+      pose.airK = bot.onGround ? 0.0F : 1.0F;
+      pose.hurt = (bot.hurtTime > 0 || bot.dead) ? 1.0F : 0.0F;
+      pose.age = bot.age + partial;
+      pose.held = botHeldItem(bot, w);
+
+      int skinIdx = Math.abs(bot.netId + bot.variant);
+      int team = botTeamIndex(bot);
+      int col = 0xFFE680;
+      if (team >= 0 && team < 4) {
+         int[] rgb = new int[]{0xFF5555, 0x55AAFF, 0x55FF55, 0xFFFF55};
+         col = rgb[team];
+      }
+      GL11.glPushMatrix();
+      GL11.glTranslated(x - r.camX, y - r.camY, z - r.camZ);
+      PlayerModel.draw(Net319.skinPixels(skinIdx), (skinIdx & 1) == 1, pose, bright);
+      String tag = botDisplayName(bot) + " (" + Math.max(0, bot.health) + "HP)";
+      Net319.drawNameTag(r, tag, 2.16F, col, Math.max(0.0F, bot.health / 20.0F));
+      GL11.glPopMatrix();
+   }
+
+   public static void onBotKilled(Game g, Mobs.Mob bot) {
+      if (bot == null || g == null || g.world == null || g.world.settings == null) {
+         return;
+      }
+      int type = g.world.settings.type;
+      if (type == WorldSettings.BEDWARS) {
+         int team = botTeamIndex(bot);
+         int role = bot.variant & 1;
+         if (team >= 0 && team < 4) {
+            int slot = team * 2 + role;
+            if (isTeamBedIntact(g.world, team)) {
+               bwBotRespawnTicks[slot] = 100; // Respawn in 5 seconds while team bed is intact!
+               g.say("\u00a77[Bedwars] " + BEDWARS_CODES[team] + botDisplayName(bot) + " \u00a77was eliminated and will respawn in 5s!");
+            } else {
+               bwBotRespawnTicks[slot] = 0;
+               g.say("\u00a7e\u00a7l[FINAL KILL] " + BEDWARS_CODES[team] + botDisplayName(bot) + " \u00a77has been permanently eliminated!");
+            }
+         }
+      }
+   }
+
+   private static boolean hasFootingAt(World w, int bx, int by, int bz) {
+      for (int dy = 0; dy <= 3; dy++) {
+         int id = w.getBlock(bx, by - dy, bz);
+         if (Blocks.isLava(id)) {
+            return false;
+         }
+         if (id != 0 && Blocks.coll[id] != null) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   /** Steers a minigame bot toward (tx, tz) while avoiding void/lava drops and parkour-jumping across 1-2 block gaps! */
+   private static void steerBotSafely(Mobs.Mob bot, World w, double tx, double tz, BotIntent out, double baseSpeed) {
+      double dx = tx - bot.x;
+      double dz = tz - bot.z;
+      double dist = Math.hypot(dx, dz);
+      if (dist < 0.45) {
+         out.moving = false;
+         return;
+      }
+      float desiredYaw = Mobs.angleTo(dx, dz);
+      int by = (int)Math.floor(bot.y);
+
+      // Check footing 1.5 blocks ahead; if missing, check if 2.8 blocks ahead has footing (parkour jump!) or scan left/right angles
+      double rad = Math.toRadians(desiredYaw);
+      double fx1 = bot.x - Math.sin(rad) * 1.4;
+      double fz1 = bot.z + Math.cos(rad) * 1.4;
+      boolean nearOk = hasFootingAt(w, (int)Math.floor(fx1), by, (int)Math.floor(fz1));
+      if (!nearOk) {
+         double fxJump = bot.x - Math.sin(rad) * 2.8;
+         double fzJump = bot.z + Math.cos(rad) * 2.8;
+         if (bot.onGround && dist > 2.2 && hasFootingAt(w, (int)Math.floor(fxJump), by, (int)Math.floor(fzJump))) {
+            bot.vy = Mobs.JUMP;
+            nearOk = true;
+         } else {
+            // Scan alternative steering angles (+/- 35, 70, 105, 145 deg) to stay on bridges/islands
+            float[] offsets = new float[]{35.0F, -35.0F, 70.0F, -70.0F, 105.0F, -105.0F, 145.0F, -145.0F};
+            for (float off : offsets) {
+               float candYaw = desiredYaw + off;
+               double crad = Math.toRadians(candYaw);
+               int cx = (int)Math.floor(bot.x - Math.sin(crad) * 1.6);
+               int cz = (int)Math.floor(bot.z + Math.cos(crad) * 1.6);
+               if (hasFootingAt(w, cx, by, cz)) {
+                  desiredYaw = candYaw;
+                  nearOk = true;
+                  break;
+               }
+            }
+         }
+      }
+
+      if (!nearOk) {
+         bot.dirYaw = Mobs.wrap(desiredYaw + 180.0F);
+         out.moving = false;
+         return;
+      }
+      bot.dirYaw = desiredYaw;
+      out.headYaw = desiredYaw;
+      out.moving = true;
+      out.speedMul = baseSpeed;
+   }
+
+   /** Bridges across island gaps in Battle by routing Outer Spawn -> Nearest Mid-Ring -> Center -> Target. */
+   private static double[] nextArenaBridgeWaypoint(World w, double sx, double sz, double tx, double tz) {
+      int mx = (int)Math.floor((sx + tx) * 0.5);
+      int mz = (int)Math.floor((sz + tz) * 0.5);
+      if (hasFootingAt(w, mx, Y_DECK, mz) || Math.hypot(tx - sx, tz - sz) <= 9.0) {
+         return new double[]{tx, tz};
+      }
+      double dSelf = Math.hypot(sx, sz);
+      double dTarg = Math.hypot(tx, tz);
+      // If on an outer spawn island (d > 26), step to the closest Mid-Ring node or Center along the cardinal/diagonal walkways
+      if (dSelf > 26.0) {
+         double bestD = 1e9;
+         double[] best = new double[]{0.5, 0.5};
+         for (int[] m : SKYWARS_MIDS) {
+            double d = Math.hypot(sx - m[0], sz - m[1]);
+            if (d < bestD) {
+               bestD = d;
+               best = new double[]{m[0] + 0.5, m[1] + 0.5};
+            }
+         }
+         if (Math.abs(Math.abs(sx) - Math.abs(sz)) <= 6.0) {
+            return new double[]{sx * 0.55, sz * 0.55};
+         }
+         return best;
+      }
+      if (dSelf > 12.0 && dTarg > 12.0 && (sx * tx + sz * tz) < 0.0) {
+         return new double[]{0.5, 0.5};
+      }
+      return new double[]{tx, tz};
+   }
+
+   public static BotIntent tickBotAI(Mobs mobs, Mobs.Mob bot, World w, Player player) {
+      if (mobs == null || bot == null || w == null || w.settings == null) {
+         return null;
+      }
+      BotIntent out = new BotIntent();
+      out.headYaw = bot.yaw;
+      out.headPitch = 0.0F;
+      if (bot.cd > 0) {
+         bot.cd--;
+      }
+
+      int mode = w.settings.type;
+
+      // ====================================================================
+      //  1. TUMBLE AI: Layer Footing Survival, Parkour Jumps, Shovel & Snowballs
+      // ====================================================================
+      if (mode == WorldSettings.TUMBLE) {
+         // Find nearest rival on the same layer (either human player or another TumbleBot)
+         double targX = 0.5;
+         double targY = bot.y;
+         double targZ = 0.5;
+         double bestDist = 999.0;
+         boolean hasRival = false;
+
+         if (player != null && mobs.targetable(player) && Math.abs(player.y - bot.y) < 3.5) {
+            double d = Math.hypot(player.x - bot.x, player.z - bot.z);
+            if (d < bestDist) {
+               bestDist = d;
+               targX = player.x;
+               targY = player.y;
+               targZ = player.z;
+               hasRival = true;
+            }
+         }
+         for (Mobs.Mob other : mobs.list) {
+            if (other != null && other != bot && !other.dead && Mobs.hostile(other.type) && Math.abs(other.y - bot.y) < 3.5) {
+               double d = Math.hypot(other.x - bot.x, other.z - bot.z);
+               if (d < bestDist) {
+                  bestDist = d;
+                  targX = other.x;
+                  targY = other.y;
+                  targZ = other.z;
+                  hasRival = true;
+               }
+            }
+         }
+
+         // Evaluate intact blocks around bot to avoid standing on isolated 1-block islands
+         int by = (int)Math.floor(bot.y) - 1;
+         double safeX = bot.x * 0.7;
+         double safeZ = bot.z * 0.7;
+         if (hasRival && bestDist > 4.2) {
+            safeX = targX;
+            safeZ = targZ;
+         } else if (hasRival && bestDist < 2.5) {
+            // Strafe around close rival so bot doesn't get easily spleefed
+            double ang = Math.atan2(bot.z - targZ, bot.x - targX) + 0.8 * bot.strafeDir;
+            safeX = targX + Math.cos(ang) * 4.0;
+            safeZ = targZ + Math.sin(ang) * 4.0;
+         }
+         steerBotSafely(bot, w, safeX, safeZ, out, 1.18);
+
+         if (hasRival) {
+            out.headYaw = Mobs.angleTo(targX - bot.x, targZ - bot.z);
+            out.headPitch = 18.0F;
+            int rbx = (int)Math.floor(targX);
+            int rby = (int)Math.floor(targY) - 1;
+            int rbz = (int)Math.floor(targZ);
+
+            // Close-range Shovel Spleef: mine the block directly beneath or in front of the rival!
+            if (bestDist <= 4.6 && bot.cd <= 0 && (tumbleWeaponMode % 3) != 2) {
+               if (isTumbleLayerBlock(rbx, rby, rbz) && !(rbx == 0 && rby == Y_DECK && rbz == 0)
+                  && (Math.abs(rbx - (int)Math.floor(bot.x)) > 1 || Math.abs(rbz - (int)Math.floor(bot.z)) > 1)) {
+                  int bid = w.getBlock(rbx, rby, rbz);
+                  if (bid != 0 && !Blocks.isFluid(bid)) {
+                     bot.cd = 14;
+                     bot.attackAnim = 8;
+                     SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
+                     if (mobs.g != null) {
+                        mobs.g.spawnBreakParticles(rbx, rby, rbz, bid, 8);
+                     }
+                     SoundEngine.playBlockBreak(w, bid, rbx, rby, rbz);
+                     w.setBlock(rbx, rby, rbz, 0);
+                  }
+               }
+            }
+            // Medium-range Snowball Spleef: throw a snowball that breaks a layer block under the rival's feet!
+            else if (bestDist > 4.2 && bestDist <= 15.5 && bot.cd <= 0 && (tumbleWeaponMode % 3) != 1) {
+               if (isTumbleLayerBlock(rbx, rby, rbz) && !(rbx == 0 && rby == Y_DECK && rbz == 0)) {
+                  int bid = w.getBlock(rbx, rby, rbz);
+                  if (bid != 0 && !Blocks.isFluid(bid)) {
+                     bot.cd = 24;
+                     bot.attackAnim = 8;
+                     SoundEngine.playThrow(w, bot.x, bot.y + 1.4, bot.z);
+                     if (mobs.g != null) {
+                        mobs.g.spawnBreakParticles((int)Math.floor((bot.x + targX) * 0.5), rby + 2, (int)Math.floor((bot.z + targZ) * 0.5), Blocks.SNOW, 4);
+                        mobs.g.spawnBreakParticles(rbx, rby, rbz, bid, 8);
+                     }
+                     SoundEngine.playBlockBreak(w, bid, rbx, rby, rbz);
+                     w.setBlock(rbx, rby, rbz, 0);
+                  }
+               }
+            }
+         }
+         return out;
+      }
+
+      // ====================================================================
+      //  2. BATTLE AI: Chest Looting, Bridge Waypoints, Showdown & FFA Combat
+      // ====================================================================
+      if (mode == WorldSettings.BATTLE) {
+         // During Grace Period (first 15s) or before looting a chest, rush to nearest chest & equip gear!
+         if (battleGraceTicks > 0 || (bot.variant == 0 && bot.age < 260)) {
+            double cx = 0.5;
+            double cz = 0.5;
+            if (Math.hypot(bot.x, bot.z) > 22.0) {
+               // Rush toward nearest mid-ring chest or center feast chest
+               double bestC = 999.0;
+               for (int[] m : SKYWARS_MIDS) {
+                  double d = Math.hypot(bot.x - m[0], bot.z - m[1]);
+                  if (d < bestC) {
+                     bestC = d;
+                     cx = m[0] + 0.5;
+                     cz = m[1] + 0.5;
+                  }
+               }
+               if (Math.hypot(bot.x - cx, bot.z - cz) < 2.4) {
+                  bot.variant = Math.max(bot.variant, 1);
+                  bot.attackAnim = 6;
+                  cx = 0.5;
+                  cz = 0.5;
+               }
+            } else if (Math.hypot(bot.x, bot.z) < 3.6 && bot.variant < 2) {
+               bot.variant = 2; // Looted central feast!
+               bot.health = Math.min(24, bot.health + 4);
+               bot.attackAnim = 8;
+               SoundEngine.play3D(w, "chest_open", bot.x, bot.y + 1.0, bot.z, 0.65F, 1.0F);
+            }
+            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, cx, cz);
+            steerBotSafely(bot, w, wp[0], wp[1], out, 1.22);
+            return out;
+         }
+
+         // Showdown active: if outside center courtyard, urgently sprint to center!
+         if (showdownActive && Math.hypot(bot.x, bot.z) > 16.0) {
+            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, 0.5, 0.5);
+            steerBotSafely(bot, w, wp[0], wp[1], out, 1.32);
+            return out;
+         }
+
+         // Free-For-All Target Acquisition: nearest human player OR rival BattleBot!
+         Mobs.Mob rivalBot = null;
+         double targX = 0.5;
+         double targY = Y_DECK + 1.0;
+         double targZ = 0.5;
+         double bestDist = 999.0;
+         boolean targetIsPlayer = false;
+
+         if (player != null && mobs.targetable(player)) {
+            double d = Math.hypot(player.x - bot.x, player.z - bot.z);
+            if (d < bestDist) {
+               bestDist = d;
+               targX = player.x;
+               targY = player.y;
+               targZ = player.z;
+               targetIsPlayer = true;
+            }
+         }
+         for (Mobs.Mob other : mobs.list) {
+            if (other != null && other != bot && !other.dead && Mobs.hostile(other.type)) {
+               double d = Math.hypot(other.x - bot.x, other.z - bot.z);
+               if (d < bestDist) {
+                  bestDist = d;
+                  rivalBot = other;
+                  targX = other.x;
+                  targY = other.y;
+                  targZ = other.z;
+                  targetIsPlayer = false;
+               }
+            }
+         }
+
+         double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, targX, targZ);
+         boolean isArcher = bot.type == Mobs.SKELETON;
+         if (isArcher && bestDist < 10.5 && bestDist > 3.5 && wp[0] == targX && wp[1] == targZ) {
+            // Archer strafes at mid-range while firing bow
+            if (bot.age % 45 == 0) {
+               bot.strafeDir = -bot.strafeDir;
+            }
+            double ang = Math.atan2(bot.z - targZ, bot.x - targX) + 0.9 * bot.strafeDir;
+            steerBotSafely(bot, w, targX + Math.cos(ang) * 7.5, targZ + Math.sin(ang) * 7.5, out, 0.95);
+         } else {
+            steerBotSafely(bot, w, wp[0], wp[1], out, bestDist < 7.0 ? 1.25 : 1.15);
+         }
+
+         out.headYaw = Mobs.angleTo(targX - bot.x, targZ - bot.z);
+         out.headPitch = (float)(-Math.toDegrees(Math.atan2((targY + 1.0) - (bot.y + 1.4), Math.max(0.5, bestDist))));
+
+         // Combat execution (Melee Sword/Axe or Ranged Bow against BOTH Player and Rival Bots!)
+         int dmg = 3 + Math.min(2, Math.max(0, bot.variant));
+         if (bestDist < 2.15 && Math.abs(targY - bot.y) < 2.2 && bot.cd <= 0) {
+            bot.cd = 18;
+            bot.attackAnim = 8;
+            SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
+            SoundEngine.playHit(w, targX, targY + 1.0, targZ, bot.onGround && bot.vy < 0.0);
+            if (targetIsPlayer && mobs.g != null) {
+               mobs.g.damagePlayer(dmg, bot.x, bot.z);
+            } else if (rivalBot != null) {
+               mobs.hurtMob(rivalBot, dmg, bot.x, bot.z, 0.42, false);
+               if (rivalBot.dead && mobs.g != null) {
+                  mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77eliminated \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
+               }
+            }
+         } else if (isArcher && bestDist >= 2.5 && bestDist < 16.5 && bot.cd <= 0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
+            bot.cd = 36;
+            SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
+            if (targetIsPlayer) {
+               mobs.shootAtPos(bot, targX, targY + 1.2, targZ);
+            } else if (rivalBot != null) {
+               mobs.shootAtPos(bot, targX, targY + 1.0, targZ);
+               if (mobs.rnd.nextInt(3) != 0) {
+                  mobs.hurtMob(rivalBot, 3, bot.x, bot.z, 0.3, false);
+                  if (rivalBot.dead && mobs.g != null) {
+                     mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77sniped \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
+                  }
+               }
+            }
+         }
+         return out;
+      }
+
+      // ====================================================================
+      //  3. BEDWARS AI: Bed Defense, Wool Bridging, Bed Raiding & Team Combat
+      // ====================================================================
+      if (mode == WorldSettings.BEDWARS) {
+         int myBotTeam = botTeamIndex(bot);
+         if (myBotTeam < 0 || myBotTeam >= 4) {
+            return null;
+         }
+         int role = bot.variant & 1; // 0 = Defender / Engineer, 1 = Bridger / Bed Raider
+         int woolId = Blocks.WOOL0 + BEDWARS_COLORS[myBotTeam];
+         int baseX = BEDWARS_BASES[myBotTeam][0];
+         int baseZ = BEDWARS_BASES[myBotTeam][1];
+
+         // 3a. Defender Bot (#0): Fortifies own team Bed with wool defense blocks & guards base courtyard
+         if (role == 0 && isTeamBedIntact(w, myBotTeam) && bot.age % 25 == 5) {
+            int[] bf = getTeamBedFoot(myBotTeam);
+            int[] bh = getTeamBedHead(myBotTeam);
+            int[][] coverOffsets = new int[][]{
+               {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
+               {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
+               {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
+            };
+            for (int[] co : coverOffsets) {
+               if (w.chunkAt(co[0], co[2]) != null && w.getBlock(co[0], co[1], co[2]) == 0) {
+                  w.setBlock(co[0], co[1], co[2], woolId);
+                  bot.attackAnim = 6;
+                  SoundEngine.playBlockPlace(w, woolId, co[0], co[1], co[2]);
+                  break;
+               }
+            }
+         }
+
+         // 3b. Bridger / Raider Bot (#1): Actively builds a Team Wool bridge from its base toward the Center Island!
+         if (role == 1 && bot.age % 12 == 0) {
+            int dirX = Integer.compare(0, baseX);
+            int dirZ = Integer.compare(0, baseZ);
+            int step = bwTeamBridgeStep[myBotTeam];
+            if (step < 30) {
+               int brX = baseX + dirX * (6 + step);
+               int brZ = baseZ + dirZ * (6 + step);
+               if (w.chunkAt(brX, brZ) != null) {
+                  if (w.getBlock(brX, Y_DECK, brZ) == 0) {
+                     w.setBlock(brX, Y_DECK, brZ, woolId);
+                     bot.attackAnim = 6;
+                     SoundEngine.playBlockPlace(w, woolId, brX, Y_DECK, brZ);
+                  }
+                  // Make bridge 2 blocks wide so AI and players can sprint across easily
+                  int sideX = brX + (dirX == 0 ? 1 : 0);
+                  int sideZ = brZ + (dirZ == 0 ? 1 : 0);
+                  if (w.getBlock(sideX, Y_DECK, sideZ) == 0) {
+                     w.setBlock(sideX, Y_DECK, sideZ, woolId);
+                  }
+                  bwTeamBridgeStep[myBotTeam] = step + 1;
+               }
+            }
+         }
+
+         // 3c. Scan for nearby enemy player or enemy team bot
+         int humanTeam = mobs.g != null ? getPlayerTeam(mobs.g) : 0;
+         Mobs.Mob enemyBot = null;
+         double enemyX = baseX + 0.5;
+         double enemyY = Y_DECK + 1.0;
+         double enemyZ = baseZ + 0.5;
+         double enemyDist = 999.0;
+         boolean enemyIsPlayer = false;
+
+         if (player != null && mobs.targetable(player) && humanTeam != myBotTeam) {
+            double d = Math.hypot(player.x - bot.x, player.z - bot.z);
+            if (d < enemyDist) {
+               enemyDist = d;
+               enemyX = player.x;
+               enemyY = player.y;
+               enemyZ = player.z;
+               enemyIsPlayer = true;
+            }
+         }
+         for (Mobs.Mob other : mobs.list) {
+            if (other != null && other != bot && !other.dead && Mobs.hostile(other.type)) {
+               int ot = botTeamIndex(other);
+               if (ot >= 0 && ot != myBotTeam) {
+                  double d = Math.hypot(other.x - bot.x, other.z - bot.z);
+                  if (d < enemyDist) {
+                     enemyDist = d;
+                     enemyBot = other;
+                     enemyX = other.x;
+                     enemyY = other.y;
+                     enemyZ = other.z;
+                     enemyIsPlayer = false;
+                  }
+               }
+            }
+         }
+
+         // Defender (#0) stays within 16 blocks of base unless its bed is broken; Raider (#1) advances along bridges toward enemy beds!
+         double goalX = baseX + 0.5;
+         double goalZ = baseZ + 0.5;
+         if (role == 0 && isTeamBedIntact(w, myBotTeam)) {
+            if (enemyDist <= 16.0) {
+               goalX = enemyX;
+               goalZ = enemyZ;
+            } else {
+               int[] bf = getTeamBedFoot(myBotTeam);
+               double patrolAng = (bot.age * 0.04) + myBotTeam;
+               goalX = bf[0] + 0.5 + Math.cos(patrolAng) * 2.5;
+               goalZ = bf[2] + 0.5 + Math.sin(patrolAng) * 2.5;
+            }
+         } else {
+            // Raider (#1) or Defender whose bed is gone: target nearest intact enemy Bed, or nearest enemy fighter!
+            int targetBedTeam = -1;
+            double bestBedD = 999.0;
+            for (int t = 0; t < 4; t++) {
+               if (t != myBotTeam && isTeamBedIntact(w, t)) {
+                  int[] bf = getTeamBedFoot(t);
+                  double d = Math.hypot(bf[0] - bot.x, bf[2] - bot.z);
+                  if (d < bestBedD) {
+                     bestBedD = d;
+                     targetBedTeam = t;
+                  }
+               }
+            }
+            if (enemyDist <= 9.0) {
+               goalX = enemyX;
+               goalZ = enemyZ;
+            } else if (targetBedTeam >= 0) {
+               int[] bf = getTeamBedFoot(targetBedTeam);
+               // Route via center island (0, 0) if on different axis
+               if (Math.hypot(bot.x, bot.z) > 12.0 && (bot.x * bf[0] + bot.z * bf[2]) <= 0.0) {
+                  goalX = 0.5;
+                  goalZ = 0.5;
+               } else {
+                  goalX = bf[0] + 0.5;
+                  goalZ = bf[2] + 0.5;
+               }
+               // If Raider has reached the enemy Bed, mine any defense block and destroy the enemy Bed!
+               if (bestBedD <= 3.2 && bot.cd <= 0) {
+                  bot.cd = 25;
+                  bot.attackAnim = 8;
+                  int coverId = w.getBlock(bf[0], bf[1] + 1, bf[2]);
+                  if (coverId != 0 && !Decor315.isBed(coverId)) {
+                     if (mobs.g != null) {
+                        mobs.g.spawnBreakParticles(bf[0], bf[1] + 1, bf[2], coverId, 8);
+                     }
+                     SoundEngine.playBlockBreak(w, coverId, bf[0], bf[1] + 1, bf[2]);
+                     w.setBlock(bf[0], bf[1] + 1, bf[2], 0);
+                  } else {
+                     SoundEngine.playBlockBreak(w, Blocks.PLANKS, bf[0], bf[1], bf[2]);
+                     onBedDestroyed(mobs.g, w, targetBedTeam, botDisplayName(bot), true);
+                  }
+               }
+            } else if (enemyDist < 200.0) {
+               goalX = enemyX;
+               goalZ = enemyZ;
+            }
+         }
+
+         steerBotSafely(bot, w, goalX, goalZ, out, 1.18);
+
+         // Melee combat against enemy player or enemy team bot
+         if (enemyDist < 2.2 && Math.abs(enemyY - bot.y) < 2.2 && bot.cd <= 0) {
+            bot.cd = 18;
+            bot.attackAnim = 8;
+            int dmg = 3 + (hasTeamSharpness(myBotTeam) ? 2 : 0);
+            SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
+            SoundEngine.playHit(w, enemyX, enemyY + 1.0, enemyZ, false);
+            if (enemyIsPlayer && mobs.g != null) {
+               mobs.g.damagePlayer(dmg, bot.x, bot.z);
+            } else if (enemyBot != null) {
+               mobs.hurtMob(enemyBot, dmg, bot.x, bot.z, 0.4, false);
+            }
+         }
+         return out;
+      }
+
+      return null;
    }
 
    public static boolean isTeamBedIntact(World w, int team) {
@@ -1359,35 +2310,17 @@ public final class SkyGen extends Gen {
                g.player.hurt(20);
             }
          }
-         // Competitor bots actively mine Tumble blocks around the layers & get eliminated in lava
+         // Check if any Tumble AI competitor fell into the boiling lava cauldron
          if (g != null && g.mobs != null && !Net319.isConnected()) {
-            int botIdx = 0;
             for (Mobs.Mob m : g.mobs.list) {
-               botIdx++;
                if (m == null || m.dead || !Mobs.hostile(m.type)) {
                   continue;
                }
                if (m.y <= Y_DECK - 12.2) {
                   m.dead = true;
                   myKills++;
-                  g.say("\u00a7b[Tumble] \u00a7eAn opponent tumbled into the lava!");
-                  continue;
-               }
-               if (w.tickCount % 18L == 0L) {
-                  int dir = (int)((w.tickCount / 18L + botIdx) & 3);
-                  int ox = dir == 0 ? 1 : (dir == 1 ? -1 : 0);
-                  int oz = dir == 2 ? 1 : (dir == 3 ? -1 : 0);
-                  int bx = (int)Math.floor(m.x) + ox;
-                  int by = (int)Math.floor(m.y) - 1;
-                  int bz = (int)Math.floor(m.z) + oz;
-                  if (isTumbleLayerBlock(bx, by, bz) && !(bx == 0 && by == Y_DECK && bz == 0)) {
-                     int bid = w.getBlock(bx, by, bz);
-                     if (bid != 0 && !Blocks.isFluid(bid)) {
-                        g.spawnBreakParticles(bx, by, bz, bid, 6);
-                        SoundEngine.playBlockBreak(w, bid, bx, by, bz);
-                        w.setBlock(bx, by, bz, 0);
-                     }
-                  }
+                  SoundEngine.play3D(w, "lava_fizz", m.x, m.y, m.z, 0.85F, 1.0F);
+                  g.say("\u00a7b[Tumble] \u00a7e" + botDisplayName(m) + " \u00a77tumbled into the lava!");
                }
             }
          }
@@ -1451,9 +2384,23 @@ public final class SkyGen extends Gen {
          return;
       }
 
-      // 3. BEDWARS: stock team bases, resource generators, bed destruction alerts & victory check
+      // 3. BEDWARS: stock team bases, AI bot respawns, resource generators, bed destruction alerts & victory check
       if (type == WorldSettings.BEDWARS) {
          stockBedwarsWorld(g, w);
+         // Process Bedwars AI Bot Respawn timers while their team bed remains intact
+         if (g != null && soloBots && !Net319.isActive()) {
+            for (int slot = 0; slot < 8; slot++) {
+               if (bwBotRespawnTicks[slot] > 0) {
+                  int team = slot >> 1;
+                  int role = slot & 1;
+                  if (!isTeamBedIntact(w, team)) {
+                     bwBotRespawnTicks[slot] = 0;
+                  } else if (--bwBotRespawnTicks[slot] == 0) {
+                     spawnBedwarsTeamBot(g, team, role);
+                  }
+               }
+            }
+         }
          long dPeriod = w.tickCount >= 9600L ? 150L : (w.tickCount >= 2400L ? 200L : 300L);
          long ePeriod = w.tickCount >= 9600L ? 250L : (w.tickCount >= 4800L ? 340L : 500L);
          if (g != null && w.tickCount == 2400L) {
@@ -1545,6 +2492,7 @@ public final class SkyGen extends Gen {
             int enemyPlayers = Net319.aliveEnemyPeers(my);
             if (!bedwarsWon && bwBaseStocked[my] && enemyBeds == 0 && countHostiles(g) == 0 && enemyPlayers == 0) {
                bedwarsWon = true;
+               SoundEngine.playMinigameSound("mg_win");
                g.say("\u00a76\u00a7l[Bedwars] VICTORY! \u00a7aAll enemy beds and opponents eliminated! (/bw reset to play again)");
             }
          }
@@ -1564,53 +2512,50 @@ public final class SkyGen extends Gen {
       return c;
    }
 
-   private static void checkSkyblockQuests(Game g) {
-      // Quest 0: 32 Cobblestone
-      if (!sbQuestDone[0] && g.countItem(Blocks.COBBLE) >= 32) {
-         sbQuestDone[0] = true;
-         g.addItem(new Stack(Items.IRON_INGOT, 8));
-         g.addItem(new Stack(Items.COAL, 16));
-         g.say("\u00a7a[Skyblock Quest] Completed 'Cobble Generator'! Reward: +8 Iron Ingots, +16 Coal");
-      }
-      // Quest 1: 8 Wheat or Melon Slices
-      if (!sbQuestDone[1] && (g.countItem(Items.WHEAT) + g.countItem(Items.MELON_SLICE)) >= 8) {
-         sbQuestDone[1] = true;
-         g.addItem(new Stack(Blocks.DIRT, 8));
-         g.addItem(new Stack(Blocks.GRASS, 4));
-         g.addItem(new Stack(Items.BONE_MEAL, 16));
-         g.say("\u00a7a[Skyblock Quest] Completed 'Sky Harvester'! Reward: +8 Dirt, +4 Grass, +16 Bone Meal");
-      }
-      // Quest 2: Bridge to an outer island (|X| >= 40 or |Z| >= 40)
-      if (!sbQuestDone[2] && (Math.abs(g.player.x) >= 40.0 || Math.abs(g.player.z) >= 40.0)) {
-         sbQuestDone[2] = true;
-         g.addItem(new Stack(Items.DIAMOND, 3));
-         g.addItem(new Stack(Items.STEAK, 4));
-         g.say("\u00a7a[Skyblock Quest] Completed 'Island Bridger'! Reward: +3 Diamonds, +4 Steak");
-      }
-      // Quest 3: 4 Monster Drops (Rotten Flesh, Bone, String, or Gunpowder)
-      int drops = g.countItem(Items.ROTTEN_FLESH) + g.countItem(Items.BONE) + g.countItem(Items.STRING) + g.countItem(Items.GUNPOWDER);
-      if (!sbQuestDone[3] && drops >= 4) {
-         sbQuestDone[3] = true;
-         g.addItem(new Stack(Items.EMERALD, 6));
-         g.addItem(new Stack(Items.BOW, 1));
-         g.addItem(new Stack(Items.ARROW, 16));
-         g.say("\u00a7a[Skyblock Quest] Completed 'Void Hunter'! Reward: +6 Emeralds, +1 Bow, +16 Arrows");
-      }
-      // Quest 4: 10 Obsidian
-      if (!sbQuestDone[4] && g.countItem(Blocks.OBSIDIAN) >= 10) {
-         sbQuestDone[4] = true;
-         g.addItem(new Stack(Items.toolId(4, Items.C_PICK), 1));
-         g.addItem(new Stack(Blocks.GOLD_BLOCK, 2));
-         g.say("\u00a76[Skyblock Quest] Completed 'Nether Pioneer'! Reward: +1 Diamond Pickaxe, +2 Gold Blocks!");
-      }
-   }
-
-   /** Handles /sb, /challenges, /sw, /bw, /shop, /upgrades, and /lobby commands. */
+   /** Handles /map, /tumble, /battle, /bw, /shop, /upgrades, and /lobby commands. */
    public static boolean onModeCommand(Game g, String cmd, String[] args) {
       if (g == null || g.world == null) {
          return false;
       }
       String c = cmd.toLowerCase();
+      if (c.equals("/map")) {
+         String sub = args.length > 1 ? args[1].toLowerCase() : "list";
+         if (sub.equals("save") && args.length > 2) {
+            String name = args[2];
+            if (saveCustomArenaMap(g.world, name)) {
+               customMapName = name;
+               g.say("\u00a7a[Maps] Saved current arena chunks to prebuilt map folder \u00a7emaps/" + name + "\u00a7a!");
+            } else {
+               g.say("\u00a7c[Maps] Failed to save map " + name + ".");
+            }
+            return true;
+         }
+         if (sub.equals("load") && args.length > 2) {
+            String name = args[2];
+            customMapName = name;
+            File f = resolvePrebuiltMapDir(g.world.settings != null ? g.world.settings.type : WorldSettings.BATTLE, 0);
+            if (f != null) {
+               resetArenaMap(g, g.world, true);
+               matchState = STATE_PLAYING;
+               g.say("\u00a7a[Maps] Loaded custom prebuilt world map \u00a7e" + f.getPath() + "\u00a7a!");
+            } else {
+               customMapName = null;
+               g.say("\u00a7c[Maps] No folder found at maps/" + name + " or saves/" + name + "!");
+            }
+            return true;
+         }
+         if (sub.equals("clear") || sub.equals("builtin")) {
+            customMapName = null;
+            resetArenaMap(g, g.world, true);
+            g.say("\u00a7e[Maps] Switched back to built-in arena generator (" + (g.world.settings != null ? g.world.settings.mapName() : "Cove") + ").");
+            return true;
+         }
+         ArrayList<String> custom = listCustomMaps();
+         g.say("\u00a7b[Maps] Built-in: Cove, Crucible, Cavern, Temple | Custom in maps/: "
+            + (custom.isEmpty() ? "(none yet - use /map save <name>)" : String.join(", ", custom))
+            + " | Commands: /map save <name> | /map load <name> | /map clear");
+         return true;
+      }
       if (c.equals("/shop")) {
          g.menu = new Menu(g, Menu.TRADE, null, Trades.BEDWARS_SHOP);
          g.setScreen(Game.S.INV);
@@ -1727,6 +2672,14 @@ public final class SkyGen extends Gen {
             g.say("\u00a7e[Bedwars] Joined " + BEDWARS_CODES[t] + BEDWARS_NAMES[t] + " Team\u00a7e!");
             return true;
          }
+         if (sub.equals(" map") || (sub.equals("map") && args.length > 2 && g.world.settings != null)) {
+            int m = parseMapArg(args[2]);
+            g.world.settings.mapId = m;
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7e[Bedwars] Switched arena map to \u00a7b" + WorldSettings.MAP_NAMES[m] + "\u00a7e!");
+            return true;
+         }
          if (sub.equals("lobby")) {
             matchState = STATE_WAITING;
             g.setScreen(Game.S.WAITING);
@@ -1766,7 +2719,7 @@ public final class SkyGen extends Gen {
       return WorldSettings.MAP_COVE;
    }
 
-   /** Renders the top-right Scoreboard HUD for Console Edition Tumble, Battle, and Bedwars. */
+   /** Renders the sleek dark-glass top-right Scoreboard HUD for Console Edition Tumble, Battle, and Bedwars. */
    public static void drawModeHud(Game g) {
       if (g == null || g.world == null || g.world.settings == null || g.debug || g.screen == Game.S.WAITING) {
          return;
@@ -1775,18 +2728,21 @@ public final class SkyGen extends Gen {
       if (!g.world.settings.isVoidMode()) {
          return;
       }
-      String mapName = g.world.settings.mapName();
+      String mapName = customMapName != null && !customMapName.isBlank() ? customMapName : g.world.settings.mapName();
       Gui gui = g.gui;
       java.util.ArrayList<String> lines = new java.util.ArrayList<>();
+      int accentColor = 0xFF68F080;
       if (type == WorldSettings.TUMBLE) {
+         accentColor = 0xFF48D8FF;
          int rivals = countHostiles(g) + Net319.aliveEnemyPeers(-1);
          int layer = g.player != null ? (g.player.y >= Y_DECK - 2 ? 1 : (g.player.y >= Y_DECK - 7 ? 2 : 3)) : 1;
          lines.add("\u00a7b\u00a7lTUMBLE \u00a77(" + mapName + ")");
          lines.add("\u00a7fRivals Left: " + (rivals > 0 ? "\u00a7c" + rivals : "\u00a7a0 (VICTORY!)") + " \u00a77| Layer: \u00a7e" + layer + "/3");
          lines.add("\u00a7fMode: \u00a7a" + (tumbleWeaponMode == 0 ? "Shovels+Snow" : (tumbleWeaponMode == 1 ? "Shovels" : "Snowballs")));
          lines.add("\u00a77L-Click: Break | R-Click: Throw");
-         lines.add("\u00a77/tumble reset | /tumble map");
+         lines.add("\u00a77/tumble reset | /map save");
       } else if (type == WorldSettings.BATTLE) {
+         accentColor = 0xFFFFB840;
          long rem = (2400L - (g.world.tickCount % 2400L)) / 20L;
          int raiders = countHostiles(g) + Net319.aliveEnemyPeers(-1);
          lines.add("\u00a76\u00a7lBATTLE \u00a77(" + mapName + " - " + SW_KIT_NAMES[swKit & 3] + ")");
@@ -1798,15 +2754,16 @@ public final class SkyGen extends Gen {
          } else {
             lines.add(String.format("\u00a7fChest Refill: \u00a7b%d:%02d", rem / 60L, rem % 60L));
          }
-         lines.add("\u00a77/battle kit | /battle map | /battle reset");
+         lines.add("\u00a77/battle kit | /battle map | /map save");
       } else if (type == WorldSettings.BEDWARS) {
+         accentColor = 0xFFFFDF58;
          int my = getPlayerTeam(g);
          long dPeriod = g.world.tickCount >= 9600L ? 150L : (g.world.tickCount >= 2400L ? 200L : 300L);
          long ePeriod = g.world.tickCount >= 9600L ? 250L : (g.world.tickCount >= 4800L ? 340L : 500L);
          long dRem = (dPeriod - (g.world.tickCount % dPeriod)) / 20L;
          long eRem = (ePeriod - (g.world.tickCount % ePeriod)) / 20L;
          String tierStr = g.world.tickCount >= 9600L ? "Max" : (g.world.tickCount >= 4800L ? "Em II" : (g.world.tickCount >= 2400L ? "Dia II" : "Tier I"));
-         lines.add("\u00a7e\u00a7lBEDWARS \u00a77(" + tierStr + ")");
+         lines.add("\u00a7e\u00a7lBEDWARS \u00a77(" + mapName + " - " + tierStr + ")");
          for (int t = 0; t < 4; t++) {
             boolean bed = isTeamBedIntact(g.world, t);
             lines.add(BEDWARS_CODES[t] + "[" + BEDWARS_NAMES[t].charAt(0) + "] " + BEDWARS_NAMES[t] + ": " + (bed ? "\u00a7aBED \u2714" : "\u00a7cBROKEN \u2718") + (t == my ? " \u00a77(You)" : ""));
@@ -1821,23 +2778,26 @@ public final class SkyGen extends Gen {
             if ((u & UPG_HEAL_POOL) != 0) usb.append(" Pool");
             lines.add(usb.toString());
          }
-         lines.add("\u00a77/shop | /upgrades | Tab");
+         lines.add("\u00a77/shop | /upgrades | /map save");
       }
 
       if (lines.isEmpty()) {
          return;
       }
-      float maxW = 90.0F;
+      float maxW = 94.0F;
       for (String s : lines) {
-         maxW = Math.max(maxW, Gui.textWidth(Gui.stripCodes(s)) + 8.0F);
+         maxW = Math.max(maxW, Gui.textWidth(Gui.stripCodes(s)) + 10.0F);
       }
-      float boxH = lines.size() * 10.0F + 6.0F;
+      float boxH = lines.size() * 10.0F + 8.0F;
       float x = gui.w - maxW - 4.0F;
       float y = 26.0F;
-      gui.rect(x, y, maxW, boxH, 0x90000000);
-      gui.rect(x, y, maxW, 1.0F, 0xFF555555);
+      gui.rect(x + 1.0F, y + 1.0F, maxW + 1.0F, boxH + 1.0F, 0x55000000);
+      gui.rect(x - 1.0F, y - 1.0F, maxW + 2.0F, boxH + 2.0F, 0xFF06080E);
+      gui.gradient(x, y, maxW, boxH, 0xDC121826, 0xE8090C14);
+      gui.rect(x, y, maxW, 1.5F, accentColor);
+      gui.rect(x, y + 12.5F, maxW, 0.5F, 0x40FFFFFF);
       for (int i = 0; i < lines.size(); i++) {
-         gui.text(lines.get(i), x + 4.0F, y + 3.0F + i * 10.0F, 0xFFFFFFFF, true);
+         gui.text(lines.get(i), x + 5.0F, y + 4.0F + i * 10.0F, 0xFFFFFFFF, true);
       }
    }
 }

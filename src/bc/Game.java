@@ -6485,31 +6485,35 @@ public final class Game {
       if (!this.player.spectator) {
          float var1 = (float)Math.floor((this.gui.w - 182.0F) / 2.0F);
          float var2 = this.gui.h - 22.0F;
-         this.gui.rect(var1, var2, 182.0F, 22.0F, -16777216);
-         this.gui.rect(var1 + 1.0F, var2 + 1.0F, 180.0F, 20.0F, -11184811);
-         this.gui.rect(var1 + 1.0F, var2 + 1.0F, 180.0F, 1.0F, -8750470);
+         // Sleek dark-glass hotbar dock
+         this.gui.rect(var1 - 1.0F, var2 - 1.0F, 184.0F, 23.0F, 0x70000000);
+         this.gui.rect(var1, var2, 182.0F, 22.0F, 0xFF080B12);
+         this.gui.gradient(var1 + 1.0F, var2 + 1.0F, 180.0F, 20.0F, 0xEE181E2C, 0xF5101420);
+         this.gui.rect(var1 + 1.0F, var2 + 1.0F, 180.0F, 1.0F, 0x4878A8FF);
 
          for (int var3 = 0; var3 < 9; var3++) {
             float var4 = var1 + 3.0F + var3 * 20;
             float var5 = var2 + 3.0F;
-            this.gui.rect(var4, var5, 16.0F, 16.0F, -13750738);
-            this.gui.rect(var4 + 1.0F, var5 + 1.0F, 14.0F, 14.0F, -7631989);
-            this.gui.rect(var4, var5, 16.0F, 1.0F, -13158601);
-            this.gui.rect(var4, var5, 1.0F, 16.0F, -13158601);
-            this.gui.rect(var4 + 15.0F, var5 + 1.0F, 1.0F, 15.0F, -1);
-            this.gui.rect(var4 + 1.0F, var5 + 15.0F, 15.0F, 1.0F, -1);
-            this.gui.rect(var4 + 1.0F, var5 + 1.0F, 14.0F, 14.0F, -7631989);
+            boolean activeSlot = var3 == this.sel;
+            this.gui.rect(var4, var5, 16.0F, 16.0F, activeSlot ? 0xFF283448 : 0xFF0E121B);
+            this.gui.gradient(var4 + 1.0F, var5 + 1.0F, 14.0F, 14.0F, activeSlot ? 0xFF32405A : 0xFF1E2434, activeSlot ? 0xFF222C40 : 0xFF283044);
+            this.gui.rect(var4, var5, 16.0F, 1.0F, 0xFF0B0E16);
+            this.gui.rect(var4, var5, 1.0F, 16.0F, 0xFF0B0E16);
+            this.gui.rect(var4 + 15.0F, var5 + 1.0F, 1.0F, 15.0F, 0xFF46526A);
+            this.gui.rect(var4 + 1.0F, var5 + 15.0F, 15.0F, 1.0F, 0xFF46526A);
          }
 
          for (int var10 = 0; var10 < 9; var10++) {
             this.drawStack(this.inv[var10], var1 + 3.0F + var10 * 20, var2 + 3.0F);
          }
 
-         float var11 = var1 + 3.0F + this.sel * 20 - 4.0F;
-         this.gui.rect(var11, var2 - 1.0F, 24.0F, 2.0F, -1);
-         this.gui.rect(var11, var2 + 21.0F, 24.0F, 2.0F, -1);
-         this.gui.rect(var11, var2 - 1.0F, 2.0F, 24.0F, -1);
-         this.gui.rect(var11 + 22.0F, var2 - 1.0F, 2.0F, 24.0F, -1);
+         float var11 = var1 + 3.0F + this.sel * 20 - 3.0F;
+         this.gui.rect(var11 - 1.0F, var2 - 1.0F, 24.0F, 24.0F, 0x80000000);
+         this.gui.rect(var11, var2 - 1.0F, 22.0F, 2.0F, 0xFFFFE670);
+         this.gui.rect(var11, var2 + 21.0F, 22.0F, 2.0F, 0xFFD8A828);
+         this.gui.rect(var11, var2 - 1.0F, 2.0F, 24.0F, 0xFFFFE670);
+         this.gui.rect(var11 + 20.0F, var2 - 1.0F, 2.0F, 24.0F, 0xFFFFE670);
+         this.gui.rect(var11 + 2.0F, var2 + 1.0F, 18.0F, 1.0F, 0x6078FF90);
          if (!this.player.creative) {
             float var12 = var2 - 11.0F;
 

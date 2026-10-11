@@ -1,2 +1,2 @@
 4.2
-# Blockcraft V4.2 (r2): Console Edition Battle & Tumble Mini Games (4 Maps: Cove, Crucible, Cavern, Temple) + Gareth Coker Tumble/Battle OST + Random/Constant Music + Fixed Block & Swing Sounds
+# Blockcraft V4.2 (r3): Minigame Smart AI Competitors + Redesigned Dark-Obsidian UI + Engine Performance Optimizations + 4 Geometrically Distinct Arena Maps & Custom Prebuilt Map Loader/Saver

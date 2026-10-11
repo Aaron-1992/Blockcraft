@@ -2720,7 +2720,7 @@ public final class Net319 {
       return out;
    }
 
-   private static synchronized int[] skinPixels(int idx) {
+   static synchronized int[] skinPixels(int idx) {
       if (peerSkins == null) {
          peerSkins = new int[][]{Skins.defaultPixels(), Skins.demoSkin()};
       }
@@ -2826,7 +2826,7 @@ public final class Net319 {
       }
    }
 
-   private static void drawNameTag(Renderer r, String name, float yOff, int rgbColor, float hpFrac) {
+   static void drawNameTag(Renderer r, String name, float yOff, int rgbColor, float hpFrac) {
       if (name == null || name.isEmpty() || Tex.fontTex == 0) {
          return;
       }

@@ -509,6 +509,10 @@ public final class SoundEngine {
       double dy = y - listenerY;
       double dz = z - listenerZ;
       double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      float maxDist = key.equals("tnt_explode") || key.equals("thunder") ? 96.0F : 28.0F;
+      if (dist >= maxDist) {
+         return null;
+      }
 
       if (speedOfSoundDelay && realAcoustics && dist > 8.0) {
          long delayNanos = (long)(((dist - 6.0) / SPEED_OF_SOUND) * 1_000_000_000L);
@@ -527,7 +531,7 @@ public final class SoundEngine {
       v.vz = vz;
       v.baseGain = Math.max(0.0F, Math.min(2.0F, volume));
       v.basePitch = Math.max(0.4F, Math.min(2.2F, pitch));
-      v.maxDist = key.equals("tnt_explode") || key.equals("thunder") ? 96.0F : 28.0F;
+      v.maxDist = maxDist;
       v.refDist = key.equals("tnt_explode") || key.equals("thunder") ? 8.0F : 2.5F;
       updateVoiceAcoustics(w, v);
       if (v.gainL > 0.001F || v.gainR > 0.001F) {

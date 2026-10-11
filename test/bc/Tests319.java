@@ -1065,6 +1065,35 @@ final class Tests319 {
          check(SoundEngine.CREDITS_SECTIONS.length >= 3, "End Credits contains Music, Sound Effects, and 3D Acoustics attribution sections");
          bwGame.runCommand("/credits");
          eq(Game.S.CREDITS, bwGame.screen, "/credits command opens the End Poem & Credits screen");
+
+         // Verify V4.2 Minigame Smart AI Competitors (Tumble, Battle, Bedwars) & Custom Prebuilt Map System
+         bwGame.world.settings.type = WorldSettings.BEDWARS;
+         SkyGen.resetArenaMap(bwGame, bwGame.world, false);
+         Mobs.Mob testBot = bwGame.mobs.spawn(Mobs.ZOMBIE, 0.5, SkyGen.Y_DECK + 1.0, 44.5);
+         testBot.teamTag = "Team:Blue:0:BlazeKing";
+         testBot.variant = 0;
+         check(SkyGen.isMinigameBot(testBot), "Bedwars AI bot recognized by SkyGen.isMinigameBot");
+         eq("[BLUE] BlazeKing", SkyGen.botDisplayName(testBot), "Bedwars AI bot formats team badge and player name");
+         eq(1, SkyGen.botTeamIndex(testBot), "Bedwars AI bot resolves Blue team index (1)");
+         SkyGen.BotIntent bi = SkyGen.tickBotAI(bwGame.mobs, testBot, bwGame.world, bwGame.player);
+         check(bi != null, "SkyGen.tickBotAI produces movement/combat intent for Bedwars AI bot");
+
+         // Verify Bedwars AI Bed Defense & Bridging
+         Mobs.Mob raiderBot = bwGame.mobs.spawn(Mobs.SKELETON, 0.5, SkyGen.Y_DECK + 1.0, 44.5);
+         raiderBot.teamTag = "Team:Blue:1:Valkyrie";
+         raiderBot.variant = 1;
+         raiderBot.age = 12;
+         SkyGen.tickBotAI(bwGame.mobs, raiderBot, bwGame.world, bwGame.player);
+         check(bwGame.world.getBlock(0, SkyGen.Y_DECK, 38) != 0, "Bedwars Raider AI places team wool bridge block toward center");
+
+         // Verify Custom Prebuilt Map save/load (/map save & /map load)
+         bwGame.world.setBlock(2, SkyGen.Y_DECK + 4, 2, Blocks.GOLD_BLOCK);
+         check(SkyGen.saveCustomArenaMap(bwGame.world, "unit_test_arena"), "SkyGen.saveCustomArenaMap saves world chunks to maps/unit_test_arena");
+         SkyGen.customMapName = "unit_test_arena";
+         SkyGen.resetArenaMap(bwGame, bwGame.world, false);
+         eq(Blocks.GOLD_BLOCK, bwGame.world.getBlock(2, SkyGen.Y_DECK + 4, 2), "Custom prebuilt map chunk restores saved GOLD_BLOCK on arena reset");
+         SkyGen.customMapName = null;
+         Game.deleteDir(new java.io.File("maps/unit_test_arena"));
       });
    }
 }

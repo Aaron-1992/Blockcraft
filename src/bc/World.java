@@ -94,6 +94,7 @@ public final class World {
 
    /** Update 3.13: the world settings pick the Overworld generator (old worlds and the tests use the classic one). */
    public World(long var1, File var3, int dimension, WorldSettings st) {
+      FastChunkCache.clear();
       this.seed = var1;
       this.dim = dimension;
       this.settings = st == null ? WorldSettings.classic() : st;
@@ -135,20 +136,36 @@ public final class World {
    }
 
    public Chunk chunk(int var1, int var2) {
-      return (Chunk)this.chunks.get(key(var1, var2));
+      if (FastChunkCache.LAST_WORLD == this) {
+         int slot = (var1 * 31 + var2) & 255;
+         Chunk c = FastChunkCache.CHUNKS[slot];
+         if (c != null && !c.unloaded && c.cx == var1 && c.cz == var2) {
+            return c;
+         }
+         c = (Chunk)this.chunks.get(key(var1, var2));
+         if (c != null && !c.unloaded) {
+            FastChunkCache.CHUNKS[slot] = c;
+         }
+         return c;
+      }
+      Chunk c = (Chunk)this.chunks.get(key(var1, var2));
+      if (c != null && !c.unloaded) {
+         FastChunkCache.switchWorld(this, c, (var1 * 31 + var2) & 255);
+      }
+      return c;
    }
 
    public Chunk chunkAt(int var1, int var2) {
-      return (Chunk)this.chunks.get(key(var1 >> 4, var2 >> 4));
+      return this.chunk(var1 >> 4, var2 >> 4);
    }
 
    public boolean isLoaded(int var1, int var2) {
-      return this.chunkAt(var1, var2) != null;
+      return this.chunk(var1 >> 4, var2 >> 4) != null;
    }
 
    public int getBlock(int var1, int var2, int var3) {
       if (var2 >= 0 && var2 <= 255) {
-         Chunk var4 = (Chunk)this.chunks.get(key(var1 >> 4, var3 >> 4));
+         Chunk var4 = this.chunk(var1 >> 4, var3 >> 4);
          return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & 0xFFFF;
       } else {
          return 0;
@@ -2036,5 +2053,23 @@ public final class World {
 
          return var1;
       }
+   }
+}
+
+final class FastChunkCache {
+   static final Chunk[] CHUNKS = new Chunk[256];
+   static volatile World LAST_WORLD;
+
+   static synchronized void clear() {
+      LAST_WORLD = null;
+      Arrays.fill(CHUNKS, null);
+   }
+
+   static synchronized void switchWorld(World w, Chunk c, int slot) {
+      if (LAST_WORLD != w) {
+         Arrays.fill(CHUNKS, null);
+         LAST_WORLD = w;
+      }
+      CHUNKS[slot] = c;
    }
 }

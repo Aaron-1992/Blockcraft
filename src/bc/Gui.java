@@ -226,33 +226,56 @@ public class Gui {
    }
 
    public void button(float var1, float var2, float var3, float var4, String var5, boolean var6, boolean var7) {
-      int var8 = !var7 ? -11908534 : (var6 ? -8485187 : -9408400);
-      this.rect(var1, var2, var3, var4, -16777216);
-      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, var8);
-      int var9 = !var7 ? -10855846 : (var6 ? -5195536 : -6250336);
-      int var10 = !var7 ? -12961222 : (var6 ? -11906416 : -12303292);
-      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, 1.0F, var9);
-      this.rect(var1 + 1.0F, var2 + 1.0F, 1.0F, var4 - 2.0F, var9);
-      this.rect(var1 + 1.0F, var2 + var4 - 2.0F, var3 - 2.0F, 1.0F, var10);
-      this.rect(var1 + var3 - 2.0F, var2 + 1.0F, 1.0F, var4 - 2.0F, var10);
-      int var11 = !var7 ? -6710887 : (var6 ? -96 : -1);
-      this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, var11, true, 1.0F);
-   }
+      // Sleek Dark-Glass / Obsidian Beveled 3D Button with Emerald-Gold Hover & Active Accents
+      boolean isSelected = var5 != null && (var5.startsWith("[") || var5.contains("\u00a7aON") || var5.contains("\u00a7aActive"));
+      // Subtle drop shadow
+      this.rect(var1 + 1.0F, var2 + 1.0F, var3, var4, 0x55000000);
+      // Outer obsidian frame
+      int borderCol = !var7 ? 0xFF1A1E28 : (var6 ? 0xFF7BE868 : (isSelected ? 0xFF42A862 : 0xFF0A0D14));
+      this.rect(var1, var2, var3, var4, borderCol);
 
-   /** Update 3.13: a track that fills up to the handle (so the setting can be read at a glance); the text sits on top. */
-   public void slider(float var1, float var2, float var3, float var4, String var5, float var6, boolean var7) {
-      this.rect(var1, var2, var3, var4, -16777216);
-      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, -13750738);
-      float var8 = var1 + 1.0F + (var3 - 8.0F) * var6;
-      float fill = var8 - (var1 + 1.0F);
-      if (fill > 1.0F) {
-         this.gradient(var1 + 1.0F, var2 + 1.0F, fill, var4 - 2.0F, var7 ? -10646691 : -11700672, var7 ? -12624064 : -13489606);
+      // Gradient fill
+      int topFill = !var7 ? 0xFF1B1F2A : (var6 ? 0xFF396146 : (isSelected ? 0xFF284636 : 0xFF32394C));
+      int botFill = !var7 ? 0xFF141720 : (var6 ? 0xFF223D2C : (isSelected ? 0xFF1A2E24 : 0xFF1F2432));
+      this.gradient(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, topFill, botFill);
+
+      // Inner specular top rim & bottom bevel
+      int topRim = !var7 ? 0xFF252A38 : (var6 ? 0xFFA4FF8E : (isSelected ? 0xFF66D884 : 0xFF525E7A));
+      int sideRim = !var7 ? 0xFF1F2330 : (var6 ? 0xFF5C9E6E : (isSelected ? 0xFF3E8458 : 0xFF3E475E));
+      int botRim = !var7 ? 0xFF0F1219 : (var6 ? 0xFF16281D : 0xFF121620);
+      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, 1.0F, topRim);
+      this.rect(var1 + 1.0F, var2 + 2.0F, 1.0F, var4 - 4.0F, sideRim);
+      this.rect(var1 + var3 - 2.0F, var2 + 2.0F, 1.0F, var4 - 4.0F, sideRim);
+      this.rect(var1 + 1.0F, var2 + var4 - 2.0F, var3 - 2.0F, 1.0F, botRim);
+
+      // Left glowing indicator pill for active toggles / selected cards
+      if (isSelected && var7) {
+         this.rect(var1 + 2.0F, var2 + 3.0F, 2.0F, var4 - 6.0F, 0xFF68F080);
       }
 
-      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, 1.0F, 553648127);
-      this.rect(var8 + 1.5F, var2 + 1.0F, 3.0F, var4 - 2.0F, -16777216);
-      this.rect(var8 + 2.0F, var2 + 2.0F, 2.0F, var4 - 4.0F, var7 ? -5195536 : -1);
-      this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, -1, true, 1.0F);
+      int textCol = !var7 ? 0xFF6C7284 : (var6 ? 0xFFFFF498 : 0xFFF2F5FA);
+      this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, textCol, true, 1.0F);
+   }
+
+   /** Update 3.13 / V4.2: Sleek dark-glass slider track with glowing emerald-cyan progress bar and 3D thumb handle. */
+   public void slider(float var1, float var2, float var3, float var4, String var5, float var6, boolean var7) {
+      float clamped = Math.max(0.0F, Math.min(1.0F, var6));
+      this.rect(var1 + 1.0F, var2 + 1.0F, var3, var4, 0x55000000);
+      this.rect(var1, var2, var3, var4, var7 ? 0xFF7BE868 : 0xFF0A0D14);
+      this.gradient(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var4 - 2.0F, 0xFF141822, 0xFF1D2332);
+      float var8 = var1 + 1.0F + (var3 - 8.0F) * clamped;
+      float fill = var8 - (var1 + 1.0F);
+      if (fill > 1.0F) {
+         int fillTop = var7 ? 0xFF42B868 : 0xFF2E8B52;
+         int fillBot = var7 ? 0xFF267342 : 0xFF1C5934;
+         this.gradient(var1 + 1.0F, var2 + 1.0F, fill, var4 - 2.0F, fillTop, fillBot);
+         this.rect(var1 + 1.0F, var2 + 1.0F, fill, 1.0F, 0x55A8FFBE);
+      }
+
+      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, 1.0F, 0x30FFFFFF);
+      this.rect(var8 + 1.0F, var2 + 1.0F, 4.0F, var4 - 2.0F, 0xFF0A0D14);
+      this.gradient(var8 + 1.5F, var2 + 2.0F, 3.0F, var4 - 4.0F, var7 ? 0xFFFFF088 : 0xFFE8EEF8, var7 ? 0xFFD8B038 : 0xFF9AA6BE);
+      this.centered(var5, var1 + var3 / 2.0F, var2 + (var4 - 8.0F) / 2.0F, var7 ? 0xFFFFF498 : 0xFFF2F5FA, true, 1.0F);
    }
 
    /** A picture made of pixels that the program computes (the world preview): uploaded to the graphics card when it changes. */
@@ -287,21 +310,20 @@ public class Gui {
       this.tex(img.tex, x, y, w, h, 0.0F, 0.0F, 1.0F, 1.0F, -1);
    }
 
-   /** A sunken rectangle with the inventory's slot colours (the box behind the player model). */
+   /** A sunken rectangle with sleek dark-slate beveled borders (the box behind the player model). */
    public void inset(float x, float y, float w, float h) {
-      this.rect(x, y, w, h, -1);
-      this.rect(x, y, w - 1.0F, h - 1.0F, -13158601);
-      this.rect(x + 1.0F, y + 1.0F, w - 2.0F, h - 2.0F, -7631989);
+      this.rect(x, y, w, h, 0xFF4A5468);
+      this.rect(x, y, w - 1.0F, h - 1.0F, 0xFF0A0D14);
+      this.gradient(x + 1.0F, y + 1.0F, w - 2.0F, h - 2.0F, 0xFF181D2A, 0xFF232A3C);
    }
 
    public void slot(float var1, float var2, float var3) {
-      this.rect(var1, var2, var3, var3, -13158601);
-      this.rect(var1, var2, var3 - 1.0F, 1.0F, -13158601);
-      this.rect(var1 + var3 - 1.0F, var2, 1.0F, var3, -1);
-      this.rect(var1, var2 + var3 - 1.0F, var3, 1.0F, -1);
-      this.rect(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var3 - 2.0F, -7631989);
-      this.rect(var1, var2, var3 - 1.0F, 1.0F, -13158601);
-      this.rect(var1, var2, 1.0F, var3 - 1.0F, -13158601);
+      this.rect(var1, var2, var3, var3, 0xFF0E121B);
+      this.rect(var1 + var3 - 1.0F, var2, 1.0F, var3, 0xFF56627A);
+      this.rect(var1, var2 + var3 - 1.0F, var3, 1.0F, 0xFF56627A);
+      this.gradient(var1 + 1.0F, var2 + 1.0F, var3 - 2.0F, var3 - 2.0F, 0xFF252B3B, 0xFF31394E);
+      this.rect(var1, var2, var3 - 1.0F, 1.0F, 0xFF111520);
+      this.rect(var1, var2, 1.0F, var3 - 1.0F, 0xFF111520);
    }
 
    static final String[] ARROW = {

@@ -103,7 +103,7 @@ public final class Mesher {
       var4.oy = var6;
       var4.oz = var7;
       var4.rot = 0;
-      Chunk[] var8 = new Chunk[9];
+      Chunk[] var8 = var4.chunks9;
 
       for (int var9 = -1; var9 <= 1; var9++) {
          for (int var10 = -1; var10 <= 1; var10++) {
@@ -121,30 +121,48 @@ public final class Mesher {
             int var14 = var7 - 1 + var13;
             int var15 = (var14 >> 4) - var1.cz + 1;
             int var16 = var14 & 15;
-
-            for (int var17 = 0; var17 < 18; var17++) {
-               int var18 = var5 - 1 + var17;
-               int var19 = ci(var17, var11, var13);
-               if (var12 < 0) {
-                  var22[var19] = 6;
-                  var23[var19] = 0;
-               } else if (var12 > 255) {
-                  var22[var19] = 0;
-                  var23[var19] = -16;
+            int rowBase = ci(0, var11, var13);
+            if (var12 < 0) {
+               Arrays.fill(var22, rowBase, rowBase + 18, (short)6);
+               Arrays.fill(var23, rowBase, rowBase + 18, (byte)0);
+            } else if (var12 > 255) {
+               Arrays.fill(var22, rowBase, rowBase + 18, (short)0);
+               Arrays.fill(var23, rowBase, rowBase + 18, (byte)-16);
+            } else {
+               // Left border (var17 = 0, local x = 15 of cx - 1)
+               Chunk cLeft = var8[var15 * 3];
+               if (cLeft == null) {
+                  var22[rowBase] = 6;
+                  var23[rowBase] = 0;
                } else {
-                  Chunk var20 = var8[var15 * 3 + (var18 >> 4) - var1.cx + 1];
-                  if (var20 == null) {
-                     var22[var19] = 6;
-                     var23[var19] = 0;
-                  } else {
-                     int var21 = Chunk.idx(var18 & 15, var12, var16);
-                     var22[var19] = var20.blocks[var21];
-                     var23[var19] = var20.light[var21];
-                  }
+                  int idxL = Chunk.idx(15, var12, var16);
+                  var22[rowBase] = cLeft.blocks[idxL];
+                  var23[rowBase] = cLeft.light[idxL];
+               }
+               // Interior 16 columns (var17 = 1..16, local x = 0..15 of cx)
+               Chunk cMid = var8[var15 * 3 + 1];
+               if (cMid == null) {
+                  Arrays.fill(var22, rowBase + 1, rowBase + 17, (short)6);
+                  Arrays.fill(var23, rowBase + 1, rowBase + 17, (byte)0);
+               } else {
+                  int idxM = Chunk.idx(0, var12, var16);
+                  System.arraycopy(cMid.blocks, idxM, var22, rowBase + 1, 16);
+                  System.arraycopy(cMid.light, idxM, var23, rowBase + 1, 16);
+               }
+               // Right border (var17 = 17, local x = 0 of cx + 1)
+               Chunk cRight = var8[var15 * 3 + 2];
+               if (cRight == null) {
+                  var22[rowBase + 17] = 6;
+                  var23[rowBase + 17] = 0;
+               } else {
+                  int idxR = Chunk.idx(0, var12, var16);
+                  var22[rowBase + 17] = cRight.blocks[idxR];
+                  var23[rowBase + 17] = cRight.light[idxR];
                }
             }
          }
       }
+      Arrays.fill(var8, null);
 
       boolean var24 = false;
 
@@ -333,8 +351,18 @@ public final class Mesher {
       int var10 = var3 + 1;
       int var11 = var4 + 1;
       int var12 = ci(var9, var10, var11);
+      // Fast-path skip for completely enclosed underground/interior cubes (no exposed faces and not a slime block)
+      if (var5 != Redstone319.SLIME_BLOCK
+         && Blocks.opaque[var7[var12 + 324] & 0xFFFF]
+         && Blocks.opaque[var7[var12 - 324] & 0xFFFF]
+         && Blocks.opaque[var7[var12 - 18] & 0xFFFF]
+         && Blocks.opaque[var7[var12 + 18] & 0xFFFF]
+         && Blocks.opaque[var7[var12 + 1] & 0xFFFF]
+         && Blocks.opaque[var7[var12 - 1] & 0xFFFF]) {
+         return;
+      }
       int var13 = tintColor(var1, var5, var2, var4);
-      float[] var14 = (float[])UVT.get();
+      float[] var14 = var0.uvt;
 
       for (int var15 = 0; var15 < 6; var15++) {
          int[] var16 = FN[var15];
@@ -420,10 +448,13 @@ public final class Mesher {
    static void bushyFronds(Mesher.Scratch s, int x, int y, int z, int px, int py, int pz, int tint) {
       int maxSky = 0;
       int maxBlk = 0;
-      int[] fSky = new int[6];
-      int[] fBlk = new int[6];
-      boolean[] fOpen = new boolean[6];
+      int[] fSky = s.fSky;
+      int[] fBlk = s.fBlk;
+      boolean[] fOpen = s.fOpen;
       for (int f = 0; f < 6; f++) {
+         fSky[f] = 0;
+         fBlk[f] = 0;
+         fOpen[f] = false;
          int nb = ci(px + FN[f][0], py + FN[f][1], pz + FN[f][2]);
          int id = s.B[nb] & 0xFFFF;
          if (!Blocks.opaque[id]) {
@@ -1394,6 +1425,11 @@ public final class Mesher {
       final float[] ql = new float[4];
       final float[] qm = new float[4];
       final float[] ao = new float[4];
+      final float[] uvt = new float[2];
+      final Chunk[] chunks9 = new Chunk[9];
+      final int[] fSky = new int[6];
+      final int[] fBlk = new int[6];
+      final boolean[] fOpen = new boolean[6];
       /** Update 3.19: the world position of the section's corner (for the variation between blocks) and the quarter turns of the next quad's texture. */
       int ox;
       int oy;

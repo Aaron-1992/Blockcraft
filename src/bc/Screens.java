@@ -46,11 +46,15 @@ final class Screens {
       double time = ui.time();
       float bottom = Logo.draw(gui, cx, top, cell, time);
       boolean infdev = ModLoader.isInfdevActive();
+      String subTitle = infdev ? "MINECRAFT INFDEV (JUNE 2010)" : ("JAVA & CONSOLE EDITION  -  V" + Game.VERSION_STR);
+      float stW = Gui.textWidth(subTitle) + 16.0F;
+      gui.gradient(cx - stW * 0.5F, bottom + 8.0F, stW, 11.0F, 0x90121826, 0x900A0D16);
+      gui.rect(cx - stW * 0.5F, bottom + 19.0F, stW, 1.0F, infdev ? 0x8063D43E : 0x80FFD84A);
       gui.centered(
-         infdev ? "MINECRAFT INFDEV (JUNE 2010)" : ("JAVA EDITION  -  V" + Game.VERSION_STR),
+         subTitle,
          cx,
          bottom + 10.0F,
-         infdev ? 0xFF63D43E : 0xFFD6D6E0,
+         infdev ? 0xFF63D43E : 0xFFFFF4C8,
          true,
          1.0F
       );
@@ -279,20 +283,26 @@ final class Screens {
       Gui gui = g.gui;
       boolean sel = wi.dir.equals(g.worldName);
       boolean hov = ui.over(x, y, w, h);
-      gui.rect(x, y, w, h, sel ? 0xFFFFFFFF : (hov ? 0xFF8A8A98 : 0xFF3A3C48));
-      gui.rect(x + 1, y + 1, w - 2, h - 2, sel ? 0xFF2C3044 : (hov ? 0xFF222532 : 0xFF161820));
+      int border = sel ? 0xFF68F080 : (hov ? 0xFF7892BE : 0xFF2E3548);
+      gui.rect(x, y, w, h, border);
+      int topFill = sel ? 0xFF28384E : (hov ? 0xFF22293B : 0xFF151926);
+      int botFill = sel ? 0xFF1A2536 : (hov ? 0xFF181D2B : 0xFF0F121C);
+      gui.gradient(x + 1, y + 1, w - 2, h - 2, topFill, botFill);
+      if (sel) {
+         gui.rect(x + 1, y + 1, 2.0F, h - 2, 0xFF68F080);
+      }
       float ts = h - 6.0F;
-      gui.rect(x + 2, y + 2, ts + 2, ts + 2, 0xFF000000);
+      gui.rect(x + 3, y + 2, ts + 2, ts + 2, 0xFF080A10);
       if (wi.thumb != null) {
-         gui.image(wi.thumb.img, x + 3, y + 3, ts, ts);
+         gui.image(wi.thumb.img, x + 4, y + 3, ts, ts);
       }
 
-      float tx = x + ts + 9.0F;
+      float tx = x + ts + 10.0F;
       float tw = w - (tx - x) - 4.0F;
       String when = ago(wi.mod);
       float ww = Gui.textWidth(when);
       gui.text(when, x + w - ww - 4.0F, y + 4.0F, Ui.FAINT, true);
-      gui.text(Game.clipText(wi.name, tw - ww - 8.0F), tx, y + 4.0F, 0xFFFFFFFF, true);
+      gui.text(Game.clipText(wi.name, tw - ww - 8.0F), tx, y + 4.0F, sel ? 0xFFFFF6B8 : 0xFFF4F8FF, true);
       gui.text(Game.clipText(MODE_NAME[Math.max(0, Math.min(MODE_NAME.length - 1, wi.mode))] + "  -  " + wi.settings.typeName(), tw), tx, y + 15.0F, Ui.DIM, true);
       gui.text(Game.clipText("Seed " + wi.seed, tw), tx, y + 25.0F, Ui.FAINT, true);
       final String dir = wi.dir;
