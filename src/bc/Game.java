@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "4.4";
+   public static final String VERSION_STR = "4.5";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -3721,9 +3721,22 @@ public final class Game {
          boolean var5 = this.screen == Game.S.LOADING;
          boolean isPanoWorld = this.pano != null && this.world == this.pano.world;
          int chunkRad = this.opt.renderDistance + 1;
-         this.world.updateChunks(var3, var4, chunkRad, 256, var5 ? 30000000L : 4000000L);
-         this.rend.scheduleMeshes(this.world, var5 ? 64 : 48);
-         this.rend.uploadMeshes(256, var5 ? 20000000L : 4000000L);
+         if (var5) {
+            long loadDeadline = System.nanoTime() + 28000000L;
+            for (int burst = 0; burst < 4; burst++) {
+               int r = this.world.loadedAround(var3, var4, 2) < 25 ? Math.min(3, chunkRad) : chunkRad;
+               this.world.updateChunks(var3, var4, r, 256, 10000000L);
+               this.rend.scheduleMeshes(this.world, 96);
+               this.rend.uploadMeshes(256, 8000000L);
+               if (System.nanoTime() >= loadDeadline) {
+                  break;
+               }
+            }
+         } else {
+            this.world.updateChunks(var3, var4, chunkRad, 256, 4000000L);
+            this.rend.scheduleMeshes(this.world, 48);
+            this.rend.uploadMeshes(256, 4000000L);
+         }
          if (this.screen == Game.S.LOADING) {
             if (Net319.isActive()) {
                Net319.tick(this);

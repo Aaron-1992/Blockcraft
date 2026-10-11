@@ -163,10 +163,13 @@ public class Gen {
 
    boolean carve(int var1, int var2, int var3) {
       double var4 = this.nCave1.noise(var1 * 0.03, var2 * 0.045, var3 * 0.03);
-      double var6 = this.nCave2.noise(var1 * 0.03 + 31.7, var2 * 0.045 + 11.3, var3 * 0.03 - 47.1);
-      if (var4 * var4 + var6 * var6 < 0.0055) {
-         return true;
-      } else if (var2 < 50) {
+      if (var4 * var4 < 0.0055) {
+         double var6 = this.nCave2.noise(var1 * 0.03 + 31.7, var2 * 0.045 + 11.3, var3 * 0.03 - 47.1);
+         if (var4 * var4 + var6 * var6 < 0.0055) {
+            return true;
+         }
+      }
+      if (var2 < 50) {
          double var8 = this.nCavern.noise(var1 * 0.012, var2 * 0.025, var3 * 0.012);
          return var8 > 0.52;
       } else {
@@ -439,7 +442,7 @@ public class Gen {
                int var13 = var6.nextInt();
                int var14 = var4 * 16 + var8;
                int var15 = var5 * 16 + var9;
-               if (var14 >= var1.cx * 16 - 8 && var14 <= var1.cx * 16 + 23 && var15 >= var1.cz * 16 - 8 && var15 <= var1.cz * 16 + 23) {
+               if (var10 <= 0.85F && var14 >= var1.cx * 16 - 8 && var14 <= var1.cx * 16 + 23 && var15 >= var1.cz * 16 - 8 && var15 <= var1.cz * 16 + 23) {
                   Gen.Col var16 = this.column(var14, var15);
                   if (var16.h >= 64 && var16.h <= 235 && !this.entrance(var14, var15)) {
                      int var17;

@@ -1459,6 +1459,56 @@ final class Tests319 {
          bwGame.world.updateChunks(0, 0, 12, 64, 10_000_000L);
          check(bwGame.world.chunk(0, 0) == centerBefore, "updateChunks preserves already-resident arena chunk instances");
          check(bwGame.world.chunk(8, 8) == null, "Void mode updateChunks clamps background chunk loading to the -5..5 arena bounds");
+
+         // =========================================================================
+         // Verify V4.5 Player-Authentic AI Economy (Diamond/Emerald Expeditions, Base Shopkeeper Purchases) & Team Mind
+         // =========================================================================
+         SkyGen.myTeam = 0;
+         SkyGen.switchMinigameMode(bwGame, WorldSettings.BEDWARS, false);
+         SkyGen.startMatch(bwGame, false);
+         Mobs.Mob econBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.botTeamIndex(m) == 1) {
+               econBot = m;
+               break;
+            }
+         }
+         check(econBot != null, "Found Blue Team AI bot for Player-Authentic Economy & Team Mind test");
+         int eSlot = Math.abs(econBot.netId) & 31;
+         SkyGen.teamUpgrades[1] = 0;
+         SkyGen.botDiamonds[eSlot] = 0;
+
+         // Drop 2 Diamonds on the nearest Diamond Generator Island (24, 24) and verify findBedwarsExpeditionTarget directs the bot there!
+         bwGame.world.dropItem(24.5, SkyGen.Y_DECK + 1.0, 24.5, Items.DIAMOND, 2);
+         double[] diaExp = SkyGen.findBedwarsExpeditionTarget(bwGame.world, econBot, 1, 0, eSlot, 99.0, -40.0, -40.0);
+         check(diaExp != null && Math.hypot(diaExp[0] - 24.5, diaExp[2] - 24.5) < 2.0,
+            "AI bot targets live Diamonds on the Diamond Generator Island (24, 24) for a physical Diamond expedition");
+
+         // Move bot to the Diamond Island to pick up the 2 Diamonds; verify Diamonds go into botDiamonds[eSlot] WITHOUT magically unlocking Team Upgrades in the field!
+         econBot.setPos(24.5, SkyGen.Y_DECK + 1.0, 24.5);
+         econBot.onGround = true;
+         SkyGen.tickBotAI(bwGame.mobs, econBot, bwGame.world, bwGame.player);
+         eq(2, SkyGen.botDiamonds[eSlot], "Picking up Diamonds on Diamond Island adds 2 Diamonds to botDiamonds[eSlot]");
+         eq(0, SkyGen.teamUpgrades[1], "Picking up Diamonds in the field does NOT unlock Team Upgrades before returning to the Base Priest Shopkeeper");
+         check(SkyGen.botNeedsBaseShopVisit(bwGame.world, 1, eSlot), "AI bot carrying 2 Diamonds flags botNeedsBaseShopVisit = true to return to Base Priest");
+
+         // Now return the bot to Blue Base (0.5, Y_DECK + 1.0, 44.5) with 2 Diamonds, 2 Emeralds, and 12 Iron, and verify performBotShopAtBase!
+         econBot.setPos(0.5, SkyGen.Y_DECK + 1.0, 44.5);
+         SkyGen.botEmeralds[eSlot] = 2;
+         SkyGen.botIron[eSlot] = 12;
+         boolean shopped = SkyGen.performBotShopAtBase(bwGame.mobs, econBot, bwGame.world, 1, eSlot);
+         check(shopped, "AI bot physically at Blue Base executes purchases at Priest & Smith Shopkeepers");
+         eq(0, SkyGen.botDiamonds[eSlot], "Priest Shopkeeper purchase consumes 2 Diamonds from botDiamonds[eSlot]");
+         check(SkyGen.teamUpgrades[1] != 0, "Spending 2 Diamonds at Base Priest unlocks Blue Team's next Team Upgrade");
+         eq(3, SkyGen.botGearTier[eSlot], "Spending 2 Emeralds at Base Smith upgrades AI bot to Diamond Gear (tier 3)");
+         check(SkyGen.botObsidian[eSlot] >= 4 && SkyGen.botEndStone[eSlot] >= 12,
+            "Spending Emeralds and Iron at Base Smith purchases Obsidian and End Stone for Bed Defense");
+
+         // Verify Team Mind emergency defense & coordinated raid states
+         SkyGen.updateBedwarsTeamMind(bwGame, bwGame.world, 1, eSlot, econBot, true, true, 0);
+         eq(SkyGen.TEAM_OBJ_EMERGENCY_DEFEND, SkyGen.teamObjective[1], "Team Mind switches to TEAM_OBJ_EMERGENCY_DEFEND when base is under attack");
+         SkyGen.updateBedwarsTeamMind(bwGame, bwGame.world, 1, eSlot, econBot, false, true, 0);
+         check(!SkyGen.getTeamThought(1).isEmpty(), "Team Mind publishes a non-empty tactical team thought summary");
       });
    }
 }

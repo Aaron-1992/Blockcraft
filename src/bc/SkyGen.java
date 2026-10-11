@@ -65,7 +65,7 @@ public final class SkyGen extends Gen {
    /** Per-bot Golden Apple heal count, Ender Pearl cooldown, Gear Tier & Looting state indexed by (bot.netId & 31). */
    private static final int[] botHealsUsed = new int[32];
    private static final int[] botPearlCooldown = new int[32];
-   private static final int[] botGearTier = new int[32];
+   public static final int[] botGearTier = new int[32];
    private static final int[] botResources = new int[32];
    private static final int[] botHoldingBlockTicks = new int[32];
    private static final int[] botEatTicks = new int[32];
@@ -77,9 +77,30 @@ public final class SkyGen extends Gen {
    public static final int[] botApples = new int[32];
    public static final int[] botWeaponItem = new int[32];
    public static final int[] botRangedItem = new int[32];
+   public static final int[] botIron = new int[32];
    public static final int[] botGold = new int[32];
+   public static final int[] botDiamonds = new int[32];
+   public static final int[] botEmeralds = new int[32];
+   public static final int[] botEndStone = new int[32];
+   public static final int[] botObsidian = new int[32];
+   public static final int[] botPickaxeTier = new int[32];
    public static final int[] botMurderRole = new int[32];
    private static final int[] botBuildUpCooldown = new int[32];
+   public static final String[] botThought = new String[32];
+
+   // Team Mind / Team Thoughts coordination state per team (0..3)
+   public static final int TEAM_OBJ_FORTIFY_AND_FARM = 0;
+   public static final int TEAM_OBJ_DIAMOND_RUN = 1;
+   public static final int TEAM_OBJ_EMERALD_CONTEST = 2;
+   public static final int TEAM_OBJ_COORDINATED_RAID = 3;
+   public static final int TEAM_OBJ_EMERGENCY_DEFEND = 4;
+   public static final int[] teamObjective = new int[4];
+   public static final int[] teamTargetBed = new int[]{-1, -1, -1, -1};
+   public static final String[] teamThoughtSummary = new String[]{
+      "Fortifying & Farming", "Fortifying & Farming", "Fortifying & Farming", "Fortifying & Farming"
+   };
+   private static final long[] teamLastCalloutTick = new long[4];
+   public static volatile boolean spawnAllyBot = false;
 
    // Thrown TNT Frag Grenade horizontal velocities
    private static final java.util.IdentityHashMap<World.Falling, double[]> tntHorizVel = new java.util.IdentityHashMap<>();
@@ -238,9 +259,20 @@ public final class SkyGen extends Gen {
       Arrays.fill(botApples, 0);
       Arrays.fill(botWeaponItem, 0);
       Arrays.fill(botRangedItem, 0);
+      Arrays.fill(botIron, 0);
       Arrays.fill(botGold, 0);
+      Arrays.fill(botDiamonds, 0);
+      Arrays.fill(botEmeralds, 0);
+      Arrays.fill(botEndStone, 0);
+      Arrays.fill(botObsidian, 0);
+      Arrays.fill(botPickaxeTier, 0);
       Arrays.fill(botMurderRole, 0);
       Arrays.fill(botBuildUpCooldown, 0);
+      Arrays.fill(botThought, "Ready");
+      Arrays.fill(teamObjective, TEAM_OBJ_FORTIFY_AND_FARM);
+      Arrays.fill(teamTargetBed, -1);
+      Arrays.fill(teamThoughtSummary, "Fortifying & Farming");
+      Arrays.fill(teamLastCalloutTick, 0L);
       synchronized (tntHorizVel) {
          tntHorizVel.clear();
       }
@@ -2550,9 +2582,16 @@ public final class SkyGen extends Gen {
       botApples[bSlot] = Math.max(0, apples);
       botWeaponItem[bSlot] = weaponItem;
       botRangedItem[bSlot] = rangedItem;
+      botIron[bSlot] = 0;
       botGold[bSlot] = 0;
+      botDiamonds[bSlot] = 0;
+      botEmeralds[bSlot] = 0;
+      botEndStone[bSlot] = 0;
+      botObsidian[bSlot] = 0;
+      botPickaxeTier[bSlot] = 0;
       botMurderRole[bSlot] = murderRole;
       botBuildUpCooldown[bSlot] = 0;
+      botThought[bSlot] = "Ready";
    }
 
    private static void spawnBattleBotAtPodium(Game g, World w, int i) {
@@ -2972,6 +3011,21 @@ public final class SkyGen extends Gen {
       return -1;
    }
 
+   public static String getBotThought(Mobs.Mob m) {
+      if (m == null) {
+         return "";
+      }
+      int bSlot = Math.abs(m.netId) & 31;
+      String th = botThought[bSlot];
+      return th != null ? th : "Ready";
+   }
+
+   public static String getTeamThought(int team) {
+      int t = Math.abs(team) & 3;
+      String th = teamThoughtSummary[t];
+      return th != null ? th : "Fortifying & Farming";
+   }
+
    public static int botHeldItem(Mobs.Mob bot, World w) {
       if (bot == null || w == null || w.settings == null) {
          return Items.toolId(1, Items.C_SWORD);
@@ -3010,8 +3064,16 @@ public final class SkyGen extends Gen {
       }
       if (type == WorldSettings.BEDWARS) {
          int t = Math.max(0, botTeamIndex(bot));
-         if (botHoldingBlockTicks[bSlot] > 0 && botBlocks[bSlot] > 0) {
-            return Blocks.WOOL0 + BEDWARS_COLORS[t];
+         if (botHoldingBlockTicks[bSlot] > 0) {
+            if (botObsidian[bSlot] > 0) {
+               return Blocks.OBSIDIAN;
+            }
+            if (botEndStone[bSlot] > 0) {
+               return Blocks.END_STONE;
+            }
+            if (botBlocks[bSlot] > 0) {
+               return Blocks.WOOL0 + BEDWARS_COLORS[t];
+            }
          }
          if (botBowDrawTicks[bSlot] > 0 && botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0) {
             return botRangedItem[bSlot];
@@ -3176,6 +3238,18 @@ public final class SkyGen extends Gen {
                   botApples[bSlot] += Math.max(1, cnt / 3);
                } else if (id == Blocks.TNT || id == Redstone319.TNT_GRENADE || id == Redstone319.FIRE_CHARGE) {
                   botGrenades[bSlot] += cnt;
+               } else if (id == Items.EMERALD) {
+                  botEmeralds[bSlot] += cnt;
+               } else if (id == Items.DIAMOND) {
+                  botDiamonds[bSlot] += cnt;
+               } else if (id == Items.GOLD_INGOT) {
+                  botGold[bSlot] += cnt;
+               } else if (id == Items.IRON_INGOT) {
+                  botIron[bSlot] += cnt;
+               } else if (id == Blocks.OBSIDIAN) {
+                  botObsidian[bSlot] += cnt;
+               } else if (id == Blocks.END_STONE) {
+                  botEndStone[bSlot] += cnt;
                } else if (!Items.isItem(id) && Blocks.solid[id]) {
                   botBlocks[bSlot] += cnt;
                }
@@ -3189,8 +3263,8 @@ public final class SkyGen extends Gen {
       }
       if (w.settings == null || w.settings.type != WorldSettings.BEDWARS) {
          bot.variant = Math.min(3, bot.variant + 1);
+         botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
       }
-      botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
       botResources[bSlot] += 4;
       bot.health = Math.min(20, bot.health + 4);
       bot.attackAnim = 8;
@@ -3263,29 +3337,38 @@ public final class SkyGen extends Gen {
                   }
                }
             } else if (id == Items.IRON_INGOT && w.settings != null && w.settings.type == WorldSettings.BEDWARS) {
-               botBlocks[bSlot] += cnt * 4;
-               if (botResources[bSlot] >= 8 && botWeaponItem[bSlot] == Items.TOOL_BASE) {
-                  botWeaponItem[bSlot] = Items.toolId(1, Items.C_SWORD);
-               }
+               botIron[bSlot] += cnt;
+               botThought[bSlot] = "Collected Iron (" + botIron[bSlot] + ")";
             } else if (id == Items.GOLD_INGOT) {
                botGold[bSlot] += cnt;
                if (w.settings != null && w.settings.type == WorldSettings.MURDER && botGold[bSlot] >= 5 && botMurderRole[bSlot] == MURDER_ROLE_INNOCENT) {
                   botGold[bSlot] -= 5;
                   botRangedItem[bSlot] = Redstone319.PISTOL;
                   botArrows[bSlot] += 6;
-               } else if (w.settings != null && w.settings.type == WorldSettings.BEDWARS && botGold[bSlot] >= 3) {
-                  botGold[bSlot] -= 3;
-                  botApples[bSlot]++;
-                  botWeaponItem[bSlot] = Items.toolId(2, Items.C_SWORD);
-                  botRangedItem[bSlot] = Items.BOW;
-                  botArrows[bSlot] += 8;
+                  botThought[bSlot] = "Armed Detective!";
+               } else if (w.settings != null && w.settings.type == WorldSettings.BEDWARS) {
+                  botThought[bSlot] = "Collected Gold (" + botGold[bSlot] + ")";
                }
-            } else if (id == Items.EMERALD || id == Items.DIAMOND) {
-               botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
-               botWeaponItem[bSlot] = Items.toolId(Math.min(4, 1 + botGearTier[bSlot]), Items.C_SWORD);
-               if (w.settings.type == WorldSettings.BEDWARS && myBotTeam >= 0 && botResources[bSlot] >= 4) {
-                  unlockNextTeamUpgrade(mobs.g, myBotTeam, true);
+            } else if (id == Items.DIAMOND) {
+               botDiamonds[bSlot] += cnt;
+               if (w.settings != null && w.settings.type == WorldSettings.BEDWARS) {
+                  botThought[bSlot] = "Grabbed Diamonds (" + botDiamonds[bSlot] + ") -> Base Priest";
+               } else {
+                  botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
+                  botWeaponItem[bSlot] = Items.toolId(Math.min(4, 1 + botGearTier[bSlot]), Items.C_SWORD);
                }
+            } else if (id == Items.EMERALD) {
+               botEmeralds[bSlot] += cnt;
+               if (w.settings != null && w.settings.type == WorldSettings.BEDWARS) {
+                  botThought[bSlot] = "Grabbed Emeralds (" + botEmeralds[bSlot] + ") -> Base Smith";
+               } else {
+                  botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
+                  botWeaponItem[bSlot] = Items.toolId(Math.min(4, 1 + botGearTier[bSlot]), Items.C_SWORD);
+               }
+            } else if (id == Blocks.OBSIDIAN) {
+               botObsidian[bSlot] += cnt;
+            } else if (id == Blocks.END_STONE) {
+               botEndStone[bSlot] += cnt;
             } else if (!Items.isItem(id) && Blocks.solid[id]) {
                botBlocks[bSlot] += cnt;
             }
@@ -3589,6 +3672,253 @@ public final class SkyGen extends Gen {
          return new double[]{0.5, 0.5};
       }
       return new double[]{tx, tz};
+   }
+
+   /** Returns true if all 6 inner defense faces around the team's bed are covered with non-air blocks. */
+   public static boolean isTeamBedFortified(World w, int team) {
+      if (w == null || !isTeamBedIntact(w, team)) {
+         return false;
+      }
+      int[] bf = getTeamBedFoot(team);
+      int[] bh = getTeamBedHead(team);
+      int[][] innerShell = new int[][]{
+         {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
+         {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
+         {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
+      };
+      for (int[] co : innerShell) {
+         if (w.getBlock(co[0], co[1], co[2]) == 0) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+   /**
+    * Returns true when a Bedwars AI bot is holding collected Iron, Gold, Diamonds, or Emeralds that it can spend
+    * at its team's Item Shopkeeper (Trades.SMITH) or Team Upgrade Shopkeeper (Trades.PRIEST).
+    */
+   public static boolean botNeedsBaseShopVisit(World w, int myBotTeam, int bSlot) {
+      int t = Math.abs(myBotTeam) & 3;
+      if (botDiamonds[bSlot] >= 2 && (teamUpgrades[t] & 15) != 15) {
+         return true;
+      }
+      if (botEmeralds[bSlot] >= 2 && (botGearTier[bSlot] < 3 || botObsidian[bSlot] < 4)) {
+         return true;
+      }
+      if (botGold[bSlot] >= 4 && (botGearTier[bSlot] < 2 || botApples[bSlot] < 2 || botRangedItem[bSlot] == 0)) {
+         return true;
+      }
+      if (botIron[bSlot] >= 12 && isTeamBedIntact(w, t) && botEndStone[bSlot] == 0) {
+         return true;
+      }
+      if (botIron[bSlot] >= 10 && botGearTier[bSlot] < 1) {
+         return true;
+      }
+      if (botIron[bSlot] >= 4 && botBlocks[bSlot] < 12) {
+         return true;
+      }
+      return false;
+   }
+
+   /**
+    * Executes real player-equivalent purchases at the team's Base Shopkeeper Villagers (Trades.SMITH & Trades.PRIEST)
+    * ONLY when the bot has physically walked back to its home base and owns the required Iron/Gold/Diamonds/Emeralds!
+    */
+   public static boolean performBotShopAtBase(Mobs mobs, Mobs.Mob bot, World w, int myBotTeam, int bSlot) {
+      int t = Math.abs(myBotTeam) & 3;
+      int baseX = BEDWARS_BASES[t][0];
+      int baseZ = BEDWARS_BASES[t][1];
+      if (bot == null || Math.hypot(bot.x - (baseX + 0.5), bot.z - (baseZ + 0.5)) > 8.0) {
+         return false;
+      }
+      boolean boughtAny = false;
+      Game g = mobs != null ? mobs.g : null;
+
+      // 1. Spend Diamonds at the Team Upgrades Shopkeeper (Trades.PRIEST)
+      while (botDiamonds[bSlot] >= 2 && (teamUpgrades[t] & 15) != 15) {
+         botDiamonds[bSlot] -= 2;
+         unlockNextTeamUpgrade(g, t, true);
+         botThought[bSlot] = "Bought Team Upgrade at Priest";
+         boughtAny = true;
+      }
+
+      // 2. Spend Emeralds at the Item Shopkeeper (Trades.SMITH) for Diamond Gear & Obsidian
+      if (botEmeralds[bSlot] >= 2 && botGearTier[bSlot] < 3) {
+         botEmeralds[bSlot] -= 2;
+         botGearTier[bSlot] = 3;
+         botWeaponItem[bSlot] = Items.toolId(3, Items.C_SWORD);
+         botPickaxeTier[bSlot] = Math.max(botPickaxeTier[bSlot], 3);
+         botObsidian[bSlot] += 4;
+         botThought[bSlot] = "Bought Diamond Gear & Obsidian";
+         boughtAny = true;
+      } else if (botEmeralds[bSlot] >= 1 && botObsidian[bSlot] < 8) {
+         botEmeralds[bSlot]--;
+         botObsidian[bSlot] += 4;
+         botApples[bSlot]++;
+         botThought[bSlot] = "Bought Obsidian for Bed";
+         boughtAny = true;
+      }
+
+      // 3. Spend Gold at the Item Shopkeeper (Trades.SMITH) for Iron Gear, Golden Apples, Bow & TNT
+      if (botGold[bSlot] >= 4 && botGearTier[bSlot] < 2) {
+         botGold[bSlot] -= 4;
+         botGearTier[bSlot] = 2;
+         botWeaponItem[bSlot] = Items.toolId(2, Items.C_SWORD);
+         botPickaxeTier[bSlot] = Math.max(botPickaxeTier[bSlot], 2);
+         botThought[bSlot] = "Bought Iron Sword & Armor";
+         boughtAny = true;
+      }
+      if (botGold[bSlot] >= 3 && botApples[bSlot] < 2) {
+         botGold[bSlot] -= 3;
+         botApples[bSlot]++;
+         botThought[bSlot] = "Bought Golden Apple";
+         boughtAny = true;
+      }
+      if (botGold[bSlot] >= 4 && botRangedItem[bSlot] == 0) {
+         botGold[bSlot] -= 4;
+         botRangedItem[bSlot] = Items.BOW;
+         botArrows[bSlot] += 12;
+         botThought[bSlot] = "Bought Bow & Arrows";
+         boughtAny = true;
+      }
+      if (botGold[bSlot] >= 4 && botGrenades[bSlot] < 2) {
+         botGold[bSlot] -= 4;
+         botGrenades[bSlot]++;
+         boughtAny = true;
+      }
+
+      // 4. Spend Iron at the Item Shopkeeper (Trades.SMITH) for End Stone, Stone Sword/Chain Armor & Team Wool
+      if (botIron[bSlot] >= 12 && botEndStone[bSlot] < 8 && isTeamBedIntact(w, t)) {
+         botIron[bSlot] -= 12;
+         botEndStone[bSlot] += 12;
+         botThought[bSlot] = "Bought End Stone for Bed";
+         boughtAny = true;
+      }
+      if (botIron[bSlot] >= 10 && botGearTier[bSlot] < 1) {
+         botIron[bSlot] -= 10;
+         botGearTier[bSlot] = 1;
+         botWeaponItem[bSlot] = Items.toolId(1, Items.C_SWORD);
+         botPickaxeTier[bSlot] = Math.max(botPickaxeTier[bSlot], 1);
+         botThought[bSlot] = "Bought Stone Sword & Chainmail";
+         boughtAny = true;
+      }
+      while (botIron[bSlot] >= 4 && botBlocks[bSlot] < 48) {
+         botIron[bSlot] -= 4;
+         botBlocks[bSlot] += 16;
+         botThought[bSlot] = "Bought 16 Team Wool";
+         boughtAny = true;
+      }
+
+      if (boughtAny) {
+         bot.attackAnim = 6;
+         if (w != null) {
+            SoundEngine.play3D(w, "item_pop", bot.x, bot.y + 1.2, bot.z, 0.65F, 1.22F);
+         }
+      }
+      return boughtAny;
+   }
+
+   /**
+    * Selects a physical resource expedition target for a Bedwars AI bot:
+    * - Base Forge Generator when low on blocks or starter Iron/Gold
+    * - Nearest Diamond Generator Island (BEDWARS_DIAMONDS) when the team needs Diamonds for Team Upgrades
+    * - Center Emerald Generator ((0, 0)) when the bot wants Emeralds for Diamond Gear / Obsidian
+    */
+   public static double[] findBedwarsExpeditionTarget(
+      World w, Mobs.Mob bot, int myBotTeam, int role, int bSlot, double enemyDist, double enemyX, double enemyZ
+   ) {
+      if (w == null || bot == null || enemyDist < 7.5) {
+         return null;
+      }
+      int t = Math.abs(myBotTeam) & 3;
+      int baseX = BEDWARS_BASES[t][0];
+      int baseZ = BEDWARS_BASES[t][1];
+      int dirX = Integer.compare(0, baseX);
+      int dirZ = Integer.compare(0, baseZ);
+
+      // 1. If critically low on building blocks (<= 6), return to our Base Forge to farm Iron -> buy Wool!
+      if (botBlocks[bSlot] <= 6 && botIron[bSlot] < 4) {
+         double forgeX = baseX - dirX * 2 + 0.5;
+         double forgeZ = baseZ - dirZ * 2 + 0.5;
+         botThought[bSlot] = "Farming Base Forge for Wool";
+         if (Math.hypot(bot.x - forgeX, bot.z - forgeZ) <= 3.0 && bot.age % 30 == 0) {
+            botIron[bSlot] += 4;
+         }
+         return new double[]{forgeX, Y_DECK + 1.0, forgeZ};
+      }
+
+      // 2. Check if there are live Diamonds on one of the 4 Diamond Generator Islands (or if Team Mind assigned a Diamond Run)
+      boolean teamNeedsUpgrades = (teamUpgrades[t] & 15) != 15;
+      if (teamNeedsUpgrades && botDiamonds[bSlot] < 2 && botBlocks[bSlot] >= 8) {
+         double bestDiamondDist = 999.0;
+         double[] bestDiamondPos = null;
+         for (World.Item it : w.items) {
+            if (it != null && !it.dead && it.count > 0 && it.id == Items.DIAMOND) {
+               double dEnemy = Math.hypot(it.x - enemyX, it.z - enemyZ);
+               double dSelf = Math.hypot(it.x - bot.x, it.z - bot.z);
+               if (dEnemy > 7.0 && dSelf < bestDiamondDist) {
+                  bestDiamondDist = dSelf;
+                  bestDiamondPos = new double[]{it.x, it.y, it.z};
+               }
+            }
+         }
+         if (bestDiamondPos == null && (teamObjective[t] == TEAM_OBJ_DIAMOND_RUN || (role == 0 && isTeamBedFortified(w, t)))) {
+            for (int[] di : BEDWARS_DIAMONDS) {
+               double dEnemy = Math.hypot(di[0] + 0.5 - enemyX, di[1] + 0.5 - enemyZ);
+               double dBase = Math.hypot(di[0] - baseX, di[1] - baseZ);
+               double dSelf = Math.hypot(di[0] + 0.5 - bot.x, di[1] + 0.5 - bot.z);
+               if (dEnemy > 7.5 && dBase <= 42.0 && dSelf < bestDiamondDist) {
+                  bestDiamondDist = dSelf;
+                  bestDiamondPos = new double[]{di[0] + 0.5, Y_DECK + 1.0, di[1] + 0.5};
+               }
+            }
+         }
+         if (bestDiamondPos != null && (role == 0 || bestDiamondDist <= 34.0 || teamObjective[t] == TEAM_OBJ_DIAMOND_RUN)) {
+            botThought[bSlot] = "Grabbing Diamonds for Team Upgrade";
+            return bestDiamondPos;
+         }
+      }
+
+      // 3. Check if there are live Emeralds at Center (0, 0) for Raider / Mid Control
+      if (botGearTier[bSlot] < 3 && botEmeralds[bSlot] < 2 && botBlocks[bSlot] >= 8) {
+         for (World.Item it : w.items) {
+            if (it != null && !it.dead && it.count > 0 && it.id == Items.EMERALD) {
+               if (Math.hypot(it.x - enemyX, it.z - enemyZ) > 7.0 && Math.hypot(it.x - bot.x, it.z - bot.z) <= 44.0) {
+                  botThought[bSlot] = "Grabbing Mid Emeralds";
+                  return new double[]{it.x, it.y, it.z};
+               }
+            }
+         }
+      }
+      return null;
+   }
+
+   /**
+    * Updates the shared Team Mind (Team Thoughts & coordinated objective) for a Bedwars team (0..3).
+    * Coordinates roles between teammates: emergency base defense, diamond upgrade runs, mid emerald control, and synchronized bed raids.
+    */
+   public static void updateBedwarsTeamMind(
+      Game g, World w, int myBotTeam, int bSlot, Mobs.Mob bot, boolean baseUnderAttack, boolean ownBedFortified, int targetBedTeam
+   ) {
+      int t = Math.abs(myBotTeam) & 3;
+      teamTargetBed[t] = targetBedTeam;
+      if (baseUnderAttack) {
+         teamObjective[t] = TEAM_OBJ_EMERGENCY_DEFEND;
+         teamThoughtSummary[t] = "DEFEND BED! Intruder at Base!";
+      } else if (!ownBedFortified && isTeamBedIntact(w, t)) {
+         teamObjective[t] = TEAM_OBJ_FORTIFY_AND_FARM;
+         teamThoughtSummary[t] = "Fortifying Bed & Farming Iron";
+      } else if ((teamUpgrades[t] & 15) != 15 && (w != null && (w.tickCount / 160L + t) % 3 == 0)) {
+         teamObjective[t] = TEAM_OBJ_DIAMOND_RUN;
+         teamThoughtSummary[t] = "Collecting Diamonds for Upgrades";
+      } else if (targetBedTeam >= 0) {
+         teamObjective[t] = TEAM_OBJ_COORDINATED_RAID;
+         teamThoughtSummary[t] = "Coordinated Push on " + BEDWARS_NAMES[targetBedTeam] + " Bed";
+      } else {
+         teamObjective[t] = TEAM_OBJ_EMERALD_CONTEST;
+         teamThoughtSummary[t] = "Controlling Mid Emeralds & Hunting";
+      }
    }
 
    public static BotIntent tickBotAI(Mobs mobs, Mobs.Mob bot, World w, Player player) {
@@ -4002,7 +4332,7 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // 3b. Defender Bot (#0): Fortifies own team Bed ONLY if botBlocks[botSlot] > 0!
+         // 3b. Defender Bot (#0) & Base Builders: Fortify own team Bed ONLY using blocks the bot actually owns (Obsidian / End Stone / Wool)!
          boolean ownBedIntact = isTeamBedIntact(w, myBotTeam);
          boolean ownBedFortified = true;
          if (ownBedIntact) {
@@ -4014,97 +4344,134 @@ public final class SkyGen extends Gen {
                {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
             };
             for (int[] co : innerShell) {
-               if (w.getBlock(co[0], co[1], co[2]) == 0) {
+               int curId = w.getBlock(co[0], co[1], co[2]);
+               boolean canUpgrade = (curId == woolId && (botObsidian[botSlot] > 0 || botEndStone[botSlot] > 0))
+                  || (curId == Blocks.END_STONE && botObsidian[botSlot] > 0);
+               if (curId == 0) {
                   ownBedFortified = false;
-                  if (role == 0 && botBlocks[botSlot] > 0 && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.0 && bot.age % 16 == 3) {
-                     int defBlock = (bot.age > 360 || botGearTier[botSlot] >= 2) ? Blocks.END_STONE : woolId;
-                     w.setBlock(co[0], co[1], co[2], defBlock);
+               }
+               if ((curId == 0 || canUpgrade)
+                  && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.0
+                  && (role == 0 || botObsidian[botSlot] > 0 || botEndStone[botSlot] > 0)
+                  && bot.age % 14 == 3) {
+                  int defBlock = 0;
+                  if (botObsidian[botSlot] > 0) {
+                     defBlock = Blocks.OBSIDIAN;
+                     botObsidian[botSlot]--;
+                  } else if (botEndStone[botSlot] > 0) {
+                     defBlock = Blocks.END_STONE;
+                     botEndStone[botSlot]--;
+                  } else if (curId == 0 && botBlocks[botSlot] > 0) {
+                     defBlock = woolId;
                      botBlocks[botSlot]--;
+                  }
+                  if (defBlock != 0) {
+                     w.setBlock(co[0], co[1], co[2], defBlock);
                      bot.attackAnim = 6;
                      botHoldingBlockTicks[botSlot] = 12;
+                     botThought[botSlot] = "Fortifying Team Bed";
                      SoundEngine.playBlockPlace(w, defBlock, co[0], co[1], co[2]);
+                     break;
                   }
+               }
+               if (curId == 0) {
                   break;
                }
             }
          }
 
-         // 3c. Background bridge progression from team base toward Center (0, 0) ONLY if botBlocks[botSlot] > 0!
-         if (role == 1 && botBlocks[botSlot] > 0 && bot.age % 10 == 0) {
+         // 3c. Starter bridge lip block at the edge of the home base island (step == 0), then physical bridging for all steps beyond!
+         if (role == 1 && botBlocks[botSlot] > 0 && Math.hypot(bot.x - (baseX + 0.5), bot.z - (baseZ + 0.5)) <= 9.0 && bot.age % 10 == 2) {
             int dirX = Integer.compare(0, baseX);
             int dirZ = Integer.compare(0, baseZ);
-            int step = bwTeamBridgeStep[myBotTeam];
-            if (step < 32) {
-               int brX = baseX + dirX * (6 + step);
-               int brZ = baseZ + dirZ * (6 + step);
-               if (w.chunkAt(brX, brZ) != null) {
-                  if (w.getBlock(brX, Y_DECK, brZ) == 0) {
-                     w.setBlock(brX, Y_DECK, brZ, woolId);
-                     botBlocks[botSlot]--;
-                     bot.attackAnim = 6;
-                     botHoldingBlockTicks[botSlot] = 10;
-                     SoundEngine.playBlockPlace(w, woolId, brX, Y_DECK, brZ);
-                  }
-                  int sideX = brX + (dirX == 0 ? 1 : 0);
-                  int sideZ = brZ + (dirZ == 0 ? 1 : 0);
-                  if (botBlocks[botSlot] > 0 && w.getBlock(sideX, Y_DECK, sideZ) == 0) {
-                     w.setBlock(sideX, Y_DECK, sideZ, woolId);
-                     botBlocks[botSlot]--;
-                  }
-                  bwTeamBridgeStep[myBotTeam] = step + 1;
-               }
+            int brX = baseX + dirX * 6;
+            int brZ = baseZ + dirZ * 6;
+            if (w.chunkAt(brX, brZ) != null && w.getBlock(brX, Y_DECK, brZ) == 0) {
+               w.setBlock(brX, Y_DECK, brZ, woolId);
+               botBlocks[botSlot]--;
+               bot.attackAnim = 6;
+               botHoldingBlockTicks[botSlot] = 10;
+               bwTeamBridgeStep[myBotTeam] = Math.max(bwTeamBridgeStep[myBotTeam], 1);
+               SoundEngine.playBlockPlace(w, woolId, brX, Y_DECK, brZ);
             }
          }
 
-         // 3d. Surroundings-Safe Looting: if no enemy is threatening (or if out of blocks!), collect nearby generator drops or chests!
-         if (enemyDist > 8.5 || botBlocks[botSlot] <= 2) {
+         // 3d. Physical Shopkeeper Runs: if carrying collected Iron/Gold/Diamonds/Emeralds for upgrades/gear, return to Base Shopkeepers!
+         double distToBase = Math.hypot(bot.x - (baseX + 0.5), bot.z - (baseZ + 0.5));
+         if (distToBase <= 7.5) {
+            performBotShopAtBase(mobs, bot, w, myBotTeam, botSlot);
+         } else if (enemyDist > 7.5 && botNeedsBaseShopVisit(w, myBotTeam, botSlot)) {
+            botThought[botSlot] = "Returning to Base Shopkeeper";
+            bridgeTowardTarget(bot, w, baseX + 0.5, baseZ + 0.5, woolId);
+            tryBotBuildUp(bot, w, baseX + 0.5, Y_DECK + 1.0, baseZ + 0.5, woolId);
+            steerBotSafely3D(bot, w, baseX + 0.5, Y_DECK + 1.0, baseZ + 0.5, out, 1.24);
+            return out;
+         }
+
+         // 3e. Surroundings-Safe Looting & Physical Diamond/Emerald Expeditions!
+         if (enemyDist > 7.5 || botBlocks[botSlot] <= 2) {
             double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, myBotTeam, enemyDist, enemyX, enemyZ);
-            if (lootGoal != null && (role == 0 || botBlocks[botSlot] <= 2 || Math.hypot(lootGoal[0] - bot.x, lootGoal[2] - bot.z) <= 8.0)) {
+            if (lootGoal != null) {
                bridgeTowardTarget(bot, w, lootGoal[0], lootGoal[2], woolId);
                tryBotBuildUp(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], woolId);
-               steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.22);
+               steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.24);
+               if (distToBase <= 7.5) {
+                  performBotShopAtBase(mobs, bot, w, myBotTeam, botSlot);
+               }
+               return out;
+            }
+            double[] expGoal = findBedwarsExpeditionTarget(w, bot, myBotTeam, role, botSlot, enemyDist, enemyX, enemyZ);
+            if (expGoal != null) {
+               bridgeTowardTarget(bot, w, expGoal[0], expGoal[2], woolId);
+               tryBotBuildUp(bot, w, expGoal[0], expGoal[1], expGoal[2], woolId);
+               steerBotSafely3D(bot, w, expGoal[0], expGoal[1], expGoal[2], out, 1.24);
                return out;
             }
          }
 
-         // 3e. Decide Strategic Objective: Defend Base vs Raid Enemy Beds!
+         // 3f. Team Mind Coordination: Synchronize Defense, Upgrades & Bed Raids across teammates!
          double goalX = baseX + 0.5;
          double goalY = Y_DECK + 1.0;
          double goalZ = baseZ + 0.5;
 
          int[] ownBf = getTeamBedFoot(myBotTeam);
-         boolean baseUnderAttack = ownBedIntact && Math.hypot(enemyX - ownBf[0], enemyZ - ownBf[2]) <= 15.0;
+         boolean baseUnderAttack = ownBedIntact && Math.hypot(enemyX - ownBf[0], enemyZ - ownBf[2]) <= 16.0;
 
-         if (role == 0 && ownBedIntact && (!ownBedFortified || baseUnderAttack)) {
+         int targetBedTeam = -1;
+         double bestBedScore = 999.0;
+         for (int t = 0; t < 4; t++) {
+            if (t != myBotTeam && isTeamBedIntact(w, t)) {
+               int[] bf = getTeamBedFoot(t);
+               double d = Math.hypot(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z);
+               double score = d - (t == humanTeam ? 8.0 : 0.0);
+               if (score < bestBedScore) {
+                  bestBedScore = score;
+                  targetBedTeam = t;
+               }
+            }
+         }
+         updateBedwarsTeamMind(mobs.g, w, myBotTeam, botSlot, bot, baseUnderAttack, ownBedFortified, targetBedTeam);
+
+         if (ownBedIntact && ((role == 0 && !ownBedFortified) || (baseUnderAttack && (role == 0 || distToBase <= 24.0)))) {
             if (baseUnderAttack || enemyDist <= 14.0) {
+               botThought[botSlot] = "Intercepting Base Intruder!";
                goalX = enemyX;
                goalY = enemyY;
                goalZ = enemyZ;
             } else {
+               botThought[botSlot] = "Guarding & Fortifying Bed";
                double patrolAng = (bot.age * 0.05) + myBotTeam;
                goalX = ownBf[0] + 0.5 + Math.cos(patrolAng) * 2.2;
                goalZ = ownBf[2] + 0.5 + Math.sin(patrolAng) * 2.2;
             }
          } else {
-            int targetBedTeam = -1;
-            double bestBedScore = 999.0;
-            for (int t = 0; t < 4; t++) {
-               if (t != myBotTeam && isTeamBedIntact(w, t)) {
-                  int[] bf = getTeamBedFoot(t);
-                  double d = Math.hypot(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z);
-                  double score = d - (t == humanTeam ? 8.0 : 0.0);
-                  if (score < bestBedScore) {
-                     bestBedScore = score;
-                     targetBedTeam = t;
-                  }
-               }
-            }
-
             if (enemyDist <= 7.0) {
+               botThought[botSlot] = "Engaging Enemy Fighter";
                goalX = enemyX;
                goalY = enemyY;
                goalZ = enemyZ;
             } else if (targetBedTeam >= 0) {
+               botThought[botSlot] = "Raiding " + BEDWARS_NAMES[targetBedTeam] + " Bed";
                int[] bf = getTeamBedFoot(targetBedTeam);
                int[] bh = getTeamBedHead(targetBedTeam);
                double distToBed = Math.min(
@@ -4276,15 +4643,26 @@ public final class SkyGen extends Gen {
          if (myCsTeam == 1 && !cs2BombPlanted && !cs2RoundOver && distToSite <= 3.5 && enemyDist > 5.0 && w.tickCount > 120L) {
             // Terrorist AI plants the C4 Bomb at Site A or Site B!
             plantCs2Bomb(mobs.g, activeSite == 0 ? 1 : 2, botDisplayName(bot), true);
+            botThought[botSlot] = "Planting C4 at Site " + (activeSite == 0 ? "A" : "B");
             bot.attackAnim = 8;
          } else if (myCsTeam == 0 && cs2BombPlanted && !cs2RoundOver && distToSite <= 3.8 && enemyDist > 4.5) {
             // Counter-Terrorist AI defuses the planted C4 Bomb!
             cs2DefuseTicks += 2;
+            botThought[botSlot] = "Defusing C4 at Site " + (cs2BombSite == 1 ? "A!" : "B!");
             bot.attackAnim = 6;
             if (cs2DefuseTicks >= 100) {
                defuseCs2Bomb(mobs.g, botDisplayName(bot), true);
             }
+         } else if (cs2BombPlanted) {
+            botThought[botSlot] = myCsTeam == 0
+               ? ("Rotating to Defuse C4 at Site " + (cs2BombSite == 1 ? "A!" : "B!"))
+               : ("Guarding Planted C4 at Site " + (cs2BombSite == 1 ? "A" : "B"));
+         } else {
+            botThought[botSlot] = myCsTeam == 0
+               ? ("Holding Site " + (activeSite == 0 ? "A" : "B"))
+               : ("Pushing Site " + (activeSite == 0 ? "A" : "B") + " with Team");
          }
+         teamThoughtSummary[myCsTeam & 1] = botThought[botSlot];
 
          double goalX = siteX;
          double goalY = Y_DECK + 1.0;
@@ -5138,9 +5516,17 @@ public final class SkyGen extends Gen {
       if (g == null || g.mobs == null) {
          return 0;
       }
+      int myTeam = getPlayerTeam(g);
+      int type = (g.world != null && g.world.settings != null) ? g.world.settings.type : -1;
       int c = 0;
       for (Mobs.Mob m : g.mobs.list) {
          if (!m.dead && Mobs.hostile(m.type) && m.y > 0.0) {
+            if (type == WorldSettings.BEDWARS && botTeamIndex(m) == myTeam) {
+               continue;
+            }
+            if (type == WorldSettings.CS2 && botTeamIndex(m) == (myTeam & 1)) {
+               continue;
+            }
             c++;
          }
       }
@@ -5366,6 +5752,20 @@ public final class SkyGen extends Gen {
             g.setScreen(Game.S.WAITING);
             return true;
          }
+         if (sub.equals("ally")) {
+            int my = getPlayerTeam(g);
+            spawnBedwarsTeamBot(g, my, 0);
+            g.say("\u00a7e[Bedwars] Summoned AI Teammate on " + BEDWARS_CODES[my] + BEDWARS_NAMES[my] + " Team\u00a7e!");
+            return true;
+         }
+         if (sub.equals("mind") || sub.equals("thoughts")) {
+            StringBuilder msb = new StringBuilder("\u00a7e[Team Minds] ");
+            for (int t = 0; t < 4; t++) {
+               msb.append(BEDWARS_CODES[t]).append(BEDWARS_NAMES[t]).append(":\u00a7f").append(getTeamThought(t)).append(" ");
+            }
+            g.say(msb.toString());
+            return true;
+         }
          if (sub.equals("reset")) {
             resetArenaMap(g, g.world, true);
             matchState = STATE_PLAYING;
@@ -5376,7 +5776,7 @@ public final class SkyGen extends Gen {
          for (int t = 0; t < 4; t++) {
             sb.append(BEDWARS_CODES[t]).append(BEDWARS_NAMES[t]).append(isTeamBedIntact(g.world, t) ? ":\u00a7aBED " : ":\u00a7cOUT ");
          }
-         sb.append("\u00a77(/bw shop | /bw upgrades | /bw upgrade | /bw team <red|blue|green|yellow> | /bw reset)");
+         sb.append("\u00a77(/bw shop | /bw upgrades | /bw mind | /bw ally | /bw reset)");
          g.say(sb.toString());
          return true;
       }
