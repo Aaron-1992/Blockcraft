@@ -1704,6 +1704,11 @@ public final class Game {
       }
 
       if (this.world != null && this.world.settings != null && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE)) {
+         if (!Net319.isClientConnected()) {
+            // In singleplayer / host mode, respawning after dying in Battle or Tumble starts a fresh round with all AI bots respawned!
+            SkyGen.startMatch(this, true);
+            return;
+         }
          boolean isTumble = this.world.settings.type == WorldSettings.TUMBLE;
          int myTeam = SkyGen.getPlayerTeam(this);
          this.player.dead = false;
@@ -6065,12 +6070,18 @@ public final class Game {
          });
       } else if (bwEliminated) {
          this.gui.centered("\u00a7cYour bed was destroyed — you cannot respawn!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
-         this.button("Spectate Match", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+         this.button("Play New Round", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 98.0F, 20.0F, true, () -> {
+            SkyGen.startMatch(this, true);
+         });
+         this.button("Spectate", var1 + 2.0F, this.gui.h / 2.0F - 10.0F, 98.0F, 20.0F, true, () -> {
             this.respawn();
             this.setScreen(Game.S.PLAY);
          });
       } else {
-         this.button("Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+         boolean isRoundMode = this.world != null
+            && this.world.settings != null
+            && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE);
+         this.button(isRoundMode ? "Play New Round" : "Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
             this.respawn();
             this.setScreen(Game.S.PLAY);
          });

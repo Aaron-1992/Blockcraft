@@ -64,6 +64,8 @@ public final class SkyGen extends Gen {
    private static final int[] botGearTier = new int[32];
    private static final int[] botResources = new int[32];
    private static final int[] botHoldingBlockTicks = new int[32];
+   private static final int[] botEatTicks = new int[32];
+   private static final int[] botBowDrawTicks = new int[32];
 
    // Battle Item Sets / Kits & Tumble Weapon Modes
    public static final String[] SW_KIT_NAMES = new String[]{"Normal", "High Power", "Archer", "Pyro"};
@@ -126,6 +128,7 @@ public final class SkyGen extends Gen {
    private static final boolean[] swBotSpawned = new boolean[8];
    private static boolean skywarsWon;
    private static final boolean[] bwBaseStocked = new boolean[5];
+   private static final boolean[] bwBotInitialSpawned = new boolean[8];
    private static boolean bedwarsWon;
    private static final boolean[] bedKnownIntact = new boolean[]{true, true, true, true};
 
@@ -150,6 +153,7 @@ public final class SkyGen extends Gen {
       battleGraceTicks = 300; // 15-second Console Edition Battle invulnerability timer
       showdownActive = false;
       Arrays.fill(bwBaseStocked, false);
+      Arrays.fill(bwBotInitialSpawned, false);
       bedwarsWon = false;
       Arrays.fill(bedKnownIntact, true);
       Arrays.fill(teamUpgrades, 0);
@@ -161,6 +165,8 @@ public final class SkyGen extends Gen {
       Arrays.fill(botGearTier, 0);
       Arrays.fill(botResources, 0);
       Arrays.fill(botHoldingBlockTicks, 0);
+      Arrays.fill(botEatTicks, 0);
+      Arrays.fill(botBowDrawTicks, 0);
       myKills = 0;
       myDeaths = 0;
       myBedsBroken = 0;
@@ -652,10 +658,11 @@ public final class SkyGen extends Gen {
             if (targetW.settings.type == WorldSettings.BEDWARS) {
                stockBedwarsWorld(g, targetW);
             } else if (targetW.settings.type == WorldSettings.BATTLE) {
-               stockSkywarsChests(g, targetW, true);
+               stockSkywarsChests(g, targetW, false);
             } else if (targetW.settings.type == WorldSettings.TUMBLE) {
                stockTumbleArena(g, targetW);
             }
+            ensureRoundBotsSpawned(g, targetW);
          }
       }
       if (broadcast && Net319.isActive()) {
@@ -671,6 +678,7 @@ public final class SkyGen extends Gen {
          g.world.settings.mapId = winningVotedMap(g.world.settings.mapId);
       }
       resetArenaMap(g, g != null ? g.world : null, false);
+      ensureRoundBotsSpawned(g, g != null ? g.world : null);
       matchState = STATE_PLAYING;
       lobbyCountdownTicks = -1;
       SoundEngine.playMinigameSound("mg_count_go");
@@ -1647,6 +1655,85 @@ public final class SkyGen extends Gen {
       return false;
    }
 
+   private static void spawnBattleBotAtPodium(Game g, World w, int i) {
+      if (g == null || g.mobs == null || w == null || i <= 0 || i >= SKYWARS_SPAWNS.length) {
+         return;
+      }
+      int[] sp = SKYWARS_SPAWNS[i];
+      w.ensureChunkLoaded(sp[0] >> 4, sp[1] >> 4);
+      if (w.getBlock(sp[0], Y_DECK, sp[1]) == 0) {
+         w.setBlock(sp[0], Y_DECK, sp[1], Blocks.GOLD_BLOCK);
+      }
+      int mobType = (i % 3 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
+      Mobs.Mob bot = g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+      if (bot != null) {
+         String bName = BOT_NAMES[i % BOT_NAMES.length];
+         bot.teamTag = "BattleBot:" + i + ":" + bName;
+         bot.variant = 0;
+         int bSlot = Math.abs(bot.netId) & 31;
+         botHealsUsed[bSlot] = 0;
+         botPearlCooldown[bSlot] = 0;
+         botGearTier[bSlot] = 0;
+         botResources[bSlot] = 0;
+         botHoldingBlockTicks[bSlot] = 0;
+         botEatTicks[bSlot] = 0;
+         botBowDrawTicks[bSlot] = 0;
+      }
+   }
+
+   /**
+    * Ensures all initial AI competitors are spawned at the start of every round across Tumble, Battle, and Bedwars,
+    * even if chests were already stocked or if the player switched teams/settings in the waiting lobby!
+    */
+   public static void ensureRoundBotsSpawned(Game g, World w) {
+      if (g == null || g.mobs == null || w == null || w.settings == null || !soloBots || Net319.isClientConnected()) {
+         return;
+      }
+      w.ensureArenaChunksLoaded();
+      int type = w.settings.type;
+      if (type == WorldSettings.TUMBLE) {
+         if (!tumbleSpawnedBots || (w.tickCount < 20L && countHostiles(g) == 0)) {
+            tumbleSpawnedBots = true;
+            for (int i = 1; i < 6; i++) {
+               double ang = i * (2.0 * Math.PI / 6.0);
+               double bx = Math.cos(ang) * 11.0 + 0.5;
+               double bz = Math.sin(ang) * 11.0 + 0.5;
+               Mobs.Mob bot = g.mobs.spawn(i % 2 == 0 ? Mobs.SKELETON : Mobs.ZOMBIE, bx, Y_DECK + 1.0, bz);
+               if (bot != null) {
+                  String bName = BOT_NAMES[i % BOT_NAMES.length];
+                  bot.teamTag = "TumbleBot:" + i + ":" + bName;
+                  bot.variant = i;
+               }
+            }
+         }
+      } else if (type == WorldSettings.BATTLE) {
+         if (w.tickCount < 20L && countHostiles(g) == 0) {
+            Arrays.fill(swBotSpawned, false);
+         }
+         for (int i = 1; i < SKYWARS_SPAWNS.length; i++) {
+            if (!swBotSpawned[i]) {
+               swBotSpawned[i] = true;
+               spawnBattleBotAtPodium(g, w, i);
+            }
+         }
+      } else if (type == WorldSettings.BEDWARS) {
+         int myTeamIdx = getPlayerTeam(g);
+         for (int t = 0; t < 4; t++) {
+            if (t == myTeamIdx || !isTeamBedIntact(w, t)) {
+               continue;
+            }
+            for (int role = 0; role <= 1; role++) {
+               int slot = t * 2 + role;
+               if (!bwBotInitialSpawned[slot]) {
+                  bwBotInitialSpawned[slot] = true;
+                  bwBotRespawnTicks[slot] = 0;
+                  spawnBedwarsTeamBot(g, t, role);
+               }
+            }
+         }
+      }
+   }
+
    public static void stockTumbleArena(Game g, World w) {
       if (w == null) {
          return;
@@ -1667,20 +1754,7 @@ public final class SkyGen extends Gen {
          sbIslandStocked[0] = true;
       }
       // Spawn 5 Named Tumble AI Competitors around the ring in solo mode
-      if (!tumbleSpawnedBots && soloBots && !Net319.isActive() && g != null && g.mobs != null && w.chunk(0, 0) != null) {
-         tumbleSpawnedBots = true;
-         for (int i = 1; i < 6; i++) {
-            double ang = i * (2.0 * Math.PI / 6.0);
-            double bx = Math.cos(ang) * 11.0 + 0.5;
-            double bz = Math.sin(ang) * 11.0 + 0.5;
-            Mobs.Mob bot = g.mobs.spawn(i % 2 == 0 ? Mobs.SKELETON : Mobs.ZOMBIE, bx, Y_DECK + 1.0, bz);
-            if (bot != null) {
-               String bName = BOT_NAMES[i % BOT_NAMES.length];
-               bot.teamTag = "TumbleBot:" + i + ":" + bName;
-               bot.variant = i;
-            }
-         }
-      }
+      ensureRoundBotsSpawned(g, w);
    }
 
    public static void stockSkyblockChests(Game g, World w) {
@@ -1696,35 +1770,28 @@ public final class SkyGen extends Gen {
       }
       // 1. 8 Outer Spawn Island Chests + 7 Named Battle AI Fighters on Podiums 1..7
       for (int i = 0; i < SKYWARS_SPAWNS.length; i++) {
-         if (swIslandStocked[i]) {
-            continue;
-         }
-         int[] sp = SKYWARS_SPAWNS[i];
-         if (putChestItems(
-            w,
-            sp[0] + 2,
-            Y_DECK + 1,
-            sp[1],
-            new Stack(i % 2 == 0 ? Items.toolId(1, Items.C_SWORD) : Items.toolId(2, Items.C_AXE), 1),
-            new Stack(i % 2 == 0 ? Blocks.PLANKS : Blocks.COBBLE, 32),
-            new Stack(Items.armorId(i % 2, 1), 1),
-            new Stack(Items.armorId(0, 3), 1),
-            new Stack(Items.STEAK, 6),
-            new Stack(i % 3 == 0 ? Items.ENDER_PEARL : Items.WATER_BUCKET, 1),
-            new Stack(Items.BOW, 1),
-            new Stack(Items.ARROW, 12)
-         )) {
-            swIslandStocked[i] = true;
-            if (!refill && !swBotSpawned[i] && i > 0 && soloBots && !Net319.isClientConnected() && g != null && g.mobs != null && w.chunkAt(sp[0], sp[1]) != null) {
-               swBotSpawned[i] = true;
-               int mobType = (i % 3 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
-               Mobs.Mob bot = g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
-               if (bot != null) {
-                  String bName = BOT_NAMES[i % BOT_NAMES.length];
-                  bot.teamTag = "BattleBot:" + i + ":" + bName;
-                  bot.variant = 0; // Looting tier 0..2
-               }
+         if (!swIslandStocked[i]) {
+            int[] sp = SKYWARS_SPAWNS[i];
+            if (putChestItems(
+               w,
+               sp[0] + 2,
+               Y_DECK + 1,
+               sp[1],
+               new Stack(i % 2 == 0 ? Items.toolId(1, Items.C_SWORD) : Items.toolId(2, Items.C_AXE), 1),
+               new Stack(i % 2 == 0 ? Blocks.PLANKS : Blocks.COBBLE, 32),
+               new Stack(Items.armorId(i % 2, 1), 1),
+               new Stack(Items.armorId(0, 3), 1),
+               new Stack(Items.STEAK, 6),
+               new Stack(i % 3 == 0 ? Items.ENDER_PEARL : Items.WATER_BUCKET, 1),
+               new Stack(Items.BOW, 1),
+               new Stack(Items.ARROW, 12)
+            )) {
+               swIslandStocked[i] = true;
             }
+         }
+         if (!refill && !swBotSpawned[i] && i > 0 && soloBots && !Net319.isClientConnected() && g != null && g.mobs != null && w != null) {
+            swBotSpawned[i] = true;
+            spawnBattleBotAtPodium(g, w, i);
          }
       }
       // 2. 4 Mid-Ring Island Chests
@@ -1786,16 +1853,23 @@ public final class SkyGen extends Gen {
             g.world.setBlock(bx, Y_DECK, bz, Blocks.STONEBRICK);
          }
       }
+      int slot = t * 2 + (role & 1);
+      bwBotInitialSpawned[slot] = true;
       double ox = role == 0 ? 0.5 : -0.5;
       double oz = role == 0 ? -0.5 : 0.5;
       Mobs.Mob bot = g.mobs.spawn(role == 0 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5 + ox, Y_DECK + 1.0, bz + 0.5 + oz);
       if (bot != null) {
          String bName = BOT_NAMES[(t * 2 + role) % BOT_NAMES.length];
          bot.teamTag = "Team:" + BEDWARS_NAMES[t] + ":" + role + ":" + bName;
-         bot.variant = role;
+         bot.variant = role & 1;
          int bSlot = Math.abs(bot.netId) & 31;
          botHealsUsed[bSlot] = 0;
          botPearlCooldown[bSlot] = 0;
+         botGearTier[bSlot] = 0;
+         botResources[bSlot] = 0;
+         botHoldingBlockTicks[bSlot] = 0;
+         botEatTicks[bSlot] = 0;
+         botBowDrawTicks[bSlot] = 0;
       }
    }
 
@@ -1916,6 +1990,9 @@ public final class SkyGen extends Gen {
       }
       int type = w.settings.type;
       int bSlot = Math.abs(bot.netId) & 31;
+      if (botEatTicks[bSlot] > 0) {
+         return Redstone319.GOLDEN_APPLE;
+      }
       if (type == WorldSettings.TUMBLE) {
          return (tumbleWeaponMode % 3) == 2 ? Blocks.SNOW : Items.toolId(4, Items.C_SHOVEL);
       }
@@ -1942,6 +2019,7 @@ public final class SkyGen extends Gen {
       if (bot == null || r == null || w == null) {
          return;
       }
+      int bSlot = Math.abs(bot.netId) & 31;
       float bright = r.brightnessAt(w, x, y + 1.0, z);
       PlayerModel.Pose pose = new PlayerModel.Pose();
       pose.bodyYaw = MobRender.lerpAngle(bot.pyaw, bot.yaw, partial);
@@ -1950,11 +2028,17 @@ public final class SkyGen extends Gen {
       pose.headPitch = bot.pheadPitch + (bot.headPitch - bot.pheadPitch) * partial;
       pose.limb = bot.pwalk + (bot.walk - bot.pwalk) * partial;
       pose.amp = bot.pwalkAmp + (bot.walkAmp - bot.pwalkAmp) * partial;
-      pose.swing = bot.attackAnim > 0 ? (1.0F - bot.attackAnim / 8.0F) : 0.0F;
-      pose.sprint = bot.moving;
-      pose.sprintK = bot.moving ? 1.0F : 0.0F;
+      pose.swing = bot.attackAnim > 0 ? (1.0F - bot.attackAnim / 8.0F) : -1.0F;
+      boolean speedBridging = botHoldingBlockTicks[bSlot] > 0 && bot.onGround;
+      pose.sneak = speedBridging;
+      pose.sneakK = speedBridging ? 0.85F : 0.0F;
+      pose.sprint = bot.moving && !speedBridging;
+      pose.sprintK = pose.sprint ? 1.0F : 0.0F;
       pose.air = !bot.onGround;
       pose.airK = bot.onGround ? 0.0F : 1.0F;
+      pose.vy = (float)bot.vy;
+      pose.eat = botEatTicks[bSlot] > 0 ? (1.0F - botEatTicks[bSlot] / 18.0F) : -1.0F;
+      pose.bow = botBowDrawTicks[bSlot] > 0 ? Math.min(1.0F, botBowDrawTicks[bSlot] / 14.0F) : -1.0F;
       pose.hurt = (bot.hurtTime > 0 || bot.dead) ? 1.0F : 0.0F;
       pose.age = bot.age + partial;
       pose.held = botHeldItem(bot, w);
@@ -2044,7 +2128,9 @@ public final class SkyGen extends Gen {
             }
          }
       }
-      bot.variant = Math.min(3, bot.variant + 1);
+      if (w.settings == null || w.settings.type != WorldSettings.BEDWARS) {
+         bot.variant = Math.min(3, bot.variant + 1);
+      }
       botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
       botResources[bSlot] += 4;
       bot.health = Math.min(20, bot.health + 4);
@@ -2282,10 +2368,28 @@ public final class SkyGen extends Gen {
          out.moving = false;
          return;
       }
+      int bSlot = Math.abs(bot.netId) & 31;
       bot.dirYaw = bestYaw;
       out.headYaw = bestYaw;
       out.moving = true;
-      out.speedMul = baseSpeed;
+      // Scale bot speed to match real human player sprinting speed (~0.22..0.25 blocks/tick)
+      out.speedMul = baseSpeed * 1.38;
+
+      // Player-like Sprint-Jumping (Bunny-Hopping) across confirmed safe straightaways!
+      if (bot.onGround
+         && dist > 5.5
+         && bestSafetyScore >= 135
+         && botHoldingBlockTicks[bSlot] <= 0
+         && botEatTicks[bSlot] <= 0
+         && ((bot.age + Math.abs(bot.netId) * 7) % 16 == 0)) {
+         bot.vy = Mobs.JUMP;
+         out.speedMul *= 1.12;
+      }
+
+      // 3D Footstep Acoustics while running on solid blocks
+      if (bot.onGround && underId > 0 && ((bot.age + Math.abs(bot.netId) * 3) % 7 == 0)) {
+         SoundEngine.playFootstep(w, underId, bot.x, bot.y, bot.z, 0.34F);
+      }
    }
 
    /** Bridges across island gaps in Battle by routing Outer Spawn -> Nearest Mid-Ring -> Center -> Target. */
@@ -2338,16 +2442,22 @@ public final class SkyGen extends Gen {
       if (botHoldingBlockTicks[botSlot] > 0) {
          botHoldingBlockTicks[botSlot]--;
       }
+      if (botEatTicks[botSlot] > 0) {
+         botEatTicks[botSlot]--;
+      }
+      if (botBowDrawTicks[botSlot] > 0) {
+         botBowDrawTicks[botSlot]--;
+      }
 
-      // Tactical Golden Apple Self-Healing: Battle & Bedwars bots eat a Golden Apple when HP <= 10!
+      // Tactical Golden Apple Self-Healing: Battle & Bedwars bots hold and eat a Golden Apple when HP <= 10!
       if ((mode == WorldSettings.BATTLE || mode == WorldSettings.BEDWARS)
          && bot.health > 0
          && bot.health <= 10
          && botHealsUsed[botSlot] < 2
          && bot.age % 35 == 0) {
          botHealsUsed[botSlot]++;
+         botEatTicks[botSlot] = 18;
          bot.health = Math.min(20, bot.health + 6);
-         bot.attackAnim = 8;
          SoundEngine.play3D(w, "eat_1", bot.x, bot.y + 1.4, bot.z, 0.7F, 1.0F);
          if (mobs.g != null) {
             mobs.g.spawnBreakParticles((int)Math.floor(bot.x), (int)Math.floor(bot.y + 1.2), (int)Math.floor(bot.z), Blocks.GOLD_BLOCK, 6);
@@ -2596,18 +2706,24 @@ public final class SkyGen extends Gen {
                   mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77eliminated \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
                }
             }
-         } else if (isArcher && bestDist >= 2.5 && bestDist < 18.0 && bot.cd <= 0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
-            bot.cd = 32;
-            SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
-            double arcY = targY + 1.1 + bestDist * 0.04;
-            if (targetIsPlayer) {
-               mobs.shootAtPos(bot, leadX, arcY, leadZ);
-            } else if (rivalBot != null) {
-               mobs.shootAtPos(bot, leadX, arcY, leadZ);
-               if (mobs.rnd.nextInt(3) != 0) {
-                  mobs.hurtMob(rivalBot, 3, bot.x, bot.z, 0.32, false);
-                  if (rivalBot.dead && mobs.g != null) {
-                     mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77sniped \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
+         } else if (isArcher && bestDist >= 2.5 && bestDist < 18.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
+            if (bot.cd > 0 && bot.cd <= 16) {
+               // Two-handed Bow draw pose before releasing the arrow!
+               botBowDrawTicks[botSlot] = 17 - bot.cd;
+            } else if (bot.cd <= 0) {
+               bot.cd = 32;
+               botBowDrawTicks[botSlot] = 0;
+               SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
+               double arcY = targY + 1.1 + bestDist * 0.04;
+               if (targetIsPlayer) {
+                  mobs.shootAtPos(bot, leadX, arcY, leadZ);
+               } else if (rivalBot != null) {
+                  mobs.shootAtPos(bot, leadX, arcY, leadZ);
+                  if (mobs.rnd.nextInt(3) != 0) {
+                     mobs.hurtMob(rivalBot, 3, bot.x, bot.z, 0.32, false);
+                     if (rivalBot.dead && mobs.g != null) {
+                        mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77sniped \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
+                     }
                   }
                }
             }
@@ -2994,6 +3110,7 @@ public final class SkyGen extends Gen {
       // 2. BATTLE: Console Edition grace period, chest refills, Showdown mode, and last-man-standing victory!
       if (type == WorldSettings.BATTLE) {
          stockSkywarsChests(g, w, false);
+         ensureRoundBotsSpawned(g, w);
          if (battleGraceTicks > 0) {
             battleGraceTicks--;
             if (g != null && g.player != null && !g.player.dead) {
@@ -3044,6 +3161,9 @@ public final class SkyGen extends Gen {
       // 3. BEDWARS: stock team bases, AI bot respawns, resource generators, bed destruction alerts & victory check
       if (type == WorldSettings.BEDWARS) {
          stockBedwarsWorld(g, w);
+         if (w.tickCount < 40L) {
+            ensureRoundBotsSpawned(g, w);
+         }
          // Process Bedwars AI Bot Respawn timers & watchdog while their team bed remains intact
          if (g != null && g.mobs != null && soloBots && !Net319.isClientConnected()) {
             int myTeamIdx = getPlayerTeam(g);

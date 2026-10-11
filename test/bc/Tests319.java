@@ -1176,6 +1176,68 @@ final class Tests319 {
          }
          check(!stillAliveAfterBedGone, "Bedwars AI bot stays permanently dead after its team bed is destroyed");
 
+         // Verify starting a NEW ROUND (startMatch / resetArenaMap) in Bedwars, Battle, and Tumble respawns all AI bots and gives player-like running!
+         SkyGen.startMatch(bwGame, false);
+         int bwRound2Bots = 0;
+         Mobs.Mob runnerBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.isMinigameBot(m)) {
+               bwRound2Bots++;
+               if ((m.variant & 1) == 1) {
+                  runnerBot = m;
+               }
+            }
+         }
+         eq(6, bwRound2Bots, "Starting a new Bedwars round respawns all 6 enemy AI bots across Blue, Green, and Yellow");
+         check(runnerBot != null, "Bedwars Raider AI bot spawned for new round");
+         for (int tick = 0; tick < 12; tick++) {
+            bwGame.world.tickCount++;
+            bwGame.mobs.tick();
+            SkyGen.tickMode(bwGame, bwGame.world);
+         }
+         check(runnerBot.moving && runnerBot.walkAmp > 0.2F, "Minigame AI bot sets moving=true and animates player-like sprinting stride");
+
+         // Switch to BATTLE mode, kill all bots, start a new round, and verify all 7 BattleBots respawn!
+         bwGame.world.settings.type = WorldSettings.BATTLE;
+         SkyGen.startMatch(bwGame, false);
+         int battleRound1Bots = 0;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.isMinigameBot(m)) {
+               battleRound1Bots++;
+               m.dead = true;
+            }
+         }
+         eq(7, battleRound1Bots, "Battle round 1 spawns all 7 BattleBot competitors");
+         SkyGen.startMatch(bwGame, false);
+         int battleRound2Bots = 0;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.isMinigameBot(m)) {
+               battleRound2Bots++;
+            }
+         }
+         eq(7, battleRound2Bots, "Starting a new Battle round (startMatch / resetArenaMap) respawns all 7 BattleBot competitors");
+
+         // Switch to TUMBLE mode, kill all bots, start a new round, and verify all 5 TumbleBots respawn!
+         bwGame.world.settings.type = WorldSettings.TUMBLE;
+         SkyGen.startMatch(bwGame, false);
+         int tumbleRound1Bots = 0;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.isMinigameBot(m)) {
+               tumbleRound1Bots++;
+               m.dead = true;
+            }
+         }
+         eq(5, tumbleRound1Bots, "Tumble round 1 spawns all 5 TumbleBot competitors");
+         SkyGen.startMatch(bwGame, false);
+         int tumbleRound2Bots = 0;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.isMinigameBot(m)) {
+               tumbleRound2Bots++;
+            }
+         }
+         eq(5, tumbleRound2Bots, "Starting a new Tumble round (startMatch / resetArenaMap) respawns all 5 TumbleBot competitors");
+         bwGame.world.settings.type = WorldSettings.BEDWARS;
+
          // Verify LOD high-detail splitDistance extends further and scales dynamically with render distance
          Lod lodTest = new Lod(null, bwGame.world.gen);
          try {

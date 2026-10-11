@@ -405,9 +405,12 @@ public final class Mobs {
             SkyGen.BotIntent bi = SkyGen.tickBotAI(this, var1, var2, var3);
             if (bi != null) {
                var12 = bi.moving;
+               var1.moving = bi.moving;
                var13 *= bi.speedMul;
                var26 = bi.headYaw;
                var27 = bi.headPitch;
+            } else {
+               var1.moving = false;
             }
          } else switch (var1.type) {
             case 4:
@@ -609,18 +612,25 @@ public final class Mobs {
             double var41 = Math.toRadians(var1.dirYaw);
             var8 = -Math.sin(var41) * var13;
             var10 = Math.cos(var41) * var13;
-            float var30 = wrap(var1.dirYaw - var1.yaw);
-            var1.yaw = var1.yaw + Math.max(-25.0F, Math.min(25.0F, var30));
+            float targetBodyYaw = SkyGen.isMinigameBot(var1) && var1.hasTarget
+               ? var26 + Math.max(-38.0F, Math.min(38.0F, wrap(var1.dirYaw - var26)))
+               : var1.dirYaw;
+            float var30 = wrap(targetBodyYaw - var1.yaw);
+            float maxTurn = SkyGen.isMinigameBot(var1) ? 32.0F : 25.0F;
+            var1.yaw = var1.yaw + Math.max(-maxTurn, Math.min(maxTurn, var30));
          }
 
          if (var1.hasTarget && !var12) {
-            var1.yaw = var1.yaw + Math.max(-10.0F, Math.min(10.0F, wrap(var1.dirYaw - var1.yaw)));
+            float maxIdleTurn = SkyGen.isMinigameBot(var1) ? 24.0F : 10.0F;
+            float targetIdleYaw = SkyGen.isMinigameBot(var1) ? var26 : var1.dirYaw;
+            var1.yaw = var1.yaw + Math.max(-maxIdleTurn, Math.min(maxIdleTurn, wrap(targetIdleYaw - var1.yaw)));
          }
 
          float var42 = wrap(var26 - var1.yaw);
-         var42 = Math.max(-50.0F, Math.min(50.0F, var42));
-         var1.headYaw = var1.headYaw + (var1.yaw + var42 - var1.headYaw) * 0.4F;
-         var1.headPitch = var1.headPitch + (var27 - var1.headPitch) * 0.4F;
+         var42 = Math.max(-55.0F, Math.min(55.0F, var42));
+         float headLerp = SkyGen.isMinigameBot(var1) ? 0.58F : 0.4F;
+         var1.headYaw = var1.headYaw + (var1.yaw + var42 - var1.headYaw) * headLerp;
+         var1.headPitch = var1.headPitch + (var27 - var1.headPitch) * headLerp;
          if (var12 && !var1.hasTarget && var1.flee <= 0 && !Mobs312.flies(var1.type) && !SkyGen.isMinigameBot(var1)) {
             double var29 = var1.x + var8 * 8.0;
             double var31 = var1.z + var10 * 8.0;
@@ -695,8 +705,13 @@ public final class Mobs {
          }
 
          double var38 = Math.hypot(var1.x - var1.px, var1.z - var1.pz);
-         var1.walkAmp = var1.walkAmp + (Math.min(1.0F, (float)(var38 * 8.0)) - var1.walkAmp) * 0.4F;
-         var1.walk += (float)var38 * 4.0F;
+         if (SkyGen.isMinigameBot(var1)) {
+            var1.walkAmp = var1.walkAmp + (Math.min(1.15F, (float)(var38 * 9.5)) - var1.walkAmp) * 0.48F;
+            var1.walk += (float)var38 * 4.8F;
+         } else {
+            var1.walkAmp = var1.walkAmp + (Math.min(1.0F, (float)(var38 * 8.0)) - var1.walkAmp) * 0.4F;
+            var1.walk += (float)var38 * 4.0F;
+         }
       }
    }
 
