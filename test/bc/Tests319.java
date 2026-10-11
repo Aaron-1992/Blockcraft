@@ -1509,6 +1509,68 @@ final class Tests319 {
          eq(SkyGen.TEAM_OBJ_EMERGENCY_DEFEND, SkyGen.teamObjective[1], "Team Mind switches to TEAM_OBJ_EMERGENCY_DEFEND when base is under attack");
          SkyGen.updateBedwarsTeamMind(bwGame, bwGame.world, 1, eSlot, econBot, false, true, 0);
          check(!SkyGen.getTeamThought(1).isEmpty(), "Team Mind publishes a non-empty tactical team thought summary");
+
+         // =========================================================================
+         // Verify V4.6 Pre-Round Tactical Warmup, Anti-Clumping, Low-HP Retreat/Walling & Layer-2 Bed Defense
+         // =========================================================================
+         // 1. Anti-Clumping Formation Offsets & Pre-Round Warmup Scouting
+         Mobs.Mob secondBlueBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && m != econBot && SkyGen.botTeamIndex(m) == 1) {
+               secondBlueBot = m;
+               break;
+            }
+         }
+         check(secondBlueBot != null, "Found second Blue Team bot for Anti-Clumping & Pre-Round Scouting test");
+         double[] sp1 = SkyGen.applyBotSpreadOffset(econBot, 0.5, 44.5, 3.6);
+         double[] sp2 = SkyGen.applyBotSpreadOffset(secondBlueBot, 0.5, 44.5, 3.6);
+         check(Math.hypot(sp1[0] - sp2[0], sp1[1] - sp2[1]) > 1.2,
+            "applyBotSpreadOffset assigns distinct tactical formation coordinates to teammates so they never pile up on one spot");
+
+         SkyGen.preRoundWarmupActive = true;
+         try {
+            SkyGen.BotIntent warmIntent = SkyGen.tickBotAI(bwGame.mobs, econBot, bwGame.world, bwGame.player);
+            check(warmIntent != null && "Pre-Round Tactical Scouting".equals(SkyGen.botThought[eSlot]),
+               "Pre-round warmup ticks AI bots in non-lethal Pre-Round Tactical Scouting mode");
+         } finally {
+            SkyGen.preRoundWarmupActive = false;
+         }
+
+         // 2. Low-HP Tactical Retreat, Defensive Walling & On-the-Run Golden Apple Healing
+         econBot.setPos(0.5, SkyGen.Y_DECK + 1.0, 2.5);
+         econBot.onGround = true;
+         econBot.health = 5;
+         econBot.age = 16;
+         SkyGen.botBlocks[eSlot] = 16;
+         SkyGen.botApples[eSlot] = 1;
+         SkyGen.botEatTicks[eSlot] = 0;
+         bwGame.world.setBlock(0, SkyGen.Y_DECK, 1, Blocks.STONE);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 1, 1, 0);
+         check(SkyGen.shouldBotRetreat(econBot, eSlot, 4.0), "shouldBotRetreat triggers when bot HP <= 8 and enemy is within 13.5 blocks");
+         int blocksBeforeRetreat = SkyGen.botBlocks[eSlot];
+         SkyGen.BotIntent retIntent = new SkyGen.BotIntent();
+         SkyGen.executeTacticalRetreat(
+            bwGame.mobs, econBot, bwGame.world, eSlot, 0.5, SkyGen.Y_DECK + 1.0, -1.5, 4.0, Blocks.WOOL0 + 11, 0.5, 44.5, retIntent
+         );
+         eq("Low HP! Tactical Retreat!", SkyGen.botThought[eSlot], "Retreating bot sets thought to Low HP! Tactical Retreat!");
+         check(econBot.health > 5 && SkyGen.botApples[eSlot] == 0, "Retreating bot consumes Golden Apple on the run to recover HP");
+         check(SkyGen.botBlocks[eSlot] < blocksBeforeRetreat && bwGame.world.getBlock(0, SkyGen.Y_DECK + 1, 1) != 0,
+            "Retreating bot places a defensive obstruction block between itself and the close pursuer");
+
+         // 3. Multi-Layer (Layer-2) Bed Defense Construction
+         econBot.health = 20;
+         int[] blueBf = SkyGen.getTeamBedFoot(1);
+         int[][] innerCore = SkyGen.getBedInnerShell(1);
+         for (int[] ic : innerCore) {
+            bwGame.world.setBlock(ic[0], ic[1], ic[2], Blocks.OBSIDIAN);
+         }
+         bwGame.world.setBlock(blueBf[0], blueBf[1] + 2, blueBf[2], 0);
+         econBot.setPos(blueBf[0] + 0.5, SkyGen.Y_DECK + 1.0, blueBf[2] + 0.5);
+         econBot.age = 19; // 19 % 14 == 5
+         SkyGen.botEndStone[eSlot] = 8;
+         SkyGen.tickBotAI(bwGame.mobs, econBot, bwGame.world, bwGame.player);
+         eq(Blocks.END_STONE, bwGame.world.getBlock(blueBf[0], blueBf[1] + 2, blueBf[2]),
+            "Once inner 6-block bed core is sealed, AI bot builds Layer-2 End Stone defense above the bed");
       });
    }
 }

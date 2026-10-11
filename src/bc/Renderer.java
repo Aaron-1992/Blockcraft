@@ -218,26 +218,22 @@ public final class Renderer {
                      continue label56;
                   }
 
-                  // Fast inline pass: clear empty air sections and 100%-enclosed solid rock sections immediately
+                  // Fast inline pass: clear empty air sections immediately without scanning underground rock on the main thread
                   for (int sy = 0; sy < 16; sy++) {
                      Section sec = var14.sections[sy];
-                     if (sec.dirty && !sec.inFlight) {
-                        boolean empty = var14.isSectionEmpty(sy);
-                        boolean solid = !empty && sy < 4 && var14.isSectionFullyEnclosedOpaque(var1, sy);
-                        if (empty || solid) {
-                           sec.dirty = false;
-                           sec.conn = empty ? CaveCull.ALL : 0L;
-                           sec.nO = 0;
-                           sec.nT = 0;
-                           var14.markMeshed(sy);
-                           if (sec.vboO != 0) {
-                              GL15.glDeleteBuffers(sec.vboO);
-                              sec.vboO = 0;
-                           }
-                           if (sec.vboT != 0) {
-                              GL15.glDeleteBuffers(sec.vboT);
-                              sec.vboT = 0;
-                           }
+                     if (sec.dirty && !sec.inFlight && var14.isSectionEmpty(sy)) {
+                        sec.dirty = false;
+                        sec.conn = CaveCull.ALL;
+                        sec.nO = 0;
+                        sec.nT = 0;
+                        var14.markMeshed(sy);
+                        if (sec.vboO != 0) {
+                           GL15.glDeleteBuffers(sec.vboO);
+                           sec.vboO = 0;
+                        }
+                        if (sec.vboT != 0) {
+                           GL15.glDeleteBuffers(sec.vboT);
+                           sec.vboT = 0;
                         }
                      }
                   }
@@ -2479,6 +2475,9 @@ public final class Renderer {
                double var11 = var10.x + var10.vx * var1 - this.camX;
                double var13 = var10.y + var10.vy * var1 - this.camY;
                double var15 = var10.z + var10.vz * var1 - this.camZ;
+               if (var11 * var11 + var13 * var13 + var15 * var15 > 2304.0 || !this.visible((float)var11, (float)var13, (float)var15, 0.65F)) {
+                  continue;
+               }
                float var17 = var10.glow ? var10.shade : this.brightnessAt(var2, var10.x, var10.y, var10.z) * var10.shade;
                float left = var10.life0 > 0 ? Math.max(0.0F, Math.min(1.0F, (var10.life - var1) / var10.life0)) : 1.0F;
                float alpha = var10.alpha;

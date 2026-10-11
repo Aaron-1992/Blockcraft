@@ -80,9 +80,18 @@ public final class Mesher {
       int secStart = var2 << 12;
       int secEnd = secStart + 4096;
       boolean anyBlock = false;
+      boolean allOpaque = !legacy && var2 < 4;
       for (int i = secStart; i < secEnd; i++) {
-         if (cblocks[i] != 0) {
+         int id = cblocks[i] & 0xFFFF;
+         if (id != 0) {
             anyBlock = true;
+            if (allOpaque && !Blocks.opaque[id]) {
+               allOpaque = false;
+            }
+         } else {
+            allOpaque = false;
+         }
+         if (anyBlock && !allOpaque) {
             break;
          }
       }
@@ -91,6 +100,12 @@ public final class Mesher {
          Mesher.Result empty = new Mesher.Result();
          empty.conn = CaveCull.ALL;
          return empty;
+      }
+
+      if (allOpaque && var0 != null && var1.isSectionFullyEnclosedOpaque(var0, var2)) {
+         Mesher.Result enclosed = new Mesher.Result();
+         enclosed.conn = 0L;
+         return enclosed;
       }
 
       Mesher.Scratch var4 = (Mesher.Scratch)TL.get();

@@ -68,7 +68,7 @@ public final class SkyGen extends Gen {
    public static final int[] botGearTier = new int[32];
    private static final int[] botResources = new int[32];
    private static final int[] botHoldingBlockTicks = new int[32];
-   private static final int[] botEatTicks = new int[32];
+   public static final int[] botEatTicks = new int[32];
    private static final int[] botBowDrawTicks = new int[32];
    /** Strict AI Inventory Ledger: bots can ONLY use blocks, arrows, grenades, apples, or weapons they actually own! */
    public static final int[] botBlocks = new int[32];
@@ -3524,7 +3524,19 @@ public final class SkyGen extends Gen {
       return false;
    }
 
-   /** Steers a minigame bot toward (tx, tz) while climbing steps/terraces, using Slime Jump Pads, and parkour-jumping gaps! */
+   private static Mobs lastMobsRef = null;
+
+   /** Computes a unique per-bot tactical formation offset around (gx, gz) so multiple bots fan out instead of piling up on one coordinate. */
+   public static double[] applyBotSpreadOffset(Mobs.Mob bot, double gx, double gz, double radius) {
+      if (bot == null || radius <= 0.05) {
+         return new double[]{gx, gz};
+      }
+      double goldenAng = (Math.abs(bot.netId) * 2.399963229728653) + ((bot.age / 48) * 0.45);
+      double r = radius * (0.65 + 0.35 * ((Math.abs(bot.netId) & 3) / 3.0));
+      return new double[]{gx + Math.cos(goldenAng) * r, gz + Math.sin(goldenAng) * r};
+   }
+
+   /** Steers a minigame bot toward (tx, tz) while climbing steps/terraces, using Slime Jump Pads, avoiding clumping, and parkour-jumping gaps! */
    private static void steerBotSafely(Mobs.Mob bot, World w, double tx, double tz, BotIntent out, double baseSpeed) {
       steerBotSafely3D(bot, w, tx, bot.y, tz, out, baseSpeed);
    }
@@ -3538,6 +3550,41 @@ public final class SkyGen extends Gen {
          bot.vy = 1.04;
          bot.onGround = false;
          SoundEngine.play3D(w, "slime_bounce", bot.x, bot.y, bot.z, 0.8F, 1.0F);
+      }
+
+      // Personal-space anti-clumping: push steering waypoint away from nearby bots so AI players never pile up on one spot!
+      if (lastMobsRef != null && lastMobsRef.list != null) {
+         double repX = 0.0;
+         double repZ = 0.0;
+         int myTeam = botTeamIndex(bot);
+         for (Mobs.Mob other : lastMobsRef.list) {
+            if (other != null && other != bot && !other.dead && Mobs.hostile(other.type) && Math.abs(other.y - bot.y) < 2.5) {
+               double ox = bot.x - other.x;
+               double oz = bot.z - other.z;
+               double od = Math.hypot(ox, oz);
+               boolean sameTeam = myTeam >= 0 && myTeam == botTeamIndex(other);
+               boolean nonLethalPhase = matchState == STATE_WAITING || battleGraceTicks > 0;
+               if (od < 2.6 && (sameTeam || nonLethalPhase || Math.hypot(tx - other.x, tz - other.z) > 2.2)) {
+                  if (od < 0.05) {
+                     double ang = Math.abs(bot.netId) * 2.39996;
+                     ox = Math.cos(ang);
+                     oz = Math.sin(ang);
+                     od = 1.0;
+                  }
+                  double push = (2.6 - od) * (sameTeam ? 1.35 : 0.95);
+                  repX += (ox / od) * push;
+                  repZ += (oz / od) * push;
+               }
+            }
+         }
+         if (repX != 0.0 || repZ != 0.0) {
+            int candX = (int)Math.floor(bot.x + repX);
+            int candZ = (int)Math.floor(bot.z + repZ);
+            if (hasFootingAt(w, candX, bby, candZ)) {
+               tx += repX * 1.4;
+               tz += repZ * 1.4;
+            }
+         }
       }
 
       // If target is on an upper deck (ty > bot.y + 2.8), route via nearest Slime Jump Pad or staircase if nearby!
@@ -3675,17 +3722,47 @@ public final class SkyGen extends Gen {
    }
 
    /** Returns true if all 6 inner defense faces around the team's bed are covered with non-air blocks. */
+   /** Returns the 6 core defense coordinates directly enclosing a team's 2-block Bed without ever overlapping the Bed blocks themselves! */
+   public static int[][] getBedInnerShell(int team) {
+      int[] bf = getTeamBedFoot(team);
+      int[] bh = getTeamBedHead(team);
+      int dirX = bh[0] - bf[0];
+      int dirZ = bh[2] - bf[2];
+      int sx = dirX == 0 ? 1 : 0;
+      int sz = dirZ == 0 ? 1 : 0;
+      return new int[][]{
+         {bf[0], bf[1] + 1, bf[2]},
+         {bh[0], bh[1] + 1, bh[2]},
+         {bf[0] - dirX, bf[1], bf[2] - dirZ},
+         {bh[0] + dirX, bh[1], bh[2] + dirZ},
+         {bf[0] + sx, bf[1], bf[2] + sz},
+         {bf[0] - sx, bf[1], bf[2] - sz}
+      };
+   }
+
+   /** Returns the 6 Layer-2 outer shell defense coordinates above and around the inner Bed core! */
+   public static int[][] getBedOuterShell(int team) {
+      int[] bf = getTeamBedFoot(team);
+      int[] bh = getTeamBedHead(team);
+      int dirX = bh[0] - bf[0];
+      int dirZ = bh[2] - bf[2];
+      int sx = dirX == 0 ? 1 : 0;
+      int sz = dirZ == 0 ? 1 : 0;
+      return new int[][]{
+         {bf[0], bf[1] + 2, bf[2]},
+         {bh[0], bh[1] + 2, bh[2]},
+         {bf[0] - dirX, bf[1] + 1, bf[2] - dirZ},
+         {bh[0] + dirX, bh[1] + 1, bh[2] + dirZ},
+         {bf[0] + sx, bf[1] + 1, bf[2] + sz},
+         {bf[0] - sx, bf[1] + 1, bf[2] - sz}
+      };
+   }
+
    public static boolean isTeamBedFortified(World w, int team) {
       if (w == null || !isTeamBedIntact(w, team)) {
          return false;
       }
-      int[] bf = getTeamBedFoot(team);
-      int[] bh = getTeamBedHead(team);
-      int[][] innerShell = new int[][]{
-         {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
-         {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
-         {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
-      };
+      int[][] innerShell = getBedInnerShell(team);
       for (int[] co : innerShell) {
          if (w.getBlock(co[0], co[1], co[2]) == 0) {
             return false;
@@ -3921,10 +3998,115 @@ public final class SkyGen extends Gen {
       }
    }
 
+   /** Returns true when a bot's health is critically low and it should perform a player-like tactical retreat/kite. */
+   public static boolean shouldBotRetreat(Mobs.Mob bot, int bSlot, double enemyDist) {
+      return bot != null && bot.health > 0 && bot.health <= 8 && enemyDist < 13.5;
+   }
+
+   /**
+    * Places a 1-block tactical barrier/cover block between the bot and an approaching enemy to block pursuit or gunfire,
+    * strictly consuming 1 block from botBlocks[bSlot]!
+    */
+   public static boolean tryPlaceDefensiveWall(Mobs.Mob bot, World w, double enemyX, double enemyZ, int blockId) {
+      if (bot == null || w == null || blockId <= 0) {
+         return false;
+      }
+      int bSlot = Math.abs(bot.netId) & 31;
+      if (botBlocks[bSlot] <= 0) {
+         return false;
+      }
+      double dx = enemyX - bot.x;
+      double dz = enemyZ - bot.z;
+      double d = Math.hypot(dx, dz);
+      if (d < 1.3 || d > 9.5) {
+         return false;
+      }
+      int wx = (int)Math.floor(bot.x + (dx / d) * 1.35);
+      int wy = (int)Math.floor(bot.y);
+      int wz = (int)Math.floor(bot.z + (dz / d) * 1.35);
+      if (wx == (int)Math.floor(bot.x) && wz == (int)Math.floor(bot.z)) {
+         return false;
+      }
+      if (w.chunkAt(wx, wz) != null
+         && w.getBlock(wx, wy, wz) == 0
+         && Blocks.solid[w.getBlock(wx, wy - 1, wz)]
+         && !Decor315.isBed(w.getBlock(wx, wy - 1, wz))) {
+         w.setBlock(wx, wy, wz, blockId);
+         botBlocks[bSlot]--;
+         botHoldingBlockTicks[bSlot] = 12;
+         bot.attackAnim = 6;
+         SoundEngine.playBlockPlace(w, blockId, wx, wy, wz);
+         return true;
+      }
+      return false;
+   }
+
+   /**
+    * Executes a player-like low-HP tactical retreat: places a defensive block wall behind itself, eats a Golden Apple on the run,
+    * sprints/bridges toward safety, and fires kiting shots backward if armed with a Bow or Gun!
+    */
+   public static BotIntent executeTacticalRetreat(
+      Mobs mobs,
+      Mobs.Mob bot,
+      World w,
+      int bSlot,
+      double enemyX,
+      double enemyY,
+      double enemyZ,
+      double enemyDist,
+      int blockId,
+      double safeX,
+      double safeZ,
+      BotIntent out
+   ) {
+      botThought[bSlot] = "Low HP! Tactical Retreat!";
+      // 1. Place defensive obstruction wall against close pursuer
+      if (enemyDist <= 6.5 && botBlocks[bSlot] > 0 && (bot.age & 7) == 0) {
+         tryPlaceDefensiveWall(bot, w, enemyX, enemyZ, blockId);
+      }
+      // 2. Eat Golden Apple immediately while retreating if available
+      if (botApples[bSlot] > 0 && botEatTicks[bSlot] <= 0 && bot.health < 20) {
+         botApples[bSlot]--;
+         botHealsUsed[bSlot]++;
+         botEatTicks[bSlot] = 18;
+         bot.health = Math.min(20, bot.health + 6);
+         SoundEngine.play3D(w, "eat_1", bot.x, bot.y + 1.4, bot.z, 0.7F, 1.0F);
+      }
+      // 3. Compute escape vector away from the attacker (biased toward safe base/anchor if provided)
+      double dx = bot.x - enemyX;
+      double dz = bot.z - enemyZ;
+      double d = Math.max(0.5, Math.hypot(dx, dz));
+      double escX = bot.x + (dx / d) * 9.0;
+      double escZ = bot.z + (dz / d) * 9.0;
+      if (!Double.isNaN(safeX) && Math.hypot(safeX - bot.x, safeZ - bot.z) > 3.5) {
+         escX = escX * 0.55 + safeX * 0.45;
+         escZ = escZ * 0.55 + safeZ * 0.45;
+      }
+      if (blockId > 0 && w.settings != null && (w.settings.type == WorldSettings.BEDWARS || w.settings.type == WorldSettings.BATTLE)) {
+         bridgeTowardTarget(bot, w, escX, escZ, blockId);
+      }
+      steerBotSafely3D(bot, w, escX, bot.y, escZ, out, 1.32);
+
+      // 4. Kiting ranged shot backward at pursuer while retreating!
+      if (botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0 && enemyDist >= 3.0 && enemyDist <= 16.0 && bot.cd <= 0
+         && mobs != null && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, enemyX, enemyY + 1.0, enemyZ)) {
+         botArrows[bSlot]--;
+         bot.cd = 24;
+         botBowDrawTicks[bSlot] = 6;
+         out.headYaw = Mobs.angleTo(enemyX - bot.x, enemyZ - bot.z);
+         SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
+         mobs.shootAtPos(bot, enemyX, enemyY + 1.1, enemyZ);
+      }
+      return out;
+   }
+
+   public static boolean preRoundWarmupActive = false;
+
    public static BotIntent tickBotAI(Mobs mobs, Mobs.Mob bot, World w, Player player) {
       if (mobs == null || bot == null || w == null || w.settings == null) {
          return null;
       }
+      lastMobsRef = mobs;
       BotIntent out = new BotIntent();
       out.headYaw = bot.yaw;
       out.headPitch = 0.0F;
@@ -3948,6 +4130,33 @@ public final class SkyGen extends Gen {
       }
       if (botBuildUpCooldown[botSlot] > 0) {
          botBuildUpCooldown[botSlot]--;
+      }
+
+      // ====================================================================
+      //  0. PRE-ROUND TACTICAL WARMUP (Waiting Lobby): Spread out, scout lanes & practice parkour without clumping!
+      // ====================================================================
+      if (preRoundWarmupActive || (mobs.g != null && mobs.g.screen == Game.S.WAITING)) {
+         botThought[botSlot] = "Pre-Round Tactical Scouting";
+         double anchorX = bot.x;
+         double anchorZ = bot.z;
+         if (mode == WorldSettings.BEDWARS) {
+            int t = Math.max(0, botTeamIndex(bot)) & 3;
+            anchorX = BEDWARS_BASES[t][0] + 0.5;
+            anchorZ = BEDWARS_BASES[t][1] + 0.5;
+         } else if (mode == WorldSettings.CS2) {
+            int csT = Math.max(0, botTeamIndex(bot)) & 1;
+            anchorX = ((botSlot & 3) - 1.5) * 4.5;
+            anchorZ = csT == 0 ? -34.5 : 34.5;
+         }
+         double[] spread = applyBotSpreadOffset(bot, anchorX, anchorZ, 3.6);
+         steerBotSafely3D(bot, w, spread[0], bot.y, spread[1], out, 1.05);
+         // Look around toward the center arena and practice warmup swings
+         out.headYaw = Mobs.angleTo(0.5 - bot.x, 0.5 - bot.z) + (float)Math.sin((bot.age + botSlot * 9) * 0.08) * 35.0F;
+         out.headPitch = (float)Math.sin((bot.age + botSlot * 5) * 0.06) * 14.0F;
+         if ((bot.age + botSlot * 13) % 45 == 0) {
+            bot.attackAnim = 6;
+         }
+         return out;
       }
 
       // Tactical Golden Apple Self-Healing: bots ONLY eat a Golden Apple if they actually have one in botApples[botSlot]!
@@ -4024,12 +4233,15 @@ public final class SkyGen extends Gen {
          double leadX = targX + Math.max(-1.8, Math.min(1.8, targVx * 5.5));
          double leadZ = targZ + Math.max(-1.8, Math.min(1.8, targVz * 5.5));
 
-         double safeX = bot.x * 0.65;
-         double safeZ = bot.z * 0.65;
+         double[] sector = applyBotSpreadOffset(bot, 0.5, 0.5, 7.5);
+         double safeX = sector[0];
+         double safeZ = sector[1];
          if (hasRival && bestDist > 4.4) {
+            botThought[botSlot] = "Cutting Off Rival's Path";
             safeX = leadX;
             safeZ = leadZ;
          } else if (hasRival && bestDist < 2.8) {
+            botThought[botSlot] = "Evasive Strafe Spleefing";
             // Strafe around close rival so bot doesn't get easily spleefed
             if (bot.age % 30 == 0) {
                bot.strafeDir = -bot.strafeDir;
@@ -4037,12 +4249,14 @@ public final class SkyGen extends Gen {
             double ang = Math.atan2(bot.z - targZ, bot.x - targX) + 0.9 * bot.strafeDir;
             safeX = targX + Math.cos(ang) * 4.2;
             safeZ = targZ + Math.sin(ang) * 4.2;
+         } else {
+            botThought[botSlot] = "Patrolling Ring Sector";
          }
          steerBotSafely3D(bot, w, safeX, targY, safeZ, out, 1.22);
 
          if (hasRival) {
             out.headYaw = Mobs.angleTo(leadX - bot.x, leadZ - bot.z);
-            out.headPitch = 18.0F;
+            out.headPitch = bestDist <= 4.8 ? 28.0F : 16.0F;
             // Prefer digging the predicted lead block first; fall back to block directly under rival's feet
             int rbx = (int)Math.floor(leadX);
             int rby = (int)Math.floor(targY) - 1;
@@ -4092,7 +4306,7 @@ public final class SkyGen extends Gen {
       }
 
       // ====================================================================
-      //  2. BATTLE AI: Surroundings-Aware Chest/Item Looting, Dynamic Bridging, Vertical Build-Up & Combat
+      //  2. BATTLE AI: Tactical Grace Positioning, Low-HP Retreat/Walling, Dynamic Bridging & Combat
       // ====================================================================
       if (mode == WorldSettings.BATTLE) {
          Mobs.Mob rivalBot = null;
@@ -4151,10 +4365,16 @@ public final class SkyGen extends Gen {
             }
          }
 
+         // Low-HP Tactical Retreat & Defensive Walling: run away, wall off pursuer & eat Golden Apple when low HP!
+         if (battleGraceTicks <= 0 && shouldBotRetreat(bot, botSlot, bestDist)) {
+            return executeTacticalRetreat(mobs, bot, w, botSlot, targX, targY, targZ, bestDist, Blocks.STONEBRICK, 0.5, 0.5, out);
+         }
+
          // Check surroundings: if it is safe (or during Grace Period, or if the bot needs blocks/weapons), loot nearby chests & dropped items!
          double effectiveEnemyDist = (battleGraceTicks > 0 || (botWeaponItem[botSlot] == 0 && botRangedItem[botSlot] == 0)) ? 999.0 : bestDist;
          double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, effectiveEnemyDist, targX, targZ);
          if (lootGoal != null) {
+            botThought[botSlot] = "Looting Supply Chest";
             double[] wpLoot = nextArenaBridgeWaypoint(w, bot.x, bot.z, lootGoal[0], lootGoal[2]);
             bridgeTowardTarget(bot, w, wpLoot[0], wpLoot[1], Blocks.STONEBRICK);
             tryBotBuildUp(bot, w, wpLoot[0], lootGoal[1], wpLoot[1], Blocks.STONEBRICK);
@@ -4162,36 +4382,38 @@ public final class SkyGen extends Gen {
             return out;
          }
 
-         // During Grace Period (first 15s) or if unequipped and safe, advance toward Mid / Center Feast chests!
+         // During Grace Period (first 15s) or if unequipped and safe: fan out tactically to distinct Mid-Ring / Shrine sectors without piling up!
          if (battleGraceTicks > 0 || (bot.variant == 0 && bestDist > 10.0)) {
-            double cx = 0.5;
-            double cz = 0.5;
-            if (Math.hypot(bot.x, bot.z) > 22.0 && Math.abs(Math.abs(bot.x) - Math.abs(bot.z)) > 8.0) {
-               double bestC = 999.0;
-               for (int[] m : SKYWARS_MIDS) {
-                  if (hasChestItemsAt(w, m[0], Y_DECK + 1, m[1])) {
-                     double d = Math.hypot(bot.x - m[0], bot.z - m[1]);
-                     if (d < bestC) {
-                        bestC = d;
-                        cx = m[0] + 0.5;
-                        cz = m[1] + 0.5;
-                     }
-                  }
-               }
+            botThought[botSlot] = battleGraceTicks > 0 ? "Grace Period Tactical Positioning" : "Advancing to Mid Shrine";
+            int midIdx = Math.abs(botSlot) % SKYWARS_MIDS.length;
+            double cx = SKYWARS_MIDS[midIdx][0] + 0.5;
+            double cz = SKYWARS_MIDS[midIdx][1] + 0.5;
+            if (Math.hypot(bot.x - cx, bot.z - cz) < 5.0) {
+               double[] spreadCenter = applyBotSpreadOffset(bot, 0.5, 0.5, 4.8);
+               cx = spreadCenter[0];
+               cz = spreadCenter[1];
+            }
+            // If a rival gets within 5.5 blocks during Grace Period, keep tactical distance!
+            if (battleGraceTicks > 0 && bestDist < 5.5) {
+               cx = bot.x + (bot.x - targX) * 1.4;
+               cz = bot.z + (bot.z - targZ) * 1.4;
             }
             double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, cx, cz);
             bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
-            steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.24);
+            steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.22);
             return out;
          }
 
-         // Showdown active: if outside center courtyard, urgently sprint & bridge to center!
+         // Showdown active: if outside center courtyard, urgently sprint & bridge to a spread position at center!
          if (showdownActive && Math.hypot(bot.x, bot.z) > 16.0) {
-            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, 0.5, 0.5);
+            botThought[botSlot] = "Showdown! Sprinting to Center";
+            double[] centerSpread = applyBotSpreadOffset(bot, 0.5, 0.5, 3.5);
+            double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, centerSpread[0], centerSpread[1]);
             bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
             steerBotSafely3D(bot, w, wp[0], Y_DECK + 1.0, wp[1], out, 1.34);
             return out;
          }
+         botThought[botSlot] = "Hunting Fighter";
 
          double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, targX, targZ);
          bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
@@ -4332,28 +4554,28 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // 3b. Defender Bot (#0) & Base Builders: Fortify own team Bed ONLY using blocks the bot actually owns (Obsidian / End Stone / Wool)!
+         // 3b. All Base Builders (Defender #0 & Raider #1 when at Base): Multi-Layer Bed Defense (Inner 6-Block Core + Outer 6-Block Shell) & Active Repair!
          boolean ownBedIntact = isTeamBedIntact(w, myBotTeam);
          boolean ownBedFortified = true;
          if (ownBedIntact) {
             int[] bf = getTeamBedFoot(myBotTeam);
-            int[] bh = getTeamBedHead(myBotTeam);
-            int[][] innerShell = new int[][]{
-               {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
-               {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
-               {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
-            };
+            int[][] innerShell = getBedInnerShell(myBotTeam);
+            int[][] outerShell = getBedOuterShell(myBotTeam);
+            boolean placedAny = false;
             for (int[] co : innerShell) {
                int curId = w.getBlock(co[0], co[1], co[2]);
+               if (Decor315.isBed(curId)) {
+                  continue;
+               }
                boolean canUpgrade = (curId == woolId && (botObsidian[botSlot] > 0 || botEndStone[botSlot] > 0))
                   || (curId == Blocks.END_STONE && botObsidian[botSlot] > 0);
                if (curId == 0) {
                   ownBedFortified = false;
                }
                if ((curId == 0 || canUpgrade)
-                  && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.0
-                  && (role == 0 || botObsidian[botSlot] > 0 || botEndStone[botSlot] > 0)
-                  && bot.age % 14 == 3) {
+                  && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.5
+                  && (role == 0 || curId == 0 || botObsidian[botSlot] > 0 || botEndStone[botSlot] > 0)
+                  && bot.age % 12 == 3) {
                   int defBlock = 0;
                   if (botObsidian[botSlot] > 0) {
                      defBlock = Blocks.OBSIDIAN;
@@ -4371,11 +4593,31 @@ public final class SkyGen extends Gen {
                      botHoldingBlockTicks[botSlot] = 12;
                      botThought[botSlot] = "Fortifying Team Bed";
                      SoundEngine.playBlockPlace(w, defBlock, co[0], co[1], co[2]);
+                     placedAny = true;
                      break;
                   }
                }
                if (curId == 0) {
                   break;
+               }
+            }
+            // Once the 6-block inner core is sealed, build a 2nd outer defense layer over the bed when holding extra End Stone / Wool!
+            if (ownBedFortified && !placedAny && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.5 && bot.age % 14 == 5) {
+               for (int[] oc : outerShell) {
+                  if (w.getBlock(oc[0], oc[1], oc[2]) == 0 && (botEndStone[botSlot] > 0 || botBlocks[botSlot] > 12)) {
+                     int outerMat = botEndStone[botSlot] > 0 ? Blocks.END_STONE : woolId;
+                     if (outerMat == Blocks.END_STONE) {
+                        botEndStone[botSlot]--;
+                     } else {
+                        botBlocks[botSlot]--;
+                     }
+                     w.setBlock(oc[0], oc[1], oc[2], outerMat);
+                     bot.attackAnim = 6;
+                     botHoldingBlockTicks[botSlot] = 12;
+                     botThought[botSlot] = "Building Layer-2 Bed Defense";
+                     SoundEngine.playBlockPlace(w, outerMat, oc[0], oc[1], oc[2]);
+                     break;
+                  }
                }
             }
          }
@@ -4396,8 +4638,16 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // 3d. Physical Shopkeeper Runs: if carrying collected Iron/Gold/Diamonds/Emeralds for upgrades/gear, return to Base Shopkeepers!
          double distToBase = Math.hypot(bot.x - (baseX + 0.5), bot.z - (baseZ + 0.5));
+         int[] ownBf = getTeamBedFoot(myBotTeam);
+         boolean baseUnderAttack = ownBedIntact && Math.hypot(enemyX - ownBf[0], enemyZ - ownBf[2]) <= 16.0;
+
+         // 3c-2. Low-HP Tactical Retreat: if critically low HP and not making a last-stand defense right on our own bed, retreat, wall off & heal!
+         if (shouldBotRetreat(bot, botSlot, enemyDist) && (!baseUnderAttack || distToBase > 9.0)) {
+            return executeTacticalRetreat(mobs, bot, w, botSlot, enemyX, enemyY, enemyZ, enemyDist, woolId, baseX + 0.5, baseZ + 0.5, out);
+         }
+
+         // 3d. Physical Shopkeeper Runs: if carrying collected Iron/Gold/Diamonds/Emeralds for upgrades/gear, return to Base Shopkeepers!
          if (distToBase <= 7.5) {
             performBotShopAtBase(mobs, bot, w, myBotTeam, botSlot);
          } else if (enemyDist > 7.5 && botNeedsBaseShopVisit(w, myBotTeam, botSlot)) {
@@ -4429,13 +4679,10 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // 3f. Team Mind Coordination: Synchronize Defense, Upgrades & Bed Raids across teammates!
+         // 3f. Team Mind Coordination: Synchronize Defense, Upgrades & Proactive Bed-Breaker Raids across teammates!
          double goalX = baseX + 0.5;
          double goalY = Y_DECK + 1.0;
          double goalZ = baseZ + 0.5;
-
-         int[] ownBf = getTeamBedFoot(myBotTeam);
-         boolean baseUnderAttack = ownBedIntact && Math.hypot(enemyX - ownBf[0], enemyZ - ownBf[2]) <= 16.0;
 
          int targetBedTeam = -1;
          double bestBedScore = 999.0;
@@ -4460,12 +4707,18 @@ public final class SkyGen extends Gen {
                goalZ = enemyZ;
             } else {
                botThought[botSlot] = "Guarding & Fortifying Bed";
-               double patrolAng = (bot.age * 0.05) + myBotTeam;
-               goalX = ownBf[0] + 0.5 + Math.cos(patrolAng) * 2.2;
-               goalZ = ownBf[2] + 0.5 + Math.sin(patrolAng) * 2.2;
+               double[] guardSpread = applyBotSpreadOffset(bot, ownBf[0] + 0.5, ownBf[2] + 0.5, 2.6);
+               goalX = guardSpread[0];
+               goalZ = guardSpread[1];
             }
          } else {
-            if (enemyDist <= 7.0) {
+            // Check how close the bot already is to the target enemy bed — if within 15 blocks, prioritize breaking the bed over chasing!
+            double distToTargetBed = 999.0;
+            if (targetBedTeam >= 0) {
+               int[] tbf = getTeamBedFoot(targetBedTeam);
+               distToTargetBed = Math.hypot(tbf[0] + 0.5 - bot.x, tbf[2] + 0.5 - bot.z);
+            }
+            if (enemyDist <= (distToTargetBed <= 15.0 ? 3.5 : 7.0)) {
                botThought[botSlot] = "Engaging Enemy Fighter";
                goalX = enemyX;
                goalY = enemyY;
@@ -4483,35 +4736,48 @@ public final class SkyGen extends Gen {
                   || (bf[2] == 0 && Math.abs(bot.z) <= 6.5 && (bot.x * bf[0]) >= -4.0);
 
                if (distToCenter > 10.5 && !inTargetCorridor) {
-                  goalX = 0.5;
-                  goalZ = 0.5;
+                  double[] midSpread = applyBotSpreadOffset(bot, 0.5, 0.5, 2.2);
+                  goalX = midSpread[0];
+                  goalZ = midSpread[1];
+               } else if (distToBed > 5.0) {
+                  double[] raidSpread = applyBotSpreadOffset(bot, bf[0] + 0.5, bf[2] + 0.5, 1.8);
+                  goalX = raidSpread[0];
+                  goalZ = raidSpread[1];
                } else {
                   goalX = bf[0] + 0.5;
                   goalZ = bf[2] + 0.5;
                }
 
-               if (distToBed <= 4.8 && bot.cd <= 0) {
-                  bot.cd = 20;
+               // Drop TNT onto enemy bed defense if the raider bought TNT at the shop!
+               if (distToBed <= 6.5 && distToBed >= 2.2 && botGrenades[botSlot] > 0 && bot.cd <= 0 && w.getBlock(bf[0], bf[1] + 1, bf[2]) != 0) {
+                  botGrenades[botSlot]--;
+                  bot.cd = 24;
+                  bot.attackAnim = 8;
+                  botThought[botSlot] = "Bombing " + BEDWARS_NAMES[targetBedTeam] + " Bed Defense!";
+                  double dx = (bf[0] + 0.5 - bot.x) / Math.max(1.0, distToBed);
+                  double dz = (bf[2] + 0.5 - bot.z) / Math.max(1.0, distToBed);
+                  w.throwTntGrenade(bot.x + dx * 0.6, bot.y + 0.95, bot.z + dz * 0.6, dx * 0.45, 0.24, dz * 0.45, 38);
+               } else if (distToBed <= 4.8 && bot.cd <= 0) {
+                  bot.cd = 18;
                   bot.attackAnim = 8;
                   out.headYaw = Mobs.angleTo(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z);
                   out.headPitch = 22.0F;
-                  int[][] defenseChecks = new int[][]{
-                     {bf[0], bf[1] + 1, bf[2]}, {bh[0], bh[1] + 1, bh[2]},
-                     {bf[0], bf[1] + 2, bf[2]}, {bh[0], bh[1] + 2, bh[2]},
-                     {bf[0] + 1, bf[1], bf[2]}, {bf[0] - 1, bf[1], bf[2]},
-                     {bh[0], bh[1], bh[2] + 1}, {bh[0], bh[1], bh[2] - 1}
-                  };
+                  int[][] outerChecks = getBedOuterShell(targetBedTeam);
+                  int[][] innerChecks = getBedInnerShell(targetBedTeam);
                   boolean minedDefense = false;
-                  for (int[] dc : defenseChecks) {
-                     int cid = w.getBlock(dc[0], dc[1], dc[2]);
-                     if (cid != 0 && !Decor315.isBed(cid) && cid != Blocks.BEDROCK) {
-                        if (mobs.g != null) {
-                           mobs.g.spawnBreakParticles(dc[0], dc[1], dc[2], cid, 8);
+                  for (int pass = 0; pass < 2 && !minedDefense; pass++) {
+                     int[][] checks = pass == 0 ? outerChecks : innerChecks;
+                     for (int[] dc : checks) {
+                        int cid = w.getBlock(dc[0], dc[1], dc[2]);
+                        if (cid != 0 && !Decor315.isBed(cid) && cid != Blocks.BEDROCK) {
+                           if (mobs.g != null) {
+                              mobs.g.spawnBreakParticles(dc[0], dc[1], dc[2], cid, 8);
+                           }
+                           SoundEngine.playBlockBreak(w, cid, dc[0], dc[1], dc[2]);
+                           w.setBlock(dc[0], dc[1], dc[2], 0);
+                           minedDefense = true;
+                           break;
                         }
-                        SoundEngine.playBlockBreak(w, cid, dc[0], dc[1], dc[2]);
-                        w.setBlock(dc[0], dc[1], dc[2], 0);
-                        minedDefense = true;
-                        break;
                      }
                   }
                   if (!minedDefense) {
@@ -4522,8 +4788,9 @@ public final class SkyGen extends Gen {
             } else if (enemyDist < 200.0) {
                double distToCenter = Math.hypot(bot.x, bot.z);
                if (distToCenter > 11.0 && (bot.x * enemyX + bot.z * enemyZ) <= 0.0) {
-                  goalX = 0.5;
-                  goalZ = 0.5;
+                  double[] midSpread = applyBotSpreadOffset(bot, 0.5, 0.5, 2.2);
+                  goalX = midSpread[0];
+                  goalZ = midSpread[1];
                } else {
                   goalX = enemyX;
                   goalY = enemyY;
@@ -4567,7 +4834,7 @@ public final class SkyGen extends Gen {
       }
 
       // ====================================================================
-      //  4. CS2 STRIKE AI: Tactical Gunfights (Pistols/Machine Guns/Snipers), TNT Grenades, Vertical Build-Up & C4 Bomb Plant/Defuse!
+      //  4. CS2 STRIKE AI: Tactical Gunfights, Anti-Clump Site Spread, Low-HP Cover Retreat & C4 Bomb Plant/Defuse!
       // ====================================================================
       if (mode == WorldSettings.CS2) {
          int myCsTeam = botTeamIndex(bot); // 0 = CT (Blue), 1 = T (Red)
@@ -4633,20 +4900,31 @@ public final class SkyGen extends Gen {
             }
          }
 
+         int blockMat = myCsTeam == 0 ? (Blocks.CONCRETE0 + 11) : (Blocks.CONCRETE0 + 14);
+         double spawnZ = myCsTeam == 0 ? -34.5 : 34.5;
+
+         // Low-HP Tactical Retreat: place concrete cover wall, use Medkit/Apple & fall back!
+         if (shouldBotRetreat(bot, botSlot, enemyDist)) {
+            return executeTacticalRetreat(mobs, bot, w, botSlot, enemyX, enemyY, enemyZ, enemyDist, blockMat, bot.x, spawnZ, out);
+         }
+
          // Strategic Bomb Site Objective: Site A (-22, 0) or Site B (+22, 0)
          int prefSite = bot.variant & 1;
-         int activeSite = cs2BombPlanted ? cs2BombSite : prefSite;
+         int activeSite = cs2BombPlanted ? (cs2BombSite == 1 ? 0 : 1) : prefSite;
          double siteX = (activeSite == 0 ? -22.0 : 22.0) + 0.5;
          double siteZ = 0.5;
          double distToSite = Math.hypot(bot.x - siteX, bot.z - siteZ);
 
-         if (myCsTeam == 1 && !cs2BombPlanted && !cs2RoundOver && distToSite <= 3.5 && enemyDist > 5.0 && w.tickCount > 120L) {
+         if (myCsTeam == 1 && !cs2BombPlanted && !cs2RoundOver && distToSite <= 3.8 && enemyDist > 5.0 && w.tickCount > 120L) {
             // Terrorist AI plants the C4 Bomb at Site A or Site B!
             plantCs2Bomb(mobs.g, activeSite == 0 ? 1 : 2, botDisplayName(bot), true);
             botThought[botSlot] = "Planting C4 at Site " + (activeSite == 0 ? "A" : "B");
             bot.attackAnim = 8;
-         } else if (myCsTeam == 0 && cs2BombPlanted && !cs2RoundOver && distToSite <= 3.8 && enemyDist > 4.5) {
-            // Counter-Terrorist AI defuses the planted C4 Bomb!
+         } else if (myCsTeam == 0 && cs2BombPlanted && !cs2RoundOver && distToSite <= 4.2 && enemyDist > 4.5) {
+            // Counter-Terrorist AI builds cover if holding concrete and defuses the planted C4 Bomb!
+            if (enemyDist < 18.0 && botBlocks[botSlot] > 0 && (bot.age & 15) == 0) {
+               tryPlaceDefensiveWall(bot, w, enemyX, enemyZ, blockMat);
+            }
             cs2DefuseTicks += 2;
             botThought[botSlot] = "Defusing C4 at Site " + (cs2BombSite == 1 ? "A!" : "B!");
             bot.attackAnim = 6;
@@ -4656,19 +4934,26 @@ public final class SkyGen extends Gen {
          } else if (cs2BombPlanted) {
             botThought[botSlot] = myCsTeam == 0
                ? ("Rotating to Defuse C4 at Site " + (cs2BombSite == 1 ? "A!" : "B!"))
-               : ("Guarding Planted C4 at Site " + (cs2BombSite == 1 ? "A" : "B"));
+               : ("Holding Post-Plant Crossfire at Site " + (cs2BombSite == 1 ? "A" : "B"));
          } else {
             botThought[botSlot] = myCsTeam == 0
-               ? ("Holding Site " + (activeSite == 0 ? "A" : "B"))
-               : ("Pushing Site " + (activeSite == 0 ? "A" : "B") + " with Team");
+               ? ("Holding Site " + (activeSite == 0 ? "A" : "B") + " Angle")
+               : ("Executing Split Push on Site " + (activeSite == 0 ? "A" : "B"));
          }
          teamThoughtSummary[myCsTeam & 1] = botThought[botSlot];
 
-         double goalX = siteX;
+         // Spread teammates into a tactical crossfire ring around the Bomb Site unless this bot is actively planting/defusing!
+         boolean mustTouchSiteCenter = (myCsTeam == 1 && !cs2BombPlanted && (botSlot & 1) == 0 && w.tickCount > 120L)
+            || (myCsTeam == 0 && cs2BombPlanted);
+         double[] sitePos = mustTouchSiteCenter ? new double[]{siteX, siteZ} : applyBotSpreadOffset(bot, siteX, siteZ, 4.2);
+         double goalX = sitePos[0];
          double goalY = Y_DECK + 1.0;
-         double goalZ = siteZ;
+         double goalZ = sitePos[1];
          boolean hasLOS = enemyDist < 28.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, enemyX, enemyY + 1.0, enemyZ);
          if (hasLOS && (!cs2BombPlanted || myCsTeam == 1 || enemyDist < 10.0)) {
+            if (enemyDist >= 7.0 && enemyDist <= 15.0 && botBlocks[botSlot] > 0 && (bot.age + botSlot * 7) % 45 == 0) {
+               tryPlaceDefensiveWall(bot, w, enemyX, enemyZ, blockMat);
+            }
             if (botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0 && enemyDist > 4.5 && enemyDist < 15.0) {
                // Tactical strafe shooting!
                if (bot.age % 28 == 0) {
@@ -4685,7 +4970,6 @@ public final class SkyGen extends Gen {
             }
          }
 
-         int blockMat = myCsTeam == 0 ? (Blocks.CONCRETE0 + 11) : (Blocks.CONCRETE0 + 14);
          tryBotBuildUp(bot, w, goalX, goalY, goalZ, blockMat);
          steerBotSafely3D(bot, w, goalX, goalY, goalZ, out, 1.24);
 
@@ -4748,11 +5032,21 @@ public final class SkyGen extends Gen {
       }
 
       // ====================================================================
-      //  5. MURDER MYSTERY AI: Murderer Stalking/Knife Throw, Sheriff Investigation & Innocent Gold Looting!
+      //  5. MURDER MYSTERY AI: Pre-Deal Social Spacing, Murderer Stalking/Knife Throw, Sheriff Investigation & Innocent Gold Looting!
       // ====================================================================
       if (mode == WorldSettings.MURDER) {
+         // Before weapons are dealt (first 5 seconds), all suspects spread out across Mansion quadrants and keep social distance!
+         if (!murderWeaponsDealt && w.tickCount < 100L) {
+            botThought[botSlot] = "Spreading Out Before Weapons Deal";
+            double quadAng = (botSlot * 0.8975979) + 0.35;
+            double[] roomPos = applyBotSpreadOffset(bot, Math.cos(quadAng) * 14.0, Math.sin(quadAng) * 14.0, 3.8);
+            steerBotSafely3D(bot, w, roomPos[0], Y_DECK + 1.0, roomPos[1], out, 1.15);
+            return out;
+         }
+
          int role = botMurderRole[botSlot];
          if (role == MURDER_ROLE_MURDERER) {
+            botThought[botSlot] = "Stalking Target";
             // Murderer Bot: hunts the nearest living human player, peer, or Innocent/Sheriff bot!
             Mobs.Mob victimBot = null;
             int victimPeerId = -1;
@@ -4871,6 +5165,7 @@ public final class SkyGen extends Gen {
 
          boolean hasGun = botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0;
          if (hasGun && murderWeaponsDealt && murdDist < 15.0) {
+            botThought[botSlot] = "Taking Aim at Murderer!";
             out.headYaw = Mobs.angleTo(murdX - bot.x, murdZ - bot.z);
             out.headPitch = (float)(-Math.toDegrees(Math.atan2((murdY + 1.0) - (bot.y + 1.45), Math.max(0.5, murdDist))));
             if (bot.cd <= 0) {
@@ -4890,17 +5185,25 @@ public final class SkyGen extends Gen {
             }
          }
 
+         // If unarmed Innocent and the Murderer is chasing within 9.5 blocks, sprint away & evade!
+         if (!hasGun && murdDist < 9.5) {
+            return executeTacticalRetreat(mobs, bot, w, botSlot, murdX, murdY, murdZ, murdDist, 0, -murdX, -murdZ, out);
+         }
+
          // Loot Gold Ingots or Dropped Sheriff Gun when safe!
          double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, murdDist, murdX, murdZ);
          if (lootGoal != null) {
+            botThought[botSlot] = "Collecting Gold Ingot";
             steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.20);
             return out;
          }
 
-         // Patrol Mansion halls or flee if the Murderer is chasing
+         // Patrol distinct Mansion rooms without clumping!
+         botThought[botSlot] = hasGun ? "Patrolling Mansion as Detective" : "Searching Mansion for Gold";
          double patAng = (bot.age * 0.03) + bot.variant * 1.4;
-         double patX = murdDist < 8.0 ? (bot.x - (murdX - bot.x) * 1.5) : (Math.cos(patAng) * 18.0);
-         double patZ = murdDist < 8.0 ? (bot.z - (murdZ - bot.z) * 1.5) : (Math.sin(patAng) * 18.0);
+         double[] patPos = applyBotSpreadOffset(bot, Math.cos(patAng) * 16.0, Math.sin(patAng) * 16.0, 4.0);
+         double patX = murdDist < 8.0 ? (bot.x - (murdX - bot.x) * 1.5) : patPos[0];
+         double patZ = murdDist < 8.0 ? (bot.z - (murdZ - bot.z) * 1.5) : patPos[1];
          steerBotSafely3D(bot, w, patX, Y_DECK + 1.0, patZ, out, murdDist < 8.0 ? 1.28 : 1.05);
          return out;
       }
@@ -4951,6 +5254,16 @@ public final class SkyGen extends Gen {
             }
          }
          return;
+      }
+      // Spawn & tick AI bots in non-lethal Pre-Round Tactical Warmup mode while waiting in the lobby so they spread out & scout!
+      if (!(Net319.isConnected() && !Net319.isHosting()) && g.mobs != null) {
+         ensureRoundBotsSpawned(g, w);
+         preRoundWarmupActive = true;
+         try {
+            g.mobs.tick();
+         } finally {
+            preRoundWarmupActive = false;
+         }
       }
       // Auto-start 10-second countdown when hosting and at least 1 friend has joined
       if (Net319.isHosting() && Net319.peerCount() > 0 && lobbyCountdownTicks < 0) {
