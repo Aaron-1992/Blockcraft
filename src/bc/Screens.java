@@ -673,7 +673,7 @@ final class Screens {
                SoundEngine.setVolumes(o.soundVolume, o.musicVolume, o.realAcoustics);
             });
          ui.slider("Music: " + (o.musicVolume <= 0.0F ? "OFF" : Math.round(o.musicVolume * 100.0F) + "%"), x1, oy, colW, 20.0F, o.musicVolume,
-            "Volume of the Animal Crossing hourly & weather-adaptive soundtrack.", v -> {
+            "Volume of the Minecraft Console Edition & Battle Minigame soundtrack.", v -> {
                o.musicVolume = v;
                SoundEngine.setVolumes(o.soundVolume, o.musicVolume, o.realAcoustics);
             });

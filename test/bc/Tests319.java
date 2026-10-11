@@ -963,28 +963,52 @@ final class Tests319 {
          check(bwGame.useSpecial(new Stack(Redstone319.COMPASS, 1)), "Compass right-click displays Spawn direction and distance");
          check(bwGame.useSpecial(new Stack(Redstone319.CLOCK, 1)), "Clock right-click displays Day, Time and Weather");
 
-         // 10. Realistic Sounds, Animal Crossing Dynamic Music, Real-Life 3D Physical Acoustics & End Credits
+         // 10. Realistic Sounds, Minecraft Legacy Console Edition + Battle Minigame Music, Real-Life 3D Physical Acoustics & End Credits
          SoundEngine.loadSoundbank();
-         check(SoundEngine.loadedSampleCount() >= 72, "Soundbank loaded >= 72 real sound effects & Animal Crossing tracks (" + SoundEngine.loadedSampleCount() + ")");
+         check(SoundEngine.loadedSampleCount() >= 78, "Soundbank loaded >= 78 real sound effects & Minecraft Console Edition tracks (" + SoundEngine.loadedSampleCount() + ")");
          check(SoundEngine.hasSample("step_grass_1") && SoundEngine.hasSample("dig_stone_1") && SoundEngine.hasSample("break_block_1") && SoundEngine.hasSample("tnt_explode"), "Real surface footsteps, block dig/break, and explosion samples loaded");
-         check(SoundEngine.hasSample("ac_morning") && SoundEngine.hasSample("ac_afternoon") && SoundEngine.hasSample("ac_sunset") && SoundEngine.hasSample("ac_night") && SoundEngine.hasSample("ac_rain") && SoundEngine.hasSample("ac_snow") && SoundEngine.hasSample("ac_kk_bossa") && SoundEngine.hasSample("ac_cafe"), "All 8 Animal Crossing hourly, weather, and K.K. Slider tracks loaded");
-         SoundEngine.Sample morningSample = SoundEngine.getSample("ac_morning");
-         check(morningSample != null && morningSample.pcm.length >= morningSample.sampleRate * 80, "Animal Crossing tracks are full-length (>80s, not truncated)");
+         check(!SoundEngine.hasSample("ac_morning") && !SoundEngine.hasSample("ac_kk_bossa"), "Animal Crossing tracks completely removed from soundbank");
+         check(SoundEngine.hasSample("lce_menu")
+            && SoundEngine.hasSample("lce_morning")
+            && SoundEngine.hasSample("lce_day")
+            && SoundEngine.hasSample("lce_afternoon")
+            && SoundEngine.hasSample("lce_sunset")
+            && SoundEngine.hasSample("lce_night")
+            && SoundEngine.hasSample("lce_creative")
+            && SoundEngine.hasSample("lce_nether")
+            && SoundEngine.hasSample("lce_end")
+            && SoundEngine.hasSample("lce_credits")
+            && SoundEngine.hasSample("lce_battle_1")
+            && SoundEngine.hasSample("lce_battle_2")
+            && SoundEngine.hasSample("lce_battle_3"), "All 13 Minecraft Console Edition (C418) & Battle Mini Game (Gareth Coker) tracks loaded");
+         SoundEngine.Sample battleSample = SoundEngine.getSample("lce_battle_1");
+         check(battleSample != null && battleSample.pcm.length >= battleSample.sampleRate * 120, "Minecraft Console Edition & Battle tracks are full-length (>120s, not truncated)");
 
-         // Verify Animal Crossing dynamic music selection by screen, time of day, and weather
+         // Verify Minecraft Console Edition music selection by screen, Skywars/Bedwars mode, dimension, and time of day
          bwGame.screen = Game.S.TITLE;
-         eq("ac_kk_bossa", SoundEngine.selectAnimalCrossingMusic(bwGame), "Title screen plays K.K. Bossa");
+         eq("lce_menu", SoundEngine.selectConsoleMusic(bwGame), "Title screen plays C418 - Moog City 2 (Menu)");
          bwGame.screen = Game.S.CREDITS;
-         eq("ac_cafe", SoundEngine.selectAnimalCrossingMusic(bwGame), "End Credits screen plays Cafe K.K.");
+         eq("lce_credits", SoundEngine.selectConsoleMusic(bwGame), "End Credits screen plays C418 - Alpha");
          bwGame.screen = Game.S.PLAY;
+         bwGame.world.settings.type = WorldSettings.SKYWARS;
+         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_battle_"), "Skywars mode plays Gareth Coker Battle Mini Game theme");
+         bwGame.world.settings.type = WorldSettings.BEDWARS;
+         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_battle_"), "Bedwars mode plays Gareth Coker Battle Mini Game theme");
+         bwGame.world.settings.type = WorldSettings.DEFAULT;
+         bwGame.player.creative = false;
          bwGame.world.dayTime = 2000L;
-         eq("ac_morning", SoundEngine.selectAnimalCrossingMusic(bwGame), "Morning (08:00) plays Animal Crossing 8 AM");
-         bwGame.world.dayTime = 7000L;
-         eq("ac_afternoon", SoundEngine.selectAnimalCrossingMusic(bwGame), "Afternoon (13:00) plays Animal Crossing 1 PM");
+         eq("lce_morning", SoundEngine.selectConsoleMusic(bwGame), "Morning (08:00) plays C418 - Subwoofer Lullaby");
+         bwGame.world.dayTime = 5000L;
+         eq("lce_day", SoundEngine.selectConsoleMusic(bwGame), "Midday Survival plays C418 - Minecraft");
+         bwGame.player.creative = true;
+         eq("lce_creative", SoundEngine.selectConsoleMusic(bwGame), "Midday Creative plays C418 - Aria Math");
+         bwGame.player.creative = false;
+         bwGame.world.dayTime = 9000L;
+         eq("lce_afternoon", SoundEngine.selectConsoleMusic(bwGame), "Afternoon plays C418 - Wet Hands");
          bwGame.world.dayTime = 12000L;
-         eq("ac_sunset", SoundEngine.selectAnimalCrossingMusic(bwGame), "Sunset (18:00) plays Animal Crossing 5 PM");
+         eq("lce_sunset", SoundEngine.selectConsoleMusic(bwGame), "Sunset plays C418 - Sweden");
          bwGame.world.dayTime = 18000L;
-         eq("ac_night", SoundEngine.selectAnimalCrossingMusic(bwGame), "Night (00:00) plays Animal Crossing 1 AM");
+         eq("lce_night", SoundEngine.selectConsoleMusic(bwGame), "Night plays C418 - Living Mice");
 
          // Verify Real-Life 3D Physical Acoustics: wall occlusion & cave enclosure reverb
          for (int x = 18; x <= 26; x++) {

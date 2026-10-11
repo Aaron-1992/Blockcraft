@@ -1,4 +1,4 @@
-BLOCKCRAFT V4.0  -  an original Minecraft-style voxel sandbox   (EDITION V4.0)
+BLOCKCRAFT V4.2  -  an original Minecraft-style voxel sandbox   (EDITION V4.2)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,11 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V4.2  (Minecraft Legacy Console Edition Soundtrack, Gareth Coker Battle Mini Game Themes for Skywars & Bedwars, Real-Life 3D Physical Acoustics, Realistic Foley Sound Effects, Backrooms & Stalker v2.3 & Full Gamemode Suite)
+  * MINECRAFT LEGACY CONSOLE EDITION SOUNDTRACK (C418). Replaced the Animal Crossing music completely with the iconic Minecraft Legacy Console Edition soundtrack by C418: Moog City 2 on the Title Screen, Menus & Minigame Waiting Lobby, Subwoofer Lullaby (Morning), Minecraft (Midday Survival), Aria Math (Creative Mode), Wet Hands (Afternoon), Sweden (Sunset/Dusk), Living Mice (Night), Dead Voxel (The Nether), Boss (The End), and Alpha on the End Poem & Credits screen, plus authentic Legacy Console Edition UI press and item pickup sounds.
+  * GARETH COKER BATTLE MINI GAME THEMES FOR SKYWARS & BEDWARS. Skywars and Bedwars matches now feature Gareth Coker's high-energy Minecraft Console Edition Battle Mini Game themes (Battle Theme 1: Double Time / Shrink, Battle Theme 2: Nock / Growth, and Battle Theme 3: Swift), automatically rotating through all three arena suites across matches.
+  * REAL-LIFE 3D PHYSICAL ACOUSTICS & 66 REAL FOLEY SOUND EFFECTS. Binaural spatialization (ITD + ILD + head-shadowing), voxel ray-cast sound occlusion through solid walls, 14-ray 3D room/cave Schroeder reverb & canyon echo, speed-of-sound propagation delay (343 m/s), Doppler shift, underwater low-pass filtering, and 66 real recorded foley sound effects for footsteps, block digging/breaking/placing, doors, chests, fire, water, lava, TNT, and combat, with full attribution in the End Credits (/credits).
 
 WHAT'S NEW IN V4.0  (New Edition V4.0, Dedicated Multiplayer Menu & Auto-Server Launcher, Survival PvP & Dropped Item Sync, Complete Redstone Expansion with Pistons/Repeaters/Observers & 3D Connected Wire, Full 28-Biome & Modern Structure LOD)
   * NEW EDITION V4.0 & DEDICATED MULTIPLAYER MENU. Blockcraft enters major Edition V4.0! The Title Screen is streamlined with Singleplayer and a dedicated Multiplayer menu (removing redundant Create New World from the title screen), where you can enter any server Host:Port, join LAN hosts automatically, host your world on LAN, or click "Start Server.bat" to automatically launch Blockcraft-server.bat / ServerMain in the background and connect immediately.

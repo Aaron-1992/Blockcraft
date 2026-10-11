@@ -93,7 +93,7 @@ public final class ServerMain {
 
       String msg = Net319.startHost(null, w, port);
       System.out.println("================================================================");
-      System.out.println(" Blockcraft V4.1 Dedicated Server");
+      System.out.println(" Blockcraft V4.2 Dedicated Server");
       System.out.println("----------------------------------------------------------------");
       System.out.println(" " + msg);
       System.out.println(" World Type : " + WorldSettings.TYPE_NAME[worldType] + " (" + WorldSettings.TYPE_INFO[worldType] + ")");

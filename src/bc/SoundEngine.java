@@ -14,7 +14,7 @@ import javax.sound.sampled.DataLine;
 import javax.sound.sampled.SourceDataLine;
 
 /**
- * Blockcraft V4.1 Real-Life 3D Physical Acoustics & Animal Crossing Music Engine.
+ * Blockcraft V4.2 Real-Life 3D Physical Acoustics & Minecraft Console Edition Music Engine.
  *
  * <h3>Real-Life Acoustic Physics</h3>
  * <ul>
@@ -124,15 +124,13 @@ public final class SoundEngine {
    /** Full music & sound attribution entries displayed in the End Credits screen. */
    public static final String[][] CREDITS_SECTIONS = {
       {
-         "ANIMAL CROSSING HOURLY & K.K. SOUNDTRACK",
-         "8:00 AM (Sunny Morning) - Animal Crossing: New Leaf (Manaka Kataoka, Atsuko Asahi)",
-         "1:00 PM (Sunny Afternoon) - Animal Crossing: New Leaf (Manaka Kataoka, Atsuko Asahi)",
-         "5:00 PM (Golden Hour Sunset) - Animal Crossing: New Leaf (Manaka Kataoka, Atsuko Asahi)",
-         "11:00 PM (Starry Night) - Animal Crossing: New Leaf (Manaka Kataoka, Atsuko Asahi)",
-         "Rainy Day (Music Box) - Animal Crossing: New Leaf (Manaka Kataoka, Atsuko Asahi)",
-         "Snowy Day (Sleigh-Bells & Marimba) - Animal Crossing: New Leaf (Manaka Kataoka, Atsuko Asahi)",
-         "K.K. Bossa & Cafe K.K. - Animal Crossing Series (Kazumi Totaka, Toru Minegishi, Kenta Nagata)",
-         "Animal Crossing Hourly Audio Archive curated by Michael D'Argenio (github.com/mjdargen/acmp)"
+         "MINECRAFT CONSOLE EDITION & BATTLE MINIGAME SOUNDTRACK",
+         "Moog City 2 (Menu), Subwoofer Lullaby, Minecraft, Wet Hands, Sweden, Living Mice - C418 (Daniel Rosenfeld)",
+         "Aria Math (Creative), Dead Voxel (Nether), Boss (The End), Alpha (End Credits) - C418 (Daniel Rosenfeld)",
+         "Battle Theme 1 (Double Time / Shrink - Skywars & Bedwars) - Gareth Coker (Minecraft Console Edition)",
+         "Battle Theme 2 (Nock / Growth - Bedwars & Skywars) - Gareth Coker (Minecraft Console Edition)",
+         "Battle Theme 3 (Swift - Skywars & Bedwars) - Gareth Coker (Minecraft Console Edition)",
+         "Legacy Console Edition Soundpack & Minigame Audio curated via Freshwaffle, Legacy-Edition-Minigames & Wilyicaro"
       },
       {
          "REALISTIC FOLEY & WORLD SOUND EFFECTS (CC-BY / CC0)",
@@ -192,14 +190,15 @@ public final class SoundEngine {
    private static volatile float reverbFeedback = 0.45F;
    private static volatile float canyonEchoWet = 0.0F;
 
-   // Animal Crossing dynamic music state
-   private static volatile String currentMusicKey = "ac_kk_bossa";
-   private static volatile String targetMusicKey = "ac_kk_bossa";
-   private static String pendingMusicKey = "ac_kk_bossa";
+   // Minecraft Legacy Console Edition dynamic music state
+   private static volatile String currentMusicKey = "lce_menu";
+   private static volatile String targetMusicKey = "lce_menu";
+   private static String pendingMusicKey = "lce_menu";
    private static int pendingMusicTicks = 0;
    private static volatile double musicPos = 0.0;
    private static volatile float musicFade = 1.0F;
    private static volatile int musicPauseSamples = 0;
+   private static volatile int battleTrackIndex = 0;
 
    // Footstep & ambient tracking
    private static double stepDistAcc = 0.0;
@@ -301,15 +300,17 @@ public final class SoundEngine {
 
    private static void synthesizeAcousticSupplements() {
       int sr = 22050;
-      // 1. UI Click (crisp wooden/tactile button click)
-      short[] click = new short[sr / 25];
-      for (int i = 0; i < click.length; i++) {
-         double t = i / (double)sr;
-         double env = Math.exp(-t * 140.0);
-         double v = (Math.sin(2.0 * Math.PI * 1050.0 * t) * 0.65 + Math.sin(2.0 * Math.PI * 2100.0 * t) * 0.35) * env;
-         click[i] = (short)(v * 18000.0);
+      // 1. UI Click fallback (if not loaded from soundbank.bin)
+      if (!BANK.containsKey("ui_click")) {
+         short[] click = new short[sr / 25];
+         for (int i = 0; i < click.length; i++) {
+            double t = i / (double)sr;
+            double env = Math.exp(-t * 140.0);
+            double v = (Math.sin(2.0 * Math.PI * 1050.0 * t) * 0.65 + Math.sin(2.0 * Math.PI * 2100.0 * t) * 0.35) * env;
+            click[i] = (short)(v * 18000.0);
+         }
+         BANK.put("ui_click", new Sample("ui_click", sr, click));
       }
-      BANK.put("ui_click", new Sample("ui_click", sr, click));
 
       // 2. Bow Twang & Arrow Release
       short[] bow = new short[sr / 3];
@@ -367,15 +368,17 @@ public final class SoundEngine {
       }
       BANK.put("note_harp", new Sample("note_harp", sr, note));
 
-      // 6. Item Pickup Pop (authentic warm harmonic pop)
-      short[] pop = new short[sr / 12];
-      for (int i = 0; i < pop.length; i++) {
-         double t = i / (double)sr;
-         double f = 380.0 + 480.0 * (t / (pop.length / (double)sr));
-         double env = Math.sin(Math.PI * i / (double)pop.length);
-         pop[i] = (short)(Math.sin(2.0 * Math.PI * f * t) * env * 20000.0);
+      // 6. Item Pickup Pop fallback (if not loaded from soundbank.bin)
+      if (!BANK.containsKey("item_pop")) {
+         short[] pop = new short[sr / 12];
+         for (int i = 0; i < pop.length; i++) {
+            double t = i / (double)sr;
+            double f = 380.0 + 480.0 * (t / (pop.length / (double)sr));
+            double env = Math.sin(Math.PI * i / (double)pop.length);
+            pop[i] = (short)(Math.sin(2.0 * Math.PI * f * t) * env * 20000.0);
+         }
+         BANK.put("item_pop", new Sample("item_pop", sr, pop));
       }
-      BANK.put("item_pop", new Sample("item_pop", sr, pop));
    }
 
    public static Sample getSample(String key) {
@@ -876,13 +879,18 @@ public final class SoundEngine {
       return false;
    }
 
-   /** Selects the appropriate Animal Crossing music track for the current game screen, time of day, and weather. */
-   public static String selectAnimalCrossingMusic(Game g) {
+   private static final String[] BATTLE_TRACKS = {"lce_battle_1", "lce_battle_2", "lce_battle_3"};
+
+   /**
+    * Selects the appropriate Minecraft Legacy Console Edition music track for the current screen,
+    * minigame mode (Gareth Coker Battle themes for Skywars & Bedwars), dimension, creative mode, and time of day.
+    */
+   public static String selectConsoleMusic(Game g) {
       if (g == null) {
-         return "ac_kk_bossa";
+         return "lce_menu";
       }
       if (g.screen == Game.S.CREDITS) {
-         return "ac_cafe";
+         return "lce_credits"; // C418 - Alpha (End Poem & Credits)
       }
       if (g.pano != null
          || g.screen == Game.S.TITLE
@@ -893,36 +901,51 @@ public final class SoundEngine {
          || g.screen == Game.S.MODS
          || g.screen == Game.S.SKINS
          || g.screen == Game.S.LOADING
+         || g.screen == Game.S.WAITING
          || g.world == null
          || g.player == null) {
-         return "ac_kk_bossa";
+         return "lce_menu"; // C418 - Moog City 2 (Title / Menus / Waiting Lobby)
       }
       if (BackroomsStalkerMod.isActive()) {
-         return ""; // Backrooms uses eerie fluorescent hum & stalker audio instead of cozy music
+         return ""; // Backrooms uses eerie fluorescent hum & stalker audio
       }
 
-      // Check active precipitation first (require actual steady rain/snow, not brief light cloud transitions)
-      if (g.world.weather != null && g.world.dim == Dim.OVERWORLD) {
-         String desc = g.world.weather.describe(g.player.x, g.player.z).toLowerCase();
-         if (desc.equals("snow") || desc.equals("blizzard")) {
-            return "ac_snow";
+      // Skywars & Bedwars: Gareth Coker's Minecraft Legacy Console Edition Battle Mini Game Themes!
+      if (g.world.settings != null) {
+         if (g.world.settings.type == WorldSettings.SKYWARS) {
+            return BATTLE_TRACKS[battleTrackIndex % BATTLE_TRACKS.length]; // Starts with Battle Theme 1 (Shrink / Double Time)
          }
-         if (desc.equals("rain") || desc.equals("thunderstorm")) {
-            return "ac_rain";
+         if (g.world.settings.type == WorldSettings.BEDWARS) {
+            return BATTLE_TRACKS[(battleTrackIndex + 1) % BATTLE_TRACKS.length]; // Starts with Battle Theme 2 (Growth / Nock)
          }
       }
 
-      // Select by in-game hour of day (dayTime 0 = 06:00 AM, 6000 = 12:00 PM, 12000 = 06:00 PM, 18000 = 12:00 AM)
+      // Dimension-specific Legacy Console Edition themes
+      if (g.world.dim == Dim.END) {
+         return "lce_end"; // C418 - Boss / The End
+      }
+      if (g.world.dim == Dim.NETHER) {
+         return "lce_nether"; // C418 - Dead Voxel
+      }
+
+      // Overworld by time of day & game mode (dayTime 0 = 06:00 AM, 6000 = 12:00 PM, 12000 = 06:00 PM, 18000 = 12:00 AM)
       int tod = (int)((g.world.dayTime % 24000L + 24000L) % 24000L);
-      if (tod < 5000) {
-         return "ac_morning"; // 06:00 - 11:00 AM: 8 AM Sunny Morning
+      if (tod < 3500) {
+         return "lce_morning"; // 06:00 - 09:30 AM: C418 - Subwoofer Lullaby
+      } else if (tod < 7500) {
+         return g.player.creative ? "lce_creative" : "lce_day"; // 09:30 AM - 01:30 PM: C418 - Aria Math (Creative) / Minecraft (Survival)
       } else if (tod < 11000) {
-         return "ac_afternoon"; // 11:00 AM - 05:00 PM: 1 PM Sunny Afternoon
+         return "lce_afternoon"; // 01:30 - 05:00 PM: C418 - Wet Hands
       } else if (tod < 14000) {
-         return "ac_sunset"; // 05:00 PM - 08:00 PM: 5 PM Golden Hour Sunset
+         return "lce_sunset"; // 05:00 - 08:00 PM: C418 - Sweden
       } else {
-         return "ac_night"; // 08:00 PM - 06:00 AM: 1 AM Starry Night
+         return "lce_night"; // 08:00 PM - 06:00 AM: C418 - Living Mice
       }
+   }
+
+   /** Compatibility alias for selectConsoleMusic. */
+   public static String selectAnimalCrossingMusic(Game g) {
+      return selectConsoleMusic(g);
    }
 
    /** Per-tick update called from Game.tick() to drive footsteps, weather/block ambience, delayed speed-of-sound events, and music selection. */
@@ -935,12 +958,14 @@ public final class SoundEngine {
          setVolumes(g.opt.soundVolume, g.opt.musicVolume, g.opt.realAcoustics);
       }
 
-      String desiredMusic = selectAnimalCrossingMusic(g);
+      String desiredMusic = selectConsoleMusic(g);
+      boolean isBattle = desiredMusic.startsWith("lce_battle_");
       boolean immediateSwitch = desiredMusic.isEmpty()
-         || desiredMusic.equals("ac_kk_bossa")
-         || desiredMusic.equals("ac_cafe")
-         || currentMusicKey.equals("ac_kk_bossa")
-         || currentMusicKey.equals("ac_cafe")
+         || desiredMusic.equals("lce_menu")
+         || desiredMusic.equals("lce_credits")
+         || isBattle
+         || currentMusicKey.equals("lce_menu")
+         || currentMusicKey.equals("lce_credits")
          || currentMusicKey.isEmpty();
       if (immediateSwitch) {
          targetMusicKey = desiredMusic;
@@ -1314,7 +1339,7 @@ public final class SoundEngine {
                }
             }
 
-            // 3. Mix Animal Crossing Music Stream (single active track at a time, full-length with natural pause between loops)
+            // 3. Mix Minecraft Legacy Console Edition Music Stream (single active track at a time, rotating Battle themes)
             float mVol = masterMusicVol;
             if (mVol > 0.001F) {
                if (!currentMusicKey.equals(targetMusicKey)) {
@@ -1343,8 +1368,14 @@ public final class SoundEngine {
                      int idx0 = (int)musicPos;
                      if (idx0 >= mlen) {
                         musicPos = 0.0;
-                        musicPauseSamples = MIX_RATE * 4; // 4-second natural breathing pause after the full song finishes
-                        continue;
+                        if (currentMusicKey.startsWith("lce_battle_")) {
+                           // Advance to the next Gareth Coker Battle Mini Game theme!
+                           battleTrackIndex = (battleTrackIndex + 1) % BATTLE_TRACKS.length;
+                           musicPauseSamples = MIX_RATE * 2;
+                        } else {
+                           musicPauseSamples = MIX_RATE * 5; // 5-second natural breathing pause after C418 track finishes
+                        }
+                        break;
                      }
                      int idx1 = Math.min(mlen - 1, idx0 + 1);
                      float frac = (float)(musicPos - idx0);
@@ -1386,6 +1417,6 @@ public final class SoundEngine {
       }
    }
    public static String currentMusicName() {
-      return currentMusicKey != null ? currentMusicKey : "ac_morning";
+      return currentMusicKey != null ? currentMusicKey : "lce_menu";
    }
 }
