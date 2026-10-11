@@ -194,9 +194,9 @@ final class WeatherFx {
       }
 
       this.texWhite = Tex.upload(1, 1, new int[]{-1}, false, true);
-      this.texRain = mip(Tex.upload(128, 256, streaks(128, 256, 32, 16, 58, 0.58F, 6001L), true, true));
-      this.texShaft = mip(Tex.upload(64, 256, veil(64, 256, 36, 24, 96, 6002L), true, true));
-      this.texSnow = mip(Tex.upload(64, 64, flakes(64, 14, 6003L), true, true));
+      this.texRain = mip(Tex.upload(64, 128, streaks(64, 128, 12, 12, 40, 0.50F, 6001L), true, true));
+      this.texShaft = mip(Tex.upload(64, 256, veil(64, 256, 30, 24, 90, 6002L), true, true));
+      this.texSnow = mip(Tex.upload(32, 32, flakes(32, 5, 6003L), true, true));
       this.texSnowVeil = mip(Tex.upload(64, 256, snowVeil(64, 256, 6004L), true, true));
    }
 
@@ -212,28 +212,22 @@ final class WeatherFx {
    static int[] streaks(int w, int h, int count, int minLen, int maxLen, float strength, long seed) {
       Random rnd = new Random(seed);
       float[] a = new float[w * h];
-      float[] head = new float[w * h];
       for (int i = 0; i < count; i++) {
          int x = rnd.nextInt(w);
          int len = minLen + rnd.nextInt(maxLen - minLen + 1);
          int y0 = rnd.nextInt(h);
-         float amp = (0.52F + 0.48F * rnd.nextFloat()) * strength;
-         int wid = rnd.nextInt(4) == 0 ? 2 : 1;
+         float amp = (0.5F + 0.5F * rnd.nextFloat()) * strength;
+         int wid = rnd.nextInt(3) == 0 ? 2 : 1;
          for (int k = 0; k < len; k++) {
             float t = (float)k / len;
-            float prof = t < 0.14F ? t / 0.14F : (float)Math.pow(1.0F - (t - 0.14F) / 0.86F, 1.25);
-            float hd = t < 0.22F ? 1.0F - Math.abs(t - 0.11F) / 0.11F : 0.0F;
+            float prof = t < 0.15F ? t / 0.15F : 1.0F - (t - 0.15F) / 0.85F * 0.55F;
             int y = (y0 + k) % h;
             for (int d = 0; d < wid; d++) {
                int xx = (x + d) % w;
                float v = amp * prof * (d == 0 ? 1.0F : 0.55F);
-               int idx = y * w + xx;
-               if (v > a[idx]) {
-                  a[idx] = v;
-                  head[idx] = Math.max(head[idx], hd);
-               }
+               a[y * w + xx] = Math.max(a[y * w + xx], v);
                int xl = (x - 1 + w) % w;
-               a[y * w + xl] = Math.max(a[y * w + xl], v * 0.22F);
+               a[y * w + xl] = Math.max(a[y * w + xl], v * 0.18F);
             }
          }
       }
@@ -241,11 +235,7 @@ final class WeatherFx {
       int[] px = new int[w * h];
       for (int i = 0; i < px.length; i++) {
          int al = Math.min(255, (int)(a[i] * 255.0F));
-         float hAmt = Math.max(0.0F, Math.min(1.0F, head[i]));
-         int r = (int)(202 + 44 * hAmt);
-         int g = (int)(222 + 28 * hAmt);
-         int b = 255;
-         px[i] = al << 24 | r << 16 | g << 8 | b;
+         px[i] = al << 24 | 0xDCE6FF;
       }
 
       return px;
@@ -1027,17 +1017,16 @@ final class WeatherFx {
       double cx = this.r.camX;
       double cy = this.r.camY;
       double cz = this.r.camZ;
-      int rad = 5 + (int)(9.0F * amount);
+      int rad = 4 + (int)(7.0F * amount);
       int bx = (int)Math.floor(cx);
       int bz = (int)Math.floor(cz);
       double t = (w.weather.ticks + partial) / 20.0;
-      float bright = 0.48F + 0.52F * Math.max(0.0F, Math.min(1.0F, this.r.daylight * 1.1F + this.flash * 0.65F));
-      float lr = Math.min(1.0F, tint[0] * bright + this.flash * 0.25F);
-      float lg = Math.min(1.0F, tint[1] * bright + this.flash * 0.28F);
-      float lb = Math.min(1.0F, tint[2] * bright + this.flash * 0.35F);
-      float gust = 1.0F + 0.40F * this.storm + 0.16F * (float)Math.sin(t * 1.8);
-      float wx = this.snap.windX * 0.015F * gust;
-      float wz = this.snap.windZ * 0.015F * gust;
+      float bright = 0.45F + 0.55F * Math.max(0.0F, Math.min(1.0F, this.r.daylight * 1.1F));
+      float lr = tint[0] * bright;
+      float lg = tint[1] * bright;
+      float lb = tint[2] * bright;
+      float wx = this.snap.windX * 0.012F;
+      float wz = this.snap.windZ * 0.012F;
       GL11.glEnable(3553);
       GL11.glTexEnvi(8960, 8704, 8448);
       for (int pass = 0; pass < 2; pass++) {
@@ -1048,7 +1037,7 @@ final class WeatherFx {
          for (int dz = -rad; dz <= rad; dz++) {
             for (int dx = -rad; dx <= rad; dx++) {
                double d2 = dx * dx + dz * dz;
-               if (d2 > rad * rad || d2 < 0.28) {
+               if (d2 > rad * rad || d2 < 0.3) {
                   continue;
                }
 
@@ -1066,7 +1055,7 @@ final class WeatherFx {
 
                int hm = c.hm[(z & 15) * 16 + (x & 15)] + 1;
                double yb = Math.max(hm, cy - 16.0);
-               double yt = cy + 15.0;
+               double yt = cy + 14.0;
                if (yb >= yt) {
                   continue;
                }
@@ -1077,25 +1066,23 @@ final class WeatherFx {
                double ddz = z + 0.5 - cz;
                double dl = Math.sqrt(ddx * ddx + ddz * ddz);
                // thin out the streaks that pass right in front of the lens: they would be fat bright bands on screen
-               float alpha = (1.0F - f * f) * (pass == 0 ? 0.46F : 0.82F) * Math.min(1.0F, amount * 1.45F) * Weather.smooth(1.3F, 6.0F, (float)dl);
-               float px = (float)(-ddz / dl * 0.52);
-               float pz = (float)(ddx / dl * 0.52);
+               float alpha = (1.0F - f * f) * (pass == 0 ? 0.42F : 0.80F) * Math.min(1.0F, amount * 1.4F) * Weather.smooth(1.4F, 6.5F, (float)dl);
+               float px = (float)(-ddz / dl * 0.5);
+               float pz = (float)(ddx / dl * 0.5);
                float uoff = (hash & 31) / 32.0F;
-               float speed = pass == 0 ? (float)(t * (1.62 + (hash >> 5 & 7) * 0.06)) : (float)(t * (0.28 + (hash >> 5 & 7) * 0.025));
+               float speed = pass == 0 ? (float)(t * (1.55 + (hash >> 5 & 7) * 0.05)) : (float)(t * (0.28 + (hash >> 5 & 7) * 0.02));
                float vOff = (hash >> 8 & 63) / 64.0F + speed;
-               float sway = pass == 0
-                  ? (float)(Math.sin(t * 2.1 + (hash & 63)) * 0.08)
-                  : (float)(Math.sin(t * 1.3 + (hash & 255)) * 0.38);
+               float sway = pass == 0 ? 0.0F : (float)(Math.sin(t * 1.3 + (hash & 255)) * 0.35);
                float hgt = (float)(yt - yb);
                float v0 = vOff;
-               float v1 = vOff + hgt / (pass == 0 ? 13.0F : 6.0F);
+               float v1 = vOff + hgt / (pass == 0 ? 14.0F : 6.0F);
                float u0 = uoff;
                float u1 = uoff + (pass == 0 ? 0.5F : 1.0F);
                GL11.glColor4f(lr, lg, lb, alpha);
                float tx = (float)(x + 0.5 - cx) + sway;
                float tz2 = (float)(z + 0.5 - cz);
-               float topShiftX = wx * hgt * (pass == 0 ? 1.0F : 0.45F);
-               float topShiftZ = wz * hgt * (pass == 0 ? 1.0F : 0.45F);
+               float topShiftX = wx * hgt * (pass == 0 ? 1.0F : 0.4F);
+               float topShiftZ = wz * hgt * (pass == 0 ? 1.0F : 0.4F);
                GL11.glTexCoord2f(u0, v0);
                GL11.glVertex3f(tx - px, (float)(yb - cy), tz2 - pz);
                GL11.glTexCoord2f(u1, v0);
@@ -1104,99 +1091,11 @@ final class WeatherFx {
                GL11.glVertex3f(tx + px + topShiftX, (float)(yt - cy), tz2 + pz + topShiftZ);
                GL11.glTexCoord2f(u0, v1);
                GL11.glVertex3f(tx - px + topShiftX, (float)(yt - cy), tz2 - pz + topShiftZ);
-
-               if (d2 < 49.0) {
-                  float qx = (px - pz) * 0.68F;
-                  float qz = (px + pz) * 0.68F;
-                  float u0b = uoff + 0.25F;
-                  float u1b = u0b + (pass == 0 ? 0.5F : 1.0F);
-                  float v0b = vOff + 0.37F;
-                  float v1b = v0b + hgt / (pass == 0 ? 14.5F : 6.5F);
-                  GL11.glColor4f(lr, lg, lb, alpha * 0.62F);
-                  GL11.glTexCoord2f(u0b, v0b);
-                  GL11.glVertex3f(tx - qx, (float)(yb - cy), tz2 - qz);
-                  GL11.glTexCoord2f(u1b, v0b);
-                  GL11.glVertex3f(tx + qx, (float)(yb - cy), tz2 + qz);
-                  GL11.glTexCoord2f(u1b, v1b);
-                  GL11.glVertex3f(tx + qx + topShiftX, (float)(yt - cy), tz2 + qz + topShiftZ);
-                  GL11.glTexCoord2f(u0b, v1b);
-                  GL11.glVertex3f(tx - qx + topShiftX, (float)(yt - cy), tz2 - qz + topShiftZ);
-               }
             }
          }
 
          GL11.glEnd();
       }
-
-      this.drawGroundSplashes(w, bx, bz, cx, cy, cz, t, amount, lr, lg, lb);
-   }
-
-   /** Expanding ground raindrop splash rings and low-lying rain mist around the player. */
-   void drawGroundSplashes(World w, int bx, int bz, double cx, double cy, double cz, double t, float amount, float lr, float lg, float lb) {
-      if (this.snowy > 0.7F) {
-         return;
-      }
-
-      int srad = Math.min(9, 4 + (int)(5.0F * amount));
-      GL11.glDisable(3553);
-      GL11.glBegin(7);
-      for (int dz = -srad; dz <= srad; dz++) {
-         for (int dx = -srad; dx <= srad; dx++) {
-            int d2 = dx * dx + dz * dz;
-            if (d2 > srad * srad) {
-               continue;
-            }
-
-            int x = bx + dx;
-            int z = bz + dz;
-            Chunk c = w.chunkAt(x, z);
-            if (c == null || w.weather.precipKind(x, z) != 1) {
-               continue;
-            }
-
-            int hmBlock = c.hm[(z & 15) * 16 + (x & 15)];
-            int topId = c.get(x & 15, hmBlock, z & 15);
-            if (topId == 0 || Blocks.isLava(topId)) {
-               continue;
-            }
-
-            boolean onWater = Blocks.isWater(topId);
-            float gy = hmBlock + (onWater ? 0.90F : 1.02F) - (float)cy;
-            if (Math.abs(gy) > 9.0F) {
-               continue;
-            }
-
-            int h = x * 374761393 ^ z * 668265263;
-            float distFade = 1.0F - (float)Math.sqrt(d2) / (srad + 0.5F);
-            for (int k = 0; k < 2; k++) {
-               int hk = h ^ (k * 1274126177);
-               float ph = (float)((t * (2.6 + (hk & 7) * 0.18) + ((hk >>> 4 & 255) / 255.0)) % 1.0);
-               float ox = ((hk >>> 12 & 15) / 15.0F) * 0.72F + 0.14F;
-               float oz = ((hk >>> 16 & 15) / 15.0F) * 0.72F + 0.14F;
-               float sx = (float)(x + ox - cx);
-               float sz = (float)(z + oz - cz);
-               float r = (0.04F + ph * (onWater ? 0.28F : 0.20F));
-               float al = (1.0F - ph) * distFade * Math.min(1.0F, amount * 1.3F) * (onWater ? 0.34F : 0.24F);
-               GL11.glColor4f(lr * 0.95F + 0.05F, lg * 0.97F + 0.03F, Math.min(1.0F, lb * 1.04F), al);
-               GL11.glVertex3f(sx - r, gy, sz - r);
-               GL11.glVertex3f(sx - r, gy, sz + r);
-               GL11.glVertex3f(sx + r, gy, sz + r);
-               GL11.glVertex3f(sx + r, gy, sz - r);
-               if (ph < 0.42F) {
-                  float sh = (0.42F - ph) * 0.55F;
-                  float sw = 0.028F;
-                  GL11.glColor4f(lr, lg, Math.min(1.0F, lb * 1.05F), al * 1.25F);
-                  GL11.glVertex3f(sx - sw, gy, sz);
-                  GL11.glVertex3f(sx + sw, gy, sz);
-                  GL11.glVertex3f(sx + sw * 1.6F, gy + sh, sz);
-                  GL11.glVertex3f(sx - sw * 1.6F, gy + sh, sz);
-               }
-            }
-         }
-      }
-
-      GL11.glEnd();
-      GL11.glEnable(3553);
    }
 
    /** Lightning: glowing jagged ribbons facing the camera, additive, hidden behind terrain. */

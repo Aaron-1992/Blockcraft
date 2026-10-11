@@ -201,37 +201,5 @@ final class Scenes315 {
             set(w, c, Y + 1, 3, Shapes.CARPET0 + c);
          }
       });
-
-      put("redstone", new double[]{7.5, 61.2, 4.5, 18, 32, 13}, w -> {
-         // Row z=2: Pistons (Up, Down, North, South, East, West) + Sticky Piston Up + Extended Piston & Head
-         for (int f = 0; f < 6; f++) {
-            set(w, 1 + f * 2, Y, 2, Redstone319.PISTON + f);
-         }
-         set(w, 13, Y, 2, Redstone319.STICKY_PISTON + 1);
-         set(w, 15, Y, 2, Redstone319.PISTON_EXT + 3);
-         set(w, 15, Y, 3, Redstone319.PISTON_HEAD + 3);
-
-         // Row z=4: Observers (4 facings) + Repeaters OFF/ON (4 facings)
-         for (int f = 0; f < 4; f++) {
-            set(w, 1 + f * 2, Y, 4, Redstone319.OBSERVER + f);
-            set(w, 9 + f * 2, Y, 4, Redstone319.REPEATER_ON + f);
-         }
-
-         // Row z=6: Torch, Lever OFF/ON, Buttons, Plates, Daylight Sensor, Note Block, Lamp OFF/ON, Slime, Sea Lantern, Sideways Logs
-         set(w, 1, Y, 6, Redstone319.REDSTONE_TORCH);
-         set(w, 2, Y, 6, Redstone319.LEVER_OFF);
-         set(w, 3, Y, 6, Redstone319.LEVER_ON);
-         set(w, 4, Y, 6, Redstone319.STONE_BUTTON);
-         set(w, 5, Y, 6, Redstone319.WOOD_BUTTON);
-         set(w, 6, Y, 6, Redstone319.DAYLIGHT_SENSOR);
-         set(w, 7, Y, 6, Redstone319.NOTE_BLOCK);
-         set(w, 8, Y, 6, Redstone319.REDSTONE_LAMP);
-         set(w, 9, Y, 6, Redstone319.REDSTONE_LAMP_LIT);
-         set(w, 10, Y, 6, Redstone319.SLIME_BLOCK);
-         set(w, 11, Y, 6, Redstone319.SEA_LANTERN);
-         set(w, 12, Y, 6, 220); // sideways oak log
-         set(w, 13, Y, 6, 222); // sideways birch log
-         set(w, 14, Y, 6, 224); // sideways spruce log
-      });
    }
 }

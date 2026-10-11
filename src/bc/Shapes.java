@@ -624,7 +624,9 @@ final class Shapes {
          return false;
       }
 
+      boolean opening = isGate(id) ? !gateOpen(id) : !trapOpen(id);
       g.world.setBlock(x, y, z, toggled(id));
+      SoundEngine.play3D(g.world, isGate(id) ? (opening ? "gate_open" : "gate_close") : (opening ? "door_open" : "door_close"), x + 0.5, y + 0.5, z + 0.5, 0.85F, 0.96F);
       g.meshNow(x, y, z);
       return true;
    }
@@ -718,6 +720,7 @@ final class Shapes {
       if (hitsPlayer(g, x, y, z, put) || !w.setBlock(x, y, z, put)) {
          return false;
       }
+      SoundEngine.playBlockPlace(w, put, x, y, z);
 
       if (Redstone319.handlesUpdate(put)) {
          Redstone319.propagate(w, x, y, z);

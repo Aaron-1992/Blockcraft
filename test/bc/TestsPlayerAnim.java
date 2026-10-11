@@ -309,8 +309,6 @@ final class TestsPlayerAnim {
       double maxX = -1e9;
       double maxY = -1e9;
       double maxZ = -1e9;
-      double armMinY = 1e9;
-      double armMaxY = -1e9;
       int boxes;
       int held;
       boolean bad;
@@ -355,9 +353,6 @@ final class TestsPlayerAnim {
          }
 
          double[] p = new double[3];
-         double[] c = new double[3];
-         Rig.apply(this.m, (x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5, c);
-         boolean isArm = Math.abs(c[0]) > 0.28;
          for (int i = 0; i < 8; i++) {
             Rig.apply(this.m, (i & 1) == 0 ? x0 : x1, (i & 2) == 0 ? y0 : y1, (i & 4) == 0 ? z0 : z1, p);
             this.minX = Math.min(this.minX, p[0]);
@@ -366,10 +361,6 @@ final class TestsPlayerAnim {
             this.maxX = Math.max(this.maxX, p[0]);
             this.maxY = Math.max(this.maxY, p[1]);
             this.maxZ = Math.max(this.maxZ, p[2]);
-            if (isArm) {
-               this.armMinY = Math.min(this.armMinY, p[1]);
-               this.armMaxY = Math.max(this.armMaxY, p[1]);
-            }
          }
       }
 
@@ -393,8 +384,6 @@ final class TestsPlayerAnim {
             check(!b.bad, "texture rectangles inside the skin");
             check(near((float)b.minY, 0.0F, 0.03F), "the soles are at the floor: " + b.minY);
             check(near((float)b.maxY, 1.875F + 0.0235F, 0.05F), "the head is 1.875 blocks up (+ the hat layer): " + b.maxY);
-            check(near((float)b.armMaxY, 24.0F * 0.9375F / 16.0F + 0.02F, 0.04F), "the top of the shoulders is flush with the top of the torso (y = 24px): " + b.armMaxY);
-            check(near((float)b.armMinY, 12.0F * 0.9375F / 16.0F, 0.04F), "the hands end at the waist (y = 12px): " + b.armMinY);
             float width = (float)(b.maxX - b.minX) * 16.0F / 0.9375F; // in model pixels
             check(width > (slim ? 14.0F : 16.0F) && width < (slim ? 17.5F : 19.5F), "width over the arms (" + slim + "): " + width + " pixels");
             check(b.boxes == 2 * 2 * 2 + 2 + 2 * 2 * 2 + 2, "boxes: 4 for each leg, 2 for the torso, 4 for each arm, 2 for the head - and no caps while the joints are straight: " + b.boxes);

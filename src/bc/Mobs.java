@@ -1036,6 +1036,7 @@ public final class Mobs {
    void blast(double var1, double var3, double var5, int var7, Mobs.Mob var8) {
       World var9 = this.g.world;
       Player var10 = this.g.player;
+      SoundEngine.play3DMoving(var9, "tnt_explode", var1, var3, var5, 0.0, 0.0, 0.0, 1.55F, 0.90F + this.rnd.nextFloat() * 0.12F, true);
       int var11 = (int)Math.floor(var1);
       int var12 = (int)Math.floor(var3);
       int var13 = (int)Math.floor(var5);

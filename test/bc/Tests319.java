@@ -962,6 +962,64 @@ final class Tests319 {
          eq("Fire Charge", Items.name(Redstone319.FIRE_CHARGE), "Fire Charge item registered");
          check(bwGame.useSpecial(new Stack(Redstone319.COMPASS, 1)), "Compass right-click displays Spawn direction and distance");
          check(bwGame.useSpecial(new Stack(Redstone319.CLOCK, 1)), "Clock right-click displays Day, Time and Weather");
+
+         // 10. Realistic Sounds, Animal Crossing Dynamic Music, Real-Life 3D Physical Acoustics & End Credits
+         SoundEngine.loadSoundbank();
+         check(SoundEngine.loadedSampleCount() >= 72, "Soundbank loaded >= 72 real sound effects & Animal Crossing tracks (" + SoundEngine.loadedSampleCount() + ")");
+         check(SoundEngine.hasSample("step_grass_1") && SoundEngine.hasSample("dig_stone_1") && SoundEngine.hasSample("break_block_1") && SoundEngine.hasSample("tnt_explode"), "Real surface footsteps, block dig/break, and explosion samples loaded");
+         check(SoundEngine.hasSample("ac_morning") && SoundEngine.hasSample("ac_afternoon") && SoundEngine.hasSample("ac_sunset") && SoundEngine.hasSample("ac_night") && SoundEngine.hasSample("ac_rain") && SoundEngine.hasSample("ac_snow") && SoundEngine.hasSample("ac_kk_bossa") && SoundEngine.hasSample("ac_cafe"), "All 8 Animal Crossing hourly, weather, and K.K. Slider tracks loaded");
+
+         // Verify Animal Crossing dynamic music selection by screen, time of day, and weather
+         bwGame.screen = Game.S.TITLE;
+         eq("ac_kk_bossa", SoundEngine.selectAnimalCrossingMusic(bwGame), "Title screen plays K.K. Bossa");
+         bwGame.screen = Game.S.CREDITS;
+         eq("ac_cafe", SoundEngine.selectAnimalCrossingMusic(bwGame), "End Credits screen plays Cafe K.K.");
+         bwGame.screen = Game.S.PLAY;
+         bwGame.world.dayTime = 2000L;
+         eq("ac_morning", SoundEngine.selectAnimalCrossingMusic(bwGame), "Morning (08:00) plays Animal Crossing 8 AM");
+         bwGame.world.dayTime = 7000L;
+         eq("ac_afternoon", SoundEngine.selectAnimalCrossingMusic(bwGame), "Afternoon (13:00) plays Animal Crossing 1 PM");
+         bwGame.world.dayTime = 12000L;
+         eq("ac_sunset", SoundEngine.selectAnimalCrossingMusic(bwGame), "Sunset (18:00) plays Animal Crossing 5 PM");
+         bwGame.world.dayTime = 18000L;
+         eq("ac_night", SoundEngine.selectAnimalCrossingMusic(bwGame), "Night (00:00) plays Animal Crossing 1 AM");
+
+         // Verify Real-Life 3D Physical Acoustics: wall occlusion & cave enclosure reverb
+         for (int x = 18; x <= 26; x++) {
+            for (int y = 79; y <= 84; y++) {
+               for (int z = 18; z <= 26; z++) {
+                  bwGame.world.setBlock(x, y, z, 0);
+               }
+            }
+         }
+         float openOcc = SoundEngine.computeOcclusion(bwGame.world, 20.5, 81.5, 20.5, 25.5, 81.5, 20.5);
+         eq(0.0F, openOcc, "Open line-of-sight has 0.0 acoustic wall occlusion");
+         for (int y = 79; y <= 84; y++) {
+            for (int z = 18; z <= 24; z++) {
+               bwGame.world.setBlock(23, y, z, Blocks.STONE);
+            }
+         }
+         float wallOcc = SoundEngine.computeOcclusion(bwGame.world, 20.5, 81.5, 20.5, 25.5, 81.5, 20.5);
+         check(wallOcc >= 0.25F, "Solid stone wall between source and listener muffles sound via physical occlusion (" + wallOcc + ")");
+
+         // Build a sealed stone cave chamber around (40, 80, 40) and verify 14-ray acoustic probing increases reverb
+         for (int x = 36; x <= 44; x++) {
+            for (int y = 77; y <= 84; y++) {
+               for (int z = 36; z <= 44; z++) {
+                  boolean shell = x == 36 || x == 44 || y == 77 || y == 84 || z == 36 || z == 44;
+                  bwGame.world.setBlock(x, y, z, shell ? Blocks.STONE : 0);
+               }
+            }
+         }
+         for (int i = 0; i < 6; i++) {
+            SoundEngine.updateEnvironmentAcoustics(bwGame.world, 40.5, 80.5, 40.5);
+         }
+         check(SoundEngine.getRoomEnclosure() > 0.45F && SoundEngine.getReverbWet() > 0.14F, "Enclosed stone cave increases 3D room enclosure & Schroeder reverb wet mix");
+
+         // Verify End Credits attributions & /credits command
+         check(SoundEngine.CREDITS_SECTIONS.length >= 3, "End Credits contains Music, Sound Effects, and 3D Acoustics attribution sections");
+         bwGame.runCommand("/credits");
+         eq(Game.S.CREDITS, bwGame.screen, "/credits command opens the End Poem & Credits screen");
       });
    }
 }

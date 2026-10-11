@@ -81,18 +81,13 @@ final class Creative {
    }
 
    static int tabOf(int id) {
-      if (Redstone319.isRedstoneUtility(id)) {
-         return UTILITY;
-      }
-
       String n = Items.name(id).toLowerCase(Locale.ROOT);
       if (colorGroup(n) >= 0) {
          return COLORS;
       }
 
       if (Items.isTool(id) || Items.isArmor(id) || Items.isHoe(id) || n.equals("bow") || n.equals("arrow") || n.equals("shears") || n.equals("flint and steel")
-         || n.endsWith(" bucket") || n.equals("bucket") || n.equals("fishing rod") || n.equals("shield") || n.equals("compass") || n.equals("clock")
-         || n.equals("fire charge")) {
+         || n.endsWith(" bucket") || n.equals("bucket") || n.equals("fishing rod") || n.equals("shield")) {
          return TOOLS;
       }
 
@@ -197,8 +192,6 @@ final class Creative {
             }
 
             return 4;
-         case UTILITY:
-            return Redstone319.isRedstoneUtility(id) ? 1 : 0;
          default:
             return 0;
       }
@@ -207,7 +200,7 @@ final class Creative {
    /** The items of one tab, in a sensible order. */
    static int[] tab(int tab) {
       build();
-      return ModLoader.filterPalette(cache[Math.max(0, Math.min(SEARCH - 1, tab))]);
+      return cache[Math.max(0, Math.min(SEARCH - 1, tab))];
    }
 
    private static synchronized void build() {
@@ -242,7 +235,7 @@ final class Creative {
 
    /** Everything whose name contains all the words typed (any case); an empty text finds everything. */
    static int[] search(String query) {
-      int[] all = ModLoader.filterPalette(Blocks.creativeList());
+      int[] all = Blocks.creativeList();
       String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
       if (q.isEmpty()) {
          return all;
@@ -272,10 +265,6 @@ final class Creative {
 
    /** A short word for what an item is (shown under its name in the tooltip). */
    static String kind(int id) {
-      if (Redstone319.isRedstoneUtility(id)) {
-         return "Redstone";
-      }
-
       String n = Items.name(id).toLowerCase(Locale.ROOT);
       if (Items.isArmor(id)) {
          return "Armor";

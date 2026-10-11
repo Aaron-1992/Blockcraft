@@ -26,13 +26,9 @@ final class Ui {
    int focus;
    /** The options tab that is open. */
    int optTab;
-   /** The mods tab that is open (0 = Browse Modrinth Catalog, 1 = Installed Mods). */
-   int modTab;
    /** Scroll offsets of the lists (one element arrays, so that the wheel can change them). */
    final float[] optScroll = new float[1];
    final float[] worldScroll = new float[1];
-   final float[] packScroll = new float[1];
-   final float[] modScroll = new float[1];
    /** The scrolling area the mouse wheel acts on in this frame (set while drawing), the offset it changes, the largest offset and the step of one notch. */
    float[] wheelArea;
    float[] wheelHolder;

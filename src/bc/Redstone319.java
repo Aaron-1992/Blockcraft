@@ -926,6 +926,7 @@ final class Redstone319 {
       if (id == LEVER_OFF || id == LEVER_ON) {
          int next = id == LEVER_OFF ? LEVER_ON : LEVER_OFF;
          g.world.setBlock(x, y, z, next);
+         SoundEngine.play3D(g.world, "ui_click", x + 0.5, y + 0.5, z + 0.5, 0.7F, next == LEVER_ON ? 1.15F : 0.9F);
          propagate(g.world, x, y, z);
          g.meshNow(x, y, z);
          return true;
@@ -934,6 +935,7 @@ final class Redstone319 {
       if (id == STONE_BUTTON || id == WOOD_BUTTON) {
          int next = id == STONE_BUTTON ? STONE_BUTTON_ON : WOOD_BUTTON_ON;
          g.world.setBlock(x, y, z, next);
+         SoundEngine.play3D(g.world, "ui_click", x + 0.5, y + 0.5, z + 0.5, 0.7F, 1.1F);
          buttonTimers.put(pack(x, y, z), id == STONE_BUTTON ? 20 : 30);
          propagate(g.world, x, y, z);
          g.meshNow(x, y, z);
@@ -941,6 +943,9 @@ final class Redstone319 {
       }
 
       if (id == NOTE_BLOCK) {
+         long key = pack(x, y, z);
+         int note = (notePitches.getOrDefault(key, -1) + 1) % 25;
+         notePitches.put(key, note);
          playNote(g, x, y, z);
          return true;
       }
@@ -956,7 +961,11 @@ final class Redstone319 {
       return false;
    }
 
+   private static final java.util.Map<Long, Integer> notePitches = new java.util.HashMap<>();
+
    private static void playNote(Game g, int x, int y, int z) {
+      int semitone = notePitches.getOrDefault(pack(x, y, z), 0);
+      SoundEngine.playNoteBlock(g != null ? g.world : null, x, y, z, semitone);
       if (g != null && g.particles != null) {
          g.spawnBreakParticles(x, y + 1, z, REDSTONE_TORCH, 4);
       }
@@ -1290,12 +1299,14 @@ final class Redstone319 {
                   boolean open = Shapes.trapOpen(id);
                   if (pow != open) {
                      w.setBlock(x, y, z, Shapes.toggled(id));
+                     SoundEngine.play3D(w, pow ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5, 0.8F, 1.0F);
                      remesh.add(key);
                   }
                } else if (Shapes.isGate(id)) {
                   boolean open = Shapes.gateOpen(id);
                   if (pow != open) {
                      w.setBlock(x, y, z, Shapes.toggled(id));
+                     SoundEngine.play3D(w, pow ? "gate_open" : "gate_close", x + 0.5, y + 0.5, z + 0.5, 0.85F, 1.0F);
                      remesh.add(key);
                   }
                } else if (Blocks.isDoorLo(id)) {
@@ -1307,12 +1318,14 @@ final class Redstone319 {
                         if (!open) {
                            w.setBlock(x, y, z, id + 4);
                            w.setBlock(x, y + 1, z, hi + 4);
+                           SoundEngine.play3D(w, "door_open", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
                            remesh.add(key);
                            remesh.add(pack(x, y + 1, z));
                         }
                      } else if (open && redstoneOpened.remove(key)) {
                         w.setBlock(x, y, z, id - 4);
                         w.setBlock(x, y + 1, z, hi - 4);
+                           SoundEngine.play3D(w, "door_close", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
                         remesh.add(key);
                         remesh.add(pack(x, y + 1, z));
                      }
@@ -1326,6 +1339,7 @@ final class Redstone319 {
                } else if (id == Blocks.TNT && pow) {
                   w.setBlock(x, y, z, 0);
                   w.primeTnt(x, y, z, 80);
+                  SoundEngine.play3D(w, "tnt_ignite", x + 0.5, y + 0.5, z + 0.5, 0.9F, 1.0F);
                   remesh.add(key);
                }
             }

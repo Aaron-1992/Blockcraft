@@ -107,20 +107,12 @@ final class Village314 {
       }
 
       k.queue.add("smithy");
-      if (target >= 12) {
-         k.queue.add("inn");
-      }
-
       if (target >= 11) {
          k.queue.add("library");
       }
 
       if (target >= 10) {
-         k.queue.add((target & 1) == 0 ? "bakery" : "butcher");
-      }
-
-      if (target >= 14 && k.style != Style.DESERT) {
-         k.queue.add("windmill");
+         k.queue.add("butcher");
       }
 
       // the well in the square
@@ -296,13 +288,11 @@ final class Village314 {
       } else if (roll < 15) {
          return kindFor(k, "house_l");
       } else if (roll < 17) {
-         return cold ? "longhouse" : ((k.houses & 1) == 0 ? "bakery" : kindFor(k, "house_m"));
+         return cold ? "longhouse" : kindFor(k, "house_m");
       } else if (roll < 18 && dist > 20.0) {
-         return (k.houses & 1) == 0 ? "archery" : "barn";
+         return "barn";
       } else if (roll < 19 && dist > 20.0 && k.pens < 2) {
          return "pen";
-      } else if (roll == 19 && dist < 18.0) {
-         return "gazebo";
       }
 
       return kindFor(k, "house_s");

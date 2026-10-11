@@ -474,7 +474,7 @@ final class Screens {
             rows = 4;
             break;
          case 2:
-            rows = 3;
+            rows = 5;
             break;
          default:
             rows = (KEYS.length + 1) / 2;
@@ -662,6 +662,35 @@ final class Screens {
             "Browse the Modrinth-style Mod Catalog, toggle installed mods, or launch the external Mod Manager.", () -> {
                g.modsReturn = Game.S.OPTIONS;
                g.setScreen(Game.S.MODS);
+            });
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.slider("Sound: " + (o.soundVolume <= 0.0F ? "OFF" : Math.round(o.soundVolume * 100.0F) + "%"), x0, oy, colW, 20.0F, o.soundVolume,
+            "Volume of realistic world sound effects (footsteps, mining, doors, chests, fire, water, explosions).", v -> {
+               o.soundVolume = v;
+               SoundEngine.setVolumes(o.soundVolume, o.musicVolume, o.realAcoustics);
+            });
+         ui.slider("Music: " + (o.musicVolume <= 0.0F ? "OFF" : Math.round(o.musicVolume * 100.0F) + "%"), x1, oy, colW, 20.0F, o.musicVolume,
+            "Volume of the Animal Crossing hourly & weather-adaptive soundtrack.", v -> {
+               o.musicVolume = v;
+               SoundEngine.setVolumes(o.soundVolume, o.musicVolume, o.realAcoustics);
+            });
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("3D Acoustics", o.realAcoustics, x0, oy, colW, 20.0F,
+            "Real-life sound physics: wall muffling/occlusion, 3D cave reverb & echo, speed-of-sound delay (343 m/s), and Doppler shift.", () -> {
+               o.realAcoustics = !o.realAcoustics;
+               SoundEngine.setVolumes(o.soundVolume, o.musicVolume, o.realAcoustics);
+            });
+         ui.button("End Credits...", x1, oy, colW, 20.0F, true,
+            "View the End Poem and the full Music & Sound Credits.", () -> {
+               g.creditsReturn = Game.S.OPTIONS;
+               g.creditsScroll = 0.0F;
+               g.setScreen(Game.S.CREDITS);
             });
       }
    }
@@ -1050,6 +1079,101 @@ final class Screens {
             ui.say("Arena map completely reset!");
          });
       ui.button("Leave Lobby", x1, footY, colW, 20.0F, true, null, g::quitToTitle);
+      ui.drawToast();
+   }
+
+   static final String[][] END_POEM_LINES = new String[][]{
+      {"#28C8B8", "I see the player you mean."},
+      {"#38B848", "Does it know that we love it? That the universe is kind?"},
+      {"#28C8B8", "Sometimes, through the noise of its thoughts, it hears the universe, yes."},
+      {"#38B848", "Wait. It has reached the higher level. It can read our thoughts."},
+      {"#28C8B8", "It thinks we are part of the game. I like this player. It played well. It did not give up."},
+      {"#38B848", "And the game was over and the player woke up from the dream."},
+      {"#28C8B8", "And the player began a new dream. And the player dreamed again, dreamed better."},
+      {"#F6D365", "You are the player. Wake up."}
+   };
+
+   // ================================================================================
+   //  End Poem & Music / Sound Credits (triggered by End Exit Portal, /credits, or Options)
+   // ================================================================================
+
+   static void credits(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.75F);
+      gui.rect(0.0F, 0.0F, gui.w, gui.h, 0xD8050810);
+
+      float cx = gui.w * 0.5F;
+      float pw = Math.min(340.0F, gui.w - 16.0F);
+      float px = cx - pw * 0.5F;
+      float topY = 26.0F;
+      float footY = gui.h - 26.0F;
+      float viewH = Math.max(80.0F, footY - topY - 6.0F);
+
+      ui.panel(px, topY - 20.0F, pw, viewH + 22.0F);
+      gui.centered("BLOCKCRAFT  -  END POEM & CREDITS", cx, topY - 14.0F, Ui.GOLD, true, 1.0F);
+
+      // Calculate total content height
+      int totalLines = END_POEM_LINES.length + 4;
+      for (int s = 0; s < SoundEngine.CREDITS_SECTIONS.length; s++) {
+         totalLines += 2 + SoundEngine.CREDITS_SECTIONS[s].length;
+      }
+      float lineStep = 12.0F;
+      float contentH = (float)totalLines * lineStep + 32.0F;
+      float maxScroll = Math.max(0.0F, contentH - viewH);
+
+      // Gentle auto-scroll
+      g.creditsScroll = Math.min(maxScroll, g.creditsScroll + 0.35F);
+
+      float y = topY + 6.0F - g.creditsScroll;
+      float textX = px + 10.0F;
+      float maxTextW = pw - 20.0F;
+
+      // 1. End Poem
+      if (y + 10.0F >= topY && y <= topY + viewH - 10.0F) {
+         gui.centered(Game.clipText("=== THE END POEM ===", maxTextW), cx, y, 0xFFFAD666, true, 1.0F);
+      }
+      y += lineStep + 4.0F;
+      for (int i = 0; i < END_POEM_LINES.length; i++) {
+         String col = END_POEM_LINES[i][0];
+         String line = Game.clipText(END_POEM_LINES[i][1], maxTextW);
+         if (y + 10.0F >= topY && y <= topY + viewH - 10.0F) {
+            int color = col.equals("#28C8B8") ? 0xFF28C8B8 : (col.equals("#38B848") ? 0xFF38C848 : 0xFFF6D365);
+            gui.text(line, textX, y, color, true);
+         }
+         y += lineStep;
+      }
+      y += 8.0F;
+
+      // 2. Music, Sound Effects & 3D Acoustics Attributions
+      for (int s = 0; s < SoundEngine.CREDITS_SECTIONS.length; s++) {
+         String[] sec = SoundEngine.CREDITS_SECTIONS[s];
+         String header = Game.clipText(sec[0], maxTextW);
+         if (y + 10.0F >= topY && y <= topY + viewH - 10.0F) {
+            gui.centered(header, cx, y, 0xFFF5D161, true, 1.0F);
+         }
+         y += lineStep + 2.0F;
+         for (int i = 1; i < sec.length; i++) {
+            String line = Game.clipText(sec[i], maxTextW);
+            if (y + 10.0F >= topY && y <= topY + viewH - 10.0F) {
+               boolean highlight = sec[i].startsWith("Original") || sec[i].startsWith("Curated") || sec[i].startsWith("Freesound") || sec[i].startsWith("CC-BY") || sec[i].startsWith("CC0");
+               int color = highlight ? 0xFFB8E6FF : 0xFFD6D6E0;
+               gui.text(line, textX, y, color, true);
+            }
+            y += lineStep;
+         }
+         y += 8.0F;
+      }
+
+      float btnW = Math.min(140.0F, (pw - 24.0F) * 0.5F);
+      ui.button("Top", cx - btnW - 4.0F, footY, btnW, 20.0F, true, "Scroll back to the start of the credits.", () -> {
+         g.creditsScroll = 0.0F;
+      });
+      ui.button("Done", cx + 4.0F, footY, btnW, 20.0F, true, null, () -> {
+         Game.S ret = g.creditsReturn != null ? g.creditsReturn : (g.world != null ? Game.S.PLAY : Game.S.TITLE);
+         g.setScreen(ret);
+      });
       ui.drawToast();
    }
 }

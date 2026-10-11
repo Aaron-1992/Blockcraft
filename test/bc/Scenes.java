@@ -109,6 +109,10 @@ final class Scenes {
             g.screen = Game.S.MODS;
             Screens.mods(g);
             break;
+         case "credits":
+            g.screen = Game.S.CREDITS;
+            Screens.credits(g);
+            break;
          case "loading":
             g.screen = Game.S.LOADING;
             g.worldDisplayName = "My Survival World";

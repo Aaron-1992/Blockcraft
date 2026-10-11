@@ -792,7 +792,7 @@ final class Tests38 {
       });
       test("the version strings follow the build", () -> {
          check(Game.VERSION_STR.matches("[0-9]+\\.[0-9]+"), "VERSION_STR is a version: " + Game.VERSION_STR);
-         check(Game.TITLE_STR.endsWith("V" + Game.VERSION_STR) || Game.TITLE_STR.endsWith("Update " + Game.VERSION_STR), "title string");
+         check(Game.TITLE_STR.endsWith("Update " + Game.VERSION_STR), "title string");
       });
    }
 }

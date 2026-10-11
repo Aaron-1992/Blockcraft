@@ -350,10 +350,6 @@ final class TexArt315 {
          return bannerSprite(id - Decor315.BANNER_ITEM0);
       }
 
-      if (id >= Redstone319.ITEM_REDSTONE && id <= Redstone319.FIRE_CHARGE) {
-         return Redstone319.sprite(id);
-      }
-
       return null;
    }
 

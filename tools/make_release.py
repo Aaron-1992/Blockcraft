@@ -46,18 +46,18 @@ def find_patch(version=None):
 
 
 def whats_new(version):
-    """The 'WHAT'S NEW IN UPDATE x.y' or 'WHAT'S NEW IN V x.y' section of package/README.txt."""
+    """The 'WHAT'S NEW IN UPDATE x.y' section of package/README.txt (text up to the next such heading)."""
     text = open(os.path.join(ROOT, "package", "README.txt"), encoding="utf-8", errors="replace").read().replace("\r\n", "\n")
-    m = re.search(r"^WHAT'S NEW IN (?:UPDATE |V)%s\b.*?$(.*?)(?=^(?:WHAT'S NEW IN |NEW IN [0-9]|FIXES IN|CONTROLS)\b)" % re.escape(version), text, re.S | re.M)
+    m = re.search(r"^WHAT'S NEW IN UPDATE %s\b.*?$(.*?)(?=^(?:WHAT'S NEW IN UPDATE|NEW IN [0-9]|FIXES IN|CONTROLS)\b)" % re.escape(version), text, re.S | re.M)
     if not m:
         return "(see README.txt inside the zip)"
-    heading = re.search(r"^WHAT'S NEW IN (?:UPDATE |V)%s\b.*?$" % re.escape(version), text, re.M).group(0).strip()
+    heading = re.search(r"^WHAT'S NEW IN UPDATE %s\b.*?$" % re.escape(version), text, re.M).group(0).strip()
     return heading + "\n" + m.group(1).rstrip()
 
 
 def notes(version, full_name, patch_name):
     return (
-        "## Blockcraft V%(v)s\n\n"
+        "## Blockcraft - Update %(v)s\n\n"
         "### Install (Windows 64-bit, nothing else needed - Java is inside)\n\n"
         "1. Download **%(full)s** below (\"Assets\").\n"
         "2. Right-click it -> *Extract All...* into a **new folder** (anywhere you like).\n"
@@ -66,7 +66,7 @@ def notes(version, full_name, patch_name):
         "If Windows SmartScreen warns about an unknown publisher: *More info -> Run anyway* (the game is not code-signed).\n"
         "If it doesn't start, run `Blockcraft-debug.bat` and read the messages (or open `%%USERPROFILE%%\\.blockcraft112\\crash.log`).\n\n"
         "*Small download instead?* `%(patch)s` (about 6 MB) only contains the changed files - extract it and copy the "
-        "`Blockcraft` folder over an existing Blockcraft install of V3.5 or newer (\"Replace files\").\n\n"
+        "`Blockcraft` folder over an existing Blockcraft install of Update 3.5 or newer (\"Replace files\").\n\n"
         "### What's new\n\n```\n%(new)s\n```\n"
     ) % {"v": version, "full": full_name, "patch": patch_name, "new": whats_new(version)}
 
@@ -90,8 +90,8 @@ def main():
         if need not in rep:
             sys.exit("update pack %s lacks %s" % (os.path.basename(patch), need))
 
-    full_name = "Blockcraft-V%s-windows.zip" % version
-    patch_name = "Blockcraft-V%s-patch.zip" % version
+    full_name = "Blockcraft-1.12-UPDATE%s-windows.zip" % version
+    patch_name = "Blockcraft-UPDATE%s-patch.zip" % version
     full = B.compose_full_zip(os.path.join(OUT, full_name), rep)
     shutil.copy(patch, os.path.join(OUT, patch_name))
 

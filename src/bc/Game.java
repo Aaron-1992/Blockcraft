@@ -197,6 +197,9 @@ public final class Game {
    Game.S skinReturn = Game.S.TITLE;
    Game.S packsReturn = Game.S.TITLE;
    Game.S modsReturn = Game.S.TITLE;
+   Game.S creditsReturn = Game.S.TITLE;
+   float creditsScroll = 0.0F;
+   boolean pendingEndCredits = false;
    volatile boolean skinBrowsing;
    /** the game was fullscreen when the file dialog opened: go back to it once the dialog is gone */
    volatile boolean skinRefull;
@@ -2309,6 +2312,12 @@ public final class Game {
                   }
 
                   return;
+               case CREDITS:
+                  if (var2 == 1 && var1 == 256) {
+                     this.setScreen(this.creditsReturn != null ? this.creditsReturn : (this.world != null ? Game.S.PLAY : Game.S.TITLE));
+                  }
+
+                  return;
                case OPTIONS:
                   if (var2 == 1 && var1 == 256) {
                      this.opt.save();
@@ -2352,6 +2361,7 @@ public final class Game {
                   for (int var8 = 0; var8 < this.activeBtns.size(); var8++) {
                      Game.Btn var9 = (Game.Btn)this.activeBtns.get(var8);
                      if (var4 >= var9.x && var4 <= var9.x + var9.w && var5 >= var9.y && var5 <= var9.y + var9.h && var9.action != null) {
+                        SoundEngine.playUi("ui_click", 0.55F, 1.0F);
                         var9.action.run();
                         return;
                      }
@@ -2366,6 +2376,7 @@ public final class Game {
                      if (var7.slider != null) {
                         this.dragging = var6;
                      } else if (var7.action != null) {
+                        SoundEngine.playUi("ui_click", 0.55F, 1.0F);
                         var7.action.run();
                      }
                      break;
@@ -2819,6 +2830,19 @@ public final class Game {
                case "mods":
                   ModLoader.onCommand(this, "/mods", var2);
                   break;
+               case "credits":
+               case "endcredits":
+                  this.creditsReturn = this.world != null ? Game.S.PLAY : Game.S.TITLE;
+                  this.creditsScroll = 0.0F;
+                  this.setScreen(Game.S.CREDITS);
+                  break;
+               case "music":
+               case "sound":
+               case "acoustics":
+                  this.say("§6[Audio] §fNow playing: §e" + SoundEngine.currentMusicName()
+                     + " §7| §fSound: §a" + Math.round(this.opt.soundVolume * 100.0F) + "% §7| §fMusic: §a" + Math.round(this.opt.musicVolume * 100.0F)
+                     + "% §7| §f3D Acoustics: §b" + (this.opt.realAcoustics ? "ON" : "OFF"));
+                  break;
                case "sb":
                case "challenges":
                case "sw":
@@ -2828,7 +2852,7 @@ public final class Game {
                   SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
                   break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /sb /sw /bw /shop /host /join /disconnect");
+                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
                   if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
@@ -3181,12 +3205,25 @@ public final class Game {
    }
 
    void openMenu(int var1, TileEntity var2) {
+      if (var1 == 3 && this.world != null) {
+         double cx = var2 != null ? var2.x + 0.5 : this.player.x;
+         double cy = var2 != null ? var2.y + 0.5 : this.player.y + 0.5;
+         double cz = var2 != null ? var2.z + 0.5 : this.player.z;
+         SoundEngine.play3D(this.world, "chest_open", cx, cy, cz, 0.85F, 0.96F + this.rnd.nextFloat() * 0.08F);
+      }
       this.menu = new Menu(this, var1, var2);
       this.setScreen(Game.S.INV);
    }
 
    void closeMenu() {
       if (this.menu != null) {
+         if (this.menu.kind == 3 && this.world != null) {
+            TileEntity var2 = this.menu.tile;
+            double cx = var2 != null ? var2.x + 0.5 : this.player.x;
+            double cy = var2 != null ? var2.y + 0.5 : this.player.y + 0.5;
+            double cz = var2 != null ? var2.z + 0.5 : this.player.z;
+            SoundEngine.play3D(this.world, "chest_close", cx, cy, cz, 0.85F, 0.96F + this.rnd.nextFloat() * 0.08F);
+         }
          this.menu.close();
          this.menu = null;
       }
@@ -3533,7 +3570,7 @@ public final class Game {
 
       int cap = this.opt.maxFps;
       boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
-         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
+         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE || this.screen == Game.S.CREDITS;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -3665,7 +3702,12 @@ public final class Game {
                      this.player.setPos(this.player.x, this.player.y + 1.0, this.player.z);
                   }
 
-                  if (this.world.settings != null
+                  if (this.pendingEndCredits) {
+                     this.pendingEndCredits = false;
+                     this.creditsReturn = Game.S.PLAY;
+                     this.creditsScroll = 0.0F;
+                     this.setScreen(Game.S.CREDITS);
+                  } else if (this.world.settings != null
                      && this.world.settings.isMinigame()
                      && SkyGen.matchState == SkyGen.STATE_WAITING
                      && this.window != 0L
@@ -3705,6 +3747,9 @@ public final class Game {
                float var8 = (float)(this.mouseX / this.gui.scale);
                float var9 = (var8 - var17.x - 4.0F) / (var17.w - 8.0F);
                var17.slider.accept(Math.max(0.0F, Math.min(1.0F, var9)));
+            }
+            if (!var6) {
+               SoundEngine.tick(this);
             }
          }
       }
@@ -3950,6 +3995,7 @@ public final class Game {
       Net319.tick(this);
       SkyGen.tickMode(this, this.world);
       ModLoader.onGameTick(this);
+      SoundEngine.tick(this);
       this.adv.tick();
       if (this.tickCount % 10 == 0) {
          this.adv.poll(this);
@@ -4190,6 +4236,9 @@ public final class Game {
                if (this.rnd.nextInt(3) == 0) {
                   this.spawnBreakParticles(this.target.x, this.target.y, this.target.z, var6, 1);
                }
+               if ((this.tickCount & 3) == 0) {
+                  SoundEngine.playBlockDig(this.world, var6, this.target.x, this.target.y, this.target.z);
+               }
 
                if (this.breakProg >= 1.0F) {
                   this.breakBlock(this.target.x, this.target.y, this.target.z);
@@ -4237,6 +4286,7 @@ public final class Game {
                this.rightDown = false;
                int heal = eatenId == Redstone319.GOLDEN_APPLE ? 8 : Items.foodPts[eatenId];
                this.player.health = Math.min(20, this.player.health + heal);
+               SoundEngine.play3D(this.world, "eat_bite", this.player.x, this.player.y + 1.5, this.player.z, 0.85F, 0.95F + this.rnd.nextFloat() * 0.1F);
                var3.n--;
                if (var3.n <= 0) {
                   this.inv[this.sel] = null;
@@ -4246,6 +4296,9 @@ public final class Game {
                }
             } else {
                this.eatTicks++;
+               if ((this.eatTicks & 3) == 1) {
+                  SoundEngine.play3D(this.world, "eat_bite", this.player.x, this.player.y + 1.5, this.player.z, 0.72F, 0.92F + this.rnd.nextFloat() * 0.16F);
+               }
                if (this.eatTicks >= 32) {
                   this.eatTicks = 0;
                   this.player.food = Math.min(20, this.player.food + Items.foodPts[eatenId]);
@@ -4306,6 +4359,7 @@ public final class Game {
                               var17,
                               3.0F * var8
                            );
+                        SoundEngine.play3D(this.world, "bow_shoot", this.player.x, this.player.y + this.player.eye, this.player.z, 0.9F, 1.0F / (1.0F + (this.rnd.nextFloat() - 0.5F) * 0.2F));
                         if (!this.player.creative) {
                            this.removeItems(267, 1);
                            this.damageHeld(1);
@@ -4632,6 +4686,7 @@ public final class Game {
          var2.dmg += var1;
          if (var2.dmg >= Items.maxDamage(var2.id)) {
             this.inv[this.sel] = null;
+            SoundEngine.play3D(this.world, "tool_break", this.player.x, this.player.y + 1.2, this.player.z, 0.9F, 0.96F + this.rnd.nextFloat() * 0.08F);
          }
       }
    }
@@ -4647,6 +4702,7 @@ public final class Game {
          }
 
          int var5 = this.heldId();
+         SoundEngine.playBlockBreak(this.world, var4, var1, var2, var3);
          this.spawnBreakParticles(var1, var2, var3, var4, 16);
          boolean var6 = var4 == 69 || var4 == 70 || var4 == 67 || var4 == 68;
          if (var4 == 70 && !this.player.creative) {
@@ -4970,6 +5026,7 @@ public final class Game {
       this.player.sat = Math.min(this.player.food, this.player.sat + 0.4F);
       this.world.setBlock(x, y, z, id >= Blocks.CAKE + 6 ? 0 : id + 1);
       this.meshNow(x, y, z);
+      SoundEngine.play3D(this.world, "eat_bite", x + 0.5, y + 0.5, z + 0.5, 0.8F, 1.0F);
       return true;
    }
 
@@ -5166,6 +5223,7 @@ public final class Game {
             int fz = this.target.z + this.target.nz;
             if (this.world.fire.ignite(fx, fy, fz)) {
                this.meshNow(fx, fy, fz);
+               SoundEngine.play3D(this.world, "flint_steel", fx + 0.5, fy + 0.5, fz + 0.5, 0.85F, 1.0F);
                if (!this.player.creative) {
                   var1.n--;
                   if (var1.n <= 0) {
@@ -5200,6 +5258,7 @@ public final class Game {
             int var22 = Blocks.isWater(var21) ? 283 : 284;
             this.world.setBlock(var19.x, var19.y, var19.z, 0);
             this.meshNow(var19.x, var19.y, var19.z);
+            SoundEngine.play3D(this.world, Blocks.isWater(var21) ? "water_flow" : "lava_pop", var19.x + 0.5, var19.y + 0.5, var19.z + 0.5, 0.85F, 1.0F);
             var1.n--;
             if (var1.n <= 0) {
                this.inv[this.sel] = new Stack(var22, 1);
@@ -5228,6 +5287,7 @@ public final class Game {
                   }
 
                   this.meshNow(fx, fy, fz);
+                  SoundEngine.play3D(this.world, "flint_steel", fx + 0.5, fy + 0.5, fz + 0.5, 0.85F, 1.0F);
                   this.damageHeld(1);
                   return true;
                }
@@ -5235,6 +5295,7 @@ public final class Game {
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 0);
                this.meshNow(this.target.x, this.target.y, this.target.z);
                this.world.primeTnt(this.target.x, this.target.y, this.target.z, 80);
+               SoundEngine.play3D(this.world, "tnt_ignite", this.target.x + 0.5, this.target.y + 0.5, this.target.z + 0.5, 0.9F, 1.0F);
                this.damageHeld(1);
                return true;
             } else {
@@ -5255,6 +5316,7 @@ public final class Game {
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 123);
                this.meshNow(this.target.x, this.target.y, this.target.z);
                this.meshNow(this.target.x, this.target.y + 1, this.target.z);
+               SoundEngine.playBlockPlace(this.world, 123, this.target.x, this.target.y, this.target.z);
                this.damageHeld(1);
                return true;
             } else {
@@ -5276,6 +5338,7 @@ public final class Game {
          if (var16 >= 0 && var16 <= 255 && Blocks.replaceable[this.world.getBlock(var15, var16, var17)]) {
             this.world.setBlock(var15, var16, var17, var2 == 283 ? 50 : 58);
             this.meshNow(var15, var16, var17);
+            SoundEngine.play3D(this.world, var2 == 283 ? "water_flow" : "lava_pop", var15 + 0.5, var16 + 0.5, var17 + 0.5, 0.85F, 1.0F);
             if (!this.player.creative) {
                this.inv[this.sel] = new Stack(282, 1);
             }
@@ -5347,11 +5410,13 @@ public final class Game {
       int var6 = this.world.getBlock(var1, var5, var3);
       int var7 = this.world.getBlock(var1, var5 + 1, var3);
       if (Blocks.isDoorLo(var6) && Blocks.isDoorHi(var7)) {
-         int var8 = Blocks.doorOpen(var6) ? -4 : 4;
+         boolean opening = !Blocks.doorOpen(var6);
+         int var8 = opening ? 4 : -4;
          this.world.setBlock(var1, var5, var3, var6 + var8);
          this.world.setBlock(var1, var5 + 1, var3, var7 + var8);
          this.meshNow(var1, var5, var3);
          this.meshNow(var1, var5 + 1, var3);
+         SoundEngine.play3D(this.world, opening ? "door_open" : "door_close", var1 + 0.5, var5 + 1.0, var3 + 0.5, 0.85F, 0.94F + this.rnd.nextFloat() * 0.12F);
       }
    }
 
@@ -5619,11 +5684,13 @@ public final class Game {
                if (!this.world.setBlock(var3, var4, var5, var2)) {
                   return false;
                }
+               SoundEngine.playBlockPlace(this.world, var2, var3, var4, var5);
                ModLoader.onBlockPlaced(this.world, var3, var4, var5, var2);
 
                if (var2 == Blocks.TNT && this.world.settings != null && this.world.settings.isMinigame()) {
                   this.world.setBlock(var3, var4, var5, 0);
                   this.world.primeTnt(var3, var4, var5, 55);
+                  SoundEngine.play3D(this.world, "tnt_ignite", var3 + 0.5, var4 + 0.5, var5 + 0.5, 0.9F, 1.0F);
                }
 
                if (tallPlant) {
@@ -5664,6 +5731,7 @@ public final class Game {
          return false;
       }
 
+      SoundEngine.playBlockPlace(this.world, Blocks.STAIR_MAT[mat], x, y, z);
       this.meshNow(x, y, z);
       return true;
    }
@@ -5681,9 +5749,11 @@ public final class Game {
                   this.addItem(var9);
                   if (var9.n <= 0) {
                      var2.dead = true;
+                     SoundEngine.play3D(this.world, "item_pop", this.player.x, this.player.y + 1.0, this.player.z, 0.55F, 0.9F + this.rnd.nextFloat() * 0.3F);
                      Net319.onPickupItem(var2);
                   } else if (var9.n < prevCount) {
                      var2.count = var9.n;
+                     SoundEngine.play3D(this.world, "item_pop", this.player.x, this.player.y + 1.0, this.player.z, 0.55F, 0.9F + this.rnd.nextFloat() * 0.3F);
                      Net319.onPickupItem(var2);
                   } else {
                      var2.count = var9.n;
@@ -5866,6 +5936,9 @@ public final class Game {
             break;
          case MODS:
             Screens.mods(this);
+            break;
+         case CREDITS:
+            Screens.credits(this);
             break;
          case OPTIONS:
             Screens.options(this);
@@ -6320,6 +6393,7 @@ public final class Game {
          }
 
          this.player.hurt(var8);
+         SoundEngine.play3D(this.world, "player_hurt", this.player.x, this.player.y + 1.0, this.player.z, 0.9F, 0.94F + this.rnd.nextFloat() * 0.12F);
          double var9 = this.player.x - var2;
          double var11 = this.player.z - var4;
          double var13 = Math.sqrt(var9 * var9 + var11 * var11);
@@ -6973,6 +7047,7 @@ public final class Game {
       SKINS,
       PACKS,
       MODS,
+      CREDITS,
       DEAD;
    }
 

@@ -27,7 +27,6 @@ public final class Player {
    public boolean creative = true;
    public boolean spectator;
    public boolean adventure;
-   public boolean hardcore;
    public int gameMode = 1;
    public int food = 20;
    public float sat = 5.0F;
@@ -62,8 +61,7 @@ public final class Player {
    }
 
    public void setMode(int var1) {
-      this.hardcore = var1 == 4;
-      this.gameMode = var1 == 4 ? 0 : var1;
+      this.gameMode = var1;
       this.creative = var1 == 1 || var1 == 3;
       this.spectator = var1 == 3;
       this.adventure = var1 == 2;
@@ -76,25 +74,7 @@ public final class Player {
       if (var1 == 1 || var1 == 3) {
          this.food = 20;
          this.sat = 5.0F;
-         this.burn = 0;
       }
-   }
-
-   public int rawMode() {
-      return this.hardcore ? 4 : this.gameMode;
-   }
-
-   public String modeName() {
-      if (this.hardcore) {
-         return "Hardcore";
-      }
-      return switch (this.gameMode) {
-         case 0 -> "Survival";
-         case 1 -> "Creative";
-         case 2 -> "Adventure";
-         case 3 -> "Spectator";
-         default -> "Survival";
-      };
    }
 
    public void addExhaustion(float var1) {
@@ -107,9 +87,6 @@ public final class Player {
    }
 
    public double height() {
-      if (BackroomsStalkerMod.isActive() && this.sneaking) {
-         return 0.72;
-      }
       return this.sneaking ? 1.65 : 1.8;
    }
 
@@ -141,7 +118,7 @@ public final class Player {
          this.tickSpectator(var2, var3, var4, var5, var6);
       } else {
          boolean var7 = this.sneaking;
-         this.sneaking = (var5 || (BackroomsStalkerMod.isActive() && BackroomsStalkerMod.mustStayCrouched(var1, this))) && !this.flying;
+         this.sneaking = var5 && !this.flying;
          if (this.sneaking != var7) {
             this.updateBox();
          }
@@ -228,7 +205,7 @@ public final class Player {
             }
          }
 
-         float var11 = this.sneaking ? (BackroomsStalkerMod.isActive() ? 0.62F : 1.54F) : 1.62F;
+         float var11 = this.sneaking ? 1.54F : 1.62F;
          this.eye = this.eye + (var11 - this.eye) * 0.5F;
          if (!this.creative) {
             if (this.inLava && this.invuln == 0) {
@@ -595,32 +572,23 @@ public final class Player {
          int landY = fl(this.y - 0.001);
          int landZ = fl(this.z);
          int below = var1.getBlock(landX, landY, landZ);
-         if (below == Redstone319.SLIME_BLOCK && !this.sneaking) {
-            if (this.fallDistance > 1.0F && !this.flying) {
-               this.vy = Math.min(1.15, Math.sqrt(this.fallDistance) * 0.28);
-               this.onGround = false;
-            }
-
-            this.fallDistance = 0.0F;
-         } else {
-            if (this.fallDistance > 0.5F && !this.flying) {
-               var1.trample(landX, landY, landZ, this.fallDistance);
-            }
-
-            if (this.fallDistance > 3.0F && !this.creative && !this.flying) {
-               int var29 = (int)Math.ceil(this.fallDistance - 3.0F);
-               if (below == Blocks.HAY_BALE) {
-                  var29 = (int)Math.ceil(var29 * 0.2F);
-               }
-
-               if (var29 > 0) {
-                  this.invuln = 0;
-                  this.hurt(var29);
-               }
-            }
-
-            this.fallDistance = 0.0F;
+         if (this.fallDistance > 0.5F && !this.flying) {
+            var1.trample(landX, landY, landZ, this.fallDistance);
          }
+
+         if (this.fallDistance > 3.0F && !this.creative && !this.flying) {
+            int var29 = (int)Math.ceil(this.fallDistance - 3.0F);
+            if (below == Blocks.HAY_BALE) {
+               var29 = (int)Math.ceil(var29 * 0.2F);
+            }
+
+            if (var29 > 0) {
+               this.invuln = 0;
+               this.hurt(var29);
+            }
+         }
+
+         this.fallDistance = 0.0F;
       } else if (var12 < 0.0) {
          this.fallDistance -= (float)var12;
       }

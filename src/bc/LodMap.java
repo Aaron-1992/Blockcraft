@@ -89,13 +89,6 @@ public final class LodMap {
    static volatile int[] topAvg;
    static volatile int[] sideAvg;
 
-   public static void resetAverages() {
-      synchronized (LodMap.class) {
-         topAvg = null;
-         sideAvg = null;
-      }
-   }
-
    static int avgTile(int tile) {
       int r = 0;
       int g = 0;

@@ -383,8 +383,6 @@ public final class Blocks {
          return 350;
       } else if (isSideLog(var0)) {
          return uprightLog(var0);
-      } else if (var0 >= Redstone319.REDSTONE_BLOCK && var0 <= Redstone319.OBSERVER_ON + 3) {
-         return Redstone319.pickItem(var0);
       } else {
          return isFire(var0) ? 0 : var0;
       }
@@ -501,7 +499,6 @@ public final class Blocks {
       Blocks313.addToCreative(var1);
       Shapes.addToCreative(var1);
       Decor315.addToCreative(var1);
-      Redstone319.addToCreative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -988,6 +985,5 @@ public final class Blocks {
       Blocks313.register();
       Shapes.register();
       Decor315.register();
-      Redstone319.register();
    }
 }

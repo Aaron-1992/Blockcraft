@@ -63,92 +63,79 @@ final class AnimE317 {
       float ph = perched ? t * 0.06F : s.walk * 0.5F;
       float u = stroke(ph);
       float lift = sin(u);
-      float thrust = cos(u);
       float stretch = perched ? Anim317.moment(s, 6, 420.0F, 70.0F) : 0.0F;
       float stretchK = stretch > 0.0F ? sin(Math.PI * (1.0F - stretch)) : 0.0F;
       float fold = perched ? 1.0F - 0.6F * stretchK : (landing ? 0.35F : 0.0F);
-      float amp = dead ? 0.12F : (perched ? 0.16F + 0.8F * stretchK : 1.0F);
-      float climb = perched ? 0.0F : clamp(-s.vy * 48.0F, -28.0F, 28.0F);
-      float bank = perched ? 0.0F : clamp(s.turn * 5.5F, -26.0F, 26.0F);
+      float amp = dead ? 0.12F : (perched ? 0.14F + 0.8F * stretchK : 1.0F);
+      float climb = perched ? 0.0F : clamp(-s.vy * 45.0F, -28.0F, 28.0F);
+      float bank = perched ? 0.0F : clamp(s.turn * 5.0F, -24.0F, 24.0F);
       float[] fan = {6.0F, 27.0F, 50.0F};
       for (int i = 0; i < 2; i++) {
          float sg = i == 0 ? 1.0F : -1.0F;
          String n = i == 0 ? "L" : "R";
          float e0 = flap(ph);
-         float e1 = flap(ph - 0.65F);
-         float e2 = flap(ph - 1.25F);
-         float e3 = flap(ph - 1.65F);
+         float e1 = flap(ph - 0.55F);
+         float e2 = flap(ph - 1.1F);
+         float e3 = flap(ph - 1.5F);
          // 1 while the wing goes up (it folds then), 0 while it goes down
          float up = Anim317.smooth(-0.02F, 0.12F, flap(ph + 0.06F) - flap(ph - 0.06F)) * flyK;
-         // 3D figure-8 wing stroke: shoulder sweeps forward on the power downstroke and pitches camber along the wing
-         float sweepX = flyK * amp * (11.0F * sin(u) - 4.0F * cos(u));
-         float midPitchX = flyK * amp * 8.5F * sin(u - 0.55F);
-         float tipPitchX = flyK * amp * 7.0F * sin(u - 1.1F);
-         p.rot(r.idx("wing" + n), sweepX, sg * lerp(5.0F + 16.0F * up, 36.0F, fold), sg * lerp(amp * 38.0F * e0 + 4.0F, 12.0F + amp * 8.0F * e0, fold));
-         p.rot(r.idx("wingMid" + n), midPitchX, sg * lerp(4.0F + 30.0F * up, 118.0F, fold), sg * lerp(amp * 32.0F * e1 + 3.0F, -6.0F, fold));
-         p.rot(r.idx("wingTip" + n), tipPitchX, sg * lerp(6.0F + 38.0F * up, 36.0F, fold), sg * lerp(amp * 26.0F * e2 + 2.0F, 0.0F, fold));
+         // the shoulder, the elbow, the wrist: flying (spread, beating) and perched (folded back along the body), mixed by fold
+         p.rot(r.idx("wing" + n), 0.0F, sg * lerp(6.0F + 12.0F * up, 36.0F, fold), sg * lerp(amp * 30.0F * e0 + 4.0F, 12.0F + amp * 8.0F * e0, fold));
+         p.rot(r.idx("wingMid" + n), 0.0F, sg * lerp(4.0F + 24.0F * up, 118.0F, fold), sg * lerp(amp * 24.0F * e1 + 3.0F, -6.0F, fold));
+         p.rot(r.idx("wingTip" + n), 0.0F, sg * lerp(6.0F + 32.0F * up, 36.0F, fold), sg * lerp(amp * 20.0F * e2 + 2.0F, 0.0F, fold));
          for (int f = 0; f < 3; f++) {
             // the fingers close up on the upstroke and when the wing is folded, and flutter behind the wrist
-            float close = Math.max(up * 0.62F, fold * 0.92F);
-            float fe = flap(ph - 1.55F - 0.15F * f);
-            p.rot(r.idx("finger" + f + n), flyK * (3.0F + 1.5F * f) * sin(u - 1.2F - 0.2F * f), -sg * fan[f] * close, sg * amp * (13.0F + 6.0F * f) * fe);
+            float close = Math.max(up * 0.55F, fold * 0.92F);
+            p.rot(r.idx("finger" + f + n), 0.0F, -sg * fan[f] * close, sg * amp * (10.0F + 5.0F * f) * e3);
          }
 
          if (!perched) {
-            // legs tucked under the body while it flies, stretched out when it lands; they pulse and trail with every wingbeat
-            float stretchL = landing ? 0.72F : 0.0F;
-            float sidePh = i * 0.35F;
-            float swing = sin(u - 1.05F + sidePh);
-            float drag = clamp(s.vy * 16.0F, -12.0F, 12.0F);
-            p.rot(r.idx("legF" + n), -52.0F * (1.0F - stretchL) - 12.0F * stretchL + 10.0F * swing + drag, sg * 3.0F * cos(u + sidePh), sg * (5.0F + 3.0F * lift));
-            p.rot(r.idx("shinF" + n), 76.0F * (1.0F - stretchL) + 22.0F * stretchL + 12.0F * sin(u - 1.55F + sidePh), 0.0F, 0.0F);
-            p.rot(r.idx("pawF" + n), -28.0F * (1.0F - stretchL) + 10.0F * sin(u - 2.0F + sidePh), 0.0F, 0.0F);
-            p.rot(r.idx("legH" + n), 26.0F * (1.0F - stretchL) - 18.0F * stretchL + 9.0F * sin(u - 1.35F - sidePh) - drag, -sg * 3.0F * sin(u), sg * (6.0F + 3.0F * lift));
-            p.rot(r.idx("shinH" + n), -56.0F * (1.0F - stretchL) + 22.0F * stretchL + 11.0F * sin(u - 1.85F - sidePh), 0.0F, 0.0F);
-            p.rot(r.idx("pawH" + n), 28.0F * (1.0F - stretchL) + 9.0F * sin(u - 2.25F - sidePh), 0.0F, 0.0F);
+            // legs tucked under the body while it flies, stretched out when it lands; they dangle and swing a little behind the body
+            float stretchL = landing ? 0.7F : 0.0F;
+            float swing = sin(u - 1.1F);
+            float drag = clamp(s.vy * 14.0F, -10.0F, 10.0F);
+            p.rot(r.idx("legF" + n), -54.0F * (1.0F - stretchL) - 14.0F * stretchL + 5.0F * swing + drag, 0.0F, sg * 4.0F);
+            p.rot(r.idx("shinF" + n), 78.0F * (1.0F - stretchL) + 20.0F * stretchL + 6.0F * sin(u - 1.6F), 0.0F, 0.0F);
+            p.rot(r.idx("pawF" + n), -30.0F * (1.0F - stretchL) + 5.0F * sin(u - 2.0F), 0.0F, 0.0F);
+            p.rot(r.idx("legH" + n), 28.0F * (1.0F - stretchL) - 18.0F * stretchL + 4.0F * sin(u - 1.4F) - drag, 0.0F, sg * 5.0F);
+            p.rot(r.idx("shinH" + n), -58.0F * (1.0F - stretchL) + 20.0F * stretchL + 5.0F * sin(u - 1.9F), 0.0F, 0.0F);
+            p.rot(r.idx("pawH" + n), 30.0F * (1.0F - stretchL) + 4.0F * sin(u - 2.3F), 0.0F, 0.0F);
          } else {
-            float shift = sin(t * 0.035F + 1.3F) * 4.5F;
-            float kneeFlex = 6.0F + 4.0F * sin(t * 0.07F + i * 1.2F);
-            p.rot(r.idx("legF" + n), -6.0F + 4.5F * sin(t * 0.05F + i), sg * 3.0F, sg * 3.5F);
-            p.rot(r.idx("shinF" + n), kneeFlex, 0.0F, 0.0F);
-            p.rot(r.idx("pawF" + n), -kneeFlex * 0.6F, 0.0F, 0.0F);
-            p.rot(r.idx("legH" + n), -4.0F + sg * shift, -sg * 2.5F, sg * 3.5F);
-            p.rot(r.idx("shinH" + n), -kneeFlex * 0.7F, 0.0F, 0.0F);
-            p.rot(r.idx("pawH" + n), kneeFlex * 0.5F, 0.0F, 0.0F);
+            float shift = sin(t * 0.021F + 1.3F) * 2.0F;
+            p.rot(r.idx("legF" + n), 3.0F * sin(t * 0.05F), 0.0F, sg * 2.0F);
+            p.rot(r.idx("legH" + n), -2.0F + sg * shift, 0.0F, sg * 2.0F);
          }
       }
 
       int body = r.idx("body");
       float pitch = clamp(s.headPitch, -35.0F, 35.0F);
-      float bodyHeave = perched ? 0.85F * sin(t * 0.07F) : 3.2F * lift;
-      float bodySurge = perched ? 0.0F : 0.9F * thrust;
-      p.move(body, 0.0F, bodyHeave, bodySurge);
-      p.rot(body, perched ? 4.5F + 2.0F * sin(t * 0.07F) : pitch * 0.55F + climb - 9.0F * lift, sin(t * 0.033F) * (perched ? 3.5F : 2.5F), bank + (perched ? 1.8F * cos(t * 0.041F) : 2.5F * sin(t * 0.037F)));
-      float breathe = 1.0F + 0.018F * sin(t * 0.09F);
+      p.move(body, 0.0F, perched ? 0.35F * sin(t * 0.07F) : 1.1F * lift, 0.0F);
+      p.rot(body, perched ? 4.0F : pitch * 0.45F + climb - 3.5F * lift, 0.0F, bank);
+      float breathe = 1.0F + 0.012F * sin(t * 0.09F);
       p.scale(body, breathe, breathe, 1.0F);
-      // the neck is an S that follows where the head looks; its pieces follow the wings with a travelling wave and serpentine sway
+      // the neck is an S that follows where the head looks; its pieces follow the wings a little later, one after the other
       float hy = clamp(s.headYaw, -55.0F, 55.0F);
       float rise = perched ? 1.0F : 0.0F;
+      float sway = sin(t * 0.045F) * (perched ? 8.0F : 2.0F);
       float[] base = {-10.0F, 4.0F, 6.0F, 5.0F, 3.0F};
       float[] riseAdd = {-18.0F, 8.0F, 4.0F, 2.0F, 2.0F};
-      float[] yawW = {0.14F, 0.18F, 0.22F, 0.26F, 0.30F};
+      float[] yawW = {0.12F, 0.16F, 0.2F, 0.24F, 0.28F};
       float wobble = 0.0F;
       for (int k = 0; k < 5; k++) {
-         float wave = flyK * (4.4F + 0.95F * k) * sin(u - 0.45F - 0.42F * k) + (perched ? 1.8F * sin(t * 0.07F - 0.35F * k) : 0.0F);
-         float sway = sin(t * 0.052F - 0.32F * k) * (perched ? 9.5F : 3.6F);
-         p.rot(r.idx("neck" + k), base[k] + rise * riseAdd[k] + pitch * 0.14F + wave, -hy * yawW[k] + sway * (0.28F + 0.11F * k), -bank * 0.1F + sin(t * 0.04F - 0.3F * k) * 1.6F);
+         float wave = flyK * (2.2F + 0.5F * k) * sin(u - 0.5F - 0.4F * k);
+         p.rot(r.idx("neck" + k), base[k] + rise * riseAdd[k] + pitch * 0.12F + wave, -hy * yawW[k] + sway * (0.25F + 0.1F * k), 0.0F);
          wobble += wave;
       }
 
       int head = r.idx("head");
-      p.rot(head, pitch * 0.45F - 6.0F - 8.0F * rise - 0.58F * wobble, -hy * 0.24F, sin(t * 0.035F) * 3.2F - bank * 0.15F);
+      p.rot(head, pitch * 0.4F - 6.0F - 8.0F * rise - 0.55F * wobble, -hy * 0.2F, sin(t * 0.03F) * 2.0F);
       float roar = perched ? Anim317.moment(s, 5, 70.0F, 28.0F) : 0.0F;
-      float rest = 6.0F + sin(t * 0.12F) * 3.5F + flyK * 4.0F * Math.max(0.0F, -lift);
+      float rest = 5.0F + sin(t * 0.12F) * 3.0F;
       float bite = s.attackT > 0.0F ? Math.min(1.0F, s.attackT / 6.0F) * Anim317.smooth(10.0F, 9.0F, s.attackT) : 0.0F;
-      float open = rest + (32.0F - rest) * bite;
+      float open = rest + (30.0F - rest) * bite;
       if (roar > 0.0F) {
-         open = Math.max(open, 38.0F * sin(Math.PI * (1.0F - roar)));
-         p.rot(head, -18.0F * sin(Math.PI * (1.0F - roar)), 0.0F, 0.0F);
+         open = Math.max(open, 36.0F * sin(Math.PI * (1.0F - roar)));
+         p.rot(head, -16.0F * sin(Math.PI * (1.0F - roar)), 0.0F, 0.0F);
       }
 
       if (dead) {
@@ -157,12 +144,11 @@ final class AnimE317 {
 
       p.rot(r.idx("jaw"), open, 0.0F, 0.0F);
       // the tail whips from side to side, more and more towards the tip, bobs with a delay after the wings and trails behind a turn
-      float lag = clamp(s.turn, -4.5F, 4.5F) * flyK;
+      float lag = clamp(s.turn, -4.0F, 4.0F) * flyK;
       for (int k = 0; k < 9; k++) {
-         float w = sin((perched ? t * 0.05F : s.walk * 0.35F) - k * 0.52F) * ((perched ? 2.2F : 3.4F) + (perched ? 0.7F : 0.95F) * k);
-         float l = flyK * (2.6F + 1.05F * k) * sin(u - 0.75F - 0.52F * k) + climb * 0.14F + (perched ? sin(t * 0.055F - k * 0.45F) * (1.2F + 0.35F * k) : 0.0F);
-         float rollT = sin((perched ? t * 0.05F : s.walk * 0.35F) - k * 0.52F) * (0.7F + 0.3F * k);
-         p.rot(r.idx("tail" + k), (perched ? -2.0F : 0.0F) + l, w - lag * (0.5F + 0.06F * k), rollT);
+         float w = sin(s.walk * 0.3F - k * 0.55F) * (1.8F + 0.45F * k);
+         float l = flyK * (1.0F + 0.55F * k) * sin(u - 0.8F - 0.55F * k) + climb * 0.1F;
+         p.rot(r.idx("tail" + k), (perched ? -2.0F : 0.0F) + l, w * (perched ? 0.4F : 1.0F) + (perched ? sin(t * 0.04F - k * 0.5F) * (1.2F + k * 0.6F) : 0.0F) - lag * 0.45F, 0.0F);
       }
 
       if (dead) {

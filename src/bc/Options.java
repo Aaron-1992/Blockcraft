@@ -46,6 +46,9 @@ public final class Options {
    public boolean bushyLeaves = true;
    /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
    public String resourcePack = ResourcePacks.ID_DEFAULT;
+   public float soundVolume = 1.0F;
+   public float musicVolume = 0.75F;
+   public boolean realAcoustics = true;
    final File file;
 
    public Options(File var1) {
@@ -85,6 +88,9 @@ public final class Options {
                this.fx = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("fx", "1"))));
                this.bushyLeaves = Boolean.parseBoolean(var2.getProperty("bushyLeaves", "true"));
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
+               this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
+               this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
+               this.realAcoustics = Boolean.parseBoolean(var2.getProperty("realAcoustics", "true"));
                ResourcePacks.setActiveId(this.resourcePack);
             } catch (Throwable var5) {
                try {
@@ -130,6 +136,9 @@ public final class Options {
       var1.setProperty("fx", this.fx + "");
       var1.setProperty("bushyLeaves", this.bushyLeaves + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
+      var1.setProperty("soundVolume", this.soundVolume + "");
+      var1.setProperty("musicVolume", this.musicVolume + "");
+      var1.setProperty("realAcoustics", this.realAcoustics + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

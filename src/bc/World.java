@@ -30,7 +30,7 @@ public final class World {
    public final long seed;
    /** Update 3.12: 0 = Overworld, -1 = Nether, 1 = End (see Dim). */
    public final int dim;
-   public Gen gen;
+   public final Gen gen;
    public final File dir;
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
@@ -80,7 +80,6 @@ public final class World {
    private final double[] res = new double[3];
    static final double[] FULL;
    public boolean rayFluids;
-   public boolean inPassiveTick;
    /** Update 3.13: what the world was created with (generator type, structures). */
    public final WorldSettings settings;
 
@@ -211,7 +210,6 @@ public final class World {
                   }
                }
 
-               Net319.applyEditsToChunk(this, var5);
                this.ready.add(var5);
             } catch (Throwable var13) {
                var13.printStackTrace();
@@ -472,22 +470,12 @@ public final class World {
    }
 
    private void propagate(boolean var1) {
-      Chunk lastC = null;
-      int lastCx = Integer.MIN_VALUE;
-      int lastCz = Integer.MIN_VALUE;
       while (!this.addQ.isEmpty()) {
          long var2 = this.addQ.poll();
          int var4 = ux(var2);
          int var5 = uy(var2);
          int var6 = uz(var2);
-         int cx = var4 >> 4;
-         int cz = var6 >> 4;
-         if (cx != lastCx || cz != lastCz) {
-            lastC = this.chunk(cx, cz);
-            lastCx = cx;
-            lastCz = cz;
-         }
-         Chunk var7 = lastC;
+         Chunk var7 = this.chunkAt(var4, var6);
          if (var7 != null) {
             int var8 = this.lightOf(var7, var1, var4 & 15, var5, var6 & 15);
             if (var8 > 1) {
@@ -496,19 +484,7 @@ public final class World {
                   int var11 = var5 + DY[var9];
                   int var12 = var6 + DZ[var9];
                   if (var11 >= 0 && var11 <= 255) {
-                     int ncx = var10 >> 4;
-                     int ncz = var12 >> 4;
-                     Chunk var13;
-                     if (ncx == cx && ncz == cz) {
-                        var13 = var7;
-                     } else if (ncx == lastCx && ncz == lastCz) {
-                        var13 = lastC;
-                     } else {
-                        var13 = this.chunk(ncx, ncz);
-                        lastC = var13;
-                        lastCx = ncx;
-                        lastCz = ncz;
-                     }
+                     Chunk var13 = var10 >> 4 == var7.cx && var12 >> 4 == var7.cz ? var7 : this.chunkAt(var10, var12);
                      if (var13 != null) {
                         int var14 = var10 & 15;
                         int var15 = var12 & 15;
@@ -546,9 +522,6 @@ public final class World {
          var6.setBlk(var2 & 15, var3, var4 & 15, 0);
       }
 
-      Chunk lastC = var6;
-      int lastCx = var6.cx;
-      int lastCz = var6.cz;
       this.remQ.add(pack(var2, var3, var4) | (long)var5 << 60);
 
       while (!this.remQ.isEmpty()) {
@@ -563,14 +536,7 @@ public final class World {
             int var15 = var11 + DY[var13];
             int var16 = var12 + DZ[var13];
             if (var15 >= 0 && var15 <= 255) {
-               int ncx = var14 >> 4;
-               int ncz = var16 >> 4;
-               if (ncx != lastCx || ncz != lastCz) {
-                  lastC = this.chunk(ncx, ncz);
-                  lastCx = ncx;
-                  lastCz = ncz;
-               }
-               Chunk var17 = lastC;
+               Chunk var17 = this.chunkAt(var14, var16);
                if (var17 != null) {
                   int var18 = var14 & 15;
                   int var19 = var16 & 15;
@@ -733,17 +699,8 @@ public final class World {
          this.resetBounds();
          this.touch(var1, var2, var3);
 
-         int oldOp = Blocks.opacity[var8];
-         int newOp = Blocks.opacity[var4];
-         int oldEm = Blocks.emit[var8];
-         int newEm = Blocks.emit[var4];
-
          for (int var9 = 0; var9 < 2; var9++) {
             boolean var10 = var9 == 0;
-            if (var10 ? oldOp == newOp : (oldOp == newOp && oldEm == newEm)) {
-               continue;
-            }
-
             int var11 = this.lightOf(var5, var10, var6, var2, var7);
             if (var11 > 0) {
                this.removeLight(var10, var1, var2, var3, var11);
@@ -791,7 +748,6 @@ public final class World {
          }
 
          this.notifyAround(var1, var2, var3);
-         Net319.onSetBlock(this, var1, var2, var3, var4);
          return true;
       } else {
          return false;
@@ -841,32 +797,6 @@ public final class World {
             }
          }
       }
-      Redstone319.onBlockChanged(this, var1, var2, var3);
-   }
-
-   public void resetAllChunks() {
-      this.fluidDue.clear();
-      this.fluidPending.clear();
-      this.blockUpdates.clear();
-      this.blockPending.clear();
-      this.fallers.clear();
-      this.items.clear();
-      this.tiles.clear();
-      this.ready.clear();
-      this.requested.clear();
-      ArrayList<Chunk> list = new ArrayList<Chunk>(this.chunks.values());
-      for (Chunk ch : list) {
-         Chunk fresh = this.gen.generate(ch.cx, ch.cz);
-         System.arraycopy(fresh.blocks, 0, ch.blocks, 0, fresh.blocks.length);
-         System.arraycopy(fresh.hm, 0, ch.hm, 0, fresh.hm.length);
-         ch.modified = false;
-      }
-      for (Chunk ch : list) {
-         this.lightChunk(ch);
-         for (Section s : ch.sections) {
-            s.dirty = true;
-         }
-      }
    }
 
    public void tick() {
@@ -879,88 +809,66 @@ public final class World {
          this.lodRefresh();
       }
 
-      boolean remoteClientOnly = Net319.isClientConnected() && !Net319.isHosting();
-      this.inPassiveTick = true;
-      try {
-         if (!remoteClientOnly) {
-            int var1 = 0;
+      int var1 = 0;
 
-            while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
-               for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
-                  this.fluidPending.remove(var4);
-                  this.fluidUpdate(ux(var4), uy(var4), uz(var4));
-                  var1++;
-               }
-            }
+      while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
+         for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
+            this.fluidPending.remove(var4);
+            this.fluidUpdate(ux(var4), uy(var4), uz(var4));
+            var1++;
+         }
+      }
 
-            int var7 = 0;
+      int var7 = 0;
 
-            while (!this.blockUpdates.isEmpty() && var7++ < 600) {
-               long var8 = (Long)this.blockUpdates.poll();
-               this.blockPending.remove(var8);
-               this.blockUpdate(ux(var8), uy(var8), uz(var8));
-            }
+      while (!this.blockUpdates.isEmpty() && var7++ < 600) {
+         long var8 = (Long)this.blockUpdates.poll();
+         this.blockPending.remove(var8);
+         this.blockUpdate(ux(var8), uy(var8), uz(var8));
+      }
+
+      for (int var9 = 0; var9 < this.fallers.size(); var9++) {
+         World.Falling var12 = (World.Falling)this.fallers.get(var9);
+         var12.px = var12.x;
+         var12.py = var12.y;
+         var12.pz = var12.z;
+         if (var12.fuse > 0) {
+            this.tickTnt(var12);
          } else {
-            this.fluidDue.clear();
-            this.fluidPending.clear();
-            this.blockUpdates.clear();
-            this.blockPending.clear();
+            this.tickFalling(var12);
          }
+      }
 
-         for (int var9 = 0; var9 < this.fallers.size(); var9++) {
-            World.Falling var12 = (World.Falling)this.fallers.get(var9);
-            var12.px = var12.x;
-            var12.py = var12.y;
-            var12.pz = var12.z;
-            if (var12.fuse > 0) {
-               this.tickTnt(var12);
-            } else {
-               this.tickFalling(var12);
-            }
-         }
+      this.fallers.removeIf(var0 -> var0.dead);
+      this.tickCrops();
+      this.fire.tick();
+      this.trees.tick();
+      if (this.dim == Dim.OVERWORLD) {
+         // no sky, no weather, no earthquakes in the other dimensions
+         this.disasters.tick();
+         this.weather.tick();
+      }
 
-         this.fallers.removeIf(var0 -> var0.dead);
-         if (!remoteClientOnly) {
-            this.tickCrops();
-            this.fire.tick();
-         }
-         this.trees.tick();
-         if (this.dim == Dim.OVERWORLD) {
-            // no sky, no weather, no earthquakes in the other dimensions
-            if (!remoteClientOnly) {
-               this.disasters.tick();
-            }
-            this.weather.tick();
-         }
+      for (World.Item var13 : this.items) {
+         this.tickItem(var13);
+      }
 
-         for (World.Item var13 : this.items) {
-            this.tickItem(var13);
-         }
-
-         this.items.removeIf(var0 -> var0.dead);
-         if (!this.tiles.isEmpty()) {
-            for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
-               if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
-                  int var5 = this.getBlock(var14.x, var14.y, var14.z);
-                  if (var5 != 67 && var5 != 68) {
-                     this.tiles.remove(tkey(var14.x, var14.y, var14.z));
-                  } else if (!remoteClientOnly) {
-                     int prevCook = var14.cook;
-                     int prevBurn = var14.burn;
-                     var14.tickFurnace(this);
-                     int var6 = var14.burn > 0 ? 68 : 67;
-                     if (var5 != var6) {
-                        this.setBlock(var14.x, var14.y, var14.z, var6);
-                     }
-                     if ((prevCook == 0 && var14.cook > 0) || (prevCook > 0 && var14.cook == 0) || (prevBurn > 0 && var14.burn == 0)) {
-                        Net319.onTileChanged(this, var14);
-                     }
+      this.items.removeIf(var0 -> var0.dead);
+      if (!this.tiles.isEmpty()) {
+         for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
+            if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
+               int var5 = this.getBlock(var14.x, var14.y, var14.z);
+               if (var5 != 67 && var5 != 68) {
+                  this.tiles.remove(tkey(var14.x, var14.y, var14.z));
+               } else {
+                  var14.tickFurnace(this);
+                  int var6 = var14.burn > 0 ? 68 : 67;
+                  if (var5 != var6) {
+                     this.setBlock(var14.x, var14.y, var14.z, var6);
                   }
                }
             }
          }
-      } finally {
-         this.inPassiveTick = false;
       }
    }
 
@@ -973,7 +881,6 @@ public final class World {
       var5.fuse = var4;
       var5.vy = 0.2;
       this.fallers.add(var5);
-      Net319.onPrimeTnt(this, var1, var2, var3, var4);
    }
 
    private void tickTnt(World.Falling var1) {
@@ -993,11 +900,7 @@ public final class World {
          var1.vy *= 0.98;
          if (--var1.fuse <= 0) {
             var1.dead = true;
-            if (Net319.isClientConnected() && !Net319.isHosting()) {
-               if (this.game != null) {
-                  this.game.explosionParticles(var1.x, var1.y + 0.5, var1.z);
-               }
-            } else if (this.game != null) {
+            if (this.game != null) {
                this.game.mobs.blast(var1.x, var1.y + 0.5, var1.z, 4, null);
             }
          }
@@ -1238,7 +1141,7 @@ public final class World {
          int var11 = var17 ? Decor315.foot(Decor315.bedColor(var4), var22) : Decor315.head(Decor315.bedColor(var4), var22);
          if (this.getBlock(var9, var2, var10) != var11) {
             this.setBlock(var1, var2, var3, 0);
-            if (!var17 && (this.settings == null || this.settings.type != WorldSettings.BEDWARS)) {
+            if (!var17) {
                this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }
@@ -1397,9 +1300,7 @@ public final class World {
          var10.count = var8;
          var10.dmg = var9;
          var10.spin = this.rnd.nextFloat() * 360.0F;
-         var10.netId = Net319.nextItemId();
          this.items.add(var10);
-         Net319.onDropItem(this, var10);
          return var10;
       } else {
          return null;
@@ -1421,9 +1322,7 @@ public final class World {
          this.setBlock(var1, var2, var3, 69);
          var5 = new TileEntity(0, var1, var2, var3);
          this.fillLoot(var5);
-         Net319.applyPendingTile(this, var5);
          this.tiles.put(tkey(var1, var2, var3), var5);
-         Net319.onTileChanged(this, var5);
          return var5;
       }
 
@@ -1438,7 +1337,6 @@ public final class World {
             var5 = new TileEntity(1, var1, var2, var3);
          }
 
-         Net319.applyPendingTile(this, var5);
          this.tiles.put(tkey(var1, var2, var3), var5);
       }
 
@@ -1663,19 +1561,6 @@ public final class World {
       }
    }
 
-   int cobbleOrSkyblockOre() {
-      if (this.settings != null && this.settings.type == WorldSettings.SKYBLOCK) {
-         int r = this.rnd.nextInt(100);
-         if (r < 12) return Blocks.COAL_ORE;
-         if (r < 19) return Blocks.IRON_ORE;
-         if (r < 22) return Blocks.GOLD_ORE;
-         if (r < 24) return Blocks.REDSTONE_ORE;
-         if (r < 25) return Blocks.LAPIS_ORE;
-         if (r < 26) return Blocks.DIAMOND_ORE;
-      }
-      return 4;
-   }
-
    private void fluidUpdate(int var1, int var2, int var3) {
       int var4 = this.getBlock(var1, var2, var3);
       if (Blocks.isFluid(var4)) {
@@ -1685,7 +1570,7 @@ public final class World {
          int var8 = var5 ? 7 : 3;
          int var9 = var5 ? 5 : 30;
          if (!var5 && this.touchesWater(var1, var2, var3)) {
-            this.setBlock(var1, var2, var3, var6 == 0 ? 26 : this.cobbleOrSkyblockOre());
+            this.setBlock(var1, var2, var3, var6 == 0 ? 26 : 4);
          } else {
             int var10 = this.getBlock(var1, var2 + 1, var3);
             if (var6 > 0) {
@@ -1734,7 +1619,7 @@ public final class World {
                if (!var5 && Blocks.isWater(var17)) {
                   this.setBlock(var1, var2 - 1, var3, 1);
                } else if (var5 && Blocks.isLava(var17)) {
-                  this.setBlock(var1, var2 - 1, var3, Blocks.isLava(var17) && Blocks.fluidLevel(var17) == 0 ? 26 : this.cobbleOrSkyblockOre());
+                  this.setBlock(var1, var2 - 1, var3, Blocks.isLava(var17) && Blocks.fluidLevel(var17) == 0 ? 26 : 4);
                } else {
                   if (!Blocks.isFluid(var17) || Blocks.fluidLevel(var17) != 1) {
                      this.setBlock(var1, var2 - 1, var3, var7 + 1);
@@ -1754,7 +1639,7 @@ public final class World {
                            if (!var5 && Blocks.isWater(var16)) {
                               this.setBlock(var21, var2, var22, 1);
                            } else if (var5 && Blocks.isLava(var16)) {
-                              this.setBlock(var21, var2, var22, Blocks.fluidLevel(var16) == 0 ? 26 : this.cobbleOrSkyblockOre());
+                              this.setBlock(var21, var2, var22, Blocks.fluidLevel(var16) == 0 ? 26 : 4);
                            } else if (!Blocks.isFluid(var16) || !Blocks.sameFluid(var16, var4) || Blocks.fluidLevel(var16) > var18) {
                               this.setBlock(var21, var2, var22, var7 + var18);
                            }
@@ -1994,7 +1879,6 @@ public final class World {
       public int dmg;
       public boolean dead;
       public float spin;
-      public long netId;
       /** Update 3.12: an Eye of Ender in flight: it flies from (lx, ly, lz) to above (ax, az) and then drops like any other item. */
       public boolean eye;
       public int eyeT;

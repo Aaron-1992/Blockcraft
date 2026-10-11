@@ -302,7 +302,6 @@ public final class Recipes {
       Items312.recipes();
       Shapes.recipes();
       Decor315.recipes();
-      Redstone319.recipes();
    }
 
    static final class Recipe {

@@ -14,10 +14,7 @@ final class TexArt310 {
 
    /** The bark of oak, birch and spruce logs, exactly as Tex.init paints tiles 7, 33 and 31. */
    static int[] bark(int type) {
-      if (ResourcePacks.isClassicBase()) {
-         return type == 0 ? Tex.tLogSide(6L, 102, 81, 50) : (type == 1 ? Tex.tBirchSide() : Tex.tLogSide(15L, 58, 39, 19));
-      }
-      return type == 0 ? TexPaint.oakSide() : (type == 1 ? TexPaint.birchSide() : TexPaint.spruceSide());
+      return type == 0 ? Tex.tLogSide(8L, 104, 83, 50) : (type == 1 ? Tex.tBirchSide() : Tex.tLogSide(32L, 59, 42, 22));
    }
 
    static void blocks() {
