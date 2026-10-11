@@ -137,8 +137,8 @@ public final class World {
 
    public Chunk chunk(int var1, int var2) {
       FastChunkCache cache = FastChunkCache.TL.get();
+      int slot = ((var1 & 31) << 5) | (var2 & 31);
       if (cache.lastWorld == this) {
-         int slot = (var1 * 31 + var2) & 255;
          Chunk c = cache.chunks[slot];
          if (c != null && !c.unloaded && c.cx == var1 && c.cz == var2) {
             return c;
@@ -151,7 +151,7 @@ public final class World {
       }
       Chunk c = (Chunk)this.chunks.get(key(var1, var2));
       if (c != null && !c.unloaded) {
-         cache.switchWorld(this, c, (var1 * 31 + var2) & 255);
+         cache.switchWorld(this, c, slot);
       }
       return c;
    }
@@ -203,8 +203,14 @@ public final class World {
       long var3 = key(var1, var2);
       if (this.requested.add(var3)) {
          this.pool.execute(() -> {
+            if (!this.requested.contains(var3)) {
+               return;
+            }
             try {
                Chunk var5 = this.gen.generate(var1, var2);
+               if (!this.requested.contains(var3)) {
+                  return;
+               }
                File var6 = this.dir == null ? null : this.chunkFile(var1, var2);
                if (var6 != null && var6.exists()) {
                   try {
@@ -246,8 +252,16 @@ public final class World {
    public void updateChunks(int var1, int var2, int var3, int var4, long var5) {
       boolean isVoidArena = this.settings != null && this.settings.isVoidMode();
       int maxVoidCoord = 5;
+      if (!isVoidArena && !this.requested.isEmpty()) {
+         int maxReqDist = var3 + 2;
+         this.requested.removeIf(rk -> {
+            int rcx = (int)(rk.longValue() >> 32);
+            int rcz = (int)rk.longValue();
+            return Math.max(Math.abs(rcx - var1), Math.abs(rcz - var2)) > maxReqDist;
+         });
+      }
       int var7 = this.requested.size();
-      int var8 = genThreads() * 4;
+      int var8 = genThreads() * 6;
       long var9 = System.nanoTime();
       if (var7 < var8) {
          int effR = isVoidArena ? Math.min(var3, maxVoidCoord) : var3;
@@ -298,8 +312,16 @@ public final class World {
                for (int var25 = -1; var25 <= 1; var25++) {
                   Chunk var26 = this.chunk(var22.cx + var24, var22.cz + var25);
                   if (var26 != null) {
-                     for (Section var19 : var26.sections) {
-                        var19.dirty = true;
+                     if (var26 == var22 || !var26.everMeshed) {
+                        for (Section var19 : var26.sections) {
+                           var19.dirty = true;
+                        }
+                     } else if (Math.abs(var24) + Math.abs(var25) == 1) {
+                        for (int sy = 0; sy < 16; sy++) {
+                           if (!var26.isSectionEmpty(sy) && !var22.isSectionEmpty(sy)) {
+                              var26.sections[sy].dirty = true;
+                           }
+                        }
                      }
                   }
                }
@@ -691,31 +713,34 @@ public final class World {
 
       if (this.dim == Dim.OVERWORLD) {
          int voidMinY = isVoid ? 44 : 0;
+         int maxHm = 0;
+         for (int i = 0; i < 256; i++) {
+            if (var1.hm[i] > maxHm) {
+               maxHm = var1.hm[i];
+            }
+         }
+         int bulkStartY = Math.max(voidMinY, maxHm + 1);
+         if (bulkStartY < 256) {
+            Arrays.fill(var1.light, bulkStartY << 8, 65536, (byte)0xF0);
+         }
          // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
          for (int var5 = 0; var5 < 16; var5++) {
             for (int var6 = 0; var6 < 16; var6++) {
                int var7 = var1.hm[var5 * 16 + var6];
-
-               for (int var8 = Math.max(voidMinY, var7 + 1); var8 < 256; var8++) {
+               int colTopY = Math.min(256, bulkStartY);
+               for (int var8 = Math.max(voidMinY, var7 + 1); var8 < colTopY; var8++) {
                   var1.setSky(var6, var8, var5, 15);
                }
 
                int var21 = var7;
-               int[][] var9 = new int[][]{{var6 + 1, var5}, {var6 - 1, var5}, {var6, var5 + 1}, {var6, var5 - 1}};
-
-               for (int[] var13 : var9) {
-                  int var14;
-                  if (var13[0] >= 0 && var13[0] < 16 && var13[1] >= 0 && var13[1] < 16) {
-                     var14 = var1.hm[var13[1] * 16 + var13[0]];
-                  } else {
-                     Chunk var15 = this.chunk(var2 + var13[0] >> 4, var3 + var13[1] >> 4);
-                     var14 = var15 == null ? var7 : var15.hm[(var13[1] & 15) * 16 + (var13[0] & 15)];
-                  }
-
-                  if (var14 > var21) {
-                     var21 = var14;
-                  }
-               }
+               int hE = var6 < 15 ? var1.hm[var5 * 16 + var6 + 1] : (var4[0] == null ? var7 : var4[0].hm[var5 * 16]);
+               if (hE > var21) var21 = hE;
+               int hW = var6 > 0 ? var1.hm[var5 * 16 + var6 - 1] : (var4[1] == null ? var7 : var4[1].hm[var5 * 16 + 15]);
+               if (hW > var21) var21 = hW;
+               int hS = var5 < 15 ? var1.hm[(var5 + 1) * 16 + var6] : (var4[2] == null ? var7 : var4[2].hm[var6]);
+               if (hS > var21) var21 = hS;
+               int hN = var5 > 0 ? var1.hm[(var5 - 1) * 16 + var6] : (var4[3] == null ? var7 : var4[3].hm[15 * 16 + var6]);
+               if (hN > var21) var21 = hN;
 
                int var26 = Math.min(255, Math.max(var7 + 1, var21));
                int seedStartY = isVoid ? Math.max(44, var7 + 1) : (var7 + 1);
@@ -768,32 +793,32 @@ public final class World {
       for (int var4 = 0; var4 < 4; var4++) {
          Chunk var5 = var3[var4];
          if (var5 != null) {
-            for (int var6 = yLo; var6 < yHi; var6++) {
-               for (int var7 = 0; var7 < 16; var7++) {
-                  int var8;
-                  int var9;
-                  switch (var4) {
-                     case 0:
-                        var8 = 0;
-                        var9 = var7;
-                        break;
-                     case 1:
-                        var8 = 15;
-                        var9 = var7;
-                        break;
-                     case 2:
-                        var8 = var7;
-                        var9 = 0;
-                        break;
-                     default:
-                        var8 = var7;
-                        var9 = 15;
-                  }
-
+            for (int var7 = 0; var7 < 16; var7++) {
+               int var8;
+               int var9;
+               switch (var4) {
+                  case 0:
+                     var8 = 0;
+                     var9 = var7;
+                     break;
+                  case 1:
+                     var8 = 15;
+                     var9 = var7;
+                     break;
+                  case 2:
+                     var8 = var7;
+                     var9 = 0;
+                     break;
+                  default:
+                     var8 = var7;
+                     var9 = 15;
+               }
+               byte var11 = (byte)(var4 == 0 ? 15 : (var4 == 1 ? 0 : var8));
+               byte var12 = (byte)(var4 == 2 ? 15 : (var4 == 3 ? 0 : var9));
+               int colYHi = var2 ? Math.min(yHi, Math.max(yLo, var1.hm[var12 * 16 + var11] + 1)) : yHi;
+               for (int var6 = yLo; var6 < colYHi; var6++) {
                   int var10 = this.lightOf(var5, var2, var8, var6, var9);
                   if (var10 > 1) {
-                     byte var11 = (byte)(var4 == 0 ? 15 : (var4 == 1 ? 0 : var8));
-                     byte var12 = (byte)(var4 == 2 ? 15 : (var4 == 3 ? 0 : var9));
                      if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & 0xFFFF] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
                         this.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
                      }
@@ -2201,7 +2226,7 @@ final class FastChunkCache {
       return c;
    });
 
-   final Chunk[] chunks = new Chunk[256];
+   final Chunk[] chunks = new Chunk[1024];
    World lastWorld;
 
    static void clear() {

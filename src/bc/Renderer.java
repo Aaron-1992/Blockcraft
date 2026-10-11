@@ -193,9 +193,8 @@ public final class Renderer {
       if (this.inflight.get() < var3) {
          int var4 = (int)Math.floor(this.camX) >> 4;
          int var5 = (int)Math.floor(this.camZ) >> 4;
-         boolean isPano = this.g.pano != null && var1 == this.g.pano.world;
          boolean isVoid = var1.settings != null && var1.settings.isVoidMode();
-         int var6 = isPano ? Math.min(4, this.g.opt.renderDistance) : (isVoid ? Math.min(5, this.g.opt.renderDistance) : this.g.opt.renderDistance);
+         int var6 = isVoid ? Math.min(5, this.g.opt.renderDistance) : this.g.opt.renderDistance;
          int var7 = (var6 + 1) * (var6 + 1);
          boolean var8 = this.g.opt.smooth;
          int var9 = 0;
@@ -205,38 +204,52 @@ public final class Renderer {
             if (var13[0] * var13[0] + var13[1] * var13[1] <= var7) {
                Chunk var14 = var1.chunk(var4 + var13[0], var5 + var13[1]);
                if (var14 != null) {
-                  boolean var15 = false;
-                  boolean var16 = false;
+                  boolean hasDirty = false;
+                  for (int sy = 0; sy < 16; sy++) {
+                     if (var14.sections[sy].dirty && !var14.sections[sy].inFlight) {
+                        hasDirty = true;
+                        break;
+                     }
+                  }
+                  if (!hasDirty) {
+                     continue;
+                  }
+                  if (!this.ready(var1, var14)) {
+                     continue label56;
+                  }
 
-                  for (int var17 = 0; var17 < 16; var17++) {
+                  // Fast inline pass: clear empty air sections and 100%-enclosed solid rock sections immediately
+                  for (int sy = 0; sy < 16; sy++) {
+                     Section sec = var14.sections[sy];
+                     if (sec.dirty && !sec.inFlight) {
+                        boolean empty = var14.isSectionEmpty(sy);
+                        boolean solid = !empty && sy < 4 && var14.isSectionFullyEnclosedOpaque(var1, sy);
+                        if (empty || solid) {
+                           sec.dirty = false;
+                           sec.conn = empty ? CaveCull.ALL : 0L;
+                           sec.nO = 0;
+                           sec.nT = 0;
+                           var14.markMeshed(sy);
+                           if (sec.vboO != 0) {
+                              GL15.glDeleteBuffers(sec.vboO);
+                              sec.vboO = 0;
+                           }
+                           if (sec.vboT != 0) {
+                              GL15.glDeleteBuffers(sec.vboT);
+                              sec.vboT = 0;
+                           }
+                        }
+                     }
+                  }
+
+                  int surfSy = Math.max(3, Math.min(14, var14.hm[136] >> 4));
+                  for (int step = 0; step < 16; step++) {
+                     int var17 = surfSy + ((step & 1) == 0 ? -(step >> 1) : ((step + 1) >> 1));
+                     if (var17 < 0 || var17 >= 16) {
+                        continue;
+                     }
                      Section var18 = var14.sections[var17];
                      if (var18.dirty && !var18.inFlight) {
-                        if (!var16) {
-                           var15 = this.ready(var1, var14);
-                           var16 = true;
-                        }
-
-                        if (!var15) {
-                           continue label56;
-                        }
-
-                        if (var14.isSectionEmpty(var17)) {
-                           var18.dirty = false;
-                           var18.conn = CaveCull.ALL;
-                           var18.nO = 0;
-                           var18.nT = 0;
-                           var14.markMeshed(var17);
-                           if (var18.vboO != 0) {
-                              GL15.glDeleteBuffers(var18.vboO);
-                              var18.vboO = 0;
-                           }
-                           if (var18.vboT != 0) {
-                              GL15.glDeleteBuffers(var18.vboT);
-                              var18.vboT = 0;
-                           }
-                           continue;
-                        }
-
                         if (var9 >= var2 || this.inflight.get() >= var3) {
                            return;
                         }
@@ -976,8 +989,7 @@ public final class Renderer {
             this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
          }
 
-         int lodInner = (this.g.pano != null && var5 == this.g.pano.world) ? Math.min(4, var13) : var13;
-         this.lod.render(this.camX, this.camY, this.camZ, var15, lodInner, this.skyLightFactor);
+         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
          if (var29) {
             this.sh.stopLod();
          }

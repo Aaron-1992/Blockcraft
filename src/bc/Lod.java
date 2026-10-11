@@ -49,6 +49,9 @@ public final class Lod {
    int maxDist;
    int innerHalf;
    ArrayList<Lod.Tile> drawList = new ArrayList();
+   final ArrayList<Lod.Tile> pendingVisible = new ArrayList<>();
+   final ArrayList<Lod.Tile> pendingBehind = new ArrayList<>();
+   final int maxInflight;
 
    public Lod(Renderer var1, Gen var2) {
       this(var1, var2, null);
@@ -62,11 +65,12 @@ public final class Lod {
          map.listener = this::invalidate;
       }
 
-      int var3 = Math.max(1, Math.min(3, Runtime.getRuntime().availableProcessors() - 1));
+      int var3 = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() - 1));
+      this.maxInflight = var3 * 10;
       this.pool = Executors.newFixedThreadPool(var3, var0 -> {
          Thread var1x = new Thread(var0, "lod-gen");
          var1x.setDaemon(true);
-         var1x.setPriority(2);
+         var1x.setPriority(4);
          return var1x;
       });
    }
@@ -102,12 +106,16 @@ public final class Lod {
    }
 
    void request(Lod.Tile var1) {
-      if (var1.state == 0 && this.inflight.get() < 32) {
+      if (var1.state == 0 && this.inflight.get() < this.maxInflight) {
          var1.state = 1;
          this.inflight.incrementAndGet();
          this.pool.execute(() -> {
             try {
                if (!this.dead) {
+                  if (this.maxDist > 0 && this.nearest(var1.x0, var1.z0, var1.size) > this.maxDist + 512.0) {
+                     var1.state = 0;
+                     return;
+                  }
                   this.build(var1);
                }
             } catch (Throwable var6) {
@@ -259,13 +267,13 @@ public final class Lod {
                if (!wet[i] || !wet[ni]) {
                   float low;
                   if (ny < y) {
-                     low = edge ? ny - 14.0F : ny;
+                     low = edge ? ny - Math.min(3.5F, 1.0F + cs * 0.35F) : ny;
                   } else {
-                     if (!edge) {
+                     if (!edge || ny > y + 0.5F) {
                         continue;
                      }
 
-                     low = y - 14.0F;
+                     low = y - Math.min(3.0F, 0.8F + cs * 0.3F);
                   }
 
                   int wall;
@@ -362,6 +370,9 @@ public final class Lod {
    }
 
    static void box(Lod.Mb var0, float var1, float var2, float var3, float var4, float var5, float var6, int var7, float var8) {
+      if (var5 <= var2) {
+         return;
+      }
       if (var0.bb.remaining() < 448) {
          ByteBuffer var9 = ByteBuffer.allocateDirect(var0.bb.capacity() * 2).order(ByteOrder.nativeOrder());
          var0.bb.flip();
@@ -384,6 +395,31 @@ public final class Lod {
       var0.n = var0.n + var10[0];
    }
 
+   /** Emits only the 4 outer vertical walls of a box when its top face is completely covered by a wider/equal tier above. */
+   static void boxSides(Lod.Mb var0, float var1, float var2, float var3, float var4, float var5, float var6, int var7, float var8) {
+      if (var5 <= var2) {
+         return;
+      }
+      if (var0.bb.remaining() < 384) {
+         ByteBuffer var9 = ByteBuffer.allocateDirect(var0.bb.capacity() * 2).order(ByteOrder.nativeOrder());
+         var0.bb.flip();
+         var9.put(var0.bb);
+         var0.bb = var9;
+      }
+
+      ByteBuffer var16 = var0.bb;
+      int[] var10 = new int[]{0};
+      int var12 = code(pack(var7, 0.82F, var8), 240);
+      int var13 = code(pack(var7, 0.68F, var8), 210);
+      int var14 = code(var12, 225);
+      int var15 = code(var13, 195);
+      quadN(var16, var10, 0, 0, -1, var1, var5, var3, var4, var5, var3, var4, var2, var3, var1, var2, var3, var12);
+      quadN(var16, var10, 0, 0, 1, var4, var5, var6, var1, var5, var6, var1, var2, var6, var4, var2, var6, var14);
+      quadN(var16, var10, -1, 0, 0, var1, var5, var6, var1, var5, var3, var1, var2, var3, var1, var2, var6, var13);
+      quadN(var16, var10, 1, 0, 0, var4, var5, var3, var4, var5, var6, var4, var2, var6, var4, var2, var3, var15);
+      var0.n = var0.n + var10[0];
+   }
+
    void trees(Lod.Tile var1, Lod.Mb var2, List<Village> var3, float var4) {
       this.trees(var1, var2, var3, var4, null, null, null);
    }
@@ -393,12 +429,12 @@ public final class Lod {
       int var6 = Math.floorDiv(var1.x0 + var1.size - 1, 16);
       int var7 = Math.floorDiv(var1.z0, 16);
       int var8 = Math.floorDiv(var1.z0 + var1.size - 1, 16);
-      boolean var9 = var1.size <= 128;
-      int maxTries = var1.size <= 64 ? 16 : (var1.size == 128 ? 16 : (var1.size == 256 ? 12 : 8));
-      int chunkStep = var1.size >= 1024 ? 2 : 1;
-      boolean drawTrunk = var1.size <= 256;
+      boolean var9 = var1.size <= 64;
+      int maxTries = var1.size <= 64 ? 12 : (var1.size == 128 ? 10 : (var1.size == 256 ? 7 : 5));
+      int chunkStep = var1.size >= 1024 ? 4 : (var1.size == 512 ? 2 : 1);
+      boolean drawTrunk = var1.size <= 128;
       boolean drawCrownCap = var1.size <= 512;
-      float canopyPad = var1.size >= 1024 ? 1.35F : (var1.size == 512 ? 0.85F : (var1.size == 256 ? 0.35F : 0.0F));
+      float canopyPad = var1.size >= 1024 ? 1.55F : (var1.size == 512 ? 0.95F : (var1.size == 256 ? 0.45F : 0.0F));
       int cs = Math.max(1, var1.size / 32);
 
       List<Landmarks319.Site> landmarks = null;
@@ -439,7 +475,7 @@ public final class Lod {
                   int bm;
                   int cellRgb = 0x598E34;
                   Col var22 = null;
-                  if (var1.size >= 128 && gridH != null && gridBiome != null) {
+                  if (gridH != null && gridBiome != null) {
                      int gx = 1 + Math.max(0, Math.min(31, (var20 - var1.x0) / cs));
                      int gz = 1 + Math.max(0, Math.min(31, (var21 - var1.z0) / cs));
                      int gi = gz * 34 + gx;
@@ -464,10 +500,12 @@ public final class Lod {
                         }
 
                         ground = sum.top[k] - 1;
+                        var22 = this.gen.column(var20, var21);
+                        bm = var22.biome;
                      }
                   }
 
-                  if (ground >= 64 && ground <= 235 && (var1.size >= 128 || !this.gen.entrance(var20, var21))) {
+                  if (ground >= 64 && ground <= 235 && (var1.size >= 64 || !this.gen.entrance(var20, var21))) {
                      int var23;
                      switch (bm) {
                         case Biomes.PLAINS:
@@ -652,7 +690,7 @@ public final class Lod {
                            int mh = 5 + (var18 & 1);
                            int capCol = (var17 & 1) == 0 ? 0xB82824 : 0x8A6444;
                            if (drawTrunk) {
-                              box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + mh, var48 + 0.5F, 0xCFC8B8, 0.0F);
+                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + mh - 1.0F, var48 + 0.5F, 0xCFC8B8, 0.0F);
                            }
                            float mr = 2.5F + canopyPad * 0.6F;
                            box(var2, var47 - mr, var50 + mh - 1.0F, var48 - mr, var47 + mr, var50 + mh + 1.2F, var48 + mr, capCol, var29);
@@ -668,7 +706,7 @@ public final class Lod {
                         if (var23 == 4) {
                            int ah = 5 + var18;
                            if (drawTrunk) {
-                              box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + ah, var48 + 0.5F, var31, 0.0F);
+                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + ah - 1.5F, var48 + 0.5F, var31, 0.0F);
                            }
                            float ar = 3.5F + canopyPad;
                            box(var2, var47 - ar, var50 + ah - 1.5F, var48 - ar, var47 + ar, var50 + ah + 0.6F, var48 + ar, var30, var29);
@@ -681,57 +719,29 @@ public final class Lod {
                         if (var23 == 2) {
                            int var53 = 7 + var18 * 2 + var32.nextInt(3) + (bm == Biomes.MEGA_TAIGA ? 5 : 0);
                            float var55 = var50 + var53;
-                           int var56 = var53 >= 10 ? 4 : 3;
-                           if (var9) {
-                              box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var55, var48 + 0.5F, var31, 0.0F);
-
-                              for (float var57 = var50 + 2.0F; var57 <= var55 + 1.0F; var57 += 2.0F) {
-                                 int var58 = (int)(var55 + 1.0F - var57);
-                                 float var59 = Math.max(spR(var58, var56), spR(var58 - 1, var56)) + 0.5F;
-                                 float var60 = 0.82F + 0.3F * (var57 - var50) / var53;
-                                 box(
-                                    var2,
-                                    var47 - var59,
-                                    var57,
-                                    var48 - var59,
-                                    var47 + var59,
-                                    Math.min(var57 + 2.0F, var55 + 2.0F),
-                                    var48 + var59,
-                                    shade(var30, var60),
-                                    var29
-                                 );
-                              }
-                           } else {
-                              if (drawTrunk) {
-                                 box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var55, var48 + 0.5F, var31, 0.0F);
-                              }
-
-                              float spBaseR = 2.6F + canopyPad * 0.8F;
-                              float spLowY = var1.size >= 256 ? var49 : var50 + 1.8F;
-                              box(var2, var47 - spBaseR, spLowY, var48 - spBaseR, var47 + spBaseR, var50 + var53 * 0.58F, var48 + spBaseR, shade(var30, 0.86F), var29);
-                              if (drawCrownCap) {
-                                 float spTopR = 1.65F + canopyPad * 0.55F;
-                                 box(var2, var47 - spTopR, var50 + var53 * 0.58F, var48 - spTopR, var47 + spTopR, var55 + 1.2F, var48 + spTopR, shade(var30, 1.04F), var29);
-                              }
+                           if (drawTrunk) {
+                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + 2.0F, var48 + 0.5F, var31, 0.0F);
+                           }
+                           float spBaseR = 2.6F + canopyPad * 0.8F;
+                           float spLowY = var1.size >= 256 ? var49 : var50 + 1.8F;
+                           float spMidY = var50 + var53 * 0.58F;
+                           box(var2, var47 - spBaseR, spLowY, var48 - spBaseR, var47 + spBaseR, spMidY, var48 + spBaseR, shade(var30, 0.86F), var29);
+                           if (drawCrownCap) {
+                              float spTopR = 1.65F + canopyPad * 0.55F;
+                              box(var2, var47 - spTopR, spMidY, var48 - spTopR, var47 + spTopR, var55 + 1.2F, var48 + spTopR, shade(var30, 1.04F), var29);
                            }
                         } else if (var23 == 1) {
                            int var52 = 6 + var18 + var32.nextInt(2);
                            float var54 = var50 + var52 - 1.0F;
+                           float br = 2.2F + canopyPad * 0.8F;
+                           float bLow = var1.size >= 256 ? var49 + 1.0F : var54 - 2.4F;
                            if (drawTrunk) {
-                              box(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + var52 + 1.0F, var48 + 0.5F, var31, 0.0F);
+                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, bLow, var48 + 0.5F, var31, 0.0F);
                            }
-
-                           if (var9) {
-                              canopy(var2, var47, var54, var48, 2.3F, 3.0F, 2.3F, var30, var29, 2);
-                              canopy(var2, var47, var54 + 2.0F, var48, 1.4F, 1.6F, 1.4F, var30, var29, 2);
-                           } else {
-                              float br = 2.2F + canopyPad * 0.8F;
-                              float bLow = var1.size >= 256 ? var49 + 1.0F : var54 - 2.6F;
-                              box(var2, var47 - br, bLow, var48 - br, var47 + br, var54 + 1.8F, var48 + br, shade(var30, 0.94F), var29);
-                              if (drawCrownCap) {
-                                 float bTopR = 1.4F + canopyPad * 0.5F;
-                                 box(var2, var47 - bTopR, var54 + 1.8F, var48 - bTopR, var47 + bTopR, var54 + 3.4F, var48 + bTopR, shade(var30, 1.08F), var29);
-                              }
+                           box(var2, var47 - br, bLow, var48 - br, var47 + br, var54 + 1.8F, var48 + br, shade(var30, 0.94F), var29);
+                           if (drawCrownCap) {
+                              float bTopR = 1.4F + canopyPad * 0.5F;
+                              box(var2, var47 - bTopR, var54 + 1.8F, var48 - bTopR, var47 + bTopR, var54 + 3.4F, var48 + bTopR, shade(var30, 1.08F), var29);
                            }
                         } else {
                            boolean var51 = var23 == 3 || var23 == 5 || var32.nextInt(7) == 0;
@@ -739,14 +749,15 @@ public final class Lod {
                            float var35 = var50 + var34 - 1.0F;
                            float var36 = (var51 ? 4.2F : 3.1F) + canopyPad;
                            float var37 = var51 ? 3.2F : 2.5F;
+                           float cLow = var1.size >= 256 ? var49 + 1.0F : var35 - var37;
                            if (drawTrunk) {
-                              box(
+                              boxSides(
                                  var2,
                                  var47 - 0.5F,
                                  var49,
                                  var48 - 0.5F,
                                  var47 + (var51 ? 1.5F : 0.5F),
-                                 var50 + var34 + 1.0F,
+                                 cLow,
                                  var48 + (var51 ? 1.5F : 0.5F),
                                  var31,
                                  0.0F
@@ -754,7 +765,6 @@ public final class Lod {
                            }
 
                            if (!var9) {
-                              float cLow = var1.size >= 256 ? var49 + 1.0F : var35 - var37;
                               box(
                                  var2,
                                  var47 - var36 + 0.5F,
@@ -771,29 +781,7 @@ public final class Lod {
                                  box(var2, var47 - capR, var35 + var37 * 0.75F, var48 - capR, var47 + capR, var35 + var37 + 1.6F, var48 + capR, shade(var30, 1.06F), var29);
                               }
                            } else {
-                              canopy(var2, var47, var35, var48, var36, var37, var36, var30, var29, 1);
-                              Random var38 = new Random(var19 * 31L + 7L);
-                              int var39 = 2 + var38.nextInt(3);
-
-                              for (int var40 = 0; var40 < var39; var40++) {
-                                 double var41 = var38.nextDouble() * Math.PI * 2.0;
-                                 double var43 = var51 ? 3.6 : 2.7;
-                                 float var45 = var47 + (float)Math.round(Math.cos(var41) * var43);
-                                 float var46 = var48 + (float)Math.round(Math.sin(var41) * var43);
-                                 canopy(
-                                    var2,
-                                    var45,
-                                    var35 - var38.nextInt(3),
-                                    var46,
-                                    var51 ? 2.6F : 2.1F,
-                                    var51 ? 2.1F : 1.8F,
-                                    var51 ? 2.6F : 2.1F,
-                                    var30,
-                                    var29,
-                                    2
-                                 );
-                              }
-
+                              canopy(var2, var47, var35, var48, var36, var37, var36, var30, var29, 2);
                               canopy(var2, var47, var35 + (var51 ? 3 : 2), var48, var51 ? 2.4F : 1.7F, 1.4F, var51 ? 2.4F : 1.7F, var30, var29, 2);
                            }
                         }
@@ -819,11 +807,12 @@ public final class Lod {
    }
 
    static void canopy(Lod.Mb var0, float var1, float var2, float var3, float var4, float var5, float var6, int var7, float var8, int var9) {
+      int step = Math.max(2, var9);
       int var10 = (int)Math.ceil(var5);
       int var11 = -var10;
 
       while (var11 < var10) {
-         float var12 = var11 + 0.5F * var9;
+         float var12 = var11 + 0.5F * step;
          float var13 = var12 / var5;
          float var14 = 1.0F - var13 * var13;
          if (!(var14 <= 0.05F)) {
@@ -831,10 +820,26 @@ public final class Lod {
             float var16 = (float)Math.floor(var4 * var15) + 0.5F;
             float var17 = (float)Math.floor(var6 * var15) + 0.5F;
             float var18 = 0.84F + 0.22F * (var11 + var10) / (2.0F * var10);
-            box(var0, var1 - var16, var2 + var11, var3 - var17, var1 + var16, var2 + var11 + var9, var3 + var17, shade(var7, var18), var8);
+            int nextY = var11 + step;
+            boolean topCovered = false;
+            if (nextY < var10) {
+               float nextMid = (nextY + 0.5F * step) / var5;
+               float nextSq = 1.0F - nextMid * nextMid;
+               if (nextSq > 0.05F) {
+                  float nextS = (float)Math.sqrt(nextSq);
+                  float nextX = (float)Math.floor(var4 * nextS) + 0.5F;
+                  float nextZ = (float)Math.floor(var6 * nextS) + 0.5F;
+                  topCovered = nextX >= var16 && nextZ >= var17;
+               }
+            }
+            if (topCovered) {
+               boxSides(var0, var1 - var16, var2 + var11, var3 - var17, var1 + var16, var2 + var11 + step, var3 + var17, shade(var7, var18), var8);
+            } else {
+               box(var0, var1 - var16, var2 + var11, var3 - var17, var1 + var16, var2 + var11 + step, var3 + var17, shade(var7, var18), var8);
+            }
          }
 
-         var11 += var9;
+         var11 += step;
       }
    }
 
@@ -866,7 +871,7 @@ public final class Lod {
                   float bz0 = var9.bz0 - var5;
                   float bx1 = var9.bx1 + 1 - var4;
                   float bz1 = var9.bz1 + 1 - var5;
-                  box(var2, bx0, var9.y0 - 4, bz0, bx1, var9.y0 + var9.wallH + 1, bz1, wallCol, 0.02F);
+                  boxSides(var2, bx0, var9.y0 - 4, bz0, bx1, var9.y0 + var9.wallH + 1, bz1, wallCol, 0.02F);
                   box(var2, bx0 - 0.5F, var9.y0 + var9.wallH + 1, bz0 - 0.5F, bx1 + 0.5F, var9.y0 + var9.wallH + 3, bz1 + 0.5F, roofCol, 0.03F);
                }
             }
@@ -957,10 +962,10 @@ public final class Lod {
       if (name.equals("well") || name.equals("gazebo")) {
          box(mb, bx0, y0 - 4, bz0, bx1, y0 + 1, bz1, baseCol, 0.02F);
          box(mb, bx0 + 1, y0 + 1, bz0 + 1, bx1 - 1, y0 + 2, bz1 - 1, baseCol, 0.02F);
-         box(mb, bx0 + 1, y0 + 2, bz0 + 1, bx0 + 2, y0 + 5, bz0 + 2, logCol, 0.0F);
-         box(mb, bx1 - 2, y0 + 2, bz0 + 1, bx1 - 1, y0 + 5, bz0 + 2, logCol, 0.0F);
-         box(mb, bx0 + 1, y0 + 2, bz1 - 2, bx0 + 2, y0 + 5, bz1 - 1, logCol, 0.0F);
-         box(mb, bx1 - 2, y0 + 2, bz1 - 2, bx1 - 1, y0 + 5, bz1 - 1, logCol, 0.0F);
+         boxSides(mb, bx0 + 1, y0 + 2, bz0 + 1, bx0 + 2, y0 + 5, bz0 + 2, logCol, 0.0F);
+         boxSides(mb, bx1 - 2, y0 + 2, bz0 + 1, bx1 - 1, y0 + 5, bz0 + 2, logCol, 0.0F);
+         boxSides(mb, bx0 + 1, y0 + 2, bz1 - 2, bx0 + 2, y0 + 5, bz1 - 1, logCol, 0.0F);
+         boxSides(mb, bx1 - 2, y0 + 2, bz1 - 2, bx1 - 1, y0 + 5, bz1 - 1, logCol, 0.0F);
          box(mb, bx0 + 0.5F, y0 + 5, bz0 + 0.5F, bx1 - 0.5F, y0 + 6, bz1 - 0.5F, roofCol, 0.03F);
          box(mb, bx0 + 1.5F, y0 + 6, bz0 + 1.5F, bx1 - 1.5F, y0 + 7, bz1 - 1.5F, roofCol, 0.03F);
          return;
@@ -973,8 +978,8 @@ public final class Lod {
       float wz1 = bz1 - 1.0F;
       int totalH = t.height();
       int wallH = Math.max(4, Math.min(totalH - 3, 8));
-      box(mb, wx0, y0 - 4, wz0, wx1, y0 + 2, wz1, baseCol, 0.02F);
-      box(mb, wx0, y0 + 2, wz0, wx1, y0 + wallH, wz1, wallCol, 0.02F);
+      boxSides(mb, wx0, y0 - 4, wz0, wx1, y0 + 2, wz1, baseCol, 0.02F);
+      boxSides(mb, wx0, y0 + 2, wz0, wx1, y0 + wallH, wz1, wallCol, 0.02F);
 
       if (st.kind == Style.DESERT) {
          // Desert flat crenellated roof with terracotta trim
@@ -1104,7 +1109,7 @@ public final class Lod {
       long start = System.nanoTime();
 
       Lod.Tile var2;
-      while (var1 < 24 && (var1 == 0 || System.nanoTime() - start < 6000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
+      while (var1 < 64 && (var1 == 0 || System.nanoTime() - start < 6000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
          var1++;
          if (this.dead) {
             var2.data = null;
@@ -1128,6 +1133,44 @@ public final class Lod {
       return var0.state == 3 || var0.state == 4;
    }
 
+   void addDrawOnce(Lod.Tile t) {
+      Lod.Tile d = this.refresh(t);
+      if (d.lastDrawFrame != this.frame) {
+         d.lastDrawFrame = this.frame;
+         this.drawList.add(d);
+      }
+   }
+
+   void drawFallback(int x0, int z0, int size) {
+      if (size > 32) {
+         int half = size >> 1;
+         boolean anyChild = false;
+         for (int dx = 0; dx <= half; dx += half) {
+            for (int dz = 0; dz <= half; dz += half) {
+               Lod.Tile ch = (Lod.Tile)this.tiles.get(key(half, x0 + dx, z0 + dz));
+               if (ch != null && ready(ch)) {
+                  ch.lastUse = this.frame;
+                  this.addDrawOnce(ch);
+                  anyChild = true;
+               }
+            }
+         }
+         if (anyChild) {
+            return;
+         }
+      }
+      for (int pSize = size * 2; pSize <= 1024; pSize *= 2) {
+         int px0 = Math.floorDiv(x0, pSize) * pSize;
+         int pz0 = Math.floorDiv(z0, pSize) * pSize;
+         Lod.Tile anc = (Lod.Tile)this.tiles.get(key(pSize, px0, pz0));
+         if (anc != null && ready(anc) && this.nearest(px0, pz0, pSize) >= this.innerHalf * 0.7) {
+            anc.lastUse = this.frame;
+            this.addDrawOnce(anc);
+            return;
+         }
+      }
+   }
+
    public void render(double var1, double var3, double var5, int var7, int var8, float var9) {
       this.ensureTex();
       this.frame++;
@@ -1138,6 +1181,8 @@ public final class Lod {
       this.innerHalf = Math.max(0, (var8 - 1) * 16);
       this.uploadPending();
       this.drawList.clear();
+      this.pendingVisible.clear();
+      this.pendingBehind.clear();
       int var10 = (int)Math.floor(var1);
       int var11 = (int)Math.floor(var5);
       int var12 = Math.floorDiv(var10 - this.maxDist, 1024);
@@ -1156,6 +1201,19 @@ public final class Lod {
 
       for (int[] var22 : var16) {
          this.visit(var22[0], var22[1], 1024);
+      }
+
+      if (!this.pendingVisible.isEmpty() && this.inflight.get() < this.maxInflight) {
+         this.pendingVisible.sort((a, b) -> Double.compare(this.nearest(a.x0, a.z0, a.size), this.nearest(b.x0, b.z0, b.size)));
+         for (int i = 0; i < this.pendingVisible.size() && this.inflight.get() < this.maxInflight; i++) {
+            this.request(this.pendingVisible.get(i));
+         }
+      }
+      if (!this.pendingBehind.isEmpty() && this.inflight.get() < this.maxInflight) {
+         this.pendingBehind.sort((a, b) -> Double.compare(this.nearest(a.x0, a.z0, a.size), this.nearest(b.x0, b.z0, b.size)));
+         for (int i = 0; i < this.pendingBehind.size() && this.inflight.get() < this.maxInflight; i++) {
+            this.request(this.pendingBehind.get(i));
+         }
       }
 
       GL13.glActiveTexture(33984);
@@ -1292,35 +1350,34 @@ public final class Lod {
          if (var3 <= 128 && this.insideInner(var1, var2, var3) && this.coveredBox(var1, var2, var3)) {
             return;
          }
-         if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.72F + 28.0F)) {
-            boolean var6 = var3 > 32 && var4 < this.splitDistance(var3);
-            if (!var6) {
-               Lod.Tile var16 = this.tile(var3, var1, var2);
-               var16.lastUse = this.frame;
-               if (ready(var16)) {
-                  this.drawList.add(this.refresh(var16));
-               } else {
-                  this.request(var16);
-                  if (var3 < 1024) {
-                     int pSize = var3 * 2;
-                     int px0 = Math.floorDiv(var1, pSize) * pSize;
-                     int pz0 = Math.floorDiv(var2, pSize) * pSize;
-                     Lod.Tile anc = (Lod.Tile)this.tiles.get(key(pSize, px0, pz0));
-                     if (anc != null && ready(anc) && anc.lastUse != this.frame && this.nearest(px0, pz0, pSize) >= this.innerHalf) {
-                        anc.lastUse = this.frame;
-                        this.drawList.add(anc);
-                     }
-                  }
+         boolean inFrustum = this.rend.visible(
+            (float)(var1 + var3 / 2 - this.cx),
+            (float)(100.0 - this.cy),
+            (float)(var2 + var3 / 2 - this.cz),
+            var3 * 0.75F + 40.0F
+         );
+         boolean var6 = var3 > 32 && var4 < this.splitDistance(var3);
+         if (!var6) {
+            Lod.Tile var16 = this.tile(var3, var1, var2);
+            var16.lastUse = this.frame;
+            if (ready(var16)) {
+               if (inFrustum) {
+                  this.addDrawOnce(var16);
                }
+            } else if (inFrustum) {
+               this.pendingVisible.add(var16);
+               this.drawFallback(var1, var2, var3);
             } else {
-               int var7 = var3 >> 1;
-               int sx = this.cx >= var1 + var7 ? var7 : 0;
-               int sz = this.cz >= var2 + var7 ? var7 : 0;
-               this.visit(var1 + sx, var2 + sz, var7);
-               this.visit(var1 + (var7 - sx), var2 + sz, var7);
-               this.visit(var1 + sx, var2 + (var7 - sz), var7);
-               this.visit(var1 + (var7 - sx), var2 + (var7 - sz), var7);
+               this.pendingBehind.add(var16);
             }
+         } else {
+            int var7 = var3 >> 1;
+            int sx = this.cx >= var1 + var7 ? var7 : 0;
+            int sz = this.cz >= var2 + var7 ? var7 : 0;
+            this.visit(var1 + sx, var2 + sz, var7);
+            this.visit(var1 + (var7 - sx), var2 + sz, var7);
+            this.visit(var1 + sx, var2 + (var7 - sz), var7);
+            this.visit(var1 + (var7 - sx), var2 + (var7 - sz), var7);
          }
       }
    }
@@ -1331,7 +1388,11 @@ public final class Lod {
       while (var1.hasNext()) {
          Lod.Tile var2 = (Lod.Tile)((Entry)var1.next()).getValue();
          boolean replIdle = var2.replacement == null || var2.replacement.state == 0 || var2.replacement.state == 3 || var2.replacement.state == 4;
-         if (this.frame - var2.lastUse > 900L && (var2.state == 3 || var2.state == 4 || var2.state == 0) && replIdle) {
+         double dist = this.nearest(var2.x0, var2.z0, var2.size);
+         long idle = this.frame - var2.lastUse;
+         boolean outOfRange = dist > this.maxDist + 256.0 && idle > 600L;
+         boolean staleSplit = idle > 1800L;
+         if ((outOfRange || staleSplit) && (var2.state == 3 || var2.state == 4 || var2.state == 0) && replIdle) {
             if (var2.vbo != 0) {
                GL15.glDeleteBuffers(var2.vbo);
             }
@@ -1448,6 +1509,7 @@ public final class Lod {
       volatile ByteBuffer data;
       volatile int vcount;
       long lastUse;
+      long lastDrawFrame;
       long coverFrame;
       boolean covered;
       /** Update 3.11: the epoch (see Lod.invalidate) the tile was built at / last found outdated at, the frame it was uploaded, its replacement. */

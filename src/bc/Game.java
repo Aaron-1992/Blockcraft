@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "4.3";
+   public static final String VERSION_STR = "4.4";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -3720,7 +3720,7 @@ public final class Game {
          this.rend.camZ = this.player.z;
          boolean var5 = this.screen == Game.S.LOADING;
          boolean isPanoWorld = this.pano != null && this.world == this.pano.world;
-         int chunkRad = isPanoWorld ? Math.min(4, this.opt.renderDistance) : (this.opt.renderDistance + 1);
+         int chunkRad = this.opt.renderDistance + 1;
          this.world.updateChunks(var3, var4, chunkRad, 256, var5 ? 30000000L : 4000000L);
          this.rend.scheduleMeshes(this.world, var5 ? 64 : 48);
          this.rend.uploadMeshes(256, var5 ? 20000000L : 4000000L);

@@ -1407,7 +1407,7 @@ final class Tests319 {
 
          bwGame.world.settings.type = WorldSettings.BEDWARS;
 
-         // Verify LOD high-detail splitDistance extends further and scales dynamically with render distance
+         // Verify LOD high-detail splitDistance extends further, boxSides emits outer walls only, and evict retains 360-degree in-range tiles
          Lod lodTest = new Lod(null, bwGame.world.gen);
          try {
             lodTest.innerHalf = 112; // Render distance 8
@@ -1416,6 +1416,18 @@ final class Tests319 {
             lodTest.innerHalf = 240; // Render distance 16
             double splitRD16 = lodTest.splitDistance(64);
             check(splitRD8 >= 280.0 && splitRD16 > splitRD8 + 150.0, "High-detail LOD split distance reaches far out and scales with render distance");
+            Lod.Mb sideMb = new Lod.Mb();
+            sideMb.bb = java.nio.ByteBuffer.allocateDirect(512).order(java.nio.ByteOrder.nativeOrder());
+            Lod.boxSides(sideMb, 0.0F, 0.0F, 0.0F, 2.0F, 4.0F, 2.0F, 0x558833, 0.0F);
+            eq(16, sideMb.n, "Lod.boxSides emits only the 4 outer vertical walls (16 vertices) without hidden interior horizontal caps");
+            Lod.Tile behindTile = lodTest.tile(64, -128, -128);
+            behindTile.state = 3;
+            behindTile.lastUse = 1L;
+            lodTest.cx = 0.0;
+            lodTest.cz = 0.0;
+            lodTest.frame = 1000L; // > 900 frames since lastUse, but still inside maxDist (1024)
+            lodTest.evict();
+            check(lodTest.tiles.containsKey(Lod.key(64, -128, -128)), "Lod.evict retains in-range tiles behind the camera so turning around never drops LOD chunks");
          } finally {
             lodTest.dispose();
          }
