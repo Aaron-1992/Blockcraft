@@ -264,7 +264,17 @@ public final class SoundEngine {
          return;
       }
       bankLoaded = true;
-      try (InputStream rawIn = SoundEngine.class.getResourceAsStream("/sounds/soundbank.bin")) {
+      InputStream stream = SoundEngine.class.getResourceAsStream("/sounds/soundbank.bin");
+      if (stream == null) {
+         try {
+            java.io.File f = new java.io.File("res/sounds/soundbank.bin");
+            if (f.isFile()) {
+               stream = new java.io.FileInputStream(f);
+            }
+         } catch (Throwable ignored) {
+         }
+      }
+      try (InputStream rawIn = stream) {
          if (rawIn != null) {
             DataInputStream in = new DataInputStream(rawIn);
             byte[] magic = new byte[4];
