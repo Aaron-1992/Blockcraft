@@ -1232,6 +1232,26 @@ public final class SkyGen extends Gen {
       }
    }
 
+   private static World arenaLoadedWorldRef = null;
+
+   public static void ensureArenaChunksLoadedOnce(World w) {
+      if (w == null) {
+         return;
+      }
+      if (w == arenaLoadedWorldRef
+         && w.chunk(0, 0) != null
+         && w.chunk(-5, -5) != null
+         && w.chunk(5, 5) != null
+         && w.chunk(0, 3) != null
+         && w.chunk(-3, 0) != null
+         && w.chunk(3, 0) != null
+         && w.chunk(0, -3) != null) {
+         return;
+      }
+      w.ensureArenaChunksLoaded();
+      arenaLoadedWorldRef = w;
+   }
+
    public static void resetArenaMap(Game g, World w, boolean broadcast) {
       resetMatchState();
       Net319.clearWorldState();
@@ -1245,6 +1265,7 @@ public final class SkyGen extends Gen {
             targetW.gen = new SkyGen(targetW.seed, targetW.settings);
          }
          targetW.resetAllChunks();
+         arenaLoadedWorldRef = targetW;
       }
       if (g != null) {
          if (g.mobs != null) {
@@ -1252,7 +1273,6 @@ public final class SkyGen extends Gen {
          }
          g.particles.clear();
          if (targetW != null && g.rend != null) {
-            g.rend.clearWorldMeshes(targetW);
             g.rend.setLod(targetW);
          }
          if (g.player != null) {
@@ -1529,16 +1549,24 @@ public final class SkyGen extends Gen {
       return null;
    }
 
+   private static int cachedPrebuiltMode = -99;
+   private static int cachedPrebuiltMapId = -99;
+   private static String cachedPrebuiltCustomName = null;
+   private static long cachedPrebuiltCheckNs = 0L;
+   private static File cachedPrebuiltDir = null;
+
    @Override
    public Chunk generate(int cx, int cz) {
       Chunk ch = new Chunk(cx, cz);
-      for (int z = 0; z < 16; z++) {
-         for (int x = 0; x < 16; x++) {
-            int idx = z * 16 + x;
-            ch.biome[idx] = Biomes.PLAINS;
-            ch.grassColor[idx] = Gen.grassColorFor(0.8, 0.4);
-            ch.foliageColor[idx] = Gen.foliageColorFor(0.8, 0.4);
-         }
+      int gCol = Gen.grassColorFor(0.8, 0.4);
+      int fCol = Gen.foliageColorFor(0.8, 0.4);
+      Arrays.fill(ch.biome, (byte)Biomes.PLAINS);
+      Arrays.fill(ch.grassColor, gCol);
+      Arrays.fill(ch.foliageColor, fCol);
+
+      File preDir = resolvePrebuiltMapDir(this.mode, this.mapId);
+      if (preDir == null && (Math.abs(cx) > 4 || Math.abs(cz) > 4)) {
+         return ch;
       }
 
       if (this.mode == WorldSettings.SKYBLOCK) {
@@ -1553,14 +1581,15 @@ public final class SkyGen extends Gen {
          generateMurder(ch);
       }
 
-      loadCustomChunkIfPresent(ch);
+      if (preDir != null) {
+         loadCustomChunkIfPresent(ch, preDir);
+      }
       ch.computeHeightmap();
       return ch;
    }
 
    /** If a custom prebuilt map folder is active (or a matching folder in maps/ exists), overlays its saved chunk blocks. */
-   private void loadCustomChunkIfPresent(Chunk ch) {
-      File dir = resolvePrebuiltMapDir(this.mode, this.mapId);
+   private void loadCustomChunkIfPresent(Chunk ch, File dir) {
       if (dir == null) {
          return;
       }
@@ -1575,23 +1604,40 @@ public final class SkyGen extends Gen {
    }
 
    public static File resolvePrebuiltMapDir(int mode, int mapId) {
-      if (customMapName != null && !customMapName.isBlank()) {
-         File f1 = new File("maps/" + customMapName);
+      long now = System.nanoTime();
+      String curCustom = customMapName == null ? "" : customMapName;
+      if (mode == cachedPrebuiltMode
+         && mapId == cachedPrebuiltMapId
+         && curCustom.equals(cachedPrebuiltCustomName)
+         && (now - cachedPrebuiltCheckNs) < 2_000_000_000L) {
+         return cachedPrebuiltDir;
+      }
+      File found = null;
+      if (!curCustom.isBlank()) {
+         File f1 = new File("maps/" + curCustom);
          if (f1.isDirectory()) {
-            return f1;
-         }
-         File f2 = new File("saves/" + customMapName);
-         if (f2.isDirectory()) {
-            return f2;
+            found = f1;
+         } else {
+            File f2 = new File("saves/" + curCustom);
+            if (f2.isDirectory()) {
+               found = f2;
+            }
          }
       }
-      String modeSlug = mode == WorldSettings.TUMBLE ? "tumble" : (mode == WorldSettings.BEDWARS ? "bedwars" : "battle");
-      String mapSlug = WorldSettings.MAP_NAMES[Math.max(0, Math.min(WorldSettings.MAP_COUNT - 1, mapId))].toLowerCase();
-      File autoDir = new File("maps/" + modeSlug + "_" + mapSlug);
-      if (autoDir.isDirectory()) {
-         return autoDir;
+      if (found == null) {
+         String modeSlug = mode == WorldSettings.TUMBLE ? "tumble" : (mode == WorldSettings.BEDWARS ? "bedwars" : "battle");
+         String mapSlug = WorldSettings.MAP_NAMES[Math.max(0, Math.min(WorldSettings.MAP_COUNT - 1, mapId))].toLowerCase();
+         File autoDir = new File("maps/" + modeSlug + "_" + mapSlug);
+         if (autoDir.isDirectory()) {
+            found = autoDir;
+         }
       }
-      return null;
+      cachedPrebuiltMode = mode;
+      cachedPrebuiltMapId = mapId;
+      cachedPrebuiltCustomName = curCustom;
+      cachedPrebuiltCheckNs = now;
+      cachedPrebuiltDir = found;
+      return found;
    }
 
    public static boolean saveCustomArenaMap(World w, String name) {
@@ -1808,6 +1854,9 @@ public final class SkyGen extends Gen {
    }
 
    private void generateSkywars(Chunk ch) {
+      if (Math.abs(ch.cx) > 4 || Math.abs(ch.cz) > 4) {
+         return;
+      }
       // Console Edition BATTLE Mini Game Arena with 4 Architecturally Distinct Maps: Cove (0), Crucible (1), Cavern (2), Temple (3)!
       int topId = switch (this.mapId) {
          case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHERRACK;
@@ -2081,6 +2130,9 @@ public final class SkyGen extends Gen {
    }
 
    private void generateBedwars(Chunk ch) {
+      if (Math.abs(ch.cx) > 4 || Math.abs(ch.cz) > 4) {
+         return;
+      }
       // BEDWARS with 4 Architecturally Distinct Multi-Level Maps: Cove (0), Crucible (1), Cavern (2), Temple (3)!
       int centerTop = switch (this.mapId) {
          case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
@@ -2540,7 +2592,7 @@ public final class SkyGen extends Gen {
       if (g == null || g.mobs == null || w == null || w.settings == null || !soloBots || Net319.isClientConnected()) {
          return;
       }
-      w.ensureArenaChunksLoaded();
+      ensureArenaChunksLoadedOnce(w);
       int type = w.settings.type;
       if (type == WorldSettings.TUMBLE) {
          if (!tumbleSpawnedBots || (w.tickCount < 20L && countHostiles(g) == 0)) {
@@ -3015,11 +3067,13 @@ public final class SkyGen extends Gen {
       GL11.glPushMatrix();
       GL11.glTranslated(x - r.camX, y - r.camY, z - r.camZ);
       PlayerModel.draw(Net319.skinPixels(skinIdx), (skinIdx & 1) == 1, pose, bright);
-      String tag = (w.settings != null && w.settings.type == WorldSettings.MURDER)
-         ? botDisplayName(bot)
-         : (botDisplayName(bot) + " (" + Math.max(0, bot.health) + "HP)");
-      float hpFrac = (w.settings != null && w.settings.type == WorldSettings.MURDER) ? 1.0F : Math.max(0.0F, bot.health / 20.0F);
-      Net319.drawNameTag(r, tag, 2.16F, col, hpFrac);
+      if (!bot.dead) {
+         String tag = (w.settings != null && w.settings.type == WorldSettings.MURDER)
+            ? botDisplayName(bot)
+            : (botDisplayName(bot) + " (" + Math.max(0, bot.health) + "HP)");
+         float hpFrac = (w.settings != null && w.settings.type == WorldSettings.MURDER) ? 1.0F : Math.max(0.0F, bot.health / 20.0F);
+         Net319.drawNameTag(r, tag, 2.16F, col, hpFrac);
+      }
       GL11.glPopMatrix();
    }
 
@@ -3242,24 +3296,48 @@ public final class SkyGen extends Gen {
       }
 
       // 3. Scan nearby surroundings (within 9 blocks) for unlooted Chests on safe ground
+      int modeType = w.settings == null ? -1 : w.settings.type;
+      if (modeType == WorldSettings.CS2 || modeType == WorldSettings.MURDER || modeType == WorldSettings.TUMBLE) {
+         return null;
+      }
       int bbx = (int)Math.floor(bot.x);
       int bby = (int)Math.floor(bot.y);
       int bbz = (int)Math.floor(bot.z);
       int bestCx = 0, bestCy = -1, bestCz = 0;
       double bestChestD = 999.0;
-      for (int dz = -9; dz <= 9; dz++) {
-         for (int dx = -9; dx <= 9; dx++) {
-            for (int dy = -2; dy <= 3; dy++) {
-               int cx = bbx + dx;
-               int cy = bby + dy;
-               int cz = bbz + dz;
-               if (hasChestItemsAt(w, cx, cy, cz)) {
-                  double d = Math.hypot(cx + 0.5 - bot.x, cz + 0.5 - bot.z);
-                  if (d < bestChestD && Math.hypot(cx + 0.5 - enemyX, cz + 0.5 - enemyZ) > 6.0) {
+      if (!w.tiles.isEmpty()) {
+         for (TileEntity te : w.tiles.values()) {
+            if (te == null || te.type != 0) {
+               continue;
+            }
+            if (Math.abs(te.x - bbx) <= 9 && Math.abs(te.z - bbz) <= 9 && te.y >= bby - 2 && te.y <= bby + 3) {
+               if (hasChestItemsAt(w, te.x, te.y, te.z)) {
+                  double d = Math.hypot(te.x + 0.5 - bot.x, te.z + 0.5 - bot.z);
+                  if (d < bestChestD && Math.hypot(te.x + 0.5 - enemyX, te.z + 0.5 - enemyZ) > 6.0) {
                      bestChestD = d;
-                     bestCx = cx;
-                     bestCy = cy;
-                     bestCz = cz;
+                     bestCx = te.x;
+                     bestCy = te.y;
+                     bestCz = te.z;
+                  }
+               }
+            }
+         }
+      }
+      if (bestCy < 0 && (bot.age & 7) == (bSlot & 7)) {
+         for (int dz = -6; dz <= 6; dz++) {
+            for (int dx = -6; dx <= 6; dx++) {
+               for (int dy = -1; dy <= 2; dy++) {
+                  int cx = bbx + dx;
+                  int cy = bby + dy;
+                  int cz = bbz + dz;
+                  if (hasChestItemsAt(w, cx, cy, cz)) {
+                     double d = Math.hypot(cx + 0.5 - bot.x, cz + 0.5 - bot.z);
+                     if (d < bestChestD && Math.hypot(cx + 0.5 - enemyX, cz + 0.5 - enemyZ) > 6.0) {
+                        bestChestD = d;
+                        bestCx = cx;
+                        bestCy = cy;
+                        bestCz = cz;
+                     }
                   }
                }
             }
@@ -3384,17 +3462,17 @@ public final class SkyGen extends Gen {
          double bestPadD = 99.0;
          int bestPx = 0;
          int bestPz = 0;
-         for (int dz = -7; dz <= 7; dz++) {
-            for (int dx = -7; dx <= 7; dx++) {
-               int px = bbx + dx;
-               int pz = bbz + dz;
-               if (w.getBlock(px, bby - 1, pz) == Redstone319.SLIME_BLOCK || w.getBlock(px, Y_DECK, pz) == Redstone319.SLIME_BLOCK) {
-                  double pd = Math.hypot(px + 0.5 - bot.x, pz + 0.5 - bot.z);
-                  if (pd < bestPadD) {
-                     bestPadD = pd;
-                     bestPx = px;
-                     bestPz = pz;
-                  }
+         int[][] knownPads = new int[][]{{-3, -3}, {3, -3}, {-3, 3}, {3, 3}, {-9, -9}, {9, -9}, {-9, 9}, {9, 9}};
+         for (int[] kp : knownPads) {
+            int px = kp[0];
+            int pz = kp[1];
+            if (Math.abs(px - bbx) <= 8 && Math.abs(pz - bbz) <= 8
+               && (w.getBlock(px, bby - 1, pz) == Redstone319.SLIME_BLOCK || w.getBlock(px, Y_DECK, pz) == Redstone319.SLIME_BLOCK)) {
+               double pd = Math.hypot(px + 0.5 - bot.x, pz + 0.5 - bot.z);
+               if (pd < bestPadD) {
+                  bestPadD = pd;
+                  bestPx = px;
+                  bestPz = pz;
                }
             }
          }
@@ -3440,6 +3518,9 @@ public final class SkyGen extends Gen {
             if (score > bestSafetyScore) {
                bestSafetyScore = score;
                bestYaw = candYaw;
+            }
+            if (score >= 155) {
+               break;
             }
          } else if (Math.abs(off) <= 25.0F && bot.onGround && dist > 2.2 && (ok2 || ok3)) {
             // Parkour jump across a 1-2 block gap with confirmed landing on the far side!
@@ -4482,8 +4563,8 @@ public final class SkyGen extends Gen {
       if (g == null || w == null || w.settings == null || !w.settings.isMinigame()) {
          return;
       }
-      // Ensure all 9x9 arena chunks (-4..4 x -4..4) are generated and resident while players wait in the lobby
-      w.ensureArenaChunksLoaded();
+      // Ensure all 11x11 arena chunks (-5..5 x -5..5) are generated and resident while players wait in the lobby
+      ensureArenaChunksLoadedOnce(w);
       if (showingOverview) {
          if (overviewCountdownTicks > 0) {
             overviewCountdownTicks--;

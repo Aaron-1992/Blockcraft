@@ -132,6 +132,28 @@ public final class Chunk {
       this.light[var5] = (byte)(this.light[var5] & 240 | var4);
    }
 
+   public boolean isSectionEmpty(int sy) {
+      int base = sy << 12;
+      int end = base + 4096;
+      short[] b = this.blocks;
+      for (int i = base; i < end; i++) {
+         if (b[i] != 0) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+   public boolean isChunkEmpty() {
+      short[] b = this.blocks;
+      for (int i = 0; i < b.length; i++) {
+         if (b[i] != 0) {
+            return false;
+         }
+      }
+      return true;
+   }
+
    public void computeHeightmap() {
       for (int var1 = 0; var1 < 16; var1++) {
          for (int var2 = 0; var2 < 16; var2++) {

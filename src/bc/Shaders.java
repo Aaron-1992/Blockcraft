@@ -1512,7 +1512,7 @@ public final class Shaders {
       this.csAmt = Math.max(0.0F, Math.min(1.0F, (sy - 0.15F) / 0.25F)) * 0.92F;
       boolean recentre = !this.csHave || Math.abs(camX - this.csCx) > 64.0 || Math.abs(camZ - this.csCz) > 64.0;
       this.csFrame++;
-      if (!recentre && this.csFrame % 3 != 0) {
+      if (!recentre && this.csFrame % 8 != 0) {
          return;
       }
 

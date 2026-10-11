@@ -1438,6 +1438,15 @@ final class Tests319 {
          check(!removedOnWall && shotAr.stuck, "Bullet arrow embeds in solid wall on impact without disappearing immediately");
          check(shotAr.vz > 0.0, "Embedded arrow preserves non-zero flight heading vector for 3D rendering");
          bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 2, 0);
+
+         // Verify 11x11 arena + border ring (-5..5) stays resident, outer void chunks fast-path, and updateChunks never overwrites resident chunks
+         bwGame.world.ensureArenaChunksLoaded();
+         check(bwGame.world.chunk(-5, -5) != null && bwGame.world.chunk(5, 5) != null && bwGame.world.chunk(5, 5).lit,
+            "1-chunk border ring (-5..5) around minigame arena is loaded and lit so outer arena chunks can mesh immediately");
+         Chunk centerBefore = bwGame.world.chunk(0, 0);
+         bwGame.world.updateChunks(0, 0, 12, 64, 10_000_000L);
+         check(bwGame.world.chunk(0, 0) == centerBefore, "updateChunks preserves already-resident arena chunk instances");
+         check(bwGame.world.chunk(8, 8) == null, "Void mode updateChunks clamps background chunk loading to the -5..5 arena bounds");
       });
    }
 }

@@ -1230,24 +1230,36 @@ public final class Lod {
    }
 
    boolean covered(int var1, int var2) {
-      Lod.Tile var3 = this.tile(32, var1, var2);
-      var3.lastUse = this.frame;
-      if (var3.coverFrame != 0L && this.frame - var3.coverFrame < 15L) {
-         return var3.covered;
+      return this.coveredBox(var1, var2, 32);
+   }
+
+   boolean coveredBox(int var1, int var2, int size) {
+      Lod.Tile var3 = (Lod.Tile)this.tiles.get(key(size, var1, var2));
+      if (var3 != null) {
+         var3.lastUse = this.frame;
+         if (var3.coverFrame != 0L && this.frame - var3.coverFrame < 15L) {
+            return var3.covered;
+         }
       }
 
       boolean var4 = true;
+      int cx0 = var1 >> 4;
+      int cx1 = (var1 + size - 1) >> 4;
+      int cz0 = var2 >> 4;
+      int cz1 = (var2 + size - 1) >> 4;
 
-      for (int var5 = var1 >> 4; var4 && var5 <= var1 + 32 - 1 >> 4; var5++) {
-         for (int var6 = var2 >> 4; var4 && var6 <= var2 + 32 - 1 >> 4; var6++) {
+      for (int var5 = cx0; var4 && var5 <= cx1; var5++) {
+         for (int var6 = cz0; var4 && var6 <= cz1; var6++) {
             if (!this.rend.chunkMeshed(var5, var6)) {
                var4 = false;
             }
          }
       }
 
-      var3.coverFrame = this.frame;
-      var3.covered = var4;
+      if (var3 != null) {
+         var3.coverFrame = this.frame;
+         var3.covered = var4;
+      }
       return var4;
    }
 
@@ -1262,19 +1274,22 @@ public final class Lod {
       double scale = Math.max(rdScale, rdScale * 0.65 + lodScale * 0.35);
       if (tileSize == 64) {
          // 64 -> 32 (highest-detail 1x1 block LOD): reaches far beyond real chunks and scales with render distance
-         return Math.max(this.innerHalf + Math.max(176.0, this.innerHalf * 1.6), 64.0 * 3.4 * scale);
+         return Math.max(this.innerHalf + Math.max(176.0, this.innerHalf * 1.45), 64.0 * 3.1 * scale);
       }
       if (tileSize == 128) {
          // 128 -> 64 (high-detail 2x2 block LOD with full trees, trunks, and village roofs)
-         return Math.max(this.innerHalf + Math.max(352.0, this.innerHalf * 2.6), 128.0 * 2.9 * scale);
+         return Math.max(this.innerHalf + Math.max(288.0, this.innerHalf * 2.1), 128.0 * 2.6 * scale);
       }
-      return Math.max(this.innerHalf + tileSize * 1.35, tileSize * 2.4 * scale);
+      return Math.max(this.innerHalf + tileSize * 1.2, tileSize * 2.15 * scale);
    }
 
    void visit(int var1, int var2, int var3) {
       double var4 = this.nearest(var1, var2, var3);
       if (!(var4 > this.maxDist)) {
-         if (var3 == 32 && this.covered(var1, var2)) {
+         if (var3 == 32 && this.coveredBox(var1, var2, 32)) {
+            return;
+         }
+         if (var3 <= 128 && this.insideInner(var1, var2, var3) && this.coveredBox(var1, var2, var3)) {
             return;
          }
          if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.72F + 28.0F)) {
@@ -1291,30 +1306,20 @@ public final class Lod {
                      int px0 = Math.floorDiv(var1, pSize) * pSize;
                      int pz0 = Math.floorDiv(var2, pSize) * pSize;
                      Lod.Tile anc = (Lod.Tile)this.tiles.get(key(pSize, px0, pz0));
-                     if (anc != null && ready(anc) && this.nearest(px0, pz0, pSize) >= this.innerHalf && !this.drawList.contains(anc)) {
+                     if (anc != null && ready(anc) && anc.lastUse != this.frame && this.nearest(px0, pz0, pSize) >= this.innerHalf) {
                         anc.lastUse = this.frame;
                         this.drawList.add(anc);
                      }
                   }
                }
             } else {
-               int var7 = var3 / 2;
-               int[][] var8 = new int[][]{{var1, var2}, {var1 + var7, var2}, {var1, var2 + var7}, {var1 + var7, var2 + var7}};
-               // Sort the 4 quadrants nearest-first to the camera so foreground LOD rings build first
-               for (int i = 0; i < 3; i++) {
-                  for (int j = i + 1; j < 4; j++) {
-                     double di = this.nearest(var8[i][0], var8[i][1], var7);
-                     double dj = this.nearest(var8[j][0], var8[j][1], var7);
-                     if (dj < di) {
-                        int[] tmp = var8[i];
-                        var8[i] = var8[j];
-                        var8[j] = tmp;
-                     }
-                  }
-               }
-               for (int[] child : var8) {
-                  this.visit(child[0], child[1], var7);
-               }
+               int var7 = var3 >> 1;
+               int sx = this.cx >= var1 + var7 ? var7 : 0;
+               int sz = this.cz >= var2 + var7 ? var7 : 0;
+               this.visit(var1 + sx, var2 + sz, var7);
+               this.visit(var1 + (var7 - sx), var2 + sz, var7);
+               this.visit(var1 + sx, var2 + (var7 - sz), var7);
+               this.visit(var1 + (var7 - sx), var2 + (var7 - sz), var7);
             }
          }
       }

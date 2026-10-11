@@ -193,7 +193,9 @@ public final class Renderer {
       if (this.inflight.get() < var3) {
          int var4 = (int)Math.floor(this.camX) >> 4;
          int var5 = (int)Math.floor(this.camZ) >> 4;
-         int var6 = this.g.opt.renderDistance;
+         boolean isPano = this.g.pano != null && var1 == this.g.pano.world;
+         boolean isVoid = var1.settings != null && var1.settings.isVoidMode();
+         int var6 = isPano ? Math.min(4, this.g.opt.renderDistance) : (isVoid ? Math.min(5, this.g.opt.renderDistance) : this.g.opt.renderDistance);
          int var7 = (var6 + 1) * (var6 + 1);
          boolean var8 = this.g.opt.smooth;
          int var9 = 0;
@@ -216,6 +218,23 @@ public final class Renderer {
 
                         if (!var15) {
                            continue label56;
+                        }
+
+                        if (var14.isSectionEmpty(var17)) {
+                           var18.dirty = false;
+                           var18.conn = CaveCull.ALL;
+                           var18.nO = 0;
+                           var18.nT = 0;
+                           var14.markMeshed(var17);
+                           if (var18.vboO != 0) {
+                              GL15.glDeleteBuffers(var18.vboO);
+                              var18.vboO = 0;
+                           }
+                           if (var18.vboT != 0) {
+                              GL15.glDeleteBuffers(var18.vboT);
+                              var18.vboT = 0;
+                           }
+                           continue;
                         }
 
                         if (var9 >= var2 || this.inflight.get() >= var3) {
@@ -356,9 +375,21 @@ public final class Renderer {
    }
 
    public void meshNow(World var1, int var2, int var3, int var4) {
-      for (int var5 = -1; var5 <= 1; var5++) {
-         for (int var6 = -1; var6 <= 1; var6++) {
-            for (int var7 = -1; var7 <= 1; var7++) {
+      int lx = var2 & 15;
+      int ly = var3 & 15;
+      int lz = var4 & 15;
+      int minDx = lx == 0 ? -1 : 0;
+      int maxDx = lx == 15 ? 1 : 0;
+      int minDy = ly == 0 ? -1 : 0;
+      int maxDy = ly == 15 ? 1 : 0;
+      int minDz = lz == 0 ? -1 : 0;
+      int maxDz = lz == 15 ? 1 : 0;
+      for (int var5 = minDx; var5 <= maxDx; var5++) {
+         for (int var6 = minDz; var6 <= maxDz; var6++) {
+            for (int var7 = minDy; var7 <= maxDy; var7++) {
+               if (Math.abs(var5) + Math.abs(var6) + Math.abs(var7) > 1) {
+                  continue;
+               }
                int var8 = var2 + var5 * 16;
                int var9 = var3 + var7 * 16;
                int var10 = var4 + var6 * 16;
@@ -369,7 +400,22 @@ public final class Renderer {
                      Section var13 = var11.sections[var12];
                      if (var13.dirty && !var13.inFlight && this.ready(var1, var11)) {
                         var13.dirty = false;
-                        this.upload(var11, var12, Mesher.build(var1, var11, var12, this.g.opt.smooth));
+                        if (var11.isSectionEmpty(var12)) {
+                           var13.conn = CaveCull.ALL;
+                           var13.nO = 0;
+                           var13.nT = 0;
+                           var11.markMeshed(var12);
+                           if (var13.vboO != 0) {
+                              GL15.glDeleteBuffers(var13.vboO);
+                              var13.vboO = 0;
+                           }
+                           if (var13.vboT != 0) {
+                              GL15.glDeleteBuffers(var13.vboT);
+                              var13.vboT = 0;
+                           }
+                        } else {
+                           this.upload(var11, var12, Mesher.build(var1, var11, var12, this.g.opt.smooth));
+                        }
                      }
                   }
                }
@@ -930,7 +976,8 @@ public final class Renderer {
             this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
          }
 
-         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
+         int lodInner = (this.g.pano != null && var5 == this.g.pano.world) ? Math.min(4, var13) : var13;
+         this.lod.render(this.camX, this.camY, this.camZ, var15, lodInner, this.skyLightFactor);
          if (var29) {
             this.sh.stopLod();
          }
@@ -1059,24 +1106,36 @@ public final class Renderer {
       ArrayList<float[]> var5 = new ArrayList<>();
       int var6 = (int)Math.floor(this.camX) >> 4;
       int var7 = (int)Math.floor(this.camZ) >> 4;
+      int syLo = var3 >> 4;
+      int syHi = var4 >> 4;
 
       for (int var8 = -2; var8 <= 2; var8++) {
          for (int var9 = -2; var9 <= 2; var9++) {
             Chunk var10 = this.g.world.chunk(var6 + var9, var7 + var8);
             if (var10 != null) {
-               for (int var11 = var3; var11 <= var4; var11++) {
-                  for (int var12 = 0; var12 < 16; var12++) {
-                     for (int var13 = 0; var13 < 16; var13++) {
-                        int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
-                        if (var14 != 0 && Blocks.emit[var14] >= 7) {
-                           float var15 = var10.cx * 16 + var13 + 0.5F;
-                           float var16 = var10.cz * 16 + var12 + 0.5F;
-                           float var17 = (float)(var15 - this.camX);
-                           float var18 = (float)(var16 - this.camZ);
-                           float var19 = (float)(var11 + 0.5 - this.camY);
-                           float var20 = var17 * var17 + var19 * var19 + var18 * var18;
-                           if (!(var20 > 576.0F)) {
-                              var5.add(new float[]{var15, var11 + 0.5F, var16, var14, var20});
+               for (int sy = syLo; sy <= syHi; sy++) {
+                  if (var10.isSectionEmpty(sy)) {
+                     continue;
+                  }
+                  int yStart = Math.max(var3, sy << 4);
+                  int yEnd = Math.min(var4, (sy << 4) + 15);
+                  for (int var11 = yStart; var11 <= yEnd; var11++) {
+                     for (int var12 = 0; var12 < 16; var12++) {
+                        for (int var13 = 0; var13 < 16; var13++) {
+                           int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
+                           if (var14 != 0 && Blocks.emit[var14] >= 7) {
+                              if (Blocks.isLava(var14) && ((var13 + var12) & 3) != 0) {
+                                 continue;
+                              }
+                              float var15 = var10.cx * 16 + var13 + 0.5F;
+                              float var16 = var10.cz * 16 + var12 + 0.5F;
+                              float var17 = (float)(var15 - this.camX);
+                              float var18 = (float)(var16 - this.camZ);
+                              float var19 = (float)(var11 + 0.5 - this.camY);
+                              float var20 = var17 * var17 + var19 * var19 + var18 * var18;
+                              if (!(var20 > 576.0F)) {
+                                 var5.add(new float[]{var15, var11 + 0.5F, var16, var14, var20});
+                              }
                            }
                         }
                      }
@@ -1270,7 +1329,9 @@ public final class Renderer {
       GL11.glBindTexture(3553, Tex.atlas);
       int var3 = (int)Math.floor(this.camX) >> 4;
       int var4 = (int)Math.floor(this.camZ) >> 4;
-      int var5 = 9;
+      boolean isVoidShadow = this.g.world != null && this.g.world.settings != null && this.g.world.settings.isVoidMode();
+      boolean isPanoShadow = this.g.pano != null && this.g.world == this.g.pano.world;
+      int var5 = Math.min(9, isPanoShadow ? Math.min(4, this.g.opt.renderDistance) : (isVoidShadow ? 5 : this.g.opt.renderDistance));
       // Update 3.18: only what can land inside the map is drawn into it (the map is a 168 m square of light space: the 19 x 19 chunks round the player were
       // 90 000 m2, with the vertices of every section, underground ones too, going through the vertex shader to be clipped away) - same picture, a third of the work
       float[] sm = this.sh.shadowM;

@@ -1029,29 +1029,31 @@ public final class Tex {
       float pos = animPos(var0, partial);
       int f0 = (int)Math.floor(pos);
       float w = pos - f0;
-      int step = Math.min(15, (int)(w * 16.0F));
+      int step = Math.min(15, (int)(w * 16.0F)) & ~1;
       int key = (f0 & 15) * 16 + step;
       if (key != lastBlendKey) {
          lastBlendKey = key;
          float mix = step / 16.0F;
          int a = f0 & 15;
          int b = a + 1 & 15;
+         boolean mips = (step & 3) == 0;
          GL11.glBindTexture(3553, atlas);
-         upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix));
-         upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix));
-         upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix));
-         upload(tx(TexArt312.PORTAL), ty(TexArt312.PORTAL), blendFrames(TexArt312.portalFrames[a], TexArt312.portalFrames[b], mix));
+         upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix), mips);
+         upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix), mips);
+         upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix), mips);
+         upload(tx(TexArt312.PORTAL), ty(TexArt312.PORTAL), blendFrames(TexArt312.portalFrames[a], TexArt312.portalFrames[b], mix), mips);
       }
    }
 
-   private static void upload(int x, int y, int[] pixels) {
+   private static void upload(int x, int y, int[] pixels, boolean mips) {
       int[] cur = pixels;
       int size = 16;
-      for (int level = 0; level <= 3; level++) {
+      int maxLevel = mips ? 3 : 0;
+      for (int level = 0; level <= maxLevel; level++) {
          ByteBuffer buf = toBuffer(cur);
          GL11.glTexSubImage2D(3553, level, x >> level, y >> level, size, size, 6408, 5121, buf);
          MemoryUtil.memFree(buf);
-         if (level < 3) {
+         if (level < maxLevel) {
             cur = downsampleTile(cur, size);
             size >>= 1;
          }

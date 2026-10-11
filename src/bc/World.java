@@ -245,11 +245,13 @@ public final class World {
 
    public void updateChunks(int var1, int var2, int var3, int var4, long var5) {
       boolean isVoidArena = this.settings != null && this.settings.isVoidMode();
+      int maxVoidCoord = 5;
       int var7 = this.requested.size();
       int var8 = genThreads() * 4;
       long var9 = System.nanoTime();
       if (var7 < var8) {
-         int var11 = (var3 + 1) * (var3 + 1) + 2;
+         int effR = isVoidArena ? Math.min(var3, maxVoidCoord) : var3;
+         int var11 = (effR + 1) * (effR + 1) + 2;
          int var12 = 0;
 
          for (int[] var16 : ORDER) {
@@ -259,7 +261,11 @@ public final class World {
 
             int var17 = var1 + var16[0];
             int var18 = var2 + var16[1];
-            if (!this.chunks.containsKey(key(var17, var18)) && !this.requested.contains(key(var17, var18))) {
+            if (isVoidArena && (Math.abs(var17) > maxVoidCoord || Math.abs(var18) > maxVoidCoord)) {
+               continue;
+            }
+            long reqKey = key(var17, var18);
+            if (!this.chunks.containsKey(reqKey) && !this.requested.contains(reqKey)) {
                this.requestChunk(var17, var18);
                if (++var12 + var7 >= var8) {
                   break;
@@ -274,10 +280,17 @@ public final class World {
             break;
          }
 
-         this.requested.remove(key(var22.cx, var22.cz));
-         boolean inArenaBounds = isVoidArena && Math.abs(var22.cx) <= 4 && Math.abs(var22.cz) <= 4;
+         long readyKey = key(var22.cx, var22.cz);
+         this.requested.remove(readyKey);
+         if (this.chunks.containsKey(readyKey)) {
+            continue;
+         }
+         if (isVoidArena && (Math.abs(var22.cx) > maxVoidCoord || Math.abs(var22.cz) > maxVoidCoord)) {
+            continue;
+         }
+         boolean inArenaBounds = isVoidArena && Math.abs(var22.cx) <= maxVoidCoord && Math.abs(var22.cz) <= maxVoidCoord;
          if (inArenaBounds || Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
-            this.chunks.put(key(var22.cx, var22.cz), var22);
+            this.chunks.put(readyKey, var22);
             this.fire.scanChunk(var22);
             this.lightChunk(var22);
 
@@ -295,10 +308,11 @@ public final class World {
       }
 
       for (Chunk var23 : this.chunks.values()) {
-         if (isVoidArena && Math.abs(var23.cx) <= 4 && Math.abs(var23.cz) <= 4) {
-            continue; // Never unload active minigame arena chunks (-4..4 x -4..4)
+         if (isVoidArena && Math.abs(var23.cx) <= maxVoidCoord && Math.abs(var23.cz) <= maxVoidCoord) {
+            continue; // Never unload active minigame arena chunks (-5..5 x -5..5)
          }
-         if (Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3) {
+         if ((isVoidArena && (Math.abs(var23.cx) > maxVoidCoord || Math.abs(var23.cz) > maxVoidCoord))
+            || Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3) {
             if (var23.modified) {
                this.saveChunk(var23);
             }
@@ -332,13 +346,13 @@ public final class World {
       return fresh;
    }
 
-   /** Ensures all 9x9 minigame arena chunks (-4..4 x -4..4) are resident so AI bots, beds, and chests never unload. */
+   /** Ensures all 11x11 minigame arena chunks (-5..5 x -5..5, including border ring) are resident and lit. */
    public void ensureArenaChunksLoaded() {
       if (this.settings == null || !this.settings.isVoidMode()) {
          return;
       }
-      for (int cz = -4; cz <= 4; cz++) {
-         for (int cx = -4; cx <= 4; cx++) {
+      for (int cz = -5; cz <= 5; cz++) {
+         for (int cx = -5; cx <= 5; cx++) {
             if (this.chunk(cx, cz) == null) {
                this.ensureChunkLoaded(cx, cz);
             }
@@ -529,6 +543,7 @@ public final class World {
    }
 
    private void propagate(boolean var1) {
+      int minLightY = (this.settings != null && this.settings.isVoidMode()) ? 44 : 0;
       Chunk lastC = null;
       int lastCx = Integer.MIN_VALUE;
       int lastCz = Integer.MIN_VALUE;
@@ -552,7 +567,7 @@ public final class World {
                   int var10 = var4 + DX[var9];
                   int var11 = var5 + DY[var9];
                   int var12 = var6 + DZ[var9];
-                  if (var11 >= 0 && var11 <= 255) {
+                  if (var11 >= minLightY && var11 <= 255) {
                      int ncx = var10 >> 4;
                      int ncz = var12 >> 4;
                      Chunk var13;
@@ -596,6 +611,7 @@ public final class World {
    }
 
    private void removeLight(boolean var1, int var2, int var3, int var4, int var5) {
+      int minLightY = (this.settings != null && this.settings.isVoidMode()) ? 44 : 0;
       Chunk var6 = this.chunkAt(var2, var4);
       if (var1) {
          var6.setSky(var2 & 15, var3, var4 & 15, 0);
@@ -619,7 +635,7 @@ public final class World {
             int var14 = var10 + DX[var13];
             int var15 = var11 + DY[var13];
             int var16 = var12 + DZ[var13];
-            if (var15 >= 0 && var15 <= 255) {
+            if (var15 >= minLightY && var15 <= 255) {
                int ncx = var14 >> 4;
                int ncz = var16 >> 4;
                if (ncx != lastCx || ncz != lastCz) {
@@ -660,13 +676,27 @@ public final class World {
          this.chunk(var1.cx + 1, var1.cz), this.chunk(var1.cx - 1, var1.cz), this.chunk(var1.cx, var1.cz + 1), this.chunk(var1.cx, var1.cz - 1)
       };
 
+      boolean isVoid = this.settings != null && this.settings.isVoidMode();
+      if (isVoid && this.dim == Dim.OVERWORLD && var1.isChunkEmpty()) {
+         Arrays.fill(var1.light, (byte)0xF0);
+         this.pullNeighbors(var1, false, var4);
+         this.propagate(false);
+         var1.lit = true;
+         for (Section var25 : var1.sections) {
+            var25.dirty = true;
+         }
+         this.markBounds();
+         return;
+      }
+
       if (this.dim == Dim.OVERWORLD) {
+         int voidMinY = isVoid ? 44 : 0;
          // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
          for (int var5 = 0; var5 < 16; var5++) {
             for (int var6 = 0; var6 < 16; var6++) {
                int var7 = var1.hm[var5 * 16 + var6];
 
-               for (int var8 = var7 + 1; var8 < 256; var8++) {
+               for (int var8 = Math.max(voidMinY, var7 + 1); var8 < 256; var8++) {
                   var1.setSky(var6, var8, var5, 15);
                }
 
@@ -688,8 +718,9 @@ public final class World {
                }
 
                int var26 = Math.min(255, Math.max(var7 + 1, var21));
+               int seedStartY = isVoid ? Math.max(44, var7 + 1) : (var7 + 1);
 
-               for (int var28 = var7 + 1; var28 <= var26; var28++) {
+               for (int var28 = seedStartY; var28 <= var26; var28++) {
                   this.addQ.add(pack(var2 + var6, var28, var3 + var5));
                }
             }
@@ -701,14 +732,21 @@ public final class World {
 
       short[] var16 = var1.blocks;
 
-      for (int var17 = 0; var17 < var16.length; var17++) {
-         int var19 = Blocks.emit[var16[var17] & 0xFFFF];
-         if (var19 > 0) {
-            var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
-            int var22 = var17 >> 8;
-            int var24 = var17 >> 4 & 15;
-            int var27 = var17 & 15;
-            this.addQ.add(pack(var2 + var27, var22, var3 + var24));
+      for (int sy = 0; sy < 16; sy++) {
+         if (var1.isSectionEmpty(sy)) {
+            continue;
+         }
+         int baseIdx = sy << 12;
+         int endIdx = baseIdx + 4096;
+         for (int var17 = baseIdx; var17 < endIdx; var17++) {
+            int var19 = Blocks.emit[var16[var17] & 0xFFFF];
+            if (var19 > 0) {
+               var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
+               int var22 = var17 >> 8;
+               int var24 = var17 >> 4 & 15;
+               int var27 = var17 & 15;
+               this.addQ.add(pack(var2 + var27, var22, var3 + var24));
+            }
          }
       }
 
@@ -724,10 +762,13 @@ public final class World {
    }
 
    private void pullNeighbors(Chunk var1, boolean var2, Chunk[] var3) {
+      boolean isVoid = this.settings != null && this.settings.isVoidMode();
+      int yLo = isVoid ? 44 : 0;
+      int yHi = isVoid ? 120 : 256;
       for (int var4 = 0; var4 < 4; var4++) {
          Chunk var5 = var3[var4];
          if (var5 != null) {
-            for (int var6 = 0; var6 < 256; var6++) {
+            for (int var6 = yLo; var6 < yHi; var6++) {
                for (int var7 = 0; var7 < 16; var7++) {
                   int var8;
                   int var9;
@@ -915,14 +956,17 @@ public final class World {
       if (this.lodMap != null) {
          this.lodMap.sums.clear();
       }
+      boolean isVoidReset = this.settings != null && this.settings.isVoidMode();
       java.util.HashSet<Long> coords = new java.util.HashSet<Long>();
       for (Chunk old : this.chunks.values()) {
          old.unloaded = true;
-         coords.add(key(old.cx, old.cz));
+         if (!isVoidReset || (Math.abs(old.cx) <= 5 && Math.abs(old.cz) <= 5)) {
+            coords.add(key(old.cx, old.cz));
+         }
       }
-      if (this.settings != null && this.settings.isVoidMode()) {
-         for (int cx = -4; cx <= 4; cx++) {
-            for (int cz = -4; cz <= 4; cz++) {
+      if (isVoidReset) {
+         for (int cx = -5; cx <= 5; cx++) {
+            for (int cz = -5; cz <= 5; cz++) {
                coords.add(key(cx, cz));
             }
          }
@@ -1002,14 +1046,15 @@ public final class World {
          }
 
          this.fallers.removeIf(var0 -> var0 == null || var0.dead);
-         if (!remoteClientOnly) {
+         boolean isMinigame = this.settings != null && this.settings.isMinigame();
+         if (!remoteClientOnly && !isMinigame) {
             this.tickCrops();
             this.fire.tick();
          }
          this.trees.tick();
          if (this.dim == Dim.OVERWORLD) {
             // no sky, no weather, no earthquakes in the other dimensions
-            if (!remoteClientOnly) {
+            if (!remoteClientOnly && !isMinigame) {
                this.disasters.tick();
             }
             this.weather.tick();

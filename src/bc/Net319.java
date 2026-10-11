@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
 
 /**
  * Update 3.19: Prototype peer-to-peer / LAN & standalone-server multiplayer.
@@ -2547,9 +2548,6 @@ public final class Net319 {
                         try {
                            if (w.chunkAt(bx, bz) != null) {
                               w.setBlock(bx, by, bz, bid);
-                              if (g != null) {
-                                 g.meshNow(bx, by, bz);
-                              }
                            }
                         } finally {
                            applyingRemote = false;
@@ -3018,7 +3016,7 @@ public final class Net319 {
    private static void drawWorldPingBeacon(Renderer r, WorldPing wp) {
       boolean wasEnt = r.sh != null && r.sh.entityOn;
       if (wasEnt) {
-         r.sh.stopEntity();
+         GL20.glUseProgram(0);
       }
       int[] rgb = new int[]{0xFF5555, 0x55AAFF, 0x55FF55, 0xFFFF55};
       int c = wp.team >= 0 && wp.team < 4 ? rgb[wp.team] : 0x55FFFF;
@@ -3059,7 +3057,7 @@ public final class Net319 {
       drawNameTag(r, "[! " + wp.senderName + " " + dist + "m]", 2.4F, c, -1.0F);
       GL11.glPopMatrix();
       if (wasEnt) {
-         r.sh.useEntity(r.mv, r.camX, r.camY, r.camZ, r.entFogNear, r.entFogFar, r.entFogCol, r.entShadow, r.lastSky, r.lastBlk);
+         GL20.glUseProgram(r.sh.pEntity);
       }
    }
 
@@ -3070,7 +3068,7 @@ public final class Net319 {
 
       boolean wasEnt = r.sh != null && r.sh.entityOn;
       if (wasEnt) {
-         r.sh.stopEntity();
+         GL20.glUseProgram(0);
       }
 
       GL11.glPushMatrix();
@@ -3149,7 +3147,7 @@ public final class Net319 {
       GL11.glDisable(3042);
       GL11.glPopMatrix();
       if (wasEnt) {
-         r.sh.useEntity(r.mv, r.camX, r.camY, r.camZ, r.entFogNear, r.entFogFar, r.entFogCol, r.entShadow, r.lastSky, r.lastBlk);
+         GL20.glUseProgram(r.sh.pEntity);
       }
    }
 
