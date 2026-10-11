@@ -1,4 +1,4 @@
-tag=v4.3
+4.3
 title=Blockcraft Update 4.3 — Major Frame-Rate & Minigame Lag-Spike Optimisations, Void Lighting & Remesh Fixes
 notes=Update 4.3 eliminates overall frame-time overhead and severe lag spikes in gamemodes and menus: boundary-aware synchronous remeshing in Renderer.meshNow (1–4 sections instead of 27), async network block updates, 11x11 resident minigame arena + lit border ring (-5..5) with duplicate-chunk overwrite protection in World.updateChunks, fast-pathed void chunk generation & sky-light propagation, zero-allocation nearest-first LOD quadtree traversal & 4-chunk Title Screen Panorama radius, instant glUseProgram(0) nametag/ping shader switching, TileEntity-indexed AI chest scanning, and disabled lava-spark/disaster ticks in minigames.
 
