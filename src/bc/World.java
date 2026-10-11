@@ -1054,7 +1054,24 @@ public final class World {
       Net319.onPrimeTnt(this, var1, var2, var3, var4);
    }
 
+   public void throwTntGrenade(double x, double y, double z, double vx, double vy, double vz, int fuse) {
+      World.Falling f = new World.Falling();
+      f.x = x;
+      f.y = y;
+      f.z = z;
+      f.px = x;
+      f.py = y;
+      f.pz = z;
+      f.id = 132;
+      f.fuse = fuse;
+      f.vy = vy;
+      SkyGen.registerThrownTnt(f, vx, vz);
+      this.fallers.add(f);
+      Net319.onPrimeTnt(this, (int)Math.floor(x + vx * 8.0), (int)Math.floor(y), (int)Math.floor(z + vz * 8.0), fuse);
+   }
+
    private void tickTnt(World.Falling var1) {
+      SkyGen.tickThrownTntHorizontal(this, var1);
       var1.vy -= 0.04;
       var1.y = var1.y + var1.vy;
       int var2 = (int)Math.floor(var1.x);
@@ -1071,9 +1088,15 @@ public final class World {
          var1.vy *= 0.98;
          if (--var1.fuse <= 0) {
             var1.dead = true;
+            SkyGen.removeThrownTnt(var1);
             if (Net319.isClientConnected() && !Net319.isHosting()) {
                if (this.game != null) {
                   this.game.explosionParticles(var1.x, var1.y + 0.5, var1.z);
+               }
+            } else if (this.settings != null && (this.settings.type == WorldSettings.CS2 || this.settings.type == WorldSettings.MURDER)) {
+               if (this.game != null) {
+                  this.game.explosionParticles(var1.x, var1.y + 0.5, var1.z);
+                  SkyGen.onTntGrenadeDetonate(this.game, this, var1.x, var1.y + 0.5, var1.z);
                }
             } else if (this.game != null) {
                this.game.mobs.blast(var1.x, var1.y + 0.5, var1.z, 4, null);

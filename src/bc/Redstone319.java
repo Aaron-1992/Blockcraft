@@ -83,8 +83,14 @@ final class Redstone319 {
    static final int COMPASS = 456;
    static final int CLOCK = 457;
    static final int FIRE_CHARGE = 458;
+   static final int PISTOL = 459;
+   static final int MACHINE_GUN = 460;
+   static final int SNIPER_RIFLE = 461;
+   static final int TNT_GRENADE = 462;
+   static final int MURDER_KNIFE = 463;
+   static final int C4_BOMB = 464;
 
-   // Atlas tiles (643..687)
+   // Atlas tiles (643..693)
    static final int T_REDSTONE_BLOCK = 643;
    static final int T_LAMP_OFF = 644;
    static final int T_LAMP_ON = 645;
@@ -130,6 +136,12 @@ final class Redstone319 {
    static final int T_PURPUR_PILLAR = 685;
    static final int T_BONE_TOP = 686;
    static final int T_BONE_SIDE = 687;
+   static final int T_PISTOL = 688;
+   static final int T_MACHINE_GUN = 689;
+   static final int T_SNIPER_RIFLE = 690;
+   static final int T_TNT_GRENADE = 691;
+   static final int T_MURDER_KNIFE = 692;
+   static final int T_C4_BOMB = 693;
 
    private static final int[] HDX = {0, 0, 1, -1};
    private static final int[] HDZ = {-1, 1, 0, 0};
@@ -163,6 +175,18 @@ final class Redstone319 {
       Items.defTile(COMPASS, "Compass", T_COMPASS);
       Items.defTile(CLOCK, "Clock", T_CLOCK);
       Items.defTile(FIRE_CHARGE, "Fire Charge", T_FIRE_CHARGE);
+      Items.defTile(PISTOL, "Tactical Pistol", T_PISTOL);
+      Items.maxStack[PISTOL] = 1;
+      Items.defTile(MACHINE_GUN, "Assault SMG", T_MACHINE_GUN);
+      Items.maxStack[MACHINE_GUN] = 1;
+      Items.defTile(SNIPER_RIFLE, "Heavy Sniper", T_SNIPER_RIFLE);
+      Items.maxStack[SNIPER_RIFLE] = 1;
+      Items.defTile(TNT_GRENADE, "TNT Frag Grenade", T_TNT_GRENADE);
+      Items.maxStack[TNT_GRENADE] = 16;
+      Items.defTile(MURDER_KNIFE, "Murderer's Knife", T_MURDER_KNIFE);
+      Items.maxStack[MURDER_KNIFE] = 1;
+      Items.defTile(C4_BOMB, "C4 Explosive", T_C4_BOMB);
+      Items.maxStack[C4_BOMB] = 1;
    }
 
    private static void cube(int id, String name, float hardness, int tile, int mineClass, boolean needTool) {
@@ -1642,6 +1666,12 @@ final class Redstone319 {
       Tex.blit(T_PURPUR_PILLAR, purpurPillarTile());
       Tex.blit(T_BONE_TOP, boneTopTile());
       Tex.blit(T_BONE_SIDE, boneSideTile());
+      Tex.blit(T_PISTOL, pistolItem());
+      Tex.blit(T_MACHINE_GUN, machineGunItem());
+      Tex.blit(T_SNIPER_RIFLE, sniperRifleItem());
+      Tex.blit(T_TNT_GRENADE, tntGrenadeItem());
+      Tex.blit(T_MURDER_KNIFE, murderKnifeItem());
+      Tex.blit(T_C4_BOMB, c4BombItem());
    }
 
    static int[] sprite(int id) {
@@ -1655,6 +1685,12 @@ final class Redstone319 {
          case COMPASS -> compassItem();
          case CLOCK -> clockItem();
          case FIRE_CHARGE -> fireChargeItem();
+         case PISTOL -> pistolItem();
+         case MACHINE_GUN -> machineGunItem();
+         case SNIPER_RIFLE -> sniperRifleItem();
+         case TNT_GRENADE -> tntGrenadeItem();
+         case MURDER_KNIFE -> murderKnifeItem();
+         case C4_BOMB -> c4BombItem();
          default -> null;
       };
    }
@@ -2229,6 +2265,91 @@ final class Redstone319 {
       cv.ell(6.8, 7.4, 1.8, 1.7, 0xF8B828);
       cv.set(6, 6, 0xFFF8A8);
       cv.set(9, 9, 0xF8B828);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] pistolItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.rect(3, 5, 10, 3, 0x687280);
+      cv.rect(4, 5, 8, 1, 0x98A4B4);
+      cv.rect(3, 8, 4, 5, 0x2A2E36);
+      cv.rect(4, 9, 2, 3, 0x4E3828);
+      cv.rect(7, 8, 2, 2, 0x444A54);
+      cv.set(12, 4, 0xF8A828);
+      cv.set(4, 4, 0xDCE4EC);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] machineGunItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.rect(1, 7, 3, 3, 0x5A3E28);
+      cv.rect(4, 6, 8, 3, 0x4A525E);
+      cv.rect(5, 6, 6, 1, 0x8894A4);
+      cv.rect(12, 7, 3, 1, 0x2C3038);
+      cv.rect(5, 9, 2, 4, 0x282C34);
+      cv.rect(8, 9, 2, 5, 0xD48824);
+      cv.rect(6, 4, 4, 2, 0x343A42);
+      cv.set(14, 6, 0xFF9820);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] sniperRifleItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.rect(1, 8, 3, 3, 0x2E4E34);
+      cv.rect(4, 7, 7, 2, 0x46724E);
+      cv.rect(11, 7, 4, 1, 0x363C44);
+      cv.rect(5, 4, 5, 2, 0x242830);
+      cv.set(9, 4, 0x64D4FF);
+      cv.set(5, 4, 0x64D4FF);
+      cv.rect(5, 9, 2, 3, 0x22262C);
+      cv.rect(8, 9, 2, 3, 0x3E444C);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] tntGrenadeItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.ell(7.5, 9.0, 4.4, 4.8, 0xC8241C);
+      cv.rect(4, 8, 8, 2, 0xF2F2F2);
+      cv.set(5, 9, 0x202020);
+      cv.set(7, 9, 0x202020);
+      cv.set(9, 9, 0x202020);
+      cv.rect(6, 3, 3, 2, 0x58606A);
+      cv.line(9, 4, 11, 7, 0x7A8490);
+      cv.set(7, 2, 0xFFE048);
+      cv.set(8, 1, 0xFF6820);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] murderKnifeItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.line(3, 13, 6, 10, 0x38241C);
+      cv.line(4, 13, 6, 11, 0x5A3A2C);
+      cv.set(3, 13, 0xD82028);
+      cv.line(5, 8, 8, 11, 0xD4A828);
+      cv.line(7, 9, 13, 3, 0xDCE6F0);
+      cv.line(8, 9, 13, 4, 0x98A4B4);
+      cv.line(9, 8, 13, 4, 0xC81C24);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] c4BombItem() {
+      TexExtra.Cv cv = new TexExtra.Cv();
+      cv.rect(3, 4, 10, 9, 0x7A7250);
+      cv.rect(4, 5, 8, 7, 0x9C9268);
+      cv.rect(3, 7, 10, 1, 0x282C30);
+      cv.rect(3, 10, 10, 1, 0x282C30);
+      cv.rect(5, 6, 6, 3, 0x1C2226);
+      cv.set(6, 7, 0xFF2820);
+      cv.set(7, 7, 0xFF2820);
+      cv.set(9, 7, 0x38F048);
+      cv.line(5, 4, 6, 2, 0xE02820);
+      cv.line(10, 4, 9, 2, 0x2878E0);
       cv.shade();
       return cv.p;
    }

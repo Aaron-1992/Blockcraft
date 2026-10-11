@@ -1191,6 +1191,12 @@ public final class Game {
          } else if (ws.type == WorldSettings.TUMBLE) {
             SkyGen.giveTumbleLoadout(this);
             this.player.yaw = SkyGen.getSkywarsYaw(0);
+         } else if (ws.type == WorldSettings.CS2) {
+            SkyGen.giveCs2Loadout(this, SkyGen.swKit);
+            this.player.yaw = (SkyGen.myTeam & 1) == 0 ? 0.0F : 180.0F;
+         } else if (ws.type == WorldSettings.MURDER) {
+            SkyGen.assignMurderMysteryRoles(this, this.world);
+            this.player.yaw = 0.0F;
          }
 
          this.sel = 0;
@@ -1220,6 +1226,9 @@ public final class Game {
 
       this.adv.load(this.rootDir); // Update 3.12: advancements (a new world starts with none)
       this.player.updateBox();
+      if (Net319.isHosting()) {
+         Net319.onHostWorldSwitched(this);
+      }
       this.setScreen(Game.S.LOADING);
    }
 
@@ -1285,6 +1294,10 @@ public final class Game {
             SkyGen.giveSkywarsKit(this, SkyGen.swKit);
          } else if (wType == WorldSettings.TUMBLE) {
             SkyGen.giveTumbleLoadout(this);
+         } else if (wType == WorldSettings.CS2) {
+            SkyGen.giveCs2Loadout(this, SkyGen.swKit);
+         } else if (wType == WorldSettings.MURDER) {
+            SkyGen.assignMurderMysteryRoles(this, this.world);
          }
 
          this.cursor = null;
@@ -1321,7 +1334,7 @@ public final class Game {
    }
 
    private static boolean wsIsVoid(int t) {
-      return t == WorldSettings.SKYBLOCK || t == WorldSettings.SKYWARS || t == WorldSettings.BEDWARS;
+      return WorldSettings.isVoidMode(t);
    }
 
    static void parseStacks(String var0, Stack[] var1) {
@@ -1600,7 +1613,10 @@ public final class Game {
    }
 
    void quitToTitle() {
-      Net319.disconnect(this);
+      // Keep the host server alive when switching worlds or gamemodes so connected players never get disconnected!
+      if (!Net319.isHosting()) {
+         Net319.disconnect(this);
+      }
       this.saveWorld();
 
       for (Chunk var2 : this.world.chunks.values()) {
@@ -1704,8 +1720,13 @@ public final class Game {
          return;
       }
 
-      if (this.world != null && this.world.settings != null && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE)) {
-         boolean isTumble = this.world.settings.type == WorldSettings.TUMBLE;
+      if (this.world != null
+         && this.world.settings != null
+         && (this.world.settings.type == WorldSettings.BATTLE
+            || this.world.settings.type == WorldSettings.TUMBLE
+            || this.world.settings.type == WorldSettings.CS2
+            || this.world.settings.type == WorldSettings.MURDER)) {
+         int mType = this.world.settings.type;
          SkyGen.localEliminated = true;
          this.bedPos = null;
          this.player.dead = false;
@@ -1721,11 +1742,10 @@ public final class Game {
          this.player.setMode(3);
          this.player.setPos(0.5, SkyGen.Y_DECK + 14.0, 0.5);
          this.player.updateBox();
-         this.say(
-            isTumble
-               ? "\u00a7b\u00a7l[Tumble] ELIMINATED! \u00a77You cannot respawn this round — spectating match..."
-               : "\u00a76\u00a7l[Battle] ELIMINATED! \u00a77You cannot respawn this round — spectating match..."
-         );
+         String tag = mType == WorldSettings.TUMBLE ? "\u00a7b\u00a7l[Tumble]"
+            : (mType == WorldSettings.CS2 ? "\u00a7b\u00a7l[CS2 Strike]"
+            : (mType == WorldSettings.MURDER ? "\u00a7d\u00a7l[Murder Mystery]" : "\u00a76\u00a7l[Battle]"));
+         this.say(tag + " ELIMINATED! \u00a77You cannot respawn this round — spectating match...");
          return;
       }
 
@@ -3482,6 +3502,24 @@ public final class Game {
          var4.add("§7Right-click to check Day, Time & Weather");
       } else if (id == Redstone319.FIRE_CHARGE) {
          var4.add("§7Right-click to ignite fire or launch fireball");
+      } else if (id == Redstone319.PISTOL) {
+         var4.add("§b6.0 Ranged Damage §7(Semi-Auto Sidearm)");
+         var4.add("§7Left/Right-click to fire high-velocity arrows");
+      } else if (id == Redstone319.MACHINE_GUN) {
+         var4.add("§b4.0 Ranged Damage §7(Full-Auto Assault Rifle)");
+         var4.add("§7Hold Left/Right-click for rapid-fire arrows");
+      } else if (id == Redstone319.SNIPER_RIFLE) {
+         var4.add("§b14.0 Ranged Damage §7(AWP Precision Rifle)");
+         var4.add("§7Left/Right-click to fire armor-piercing rounds");
+      } else if (id == Redstone319.TNT_GRENADE) {
+         var4.add("§cExplosive Fragmentation Grenade");
+         var4.add("§7Right-click to throw primed TNT grenade");
+      } else if (id == Redstone319.MURDER_KNIFE) {
+         var4.add("§c24.0 Lethal Strike Damage");
+         var4.add("§7Left-click to strike | Right-click to throw knife");
+      } else if (id == Redstone319.C4_BOMB) {
+         var4.add("§eTactical Explosive Charge (CS2 Strike)");
+         var4.add("§7Click at Bomb Site A or B to plant the C4");
       }
 
       int fuel = Recipes.fuelTime(new Stack(id, 1));
@@ -4224,7 +4262,12 @@ public final class Game {
          }
 
          boolean var5 = false;
-         if (var1 && Net319.tryAttackPeer(this)) {
+         if ((var1 || (this.leftDown && var4 == Redstone319.MACHINE_GUN))
+            && (var4 == Redstone319.PISTOL || var4 == Redstone319.MACHINE_GUN || var4 == Redstone319.SNIPER_RIFLE || var4 == Redstone319.C4_BOMB)
+            && SkyGen.tryUseTacticalWeapon(this, var4)) {
+            var5 = true;
+            this.breakProg = 0.0F;
+         } else if (var1 && Net319.tryAttackPeer(this)) {
             var5 = true;
             this.breakProg = 0.0F;
          } else if (this.targetMob != null) {
@@ -4299,8 +4342,10 @@ public final class Game {
 
          if (var19) {
             this.rightDown = false;
-         } else if (var2 && var3 != null && this.useSpecial(var3)) {
-            this.rightDown = false;
+         } else if ((var2 || (this.rightDown && var4 == Redstone319.MACHINE_GUN)) && var3 != null && this.useSpecial(var3)) {
+            if (var4 != Redstone319.MACHINE_GUN) {
+               this.rightDown = false;
+            }
             this.swinging = true;
             this.swing = 1.0E-4F;
          } else if (this.rightDown
@@ -4577,24 +4622,30 @@ public final class Game {
 
    void attackMob(Mob var1) {
       if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
-         if (var1.teamTag != null && var1.teamTag.equals("Team:" + SkyGen.BEDWARS_NAMES[SkyGen.getPlayerTeam(this)])) {
-            this.say("§c[Bedwars] That is your own team's Defender!");
+         if (SkyGen.botTeamIndex(var1) == SkyGen.getPlayerTeam(this)) {
+            this.say("§c[Bedwars] That is your own team's teammate!");
+            return;
+         }
+      }
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.CS2) {
+         if (SkyGen.botTeamIndex(var1) == (SkyGen.getPlayerTeam(this) & 1)) {
+            this.say("§c[CS2 Strike] Hold your fire — that is your teammate!");
             return;
          }
       }
       int var2 = this.heldId();
-      boolean var3 = Items.isTool(var2);
+      boolean var3 = Items.isTool(var2) || var2 == Redstone319.MURDER_KNIFE;
       float var4 = var3 ? Items.attackDamage(var2) : 1.0F;
       if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamSharpness(SkyGen.getPlayerTeam(this))) {
          var4 += 2.0F;
       }
       float var5 = 4.0F;
-      if (var3) {
+      if (Items.isTool(var2)) {
          int var6 = Items.toolClass(var2);
          var5 = var6 == 4 ? 1.6F : (var6 == 1 ? 1.2F : (var6 == 2 ? (Items.toolTier(var2) >= 3 ? 1.0F : 0.8F) : 1.0F));
       }
 
-      float var10 = Math.min(1.0F, (this.atkTicks + 0.5F) / (20.0F / var5));
+      float var10 = var2 == Redstone319.MURDER_KNIFE ? 1.0F : Math.min(1.0F, (this.atkTicks + 0.5F) / (20.0F / var5));
       var4 *= 0.2F + var10 * var10 * 0.8F;
       boolean crit = false;
       if (var10 > 0.9F && !this.player.onGround && this.player.vy < 0.0 && !this.player.inWater && !this.player.sprinting) {
@@ -4610,6 +4661,10 @@ public final class Game {
       boolean var8 = this.mobs.hurtMob(var1, Math.max(1, Math.round(var4)), this.player.x, this.player.z, 0.4 + (var7 ? 0.5 : 0.0), true);
       if (var8) {
          SoundEngine.playHit(this.world, var1.x, var1.y + 0.8, var1.z, crit);
+         if (var1.dead) {
+            SkyGen.myKills++;
+            SkyGen.onBotKilled(this, var1);
+         }
       }
       if (var7) {
          this.player.sprinting = false;
@@ -5173,6 +5228,9 @@ public final class Game {
          return false;
       }
       int var2 = var1.id;
+      if (SkyGen.tryUseTacticalWeapon(this, var2)) {
+         return true;
+      }
       if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE && SkyGen.useTumbleItem(this, var1)) {
          return true;
       }

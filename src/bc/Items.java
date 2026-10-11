@@ -202,6 +202,9 @@ public final class Items {
    }
 
    public static float attackDamage(int var0) {
+      if (var0 == Redstone319.MURDER_KNIFE) {
+         return 24.0F;
+      }
       if (!isTool(var0)) {
          return 1.0F;
       }

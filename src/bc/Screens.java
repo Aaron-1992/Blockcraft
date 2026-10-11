@@ -775,10 +775,13 @@ final class Screens {
       });
       boolean isMg = g.world != null && g.world.settings != null && g.world.settings.isMinigame();
       if (isMg && !Net319.isClientConnected()) {
-         ui.button("New Round", bx, y + 104.0F, half, 20.0F, true,
+         ui.button("New Round", bx, y + 104.0F, third, 20.0F, true,
             "Reset the arena map and start a fresh round with all AI competitors respawned.",
             () -> SkyGen.startMatch(g, true));
-         ui.button("Leave Minigame", bx + half + 4.0F, y + 104.0F, half, 20.0F, true, null, g::quitToTitle);
+         ui.button("Lobby / Mode", bx + third + 4.0F, y + 104.0F, third, 20.0F, true,
+            "Open the Waiting Lobby to switch Minigame Modes, vote on Maps, or change Teams without disconnecting players.",
+            () -> SkyGen.enterInterRoundLobby(g));
+         ui.button("Leave", bx + 2.0F * (third + 4.0F), y + 104.0F, third, 20.0F, true, null, g::quitToTitle);
       } else {
          ui.button(isMg ? "Leave Minigame" : "Save and Quit to Title", bx, y + 104.0F, bw, 20.0F, true, null, g::quitToTitle);
       }
@@ -978,7 +981,7 @@ final class Screens {
    }
 
    // =================================================================== V4.3: Console Edition Mini Games Hub
-   static final String[] MINIGAME_TABS = {"Battle", "Tumble", "Bedwars"};
+   static final String[] MINIGAME_TABS = {"Battle", "Tumble", "Bedwars", "CS2", "Murder"};
 
    static void openMinigames(Game g, Game.S ret) {
       g.mgReturn = ret != null ? ret : Game.S.TITLE;
@@ -986,7 +989,13 @@ final class Screens {
          g.newSettings.type = WorldSettings.BATTLE;
          g.mgTab = 0;
       } else {
-         g.mgTab = g.newSettings.type == WorldSettings.TUMBLE ? 1 : (g.newSettings.type == WorldSettings.BEDWARS ? 2 : 0);
+         g.mgTab = 0;
+         for (int i = 0; i < WorldSettings.MINIGAME_ORDER.length; i++) {
+            if (WorldSettings.MINIGAME_ORDER[i] == g.newSettings.type) {
+               g.mgTab = i;
+               break;
+            }
+         }
       }
       g.newMode = 0;
       g.ui.randomSeed = new Random().nextLong();
@@ -1055,6 +1064,22 @@ final class Screens {
             () -> {
                SkyGen.tumbleWeaponMode = (SkyGen.tumbleWeaponMode + 1) % 3;
                ui.say("Tumble: " + SkyGen.TUMBLE_MODE_NAMES[SkyGen.tumbleWeaponMode]);
+            });
+      } else if (ws.type == WorldSettings.CS2) {
+         String kitName = SkyGen.CS2_KIT_NAMES[SkyGen.swKit & 3];
+         ui.button("Kit: " + kitName, ix, optY0, colW, 20.0F, true,
+            "CS2 Strike Loadout: " + SkyGen.CS2_KIT_DESC[SkyGen.swKit & 3],
+            () -> {
+               SkyGen.swKit = (SkyGen.swKit + 1) & 3;
+               ui.say("CS2 Kit: " + SkyGen.CS2_KIT_NAMES[SkyGen.swKit]);
+            });
+      } else if (ws.type == WorldSettings.MURDER) {
+         String rolePref = SkyGen.MURDER_PREF_NAMES[SkyGen.murderRolePref & 3];
+         ui.button("Role: " + rolePref, ix, optY0, colW, 20.0F, true,
+            "Select preferred Murder Mystery role (Random, Innocent, Sheriff, or Murderer).",
+            () -> {
+               SkyGen.murderRolePref = (SkyGen.murderRolePref + 1) & 3;
+               ui.say("Role Preference: " + SkyGen.MURDER_PREF_NAMES[SkyGen.murderRolePref]);
             });
       } else {
          int t = SkyGen.myTeam & 3;
@@ -1130,6 +1155,8 @@ final class Screens {
       String mapName = (g.world != null && g.world.settings != null) ? g.world.settings.mapName() : "Cove";
       boolean isBedwars = wType == WorldSettings.BEDWARS;
       boolean isTumble = wType == WorldSettings.TUMBLE;
+      boolean isCs2 = wType == WorldSettings.CS2;
+      boolean isMurder = wType == WorldSettings.MURDER;
 
       float pw = Math.min(300.0F, gui.w - 16.0F);
       float px = cx - pw / 2.0F;
@@ -1182,7 +1209,7 @@ final class Screens {
          int ovSecs = Math.max(1, (SkyGen.overviewCountdownTicks + 19) / 20);
          float actY = voteY + 28.0F;
          ui.button("Continue to Lobby (" + ovSecs + "s)", ix, actY, iw, 20.0F, true,
-            "Proceed to the Waiting Lobby to wait for the next round and finalize map votes.",
+            "Proceed to the Waiting Lobby to wait for the next round, vote on maps, or switch gamemodes.",
             () -> SkyGen.enterInterRoundLobby(g));
 
          ui.button("Play Next Round Now", ix, footY, colW, 20.0F, true,
@@ -1193,13 +1220,14 @@ final class Screens {
          return;
       }
 
-      // 2. INTER-ROUND WAITING LOBBY WITH LIVE MAP VOTING
+      // 2. INTER-ROUND WAITING LOBBY WITH LIVE MAP VOTING & GAMEMODE SWITCHER
       if (SkyGen.myMapVote < 0) {
          SkyGen.initMapVoting(g);
       }
       int leadMap = SkyGen.winningVotedMap(g.world != null && g.world.settings != null ? g.world.settings.mapId : 0);
       String leadMapName = WorldSettings.MAP_NAMES[leadMap & 3];
-      String lobbyTitle = (isBedwars ? "Bedwars" : (isTumble ? "Tumble" : "Battle")) + " Lobby - " + mapName;
+      String modeTitle = WorldSettings.TYPE_NAME[Math.max(0, Math.min(WorldSettings.TYPES - 1, wType))];
+      String lobbyTitle = modeTitle + " Lobby - " + mapName;
       ui.title(lobbyTitle, 7.0F);
       ui.panel(px, py, pw, ph);
 
@@ -1209,35 +1237,53 @@ final class Screens {
          int secs = (SkyGen.lobbyCountdownTicks + 19) / 20;
          statusLine = "Next round in " + secs + "s! Leading Map Vote: " + leadMapName;
       } else {
-         statusLine = "Lobby (" + totalPlayers + "/8) - Vote for a Map below or click Start!";
+         statusLine = "Lobby (" + totalPlayers + "/8) - Vote Map, Switch Mode, or click Start!";
       }
       gui.text(Game.clipText(statusLine, iw), ix, iy, SkyGen.lobbyCountdownTicks > 0 ? 0xFF8FE060 : Ui.GOLD, true);
 
       int myTeam = SkyGen.getPlayerTeam(g);
+      String teamDesc = isBedwars
+         ? (SkyGen.BEDWARS_NAMES[myTeam] + " Team")
+         : (isCs2
+            ? ((myTeam & 1) == 0 ? "CT (Blue)" : "T (Red)")
+            : (isMurder
+               ? ("Role: " + SkyGen.MURDER_ROLE_NAMES[SkyGen.myMurderRole & 3])
+               : ("Podium #" + (myTeam + 1))));
       String netRoster;
       if (Net319.isHosting()) {
          netRoster = "Host: " + Net319.publicAddress + " | Code: " + Net319.shareCode;
       } else if (Net319.isConnected()) {
-         netRoster = "Connected (" + Net319.peerCount() + " peers) | Team: " + (isBedwars ? SkyGen.BEDWARS_NAMES[myTeam] : ("#" + (myTeam + 1)));
+         netRoster = "Connected (" + Net319.peerCount() + " peers) | " + teamDesc;
       } else {
-         netRoster = "You: " + (isBedwars ? SkyGen.BEDWARS_NAMES[myTeam] + " Team" : ("Podium #" + (myTeam + 1))) + " | LAN IP: " + Net319.localLanIp();
+         netRoster = "You: " + teamDesc + " | LAN IP: " + Net319.localLanIp();
       }
       gui.text(Game.clipText(netRoster, iw), ix, iy + 11.0F, Ui.TEXT, true);
 
-      // Row 1 (by0): Team / Spawn Podium Selection
+      // Row 1 (by0): Team / Spawn Podium / Faction Selection
       float by0 = iy + 23.0F;
       for (int t = 0; t < 4; t++) {
          final int teamIdx = t;
-         boolean sel = (myTeam == t);
-         String lbl = isBedwars
-            ? (sel ? "[" + SkyGen.BEDWARS_NAMES[t] + "]" : SkyGen.BEDWARS_NAMES[t])
-            : (sel ? "[Spot " + (t + 1) + "]" : "Spot " + (t + 1));
-         ui.button(lbl, ix + t * (qW + 4.0F), by0, qW, 18.0F, true,
-            isBedwars ? "Join " + SkyGen.BEDWARS_NAMES[t] + " Team base." : "Select starting podium #" + (t + 1) + ".",
-            () -> {
-               SkyGen.selectTeam(g, teamIdx, true);
-               ui.say(isBedwars ? "Selected " + SkyGen.BEDWARS_NAMES[teamIdx] + " Team" : "Selected Podium #" + (teamIdx + 1));
-            });
+         boolean sel = isCs2 ? ((myTeam & 1) == (t & 1) && t < 2) : (myTeam == t);
+         String lbl;
+         String tip;
+         if (isBedwars) {
+            lbl = sel ? "[" + SkyGen.BEDWARS_NAMES[t] + "]" : SkyGen.BEDWARS_NAMES[t];
+            tip = "Join " + SkyGen.BEDWARS_NAMES[t] + " Team base.";
+         } else if (isCs2) {
+            String[] cs2Btn = new String[]{"CT Blue", "T Red", "CT #2", "T #2"};
+            sel = (myTeam == t);
+            lbl = sel ? "[" + cs2Btn[t] + "]" : cs2Btn[t];
+            tip = (t & 1) == 0 ? "Join Counter-Terrorists (Defend Sites A & B / Defuse C4)." : "Join Terrorists (Plant C4 at Site A or B).";
+         } else {
+            lbl = sel ? "[Spot " + (t + 1) + "]" : "Spot " + (t + 1);
+            tip = isMurder ? "Select Mansion starting room #" + (t + 1) + "." : "Select starting podium #" + (t + 1) + ".";
+         }
+         ui.button(Game.clipText(lbl, qW - 6.0F), ix + t * (qW + 4.0F), by0, qW, 18.0F, true, tip, () -> {
+            SkyGen.selectTeam(g, teamIdx, true);
+            ui.say(isBedwars
+               ? "Selected " + SkyGen.BEDWARS_NAMES[teamIdx] + " Team"
+               : (isCs2 ? ("Joined " + ((teamIdx & 1) == 0 ? "Counter-Terrorists" : "Terrorists")) : ("Selected Spot #" + (teamIdx + 1))));
+         });
       }
 
       // Row 2 (byVote): Votable Arena Maps (Cove, Crucible, Cavern, Temple)
@@ -1274,7 +1320,7 @@ final class Screens {
             }
          });
 
-      // Row 4 (by2): Mode Settings & Leading Voted Map
+      // Row 4 (by2): Mode Loadout/Settings & Seamless Gamemode Switcher
       float by2 = by1 + 20.0F;
       if (isBedwars) {
          ui.button("Solo Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, by2, colW, 18.0F, true,
@@ -1292,6 +1338,25 @@ final class Screens {
                SkyGen.giveTumbleLoadout(g);
                ui.say("Tumble Mode: " + SkyGen.TUMBLE_MODE_NAMES[SkyGen.tumbleWeaponMode]);
             });
+      } else if (isCs2) {
+         String kitName = SkyGen.CS2_KIT_NAMES[SkyGen.swKit & 3];
+         ui.button(Game.clipText("Kit: " + kitName, colW - 8.0F), ix, by2, colW, 18.0F, true,
+            "Select CS2 Strike Loadout (" + SkyGen.CS2_KIT_DESC[SkyGen.swKit & 3] + ").",
+            () -> {
+               SkyGen.swKit = (SkyGen.swKit + 1) & 3;
+               SkyGen.giveCs2Loadout(g);
+               ui.say("CS2 Kit: " + SkyGen.CS2_KIT_NAMES[SkyGen.swKit]);
+            });
+      } else if (isMurder) {
+         String rolePref = SkyGen.MURDER_PREF_NAMES[SkyGen.murderRolePref & 3];
+         ui.button(Game.clipText("Role: " + rolePref, colW - 8.0F), ix, by2, colW, 18.0F, true,
+            "Select preferred Murder Mystery role (Random, Innocent, Sheriff, or Murderer).",
+            () -> {
+               SkyGen.murderRolePref = (SkyGen.murderRolePref + 1) & 3;
+               SkyGen.assignMurderMysteryRoles(g);
+               SkyGen.giveMurderLoadout(g);
+               ui.say("Role Preference: " + SkyGen.MURDER_PREF_NAMES[SkyGen.murderRolePref]);
+            });
       } else {
          String kitName = SkyGen.SW_KIT_NAMES[SkyGen.swKit & 3];
          ui.button("Set: " + kitName, ix, by2, colW, 18.0F, true,
@@ -1302,12 +1367,19 @@ final class Screens {
                ui.say("Item Set: " + SkyGen.SW_KIT_NAMES[nextKit] + " (" + SkyGen.SW_KIT_DESC[nextKit] + ")");
             });
       }
-      ui.button("Vote Lead: " + leadMapName, x1, by2, colW, 18.0F, true,
-         "Cycle vote across Console Edition Arena Maps (Cove, Crucible, Cavern, Temple).",
+      ui.button(Game.clipText("Game: " + modeTitle, colW - 8.0F), x1, by2, colW, 18.0F, !Net319.isClientConnected(),
+         "Switch active Minigame (Battle, Tumble, Bedwars, CS2 Strike, Murder Mystery) without disconnecting players!",
          () -> {
-            int nextVote = ((SkyGen.myMapVote < 0 ? 0 : SkyGen.myMapVote) + 1) & 3;
-            SkyGen.castMapVote(g, nextVote, true);
-            ui.say("Voted for " + WorldSettings.MAP_NAMES[nextVote]);
+            int curIdx = 0;
+            for (int i = 0; i < WorldSettings.MINIGAME_ORDER.length; i++) {
+               if (WorldSettings.MINIGAME_ORDER[i] == wType) {
+                  curIdx = i;
+                  break;
+               }
+            }
+            int nextType = WorldSettings.MINIGAME_ORDER[(curIdx + 1) % WorldSettings.MINIGAME_ORDER.length];
+            SkyGen.switchMinigameMode(g, nextType, true);
+            ui.say("Switched Game to " + WorldSettings.TYPE_NAME[nextType]);
          });
 
       // Row 5 (by3): Multiplayer Hosting & Share Code

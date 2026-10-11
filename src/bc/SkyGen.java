@@ -70,6 +70,53 @@ public final class SkyGen extends Gen {
    private static final int[] botHoldingBlockTicks = new int[32];
    private static final int[] botEatTicks = new int[32];
    private static final int[] botBowDrawTicks = new int[32];
+   /** Strict AI Inventory Ledger: bots can ONLY use blocks, arrows, grenades, apples, or weapons they actually own! */
+   public static final int[] botBlocks = new int[32];
+   public static final int[] botArrows = new int[32];
+   public static final int[] botGrenades = new int[32];
+   public static final int[] botApples = new int[32];
+   public static final int[] botWeaponItem = new int[32];
+   public static final int[] botRangedItem = new int[32];
+   public static final int[] botGold = new int[32];
+   public static final int[] botMurderRole = new int[32];
+   private static final int[] botBuildUpCooldown = new int[32];
+
+   // Thrown TNT Frag Grenade horizontal velocities
+   private static final java.util.IdentityHashMap<World.Falling, double[]> tntHorizVel = new java.util.IdentityHashMap<>();
+   public static volatile int playerGunCooldown = 0;
+
+   // CS2 Tactical Strike state (CT = Team 0, T = Team 1; Bomb Site A = (-22, Y_DECK+1, 0), Bomb Site B = (22, Y_DECK+1, 0))
+   public static final String[] CS2_KIT_NAMES = new String[]{"Assault SMG", "AWP Sniper", "Demolitions", "Tactical Support"};
+   public static final String[] CS2_KIT_DESC = new String[]{
+      "Assault SMG + Tactical Pistol + 64 Ammo + 2 TNT Grenades + 16 Cover Blocks",
+      "Heavy Sniper + Tactical Pistol + 48 Ammo + 1 TNT Grenade + 16 Cover Blocks",
+      "Assault SMG + Combat Knife + 64 Ammo + 4 TNT Grenades + 24 Cover Blocks",
+      "Assault SMG + Tactical Pistol + 64 Ammo + 2 Medkits + 24 Cover Blocks"
+   };
+   public static volatile boolean cs2BombPlanted = false;
+   public static volatile int cs2BombSite = 0; // 1 = Site A (-22, 0), 2 = Site B (+22, 0)
+   public static volatile int cs2BombTimerTicks = 0;
+   public static volatile int cs2DefuseTicks = 0;
+   private static boolean cs2BotsSpawned = false;
+   public static volatile boolean cs2RoundOver = false;
+
+   // Murder Mystery state (0 = Innocent, 1 = Sheriff, 2 = Murderer)
+   public static final int MURDER_ROLE_INNOCENT = 0;
+   public static final int MURDER_ROLE_SHERIFF = 1;
+   public static final int MURDER_ROLE_MURDERER = 2;
+   public static final String[] MURDER_ROLE_NAMES = new String[]{"INNOCENT", "SHERIFF", "MURDERER"};
+   public static final String[] MURDER_ROLE_CODES = new String[]{"\u00a7a", "\u00a79", "\u00a7c"};
+   public static final String[] MURDER_PREF_NAMES = new String[]{"Random Role", "Murderer", "Sheriff", "Innocent"};
+   public static volatile int murderRolePref = 0;
+   public static volatile int myMurderRole = MURDER_ROLE_INNOCENT;
+   public static volatile int myMurderGold = 0;
+   public static volatile boolean murderWeaponsDealt = false;
+   public static volatile boolean murderGunDropped = false;
+   public static volatile double murderDroppedGunX = 0.5;
+   public static volatile double murderDroppedGunY = Y_DECK + 1.0;
+   public static volatile double murderDroppedGunZ = 0.5;
+   private static boolean murderBotsSpawned = false;
+   private static boolean murderRoundOver = false;
 
    // Battle Item Sets / Kits & Tumble Weapon Modes
    public static final String[] SW_KIT_NAMES = new String[]{"Normal", "High Power", "Archer", "Pyro"};
@@ -171,6 +218,30 @@ public final class SkyGen extends Gen {
       Arrays.fill(botHoldingBlockTicks, 0);
       Arrays.fill(botEatTicks, 0);
       Arrays.fill(botBowDrawTicks, 0);
+      Arrays.fill(botBlocks, 0);
+      Arrays.fill(botArrows, 0);
+      Arrays.fill(botGrenades, 0);
+      Arrays.fill(botApples, 0);
+      Arrays.fill(botWeaponItem, 0);
+      Arrays.fill(botRangedItem, 0);
+      Arrays.fill(botGold, 0);
+      Arrays.fill(botMurderRole, 0);
+      Arrays.fill(botBuildUpCooldown, 0);
+      synchronized (tntHorizVel) {
+         tntHorizVel.clear();
+      }
+      playerGunCooldown = 0;
+      cs2BombPlanted = false;
+      cs2BombSite = 0;
+      cs2BombTimerTicks = 0;
+      cs2DefuseTicks = 0;
+      cs2BotsSpawned = false;
+      cs2RoundOver = false;
+      myMurderGold = 0;
+      murderWeaponsDealt = false;
+      murderGunDropped = false;
+      murderBotsSpawned = false;
+      murderRoundOver = false;
       myKills = 0;
       myDeaths = 0;
       myBedsBroken = 0;
@@ -187,7 +258,7 @@ public final class SkyGen extends Gen {
          return false;
       }
       int type = g.world.settings.type;
-      if (type == WorldSettings.BATTLE || type == WorldSettings.TUMBLE) {
+      if (type == WorldSettings.BATTLE || type == WorldSettings.TUMBLE || type == WorldSettings.CS2 || type == WorldSettings.MURDER) {
          return true;
       }
       if (type == WorldSettings.BEDWARS) {
@@ -589,6 +660,10 @@ public final class SkyGen extends Gen {
       return new int[]{bx + dirX * 4, Y_DECK + 1, bz + dirZ * 4};
    }
 
+   public static int getBedTeamAt(int x, int y, int z) {
+      return getBedTeamAt(x, z);
+   }
+
    public static int getBedTeamAt(int x, int z) {
       for (int t = 0; t < 4; t++) {
          int[] f = getTeamBedFoot(t);
@@ -603,8 +678,430 @@ public final class SkyGen extends Gen {
       return -1;
    }
 
-   public static int getBedTeamAt(int x, int y, int z) {
-      return getBedTeamAt(x, z);
+   public static void registerThrownTnt(World.Falling f, double vx, double vz) {
+      if (f != null) {
+         synchronized (tntHorizVel) {
+            tntHorizVel.put(f, new double[]{vx, vz});
+         }
+      }
+   }
+
+   public static void removeThrownTnt(World.Falling f) {
+      if (f != null) {
+         synchronized (tntHorizVel) {
+            tntHorizVel.remove(f);
+         }
+      }
+   }
+
+   public static void tickThrownTntHorizontal(World w, World.Falling f) {
+      if (w == null || f == null) {
+         return;
+      }
+      double[] hv;
+      synchronized (tntHorizVel) {
+         hv = tntHorizVel.get(f);
+      }
+      if (hv == null) {
+         return;
+      }
+      f.px = f.x;
+      f.py = f.y;
+      f.pz = f.z;
+      double nx = f.x + hv[0];
+      double nz = f.z + hv[1];
+      int by = (int)Math.floor(f.y + 0.2);
+      if (Blocks.solid[w.getBlock((int)Math.floor(nx), by, (int)Math.floor(f.z))]) {
+         hv[0] = -hv[0] * 0.45;
+      } else {
+         f.x = nx;
+      }
+      if (Blocks.solid[w.getBlock((int)Math.floor(f.x), by, (int)Math.floor(nz))]) {
+         hv[1] = -hv[1] * 0.45;
+      } else {
+         f.z = nz;
+      }
+      boolean onGround = Blocks.solid[w.getBlock((int)Math.floor(f.x), (int)Math.floor(f.y - 0.05), (int)Math.floor(f.z))];
+      double drag = onGround ? 0.72 : 0.96;
+      hv[0] *= drag;
+      hv[1] *= drag;
+   }
+
+   public static void onTntGrenadeDetonate(Game g, World w, double gx, double gy, double gz) {
+      if (g == null || w == null) {
+         return;
+      }
+      SoundEngine.play3D(w, "explode", gx, gy, gz, 1.0F, 0.95F);
+      double radius = 5.2;
+      if (g.player != null && !g.player.dead && !g.player.creative && !g.player.spectator) {
+         double d = Math.sqrt((g.player.x - gx) * (g.player.x - gx) + (g.player.y + 0.9 - gy) * (g.player.y + 0.9 - gy) + (g.player.z - gz) * (g.player.z - gz));
+         if (d < radius) {
+            int dmg = Math.max(2, (int)Math.round(14.0 * (1.0 - d / radius)));
+            g.damagePlayer(dmg, gx, gz);
+         }
+      }
+      if (g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m != null && !m.dead) {
+               double d = Math.sqrt((m.x - gx) * (m.x - gx) + (m.y + 0.9 - gy) * (m.y + 0.9 - gy) + (m.z - gz) * (m.z - gz));
+               if (d < radius) {
+                  int dmg = Math.max(2, (int)Math.round(14.0 * (1.0 - d / radius)));
+                  g.mobs.hurtMob(m, dmg, gx, gz, 0.65, true);
+               }
+            }
+         }
+      }
+      if (Net319.isActive()) {
+         for (Net319.Peer peer : Net319.peers().values()) {
+            if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0) {
+               double d = Math.sqrt((peer.x - gx) * (peer.x - gx) + (peer.y - gy) * (peer.y - gy) + (peer.z - gz) * (peer.z - gz));
+               if (d < radius) {
+                  int dmg = Math.max(2, (int)Math.round(14.0 * (1.0 - d / radius)));
+                  Net319.sendHit(peer.id, dmg, gx, gz, Net319.selfName);
+               }
+            }
+         }
+      }
+   }
+
+   public static boolean tryUseTacticalWeapon(Game g, int itemId) {
+      if (g == null) {
+         return false;
+      }
+      Stack held = g.held();
+      if (held == null || held.id != itemId) {
+         held = new Stack(itemId, 1);
+      }
+      return tryUseTacticalWeapon(g, held, true);
+   }
+
+   /**
+    * Fires Tactical Pistol, Assault SMG (Machine Gun), Heavy Sniper, TNT Frag Grenade, Murderer's Thrown Knife,
+    * or plants/defuses the C4 Explosive!
+    */
+   public static boolean tryUseTacticalWeapon(Game g, Stack held, boolean isClickOrHold) {
+      if (g == null || g.world == null || g.player == null || held == null || g.player.spectator || g.player.dead) {
+         return false;
+      }
+      int id = held.id;
+      Player p = g.player;
+      double yaw = Math.toRadians(p.yaw);
+      double pitch = Math.toRadians(p.pitch);
+      double dx = -Math.sin(yaw) * Math.cos(pitch);
+      double dy = -Math.sin(pitch);
+      double dz = Math.cos(yaw) * Math.cos(pitch);
+      double sx = p.x + dx * 0.45;
+      double sy = p.y + p.eye - 0.1;
+      double sz = p.z + dz * 0.45;
+
+      // 1. Tactical Firearms (Pistol, Machine Gun, Sniper Rifle) — shoot high-velocity Arrows consuming Arrow ammo!
+      if (id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE) {
+         if (playerGunCooldown > 0) {
+            return true;
+         }
+         if (!p.creative && g.countItem(Items.ARROW) <= 0) {
+            if (isClickOrHold && g.world.tickCount % 15L == 0L) {
+               SoundEngine.playUi("click_block", 0.55F, 1.6F);
+               g.say("\u00a7c[Out of Ammo] No Arrows remaining in inventory!");
+            }
+            return true;
+         }
+         if (!p.creative) {
+            g.removeItems(Items.ARROW, 1);
+         }
+         boolean isMurder = g.world.settings != null && g.world.settings.type == WorldSettings.MURDER;
+         float speed = id == Redstone319.SNIPER_RIFLE ? 3.6F : (id == Redstone319.PISTOL ? 2.6F : 2.5F);
+         int dmg = isMurder ? 24 : (id == Redstone319.SNIPER_RIFLE ? 16 : (id == Redstone319.PISTOL ? 6 : 4));
+         playerGunCooldown = id == Redstone319.SNIPER_RIFLE ? 22 : (id == Redstone319.PISTOL ? 7 : 3);
+         // Slight spread for full-auto SMG bursts
+         double spread = id == Redstone319.MACHINE_GUN ? 0.022 : (id == Redstone319.PISTOL ? 0.008 : 0.002);
+         double jx = dx + (g.rnd.nextDouble() - 0.5) * spread;
+         double jy = dy + (g.rnd.nextDouble() - 0.5) * spread;
+         double jz = dz + (g.rnd.nextDouble() - 0.5) * spread;
+         g.mobs.shootGunArrow(sx, sy, sz, jx, jy, jz, speed, dmg, true);
+         SoundEngine.play3D(g.world, "bow", p.x, p.y + p.eye, p.z, 0.9F, id == Redstone319.SNIPER_RIFLE ? 0.68F : (id == Redstone319.MACHINE_GUN ? 1.45F : 1.25F));
+         SoundEngine.play3D(g.world, "hit_1", p.x, p.y + p.eye, p.z, 0.55F, id == Redstone319.SNIPER_RIFLE ? 0.72F : 1.55F);
+         return true;
+      }
+
+      // 2. TNT Frag Grenade — throws a live bouncing Primed TNT Grenade!
+      if (id == Redstone319.TNT_GRENADE) {
+         if (playerGunCooldown > 0) {
+            return true;
+         }
+         playerGunCooldown = 12;
+         SoundEngine.playThrow(g.world, p.x, p.y + p.eye, p.z);
+         SoundEngine.play3D(g.world, "tnt_prime", p.x, p.y + p.eye, p.z, 0.8F, 1.25F);
+         g.world.throwTntGrenade(sx, sy, sz, dx * 0.92, dy * 0.75 + 0.18, dz * 0.92, 35);
+         if (!p.creative) {
+            held.n--;
+            if (held.n <= 0 && g.inv[g.sel] == held) {
+               g.inv[g.sel] = null;
+            }
+         }
+         return true;
+      }
+
+      // 3. Murderer's Knife — Right-Click throws a flying lethal blade (5s cooldown)!
+      if (id == Redstone319.MURDER_KNIFE) {
+         if (playerGunCooldown > 0) {
+            g.say("\u00a7c[Knife Throw] Blade throw recharging (" + ((playerGunCooldown + 19) / 20) + "s)...");
+            return true;
+         }
+         playerGunCooldown = 90;
+         SoundEngine.playThrow(g.world, p.x, p.y + p.eye, p.z);
+         g.mobs.shootGunArrow(sx, sy, sz, dx, dy, dz, 2.3F, 24, true);
+         return true;
+      }
+
+      // 4. C4 Explosive / Defuser in CS2 Strike mode
+      if (id == Redstone319.C4_BOMB && g.world.settings != null && g.world.settings.type == WorldSettings.CS2) {
+         int my = getPlayerTeam(g) & 1; // 0 = CT, 1 = T
+         if (my == 1 && !cs2BombPlanted) {
+            int site = nearCs2BombSite(p.x, p.z);
+            if (site > 0) {
+               plantCs2Bomb(g, site, Net319.selfName, true);
+            } else {
+               g.say("\u00a7c[CS2 Strike] Move to Bomb Site A (West: -22, 0) or Bomb Site B (East: +22, 0) to plant the C4!");
+            }
+         } else if (my == 0 && cs2BombPlanted) {
+            int site = nearCs2BombSite(p.x, p.z);
+            if (site == cs2BombSite) {
+               defuseCs2Bomb(g, Net319.selfName, true);
+            } else {
+               g.say("\u00a7c[CS2 Strike] Move to Planted Bomb Site " + (cs2BombSite == 1 ? "A" : "B") + " to defuse the C4!");
+            }
+         }
+         return true;
+      }
+      return false;
+   }
+
+   public static int nearCs2BombSite(double x, double y, double z) {
+      return Math.abs(y - (Y_DECK + 1.0)) <= 4.5 ? nearCs2BombSite(x, z) : 0;
+   }
+
+   public static int nearCs2BombSite(double x, double z) {
+      if (Math.hypot(x - (-22.0), z) <= 5.5) {
+         return 1; // Bomb Site A
+      }
+      if (Math.hypot(x - 22.0, z) <= 5.5) {
+         return 2; // Bomb Site B
+      }
+      return 0;
+   }
+
+   public static void plantCs2Bomb(Game g, int site, String planter, boolean broadcast) {
+      if (cs2BombPlanted || cs2RoundOver) {
+         return;
+      }
+      cs2BombPlanted = true;
+      cs2BombSite = site == 2 ? 2 : 1;
+      cs2BombTimerTicks = 700; // 35 seconds to detonation
+      cs2DefuseTicks = 0;
+      int bx = cs2BombSite == 1 ? -22 : 22;
+      if (g != null && g.world != null) {
+         g.world.setBlock(bx, Y_DECK + 1, 0, Redstone319.REDSTONE_LAMP_LIT);
+         SoundEngine.play3D(g.world, "tnt_prime", bx + 0.5, Y_DECK + 1.5, 0.5, 1.0F, 0.9F);
+      }
+      if (g != null) {
+         String sName = cs2BombSite == 1 ? "SITE A" : "SITE B";
+         g.say("\u00a7c\u00a7l[CS2 Strike] THE C4 BOMB HAS BEEN PLANTED AT " + sName + " by \u00a7f" + planter + "\u00a7c\u00a7l! (35s to detonation!)");
+      }
+      if (broadcast && Net319.isActive()) {
+         Net319.sendMatchControl("BOMB_PLANT " + cs2BombSite + " " + (planter == null ? "Terrorist" : planter.replace(' ', '_')));
+      }
+   }
+
+   public static void defuseCs2Bomb(Game g, String defuser, boolean broadcast) {
+      if (!cs2BombPlanted || cs2RoundOver) {
+         return;
+      }
+      int bx = cs2BombSite == 1 ? -22 : 22;
+      cs2BombPlanted = false;
+      cs2BombTimerTicks = 0;
+      cs2RoundOver = true;
+      if (g != null && g.world != null) {
+         g.world.setBlock(bx, Y_DECK + 1, 0, Blocks.GOLD_BLOCK);
+         SoundEngine.playMinigameSound("mg_win");
+      }
+      boolean iAmCt = (getPlayerTeam(g) & 1) == 0;
+      pendingOverviewWon = iAmCt;
+      pendingOverviewChamp = (defuser != null ? defuser : "Counter-Terrorists") + " (Defused C4!)";
+      victoryTransitionTicks = 30;
+      if (g != null) {
+         g.say("\u00a79\u00a7l[CS2 Strike] BOMB HAS BEEN DEFUSED by \u00a7f" + defuser + "\u00a79\u00a7l! Counter-Terrorists Win!");
+      }
+      if (broadcast && Net319.isActive()) {
+         Net319.sendMatchControl("BOMB_DEFUSE " + (defuser == null ? "CT" : defuser.replace(' ', '_')));
+      }
+   }
+
+   public static void giveCs2Loadout(Game g) {
+      giveCs2Loadout(g, getPlayerTeam(g), swKit);
+   }
+
+   public static void giveCs2Loadout(Game g, int kit) {
+      giveCs2Loadout(g, getPlayerTeam(g), kit);
+   }
+
+   public static void giveCs2Loadout(Game g, int team, int kit) {
+      if (g == null) {
+         return;
+      }
+      int t = Math.abs(team) & 1; // 0 = CT (Blue), 1 = T (Red)
+      int k = Math.abs(kit) & 3;
+      swKit = k;
+      Arrays.fill(g.inv, null);
+      Arrays.fill(g.armor, null);
+      int coverBlock = t == 0 ? Blocks.CONCRETE0 + 11 : Blocks.CONCRETE0 + 14;
+      switch (k) {
+         case 0 -> { // Assault SMG
+            g.inv[0] = new Stack(Redstone319.MACHINE_GUN, 1);
+            g.inv[1] = new Stack(Redstone319.PISTOL, 1);
+            g.inv[2] = new Stack(Redstone319.MURDER_KNIFE, 1);
+            g.inv[3] = new Stack(Redstone319.TNT_GRENADE, 2);
+            g.inv[4] = new Stack(coverBlock, 16);
+            g.inv[5] = new Stack(Items.ARROW, 64);
+            g.inv[6] = new Stack(Items.ARROW, 32);
+            g.armor[0] = new Stack(Items.armorId(1, 0), 1);
+            g.armor[1] = new Stack(Items.armorId(1, 1), 1);
+         }
+         case 1 -> { // AWP Sniper
+            g.inv[0] = new Stack(Redstone319.SNIPER_RIFLE, 1);
+            g.inv[1] = new Stack(Redstone319.PISTOL, 1);
+            g.inv[2] = new Stack(Redstone319.MURDER_KNIFE, 1);
+            g.inv[3] = new Stack(Redstone319.TNT_GRENADE, 1);
+            g.inv[4] = new Stack(coverBlock, 16);
+            g.inv[5] = new Stack(Items.ARROW, 48);
+            g.armor[0] = new Stack(Items.armorId(0, 0), 1);
+            g.armor[1] = new Stack(Items.armorId(1, 1), 1);
+         }
+         case 2 -> { // Demolitions / Breacher
+            g.inv[0] = new Stack(Redstone319.MACHINE_GUN, 1);
+            g.inv[1] = new Stack(Redstone319.MURDER_KNIFE, 1);
+            g.inv[2] = new Stack(Redstone319.TNT_GRENADE, 4);
+            g.inv[3] = new Stack(coverBlock, 24);
+            g.inv[4] = new Stack(Items.ARROW, 64);
+            g.armor[0] = new Stack(Items.armorId(1, 0), 1);
+            g.armor[1] = new Stack(Items.armorId(1, 1), 1);
+            g.armor[3] = new Stack(Items.armorId(1, 3), 1);
+         }
+         default -> { // Tactical Support
+            g.inv[0] = new Stack(Redstone319.MACHINE_GUN, 1);
+            g.inv[1] = new Stack(Redstone319.PISTOL, 1);
+            g.inv[2] = new Stack(Redstone319.TNT_GRENADE, 2);
+            g.inv[3] = new Stack(Redstone319.GOLDEN_APPLE, 2);
+            g.inv[4] = new Stack(coverBlock, 24);
+            g.inv[5] = new Stack(Items.ARROW, 64);
+            g.armor[0] = new Stack(Items.armorId(3, 0), 1);
+            g.armor[1] = new Stack(Items.armorId(1, 1), 1);
+         }
+      }
+      g.inv[7] = new Stack(Redstone319.C4_BOMB, 1);
+      g.sel = 0;
+   }
+
+   public static void assignMurderMysteryRoles(Game g) {
+      assignMurderMysteryRoles(g, g != null ? g.world : null);
+   }
+
+   public static void assignMurderMysteryRoles(Game g, World w) {
+      long rSeed = (w != null ? w.seed : 1337L) ^ System.nanoTime();
+      int pref = Math.abs(murderRolePref) & 3;
+      if (pref == 1) {
+         myMurderRole = MURDER_ROLE_MURDERER;
+      } else if (pref == 2) {
+         myMurderRole = MURDER_ROLE_SHERIFF;
+      } else if (pref == 3) {
+         myMurderRole = MURDER_ROLE_INNOCENT;
+      } else {
+         int roll = (int)(Math.abs(rSeed) % 3L);
+         myMurderRole = roll == 0 ? MURDER_ROLE_MURDERER : (roll == 1 ? MURDER_ROLE_SHERIFF : MURDER_ROLE_INNOCENT);
+      }
+      myMurderGold = 0;
+      murderWeaponsDealt = false;
+      murderGunDropped = false;
+   }
+
+   public static void giveMurderLoadout(Game g) {
+      giveMurderLoadout(g, murderWeaponsDealt);
+   }
+
+   public static void giveMurderLoadout(Game g, int role) {
+      myMurderRole = Math.max(0, Math.min(2, role));
+      giveMurderLoadout(g, true);
+   }
+
+   public static void giveMurderLoadout(Game g, boolean dealWeapons) {
+      if (g == null) {
+         return;
+      }
+      Arrays.fill(g.inv, null);
+      Arrays.fill(g.armor, null);
+      if (dealWeapons) {
+         if (myMurderRole == MURDER_ROLE_MURDERER) {
+            g.inv[1] = new Stack(Redstone319.MURDER_KNIFE, 1);
+            g.inv[8] = new Stack(Redstone319.COMPASS, 1);
+            g.sel = 0; // Start on empty slot 0 so Knife stays concealed until you press 2!
+         } else if (myMurderRole == MURDER_ROLE_SHERIFF) {
+            g.inv[0] = new Stack(Redstone319.PISTOL, 1);
+            g.inv[1] = new Stack(Items.ARROW, 24);
+            g.inv[8] = new Stack(Redstone319.COMPASS, 1);
+            g.sel = 0;
+         } else {
+            g.inv[8] = new Stack(Redstone319.COMPASS, 1);
+            g.sel = 0;
+         }
+      } else {
+         g.inv[8] = new Stack(Redstone319.COMPASS, 1);
+         g.sel = 0;
+      }
+   }
+
+   public static void onMurderArrowHitBot(Game g, Mobs.Mob victim, int dmg, double sx, double sz) {
+      if (g == null || victim == null || victim.dead) {
+         return;
+      }
+      int bSlot = Math.abs(victim.netId) & 31;
+      int role = botMurderRole[bSlot];
+      if (role == MURDER_ROLE_MURDERER || myMurderRole == MURDER_ROLE_MURDERER) {
+         g.mobs.hurtMob(victim, 24, sx, sz, 0.5, true);
+      } else {
+         // Innocent or Sheriff accidentally shot an Innocent!
+         g.mobs.hurtMob(victim, 24, sx, sz, 0.5, true);
+         g.say("\u00a7c\u00a7l[Murder Mystery] You shot an INNOCENT bystander! You dropped your weapon in guilt!");
+         g.removeItems(Redstone319.PISTOL, 1);
+         murderGunDropped = true;
+         murderDroppedGunX = g.player.x;
+         murderDroppedGunY = g.player.y;
+         murderDroppedGunZ = g.player.z;
+         g.world.dropItem(g.player.x, g.player.y + 0.5, g.player.z, Redstone319.PISTOL, 1);
+      }
+      if (victim.dead) {
+         myKills++;
+         onBotKilled(g, victim);
+      }
+   }
+
+   public static void switchMinigameMode(Game g, int newType) {
+      switchMinigameMode(g, newType, Net319.isHosting());
+   }
+
+   /** Switches the active minigame mode in-place without disconnecting any connected Multiplayer peers! */
+   public static void switchMinigameMode(Game g, int newType, boolean broadcast) {
+      if (g == null || g.world == null || g.world.settings == null) {
+         return;
+      }
+      g.world.settings.type = newType;
+      if (g.worldSettings != null) {
+         g.worldSettings.type = newType;
+      }
+      resetArenaMap(g, g.world, false);
+      if (broadcast && Net319.isHosting()) {
+         Net319.sendMatchControl("MODE " + newType + " " + g.world.settings.mapId);
+         Net319.onHostWorldSwitched(g);
+      }
    }
 
    public static void giveBedwarsLoadout(Game g, int team) {
@@ -686,6 +1183,33 @@ public final class SkyGen extends Gen {
                g.player.updateBox();
             }
             giveTumbleLoadout(g);
+         } else if (g.world.settings.type == WorldSettings.CS2) {
+            int csTeam = t & 1; // 0 = CT (North, Z = -36), 1 = T (South, Z = +36)
+            int sx = ((t >> 1) == 0 ? -2 : 2);
+            int sz = csTeam == 0 ? -36 : 36;
+            g.spawnXZ = new int[]{sx, sz};
+            g.bedPos = null;
+            if (g.player != null) {
+               g.player.setMode(0);
+               g.player.setPos(sx + 0.5, Y_DECK + 1.0, sz + 0.5);
+               g.player.yaw = csTeam == 0 ? 0.0F : 180.0F;
+               g.player.pitch = 0.0F;
+               g.player.updateBox();
+            }
+            giveCs2Loadout(g, csTeam, swKit);
+         } else if (g.world.settings.type == WorldSettings.MURDER) {
+            int[][] mSpawns = new int[][]{{-18, -18}, {18, -18}, {-18, 18}, {18, 18}, {0, -24}, {0, 24}, {-24, 0}, {24, 0}};
+            int[] sp = mSpawns[Math.abs(t) % mSpawns.length];
+            g.spawnXZ = new int[]{sp[0], sp[1]};
+            g.bedPos = null;
+            if (g.player != null) {
+               g.player.setMode(0);
+               g.player.setPos(sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+               g.player.yaw = (float)Math.toDegrees(Math.atan2(sp[0], -sp[1]));
+               g.player.pitch = 0.0F;
+               g.player.updateBox();
+            }
+            giveMurderLoadout(g, murderWeaponsDealt);
          }
       }
       if (broadcast) {
@@ -738,6 +1262,9 @@ public final class SkyGen extends Gen {
          Arrays.fill(g.armor, null);
          g.cursor = null;
          g.deathHandled = false;
+         if (targetW != null && targetW.settings != null && targetW.settings.type == WorldSettings.MURDER) {
+            assignMurderMysteryRoles(g, targetW);
+         }
          selectTeam(g, myTeam, false);
          if (targetW != null && targetW.settings != null) {
             if (targetW.settings.type == WorldSettings.BEDWARS) {
@@ -746,6 +1273,8 @@ public final class SkyGen extends Gen {
                stockSkywarsChests(g, targetW, false);
             } else if (targetW.settings.type == WorldSettings.TUMBLE) {
                stockTumbleArena(g, targetW);
+            } else if (targetW.settings.type == WorldSettings.CS2 || targetW.settings.type == WorldSettings.MURDER) {
+               targetW.ensureArenaChunksLoaded();
             }
             ensureRoundBotsSpawned(g, targetW);
          }
@@ -778,6 +1307,14 @@ public final class SkyGen extends Gen {
                "\u00a7e\u00a7l[Bedwars - " + mapName + "] \u00a7aMatch Started! You are on " + BEDWARS_CODES[myTeam] + BEDWARS_NAMES[myTeam] + " Team\u00a7a! Protect your bed!";
             case WorldSettings.TUMBLE ->
                "\u00a7b\u00a7l[Tumble - " + mapName + "] \u00a7aThe game has started! Use your Shovel (Left-Click) & Snowballs (Right-Click) to drop rivals into the lava!";
+            case WorldSettings.CS2 -> {
+               String tName = (myTeam & 1) == 0 ? "\u00a79Counter-Terrorists [CT]" : "\u00a7cTerrorists [T]";
+               yield "\u00a76\u00a7l[CS2 Strike - " + mapName + "] \u00a7aRound Live! Team: " + tName + " \u00a77— Hold Right-Click to fire Machine Gun / Pistol, throw TNT Grenades, or Plant/Defuse C4 at Site A & B!";
+            }
+            case WorldSettings.MURDER -> {
+               String rCol = myMurderRole == MURDER_ROLE_MURDERER ? "\u00a7c\u00a7lMURDERER" : (myMurderRole == MURDER_ROLE_SHERIFF ? "\u00a79\u00a7lSHERIFF" : "\u00a7a\u00a7lINNOCENT");
+               yield "\u00a7d\u00a7l[Murder Mystery - " + mapName + "] \u00a7fYour Secret Role: " + rCol + "\u00a7f! (Weapons unlock in 5s — Innocents collect 5 Gold for a Pistol!)";
+            }
             default ->
                "\u00a76\u00a7l[Battle - " + mapName + "] \u00a7aThe game has started! 15s Invulnerability active — loot the central chests!";
          };
@@ -851,6 +1388,12 @@ public final class SkyGen extends Gen {
    }
 
    private int surfaceHeightAt(int x, int z) {
+      if (this.mode == WorldSettings.CS2 || this.mode == WorldSettings.MURDER) {
+         if (Math.abs(x) <= 42 && Math.abs(z) <= 42) {
+            return Y_DECK;
+         }
+         return 0;
+      }
       if (this.mode == WorldSettings.TUMBLE) {
          if (Math.hypot(x, z) <= 22.5) {
             return Y_DECK;
@@ -934,6 +1477,13 @@ public final class SkyGen extends Gen {
          int t = Math.abs(myTeam) & 3;
          return new int[]{BEDWARS_BASES[t][0], Y_DECK + 1, BEDWARS_BASES[t][1]};
       }
+      if (this.mode == WorldSettings.CS2) {
+         int csTeam = Math.abs(myTeam) & 1;
+         return new int[]{0, Y_DECK + 1, csTeam == 0 ? -36 : 36};
+      }
+      if (this.mode == WorldSettings.MURDER) {
+         return new int[]{-18, Y_DECK + 1, -18};
+      }
       return new int[]{0, Y_DECK + 1, 0};
    }
 
@@ -945,6 +1495,16 @@ public final class SkyGen extends Gen {
          }
          if (w.settings.type == WorldSettings.BEDWARS) {
             int[] sp = BEDWARS_BASES[Math.abs(peerIndex) % BEDWARS_BASES.length];
+            return new double[]{sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5};
+         }
+         if (w.settings.type == WorldSettings.CS2) {
+            int csTeam = Math.abs(peerIndex) & 1;
+            int ox = ((peerIndex >> 1) & 1) == 0 ? -2 : 2;
+            return new double[]{ox + 0.5, Y_DECK + 1.0, (csTeam == 0 ? -36 : 36) + 0.5};
+         }
+         if (w.settings.type == WorldSettings.MURDER) {
+            int[][] mSpawns = new int[][]{{-18, -18}, {18, -18}, {-18, 18}, {18, 18}, {0, -24}, {0, 24}, {-24, 0}, {24, 0}};
+            int[] sp = mSpawns[Math.abs(peerIndex) % mSpawns.length];
             return new double[]{sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5};
          }
          if (w.settings.type == WorldSettings.SKYBLOCK) {
@@ -972,6 +1532,10 @@ public final class SkyGen extends Gen {
          generateSkywars(ch);
       } else if (this.mode == WorldSettings.BEDWARS) {
          generateBedwars(ch);
+      } else if (this.mode == WorldSettings.CS2) {
+         generateCs2(ch);
+      } else if (this.mode == WorldSettings.MURDER) {
+         generateMurder(ch);
       }
 
       loadCustomChunkIfPresent(ch);
@@ -1663,6 +2227,169 @@ public final class SkyGen extends Gen {
       }
    }
 
+   private void generateCs2(Chunk ch) {
+      int minX = ch.cx * 16;
+      int minZ = ch.cz * 16;
+      if (minX > 48 || minX + 15 < -48 || minZ > 48 || minZ + 15 < -48) {
+         return;
+      }
+      int floorMat = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.STONEBRICK;
+         case WorldSettings.MAP_CAVERN -> Redstone319.POLISHED_ANDESITE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.MOSSY_COBBLE;
+         default -> Blocks.SANDSTONE;
+      };
+      int wallMat = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.BRICKS;
+         case WorldSettings.MAP_CAVERN -> Redstone319.MOSSY_STONEBRICK;
+         case WorldSettings.MAP_TEMPLE -> Redstone319.CHISELED_SANDSTONE;
+         default -> Redstone319.SMOOTH_SANDSTONE;
+      };
+      int crateMat = this.mapId == WorldSettings.MAP_CRUCIBLE ? Blocks.NETHER_BRICKS : Blocks.PLANKS;
+
+      for (int lz = 0; lz < 16; lz++) {
+         int wz = minZ + lz;
+         for (int lx = 0; lx < 16; lx++) {
+            int wx = minX + lx;
+            int ax = Math.abs(wx);
+            int az = Math.abs(wz);
+            if (ax > 40 || az > 40) {
+               continue;
+            }
+            setW(ch, wx, Y_DECK - 1, wz, Blocks.BEDROCK);
+            int ground = floorMat;
+            // CT Spawn (North) & T Spawn (South) markings
+            if (az >= 32 && ax <= 8) {
+               ground = wz < 0 ? (Blocks.CONCRETE0 + 11) : (Blocks.CONCRETE0 + 14);
+            }
+            // Bomb Site A (-22, 0) & Bomb Site B (+22, 0) target pads
+            double dSiteA = Math.hypot(wx - (-22), wz);
+            double dSiteB = Math.hypot(wx - 22, wz);
+            if (dSiteA <= 3.5 || dSiteB <= 3.5) {
+               ground = (dSiteA <= 1.2 || dSiteB <= 1.2) ? Blocks.GOLD_BLOCK : Redstone319.REDSTONE_BLOCK;
+            }
+            // Slime Jump Pads to reach 2nd-story Catwalk (Y_DECK + 5)
+            if ((ax == 8 && az == 8) || (ax == 22 && az == 12)) {
+               ground = Redstone319.SLIME_BLOCK;
+            }
+            setW(ch, wx, Y_DECK, wz, ground);
+
+            // Outer Arena Perimeter Wall (height 6)
+            if (ax == 40 || az == 40) {
+               for (int y = 1; y <= 6; y++) {
+                  setW(ch, wx, Y_DECK + y, wz, y == 6 ? Blocks.GLOWSTONE : wallMat);
+               }
+               continue;
+            }
+
+            // Spawn Divider Walls with Side Doors
+            if (az == 29 && ax <= 10 && ax >= 3 && !(ax >= 5 && ax <= 7)) {
+               for (int y = 1; y <= 4; y++) {
+                  setW(ch, wx, Y_DECK + y, wz, wallMat);
+               }
+            }
+            // Tactical Mid Divider Walls & Sniper Windows
+            if (ax == 11 && az <= 20 && !(az >= 3 && az <= 6) && !(az >= 14 && az <= 17)) {
+               for (int y = 1; y <= 4; y++) {
+                  if (y == 2 && (az == 0 || az == 10)) {
+                     continue; // Sniper peek window!
+                  }
+                  setW(ch, wx, Y_DECK + y, wz, wallMat);
+               }
+            }
+
+            // Tactical Cover Crates in Mid & Bomb Sites
+            if ((ax == 3 && az == 12) || (ax == 20 && az == 4) || (ax == 25 && az == 3) || (ax == 15 && az == 16)) {
+               setW(ch, wx, Y_DECK + 1, wz, crateMat);
+               setW(ch, wx, Y_DECK + 2, wz, crateMat);
+            }
+
+            // 2nd-Story Tactical Catwalk & Heaven Overlook at Y_DECK + 5
+            boolean onCatwalk = (az <= 3 && ax <= 24) || (ax >= 16 && ax <= 20 && az <= 16);
+            if (onCatwalk && dSiteA > 2.5 && dSiteB > 2.5) {
+               setW(ch, wx, Y_DECK + 5, wz, floorMat);
+            }
+         }
+      }
+      // Staircases up to the Y_DECK + 5 Catwalk
+      for (int s = 1; s <= 4; s++) {
+         setW(ch, -16, Y_DECK + s, -16 - s, floorMat);
+         setW(ch, 16, Y_DECK + s, 16 + s, floorMat);
+      }
+   }
+
+   private void generateMurder(Chunk ch) {
+      int minX = ch.cx * 16;
+      int minZ = ch.cz * 16;
+      if (minX > 48 || minX + 15 < -48 || minZ > 48 || minZ + 15 < -48) {
+         return;
+      }
+      int floorMat = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
+         case WorldSettings.MAP_CAVERN -> Redstone319.POLISHED_DIORITE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
+         default -> Blocks.PLANKS;
+      };
+      int wallMat = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.OBSIDIAN;
+         case WorldSettings.MAP_CAVERN -> Blocks.STONEBRICK;
+         case WorldSettings.MAP_TEMPLE -> Redstone319.CHISELED_SANDSTONE;
+         default -> Blocks.QUARTZ_BLOCK;
+      };
+
+      for (int lz = 0; lz < 16; lz++) {
+         int wz = minZ + lz;
+         for (int lx = 0; lx < 16; lx++) {
+            int wx = minX + lx;
+            int ax = Math.abs(wx);
+            int az = Math.abs(wz);
+            if (ax > 34 || az > 34) {
+               continue;
+            }
+            setW(ch, wx, Y_DECK - 1, wz, Blocks.BEDROCK);
+            boolean carpet = (ax <= 3 || az <= 3) && ax <= 30 && az <= 30;
+            int ground = carpet ? (Blocks.WOOL0 + 14) : floorMat;
+            if ((ax == 10 && az == 10)) {
+               ground = Redstone319.SLIME_BLOCK; // Bounce pads to 2nd floor Mezzanine!
+            }
+            setW(ch, wx, Y_DECK, wz, ground);
+
+            // Outer Mansion Walls (height 8)
+            if (ax == 34 || az == 34) {
+               for (int y = 1; y <= 8; y++) {
+                  setW(ch, wx, Y_DECK + y, wz, y == 4 || y == 8 ? Blocks.GLOWSTONE : wallMat);
+               }
+               continue;
+            }
+
+            // Room Partition Walls with Wide Doorways (creates rooms, corridors & hiding spots!)
+            boolean roomWall = (ax == 14 && az >= 6 && az <= 30 && !(az >= 11 && az <= 15) && !(az >= 22 && az <= 25))
+               || (az == 14 && ax >= 6 && ax <= 30 && !(ax >= 11 && ax <= 15) && !(ax >= 22 && ax <= 25));
+            if (roomWall) {
+               for (int y = 1; y <= 4; y++) {
+                  setW(ch, wx, Y_DECK + y, wz, wallMat);
+               }
+            }
+
+            // Grand Hall Pillars (for breaking line of sight from the Murderer!)
+            if ((ax == 6 || ax == 22) && (az == 6 || az == 22)) {
+               for (int y = 1; y <= 5; y++) {
+                  setW(ch, wx, Y_DECK + y, wz, y == 5 ? Blocks.GLOWSTONE : wallMat);
+               }
+            }
+
+            // 2nd-Story Mezzanine Balcony at Y_DECK + 5 around the outer gallery & central skybridge
+            boolean mezzanine = (ax >= 24 && ax <= 33) || (az >= 24 && az <= 33) || (ax <= 2 && az <= 24);
+            if (mezzanine) {
+               setW(ch, wx, Y_DECK + 5, wz, floorMat);
+            }
+         }
+      }
+      // Central Monument at (0, Y_DECK + 1..3, 0)
+      setW(ch, 0, Y_DECK + 1, 0, Blocks.GOLD_BLOCK);
+      setW(ch, 0, Y_DECK + 2, 0, Blocks.GLOWSTONE);
+   }
+
    private void buildConeIsland(Chunk ch, int ox, int oz, double rad, int depth, int topId, int midId, int coreId, boolean ores) {
       int rCeil = (int)Math.ceil(rad);
       int minX = ch.cx * 16;
@@ -1742,6 +2469,25 @@ public final class SkyGen extends Gen {
       return false;
    }
 
+   private static void initBotInventory(int bSlot, int blocks, int arrows, int grenades, int apples, int weaponItem, int rangedItem, int murderRole) {
+      botHealsUsed[bSlot] = 0;
+      botPearlCooldown[bSlot] = 0;
+      botGearTier[bSlot] = 0;
+      botResources[bSlot] = 0;
+      botHoldingBlockTicks[bSlot] = 0;
+      botEatTicks[bSlot] = 0;
+      botBowDrawTicks[bSlot] = 0;
+      botBlocks[bSlot] = Math.max(0, blocks);
+      botArrows[bSlot] = Math.max(0, arrows);
+      botGrenades[bSlot] = Math.max(0, grenades);
+      botApples[bSlot] = Math.max(0, apples);
+      botWeaponItem[bSlot] = weaponItem;
+      botRangedItem[bSlot] = rangedItem;
+      botGold[bSlot] = 0;
+      botMurderRole[bSlot] = murderRole;
+      botBuildUpCooldown[bSlot] = 0;
+   }
+
    private static void spawnBattleBotAtPodium(Game g, World w, int i) {
       if (g == null || g.mobs == null || w == null || i <= 0 || i >= SKYWARS_SPAWNS.length) {
          return;
@@ -1758,18 +2504,21 @@ public final class SkyGen extends Gen {
          bot.teamTag = "BattleBot:" + i + ":" + bName;
          bot.variant = 0;
          int bSlot = Math.abs(bot.netId) & 31;
-         botHealsUsed[bSlot] = 0;
-         botPearlCooldown[bSlot] = 0;
-         botGearTier[bSlot] = 0;
-         botResources[bSlot] = 0;
-         botHoldingBlockTicks[bSlot] = 0;
-         botEatTicks[bSlot] = 0;
-         botBowDrawTicks[bSlot] = 0;
+         int kit = (i + swKit) & 3;
+         if (kit == 0) {
+            initBotInventory(bSlot, 16, 0, 0, 0, Items.toolId(1, Items.C_SWORD), 0, 0);
+         } else if (kit == 1) {
+            initBotInventory(bSlot, 16, 0, 0, 1, Items.toolId(2, Items.C_SWORD), 0, 0);
+         } else if (kit == 2) {
+            initBotInventory(bSlot, 16, 16, 0, 0, Items.toolId(0, Items.C_SWORD), Items.BOW, 0);
+         } else {
+            initBotInventory(bSlot, 16, 0, 2, 0, Items.toolId(2, Items.C_AXE), 0, 0);
+         }
       }
    }
 
    /**
-    * Ensures all initial AI competitors are spawned at the start of every round across Tumble, Battle, and Bedwars,
+    * Ensures all initial AI competitors are spawned at the start of every round across Tumble, Battle, Bedwars, CS2, and Murder Mystery,
     * even if chests were already stocked or if the player switched teams/settings in the waiting lobby!
     */
    public static void ensureRoundBotsSpawned(Game g, World w) {
@@ -1781,6 +2530,7 @@ public final class SkyGen extends Gen {
       if (type == WorldSettings.TUMBLE) {
          if (!tumbleSpawnedBots || (w.tickCount < 20L && countHostiles(g) == 0)) {
             tumbleSpawnedBots = true;
+            int wm = Math.abs(tumbleWeaponMode) % 3;
             for (int i = 1; i < 6; i++) {
                double ang = i * (2.0 * Math.PI / 6.0);
                double bx = Math.cos(ang) * 11.0 + 0.5;
@@ -1790,6 +2540,8 @@ public final class SkyGen extends Gen {
                   String bName = BOT_NAMES[i % BOT_NAMES.length];
                   bot.teamTag = "TumbleBot:" + i + ":" + bName;
                   bot.variant = i;
+                  int bSlot = Math.abs(bot.netId) & 31;
+                  initBotInventory(bSlot, 0, wm == 1 ? 0 : 16, 0, 0, wm == 2 ? 0 : Items.toolId(4, Items.C_SHOVEL), 0, 0);
                }
             }
          }
@@ -1816,6 +2568,48 @@ public final class SkyGen extends Gen {
                   bwBotInitialSpawned[slot] = true;
                   bwBotRespawnTicks[slot] = 0;
                   spawnBedwarsTeamBot(g, t, role);
+               }
+            }
+         }
+      } else if (type == WorldSettings.CS2) {
+         if (!cs2BotsSpawned || (w.tickCount < 20L && countHostiles(g) == 0)) {
+            cs2BotsSpawned = true;
+            int myCsTeam = getPlayerTeam(g) & 1; // 0 = CT, 1 = T
+            // Spawn 3 Ally Bots & 4 Enemy Bots across CT (North) and T (South)
+            for (int csTeam = 0; csTeam <= 1; csTeam++) {
+               int count = (csTeam == myCsTeam) ? 3 : 4;
+               for (int idx = 0; idx < count; idx++) {
+                  double bx = -6.0 + idx * 4.0 + 0.5;
+                  double bz = (csTeam == 0 ? -36.0 : 36.0) + 0.5;
+                  Mobs.Mob bot = g.mobs.spawn(idx % 2 == 0 ? Mobs.ZOMBIE : Mobs.SKELETON, bx, Y_DECK + 1.0, bz);
+                  if (bot != null) {
+                     String bName = BOT_NAMES[(csTeam * 4 + idx) % BOT_NAMES.length];
+                     String tName = csTeam == 0 ? "Blue" : "Red"; // Blue = CT, Red = T
+                     bot.teamTag = "CS2Bot:" + tName + ":" + idx + ":" + bName;
+                     bot.variant = idx & 1;
+                     int bSlot = Math.abs(bot.netId) & 31;
+                     int gun = (idx == 1) ? Redstone319.SNIPER_RIFLE : ((idx == 3) ? Redstone319.PISTOL : Redstone319.MACHINE_GUN);
+                     initBotInventory(bSlot, 16, 48, 2, 1, Redstone319.MURDER_KNIFE, gun, 0);
+                  }
+               }
+            }
+         }
+      } else if (type == WorldSettings.MURDER) {
+         if (!murderBotsSpawned || (w.tickCount < 20L && countHostiles(g) == 0)) {
+            murderBotsSpawned = true;
+            int[][] mSpawns = new int[][]{{18, -18}, {-18, 18}, {18, 18}, {0, -24}, {0, 24}, {-24, 0}, {24, 0}};
+            int murdererIdx = (myMurderRole == MURDER_ROLE_MURDERER) ? -1 : (int)(Math.abs(w.seed) % mSpawns.length);
+            int sheriffIdx = (myMurderRole == MURDER_ROLE_SHERIFF) ? -1 : ((murdererIdx + 3) % mSpawns.length);
+            for (int i = 0; i < mSpawns.length; i++) {
+               int[] sp = mSpawns[i];
+               Mobs.Mob bot = g.mobs.spawn(Mobs.ZOMBIE, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
+               if (bot != null) {
+                  String bName = BOT_NAMES[(i + 1) % BOT_NAMES.length];
+                  bot.teamTag = "MurderBot:" + i + ":" + bName;
+                  bot.variant = i;
+                  int bSlot = Math.abs(bot.netId) & 31;
+                  int role = (i == murdererIdx) ? MURDER_ROLE_MURDERER : ((i == sheriffIdx) ? MURDER_ROLE_SHERIFF : MURDER_ROLE_INNOCENT);
+                  initBotInventory(bSlot, 0, 0, 0, 0, 0, 0, role);
                }
             }
          }
@@ -1951,13 +2745,7 @@ public final class SkyGen extends Gen {
          bot.teamTag = "Team:" + BEDWARS_NAMES[t] + ":" + role + ":" + bName;
          bot.variant = role & 1;
          int bSlot = Math.abs(bot.netId) & 31;
-         botHealsUsed[bSlot] = 0;
-         botPearlCooldown[bSlot] = 0;
-         botGearTier[bSlot] = 0;
-         botResources[bSlot] = 0;
-         botHoldingBlockTicks[bSlot] = 0;
-         botEatTicks[bSlot] = 0;
-         botBowDrawTicks[bSlot] = 0;
+         initBotInventory(bSlot, 32, 0, 0, 0, Items.TOOL_BASE, 0, 0);
       }
    }
 
@@ -2039,7 +2827,11 @@ public final class SkyGen extends Gen {
       if (m == null || m.teamTag == null) {
          return false;
       }
-      return m.teamTag.startsWith("BattleBot:") || m.teamTag.startsWith("TumbleBot:") || m.teamTag.startsWith("Team:");
+      return m.teamTag.startsWith("BattleBot:")
+         || m.teamTag.startsWith("TumbleBot:")
+         || m.teamTag.startsWith("Team:")
+         || m.teamTag.startsWith("CS2Bot:")
+         || m.teamTag.startsWith("MurderBot:");
    }
 
    public static int getBotNetFlags(Mobs.Mob m) {
@@ -2058,7 +2850,8 @@ public final class SkyGen extends Gen {
       if (m == null) {
          return 0;
       }
-      return botGearTier[Math.abs(m.netId) & 31];
+      int bSlot = Math.abs(m.netId) & 31;
+      return (botGearTier[bSlot] & 7) | ((botMurderRole[bSlot] & 3) << 3);
    }
 
    public static void applyRemoteBotState(Mobs.Mob m, int flags, int gearTier) {
@@ -2071,7 +2864,8 @@ public final class SkyGen extends Gen {
       botHoldingBlockTicks[bSlot] = (flags & 512) != 0 ? 6 : 0;
       botEatTicks[bSlot] = (flags & 1024) != 0 ? 9 : 0;
       botBowDrawTicks[bSlot] = (flags & 2048) != 0 ? 10 : 0;
-      botGearTier[bSlot] = Math.max(0, Math.min(4, gearTier));
+      botGearTier[bSlot] = Math.max(0, Math.min(4, gearTier & 7));
+      botMurderRole[bSlot] = (gearTier >> 3) & 3;
    }
 
    public static String botDisplayName(Mobs.Mob m) {
@@ -2083,6 +2877,10 @@ public final class SkyGen extends Gen {
          String teamName = parts[1];
          String nick = parts.length >= 4 ? parts[3] : (parts.length >= 3 ? parts[2] : (teamName + " Bot"));
          return "[" + teamName.toUpperCase() + "] " + nick;
+      }
+      if (m.teamTag.startsWith("CS2Bot:") && parts.length >= 4) {
+         String side = "Blue".equals(parts[1]) ? "CT" : "T";
+         return "[" + side + "] " + parts[3];
       }
       if (parts.length >= 3) {
          return parts[2];
@@ -2101,6 +2899,9 @@ public final class SkyGen extends Gen {
             }
          }
       }
+      if (m.teamTag.startsWith("CS2Bot:")) {
+         return m.teamTag.startsWith("CS2Bot:Blue:") ? 0 : 1; // 0 = CT (Blue), 1 = T (Red)
+      }
       return -1;
    }
 
@@ -2110,29 +2911,53 @@ public final class SkyGen extends Gen {
       }
       int type = w.settings.type;
       int bSlot = Math.abs(bot.netId) & 31;
-      if (botEatTicks[bSlot] > 0) {
+      if (botEatTicks[bSlot] > 0 && botApples[bSlot] > 0) {
          return Redstone319.GOLDEN_APPLE;
       }
+      if (type == WorldSettings.MURDER) {
+         int role = botMurderRole[bSlot];
+         if (role == MURDER_ROLE_MURDERER) {
+            // Murderer conceals their knife unless actively striking!
+            return bot.attackAnim > 0 ? botWeaponItem[bSlot] : 0;
+         }
+         if (botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0) {
+            return botRangedItem[bSlot];
+         }
+         return 0;
+      }
+      if (type == WorldSettings.CS2) {
+         if (botHoldingBlockTicks[bSlot] > 0 && botBlocks[bSlot] > 0) {
+            int csTeam = Math.max(0, botTeamIndex(bot));
+            return csTeam == 0 ? Blocks.CONCRETE0 + 11 : Blocks.CONCRETE0 + 14;
+         }
+         if (botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0) {
+            return botRangedItem[bSlot];
+         }
+         return botWeaponItem[bSlot] != 0 ? botWeaponItem[bSlot] : Redstone319.MURDER_KNIFE;
+      }
       if (type == WorldSettings.TUMBLE) {
-         return (tumbleWeaponMode % 3) == 2 ? Blocks.SNOW : Items.toolId(4, Items.C_SHOVEL);
+         if (botWeaponItem[bSlot] != 0) {
+            return botWeaponItem[bSlot];
+         }
+         return botArrows[bSlot] > 0 ? Blocks.SNOW : 0;
       }
       if (type == WorldSettings.BEDWARS) {
          int t = Math.max(0, botTeamIndex(bot));
-         int role = bot.variant & 1;
-         if (botHoldingBlockTicks[bSlot] > 0 || (role == 1 && bot.age % 70 < 18)) {
+         if (botHoldingBlockTicks[bSlot] > 0 && botBlocks[bSlot] > 0) {
             return Blocks.WOOL0 + BEDWARS_COLORS[t];
          }
-         int tier = Math.min(4, 1 + Math.max(botGearTier[bSlot], bot.age > 1200 ? 1 : 0));
-         return Items.toolId(tier, Items.C_SWORD);
+         if (botBowDrawTicks[bSlot] > 0 && botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0) {
+            return botRangedItem[bSlot];
+         }
+         return botWeaponItem[bSlot] != 0 ? botWeaponItem[bSlot] : Items.TOOL_BASE;
       }
-      if (botHoldingBlockTicks[bSlot] > 0) {
+      if (botHoldingBlockTicks[bSlot] > 0 && botBlocks[bSlot] > 0) {
          return Blocks.STONEBRICK;
       }
-      if (bot.type == Mobs.SKELETON) {
-         return Items.BOW;
+      if (botBowDrawTicks[bSlot] > 0 && botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0) {
+         return botRangedItem[bSlot];
       }
-      int tier = Math.min(4, 1 + Math.max(bot.variant, botGearTier[bSlot]));
-      return Items.toolId(tier, Items.C_SWORD);
+      return botWeaponItem[bSlot];
    }
 
    public static void drawBotPlayer(Mobs.Mob bot, World w, Renderer r, float partial, double x, double y, double z) {
@@ -2166,15 +2991,20 @@ public final class SkyGen extends Gen {
       int skinIdx = Math.abs(bot.netId + bot.variant);
       int team = botTeamIndex(bot);
       int col = 0xFFE680;
-      if (team >= 0 && team < 4) {
+      if (w.settings != null && w.settings.type == WorldSettings.CS2) {
+         col = team == 0 ? 0x55AAFF : 0xFF5555;
+      } else if (team >= 0 && team < 4) {
          int[] rgb = new int[]{0xFF5555, 0x55AAFF, 0x55FF55, 0xFFFF55};
          col = rgb[team];
       }
       GL11.glPushMatrix();
       GL11.glTranslated(x - r.camX, y - r.camY, z - r.camZ);
       PlayerModel.draw(Net319.skinPixels(skinIdx), (skinIdx & 1) == 1, pose, bright);
-      String tag = botDisplayName(bot) + " (" + Math.max(0, bot.health) + "HP)";
-      Net319.drawNameTag(r, tag, 2.16F, col, Math.max(0.0F, bot.health / 20.0F));
+      String tag = (w.settings != null && w.settings.type == WorldSettings.MURDER)
+         ? botDisplayName(bot)
+         : (botDisplayName(bot) + " (" + Math.max(0, bot.health) + "HP)");
+      float hpFrac = (w.settings != null && w.settings.type == WorldSettings.MURDER) ? 1.0F : Math.max(0.0F, bot.health / 20.0F);
+      Net319.drawNameTag(r, tag, 2.16F, col, hpFrac);
       GL11.glPopMatrix();
    }
 
@@ -2188,6 +3018,7 @@ public final class SkyGen extends Gen {
       }
       bot.flee = -999;
       int type = g.world.settings.type;
+      int bSlot = Math.abs(bot.netId) & 31;
       if (type == WorldSettings.BEDWARS) {
          int team = botTeamIndex(bot);
          int role = bot.variant & 1;
@@ -2200,6 +3031,24 @@ public final class SkyGen extends Gen {
                bwBotRespawnTicks[slot] = 0;
                g.say("\u00a7e\u00a7l[FINAL KILL] " + BEDWARS_CODES[team] + botDisplayName(bot) + " \u00a77has been permanently eliminated!");
             }
+         }
+      } else if (type == WorldSettings.MURDER) {
+         int role = botMurderRole[bSlot];
+         if (role == MURDER_ROLE_SHERIFF) {
+            murderGunDropped = true;
+            murderDroppedGunX = bot.x;
+            murderDroppedGunY = bot.y;
+            murderDroppedGunZ = bot.z;
+            g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Redstone319.PISTOL, 1);
+            g.say("\u00a7e\u00a7l[Murder Mystery] THE SHERIFF (" + botDisplayName(bot) + ") WAS KILLED! \u00a7aTheir Pistol has been dropped!");
+         } else if (role == MURDER_ROLE_MURDERER && !murderRoundOver) {
+            murderRoundOver = true;
+            boolean iWon = myMurderRole != MURDER_ROLE_MURDERER;
+            pendingOverviewWon = iWon;
+            pendingOverviewChamp = "Innocents & Sheriff (Stopped " + botDisplayName(bot) + "!)";
+            victoryTransitionTicks = 30;
+            SoundEngine.playMinigameSound("mg_win");
+            g.say("\u00a7a\u00a7l[Murder Mystery] THE MURDERER (" + botDisplayName(bot) + ") HAS BEEN ELIMINATED! Innocents Win!");
          }
       }
    }
@@ -2235,17 +3084,38 @@ public final class SkyGen extends Gen {
       return false;
    }
 
-   /** Consumes up to 3 item stacks from chest at (cx, cy, cz) and upgrades the bot's gear tier & health. */
+   /** Consumes up to 4 item stacks from chest at (cx, cy, cz) and adds those exact items to the bot's inventory! */
    private static void lootChestAt(Mobs.Mob bot, World w, int cx, int cy, int cz) {
       int bSlot = Math.abs(bot.netId) & 31;
       TileEntity te = w.getOrCreateTile(cx, cy, cz);
       int taken = 0;
       if (te != null && te.slots != null) {
-         for (int i = 0; i < te.slots.length && taken < 3; i++) {
-            if (te.slots[i] != null && te.slots[i].n > 0) {
+         for (int i = 0; i < te.slots.length && taken < 4; i++) {
+            Stack st = te.slots[i];
+            if (st != null && st.n > 0) {
+               int id = st.id;
+               int cnt = st.n;
+               if (Items.isTool(id) && (Items.toolClass(id) == Items.C_SWORD || Items.toolClass(id) == Items.C_AXE)) {
+                  if (botWeaponItem[bSlot] == 0 || Items.attackDamage(id) > Items.attackDamage(botWeaponItem[bSlot])) {
+                     botWeaponItem[bSlot] = id;
+                  }
+               } else if (id == Items.BOW || id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE) {
+                  botRangedItem[bSlot] = id;
+               } else if (id == Items.ARROW) {
+                  botArrows[bSlot] += cnt;
+               } else if (id == Redstone319.GOLDEN_APPLE || Items.isFood(id)) {
+                  botApples[bSlot] += Math.max(1, cnt / 3);
+               } else if (id == Blocks.TNT || id == Redstone319.TNT_GRENADE || id == Redstone319.FIRE_CHARGE) {
+                  botGrenades[bSlot] += cnt;
+               } else if (!Items.isItem(id) && Blocks.solid[id]) {
+                  botBlocks[bSlot] += cnt;
+               }
                te.slots[i] = null;
                taken++;
             }
+         }
+         if (!Net319.isClientConnected() || Net319.isHosting()) {
+            Net319.onTileChanged(w, te);
          }
       }
       if (w.settings == null || w.settings.type != WorldSettings.BEDWARS) {
@@ -2291,8 +3161,8 @@ public final class SkyGen extends Gen {
             continue;
          }
          double priority = d;
-         if (it.id == Items.EMERALD || it.id == Items.DIAMOND || it.id == Redstone319.GOLDEN_APPLE) {
-            priority -= 5.0; // High priority for Emeralds, Diamonds & Golden Apples!
+         if (it.id == Items.EMERALD || it.id == Items.DIAMOND || it.id == Redstone319.GOLDEN_APPLE || it.id == Redstone319.PISTOL) {
+            priority -= 5.0; // High priority for Emeralds, Diamonds, Golden Apples & Dropped Sheriff Pistol!
          } else if (it.id == Items.GOLD_INGOT || it.id == Items.ENDER_PEARL) {
             priority -= 3.0;
          }
@@ -2304,19 +3174,51 @@ public final class SkyGen extends Gen {
       if (bestItem != null) {
          double dItem = Math.hypot(bestItem.x - bot.x, bestItem.z - bot.z);
          if (dItem <= 1.95) {
-            // Pick up the item!
+            // Pick up the item and add it to the bot's actual inventory!
             int id = bestItem.id;
             int cnt = bestItem.count;
             bestItem.dead = true;
             bot.attackAnim = 6;
             botResources[bSlot] += cnt;
-            if (id == Items.EMERALD || id == Items.DIAMOND) {
+            if (id == Redstone319.GOLDEN_APPLE) {
+               botApples[bSlot] += cnt;
+            } else if (id == Items.ARROW) {
+               botArrows[bSlot] += cnt;
+            } else if (id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE || id == Items.BOW) {
+               botRangedItem[bSlot] = id;
+               botArrows[bSlot] = Math.max(botArrows[bSlot], 8);
+               if (w.settings != null && w.settings.type == WorldSettings.MURDER) {
+                  murderGunDropped = false;
+                  if (mobs.g != null) {
+                     mobs.g.say("\u00a7b\u00a7l[Murder Mystery] " + botDisplayName(bot) + " \u00a7apicked up the Sheriff's Pistol!");
+                  }
+               }
+            } else if (id == Items.IRON_INGOT && w.settings != null && w.settings.type == WorldSettings.BEDWARS) {
+               botBlocks[bSlot] += cnt * 4;
+               if (botResources[bSlot] >= 8 && botWeaponItem[bSlot] == Items.TOOL_BASE) {
+                  botWeaponItem[bSlot] = Items.toolId(1, Items.C_SWORD);
+               }
+            } else if (id == Items.GOLD_INGOT) {
+               botGold[bSlot] += cnt;
+               if (w.settings != null && w.settings.type == WorldSettings.MURDER && botGold[bSlot] >= 5 && botMurderRole[bSlot] == MURDER_ROLE_INNOCENT) {
+                  botGold[bSlot] -= 5;
+                  botRangedItem[bSlot] = Redstone319.PISTOL;
+                  botArrows[bSlot] += 6;
+               } else if (w.settings != null && w.settings.type == WorldSettings.BEDWARS && botGold[bSlot] >= 3) {
+                  botGold[bSlot] -= 3;
+                  botApples[bSlot]++;
+                  botWeaponItem[bSlot] = Items.toolId(2, Items.C_SWORD);
+                  botRangedItem[bSlot] = Items.BOW;
+                  botArrows[bSlot] += 8;
+               }
+            } else if (id == Items.EMERALD || id == Items.DIAMOND) {
                botGearTier[bSlot] = Math.min(4, botGearTier[bSlot] + 1);
+               botWeaponItem[bSlot] = Items.toolId(Math.min(4, 1 + botGearTier[bSlot]), Items.C_SWORD);
                if (w.settings.type == WorldSettings.BEDWARS && myBotTeam >= 0 && botResources[bSlot] >= 4) {
                   unlockNextTeamUpgrade(mobs.g, myBotTeam, true);
                }
-            } else if (id == Items.GOLD_INGOT && botResources[bSlot] >= 6) {
-               botGearTier[bSlot] = Math.min(3, Math.max(botGearTier[bSlot], 2));
+            } else if (!Items.isItem(id) && Blocks.solid[id]) {
+               botBlocks[bSlot] += cnt;
             }
             SoundEngine.play3D(w, "item_pop", bot.x, bot.y + 1.0, bot.z, 0.55F, 1.15F);
          } else {
@@ -2360,9 +3262,13 @@ public final class SkyGen extends Gen {
 
    /**
     * Dynamically places a 2-wide bridge at Y_DECK (or current deck height) along the bot's path toward (tx, tz)
-    * whenever there is open void ahead, allowing AI bots to bridge to Center, Diamond Islands, and ANY Enemy Bed!
+    * ONLY if the bot actually has building blocks in its inventory (botBlocks[bSlot] > 0)!
     */
-   private static void bridgeTowardTarget(Mobs.Mob bot, World w, double tx, double tz, int bridgeBlockId) {
+   public static void bridgeTowardTarget(Mobs.Mob bot, World w, double tx, double tz, int bridgeBlockId) {
+      int bSlot = Math.abs(bot.netId) & 31;
+      if (botBlocks[bSlot] <= 0) {
+         return;
+      }
       double dx = tx - bot.x;
       double dz = tz - bot.z;
       double dist = Math.hypot(dx, dz);
@@ -2371,29 +3277,75 @@ public final class SkyGen extends Gen {
       }
       double ux = dx / dist;
       double uz = dz / dist;
-      int bSlot = Math.abs(bot.netId) & 31;
       int bridgeY = Y_DECK;
       int perpX = Math.abs(ux) >= Math.abs(uz) ? 0 : 1;
       int perpZ = Math.abs(ux) >= Math.abs(uz) ? 1 : 0;
 
       // Ensure footing directly under the bot and 1..2 blocks ahead along (ux, uz)
       for (int step = 0; step <= 2; step++) {
+         if (botBlocks[bSlot] <= 0) {
+            break;
+         }
          int bx = (int)Math.floor(bot.x + ux * step * 0.95);
          int bz = (int)Math.floor(bot.z + uz * step * 0.95);
          if (!hasFootingAt(w, bx, (int)Math.floor(bot.y), bz)) {
             if (w.chunkAt(bx, bz) != null && w.getBlock(bx, bridgeY, bz) == 0) {
                w.setBlock(bx, bridgeY, bz, bridgeBlockId);
+               botBlocks[bSlot]--;
                bot.attackAnim = 6;
                botHoldingBlockTicks[bSlot] = 14;
                SoundEngine.playBlockPlace(w, bridgeBlockId, bx, bridgeY, bz);
             }
             int sx = bx + perpX;
             int sz = bz + perpZ;
-            if (w.chunkAt(sx, sz) != null && w.getBlock(sx, bridgeY, sz) == 0) {
+            if (botBlocks[bSlot] > 0 && w.chunkAt(sx, sz) != null && w.getBlock(sx, bridgeY, sz) == 0) {
                w.setBlock(sx, bridgeY, sz, bridgeBlockId);
+               botBlocks[bSlot]--;
             }
          }
       }
+   }
+
+   /**
+    * Allows an AI bot to build up vertically (pillar-jump / step-build) when its target is on higher ground
+    * or when scaling a tall ledge, strictly consuming blocks from botBlocks[bSlot]!
+    */
+   public static boolean tryBotBuildUp(Mobs.Mob bot, World w, double tx, double ty, double tz, int blockId) {
+      int bSlot = Math.abs(bot.netId) & 31;
+      if (botBlocks[bSlot] <= 0 || botBuildUpCooldown[bSlot] > 0 || !bot.onGround) {
+         return false;
+      }
+      double dist = Math.hypot(tx - bot.x, tz - bot.z);
+      int bx = (int)Math.floor(bot.x);
+      int by = (int)Math.floor(bot.y);
+      int bz = (int)Math.floor(bot.z);
+      if (by >= Y_DECK + 9 || w.getBlock(bx, by + 2, bz) != 0) {
+         return false;
+      }
+      boolean targetHigher = (ty - bot.y >= 1.8) && dist <= 9.5;
+      boolean wallBlocked = false;
+      if (dist > 1.2) {
+         double ux = (tx - bot.x) / dist;
+         double uz = (tz - bot.z) / dist;
+         int ax = (int)Math.floor(bot.x + ux * 0.95);
+         int az = (int)Math.floor(bot.z + uz * 0.95);
+         wallBlocked = Blocks.solid[w.getBlock(ax, by, az)] && Blocks.solid[w.getBlock(ax, by + 1, az)] && w.getBlock(ax, by + 2, az) == 0;
+      }
+      if (!targetHigher && !wallBlocked) {
+         return false;
+      }
+      if (w.chunkAt(bx, bz) != null && w.getBlock(bx, by, bz) == 0 && Blocks.solid[w.getBlock(bx, by - 1, bz)]) {
+         w.setBlock(bx, by, bz, blockId);
+         botBlocks[bSlot]--;
+         botBuildUpCooldown[bSlot] = 14;
+         botHoldingBlockTicks[bSlot] = 14;
+         bot.attackAnim = 6;
+         bot.setPos(bx + 0.5, by + 1.0, bz + 0.5);
+         bot.vy = 0.24;
+         SoundEngine.playBlockPlace(w, blockId, bx, by, bz);
+         return true;
+      }
+      return false;
    }
 
    /** Steers a minigame bot toward (tx, tz) while climbing steps/terraces, using Slime Jump Pads, and parkour-jumping gaps! */
@@ -2568,13 +3520,17 @@ public final class SkyGen extends Gen {
       if (botBowDrawTicks[botSlot] > 0) {
          botBowDrawTicks[botSlot]--;
       }
+      if (botBuildUpCooldown[botSlot] > 0) {
+         botBuildUpCooldown[botSlot]--;
+      }
 
-      // Tactical Golden Apple Self-Healing: Battle & Bedwars bots hold and eat a Golden Apple when HP <= 10!
-      if ((mode == WorldSettings.BATTLE || mode == WorldSettings.BEDWARS)
-         && bot.health > 0
+      // Tactical Golden Apple Self-Healing: bots ONLY eat a Golden Apple if they actually have one in botApples[botSlot]!
+      if (bot.health > 0
          && bot.health <= 10
-         && botHealsUsed[botSlot] < 2
-         && bot.age % 35 == 0) {
+         && botApples[botSlot] > 0
+         && botEatTicks[botSlot] <= 0
+         && bot.age % 30 == 0) {
+         botApples[botSlot]--;
          botHealsUsed[botSlot]++;
          botEatTicks[botSlot] = 18;
          bot.health = Math.min(20, bot.health + 6);
@@ -2670,8 +3626,8 @@ public final class SkyGen extends Gen {
                rbz = (int)Math.floor(targZ);
             }
 
-            // Close-range Shovel Spleef: mine the block directly beneath or in front of the rival!
-            if (bestDist <= 4.8 && bot.cd <= 0 && (tumbleWeaponMode % 3) != 2) {
+            // Close-range Shovel Spleef: ONLY if the bot has a Shovel in botWeaponItem[botSlot]!
+            if (bestDist <= 4.8 && bot.cd <= 0 && botWeaponItem[botSlot] != 0) {
                if (isTumbleLayerBlock(rbx, rby, rbz) && !(rbx == 0 && rby == Y_DECK && rbz == 0)
                   && (Math.abs(rbx - (int)Math.floor(bot.x)) > 1 || Math.abs(rbz - (int)Math.floor(bot.z)) > 1)) {
                   int bid = w.getBlock(rbx, rby, rbz);
@@ -2687,11 +3643,12 @@ public final class SkyGen extends Gen {
                   }
                }
             }
-            // Medium-range Lead-Predicted Snowball Spleef: throw a snowball that breaks a layer block in the rival's path!
-            else if (bestDist > 4.0 && bestDist <= 16.5 && bot.cd <= 0 && (tumbleWeaponMode % 3) != 1) {
+            // Medium-range Snowball Spleef: ONLY if the bot has snowballs left in botArrows[botSlot]!
+            else if (bestDist > 4.0 && bestDist <= 16.5 && bot.cd <= 0 && botArrows[botSlot] > 0) {
                if (isTumbleLayerBlock(rbx, rby, rbz) && !(rbx == 0 && rby == Y_DECK && rbz == 0)) {
                   int bid = w.getBlock(rbx, rby, rbz);
                   if (bid != 0 && !Blocks.isFluid(bid)) {
+                     botArrows[botSlot]--;
                      bot.cd = 20;
                      bot.attackAnim = 8;
                      SoundEngine.playThrow(w, bot.x, bot.y + 1.4, bot.z);
@@ -2709,10 +3666,9 @@ public final class SkyGen extends Gen {
       }
 
       // ====================================================================
-      //  2. BATTLE AI: Surroundings-Aware Chest/Item Looting, Dynamic Bridging, Lead Bow & Crit Combos
+      //  2. BATTLE AI: Surroundings-Aware Chest/Item Looting, Dynamic Bridging, Vertical Build-Up & Combat
       // ====================================================================
       if (mode == WorldSettings.BATTLE) {
-         // Scan surroundings for nearest human player, multiplayer peer, OR rival BattleBot first so the bot knows if it is safe to loot!
          Mobs.Mob rivalBot = null;
          int targetPeerId = -1;
          double targX = 0.5;
@@ -2769,17 +3725,18 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // Check surroundings: if it is safe (or during Grace Period), loot nearby chests & dropped items!
-         double effectiveEnemyDist = battleGraceTicks > 0 ? 999.0 : bestDist;
+         // Check surroundings: if it is safe (or during Grace Period, or if the bot needs blocks/weapons), loot nearby chests & dropped items!
+         double effectiveEnemyDist = (battleGraceTicks > 0 || (botWeaponItem[botSlot] == 0 && botRangedItem[botSlot] == 0)) ? 999.0 : bestDist;
          double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, effectiveEnemyDist, targX, targZ);
          if (lootGoal != null) {
             double[] wpLoot = nextArenaBridgeWaypoint(w, bot.x, bot.z, lootGoal[0], lootGoal[2]);
             bridgeTowardTarget(bot, w, wpLoot[0], wpLoot[1], Blocks.STONEBRICK);
+            tryBotBuildUp(bot, w, wpLoot[0], lootGoal[1], wpLoot[1], Blocks.STONEBRICK);
             steerBotSafely3D(bot, w, wpLoot[0], lootGoal[1], wpLoot[1], out, 1.24);
             return out;
          }
 
-         // During Grace Period (first 15s) or if unequipped (variant == 0) and safe, advance toward Mid / Center Feast chests!
+         // During Grace Period (first 15s) or if unequipped and safe, advance toward Mid / Center Feast chests!
          if (battleGraceTicks > 0 || (bot.variant == 0 && bestDist > 10.0)) {
             double cx = 0.5;
             double cz = 0.5;
@@ -2812,8 +3769,9 @@ public final class SkyGen extends Gen {
 
          double[] wp = nextArenaBridgeWaypoint(w, bot.x, bot.z, targX, targZ);
          bridgeTowardTarget(bot, w, wp[0], wp[1], Blocks.STONEBRICK);
-         boolean isArcher = bot.type == Mobs.SKELETON;
-         if (isArcher && bestDist < 11.5 && bestDist > 3.5 && wp[0] == targX && wp[1] == targZ) {
+         tryBotBuildUp(bot, w, targX, targY, targZ, Blocks.STONEBRICK);
+         boolean hasBowAndAmmo = botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0;
+         if (hasBowAndAmmo && bestDist < 11.5 && bestDist > 3.5 && wp[0] == targX && wp[1] == targZ) {
             // Archer strafes at mid-range and seeks high ground while firing bow
             if (bot.age % 40 == 0) {
                bot.strafeDir = -bot.strafeDir;
@@ -2821,7 +3779,6 @@ public final class SkyGen extends Gen {
             double ang = Math.atan2(bot.z - targZ, bot.x - targX) + 0.95 * bot.strafeDir;
             steerBotSafely3D(bot, w, targX + Math.cos(ang) * 7.8, targY + 2.0, targZ + Math.sin(ang) * 7.8, out, 1.02);
          } else {
-            // Melee fighter weave-strafes on approach and sprint-jumps at close range for critical strikes!
             double moveX = wp[0];
             double moveZ = wp[1];
             if (bestDist < 5.5 && bestDist > 1.8 && wp[0] == targX && wp[1] == targZ) {
@@ -2843,9 +3800,9 @@ public final class SkyGen extends Gen {
          out.headYaw = Mobs.angleTo(leadX - bot.x, leadZ - bot.z);
          out.headPitch = (float)(-Math.toDegrees(Math.atan2((targY + 1.0) - (bot.y + 1.4), Math.max(0.5, bestDist))));
 
-         // Combat execution (Melee Crit Sword/Axe or Lead-Predicted Ranged Bow against BOTH Player and Rival Bots!)
          boolean isCrit = !bot.onGround && bot.vy < -0.05;
-         int dmg = 3 + Math.min(3, Math.max(bot.variant, botGearTier[botSlot])) + (isCrit ? 1 : 0);
+         int wep = botWeaponItem[botSlot];
+         int dmg = (wep != 0 ? Math.max(3, (int)Items.attackDamage(wep) / 2) : 1) + (isCrit ? 1 : 0);
          if (bestDist < 2.25 && Math.abs(targY - bot.y) < 2.4 && bot.cd <= 0) {
             bot.cd = 16;
             bot.attackAnim = 8;
@@ -2861,38 +3818,31 @@ public final class SkyGen extends Gen {
                   mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77eliminated \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
                }
             }
-         } else if (isArcher && bestDist >= 2.5 && bestDist < 18.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
+         } else if (botGrenades[botSlot] > 0 && bestDist >= 5.0 && bestDist <= 14.0 && bot.cd <= 0 && bot.age % 50 == 0
+            && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
+            botGrenades[botSlot]--;
+            bot.cd = 28;
+            bot.attackAnim = 8;
+            double dx = (leadX - bot.x) / bestDist;
+            double dz = (leadZ - bot.z) / bestDist;
+            w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 1.4, bot.z + dz * 0.7, dx * 0.65, 0.32, dz * 0.65, 45);
+         } else if (hasBowAndAmmo && bestDist >= 2.5 && bestDist < 18.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
             if (bot.cd > 0 && bot.cd <= 16) {
-               // Two-handed Bow draw pose before releasing the arrow!
                botBowDrawTicks[botSlot] = 17 - bot.cd;
             } else if (bot.cd <= 0) {
+               botArrows[botSlot]--;
                bot.cd = 32;
                botBowDrawTicks[botSlot] = 0;
                SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
                double arcY = targY + 1.1 + bestDist * 0.04;
-               if (targetIsPlayer) {
-                  mobs.shootAtPos(bot, leadX, arcY, leadZ);
-               } else if (targetPeerId > 0) {
-                  mobs.shootAtPos(bot, leadX, arcY, leadZ);
-                  if (mobs.rnd.nextInt(3) != 0) {
-                     Net319.sendHit(targetPeerId, 3, bot.x, bot.z, botDisplayName(bot));
-                  }
-               } else if (rivalBot != null) {
-                  mobs.shootAtPos(bot, leadX, arcY, leadZ);
-                  if (mobs.rnd.nextInt(3) != 0) {
-                     mobs.hurtMob(rivalBot, 3, bot.x, bot.z, 0.32, false);
-                     if (rivalBot.dead && mobs.g != null) {
-                        mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77sniped \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
-                     }
-                  }
-               }
+               mobs.shootAtPos(bot, leadX, arcY, leadZ);
             }
          }
          return out;
       }
 
       // ====================================================================
-      //  3. BEDWARS AI: Surroundings-Safe Resource/Chest Looting, Dynamic Bridging & Multi-Team Bed Raiding
+      //  3. BEDWARS AI: Surroundings-Safe Resource/Chest Looting, Dynamic Bridging, Vertical Build-Up & Bed Raiding
       // ====================================================================
       if (mode == WorldSettings.BEDWARS) {
          int myBotTeam = botTeamIndex(bot);
@@ -2904,7 +3854,6 @@ public final class SkyGen extends Gen {
          int baseX = BEDWARS_BASES[myBotTeam][0];
          int baseZ = BEDWARS_BASES[myBotTeam][1];
 
-         // 3a. Scan surroundings for nearby enemy player, enemy multiplayer peer, or enemy team bot first so the bot knows threat proximity!
          int humanTeam = mobs.g != null ? getPlayerTeam(mobs.g) : 0;
          Mobs.Mob enemyBot = null;
          int enemyPeerId = -1;
@@ -2957,7 +3906,7 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // 3b. Defender Bot (#0): Fortifies own team Bed with 2-layer End Stone + Team Wool defense shell when near base!
+         // 3b. Defender Bot (#0): Fortifies own team Bed ONLY if botBlocks[botSlot] > 0!
          boolean ownBedIntact = isTeamBedIntact(w, myBotTeam);
          boolean ownBedFortified = true;
          if (ownBedIntact) {
@@ -2971,9 +3920,10 @@ public final class SkyGen extends Gen {
             for (int[] co : innerShell) {
                if (w.getBlock(co[0], co[1], co[2]) == 0) {
                   ownBedFortified = false;
-                  if (role == 0 && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.0 && bot.age % 16 == 3) {
+                  if (role == 0 && botBlocks[botSlot] > 0 && Math.hypot(bot.x - bf[0], bot.z - bf[2]) <= 8.0 && bot.age % 16 == 3) {
                      int defBlock = (bot.age > 360 || botGearTier[botSlot] >= 2) ? Blocks.END_STONE : woolId;
                      w.setBlock(co[0], co[1], co[2], defBlock);
+                     botBlocks[botSlot]--;
                      bot.attackAnim = 6;
                      botHoldingBlockTicks[botSlot] = 12;
                      SoundEngine.playBlockPlace(w, defBlock, co[0], co[1], co[2]);
@@ -2983,8 +3933,8 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // 3c. Background bridge progression from team base toward Center (0, 0) so routes open up steadily
-         if (role == 1 && bot.age % 10 == 0) {
+         // 3c. Background bridge progression from team base toward Center (0, 0) ONLY if botBlocks[botSlot] > 0!
+         if (role == 1 && botBlocks[botSlot] > 0 && bot.age % 10 == 0) {
             int dirX = Integer.compare(0, baseX);
             int dirZ = Integer.compare(0, baseZ);
             int step = bwTeamBridgeStep[myBotTeam];
@@ -2994,25 +3944,28 @@ public final class SkyGen extends Gen {
                if (w.chunkAt(brX, brZ) != null) {
                   if (w.getBlock(brX, Y_DECK, brZ) == 0) {
                      w.setBlock(brX, Y_DECK, brZ, woolId);
+                     botBlocks[botSlot]--;
                      bot.attackAnim = 6;
                      botHoldingBlockTicks[botSlot] = 10;
                      SoundEngine.playBlockPlace(w, woolId, brX, Y_DECK, brZ);
                   }
                   int sideX = brX + (dirX == 0 ? 1 : 0);
                   int sideZ = brZ + (dirZ == 0 ? 1 : 0);
-                  if (w.getBlock(sideX, Y_DECK, sideZ) == 0) {
+                  if (botBlocks[botSlot] > 0 && w.getBlock(sideX, Y_DECK, sideZ) == 0) {
                      w.setBlock(sideX, Y_DECK, sideZ, woolId);
+                     botBlocks[botSlot]--;
                   }
                   bwTeamBridgeStep[myBotTeam] = step + 1;
                }
             }
          }
 
-         // 3d. Surroundings-Safe Looting: if no enemy is threatening (enemyDist > 8.5), collect nearby generator drops or chests!
-         if (enemyDist > 8.5) {
+         // 3d. Surroundings-Safe Looting: if no enemy is threatening (or if out of blocks!), collect nearby generator drops or chests!
+         if (enemyDist > 8.5 || botBlocks[botSlot] <= 2) {
             double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, myBotTeam, enemyDist, enemyX, enemyZ);
-            if (lootGoal != null && (role == 0 || Math.hypot(lootGoal[0] - bot.x, lootGoal[2] - bot.z) <= 8.0)) {
+            if (lootGoal != null && (role == 0 || botBlocks[botSlot] <= 2 || Math.hypot(lootGoal[0] - bot.x, lootGoal[2] - bot.z) <= 8.0)) {
                bridgeTowardTarget(bot, w, lootGoal[0], lootGoal[2], woolId);
+               tryBotBuildUp(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], woolId);
                steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.22);
                return out;
             }
@@ -3023,7 +3976,6 @@ public final class SkyGen extends Gen {
          double goalY = Y_DECK + 1.0;
          double goalZ = baseZ + 0.5;
 
-         // Check if an enemy is invading our team's base right now
          int[] ownBf = getTeamBedFoot(myBotTeam);
          boolean baseUnderAttack = ownBedIntact && Math.hypot(enemyX - ownBf[0], enemyZ - ownBf[2]) <= 15.0;
 
@@ -3038,14 +3990,12 @@ public final class SkyGen extends Gen {
                goalZ = ownBf[2] + 0.5 + Math.sin(patrolAng) * 2.2;
             }
          } else {
-            // Raider (#1), or Defender (#0) whose bed is already fortified or destroyed: actively go for Enemy Beds!
             int targetBedTeam = -1;
             double bestBedScore = 999.0;
             for (int t = 0; t < 4; t++) {
                if (t != myBotTeam && isTeamBedIntact(w, t)) {
                   int[] bf = getTeamBedFoot(t);
                   double d = Math.hypot(bf[0] + 0.5 - bot.x, bf[2] + 0.5 - bot.z);
-                  // Slight priority bonus for raiding the human player's bed or the closest intact enemy bed
                   double score = d - (t == humanTeam ? 8.0 : 0.0);
                   if (score < bestBedScore) {
                      bestBedScore = score;
@@ -3055,7 +4005,6 @@ public final class SkyGen extends Gen {
             }
 
             if (enemyDist <= 7.0) {
-               // Immediate threat in melee/close range: engage enemy fighter!
                goalX = enemyX;
                goalY = enemyY;
                goalZ = enemyZ;
@@ -3070,7 +4019,6 @@ public final class SkyGen extends Gen {
                boolean inTargetCorridor = (bf[0] == 0 && Math.abs(bot.x) <= 6.5 && (bot.z * bf[2]) >= -4.0)
                   || (bf[2] == 0 && Math.abs(bot.z) <= 6.5 && (bot.x * bf[0]) >= -4.0);
 
-               // Safe Cardinal Routing: Base -> Center (0, 0) -> Target Enemy Base!
                if (distToCenter > 10.5 && !inTargetCorridor) {
                   goalX = 0.5;
                   goalZ = 0.5;
@@ -3079,7 +4027,6 @@ public final class SkyGen extends Gen {
                   goalZ = bf[2] + 0.5;
                }
 
-               // If within 4.8 blocks of the enemy Bed, mine through any defense blocks and destroy the Bed!
                if (distToBed <= 4.8 && bot.cd <= 0) {
                   bot.cd = 20;
                   bot.attackAnim = 8;
@@ -3110,7 +4057,6 @@ public final class SkyGen extends Gen {
                   }
                }
             } else if (enemyDist < 200.0) {
-               // All enemy beds are broken: hunt down remaining enemy players/bots via Center!
                double distToCenter = Math.hypot(bot.x, bot.z);
                if (distToCenter > 11.0 && (bot.x * enemyX + bot.z * enemyZ) <= 0.0) {
                   goalX = 0.5;
@@ -3123,15 +4069,16 @@ public final class SkyGen extends Gen {
             }
          }
 
-         // Dynamically build Team Wool bridges across any void gap along our route to (goalX, goalZ)!
          bridgeTowardTarget(bot, w, goalX, goalZ, woolId);
+         tryBotBuildUp(bot, w, goalX, goalY, goalZ, woolId);
          steerBotSafely3D(bot, w, goalX, goalY, goalZ, out, 1.22);
 
-         // Melee combat against enemy player or enemy team bot
-         if (enemyDist < 2.35 && Math.abs(enemyY - bot.y) < 2.4 && bot.cd <= 0) {
+         // Melee or Ranged combat against enemy player or enemy team bot
+         int wep = botWeaponItem[botSlot];
+         if (enemyDist < 2.35 && Math.abs(enemyY - bot.y) < 2.4 && bot.cd <= 0 && wep != 0) {
             bot.cd = 16;
             bot.attackAnim = 8;
-            int dmg = 3 + Math.min(2, botGearTier[botSlot]) + (hasTeamSharpness(myBotTeam) ? 2 : 0);
+            int dmg = Math.max(3, (int)Items.attackDamage(wep) / 2) + (hasTeamSharpness(myBotTeam) ? 2 : 0);
             SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
             SoundEngine.playHit(w, enemyX, enemyY + 1.0, enemyZ, false);
             if (enemyIsPlayer && mobs.g != null) {
@@ -3141,7 +4088,346 @@ public final class SkyGen extends Gen {
             } else if (enemyBot != null) {
                mobs.hurtMob(enemyBot, dmg, bot.x, bot.z, 0.42, false);
             }
+         } else if (botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0 && enemyDist >= 3.5 && enemyDist < 17.0
+            && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, enemyX, enemyY + 1.0, enemyZ)) {
+            if (bot.cd > 0 && bot.cd <= 14) {
+               botBowDrawTicks[botSlot] = 15 - bot.cd;
+            } else if (bot.cd <= 0) {
+               botArrows[botSlot]--;
+               bot.cd = 30;
+               botBowDrawTicks[botSlot] = 0;
+               SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
+               mobs.shootAtPos(bot, enemyX, enemyY + 1.1, enemyZ);
+            }
          }
+         return out;
+      }
+
+      // ====================================================================
+      //  4. CS2 STRIKE AI: Tactical Gunfights (Pistols/Machine Guns/Snipers), TNT Grenades, Vertical Build-Up & C4 Bomb Plant/Defuse!
+      // ====================================================================
+      if (mode == WorldSettings.CS2) {
+         int myCsTeam = botTeamIndex(bot); // 0 = CT (Blue), 1 = T (Red)
+         if (myCsTeam < 0) {
+            myCsTeam = 1;
+         }
+         int humanCsTeam = mobs.g != null ? (getPlayerTeam(mobs.g) & 1) : 0;
+         Mobs.Mob enemyBot = null;
+         int enemyPeerId = -1;
+         double enemyX = 0.5;
+         double enemyY = Y_DECK + 1.0;
+         double enemyZ = 0.5;
+         double enemyVx = 0.0;
+         double enemyVz = 0.0;
+         double enemyDist = 999.0;
+         boolean enemyIsPlayer = false;
+
+         if (player != null && mobs.targetable(player) && humanCsTeam != myCsTeam) {
+            double d = Math.hypot(player.x - bot.x, player.z - bot.z);
+            if (d < enemyDist) {
+               enemyDist = d;
+               enemyX = player.x;
+               enemyY = player.y;
+               enemyZ = player.z;
+               enemyVx = player.vx;
+               enemyVz = player.vz;
+               enemyIsPlayer = true;
+            }
+         }
+         for (Net319.Peer peer : Net319.peers().values()) {
+            if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0 && peer.gameMode != 1 && peer.gameMode != 3 && (peer.team & 1) != myCsTeam) {
+               double d = Math.hypot(peer.x - bot.x, peer.z - bot.z);
+               if (d < enemyDist) {
+                  enemyDist = d;
+                  enemyX = peer.x;
+                  enemyY = peer.y;
+                  enemyZ = peer.z;
+                  enemyVx = peer.x - peer.px;
+                  enemyVz = peer.z - peer.pz;
+                  enemyIsPlayer = false;
+                  enemyPeerId = peer.id;
+                  enemyBot = null;
+               }
+            }
+         }
+         for (Mobs.Mob other : mobs.list) {
+            if (other != null && other != bot && !other.dead && Mobs.hostile(other.type)) {
+               int ot = botTeamIndex(other);
+               if (ot >= 0 && ot != myCsTeam) {
+                  double d = Math.hypot(other.x - bot.x, other.z - bot.z);
+                  if (d < enemyDist) {
+                     enemyDist = d;
+                     enemyBot = other;
+                     enemyX = other.x;
+                     enemyY = other.y;
+                     enemyZ = other.z;
+                     enemyVx = other.vx;
+                     enemyVz = other.vz;
+                     enemyIsPlayer = false;
+                     enemyPeerId = -1;
+                  }
+               }
+            }
+         }
+
+         // Strategic Bomb Site Objective: Site A (-22, 0) or Site B (+22, 0)
+         int prefSite = bot.variant & 1;
+         int activeSite = cs2BombPlanted ? cs2BombSite : prefSite;
+         double siteX = (activeSite == 0 ? -22.0 : 22.0) + 0.5;
+         double siteZ = 0.5;
+         double distToSite = Math.hypot(bot.x - siteX, bot.z - siteZ);
+
+         if (myCsTeam == 1 && !cs2BombPlanted && !cs2RoundOver && distToSite <= 3.5 && enemyDist > 5.0 && w.tickCount > 120L) {
+            // Terrorist AI plants the C4 Bomb at Site A or Site B!
+            plantCs2Bomb(mobs.g, activeSite == 0 ? 1 : 2, botDisplayName(bot), true);
+            bot.attackAnim = 8;
+         } else if (myCsTeam == 0 && cs2BombPlanted && !cs2RoundOver && distToSite <= 3.8 && enemyDist > 4.5) {
+            // Counter-Terrorist AI defuses the planted C4 Bomb!
+            cs2DefuseTicks += 2;
+            bot.attackAnim = 6;
+            if (cs2DefuseTicks >= 100) {
+               defuseCs2Bomb(mobs.g, botDisplayName(bot), true);
+            }
+         }
+
+         double goalX = siteX;
+         double goalY = Y_DECK + 1.0;
+         double goalZ = siteZ;
+         boolean hasLOS = enemyDist < 28.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, enemyX, enemyY + 1.0, enemyZ);
+         if (hasLOS && (!cs2BombPlanted || myCsTeam == 1 || enemyDist < 10.0)) {
+            if (botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0 && enemyDist > 4.5 && enemyDist < 15.0) {
+               // Tactical strafe shooting!
+               if (bot.age % 28 == 0) {
+                  bot.strafeDir = -bot.strafeDir;
+               }
+               double ang = Math.atan2(bot.z - enemyZ, bot.x - enemyX) + 0.85 * bot.strafeDir;
+               goalX = enemyX + Math.cos(ang) * 8.5;
+               goalY = enemyY;
+               goalZ = enemyZ + Math.sin(ang) * 8.5;
+            } else {
+               goalX = enemyX;
+               goalY = enemyY;
+               goalZ = enemyZ;
+            }
+         }
+
+         int blockMat = myCsTeam == 0 ? (Blocks.CONCRETE0 + 11) : (Blocks.CONCRETE0 + 14);
+         tryBotBuildUp(bot, w, goalX, goalY, goalZ, blockMat);
+         steerBotSafely3D(bot, w, goalX, goalY, goalZ, out, 1.24);
+
+         if (enemyDist < 32.0) {
+            double leadX = enemyX + enemyVx * Math.min(6.0, enemyDist * 0.32);
+            double leadZ = enemyZ + enemyVz * Math.min(6.0, enemyDist * 0.32);
+            out.headYaw = Mobs.angleTo(leadX - bot.x, leadZ - bot.z);
+            out.headPitch = (float)(-Math.toDegrees(Math.atan2((enemyY + 1.0) - (bot.y + 1.45), Math.max(0.5, enemyDist))));
+
+            // 1. Throw TNT Grenade if enemy is grouped/behind cover at medium range and bot has grenades in botGrenades[botSlot]!
+            if (botGrenades[botSlot] > 0 && enemyDist >= 6.0 && enemyDist <= 16.5 && bot.cd <= 0 && (bot.age + botSlot * 11) % 65 == 0 && hasLOS) {
+               botGrenades[botSlot]--;
+               bot.cd = 24;
+               bot.attackAnim = 8;
+               double dx = (leadX - bot.x) / enemyDist;
+               double dz = (leadZ - bot.z) / enemyDist;
+               w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 1.45, bot.z + dz * 0.7, dx * 0.68, 0.30, dz * 0.68, 42);
+            }
+            // 2. Fire Gun (Machine Gun / Pistol / Sniper Rifle) ONLY if botArrows[botSlot] > 0!
+            else if (botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0 && enemyDist >= 2.2 && enemyDist <= 28.0 && hasLOS && bot.cd <= 0) {
+               botArrows[botSlot]--;
+               int gun = botRangedItem[botSlot];
+               int cd = gun == Redstone319.MACHINE_GUN ? 7 : (gun == Redstone319.SNIPER_RIFLE ? 28 : 14);
+               int dmg = gun == Redstone319.SNIPER_RIFLE ? 14 : (gun == Redstone319.PISTOL ? 6 : 4);
+               float spd = gun == Redstone319.SNIPER_RIFLE ? 3.2F : 2.3F;
+               bot.cd = cd;
+               bot.attackAnim = 5;
+               botBowDrawTicks[botSlot] = 6;
+               double d3 = Math.max(0.5, Math.sqrt((leadX - bot.x) * (leadX - bot.x) + ((enemyY + 1.1) - (bot.y + 1.45)) * ((enemyY + 1.1) - (bot.y + 1.45)) + (leadZ - bot.z) * (leadZ - bot.z)));
+               mobs.shootGunArrow(
+                  bot.x,
+                  bot.y + 1.45,
+                  bot.z,
+                  (leadX - bot.x) / d3,
+                  ((enemyY + 1.1) - (bot.y + 1.45)) / d3,
+                  (leadZ - bot.z) / d3,
+                  spd,
+                  dmg,
+                  false
+               );
+               SoundEngine.play3D(w, "bow_shoot", bot.x, bot.y + 1.45, bot.z, 0.85F, gun == Redstone319.MACHINE_GUN ? 1.55F : 1.30F);
+            }
+            // 3. Close-quarters Combat Knife strike!
+            else if (enemyDist < 2.35 && Math.abs(enemyY - bot.y) < 2.4 && bot.cd <= 0 && botWeaponItem[botSlot] != 0) {
+               bot.cd = 14;
+               bot.attackAnim = 8;
+               int dmg = 6;
+               SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
+               SoundEngine.playHit(w, enemyX, enemyY + 1.0, enemyZ, true);
+               if (enemyIsPlayer && mobs.g != null) {
+                  mobs.g.damagePlayer(dmg, bot.x, bot.z);
+               } else if (enemyPeerId > 0) {
+                  Net319.sendHit(enemyPeerId, dmg, bot.x, bot.z, botDisplayName(bot));
+               } else if (enemyBot != null) {
+                  mobs.hurtMob(enemyBot, dmg, bot.x, bot.z, 0.42, false);
+               }
+            }
+         }
+         return out;
+      }
+
+      // ====================================================================
+      //  5. MURDER MYSTERY AI: Murderer Stalking/Knife Throw, Sheriff Investigation & Innocent Gold Looting!
+      // ====================================================================
+      if (mode == WorldSettings.MURDER) {
+         int role = botMurderRole[botSlot];
+         if (role == MURDER_ROLE_MURDERER) {
+            // Murderer Bot: hunts the nearest living human player, peer, or Innocent/Sheriff bot!
+            Mobs.Mob victimBot = null;
+            int victimPeerId = -1;
+            double vicX = 0.5;
+            double vicY = Y_DECK + 1.0;
+            double vicZ = 0.5;
+            double vicDist = 999.0;
+            boolean vicIsPlayer = false;
+
+            if (player != null && mobs.targetable(player)) {
+               double d = Math.hypot(player.x - bot.x, player.z - bot.z);
+               if (d < vicDist) {
+                  vicDist = d;
+                  vicX = player.x;
+                  vicY = player.y;
+                  vicZ = player.z;
+                  vicIsPlayer = true;
+               }
+            }
+            for (Net319.Peer peer : Net319.peers().values()) {
+               if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0 && peer.gameMode != 1 && peer.gameMode != 3) {
+                  double d = Math.hypot(peer.x - bot.x, peer.z - bot.z);
+                  if (d < vicDist) {
+                     vicDist = d;
+                     vicX = peer.x;
+                     vicY = peer.y;
+                     vicZ = peer.z;
+                     vicIsPlayer = false;
+                     victimPeerId = peer.id;
+                     victimBot = null;
+                  }
+               }
+            }
+            for (Mobs.Mob other : mobs.list) {
+               if (other != null && other != bot && !other.dead && Mobs.hostile(other.type)) {
+                  double d = Math.hypot(other.x - bot.x, other.z - bot.z);
+                  if (d < vicDist) {
+                     vicDist = d;
+                     victimBot = other;
+                     vicX = other.x;
+                     vicY = other.y;
+                     vicZ = other.z;
+                     vicIsPlayer = false;
+                     victimPeerId = -1;
+                  }
+               }
+            }
+
+            steerBotSafely3D(bot, w, vicX, vicY, vicZ, out, vicDist < 7.0 ? 1.32 : 1.18);
+            out.headYaw = Mobs.angleTo(vicX - bot.x, vicZ - bot.z);
+            out.headPitch = (float)(-Math.toDegrees(Math.atan2((vicY + 1.0) - (bot.y + 1.45), Math.max(0.5, vicDist))));
+
+            if (murderWeaponsDealt && botWeaponItem[botSlot] != 0) {
+               if (vicDist < 2.35 && Math.abs(vicY - bot.y) < 2.4 && bot.cd <= 0) {
+                  bot.cd = 18;
+                  bot.attackAnim = 8;
+                  SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
+                  SoundEngine.playHit(w, vicX, vicY + 1.0, vicZ, true);
+                  if (vicIsPlayer && mobs.g != null) {
+                     mobs.g.damagePlayer(24, bot.x, bot.z);
+                  } else if (victimPeerId > 0) {
+                     Net319.sendHit(victimPeerId, 24, bot.x, bot.z, "The Murderer");
+                  } else if (victimBot != null) {
+                     mobs.hurtMob(victimBot, 24, bot.x, bot.z, 0.45, false);
+                     if (victimBot.dead) {
+                        onBotKilled(mobs.g, victimBot);
+                     }
+                  }
+               } else if (vicDist >= 5.5 && vicDist <= 13.5 && bot.cd <= 0 && bot.age % 65 == 0
+                  && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, vicX, vicY + 1.0, vicZ)) {
+                  // Thrown Murder Knife!
+                  bot.cd = 50;
+                  bot.attackAnim = 8;
+                  double d3 = Math.max(0.5, Math.hypot(vicX - bot.x, vicZ - bot.z));
+                  mobs.shootGunArrow(bot.x, bot.y + 1.45, bot.z, (vicX - bot.x) / d3, ((vicY + 1.0) - (bot.y + 1.45)) / d3, (vicZ - bot.z) / d3, 1.85F, 24, false);
+                  SoundEngine.playThrow(w, bot.x, bot.y + 1.45, bot.z);
+               }
+            }
+            return out;
+         }
+
+         // Sheriff or Innocent Bot: locate the Murderer (if known/nearby) and collect Gold Ingots or Dropped Sheriff Gun!
+         double murdX = 0.5;
+         double murdY = Y_DECK + 1.0;
+         double murdZ = 0.5;
+         double murdDist = 999.0;
+         boolean murdIsPlayer = false;
+         Mobs.Mob murdBot = null;
+
+         if (myMurderRole == MURDER_ROLE_MURDERER && player != null && mobs.targetable(player)) {
+            double d = Math.hypot(player.x - bot.x, player.z - bot.z);
+            if (d < 15.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, player.x, player.y + 1.0, player.z)) {
+               murdDist = d;
+               murdX = player.x;
+               murdY = player.y;
+               murdZ = player.z;
+               murdIsPlayer = true;
+            }
+         }
+         for (Mobs.Mob other : mobs.list) {
+            if (other != null && other != bot && !other.dead && Mobs.hostile(other.type)) {
+               int oSlot = Math.abs(other.netId) & 31;
+               if (botMurderRole[oSlot] == MURDER_ROLE_MURDERER) {
+                  double d = Math.hypot(other.x - bot.x, other.z - bot.z);
+                  if (d < 15.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, other.x, other.y + 1.0, other.z)) {
+                     murdDist = d;
+                     murdBot = other;
+                     murdX = other.x;
+                     murdY = other.y;
+                     murdZ = other.z;
+                     murdIsPlayer = false;
+                  }
+               }
+            }
+         }
+
+         boolean hasGun = botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0;
+         if (hasGun && murderWeaponsDealt && murdDist < 15.0) {
+            out.headYaw = Mobs.angleTo(murdX - bot.x, murdZ - bot.z);
+            out.headPitch = (float)(-Math.toDegrees(Math.atan2((murdY + 1.0) - (bot.y + 1.45), Math.max(0.5, murdDist))));
+            if (bot.cd <= 0) {
+               botArrows[botSlot]--;
+               bot.cd = 22;
+               bot.attackAnim = 6;
+               botBowDrawTicks[botSlot] = 8;
+               double d3 = Math.max(0.5, Math.hypot(murdX - bot.x, murdZ - bot.z));
+               mobs.shootGunArrow(bot.x, bot.y + 1.45, bot.z, (murdX - bot.x) / d3, ((murdY + 1.0) - (bot.y + 1.45)) / d3, (murdZ - bot.z) / d3, 2.5F, 24, false);
+               SoundEngine.play3D(w, "bow_shoot", bot.x, bot.y + 1.45, bot.z, 0.9F, 1.35F);
+               if (!murdIsPlayer && murdBot != null && mobs.rnd.nextInt(2) == 0) {
+                  mobs.hurtMob(murdBot, 24, bot.x, bot.z, 0.45, false);
+                  if (murdBot.dead) {
+                     onBotKilled(mobs.g, murdBot);
+                  }
+               }
+            }
+         }
+
+         // Loot Gold Ingots or Dropped Sheriff Gun when safe!
+         double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, murdDist, murdX, murdZ);
+         if (lootGoal != null) {
+            steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.20);
+            return out;
+         }
+
+         // Patrol Mansion halls or flee if the Murderer is chasing
+         double patAng = (bot.age * 0.03) + bot.variant * 1.4;
+         double patX = murdDist < 8.0 ? (bot.x - (murdX - bot.x) * 1.5) : (Math.cos(patAng) * 18.0);
+         double patZ = murdDist < 8.0 ? (bot.z - (murdZ - bot.z) * 1.5) : (Math.sin(patAng) * 18.0);
+         steerBotSafely3D(bot, w, patX, Y_DECK + 1.0, patZ, out, murdDist < 8.0 ? 1.28 : 1.05);
          return out;
       }
 
@@ -3249,9 +4535,159 @@ public final class SkyGen extends Gen {
          g.player.setMode(3);
       }
 
+      if (playerGunCooldown > 0) {
+         playerGunCooldown--;
+      }
+
       // Fast void death so players don't fall endlessly below Y=-18
       if (g != null && g.player != null && !g.player.dead && !g.player.creative && !g.player.spectator && g.player.y < -18.0) {
          g.player.hurt(20);
+      }
+
+      // 4. CS2 STRIKE: Counter-Terrorists vs Terrorists, C4 Bomb Plant/Defuse, Tactical Guns & TNT Grenades!
+      if (type == WorldSettings.CS2) {
+         ensureRoundBotsSpawned(g, w);
+         int myCsTeam = g != null ? (getPlayerTeam(g) & 1) : 0; // 0 = CT (Blue), 1 = T (Red)
+         if (cs2BombPlanted && !cs2RoundOver) {
+            if (cs2BombTimerTicks > 0) {
+               cs2BombTimerTicks--;
+               // Audible C4 beep that accelerates as detonation approaches!
+               int beepInterval = cs2BombTimerTicks > 400 ? 30 : (cs2BombTimerTicks > 160 ? 15 : 6);
+               if (cs2BombTimerTicks % beepInterval == 0) {
+                  double bx = (cs2BombSite == 0 ? -22.0 : 22.0) + 0.5;
+                  SoundEngine.play3D(w, "click_block", bx, Y_DECK + 1.5, 0.5, 0.95F, cs2BombTimerTicks < 160 ? 1.85F : 1.45F);
+               }
+               // CT player defusing by crouching or standing right on the planted C4 at the bomb site
+               if (g != null && g.player != null && !g.player.dead && !g.player.spectator && myCsTeam == 0) {
+                  int nearSite = nearCs2BombSite(g.player.x, g.player.y, g.player.z);
+                  if (nearSite == cs2BombSite && g.player.sneaking) {
+                     cs2DefuseTicks += 2;
+                     if (cs2DefuseTicks >= 100) {
+                        defuseCs2Bomb(g, Net319.isActive() ? Net319.selfName : "You", true);
+                     }
+                  }
+               }
+               if (cs2BombTimerTicks == 0 && !cs2RoundOver) {
+                  cs2RoundOver = true;
+                  double bx = (cs2BombSite == 1 ? -22.0 : 22.0) + 0.5;
+                  SoundEngine.play3D(w, "tnt_explode", bx, Y_DECK + 1.0, 0.5, 1.0F, 0.85F);
+                  onTntGrenadeDetonate(g, w, bx, Y_DECK + 1.0, 0.5);
+                  boolean iWon = (myCsTeam == 1);
+                  pendingOverviewWon = iWon;
+                  pendingOverviewChamp = "Terrorists (Bomb Detonated!)";
+                  victoryTransitionTicks = 30;
+                  SoundEngine.playMinigameSound(iWon ? "mg_win" : "mg_lose");
+                  if (g != null) {
+                     g.say("\u00a7c\u00a7l[CS2 Strike] THE C4 HAS DETONATED! Terrorists Win the Round!");
+                  }
+               }
+            }
+         }
+         if (!cs2RoundOver && !Net319.isClientConnected() && g != null && w.tickCount > 60L && w.tickCount % 20L == 0L) {
+            int ctAlive = countCs2TeamAlive(g, 0);
+            int tAlive = countCs2TeamAlive(g, 1);
+            if (ctAlive == 0 && (cs2BotsSpawned || Net319.peerCount() > 0)) {
+               cs2RoundOver = true;
+               pendingOverviewWon = (myCsTeam == 1);
+               pendingOverviewChamp = "Terrorists (Elimination Victory!)";
+               victoryTransitionTicks = 30;
+               SoundEngine.playMinigameSound(pendingOverviewWon ? "mg_win" : "mg_lose");
+               g.say("\u00a7c\u00a7l[CS2 Strike] TERRORISTS WIN! \u00a7eAll Counter-Terrorists eliminated!");
+            } else if (tAlive == 0 && !cs2BombPlanted && (cs2BotsSpawned || Net319.peerCount() > 0)) {
+               cs2RoundOver = true;
+               pendingOverviewWon = (myCsTeam == 0);
+               pendingOverviewChamp = "Counter-Terrorists (Elimination Victory!)";
+               victoryTransitionTicks = 30;
+               SoundEngine.playMinigameSound(pendingOverviewWon ? "mg_win" : "mg_lose");
+               g.say("\u00a7b\u00a7l[CS2 Strike] COUNTER-TERRORISTS WIN! \u00a7aAll Terrorists eliminated!");
+            }
+         }
+         return;
+      }
+
+      // 5. MURDER MYSTERY: 1 Murderer (Knife), 1 Sheriff (Pistol), Innocents collecting 5 Gold for a Detective Pistol!
+      if (type == WorldSettings.MURDER) {
+         ensureRoundBotsSpawned(g, w);
+         // Deal Murder Knife & Sheriff Pistol at 5 seconds (100 ticks)
+         if (!murderWeaponsDealt && w.tickCount >= 100L) {
+            murderWeaponsDealt = true;
+            if (g != null && g.player != null && !g.player.dead && !g.player.spectator) {
+               giveMurderLoadout(g, myMurderRole);
+            }
+            if (g != null && g.mobs != null) {
+               for (Mobs.Mob m : g.mobs.list) {
+                  if (m != null && !m.dead && m.teamTag != null && m.teamTag.startsWith("MurderBot:")) {
+                     int bSlot = Math.abs(m.netId) & 31;
+                     if (botMurderRole[bSlot] == MURDER_ROLE_MURDERER) {
+                        botWeaponItem[bSlot] = Redstone319.MURDER_KNIFE;
+                     } else if (botMurderRole[bSlot] == MURDER_ROLE_SHERIFF) {
+                        botRangedItem[bSlot] = Redstone319.PISTOL;
+                        botArrows[bSlot] = 16;
+                     }
+                  }
+               }
+            }
+            SoundEngine.playMinigameSound("mg_count_go");
+            if (g != null) {
+               g.say("\u00a7c\u00a7l[Murder Mystery] \u00a7eThe Murderer has received their Knife and the Sheriff has drawn their Pistol!");
+            }
+         }
+         // Spawn Gold Ingots around the Mansion halls every 4 seconds so Innocents & Bots can collect 5 Gold for a Pistol!
+         if (!Net319.isConnected() && w.tickCount > 40L && w.tickCount % 80L == 0L) {
+            int[][] goldSpots = new int[][]{
+               {0, -16}, {0, 16}, {-16, 0}, {16, 0}, {-20, -20}, {20, -20}, {-20, 20}, {20, 20}, {0, -28}, {0, 28}
+            };
+            int[] sp = goldSpots[(int)((w.tickCount / 80L) % goldSpots.length)];
+            if (w.chunkAt(sp[0], sp[1]) != null) {
+               dropGeneratorItemCapped(w, sp[0] + 0.5, Y_DECK + 1.2, sp[1] + 0.5, Items.GOLD_INGOT, 1, 10);
+            }
+         }
+         // Check if the local player collected 5 Gold Ingots to automatically receive a Detective Pistol + Ammo!
+         if (g != null && g.player != null && !g.player.dead && !g.player.spectator) {
+            int goldCnt = g.countItem(Items.GOLD_INGOT);
+            myMurderGold = goldCnt;
+            if (goldCnt >= 5 && myMurderRole == MURDER_ROLE_INNOCENT && g.countItem(Redstone319.PISTOL) == 0) {
+               g.removeItems(Items.GOLD_INGOT, 5);
+               g.addItem(new Stack(Redstone319.PISTOL, 1));
+               g.addItem(new Stack(Items.ARROW, 6));
+               SoundEngine.playUi("levelup", 0.85F, 1.15F);
+               g.say("\u00a7a\u00a7l[Murder Mystery] \u00a7eYou collected 5 Gold Ingots and unlocked a Detective Pistol!");
+            } else if (murderGunDropped && g.countItem(Redstone319.PISTOL) > 0 && myMurderRole == MURDER_ROLE_INNOCENT) {
+               murderGunDropped = false;
+               g.addItem(new Stack(Items.ARROW, 6));
+               SoundEngine.playUi("levelup", 0.85F, 1.2F);
+               g.say("\u00a7b\u00a7l[Murder Mystery] YOU ARE NOW THE HERO! \u00a7aYou picked up the Sheriff's Pistol!");
+            }
+         }
+         // Victory checks for Murder Mystery
+         if (!murderRoundOver && !Net319.isClientConnected() && g != null && w.tickCount > 120L && w.tickCount % 20L == 0L) {
+            boolean murdererAlive = isMurdererAlive(g);
+            int innocentsAlive = countInnocentsAndSheriffAlive(g);
+            if (!murdererAlive) {
+               murderRoundOver = true;
+               pendingOverviewWon = (myMurderRole != MURDER_ROLE_MURDERER);
+               pendingOverviewChamp = "Innocents & Sheriff (Murderer Stopped!)";
+               victoryTransitionTicks = 30;
+               SoundEngine.playMinigameSound(pendingOverviewWon ? "mg_win" : "mg_lose");
+               g.say("\u00a7a\u00a7l[Murder Mystery] INNOCENTS WIN! \u00a7eThe Murderer was brought to justice!");
+            } else if (innocentsAlive == 0 && (murderBotsSpawned || Net319.peerCount() > 0)) {
+               murderRoundOver = true;
+               pendingOverviewWon = (myMurderRole == MURDER_ROLE_MURDERER);
+               pendingOverviewChamp = "The Murderer (No Survivors!)";
+               victoryTransitionTicks = 30;
+               SoundEngine.playMinigameSound(pendingOverviewWon ? "mg_win" : "mg_lose");
+               g.say("\u00a7c\u00a7l[Murder Mystery] MURDERER WINS! \u00a77No Innocents survived the night!");
+            } else if (w.tickCount >= 4800L) {
+               // Time limit survived -> Innocents Win!
+               murderRoundOver = true;
+               pendingOverviewWon = (myMurderRole != MURDER_ROLE_MURDERER);
+               pendingOverviewChamp = "Innocents & Sheriff (Survived until Dawn!)";
+               victoryTransitionTicks = 30;
+               SoundEngine.playMinigameSound(pendingOverviewWon ? "mg_win" : "mg_lose");
+               g.say("\u00a7a\u00a7l[Murder Mystery] DAWN ARRIVED! \u00a7eInnocents survived the night and win!");
+            }
+         }
+         return;
       }
 
       // 1. TUMBLE: 3-layer shovel & snowball Spleef over boiling lava!
@@ -3509,6 +4945,61 @@ public final class SkyGen extends Gen {
       }
    }
 
+   private static int countCs2TeamAlive(Game g, int csTeam) {
+      int c = 0;
+      if (g != null && g.player != null && !localEliminated && !g.player.dead && !g.player.spectator && (getPlayerTeam(g) & 1) == csTeam) {
+         c++;
+      }
+      for (Net319.Peer p : Net319.peers().values()) {
+         if (p != null && !p.spectator && !p.eliminated && p.health > 0 && (p.team & 1) == csTeam) {
+            c++;
+         }
+      }
+      if (g != null && g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m != null && !m.dead && botTeamIndex(m) == csTeam) {
+               c++;
+            }
+         }
+      }
+      return c;
+   }
+
+   private static boolean isMurdererAlive(Game g) {
+      if (myMurderRole == MURDER_ROLE_MURDERER && g != null && g.player != null && !localEliminated && !g.player.dead && !g.player.spectator) {
+         return true;
+      }
+      if (g != null && g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m != null && !m.dead && m.teamTag != null && m.teamTag.startsWith("MurderBot:")) {
+               int bSlot = Math.abs(m.netId) & 31;
+               if (botMurderRole[bSlot] == MURDER_ROLE_MURDERER) {
+                  return true;
+               }
+            }
+         }
+      }
+      return Net319.peerCount() > 0 && myMurderRole != MURDER_ROLE_MURDERER && Net319.aliveEnemyPeers(-1) > 0;
+   }
+
+   private static int countInnocentsAndSheriffAlive(Game g) {
+      int c = 0;
+      if (myMurderRole != MURDER_ROLE_MURDERER && g != null && g.player != null && !localEliminated && !g.player.dead && !g.player.spectator) {
+         c++;
+      }
+      if (g != null && g.mobs != null) {
+         for (Mobs.Mob m : g.mobs.list) {
+            if (m != null && !m.dead && m.teamTag != null && m.teamTag.startsWith("MurderBot:")) {
+               int bSlot = Math.abs(m.netId) & 31;
+               if (botMurderRole[bSlot] != MURDER_ROLE_MURDERER) {
+                  c++;
+               }
+            }
+         }
+      }
+      return c;
+   }
+
    private static int countSurvivingBedwarsTeams(Game g, World w, int excludeTeam) {
       int count = 0;
       for (int t = 0; t < 4; t++) {
@@ -3560,7 +5051,7 @@ public final class SkyGen extends Gen {
       return c;
    }
 
-   /** Handles /map, /tumble, /battle, /bw, /shop, /upgrades, and /lobby commands. */
+   /** Handles /map, /tumble, /battle, /bw, /cs2, /murder, /shop, /upgrades, and /lobby commands. */
    public static boolean onModeCommand(Game g, String cmd, String[] args) {
       if (g == null || g.world == null) {
          return false;
@@ -3618,6 +5109,52 @@ public final class SkyGen extends Gen {
          matchState = STATE_WAITING;
          lobbyCountdownTicks = -1;
          g.setScreen(Game.S.WAITING);
+         return true;
+      }
+      if (c.equals("/cs2") || c.equals("/strike")) {
+         String sub = args.length > 1 ? args[1].toLowerCase() : "status";
+         if (sub.equals("reset")) {
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7b[CS2 Strike] New round started and bomb sites reset!");
+            return true;
+         }
+         if (sub.equals("kit") && args.length > 2) {
+            int k = Integer.parseInt(args[2].replaceAll("[^0-9]", "0")) & 3;
+            giveCs2Loadout(g, k);
+            g.say("\u00a7b[CS2 Strike] Selected Loadout: \u00a7e" + CS2_KIT_NAMES[k]);
+            return true;
+         }
+         if (sub.equals("team") && args.length > 2) {
+            int t = args[2].toLowerCase().startsWith("t") || args[2].equals("1") ? 1 : 0;
+            selectTeam(g, t, true);
+            g.say("\u00a7b[CS2 Strike] Joined " + (t == 0 ? "\u00a79Counter-Terrorists (CT)" : "\u00a7cTerrorists (T)") + "\u00a7b!");
+            return true;
+         }
+         g.say("\u00a7b[CS2 Strike] CT Alive: " + countCs2TeamAlive(g, 0) + " | T Alive: " + countCs2TeamAlive(g, 1)
+            + " | Bomb: " + (cs2BombPlanted ? ("\u00a7cPLANTED AT SITE " + (cs2BombSite == 0 ? "A" : "B")) : "\u00a7aNOT PLANTED")
+            + " (/cs2 reset | /cs2 kit <0..3> | /cs2 team <ct|t>)");
+         return true;
+      }
+      if (c.equals("/murder") || c.equals("/mm")) {
+         String sub = args.length > 1 ? args[1].toLowerCase() : "status";
+         if (sub.equals("reset")) {
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7d[Murder Mystery] New round started and secret roles reassigned!");
+            return true;
+         }
+         if (sub.equals("role") && args.length > 2) {
+            String r = args[2].toLowerCase();
+            murderRolePref = r.startsWith("m") ? 3 : (r.startsWith("s") ? 2 : (r.startsWith("i") ? 1 : 0));
+            assignMurderMysteryRoles(g, g.world);
+            giveMurderLoadout(g, myMurderRole);
+            g.say("\u00a7d[Murder Mystery] Role set to \u00a7e" + MURDER_ROLE_NAMES[myMurderRole] + "\u00a7d!");
+            return true;
+         }
+         g.say("\u00a7d[Murder Mystery] Your Role: " + MURDER_ROLE_CODES[myMurderRole] + MURDER_ROLE_NAMES[myMurderRole]
+            + " \u00a77| Gold: \u00a76" + myMurderGold + "/5 \u00a77| Innocents Left: \u00a7a" + countInnocentsAndSheriffAlive(g)
+            + " \u00a77(/murder reset | /murder role <random|innocent|sheriff|murderer>)");
          return true;
       }
       if (c.equals("/tumble") || c.equals("/sb") || c.equals("/challenges")) {
@@ -3767,7 +5304,7 @@ public final class SkyGen extends Gen {
       return WorldSettings.MAP_COVE;
    }
 
-   /** Renders the sleek dark-glass top-right Scoreboard HUD for Console Edition Tumble, Battle, and Bedwars. */
+   /** Renders the sleek dark-glass top-right Scoreboard HUD for Console Edition Tumble, Battle, Bedwars, CS2 Strike, and Murder Mystery. */
    public static void drawModeHud(Game g) {
       if (g == null || g.world == null || g.world.settings == null || g.debug || g.screen == Game.S.WAITING) {
          return;
@@ -3827,6 +5364,35 @@ public final class SkyGen extends Gen {
             lines.add(usb.toString());
          }
          lines.add("\u00a77/shop | /upgrades | /map save");
+      } else if (type == WorldSettings.CS2) {
+         int myCs = getPlayerTeam(g) & 1;
+         accentColor = myCs == 0 ? 0xFF48A8FF : 0xFFFF6448;
+         int ctAlive = countCs2TeamAlive(g, 0);
+         int tAlive = countCs2TeamAlive(g, 1);
+         int ammo = g.countItem(Items.ARROW);
+         int nades = g.countItem(Redstone319.TNT_GRENADE);
+         lines.add("\u00a7b\u00a7lCS2 STRIKE \u00a77(" + mapName + ")");
+         lines.add("\u00a79CT Alive: \u00a7f" + ctAlive + " \u00a77| \u00a7cT Alive: \u00a7f" + tAlive);
+         lines.add("\u00a7fYour Side: " + (myCs == 0 ? "\u00a79CT (Defend/Defuse)" : "\u00a7cTerrorist (Plant C4)"));
+         lines.add("\u00a7fAmmo: \u00a7e" + ammo + " \u00a77| Grenades: \u00a7c" + nades + " \u00a77| Kills: \u00a7a" + myKills);
+         if (cs2BombPlanted) {
+            lines.add("\u00a7c\u00a7lC4 SITE " + (cs2BombSite == 0 ? "A" : "B") + ": \u00a7e" + ((cs2BombTimerTicks + 19) / 20) + "s!");
+         } else {
+            lines.add("\u00a77Site A: (-22,0) | Site B: (+22,0)");
+         }
+      } else if (type == WorldSettings.MURDER) {
+         accentColor = myMurderRole == MURDER_ROLE_MURDERER ? 0xFFFF4848 : (myMurderRole == MURDER_ROLE_SHERIFF ? 0xFF48B8FF : 0xFF58F088);
+         int innoAlive = countInnocentsAndSheriffAlive(g);
+         long remSec = Math.max(0L, (4800L - g.world.tickCount) / 20L);
+         lines.add("\u00a7d\u00a7lMURDER MYSTERY \u00a77(" + mapName + ")");
+         lines.add("\u00a7fRole: " + MURDER_ROLE_CODES[myMurderRole] + "\u00a7l" + MURDER_ROLE_NAMES[myMurderRole]);
+         lines.add("\u00a7fInnocents Alive: \u00a7a" + innoAlive + " \u00a77| Dawn: \u00a7e" + (remSec / 60L) + ":" + String.format("%02d", remSec % 60L));
+         lines.add("\u00a7fGold Collected: \u00a76" + myMurderGold + "/5 \u00a77(5 Gold = Pistol)");
+         if (murderGunDropped) {
+            lines.add("\u00a7e\u00a7lSHERIFF GUN DROPPED! (" + (int)murderDroppedGunX + ", " + (int)murderDroppedGunZ + ")");
+         } else if (!murderWeaponsDealt) {
+            lines.add("\u00a7eWeapons dealt in " + Math.max(1L, (100L - g.world.tickCount + 19L) / 20L) + "s...");
+         }
       }
 
       if (lines.isEmpty()) {
@@ -3848,11 +5414,24 @@ public final class SkyGen extends Gen {
          gui.text(lines.get(i), x + 5.0F, y + 4.0F + i * 10.0F, 0xFFFFFFFF, true);
       }
 
+      // Top-Center Tactical Alerts for CS2 Bomb Countdown / Defusal & Murder Mystery Role Banner
+      if (type == WorldSettings.CS2 && cs2BombPlanted && !cs2RoundOver) {
+         float cx = gui.w / 2.0F;
+         int sec = (cs2BombTimerTicks + 19) / 20;
+         gui.centered("\u00a7c\u00a7l\u26a0 C4 PLANTED AT SITE " + (cs2BombSite == 0 ? "A" : "B") + " — " + sec + "s \u26a0", cx, 24.0F, 0xFFFF5555, true, 1.15F);
+         if (cs2DefuseTicks > 0) {
+            gui.centered("\u00a7bDefusing C4... " + cs2DefuseTicks + "%", cx, 36.0F, 0xFF68D8FF, true, 1.0F);
+         }
+      } else if (type == WorldSettings.MURDER && g.world.tickCount < 160L) {
+         float cx = gui.w / 2.0F;
+         gui.centered(MURDER_ROLE_CODES[myMurderRole] + "\u00a7lROLE: " + MURDER_ROLE_NAMES[myMurderRole], cx, 26.0F, 0xFFFFFFFF, true, 1.35F);
+      }
+
       if (victoryTransitionTicks > 0) {
          float cx = gui.w / 2.0F;
          float cy = gui.h * 0.32F;
-         gui.centered("\u00a76\u00a7lVICTORY!", cx, cy, 0xFFFFDF58, true, 2.5F);
-         gui.centered("\u00a7aChampion of the Arena — Opening Overview...", cx, cy + 24.0F, 0xFF88FF98, true, 1.0F);
+         gui.centered(pendingOverviewWon ? "\u00a76\u00a7lVICTORY!" : "\u00a7e\u00a7lROUND OVER!", cx, cy, 0xFFFFDF58, true, 2.5F);
+         gui.centered("\u00a7a" + pendingOverviewChamp + " — Opening Overview...", cx, cy + 24.0F, 0xFF88FF98, true, 1.0F);
       }
    }
 }

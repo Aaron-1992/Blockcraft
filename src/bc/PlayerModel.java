@@ -422,7 +422,8 @@ final class PlayerModel {
       GL11.glRotatef(180.0F, 0.0F, 1.0F, 0.0F);
       GL11.glTranslatef(1.0F, 2.0F, -10.0F); // 1/16, 0.125, -0.625 blocks
       if (id >= 256 || Renderer.flatBlock(id)) {
-         boolean handheld = id >= 256 && (Items.isTool(id) || id == 256);
+         boolean handheld = id >= 256
+            && (Items.isTool(id) || id == 256 || id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE || id == Redstone319.MURDER_KNIFE);
          if (id == 268) { // the bow
             GL11.glTranslatef(-1.0F, -2.0F, 2.5F);
             GL11.glRotatef(-80.0F, 1.0F, 0.0F, 0.0F);

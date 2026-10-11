@@ -321,6 +321,21 @@ final class Tests319 {
                }
 
                check(syncedItem != null && syncedItem.dead, "remote PICKUP packet marked dropped item dead");
+
+               // Verify persistent Multiplayer: switching gamemode/world on host NEVER disconnects connected peers and broadcasts new ASSIGN!
+               SkyGen.switchMinigameMode(g, WorldSettings.CS2, true);
+               check(Net319.isHosting() && Net319.peerCount() == 1, "Connected peer stays connected when host switches gamemode to CS2 Strike");
+               String switchedAssign = null;
+               for (int i = 0; i < 20; i++) {
+                  String line = in.readLine();
+                  if (line != null && line.startsWith("ASSIGN ")) {
+                     switchedAssign = line;
+                     break;
+                  }
+               }
+               check(switchedAssign != null && switchedAssign.contains(" " + WorldSettings.CS2 + " "),
+                  "Host broadcasts fresh ASSIGN with new gamemode (CS2=8) to connected peers without disconnecting: " + switchedAssign);
+               g.world.settings.type = WorldSettings.CLASSIC;
             }
          } finally {
             Net319.disconnect(g);
@@ -1259,6 +1274,137 @@ final class Tests319 {
          SkyGen.onRemoteMatchOverview(bwGame, "PeerChamp_(Champion!)", "Tumble", "Cavern", 62);
          check(SkyGen.showingOverview && "PeerChamp (Champion!)".equals(SkyGen.lastRoundFirst),
             "Multiplayer MATCH OVERVIEW packet syncs Post-Match Overview screen and winner");
+
+         // =========================================================================
+         // Verify V4.3 Tactical Items, CS2 Strike, Murder Mystery, Strict AI Inventory, Vertical Building & Persistent Multiplayer
+         // =========================================================================
+         eq("Tactical Pistol", Items.name(Redstone319.PISTOL), "PISTOL item registered");
+         eq("Assault SMG", Items.name(Redstone319.MACHINE_GUN), "MACHINE_GUN item registered");
+         eq("Heavy Sniper", Items.name(Redstone319.SNIPER_RIFLE), "SNIPER_RIFLE item registered");
+         eq("TNT Frag Grenade", Items.name(Redstone319.TNT_GRENADE), "TNT_GRENADE item registered");
+         eq("Murderer's Knife", Items.name(Redstone319.MURDER_KNIFE), "MURDER_KNIFE item registered");
+         eq("C4 Explosive", Items.name(Redstone319.C4_BOMB), "C4_BOMB item registered");
+         eq(24.0F, Items.attackDamage(Redstone319.MURDER_KNIFE), "Murderer's Knife deals lethal 24.0 melee damage");
+
+         // 1. CS2 Strike mode: Arena generation, Bomb Sites A & B, arrow-shooting guns, TNT grenades, C4 plant & defuse
+         SkyGen.switchMinigameMode(bwGame, WorldSettings.CS2, false);
+         eq(WorldSettings.CS2, bwGame.world.settings.type, "switchMinigameMode switches world to CS2 Strike");
+         SkyGen.myTeam = 1; // Terrorist
+         SkyGen.startMatch(bwGame, false);
+         eq(1, SkyGen.nearCs2BombSite(-22.0, SkyGen.Y_DECK + 1.0, 0.0), "CS2 Bomb Site A located at (-22, Y_DECK+1, 0)");
+         eq(2, SkyGen.nearCs2BombSite(22.0, SkyGen.Y_DECK + 1.0, 0.0), "CS2 Bomb Site B located at (+22, Y_DECK+1, 0)");
+         int cs2BotCount = 0;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && m.teamTag != null && m.teamTag.startsWith("CS2Bot:")) {
+               cs2BotCount++;
+            }
+         }
+         eq(7, cs2BotCount, "CS2 Strike spawns 7 CT and T bots across both teams");
+
+         // Verify gun firing consumes Arrow ammo and spawns high-velocity arrow, and refuses when ammo is 0
+         SkyGen.giveCs2Loadout(bwGame, 1, 0); // Assault SMG kit
+         int arrowsBefore = bwGame.countItem(Items.ARROW);
+         int worldArrowsBefore = bwGame.mobs.arrows.size();
+         SkyGen.playerGunCooldown = 0;
+         check(SkyGen.tryUseTacticalWeapon(bwGame, Redstone319.MACHINE_GUN), "Firing MACHINE_GUN succeeds");
+         eq(arrowsBefore - 1, bwGame.countItem(Items.ARROW), "Firing MACHINE_GUN consumes 1 Arrow from inventory");
+         eq(worldArrowsBefore + 1, bwGame.mobs.arrows.size(), "Firing MACHINE_GUN spawns a high-velocity Arrow projectile");
+
+         // Remove all arrows and verify gun cannot spawn any arrow when out of ammo
+         bwGame.removeItems(Items.ARROW, 999);
+         SkyGen.playerGunCooldown = 0;
+         int arrowsEmpty = bwGame.mobs.arrows.size();
+         SkyGen.tryUseTacticalWeapon(bwGame, Redstone319.PISTOL);
+         eq(arrowsEmpty, bwGame.mobs.arrows.size(), "Gun cannot fire arrows when player has 0 Arrows in inventory");
+
+         // Verify TNT Frag Grenade throws a primed TNT entity with horizontal velocity
+         SkyGen.giveCs2Loadout(bwGame, 1, 0);
+         SkyGen.playerGunCooldown = 0;
+         int fallersBefore = bwGame.world.fallers.size();
+         bwGame.sel = 3; // TNT_GRENADE slot
+         check(SkyGen.tryUseTacticalWeapon(bwGame, Redstone319.TNT_GRENADE), "Throwing TNT_GRENADE succeeds");
+         eq(fallersBefore + 1, bwGame.world.fallers.size(), "Throwing TNT_GRENADE spawns primed TNT Falling entity");
+
+         // Verify C4 Bomb Plant and Defuse
+         SkyGen.plantCs2Bomb(bwGame, 1, "You", false);
+         check(SkyGen.cs2BombPlanted && SkyGen.cs2BombSite == 1 && SkyGen.cs2BombTimerTicks == 700, "C4 Bomb planted at Site A with 35s timer");
+         SkyGen.defuseCs2Bomb(bwGame, "Blue_CT", false);
+         check(!SkyGen.cs2BombPlanted && SkyGen.cs2RoundOver, "Defusing C4 Bomb ends CS2 round for Counter-Terrorists");
+
+         // 2. Murder Mystery mode: Mansion generation, Roles, 5s weapon deal, 5-gold Detective Pistol & Sheriff gun drop
+         SkyGen.murderRolePref = 3; // Innocent
+         SkyGen.switchMinigameMode(bwGame, WorldSettings.MURDER, false);
+         SkyGen.startMatch(bwGame, false);
+         eq(WorldSettings.MURDER, bwGame.world.settings.type, "Switched to Murder Mystery mode");
+         eq(SkyGen.MURDER_ROLE_INNOCENT, SkyGen.myMurderRole, "Player assigned Innocent role per preference");
+         int murderBots = 0;
+         Mobs.Mob sheriffBot = null;
+         Mobs.Mob murdererBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && m.teamTag != null && m.teamTag.startsWith("MurderBot:")) {
+               murderBots++;
+               int bSlot = Math.abs(m.netId) & 31;
+               if (SkyGen.botMurderRole[bSlot] == SkyGen.MURDER_ROLE_SHERIFF) {
+                  sheriffBot = m;
+               } else if (SkyGen.botMurderRole[bSlot] == SkyGen.MURDER_ROLE_MURDERER) {
+                  murdererBot = m;
+               }
+            }
+         }
+         eq(7, murderBots, "Murder Mystery spawns 7 bots in the Mansion");
+         check(sheriffBot != null && murdererBot != null, "Murder Mystery assigns 1 Murderer bot and 1 Sheriff bot when player is Innocent");
+
+         // Advance past 100 ticks (5 seconds) so Murder Knife and Sheriff Pistol are dealt
+         bwGame.world.tickCount = 105L;
+         SkyGen.tickMode(bwGame, bwGame.world);
+         check(SkyGen.murderWeaponsDealt, "Murder Mystery deals weapons at 5 seconds (100 ticks)");
+         eq(Redstone319.MURDER_KNIFE, SkyGen.botWeaponItem[Math.abs(murdererBot.netId) & 31], "Murderer bot receives MURDER_KNIFE at 5s");
+         eq(Redstone319.PISTOL, SkyGen.botRangedItem[Math.abs(sheriffBot.netId) & 31], "Sheriff bot receives PISTOL at 5s");
+
+         // Verify Innocent collecting 5 Gold Ingots receives Detective Pistol + Arrows
+         bwGame.addItem(new Stack(Items.GOLD_INGOT, 5));
+         SkyGen.tickMode(bwGame, bwGame.world);
+         check(bwGame.countItem(Redstone319.PISTOL) == 1 && bwGame.countItem(Items.ARROW) >= 6,
+            "Innocent collecting 5 Gold Ingots automatically unlocks a Detective Pistol + Arrows");
+
+         // Verify Sheriff bot dying drops the Sheriff's Pistol for Innocents to pick up
+         sheriffBot.dead = true;
+         SkyGen.onBotKilled(bwGame, sheriffBot);
+         check(SkyGen.murderGunDropped, "Sheriff bot death drops the Sheriff's Pistol in the Mansion");
+
+         // 3. Verify AI Strict Inventory Ledger & Vertical Pillar Building (tryBotBuildUp)
+         SkyGen.switchMinigameMode(bwGame, WorldSettings.BATTLE, false);
+         SkyGen.startMatch(bwGame, false);
+         Mobs.Mob pillarBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.isMinigameBot(m)) {
+               pillarBot = m;
+               break;
+            }
+         }
+         check(pillarBot != null, "Found BattleBot for strict inventory & vertical build-up test");
+         int pSlot = Math.abs(pillarBot.netId) & 31;
+         int bx = (int)Math.floor(pillarBot.x);
+         int by = (int)Math.floor(pillarBot.y);
+         int bz = (int)Math.floor(pillarBot.z);
+         bwGame.world.setBlock(bx, by - 1, bz, Blocks.STONE);
+         bwGame.world.setBlock(bx, by, bz, 0);
+         bwGame.world.setBlock(bx, by + 1, bz, 0);
+         bwGame.world.setBlock(bx, by + 2, bz, 0);
+         pillarBot.onGround = true;
+
+         // When botBlocks[pSlot] == 0, AI cannot pillar up or place blocks!
+         SkyGen.botBlocks[pSlot] = 0;
+         boolean builtEmpty = SkyGen.tryBotBuildUp(pillarBot, bwGame.world, pillarBot.x, pillarBot.y + 4.0, pillarBot.z, Blocks.COBBLE);
+         check(!builtEmpty && bwGame.world.getBlock(bx, by, bz) == 0, "AI bot cannot build vertically when botBlocks inventory is 0");
+
+         // Give the bot 4 blocks and verify tryBotBuildUp pillars up and decrements botBlocks[pSlot]!
+         SkyGen.botBlocks[pSlot] = 4;
+         boolean builtWithBlocks = SkyGen.tryBotBuildUp(pillarBot, bwGame.world, pillarBot.x, pillarBot.y + 4.0, pillarBot.z, Blocks.COBBLE);
+         check(builtWithBlocks, "AI bot pillars vertically toward higher target when it owns blocks");
+         eq(3, SkyGen.botBlocks[pSlot], "Vertical pillar building consumes 1 block from botBlocks[pSlot]");
+         eq(Blocks.COBBLE, bwGame.world.getBlock(bx, by, bz), "AI bot placed Cobblestone pillar block beneath its feet");
+
          bwGame.world.settings.type = WorldSettings.BEDWARS;
 
          // Verify LOD high-detail splitDistance extends further and scales dynamically with render distance

@@ -786,20 +786,24 @@ public final class Mobs {
    }
 
    public void shootFromPlayer(double var1, double var3, double var5, double var7, double var9, double var11, float var13) {
-      Mobs.Arrow var14 = new Mobs.Arrow();
-      var14.x = var1;
-      var14.y = var3;
-      var14.z = var5;
-      var14.px = var1;
-      var14.py = var3;
-      var14.pz = var5;
-      var14.vx = var7 * var13;
-      var14.vy = var9 * var13;
-      var14.vz = var11 * var13;
-      var14.fromPlayer = true;
-      var14.damage = Math.max(1, Math.round(var13 * 2.0F));
-      this.arrows.add(var14);
-      Net319.onSpawnArrow(this.g != null ? this.g.world : null, var14);
+      this.shootGunArrow(var1, var3, var5, var7, var9, var11, var13, Math.max(1, Math.round(var13 * 2.0F)), true);
+   }
+
+   public void shootGunArrow(double x, double y, double z, double dx, double dy, double dz, float speed, int damage, boolean fromPlayer) {
+      Mobs.Arrow a = new Mobs.Arrow();
+      a.x = x;
+      a.y = y;
+      a.z = z;
+      a.px = x;
+      a.py = y;
+      a.pz = z;
+      a.vx = dx * speed;
+      a.vy = dy * speed;
+      a.vz = dz * speed;
+      a.fromPlayer = fromPlayer;
+      a.damage = Math.max(1, damage);
+      this.arrows.add(a);
+      Net319.onSpawnArrow(this.g != null ? this.g.world : null, a);
    }
 
    boolean tickArrow(Mobs.Arrow var1, World var2, Player var3) {
@@ -837,7 +841,11 @@ public final class Mobs {
                   && var1.z > var7.bb[2] - 0.1
                   && var1.z < var7.bb[5] + 0.1) {
                   if (!var1.remote) {
-                     this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.4, true);
+                     if (var2.settings != null && var2.settings.type == WorldSettings.MURDER && SkyGen.isMinigameBot(var7)) {
+                        SkyGen.onMurderArrowHitBot(this.g, var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz);
+                     } else {
+                        this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.4, true);
+                     }
                   }
                   return true;
                }
@@ -847,15 +855,38 @@ public final class Mobs {
                   return true;
                }
             }
-         } else if (this.targetable(var3)
-            && var1.x > var3.bb[0]
-            && var1.x < var3.bb[3]
-            && var1.y > var3.bb[1]
-            && var1.y < var3.bb[4]
-            && var1.z > var3.bb[2]
-            && var1.z < var3.bb[5]) {
-            this.g.damagePlayer((int)var1.damage, var1.x - var1.vx, var1.z - var1.vz);
-            return true;
+         } else {
+            if (this.targetable(var3)
+               && var1.x > var3.bb[0]
+               && var1.x < var3.bb[3]
+               && var1.y > var3.bb[1]
+               && var1.y < var3.bb[4]
+               && var1.z > var3.bb[2]
+               && var1.z < var3.bb[5]) {
+               this.g.damagePlayer((int)var1.damage, var1.x - var1.vx, var1.z - var1.vz);
+               return true;
+            }
+            if (var1.life > 3 && var2.settings != null && var2.settings.isMinigame()) {
+               for (Mobs.Mob var7 : this.list) {
+                  if (!var7.dead
+                     && var1.x > var7.bb[0] - 0.1
+                     && var1.x < var7.bb[3] + 0.1
+                     && var1.y > var7.bb[1] - 0.1
+                     && var1.y < var7.bb[4] + 0.1
+                     && var1.z > var7.bb[2] - 0.1
+                     && var1.z < var7.bb[5] + 0.1) {
+                     if (!var1.remote) {
+                        this.hurtMob(var7, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz, 0.35, false);
+                     }
+                     return true;
+                  }
+               }
+               if (!var1.remote && Net319.isActive()) {
+                  if (Net319.tryArrowHitPeer(this.g, var1.x, var1.y, var1.z, (int)var1.damage, var1.x - var1.vx, var1.z - var1.vz)) {
+                     return true;
+                  }
+               }
+            }
          }
       }
 

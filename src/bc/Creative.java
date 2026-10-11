@@ -92,7 +92,7 @@ final class Creative {
 
       if (Items.isTool(id) || Items.isArmor(id) || Items.isHoe(id) || n.equals("bow") || n.equals("arrow") || n.equals("shears") || n.equals("flint and steel")
          || n.endsWith(" bucket") || n.equals("bucket") || n.equals("fishing rod") || n.equals("shield") || n.equals("compass") || n.equals("clock")
-         || n.equals("fire charge")) {
+         || n.equals("fire charge") || has(n, "pistol", "smg", "sniper", "grenade", "knife", "c4")) {
          return TOOLS;
       }
 

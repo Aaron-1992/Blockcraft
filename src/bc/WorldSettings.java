@@ -24,15 +24,19 @@ public final class WorldSettings {
    public static final int SKYWARS = 6;
    /** 4-Team Bedwars Mini Game. */
    public static final int BEDWARS = 7;
-   public static final int TYPES = 8;
+   /** CS2 Tactical Strike Mini Game (Counter-Terrorists vs Terrorists with pistols, machine guns, snipers, TNT grenades & C4 bomb sites). */
+   public static final int CS2 = 8;
+   /** Murder Mystery Mini Game (1 Murderer with concealed Knife, 1 Sheriff with Pistol, and Innocents scavenging Gold Ingots). */
+   public static final int MURDER = 9;
+   public static final int TYPES = 10;
 
    /** Standard world types cycled by the "Type:" button on Create New World (keeps Mini Games in their own dedicated menu). */
    public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, CLASSIC};
-   /** Console Edition Mini Game modes shown on the dedicated Mini Games menu. */
-   public static final int[] MINIGAME_ORDER = new int[]{BATTLE, TUMBLE, BEDWARS};
+   /** Console Edition & Tactical Mini Game modes shown on the dedicated Mini Games menu. */
+   public static final int[] MINIGAME_ORDER = new int[]{BATTLE, TUMBLE, BEDWARS, CS2, MURDER};
 
    public static final String[] TYPE_NAME = new String[]{
-      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Tumble", "Battle", "Bedwars"
+      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Tumble", "Battle", "Bedwars", "CS2 Strike", "Murder Mystery"
    };
    public static final String[] TYPE_INFO = new String[]{
       "The terrain of Update 3.5 - 3.12",
@@ -42,7 +46,9 @@ public final class WorldSettings {
       "Towering mountains and deep valleys",
       "Console Edition Tumble: destroy 3 layers of blocks over lava with shovels and snowballs!",
       "Console Edition Battle: arena last-man-standing with central chests, grace period, refills and showdown!",
-      "Four team bases with beds, shopkeepers and resource generators around an emerald arena!"
+      "Four team bases with beds, shopkeepers and resource generators around an emerald arena!",
+      "CS2 Tactical Strike: CT vs T defusal combat with arrow-firing Machine Guns, Pistols, Snipers, TNT Frag Grenades & C4 Bomb Sites!",
+      "Murder Mystery: 1 Murderer with a concealed Knife, 1 Sheriff with a Pistol, and Innocents scavenging 5 Gold Ingots to arm themselves!"
    };
 
    // Console Edition Mini Game Maps ("like the real deal")
@@ -165,12 +171,20 @@ public final class WorldSettings {
       return 0;
    }
 
+   public static boolean isVoidMode(int t) {
+      return t == TUMBLE || t == BATTLE || t == BEDWARS || t == CS2 || t == MURDER;
+   }
+
    public boolean isVoidMode() {
-      return this.type == TUMBLE || this.type == BATTLE || this.type == BEDWARS;
+      return isVoidMode(this.type);
+   }
+
+   public static boolean isMinigame(int t) {
+      return t == TUMBLE || t == BATTLE || t == BEDWARS || t == CS2 || t == MURDER;
    }
 
    public boolean isMinigame() {
-      return this.type == TUMBLE || this.type == BATTLE || this.type == BEDWARS;
+      return isMinigame(this.type);
    }
 
    public static int parseType(String s) {
@@ -212,6 +226,14 @@ public final class WorldSettings {
          case "bedwars":
          case "bw":
             return BEDWARS;
+         case "cs2":
+         case "strike":
+         case "counterstrike":
+            return CS2;
+         case "murder":
+         case "murder_mystery":
+         case "mm":
+            return MURDER;
          default:
             return DEFAULT;
       }

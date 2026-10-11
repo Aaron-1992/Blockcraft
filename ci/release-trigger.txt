@@ -1,3 +1,4 @@
 tag=v4.2
-title=Blockcraft Update 4.2 — Console Edition Battle & Tumble, Smart 3D Tactical AI, Multi-Height Votable Maps, Post-Match Overview & Full UI Overhaul
-notes=Update 4.2 adds true elimination & Spectator Mode for players who die without a respawn in Battle, Tumble, Bedwars (destroyed bed), and Hardcore, plus full Multiplayer compatibility for minigame AI bots (3D player models, sprinting/bridging/bow/eating animations, held gear, and peer targeting), map voting, Post-Match Overview, Waiting Lobby, and synchronized round resets.
+title=Blockcraft Update 4.2 — CS2 Strike, Murder Mystery, Console Edition Battle/Tumble/Bedwars, Smart 3D Tactical AI & Persistent Multiplayer
+notes=Update 4.2 adds CS2 Strike (Counter-Terrorists vs Terrorists with arrow-firing Machine Guns, Pistols, Snipers, TNT Frag Grenades & C4 Bomb Sites A/B), Murder Mystery (Murderer with concealed/throwable Knife, Sheriff with Pistol & Innocents collecting 5 Gold Ingots), strict AI inventory & vertical pillar building, persistent Multiplayer across gamemode/world switches without disconnecting players, Spectator Mode elimination, and polished HUDs & menus.
+

@@ -194,8 +194,8 @@ public final class Net319 {
          }
       }
       mpWorldType = WorldSettings.TYPE_ORDER[(idx + 1) % WorldSettings.TYPE_ORDER.length];
-      if (mpWorldType == WorldSettings.SKYBLOCK || mpWorldType == WorldSettings.SKYWARS || mpWorldType == WorldSettings.BEDWARS) {
-         mpGameMode = 0; // Survival by default for Skyblock / Skywars / Bedwars
+      if (WorldSettings.isMinigame(mpWorldType)) {
+         mpGameMode = 0; // Survival by default for all Minigames
       }
       statusText = "World Type: " + WorldSettings.TYPE_NAME[mpWorldType] + " — " + WorldSettings.TYPE_INFO[mpWorldType];
    }
@@ -1601,13 +1601,16 @@ public final class Net319 {
       if (!isActive() || peers.isEmpty() || g == null || g.world == null) {
          return false;
       }
-      boolean isBedwars = g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS;
+      int wType = g.world.settings != null ? g.world.settings.type : WorldSettings.DEFAULT;
       int myTeam = SkyGen.getPlayerTeam(g);
       for (Peer p : peers.values()) {
          if (p.dim != g.world.dim || p.spectator) {
             continue;
          }
-         if (isBedwars && p.team == myTeam) {
+         if (wType == WorldSettings.BEDWARS && p.team == myTeam) {
+            continue;
+         }
+         if (wType == WorldSettings.CS2 && (p.team & 1) == (myTeam & 1)) {
             continue;
          }
          double h = p.sneak ? 1.55 : 1.85;
@@ -1617,6 +1620,69 @@ public final class Net319 {
          }
       }
       return false;
+   }
+
+   /**
+    * Keeps the host's server socket and all connected peer connections alive when switching worlds or gamemodes,
+    * immediately syncing the new world seed, dimension, gamemode, map, and spawn coordinates to all connected players!
+    */
+   public static void onHostWorldSwitched(Game g) {
+      if (!hosting || g == null || g.world == null) {
+         return;
+      }
+      hostGame = g;
+      clearWorldState();
+      clearPeersEliminated();
+      World curW = g.world;
+      long seed = curW.seed;
+      int dim = curW.dim;
+      long dayTime = curW.dayTime;
+      int wType = curW.settings != null ? curW.settings.type : mpWorldType;
+      int gMode = WorldSettings.isMinigame(wType) ? 0 : (g.player != null ? g.player.rawMode() : mpGameMode);
+      int mapId = curW.settings != null ? curW.settings.mapId : 0;
+
+      for (Conn c : hostConns) {
+         if (c == null || c.closed) {
+            continue;
+         }
+         Peer peer = peers.get(c.id);
+         int assignedTeam = peer != null && peer.team >= 0 ? peer.team : Math.max(0, (c.id - 1) & 3);
+         double sx = g.player != null ? g.player.x : 8.5;
+         double sy = g.player != null ? g.player.y : 72.0;
+         double sz = g.player != null ? g.player.z : 8.5;
+         double[] modeSp = SkyGen.multiplayerSpawnFor(
+            curW,
+            (wType == WorldSettings.BEDWARS || wType == WorldSettings.CS2) ? assignedTeam : (c.id - 1)
+         );
+         if (modeSp != null) {
+            sx = modeSp[0];
+            sy = modeSp[1];
+            sz = modeSp[2];
+         }
+         c.send(
+            String.format(
+               Locale.ROOT,
+               "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d %d %d %d %d",
+               c.id,
+               seed,
+               dim,
+               dayTime,
+               sx,
+               sy,
+               sz,
+               wType,
+               gMode,
+               assignedTeam,
+               SkyGen.matchState,
+               mapId,
+               SkyGen.swKit,
+               SkyGen.tumbleWeaponMode,
+               SkyGen.soloBots ? 1 : 0
+            )
+         );
+         c.send("TEAM 1 " + SkyGen.myTeam);
+      }
+      broadcastExcept(0, "CHAT * Host switched server to " + WorldSettings.TYPE_NAME[wType] + "!");
    }
 
    public static void onClientHitMob(Mobs.Mob m, int dmg, double ax, double az, double kb) {
@@ -2389,6 +2455,27 @@ public final class Net319 {
                         if (voterId != selfId) {
                            SkyGen.onRemoteMapVote(voterId, votedMap);
                         }
+                     } else if ("MODE".equals(act) && p.length >= 3) {
+                        int newMode = Integer.parseInt(p[2]);
+                        int newMap = p.length >= 4 ? (Math.abs(Integer.parseInt(p[3])) & 3) : 0;
+                        if (w != null && w.settings != null) {
+                           w.settings.mapId = newMap;
+                        }
+                        SkyGen.switchMinigameMode(g, newMode, false);
+                     } else if ("BOMB_PLANT".equals(act) && p.length >= 3) {
+                        int site = Integer.parseInt(p[2]) & 1;
+                        String planter = p.length >= 4 ? p[3] : "Terrorist";
+                        SkyGen.cs2BombPlanted = true;
+                        SkyGen.cs2BombSite = site;
+                        SkyGen.cs2BombTimerTicks = 800;
+                        SkyGen.cs2DefuseTicks = 0;
+                        SoundEngine.playMinigameSound("mg_showdown");
+                        g.say("\u00a7c\u00a7l[CS2 Strike] BOMB HAS BEEN PLANTED AT SITE " + (site == 0 ? "A" : "B") + " \u00a77by \u00a7e" + planter + "\u00a77!");
+                     } else if ("BOMB_DEFUSE".equals(act)) {
+                        String defuser = p.length >= 3 ? p[2] : "Counter-Terrorist";
+                        SkyGen.cs2BombPlanted = false;
+                        SkyGen.cs2RoundOver = true;
+                        g.say("\u00a7b\u00a7l[CS2 Strike] BOMB HAS BEEN DEFUSED \u00a77by \u00a7a" + defuser + "\u00a77! Counter-Terrorists Win!");
                      }
                   }
                }
