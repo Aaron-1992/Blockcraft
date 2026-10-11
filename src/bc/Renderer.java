@@ -141,6 +141,26 @@ public final class Renderer {
       }
    }
 
+   /** Completely purges all GPU section VBOs and in-flight mesh jobs when an arena world is reset. */
+   public void clearWorldMeshes(World w) {
+      if (w != null && this.g != null && this.g.window != 0L) {
+         for (Chunk c : w.chunks.values()) {
+            this.onUnload(c);
+         }
+      }
+      Renderer.Done d;
+      while ((d = (Renderer.Done)this.done.poll()) != null) {
+         this.inflight.decrementAndGet();
+         d.c.sections[d.sy].inFlight = false;
+         free(d.r);
+      }
+      this.vis.clear();
+      this.shadowDirty = true;
+      if (this.lod != null) {
+         this.lod.invalidateAll();
+      }
+   }
+
    boolean ready(World var1, Chunk var2) {
       if (!var2.lit) {
          return false;
@@ -670,6 +690,7 @@ public final class Renderer {
       int var15 = this.g.opt.lodDistance;
       boolean var16 = this.lod != null && var15 > var13;
       if (var16) {
+         var15 = Math.max(var15, var13 * 3);
          var14 = var15 * 16.0F;
       }
 

@@ -1114,7 +1114,7 @@ final class Screens {
       ui.drawToast();
    }
 
-   // =================================================================== V4.1/V4.3: Minigame Waiting Room / Lobby Screen
+   // =================================================================== V4.1/V4.3: Minigame Overview & Waiting Lobby Screen
    static void waiting(Game g) {
       Ui ui = g.ui;
       Gui gui = g.gui;
@@ -1125,60 +1125,109 @@ final class Screens {
       String mapName = (g.world != null && g.world.settings != null) ? g.world.settings.mapName() : "Cove";
       boolean isBedwars = wType == WorldSettings.BEDWARS;
       boolean isTumble = wType == WorldSettings.TUMBLE;
-      String lobbyTitle = (isBedwars ? "Bedwars" : (isTumble ? "Tumble" : "Battle")) + " Lobby - " + mapName;
-      ui.title(lobbyTitle, 7.0F);
 
       float pw = Math.min(300.0F, gui.w - 16.0F);
       float px = cx - pw / 2.0F;
       float py = 21.0F;
       float footY = gui.h - 24.0F;
       float ph = footY - py - 4.0F;
-      ui.panel(px, py, pw, ph);
-
       float ix = px + 6.0F;
       float iw = pw - 12.0F;
       float colW = (iw - 6.0F) / 2.0F;
       float x1 = ix + colW + 6.0F;
-      float iy = py + 6.0F;
+      float iy = py + 5.0F;
+      float qW = (iw - 12.0F) / 4.0F;
+
+      // 1. POST-MATCH OVERVIEW SCREEN (shown after winning or completing a round before entering the inter-round lobby!)
+      if (SkyGen.showingOverview) {
+         String ovTitle = (SkyGen.lastRoundWon ? "Victory Overview - " : "Match Overview - ") + SkyGen.lastRoundMode;
+         ui.title(ovTitle, 7.0F);
+         ui.panel(px, py, pw, ph);
+
+         String banner = SkyGen.lastRoundWon
+            ? "CHAMPION OF THE ARENA! (#1 Place Victory)"
+            : "ROUND COMPLETE - MATCH STANDINGS";
+         gui.text(Game.clipText(banner, iw), ix, iy, SkyGen.lastRoundWon ? Ui.GOLD : 0xFF8FE060, true);
+
+         String pod1 = "1st Place: " + SkyGen.lastRoundFirst + "  |  Arena: " + SkyGen.lastRoundMap;
+         String pod2 = "2nd: " + SkyGen.lastRoundSecond + "  |  3rd: " + SkyGen.lastRoundThird;
+         String stats = String.format("Kills: %d  |  Beds Broken: %d  |  Match Time: %d:%02d",
+            SkyGen.lastRoundKills, SkyGen.lastRoundBedsBroken, SkyGen.lastRoundDurationSec / 60, SkyGen.lastRoundDurationSec % 60);
+         gui.text(Game.clipText(pod1, iw), ix, iy + 13.0F, 0xFF68F080, true);
+         gui.text(Game.clipText(pod2, iw), ix, iy + 25.0F, Ui.TEXT, true);
+         gui.text(Game.clipText(stats, iw), ix, iy + 37.0F, Ui.DIM, true);
+
+         gui.text(Game.clipText("Vote for Next Round's Arena Map:", iw), ix, iy + 52.0F, Ui.GOLD, true);
+         float voteY = iy + 64.0F;
+         String[] shortMaps = new String[]{"Cove", "Cruc", "Cavn", "Tmpl"};
+         for (int m = 0; m < 4; m++) {
+            final int mapIdx = m;
+            String mName = WorldSettings.MAP_NAMES[m];
+            int votes = SkyGen.mapVotes[m];
+            boolean voted = SkyGen.myMapVote == m;
+            String vLbl = voted ? ("*" + shortMaps[m] + ":" + votes + "*") : (shortMaps[m] + ":" + votes);
+            ui.button(Game.clipText(vLbl, qW - 6.0F), ix + m * (qW + 4.0F), voteY, qW, 20.0F, true,
+               "Vote to play next round on " + mName + " Arena.",
+               () -> {
+                  SkyGen.castMapVote(g, mapIdx, false);
+                  ui.say("Voted for " + mName + " (" + SkyGen.mapVotes[mapIdx] + " votes)");
+               });
+         }
+
+         int ovSecs = Math.max(1, (SkyGen.overviewCountdownTicks + 19) / 20);
+         float actY = voteY + 28.0F;
+         ui.button("Continue to Lobby (" + ovSecs + "s)", ix, actY, iw, 20.0F, true,
+            "Proceed to the Waiting Lobby to wait for the next round and finalize map votes.",
+            () -> SkyGen.enterInterRoundLobby(g));
+
+         ui.button("Play Next Round Now", ix, footY, colW, 20.0F, true,
+            "Completely reset the arena with the winning voted map and start immediately.",
+            () -> SkyGen.startMatch(g, true));
+         ui.button("Leave Lobby", x1, footY, colW, 20.0F, true, null, g::quitToTitle);
+         ui.drawToast();
+         return;
+      }
+
+      // 2. INTER-ROUND WAITING LOBBY WITH LIVE MAP VOTING
+      if (SkyGen.myMapVote < 0) {
+         SkyGen.initMapVoting(g);
+      }
+      int leadMap = SkyGen.winningVotedMap(g.world != null && g.world.settings != null ? g.world.settings.mapId : 0);
+      String leadMapName = WorldSettings.MAP_NAMES[leadMap & 3];
+      String lobbyTitle = (isBedwars ? "Bedwars" : (isTumble ? "Tumble" : "Battle")) + " Lobby - " + mapName;
+      ui.title(lobbyTitle, 7.0F);
+      ui.panel(px, py, pw, ph);
 
       int totalPlayers = 1 + Net319.peerCount();
       String statusLine;
       if (SkyGen.lobbyCountdownTicks > 0) {
          int secs = (SkyGen.lobbyCountdownTicks + 19) / 20;
-         statusLine = "Match starting in " + secs + "s... (" + totalPlayers + " in lobby)";
+         statusLine = "Next round in " + secs + "s! Leading Map Vote: " + leadMapName;
       } else {
-         statusLine = "Waiting for players (" + totalPlayers + "/8) - Ephemeral Match (No Save)";
+         statusLine = "Lobby (" + totalPlayers + "/8) - Vote for a Map below or click Start!";
       }
       gui.text(Game.clipText(statusLine, iw), ix, iy, SkyGen.lobbyCountdownTicks > 0 ? 0xFF8FE060 : Ui.GOLD, true);
 
-      String netLine;
-      if (Net319.isHosting()) {
-         netLine = "Host IP: " + Net319.publicAddress + " | Code: " + Net319.shareCode;
-      } else if (Net319.isConnected()) {
-         netLine = "Connected to Host (" + Net319.peerCount() + " peers) - Waiting for start";
-      } else {
-         netLine = "LAN / VPN IP: " + Net319.localLanIp() + ":" + Net319.DEFAULT_PORT + " (Click Host LAN to invite)";
-      }
-      gui.text(Game.clipText(netLine, iw), ix, iy + 12.0F, Ui.TEXT, true);
-
       int myTeam = SkyGen.getPlayerTeam(g);
-      StringBuilder roster = new StringBuilder("Roster: You [");
-      roster.append(isBedwars ? SkyGen.BEDWARS_NAMES[myTeam] : ("#" + (myTeam + 1))).append("]");
-      for (Net319.Peer p : Net319.peers().values()) {
-         int pt = Math.abs(p.team) & 3;
-         roster.append(", ").append(p.name).append(" [").append(isBedwars ? SkyGen.BEDWARS_NAMES[pt] : ("#" + (pt + 1))).append("]");
+      String netRoster;
+      if (Net319.isHosting()) {
+         netRoster = "Host: " + Net319.publicAddress + " | Code: " + Net319.shareCode;
+      } else if (Net319.isConnected()) {
+         netRoster = "Connected (" + Net319.peerCount() + " peers) | Team: " + (isBedwars ? SkyGen.BEDWARS_NAMES[myTeam] : ("#" + (myTeam + 1)));
+      } else {
+         netRoster = "You: " + (isBedwars ? SkyGen.BEDWARS_NAMES[myTeam] + " Team" : ("Podium #" + (myTeam + 1))) + " | LAN IP: " + Net319.localLanIp();
       }
-      gui.text(Game.clipText(roster.toString(), iw), ix, iy + 24.0F, Ui.DIM, true);
+      gui.text(Game.clipText(netRoster, iw), ix, iy + 11.0F, Ui.TEXT, true);
 
-      float by0 = iy + 38.0F;
-      float qW = (iw - 12.0F) / 4.0F;
+      // Row 1 (by0): Team / Spawn Podium Selection
+      float by0 = iy + 23.0F;
       for (int t = 0; t < 4; t++) {
          final int teamIdx = t;
          boolean sel = (myTeam == t);
          String lbl = isBedwars
             ? (sel ? "[" + SkyGen.BEDWARS_NAMES[t] + "]" : SkyGen.BEDWARS_NAMES[t])
             : (sel ? "[Spot " + (t + 1) + "]" : "Spot " + (t + 1));
-         ui.button(lbl, ix + t * (qW + 4.0F), by0, qW, 20.0F, true,
+         ui.button(lbl, ix + t * (qW + 4.0F), by0, qW, 18.0F, true,
             isBedwars ? "Join " + SkyGen.BEDWARS_NAMES[t] + " Team base." : "Select starting podium #" + (t + 1) + ".",
             () -> {
                SkyGen.selectTeam(g, teamIdx, true);
@@ -1186,25 +1235,44 @@ final class Screens {
             });
       }
 
-      float by1 = by0 + 24.0F;
-      ui.button("Start Match", ix, by1, colW, 20.0F, true,
-         "Begin the minigame immediately for yourself and all connected players.",
+      // Row 2 (byVote): Votable Arena Maps (Cove, Crucible, Cavern, Temple)
+      float byVote = by0 + 20.0F;
+      String[] shortMaps = new String[]{"Cove", "Cruc", "Cavn", "Tmpl"};
+      for (int m = 0; m < 4; m++) {
+         final int mapIdx = m;
+         String mName = WorldSettings.MAP_NAMES[m];
+         int votes = SkyGen.mapVotes[m];
+         boolean voted = SkyGen.myMapVote == m;
+         String vLbl = voted ? ("*" + shortMaps[m] + ":" + votes + "*") : (shortMaps[m] + ":" + votes);
+         ui.button(Game.clipText(vLbl, qW - 6.0F), ix + m * (qW + 4.0F), byVote, qW, 18.0F, true,
+            "Vote for " + mName + " Arena. Winning map loads when round starts!",
+            () -> {
+               SkyGen.castMapVote(g, mapIdx, true);
+               ui.say("Voted for " + mName + " (" + SkyGen.mapVotes[mapIdx] + " votes) — Arena updated!");
+            });
+      }
+
+      // Row 3 (by1): Start Match & Countdown Timer
+      float by1 = byVote + 20.0F;
+      ui.button("Start Match", ix, by1, colW, 18.0F, true,
+         "Begin the minigame immediately on the winning voted map.",
          () -> SkyGen.startMatch(g, true));
-      ui.button(SkyGen.lobbyCountdownTicks > 0 ? "Cancel Timer" : "Countdown (5s)", x1, by1, colW, 20.0F, true,
-         "Start or cancel a 5-second match start countdown.",
+      ui.button(SkyGen.lobbyCountdownTicks > 0 ? "Cancel Timer" : "Countdown (10s)", x1, by1, colW, 18.0F, true,
+         "Start or cancel the lobby countdown timer for the next round.",
          () -> {
             if (SkyGen.lobbyCountdownTicks > 0) {
                SkyGen.lobbyCountdownTicks = -1;
                ui.say("Countdown cancelled");
             } else {
-               SkyGen.lobbyCountdownTicks = 100;
-               ui.say("Match starting in 5 seconds...");
+               SkyGen.lobbyCountdownTicks = 200;
+               ui.say("New round starting in 10 seconds...");
             }
          });
 
-      float by2 = by1 + 24.0F;
+      // Row 4 (by2): Mode Settings & Leading Voted Map
+      float by2 = by1 + 20.0F;
       if (isBedwars) {
-         ui.button("Solo Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, by2, colW, 20.0F, true,
+         ui.button("Solo Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, by2, colW, 18.0F, true,
             "When ON in solo play, unoccupied enemy bases spawn AI defenders/raiders.",
             () -> {
                SkyGen.soloBots = !SkyGen.soloBots;
@@ -1212,7 +1280,7 @@ final class Screens {
             });
       } else if (isTumble) {
          String wmLabel = SkyGen.tumbleWeaponMode == 0 ? "Mixed" : (SkyGen.tumbleWeaponMode == 1 ? "Shovels" : "Snowballs");
-         ui.button("Mode: " + wmLabel, ix, by2, colW, 20.0F, true,
+         ui.button("Mode: " + wmLabel, ix, by2, colW, 18.0F, true,
             "Select Tumble weapon mode (Mixed, Shovels Only, or Snowballs Only).",
             () -> {
                SkyGen.tumbleWeaponMode = (SkyGen.tumbleWeaponMode + 1) % 3;
@@ -1221,7 +1289,7 @@ final class Screens {
             });
       } else {
          String kitName = SkyGen.SW_KIT_NAMES[SkyGen.swKit & 3];
-         ui.button("Set: " + kitName, ix, by2, colW, 20.0F, true,
+         ui.button("Set: " + kitName, ix, by2, colW, 18.0F, true,
             "Select your Battle Item Set (" + SkyGen.SW_KIT_DESC[SkyGen.swKit & 3] + ").",
             () -> {
                int nextKit = (SkyGen.swKit + 1) & 3;
@@ -1229,25 +1297,24 @@ final class Screens {
                ui.say("Item Set: " + SkyGen.SW_KIT_NAMES[nextKit] + " (" + SkyGen.SW_KIT_DESC[nextKit] + ")");
             });
       }
-      ui.button("Map: " + mapName, x1, by2, colW, 20.0F, true,
-         "Switch Console Edition Arena Map (Cove, Crucible, Cavern, Temple).",
+      ui.button("Vote Lead: " + leadMapName, x1, by2, colW, 18.0F, true,
+         "Cycle vote across Console Edition Arena Maps (Cove, Crucible, Cavern, Temple).",
          () -> {
-            if (g.world != null && g.world.settings != null) {
-               g.world.settings.nextMap();
-               SkyGen.resetArenaMap(g, g.world, true);
-               ui.say("Switched Arena Map to " + g.world.settings.mapName());
-            }
+            int nextVote = ((SkyGen.myMapVote < 0 ? 0 : SkyGen.myMapVote) + 1) & 3;
+            SkyGen.castMapVote(g, nextVote, true);
+            ui.say("Voted for " + WorldSettings.MAP_NAMES[nextVote]);
          });
 
-      float by3 = by2 + 24.0F;
-      if (by3 + 20.0F <= py + ph - 2.0F) {
-         ui.button(Net319.isHosting() ? "Stop Host (" + Net319.peerCount() + ")" : "Host LAN / VPN", ix, by3, colW, 20.0F, true,
+      // Row 5 (by3): Multiplayer Hosting & Share Code
+      float by3 = by2 + 20.0F;
+      if (by3 + 18.0F <= py + ph - 2.0F) {
+         ui.button(Net319.isHosting() ? "Stop Host (" + Net319.peerCount() + ")" : "Host LAN / VPN", ix, by3, colW, 18.0F, true,
             "Open this minigame lobby on LAN / Radmin VPN / Worldwide so friends can join.",
             () -> {
                Net319.toggleHost(g);
                ui.say(Net319.isHosting() ? "Hosting on " + Net319.publicAddress : "Stopped hosting");
             });
-         ui.button("Copy Share Code", x1, by3, colW, 20.0F, true,
+         ui.button("Copy Share Code", x1, by3, colW, 18.0F, true,
             "Copy the Share Code (includes Radmin VPN, LAN, and Worldwide Tunnel endpoints).",
             () -> {
                Net319.copyShareCode(g);
@@ -1256,7 +1323,7 @@ final class Screens {
       }
 
       ui.button("Reset Arena", ix, footY, colW, 20.0F, true,
-         "Regenerate all arena islands, beds, chests, and clear all placed blocks.",
+         "Completely regenerate all arena chunks, islands, beds, chests, and clear all placed blocks.",
          () -> {
             SkyGen.resetArenaMap(g, g.world, true);
             ui.say("Arena map completely reset!");

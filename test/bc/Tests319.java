@@ -1094,6 +1094,34 @@ final class Tests319 {
          eq(Blocks.GOLD_BLOCK, bwGame.world.getBlock(2, SkyGen.Y_DECK + 4, 2), "Custom prebuilt map chunk restores saved GOLD_BLOCK on arena reset");
          SkyGen.customMapName = null;
          Game.deleteDir(new java.io.File("maps/unit_test_arena"));
+
+         // Verify Multi-Height Arena Structures (Upper Sky-Vaults, Slime Jump Pads & 2-Story Castles)
+         SkyGen.resetArenaMap(bwGame, bwGame.world, false);
+         eq(Blocks.EMERALD_BLOCK, bwGame.world.getBlock(0, SkyGen.Y_DECK + 6, 0), "Bedwars center island has 2nd-story Sky-Vault at Y_DECK + 6");
+         eq(Redstone319.SLIME_BLOCK, bwGame.world.getBlock(3, SkyGen.Y_DECK, 3), "Bedwars center island has Slime Block Jump Pads to upper Sky-Vault");
+         check(bwGame.world.getBlock(0, SkyGen.Y_DECK + 5, -48) != 0, "Bedwars team base has 2nd-story Castle Keep roof at Y_DECK + 5");
+
+         // Verify Post-Match Victory Overview -> Inter-Round Lobby -> Map Voting Flow
+         SkyGen.openMatchOverview(bwGame, true);
+         check(SkyGen.showingOverview, "Winning a round opens the Post-Match Victory Overview screen");
+         eq(Game.S.WAITING, bwGame.screen, "Overview screen is active on Game.S.WAITING");
+         SkyGen.castMapVote(bwGame, WorldSettings.MAP_TEMPLE, false);
+         eq(WorldSettings.MAP_TEMPLE, SkyGen.myMapVote, "Player map vote is recorded for Temple");
+         SkyGen.enterInterRoundLobby(bwGame);
+         check(!SkyGen.showingOverview && SkyGen.lobbyCountdownTicks > 0, "Transitioning from Overview enters Inter-Round Waiting Lobby with active countdown");
+
+         // Verify LOD high-detail splitDistance extends further and scales dynamically with render distance
+         Lod lodTest = new Lod(null, bwGame.world.gen);
+         try {
+            lodTest.innerHalf = 112; // Render distance 8
+            lodTest.maxDist = 1024;
+            double splitRD8 = lodTest.splitDistance(64);
+            lodTest.innerHalf = 240; // Render distance 16
+            double splitRD16 = lodTest.splitDistance(64);
+            check(splitRD8 >= 280.0 && splitRD16 > splitRD8 + 150.0, "High-detail LOD split distance reaches far out and scales with render distance");
+         } finally {
+            lodTest.dispose();
+         }
       });
    }
 }

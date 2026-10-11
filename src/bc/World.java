@@ -862,6 +862,7 @@ public final class World {
    }
 
    public void resetAllChunks() {
+      FastChunkCache.clear();
       this.fluidDue.clear();
       this.fluidPending.clear();
       this.blockUpdates.clear();
@@ -871,19 +872,40 @@ public final class World {
       this.tiles.clear();
       this.ready.clear();
       this.requested.clear();
-      ArrayList<Chunk> list = new ArrayList<Chunk>(this.chunks.values());
-      for (Chunk ch : list) {
-         Chunk fresh = this.gen.generate(ch.cx, ch.cz);
-         System.arraycopy(fresh.blocks, 0, ch.blocks, 0, fresh.blocks.length);
-         System.arraycopy(fresh.hm, 0, ch.hm, 0, fresh.hm.length);
-         ch.modified = false;
+      if (this.lodMap != null) {
+         this.lodMap.sums.clear();
       }
-      for (Chunk ch : list) {
+      java.util.HashSet<Long> coords = new java.util.HashSet<Long>();
+      for (Chunk old : this.chunks.values()) {
+         old.unloaded = true;
+         coords.add(key(old.cx, old.cz));
+      }
+      if (this.settings != null && this.settings.isVoidMode()) {
+         for (int cx = -4; cx <= 4; cx++) {
+            for (int cz = -4; cz <= 4; cz++) {
+               coords.add(key(cx, cz));
+            }
+         }
+      }
+      this.chunks.clear();
+      ArrayList<Chunk> freshList = new ArrayList<Chunk>(coords.size());
+      for (long k : coords) {
+         int cx = (int)(k >> 32);
+         int cz = (int)k;
+         Chunk fresh = this.gen.generate(cx, cz);
+         fresh.modified = false;
+         fresh.unloaded = false;
+         this.chunks.put(k, fresh);
+         freshList.add(fresh);
+      }
+      for (Chunk ch : freshList) {
          this.lightChunk(ch);
          for (Section s : ch.sections) {
             s.dirty = true;
+            s.inFlight = false;
          }
       }
+      FastChunkCache.clear();
    }
 
    public void tick() {

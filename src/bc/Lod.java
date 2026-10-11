@@ -102,7 +102,7 @@ public final class Lod {
    }
 
    void request(Lod.Tile var1) {
-      if (var1.state == 0 && this.inflight.get() < 8) {
+      if (var1.state == 0 && this.inflight.get() < 16) {
          var1.state = 1;
          this.inflight.incrementAndGet();
          this.pool.execute(() -> {
@@ -192,7 +192,7 @@ public final class Lod {
                c = Biomes.lodColor(col.biome, col.h, col.t, col.hu);
             }
 
-            if (!sea && cs <= 4 && villages != null) {
+            if (!sea && cs <= 8 && villages != null) {
                for (Village v : villages) {
                   if (!v.placed.isEmpty()) {
                      int pathCol = v.style == Style.DESERT ? 14471328 : (v.style == Style.SAVANNA ? 7820603 : (v.style >= Style.SPRUCE ? 7229496 : 8748922));
@@ -393,10 +393,10 @@ public final class Lod {
       int var6 = Math.floorDiv(var1.x0 + var1.size - 1, 16);
       int var7 = Math.floorDiv(var1.z0, 16);
       int var8 = Math.floorDiv(var1.z0 + var1.size - 1, 16);
-      boolean var9 = var1.size <= 64;
-      int maxTries = var1.size <= 64 ? 16 : (var1.size == 128 ? 14 : (var1.size == 256 ? 10 : 6));
+      boolean var9 = var1.size <= 128;
+      int maxTries = var1.size <= 64 ? 16 : (var1.size == 128 ? 16 : (var1.size == 256 ? 12 : 8));
       int chunkStep = var1.size >= 1024 ? 2 : 1;
-      boolean drawTrunk = var1.size <= 128;
+      boolean drawTrunk = var1.size <= 256;
       boolean drawCrownCap = var1.size <= 512;
       float canopyPad = var1.size >= 1024 ? 1.35F : (var1.size == 512 ? 0.85F : (var1.size == 256 ? 0.35F : 0.0F));
       int cs = Math.max(1, var1.size / 32);
@@ -1104,7 +1104,7 @@ public final class Lod {
       long start = System.nanoTime();
 
       Lod.Tile var2;
-      while (var1 < 6 && (var1 == 0 || System.nanoTime() - start < 2500000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
+      while (var1 < 12 && (var1 == 0 || System.nanoTime() - start < 4000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
          var1++;
          if (this.dead) {
             var2.data = null;
@@ -1251,13 +1251,33 @@ public final class Lod {
       return var4;
    }
 
+   /**
+    * Computes the distance out to which a tile of {@code tileSize} splits into its 4 higher-detail children.
+    * Scales dynamically with both chunk render distance ({@code innerHalf}) and LOD horizon ({@code maxDist}) so
+    * high-detail 1x1-block (size 32) and 2x2-block (size 64) LOD rings reach much further out.
+    */
+   double splitDistance(int tileSize) {
+      double rdScale = Math.max(1.0, (this.innerHalf + 16.0) / 96.0);
+      double lodScale = Math.max(1.0, this.maxDist / 768.0);
+      double scale = Math.max(rdScale, rdScale * 0.65 + lodScale * 0.35);
+      if (tileSize == 64) {
+         // 64 -> 32 (highest-detail 1x1 block LOD): reaches far beyond real chunks and scales with render distance
+         return Math.max(this.innerHalf + Math.max(176.0, this.innerHalf * 1.6), 64.0 * 3.4 * scale);
+      }
+      if (tileSize == 128) {
+         // 128 -> 64 (high-detail 2x2 block LOD with full trees, trunks, and village roofs)
+         return Math.max(this.innerHalf + Math.max(352.0, this.innerHalf * 2.6), 128.0 * 2.9 * scale);
+      }
+      return Math.max(this.innerHalf + tileSize * 1.35, tileSize * 2.4 * scale);
+   }
+
    void visit(int var1, int var2, int var3) {
       double var4 = this.nearest(var1, var2, var3);
       if (!(var4 > this.maxDist)) {
          if (var3 != 32 || !this.insideInner(var1, var2, var3) || !this.covered(var1, var2)) {
             if (this.rend.visible((float)(var1 + var3 / 2 - this.cx), (float)(100.0 - this.cy), (float)(var2 + var3 / 2 - this.cz), var3 * 0.72F + 28.0F)) {
-               // (Update 3.11: a tile that may reach into the real chunks is always split down to 32, which is skipped where the chunks are meshed)
-               boolean var6 = var3 > 32 && (var4 < var3 * 1.45 || var4 < this.innerHalf + 32.0);
+               // (Update 3.11 / 4.2: high-detail LOD rings reach much further and scale dynamically with render distance)
+               boolean var6 = var3 > 32 && var4 < this.splitDistance(var3);
                if (!var6) {
                   Lod.Tile var16 = this.tile(var3, var1, var2);
                   var16.lastUse = this.frame;

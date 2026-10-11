@@ -6075,7 +6075,15 @@ public final class Game {
             this.setScreen(Game.S.PLAY);
          });
       }
-      this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      boolean isMinigame = this.world != null && this.world.settings != null && this.world.settings.isMinigame();
+      if (isMinigame) {
+         this.button("Match Overview & Lobby", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, () -> {
+            SkyGen.openMatchOverview(this, false);
+         });
+         this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 38.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      } else {
+         this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      }
    }
 
    String onOff(boolean var1) {

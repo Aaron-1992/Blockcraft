@@ -1,2 +1,1 @@
-4.2
-# Blockcraft V4.2 (r3): Minigame Smart AI Competitors + Redesigned Dark-Obsidian UI + Engine Performance Optimizations + 4 Geometrically Distinct Arena Maps & Custom Prebuilt Map Loader/Saver
+v4.2-vertical-arenas-advanced-ai-lod-scaling-map-voting
