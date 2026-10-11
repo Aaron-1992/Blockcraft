@@ -1110,6 +1110,49 @@ final class Tests319 {
          SkyGen.enterInterRoundLobby(bwGame);
          check(!SkyGen.showingOverview && SkyGen.lobbyCountdownTicks > 0, "Transitioning from Overview enters Inter-Round Waiting Lobby with active countdown");
 
+         // Verify Bedwars AI Bot Respawn when Bed is Intact vs Permanent Elimination when Bed is Destroyed
+         SkyGen.startMatch(bwGame, false);
+         Mobs.Mob blueBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (SkyGen.botTeamIndex(m) == 1 && (m.variant & 1) == 0) {
+               blueBot = m;
+               break;
+            }
+         }
+         check(blueBot != null, "Blue Team Defender AI bot spawned at match start");
+         bwGame.mobs.hurtMob(blueBot, 100, 0.0, 0.0, 0.0, true);
+         check(blueBot.dead, "Blue Team Defender AI bot died from fatal damage");
+         for (int tick = 0; tick < 105; tick++) {
+            bwGame.world.tickCount++;
+            bwGame.mobs.tick();
+            SkyGen.tickMode(bwGame, bwGame.world);
+         }
+         Mobs.Mob respawnedBlue = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.botTeamIndex(m) == 1 && (m.variant & 1) == 0) {
+               respawnedBlue = m;
+               break;
+            }
+         }
+         check(respawnedBlue != null, "Bedwars AI bot respawns after 5s when its team bed is intact");
+
+         // Now destroy Blue Team's bed, kill the bot, and verify it stays permanently dead
+         SkyGen.onBedDestroyed(bwGame, bwGame.world, 1, "You", false);
+         bwGame.mobs.hurtMob(respawnedBlue, 100, 0.0, 0.0, 0.0, true);
+         for (int tick = 0; tick < 120; tick++) {
+            bwGame.world.tickCount++;
+            bwGame.mobs.tick();
+            SkyGen.tickMode(bwGame, bwGame.world);
+         }
+         boolean stillAliveAfterBedGone = false;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (!m.dead && SkyGen.botTeamIndex(m) == 1 && (m.variant & 1) == 0) {
+               stillAliveAfterBedGone = true;
+               break;
+            }
+         }
+         check(!stillAliveAfterBedGone, "Bedwars AI bot stays permanently dead after its team bed is destroyed");
+
          // Verify LOD high-detail splitDistance extends further and scales dynamically with render distance
          Lod lodTest = new Lod(null, bwGame.world.gen);
          try {

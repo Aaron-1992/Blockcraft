@@ -169,6 +169,9 @@ public final class Mobs {
                var5.deathTime++;
                Mobs312.tickDying(this, var5, var1);
                if (var5.deathTime >= (var5.type == ENDER_DRAGON ? Dragon.DEATH_TICKS : 20)) {
+                  if (SkyGen.isMinigameBot(var5)) {
+                     SkyGen.onBotKilled(this.g, var5);
+                  }
                   this.list.remove(var4);
                   Mobs312.removed(this, var5, var1);
                }
@@ -206,11 +209,13 @@ public final class Mobs {
                double var6 = var5.x - var2.x;
                double var8 = var5.z - var2.z;
                double var10 = var6 * var6 + var8 * var8;
-               if (Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || BackroomsStalkerMod.isStalkerMob(var5) || var5.tamed || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
-                  if (var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
+               boolean isBot = SkyGen.isMinigameBot(var5);
+               if (isBot || Mobs312.persistent(var5.type) || Mobs312.keepsForever(var5.type) || BackroomsStalkerMod.isStalkerMob(var5) || var5.tamed || !(var10 > 16384.0) && (!hostile(var5.type) || !(var10 > 1600.0) || var5.age <= 600 || this.rnd.nextInt(600) != 0)) {
+                  if (isBot || var1.isLoaded((int)Math.floor(var5.x), (int)Math.floor(var5.z))) {
                      this.tickMob(var5, var1, var2, var3);
-                     if (var5.y < -20.0) {
-                        if (SkyGen.isMinigameBot(var5)) {
+                     double voidY = isBot ? (SkyGen.Y_DECK - 20.0) : -20.0;
+                     if (var5.y < voidY) {
+                        if (isBot) {
                            SkyGen.onBotKilled(this.g, var5);
                         }
                         this.list.remove(var4);
@@ -616,7 +621,7 @@ public final class Mobs {
          var42 = Math.max(-50.0F, Math.min(50.0F, var42));
          var1.headYaw = var1.headYaw + (var1.yaw + var42 - var1.headYaw) * 0.4F;
          var1.headPitch = var1.headPitch + (var27 - var1.headPitch) * 0.4F;
-         if (var12 && !var1.hasTarget && var1.flee <= 0 && !Mobs312.flies(var1.type)) {
+         if (var12 && !var1.hasTarget && var1.flee <= 0 && !Mobs312.flies(var1.type) && !SkyGen.isMinigameBot(var1)) {
             double var29 = var1.x + var8 * 8.0;
             double var31 = var1.z + var10 * 8.0;
             int var33 = (int)Math.floor(var1.y);

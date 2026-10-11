@@ -120,6 +120,7 @@ public final class SkyGen extends Gen {
    private static World lastWorldRef = null;
    private static final boolean[] sbIslandStocked = new boolean[5];
    private static final boolean[] swIslandStocked = new boolean[13];
+   private static final boolean[] swBotSpawned = new boolean[8];
    private static boolean skywarsWon;
    private static final boolean[] bwBaseStocked = new boolean[5];
    private static boolean bedwarsWon;
@@ -139,6 +140,7 @@ public final class SkyGen extends Gen {
       Arrays.fill(sbQuestDone, false);
       Arrays.fill(sbIslandStocked, false);
       Arrays.fill(swIslandStocked, false);
+      Arrays.fill(swBotSpawned, false);
       skywarsWon = false;
       tumbleSpawnedBots = false;
       tumbleWon = false;
@@ -1701,7 +1703,8 @@ public final class SkyGen extends Gen {
             new Stack(Items.ARROW, 12)
          )) {
             swIslandStocked[i] = true;
-            if (!refill && i > 0 && soloBots && !Net319.isActive() && g != null && g.mobs != null && w.chunkAt(sp[0], sp[1]) != null) {
+            if (!refill && !swBotSpawned[i] && i > 0 && soloBots && !Net319.isClientConnected() && g != null && g.mobs != null && w.chunkAt(sp[0], sp[1]) != null) {
+               swBotSpawned[i] = true;
                int mobType = (i % 3 == 0) ? Mobs.SKELETON : Mobs.ZOMBIE;
                Mobs.Mob bot = g.mobs.spawn(mobType, sp[0] + 0.5, Y_DECK + 1.0, sp[1] + 0.5);
                if (bot != null) {
@@ -1765,6 +1768,9 @@ public final class SkyGen extends Gen {
       int t = Math.abs(team) & 3;
       int bx = BEDWARS_BASES[t][0];
       int bz = BEDWARS_BASES[t][1];
+      if (g.world != null) {
+         g.world.getBlock(bx, Y_DECK, bz);
+      }
       double ox = role == 0 ? 0.5 : -0.5;
       double oz = role == 0 ? -0.5 : 0.5;
       Mobs.Mob bot = g.mobs.spawn(role == 0 ? Mobs.ZOMBIE : Mobs.SKELETON, bx + 0.5 + ox, Y_DECK + 1.0, bz + 0.5 + oz);
@@ -1826,7 +1832,7 @@ public final class SkyGen extends Gen {
                   shop2.color = Trades.PRIEST;
                }
                // Spawn 2 Smart AI Bots per unoccupied enemy base: Defender (#0) + Bridger/Raider (#1)!
-               if (soloBots && !Net319.isActive() && t != getPlayerTeam(g)) {
+               if (soloBots && !Net319.isClientConnected() && t != getPlayerTeam(g)) {
                   spawnBedwarsTeamBot(g, t, 0);
                   spawnBedwarsTeamBot(g, t, 1);
                }
@@ -1945,6 +1951,11 @@ public final class SkyGen extends Gen {
       if (bot == null || g == null || g.world == null || g.world.settings == null) {
          return;
       }
+      // Prevent duplicate death handling for the same bot instance
+      if (bot.flee == -999) {
+         return;
+      }
+      bot.flee = -999;
       int type = g.world.settings.type;
       if (type == WorldSettings.BEDWARS) {
          int team = botTeamIndex(bot);
@@ -2119,28 +2130,6 @@ public final class SkyGen extends Gen {
       int botSlot = Math.abs(bot.netId) & 31;
       if (botPearlCooldown[botSlot] > 0) {
          botPearlCooldown[botSlot]--;
-      }
-
-      // Tactical Ender Pearl Void Rescue: if a Battle or Bedwars bot is knocked below Y_DECK - 2.5 over air, pearl back to safety!
-      if ((mode == WorldSettings.BATTLE || mode == WorldSettings.BEDWARS)
-         && bot.y < Y_DECK - 2.5
-         && bot.vy < -0.1
-         && botPearlCooldown[botSlot] <= 0
-         && !hasFootingAt(w, (int)Math.floor(bot.x), (int)Math.floor(bot.y), (int)Math.floor(bot.z))) {
-         botPearlCooldown[botSlot] = 360;
-         int team = botTeamIndex(bot);
-         double safeX = (mode == WorldSettings.BEDWARS && team >= 0) ? (BEDWARS_BASES[team][0] + 0.5) : 0.5;
-         double safeZ = (mode == WorldSettings.BEDWARS && team >= 0) ? (BEDWARS_BASES[team][1] + 0.5) : 0.5;
-         SoundEngine.playThrow(w, bot.x, bot.y + 1.2, bot.z);
-         bot.x = bot.px = safeX;
-         bot.y = bot.py = Y_DECK + 1.2;
-         bot.z = bot.pz = safeZ;
-         bot.vy = 0.1;
-         bot.onGround = true;
-         if (mobs.g != null) {
-            mobs.g.spawnBreakParticles((int)Math.floor(safeX), Y_DECK + 1, (int)Math.floor(safeZ), Blocks.OBSIDIAN, 10);
-         }
-         return out;
       }
 
       // Tactical Golden Apple Self-Healing: Battle & Bedwars bots eat a Golden Apple when HP <= 10!
@@ -2808,16 +2797,33 @@ public final class SkyGen extends Gen {
       // 3. BEDWARS: stock team bases, AI bot respawns, resource generators, bed destruction alerts & victory check
       if (type == WorldSettings.BEDWARS) {
          stockBedwarsWorld(g, w);
-         // Process Bedwars AI Bot Respawn timers while their team bed remains intact
-         if (g != null && soloBots && !Net319.isActive()) {
+         // Process Bedwars AI Bot Respawn timers & watchdog while their team bed remains intact
+         if (g != null && g.mobs != null && soloBots && !Net319.isClientConnected()) {
+            int myTeamIdx = getPlayerTeam(g);
             for (int slot = 0; slot < 8; slot++) {
+               int team = slot >> 1;
+               int role = slot & 1;
+               if (team == myTeamIdx) {
+                  bwBotRespawnTicks[slot] = 0;
+                  continue;
+               }
                if (bwBotRespawnTicks[slot] > 0) {
-                  int team = slot >> 1;
-                  int role = slot & 1;
                   if (!isTeamBedIntact(w, team)) {
                      bwBotRespawnTicks[slot] = 0;
                   } else if (--bwBotRespawnTicks[slot] == 0) {
                      spawnBedwarsTeamBot(g, team, role);
+                  }
+               } else if (w.tickCount % 20L == 0L && bwBaseStocked[team] && isTeamBedIntact(w, team)) {
+                  // Watchdog: if an enemy team's bed is intact and its role bot died/vanished without a running timer, respawn it!
+                  boolean alive = false;
+                  for (Mobs.Mob m : g.mobs.list) {
+                     if (m != null && !m.dead && botTeamIndex(m) == team && (m.variant & 1) == role) {
+                        alive = true;
+                        break;
+                     }
+                  }
+                  if (!alive) {
+                     bwBotRespawnTicks[slot] = 80; // Respawn in 4 seconds
                   }
                }
             }
