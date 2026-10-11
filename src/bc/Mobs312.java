@@ -1006,6 +1006,7 @@ final class Mobs312 {
       f.vy = dy * 1.5;
       f.vz = dz * 1.5;
       g.mobs.fireballs.add(f);
+      SoundEngine.playThrow(g.world, p.x, p.y + p.eye, p.z);
       if (!p.creative) {
          held.n--;
          if (held.n <= 0) {
@@ -1044,6 +1045,7 @@ final class Mobs312 {
       f.vy = dy * 0.85;
       f.vz = dz * 0.85;
       g.mobs.fireballs.add(f);
+      SoundEngine.play3D(g.world, "fireball", p.x, p.y + p.eye, p.z, 0.85F, 1.0F);
       Net319.sendFireball(f.x, f.y, f.z, f.vx, f.vy, f.vz);
       if (!p.creative) {
          held.n--;

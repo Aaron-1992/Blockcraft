@@ -38,6 +38,13 @@ final class Scenes {
             g.screen = Game.S.MULTIPLAYER;
             Screens.multiplayer(g);
             break;
+         case "minigames":
+            g.screen = Game.S.MINIGAMES;
+            g.newSettings = new WorldSettings();
+            g.newSettings.type = WorldSettings.BATTLE;
+            g.newSettings.mapId = WorldSettings.MAP_COVE;
+            Screens.minigames(g);
+            break;
          case "worlds":
          case "worlds-long":
          case "worlds-empty": {

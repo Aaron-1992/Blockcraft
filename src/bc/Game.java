@@ -197,6 +197,8 @@ public final class Game {
    Game.S skinReturn = Game.S.TITLE;
    Game.S packsReturn = Game.S.TITLE;
    Game.S modsReturn = Game.S.TITLE;
+   Game.S mgReturn = Game.S.TITLE;
+   int mgTab = 0;
    Game.S creditsReturn = Game.S.TITLE;
    float creditsScroll = 0.0F;
    boolean pendingEndCredits = false;
@@ -1183,7 +1185,11 @@ public final class Game {
             SkyGen.giveBedwarsLoadout(this, SkyGen.myTeam);
             this.bedPos = SkyGen.getTeamBedFoot(SkyGen.myTeam);
             this.player.yaw = SkyGen.getTeamYaw(SkyGen.myTeam);
-         } else if (ws.type == WorldSettings.SKYWARS) {
+         } else if (ws.type == WorldSettings.BATTLE) {
+            SkyGen.giveSkywarsKit(this, SkyGen.swKit);
+            this.player.yaw = SkyGen.getSkywarsYaw(0);
+         } else if (ws.type == WorldSettings.TUMBLE) {
+            SkyGen.giveTumbleLoadout(this);
             this.player.yaw = SkyGen.getSkywarsYaw(0);
          }
 
@@ -1275,6 +1281,10 @@ public final class Game {
          } else if (wType == WorldSettings.BEDWARS) {
             int myTeam = SkyGen.getPlayerTeam(this);
             SkyGen.giveBedwarsLoadout(this, myTeam);
+         } else if (wType == WorldSettings.BATTLE) {
+            SkyGen.giveSkywarsKit(this, SkyGen.swKit);
+         } else if (wType == WorldSettings.TUMBLE) {
+            SkyGen.giveTumbleLoadout(this);
          }
 
          this.cursor = null;
@@ -1693,9 +1703,9 @@ public final class Game {
          return;
       }
 
-      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.SKYWARS) {
+      if (this.world != null && this.world.settings != null && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE)) {
+         boolean isTumble = this.world.settings.type == WorldSettings.TUMBLE;
          int myTeam = SkyGen.getPlayerTeam(this);
-         int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
          this.player.dead = false;
          this.player.burn = 0;
          this.player.health = 20;
@@ -1706,13 +1716,27 @@ public final class Game {
          this.player.fallDistance = 0.0F;
          this.player.invuln = 40;
          this.deathHandled = false;
-         this.spawnXZ = new int[]{sp[0], sp[2]};
-         this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
-         this.player.yaw = SkyGen.getTeamYaw(myTeam);
-         this.player.pitch = 0.0F;
-         this.player.updateBox();
-         SkyGen.giveSkywarsKit(this, SkyGen.swKit);
-         this.say("§a[Skywars] Respawned at Spawn Island #" + (myTeam + 1) + " with Kit: §e" + SkyGen.SW_KIT_NAMES[SkyGen.swKit] + "§a!");
+         if (isTumble) {
+            double ang = (Math.abs(myTeam) % 8) * (Math.PI / 4.0);
+            int sx = (int)Math.round(Math.cos(ang) * 12.0);
+            int sz = (int)Math.round(Math.sin(ang) * 12.0);
+            this.spawnXZ = new int[]{sx, sz};
+            this.player.setPos(sx + 0.5, SkyGen.Y_DECK + 1.0, sz + 0.5);
+            this.player.yaw = (float)Math.toDegrees(Math.atan2(sx, -sz));
+            this.player.pitch = 12.0F;
+            this.player.updateBox();
+            SkyGen.giveTumbleLoadout(this);
+            this.say("\u00a7b[Tumble] Respawned on the top layer with " + SkyGen.TUMBLE_MODE_NAMES[SkyGen.tumbleWeaponMode % 3] + "!");
+         } else {
+            int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
+            this.spawnXZ = new int[]{sp[0], sp[2]};
+            this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
+            this.player.yaw = SkyGen.getTeamYaw(myTeam);
+            this.player.pitch = 0.0F;
+            this.player.updateBox();
+            SkyGen.giveSkywarsKit(this, SkyGen.swKit);
+            this.say("\u00a76[Battle] Respawned at Podium #" + (myTeam + 1) + " with Item Set: \u00a7e" + SkyGen.SW_KIT_NAMES[SkyGen.swKit] + "\u00a76!");
+         }
          return;
       }
 
@@ -2195,6 +2219,12 @@ public final class Game {
                }
                case LOADING:
                   return;
+               case MINIGAMES: {
+                  if (var1 == 256 && var2 == 1) {
+                     this.setScreen(this.mgReturn != null ? this.mgReturn : Game.S.TITLE);
+                  }
+                  return;
+               }
                case WAITING: {
                   if (var1 == 256 && var2 == 1) {
                      this.quitToTitle();
@@ -4198,6 +4228,9 @@ public final class Game {
          if (this.leftDown && !this.swinging) {
             this.swinging = true;
             this.swing = 1.0E-4F;
+            if (this.target == null || this.targetMob != null) {
+               SoundEngine.playSwing(this.world, this.player.x, this.player.y + 1.4, this.player.z);
+            }
          }
 
          boolean var5 = false;
@@ -4217,6 +4250,12 @@ public final class Game {
             int var6 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
             if (!Blocks.breakable(var6) || (this.player.adventure && !Items.canAdventureBreak(var4, var6))) {
                this.breakProg = 0.0F;
+            } else if (this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE && SkyGen.isTumbleLayerBlock(this.target.x, this.target.y, this.target.z)) {
+               if (this.breakDelay <= 0) {
+                  this.breakBlock(this.target.x, this.target.y, this.target.z);
+                  this.breakProg = 0.0F;
+                  this.breakDelay = 3;
+               }
             } else if (this.player.creative) {
                boolean var7 = Items.isTool(var4) && Items.toolClass(var4) == 4;
                if (this.breakDelay <= 0 && !var7) {
@@ -4385,6 +4424,7 @@ public final class Game {
          return true;
       }
       if (Shapes.use(this, this.target.x, this.target.y, this.target.z, var1)) {
+         SoundEngine.playClickBlock(this.world, this.target.x, this.target.y, this.target.z, true);
          return true;
       }
 
@@ -4566,15 +4606,21 @@ public final class Game {
 
       float var10 = Math.min(1.0F, (this.atkTicks + 0.5F) / (20.0F / var5));
       var4 *= 0.2F + var10 * var10 * 0.8F;
+      boolean crit = false;
       if (var10 > 0.9F && !this.player.onGround && this.player.vy < 0.0 && !this.player.inWater && !this.player.sprinting) {
          var4 *= 1.5F;
+         crit = true;
       }
 
       boolean var7 = this.player.sprinting;
       this.atkTicks = 0;
       this.swinging = true;
       this.swing = 1.0E-4F;
+      SoundEngine.playSwing(this.world, this.player.x, this.player.y + 1.4, this.player.z);
       boolean var8 = this.mobs.hurtMob(var1, Math.max(1, Math.round(var4)), this.player.x, this.player.z, 0.4 + (var7 ? 0.5 : 0.0), true);
+      if (var8) {
+         SoundEngine.playHit(this.world, var1.x, var1.y + 0.8, var1.z, crit);
+      }
       if (var7) {
          this.player.sprinting = false;
       }
@@ -5137,6 +5183,9 @@ public final class Game {
          return false;
       }
       int var2 = var1.id;
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE && SkyGen.useTumbleItem(this, var1)) {
+         return true;
+      }
       if (var2 == BackroomsStalkerMod.ALMOND_WATER && BackroomsStalkerMod.drinkAlmondWater(this, var1)) {
          return true;
       }
@@ -5905,6 +5954,9 @@ public final class Game {
             break;
          case NEWWORLD:
             Screens.newWorld(this);
+            break;
+         case MINIGAMES:
+            Screens.minigames(this);
             break;
          case LOADING:
             Screens.loading(this);
@@ -7036,6 +7088,7 @@ public final class Game {
       WORLDS,
       MULTIPLAYER,
       NEWWORLD,
+      MINIGAMES,
       LOADING,
       WAITING,
       PLAY,

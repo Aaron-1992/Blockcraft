@@ -74,7 +74,8 @@ final class Screens {
       float by = Math.max(bottom + 26.0F, gui.h * 0.45F);
       by = Math.min(by, gui.h - 16.0F - row * 3.0F - 20.0F);
       float bx = cx - bw / 2.0F;
-      ui.button("Singleplayer", bx, by, bw, 20.0F, true, null, () -> openWorlds(g));
+      ui.button("Singleplayer", bx, by, half, 20.0F, true, null, () -> openWorlds(g));
+      ui.button("Mini Games", bx + half + 4.0F, by, half, 20.0F, true, null, () -> openMinigames(g, Game.S.TITLE));
       ui.button("Multiplayer", bx, by + row, half, 20.0F, true, null, () -> {
          g.mpReturn = Game.S.TITLE;
          openMultiplayer(g);
@@ -254,7 +255,8 @@ final class Screens {
       float by = gui.h - footer + 6.0F;
       float third = (pw - 8.0F) / 3.0F;
       boolean any = n > 0;
-      ui.button("Play Selected World", px, by, pw, 20.0F, any, "Opens the world you picked (double-click a world to open it faster).", () -> g.startWorld(false, null, 1));
+      ui.button("Play Selected World", px, by, pw - third - 4.0F, 20.0F, any, "Opens the world you picked (double-click a world to open it faster).", () -> g.startWorld(false, null, 1));
+      ui.button("Mini Games", px + pw - third, by, third, 20.0F, true, "Play Minecraft Console Edition Battle, Tumble, and Bedwars Mini Games across 4 arenas!", () -> openMinigames(g, Game.S.WORLDS));
       ui.button("New World", px, by + 24.0F, third, 20.0F, true, "Make a new world: choose its seed, type and game mode.", () -> openNewWorld(g));
       ui.button(g.confirmDelete ? "\u00a7cReally delete?" : "Delete", px + third + 4.0F, by + 24.0F, third, 20.0F, any,
          "Deletes the picked world from your disk. Click twice to confirm. This cannot be undone.", () -> {
@@ -474,7 +476,7 @@ final class Screens {
             rows = 4;
             break;
          case 2:
-            rows = 5;
+            rows = 6;
             break;
          default:
             rows = (KEYS.length + 1) / 2;
@@ -681,10 +683,23 @@ final class Screens {
 
       oy += row;
       if (shows(oy, row, top, viewH)) {
-         ui.toggle("3D Acoustics", o.realAcoustics, x0, oy, colW, 20.0F,
+         ui.toggle("Constant Music", o.constantMusic, x0, oy, colW, 20.0F,
+            "OFF: music plays randomly with natural quiet delays like real Minecraft. ON: music plays constantly back-to-back without waiting.", () -> {
+               o.constantMusic = !o.constantMusic;
+               SoundEngine.setConstantMusic(o.constantMusic);
+            });
+         ui.toggle("3D Acoustics", o.realAcoustics, x1, oy, colW, 20.0F,
             "Real-life sound physics: wall muffling/occlusion, 3D cave reverb & echo, speed-of-sound delay (343 m/s), and Doppler shift.", () -> {
                o.realAcoustics = !o.realAcoustics;
                SoundEngine.setVolumes(o.soundVolume, o.musicVolume, o.realAcoustics);
+            });
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Next Song", x0, oy, colW, 20.0F, true,
+            "Skip to the next Minecraft Console Edition or Battle/Tumble track.", () -> {
+               SoundEngine.nextBattleTrack();
             });
          ui.button("End Credits...", x1, oy, colW, 20.0F, true,
             "View the End Poem and the full Music & Sound Credits.", () -> {
@@ -947,15 +962,161 @@ final class Screens {
       }
    }
 
-   // =================================================================== V4.1: Minigame Waiting Room / Lobby Screen
+   // =================================================================== V4.3: Console Edition Mini Games Hub
+   static final String[] MINIGAME_TABS = {"Battle", "Tumble", "Bedwars"};
+
+   static void openMinigames(Game g, Game.S ret) {
+      g.mgReturn = ret != null ? ret : Game.S.TITLE;
+      if (!g.newSettings.isMinigame()) {
+         g.newSettings.type = WorldSettings.BATTLE;
+         g.mgTab = 0;
+      } else {
+         g.mgTab = g.newSettings.type == WorldSettings.TUMBLE ? 1 : (g.newSettings.type == WorldSettings.BEDWARS ? 2 : 0);
+      }
+      g.newMode = 0;
+      g.ui.randomSeed = new Random().nextLong();
+      g.setScreen(Game.S.MINIGAMES);
+   }
+
+   static void minigames(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      WorldSettings ws = g.newSettings;
+      if (!ws.isMinigame()) {
+         ws.type = WorldSettings.MINIGAME_ORDER[Math.max(0, Math.min(WorldSettings.MINIGAME_ORDER.length - 1, g.mgTab))];
+      }
+      float cx = gui.w / 2.0F;
+      float pw = Math.min(316.0F, gui.w - 16.0F);
+      float px = cx - pw / 2.0F;
+      ui.title("Console Edition Mini Games", 7.0F);
+      ui.tabs(MINIGAME_TABS, g.mgTab, px, 20.0F, pw, 16.0F, i -> {
+         g.mgTab = i;
+         ws.type = WorldSettings.MINIGAME_ORDER[i];
+         g.newMode = 0;
+      });
+
+      float py = 40.0F;
+      float footY = gui.h - 24.0F;
+      float ph = footY - py - 4.0F;
+      ui.panel(px, py, pw, ph);
+
+      float ix = px + 6.0F;
+      float iw = pw - 12.0F;
+      float colW = (iw - 6.0F) / 2.0F;
+      float x1 = ix + colW + 6.0F;
+
+      // Left column: 4 Console Edition Arena Map Buttons + Loadout / Bot Options + Music Track
+      ui.label("Select Arena Map", ix, py + 4.0F, Ui.GOLD);
+      float mW = (colW - 4.0F) / 2.0F;
+      for (int m = 0; m < WorldSettings.MAP_COUNT; m++) {
+         final int mapIdx = m;
+         float mx = ix + (m % 2) * (mW + 4.0F);
+         float my = py + 15.0F + (m / 2) * 22.0F;
+         boolean sel = ws.mapId == m;
+         String lbl = sel ? "[" + WorldSettings.MAP_NAMES[m] + "]" : WorldSettings.MAP_NAMES[m];
+         ui.button(lbl, mx, my, mW, 20.0F, true,
+            WorldSettings.MAP_NAMES[m] + " (" + WorldSettings.MAP_THEMES[m] + "): " + WorldSettings.MAP_INFO[m],
+            () -> {
+               ws.mapId = mapIdx;
+               ui.say("Map: " + WorldSettings.MAP_NAMES[mapIdx]);
+            });
+      }
+
+      float optY0 = py + 61.0F;
+      if (ws.type == WorldSettings.BATTLE) {
+         String kitName = SkyGen.SW_KIT_NAMES[SkyGen.swKit & 3];
+         ui.button("Set: " + kitName, ix, optY0, colW, 20.0F, true,
+            "Battle Item Set: " + SkyGen.SW_KIT_DESC[SkyGen.swKit & 3],
+            () -> {
+               SkyGen.swKit = (SkyGen.swKit + 1) & 3;
+               ui.say("Item Set: " + SkyGen.SW_KIT_NAMES[SkyGen.swKit]);
+            });
+      } else if (ws.type == WorldSettings.TUMBLE) {
+         String wmLabel = SkyGen.tumbleWeaponMode == 0 ? "Mixed" : (SkyGen.tumbleWeaponMode == 1 ? "Shovels" : "Snowballs");
+         ui.button("Mode: " + wmLabel, ix, optY0, colW, 20.0F, true,
+            "Tumble Layer Weapons: Mixed (Shovels + Snowballs), Shovels Only, or Snowballs Only.",
+            () -> {
+               SkyGen.tumbleWeaponMode = (SkyGen.tumbleWeaponMode + 1) % 3;
+               ui.say("Tumble: " + SkyGen.TUMBLE_MODE_NAMES[SkyGen.tumbleWeaponMode]);
+            });
+      } else {
+         int t = SkyGen.myTeam & 3;
+         ui.button("Team: " + SkyGen.BEDWARS_NAMES[t], ix, optY0, colW, 20.0F, true,
+            "Select your starting Bedwars Team Base (Red, Blue, Green, or Yellow).",
+            () -> {
+               SkyGen.myTeam = (SkyGen.myTeam + 1) & 3;
+               ui.say("Team: " + SkyGen.BEDWARS_NAMES[SkyGen.myTeam]);
+            });
+      }
+
+      float optY1 = optY0 + 22.0F;
+      ui.button("AI Bots: " + (SkyGen.soloBots ? "ON" : "OFF"), ix, optY1, colW, 20.0F, true,
+         "Spawn AI rival fighters/competitors in solo matches.",
+         () -> {
+            SkyGen.soloBots = !SkyGen.soloBots;
+            ui.say("AI Bots: " + (SkyGen.soloBots ? "ON" : "OFF"));
+         });
+
+      float optY2 = optY1 + 22.0F;
+      if (optY2 + 20.0F <= py + ph - 4.0F) {
+         ui.button("Next Song", ix, optY2, colW, 20.0F, true,
+            "Preview the next Gareth Coker Tumble & Battle Mini Game soundtrack!",
+            () -> {
+               SoundEngine.nextBattleTrack();
+               ui.say("Track: " + SoundEngine.currentMusicName());
+            });
+      }
+
+      // Right column: Live Arena Preview + Map Theme + Mode Info
+      float pvH = Math.min(68.0F, ph * 0.42F);
+      if (ui.preview == null) {
+         ui.preview = new WorldPreview(96, 60, 20, true);
+      }
+      ui.preview.update(ui.randomSeed + ws.mapId * 1337L, ws);
+      gui.rect(x1 - 1, py + 5.0F, colW + 2, pvH + 2, 0xFF000000);
+      gui.image(ui.preview.img, x1, py + 6.0F, colW, pvH);
+
+      float infoY = py + pvH + 11.0F;
+      gui.text(Game.clipText(ws.mapName() + " - " + ws.mapTheme(), colW), x1, infoY, Ui.GOLD, true);
+      if (infoY + 12.0F < py + ph - 6.0F) {
+         ui.paragraph(WorldSettings.MAP_INFO[ws.mapId] + " " + WorldSettings.TYPE_INFO[ws.type], x1, infoY + 11.0F, colW, Ui.DIM, 4);
+      }
+
+      float third = (pw - 8.0F) / 3.0F;
+      ui.button("Play Now", px, footY, third, 20.0F, true,
+         "Jump straight into the " + ws.typeName() + " (" + ws.mapName() + ") match!",
+         () -> {
+            g.newMode = 0;
+            g.startWorld(true, Long.toString(ui.randomSeed), 0);
+            SkyGen.startMatch(g, false);
+         });
+      ui.button("Open Lobby", px + third + 4.0F, footY, third, 20.0F, true,
+         "Open the Waiting Lobby to invite LAN / Radmin VPN / Share Code friends before starting.",
+         () -> {
+            g.newMode = 0;
+            SkyGen.matchState = SkyGen.STATE_WAITING;
+            g.startWorld(true, Long.toString(ui.randomSeed), 0);
+         });
+      ui.button("Back", px + 2.0F * (third + 4.0F), footY, third, 20.0F, true, null,
+         () -> g.setScreen(g.mgReturn != null ? g.mgReturn : Game.S.TITLE));
+      ui.drawToast();
+   }
+
+   // =================================================================== V4.1/V4.3: Minigame Waiting Room / Lobby Screen
    static void waiting(Game g) {
       Ui ui = g.ui;
       Gui gui = g.gui;
       ui.begin();
       gui.gradient(0, 0, gui.w, gui.h, 0x6810141C, 0xC006080C);
       float cx = gui.w / 2.0F;
-      boolean isBedwars = g.world == null || g.world.settings == null || g.world.settings.type == WorldSettings.BEDWARS;
-      ui.title(isBedwars ? "Bedwars Waiting Lobby" : "Skywars Waiting Lobby", 7.0F);
+      int wType = (g.world != null && g.world.settings != null) ? g.world.settings.type : WorldSettings.BATTLE;
+      String mapName = (g.world != null && g.world.settings != null) ? g.world.settings.mapName() : "Cove";
+      boolean isBedwars = wType == WorldSettings.BEDWARS;
+      boolean isTumble = wType == WorldSettings.TUMBLE;
+      String lobbyTitle = (isBedwars ? "Bedwars" : (isTumble ? "Tumble" : "Battle")) + " Lobby - " + mapName;
+      ui.title(lobbyTitle, 7.0F);
 
       float pw = Math.min(300.0F, gui.w - 16.0F);
       float px = cx - pw / 2.0F;
@@ -976,7 +1137,7 @@ final class Screens {
          int secs = (SkyGen.lobbyCountdownTicks + 19) / 20;
          statusLine = "Match starting in " + secs + "s... (" + totalPlayers + " in lobby)";
       } else {
-         statusLine = "Waiting for players (" + totalPlayers + "/4) - Ephemeral Match (No Save)";
+         statusLine = "Waiting for players (" + totalPlayers + "/8) - Ephemeral Match (No Save)";
       }
       gui.text(Game.clipText(statusLine, iw), ix, iy, SkyGen.lobbyCountdownTicks > 0 ? 0xFF8FE060 : Ui.GOLD, true);
 
@@ -1006,12 +1167,12 @@ final class Screens {
          boolean sel = (myTeam == t);
          String lbl = isBedwars
             ? (sel ? "[" + SkyGen.BEDWARS_NAMES[t] + "]" : SkyGen.BEDWARS_NAMES[t])
-            : (sel ? "[Spawn " + (t + 1) + "]" : "Spawn " + (t + 1));
+            : (sel ? "[Spot " + (t + 1) + "]" : "Spot " + (t + 1));
          ui.button(lbl, ix + t * (qW + 4.0F), by0, qW, 20.0F, true,
-            isBedwars ? "Join " + SkyGen.BEDWARS_NAMES[t] + " Team base." : "Select spawn island #" + (t + 1) + ".",
+            isBedwars ? "Join " + SkyGen.BEDWARS_NAMES[t] + " Team base." : "Select starting podium #" + (t + 1) + ".",
             () -> {
                SkyGen.selectTeam(g, teamIdx, true);
-               ui.say(isBedwars ? "Selected " + SkyGen.BEDWARS_NAMES[teamIdx] + " Team" : "Selected Spawn #" + (teamIdx + 1));
+               ui.say(isBedwars ? "Selected " + SkyGen.BEDWARS_NAMES[teamIdx] + " Team" : "Selected Podium #" + (teamIdx + 1));
             });
       }
 
@@ -1039,21 +1200,33 @@ final class Screens {
                SkyGen.soloBots = !SkyGen.soloBots;
                ui.say("Solo AI Bots: " + (SkyGen.soloBots ? "ON" : "OFF"));
             });
+      } else if (isTumble) {
+         String wmLabel = SkyGen.tumbleWeaponMode == 0 ? "Mixed" : (SkyGen.tumbleWeaponMode == 1 ? "Shovels" : "Snowballs");
+         ui.button("Mode: " + wmLabel, ix, by2, colW, 20.0F, true,
+            "Select Tumble weapon mode (Mixed, Shovels Only, or Snowballs Only).",
+            () -> {
+               SkyGen.tumbleWeaponMode = (SkyGen.tumbleWeaponMode + 1) % 3;
+               SkyGen.giveTumbleLoadout(g);
+               ui.say("Tumble Mode: " + SkyGen.TUMBLE_MODE_NAMES[SkyGen.tumbleWeaponMode]);
+            });
       } else {
          String kitName = SkyGen.SW_KIT_NAMES[SkyGen.swKit & 3];
-         ui.button("Kit: " + kitName, ix, by2, colW, 20.0F, true,
-            "Select your Skywars Starter Kit (" + SkyGen.SW_KIT_DESC[SkyGen.swKit & 3] + ").",
+         ui.button("Set: " + kitName, ix, by2, colW, 20.0F, true,
+            "Select your Battle Item Set (" + SkyGen.SW_KIT_DESC[SkyGen.swKit & 3] + ").",
             () -> {
                int nextKit = (SkyGen.swKit + 1) & 3;
                SkyGen.giveSkywarsKit(g, nextKit);
-               ui.say("Kit: " + SkyGen.SW_KIT_NAMES[nextKit] + " (" + SkyGen.SW_KIT_DESC[nextKit] + ")");
+               ui.say("Item Set: " + SkyGen.SW_KIT_NAMES[nextKit] + " (" + SkyGen.SW_KIT_DESC[nextKit] + ")");
             });
       }
-      ui.button("Copy Share Code", x1, by2, colW, 20.0F, true,
-         "Copy the Share Code (includes Radmin VPN, LAN, and Worldwide Tunnel endpoints).",
+      ui.button("Map: " + mapName, x1, by2, colW, 20.0F, true,
+         "Switch Console Edition Arena Map (Cove, Crucible, Cavern, Temple).",
          () -> {
-            Net319.copyShareCode(g);
-            ui.say("Copied Share Code: " + Net319.shareCode);
+            if (g.world != null && g.world.settings != null) {
+               g.world.settings.nextMap();
+               SkyGen.resetArenaMap(g, g.world, true);
+               ui.say("Switched Arena Map to " + g.world.settings.mapName());
+            }
          });
 
       float by3 = by2 + 24.0F;
@@ -1064,11 +1237,11 @@ final class Screens {
                Net319.toggleHost(g);
                ui.say(Net319.isHosting() ? "Hosting on " + Net319.publicAddress : "Stopped hosting");
             });
-         ui.button("Multiplayer...", x1, by3, colW, 20.0F, true,
-            "Open Multiplayer settings to join a friend's server or configure ports.",
+         ui.button("Copy Share Code", x1, by3, colW, 20.0F, true,
+            "Copy the Share Code (includes Radmin VPN, LAN, and Worldwide Tunnel endpoints).",
             () -> {
-               g.mpReturn = Game.S.WAITING;
-               Screens.openMultiplayer(g);
+               Net319.copyShareCode(g);
+               ui.say("Copied Share Code: " + Net319.shareCode);
             });
       }
 

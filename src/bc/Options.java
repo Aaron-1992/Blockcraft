@@ -49,6 +49,8 @@ public final class Options {
    public float soundVolume = 1.0F;
    public float musicVolume = 0.75F;
    public boolean realAcoustics = true;
+   /** False = random Minecraft music intervals; True = plays music continuously back-to-back. */
+   public boolean constantMusic = false;
    final File file;
 
    public Options(File var1) {
@@ -91,6 +93,7 @@ public final class Options {
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
                this.realAcoustics = Boolean.parseBoolean(var2.getProperty("realAcoustics", "true"));
+               this.constantMusic = Boolean.parseBoolean(var2.getProperty("constantMusic", "false"));
                ResourcePacks.setActiveId(this.resourcePack);
             } catch (Throwable var5) {
                try {
@@ -139,6 +142,7 @@ public final class Options {
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");
       var1.setProperty("realAcoustics", this.realAcoustics + "");
+      var1.setProperty("constantMusic", this.constantMusic + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

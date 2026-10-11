@@ -17,7 +17,7 @@ import java.util.List;
 final class TestsUi {
    static final int[][] SIZES = {{320, 240}, {343, 240}, {427, 240}, {480, 270}, {515, 360}, {640, 360}, {854, 480}};
    static final String[] SCENES = {
-      "title", "multiplayer", "packs", "mods", "credits", "worlds", "worlds-long", "worlds-empty", "newworld", "newworld-flat", "newworld-seed", "newworld-long", "options-0", "options-1", "options-2",
+      "title", "multiplayer", "minigames", "packs", "mods", "credits", "worlds", "worlds-long", "worlds-empty", "newworld", "newworld-flat", "newworld-seed", "newworld-long", "options-0", "options-1", "options-2",
       "options-3", "pause", "loading", "inv-survival", "inv-table", "inv-chest", "inv-furnace", "inv-trade", "inv-creative", "inv-creative-1", "inv-creative-4",
       "inv-search", "inv-search-none", "inv-tip-tool", "inv-tip-ore", "inv-tip-food", "inv-tip-tab"
    };

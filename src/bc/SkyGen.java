@@ -20,14 +20,20 @@ public final class SkyGen extends Gen {
    public static volatile int myKills = 0;
    public static volatile int myDeaths = 0;
 
-   // Skywars Starter Kits
-   public static final String[] SW_KIT_NAMES = new String[]{"Knight", "Archer", "Pyro", "Enderman"};
+   // Battle Item Sets / Kits & Tumble Weapon Modes
+   public static final String[] SW_KIT_NAMES = new String[]{"Normal", "High Power", "Archer", "Pyro"};
    public static final String[] SW_KIT_DESC = new String[]{
       "Stone Sword + Chain Chestplate + 16 Planks",
-      "Bow + 16 Arrows + Leather Tunic + 16 Cobble",
-      "Iron Axe + 4 Auto-TNT + 2 Fireballs + 16 Bricks",
-      "2 Ender Pearls + Iron Boots + 24 Planks"
+      "Iron Sword + Iron Chestplate + Golden Apple + 16 Bricks",
+      "Bow + 20 Arrows + Leather Tunic + 16 Cobble",
+      "Iron Axe + 4 Auto-TNT + 2 Fireballs + 16 Bricks"
    };
+   public static final String[] TUMBLE_MODE_NAMES = new String[]{"Mixed (Shovels & Snowballs)", "Shovels Only", "Snowballs Only"};
+   public static volatile int tumbleWeaponMode = 0;
+   public static volatile int battleGraceTicks = 0;
+   public static volatile boolean showdownActive = false;
+   private static boolean tumbleSpawnedBots = false;
+   private static boolean tumbleWon = false;
 
    // Bedwars Team Upgrades bitmask per team (0..3)
    public static final int UPG_SHARPNESS = 1;
@@ -78,11 +84,13 @@ public final class SkyGen extends Gen {
    private static final boolean[] bedKnownIntact = new boolean[]{true, true, true, true};
 
    private final int mode;
+   private final int mapId;
 
    public SkyGen(long seed, WorldSettings st) {
       super(seed);
       this.settings = st;
       this.mode = st.type;
+      this.mapId = st != null ? Math.max(0, Math.min(WorldSettings.MAP_COUNT - 1, st.mapId)) : 0;
    }
 
    public static void resetMatchState() {
@@ -90,6 +98,10 @@ public final class SkyGen extends Gen {
       Arrays.fill(sbIslandStocked, false);
       Arrays.fill(swIslandStocked, false);
       skywarsWon = false;
+      tumbleSpawnedBots = false;
+      tumbleWon = false;
+      battleGraceTicks = 300; // 15-second Console Edition Battle invulnerability timer
+      showdownActive = false;
       Arrays.fill(bwBaseStocked, false);
       bedwarsWon = false;
       Arrays.fill(bedKnownIntact, true);
@@ -165,34 +177,115 @@ public final class SkyGen extends Gen {
       Arrays.fill(g.inv, null);
       Arrays.fill(g.armor, null);
       switch (k) {
-         case 0 -> { // Knight
+         case 0 -> { // Normal
             g.inv[0] = new Stack(Items.toolId(1, Items.C_SWORD), 1);
             g.inv[1] = new Stack(Blocks.PLANKS, 16);
             g.inv[2] = new Stack(Items.STEAK, 4);
             g.armor[1] = new Stack(Items.armorId(1, 1), 1);
          }
-         case 1 -> { // Archer
+         case 1 -> { // High Power
+            g.inv[0] = new Stack(Items.toolId(2, Items.C_SWORD), 1);
+            g.inv[1] = new Stack(Redstone319.GOLDEN_APPLE, 2);
+            g.inv[2] = new Stack(Blocks.STONEBRICK, 16);
+            g.inv[3] = new Stack(Items.STEAK, 6);
+            g.armor[1] = new Stack(Items.armorId(2, 1), 1);
+            g.armor[3] = new Stack(Items.armorId(2, 3), 1);
+         }
+         case 2 -> { // Archer
             g.inv[0] = new Stack(Items.BOW, 1);
-            g.inv[1] = new Stack(Items.ARROW, 16);
+            g.inv[1] = new Stack(Items.ARROW, 20);
             g.inv[2] = new Stack(Blocks.COBBLE, 16);
             g.inv[3] = new Stack(Items.STEAK, 4);
             g.armor[1] = new Stack(Items.armorId(0, 1), 1);
          }
-         case 2 -> { // Pyro
+         default -> { // Pyro
             g.inv[0] = new Stack(Items.toolId(2, Items.C_AXE), 1);
             g.inv[1] = new Stack(Blocks.TNT, 4);
             g.inv[2] = new Stack(Items.BLAZE_ROD, 2);
             g.inv[3] = new Stack(Blocks.STONEBRICK, 16);
             g.armor[0] = new Stack(Items.armorId(2, 0), 1);
          }
-         default -> { // Enderman
-            g.inv[0] = new Stack(Items.toolId(1, Items.C_SWORD), 1);
-            g.inv[1] = new Stack(Items.ENDER_PEARL, 2);
-            g.inv[2] = new Stack(Blocks.PLANKS, 24);
-            g.armor[3] = new Stack(Items.armorId(1, 3), 1);
-         }
       }
       g.sel = 0;
+   }
+
+   /** Gives the Console Edition Tumble loadout (Shovels, Snowballs, or Mixed). */
+   public static void giveTumbleLoadout(Game g) {
+      if (g == null) {
+         return;
+      }
+      Arrays.fill(g.inv, null);
+      Arrays.fill(g.armor, null);
+      int wm = Math.abs(tumbleWeaponMode) % 3;
+      if (wm == 0) { // Mixed: Diamond Tumble Shovel + Tumble Snowballs
+         g.inv[0] = new Stack(Items.toolId(4, Items.C_SHOVEL), 1);
+         g.inv[1] = new Stack(Blocks.SNOW, 16);
+      } else if (wm == 1) { // Shovels Only
+         g.inv[0] = new Stack(Items.toolId(4, Items.C_SHOVEL), 1);
+      } else { // Snowballs Only
+         g.inv[0] = new Stack(Blocks.SNOW, 32);
+      }
+      g.inv[2] = new Stack(Items.STEAK, 4);
+      g.armor[3] = new Stack(Items.armorId(2, 3), 1); // Iron Boots
+      g.sel = 0;
+   }
+
+   /** Returns true if (x, y, z) is a destructible block in the 3-layer Tumble arena. */
+   public static boolean isTumbleLayerBlock(int x, int y, int z) {
+      return Math.hypot(x, z) <= 19.2 && (y == Y_DECK || y == Y_DECK - 5 || y == Y_DECK - 10);
+   }
+
+   /** Handles right-clicking in Tumble mode to throw a Spleef Snowball that breaks the targeted layer block on impact! */
+   public static boolean useTumbleItem(Game g, Stack held) {
+      if (g == null || g.world == null || g.player == null || held == null) {
+         return false;
+      }
+      int id = held.id;
+      boolean isShovel = Items.isTool(id) && Items.toolClass(id) == Items.C_SHOVEL;
+      boolean isSnow = id == Blocks.SNOW || id == Items.ENDER_PEARL;
+      if (!isShovel && !isSnow) {
+         return false;
+      }
+      if (isShovel && (Math.abs(tumbleWeaponMode) % 3) == 1) {
+         return false; // Shovels Only mode: left-click breaks blocks, no snowball throw
+      }
+      Player p = g.player;
+      SoundEngine.playThrow(g.world, p.x, p.y + p.eye, p.z);
+      double yaw = Math.toRadians(p.yaw);
+      double pitch = Math.toRadians(p.pitch);
+      double dx = -Math.sin(yaw) * Math.cos(pitch);
+      double dy = -Math.sin(pitch);
+      double dz = Math.cos(yaw) * Math.cos(pitch);
+      double rx = p.x;
+      double ry = p.y + p.eye - 0.1;
+      double rz = p.z;
+      for (int step = 1; step <= 52; step++) {
+         rx += dx * 0.5;
+         ry += dy * 0.5;
+         rz += dz * 0.5;
+         if ((step & 1) == 0) {
+            g.spawnBreakParticles((int)Math.floor(rx), (int)Math.floor(ry), (int)Math.floor(rz), Blocks.SNOW, 1);
+         }
+         int bx = (int)Math.floor(rx);
+         int by = (int)Math.floor(ry);
+         int bz = (int)Math.floor(rz);
+         int b = g.world.getBlock(bx, by, bz);
+         if (b != 0 && !Blocks.isFluid(b)) {
+            if (isTumbleLayerBlock(bx, by, bz) && !(bx == 0 && by == Y_DECK && bz == 0 && g.world.tickCount < 40L)) {
+               g.spawnBreakParticles(bx, by, bz, b, 10);
+               SoundEngine.playBlockBreak(g.world, b, bx, by, bz);
+               g.world.setBlock(bx, by, bz, 0);
+            }
+            break;
+         }
+      }
+      if (isSnow && !p.creative) {
+         held.n--;
+         if (held.n <= 0) {
+            g.inv[g.sel] = new Stack(Blocks.SNOW, 8); // Auto-replenish Tumble snowballs!
+         }
+      }
+      return true;
    }
 
    public static void onArenaKill(Game g, String victimName) {
@@ -334,7 +427,7 @@ public final class SkyGen extends Gen {
                g.player.updateBox();
             }
             giveBedwarsLoadout(g, t);
-         } else if (g.world.settings.type == WorldSettings.SKYWARS) {
+         } else if (g.world.settings.type == WorldSettings.BATTLE) {
             int idx = Math.abs(team) % SKYWARS_SPAWNS.length;
             int[] sp = SKYWARS_SPAWNS[idx];
             g.spawnXZ = new int[]{sp[0], sp[1]};
@@ -347,6 +440,21 @@ public final class SkyGen extends Gen {
                g.player.updateBox();
             }
             giveSkywarsKit(g, swKit);
+         } else if (g.world.settings.type == WorldSettings.TUMBLE) {
+            int idx = Math.abs(team) % 8;
+            double ang = idx * (Math.PI / 4.0);
+            int sx = (int)Math.round(Math.cos(ang) * 12.0);
+            int sz = (int)Math.round(Math.sin(ang) * 12.0);
+            g.spawnXZ = new int[]{sx, sz};
+            g.bedPos = null;
+            if (g.player != null) {
+               g.player.setMode(0);
+               g.player.setPos(sx + 0.5, Y_DECK + 1.0, sz + 0.5);
+               g.player.yaw = (float)Math.toDegrees(Math.atan2(sx, -sz));
+               g.player.pitch = 12.0F;
+               g.player.updateBox();
+            }
+            giveTumbleLoadout(g);
          }
       }
       if (broadcast) {
@@ -359,6 +467,9 @@ public final class SkyGen extends Gen {
       Net319.clearWorldState();
       World targetW = w != null ? w : (g != null ? g.world : null);
       if (targetW != null) {
+         if (targetW.gen instanceof SkyGen && targetW.settings != null && ((SkyGen)targetW.gen).mapId != targetW.settings.mapId) {
+            targetW.gen = new SkyGen(targetW.seed, targetW.settings);
+         }
          targetW.resetAllChunks();
       }
       if (g != null) {
@@ -384,8 +495,10 @@ public final class SkyGen extends Gen {
          if (targetW != null && targetW.settings != null) {
             if (targetW.settings.type == WorldSettings.BEDWARS) {
                stockBedwarsWorld(g, targetW);
-            } else if (targetW.settings.type == WorldSettings.SKYWARS) {
+            } else if (targetW.settings.type == WorldSettings.BATTLE) {
                stockSkywarsChests(g, targetW, true);
+            } else if (targetW.settings.type == WorldSettings.TUMBLE) {
+               stockTumbleArena(g, targetW);
             }
          }
       }
@@ -398,13 +511,20 @@ public final class SkyGen extends Gen {
       resetArenaMap(g, g != null ? g.world : null, false);
       matchState = STATE_PLAYING;
       lobbyCountdownTicks = -1;
+      SoundEngine.playMinigameSound("mg_count_go");
       if (g != null && g.world != null && g.world.settings != null) {
          if (g.screen == Game.S.WAITING || g.screen == Game.S.PAUSE || g.screen == Game.S.DEAD) {
             g.setScreen(Game.S.PLAY);
          }
-         String modeTitle = g.world.settings.type == WorldSettings.BEDWARS
-            ? "\u00a7e\u00a7l[Bedwars] \u00a7aMatch Started! You are on " + BEDWARS_CODES[myTeam] + BEDWARS_NAMES[myTeam] + " Team\u00a7a! Protect your bed!"
-            : "\u00a76\u00a7l[Skywars] \u00a7aMatch Started! Loot your island chests and conquer the Feast!";
+         String mapName = g.world.settings.mapName();
+         String modeTitle = switch (g.world.settings.type) {
+            case WorldSettings.BEDWARS ->
+               "\u00a7e\u00a7l[Bedwars - " + mapName + "] \u00a7aMatch Started! You are on " + BEDWARS_CODES[myTeam] + BEDWARS_NAMES[myTeam] + " Team\u00a7a! Protect your bed!";
+            case WorldSettings.TUMBLE ->
+               "\u00a7b\u00a7l[Tumble - " + mapName + "] \u00a7aThe game has started! Use your Shovel (Left-Click) & Snowballs (Right-Click) to drop rivals into the lava!";
+            default ->
+               "\u00a76\u00a7l[Battle - " + mapName + "] \u00a7aThe game has started! 15s Invulnerability active — loot the central chests!";
+         };
          g.say(modeTitle);
       }
       if (broadcast) {
@@ -471,17 +591,13 @@ public final class SkyGen extends Gen {
    }
 
    private int surfaceHeightAt(int x, int z) {
-      if (this.mode == WorldSettings.SKYBLOCK) {
-         if (isSkyblockMain(x, z)
-            || isSkyblockSand(x, z)
-            || isSkyblockShrine(x, z)
-            || isSkyblockTaiga(x, z)
-            || isSkyblockJungle(x, z)) {
+      if (this.mode == WorldSettings.TUMBLE) {
+         if (Math.hypot(x, z) <= 22.5) {
             return Y_DECK;
          }
          return 0;
       }
-      if (this.mode == WorldSettings.SKYWARS) {
+      if (this.mode == WorldSettings.BATTLE) {
          double d0 = Math.hypot(x, z);
          if (d0 <= 11.2) {
             return Y_DECK;
@@ -495,6 +611,11 @@ public final class SkyGen extends Gen {
             if (Math.hypot(x - sp[0], z - sp[1]) <= 4.6) {
                return Y_DECK;
             }
+         }
+         // Bridges connecting spawn podiums, mid islands & center
+         if ((Math.abs(x) <= 2 && Math.abs(z) <= 42) || (Math.abs(z) <= 2 && Math.abs(x) <= 42)
+            || (Math.abs(Math.abs(x) - Math.abs(z)) <= 2 && Math.abs(x) <= 30)) {
+            return Y_DECK;
          }
          return 0;
       }
@@ -607,101 +728,122 @@ public final class SkyGen extends Gen {
    }
 
    private void generateSkyblock(Chunk ch) {
-      // 1. Classic L-shaped Skyblock starter island around (0, 64, 0)
-      for (int wz = -1; wz <= 4; wz++) {
-         for (int wx = -1; wx <= 4; wx++) {
-            if (!isSkyblockMain(wx, wz)) {
-               continue;
+      // Console Edition TUMBLE Mini Game: 3 destructible layers suspended over a boiling Lava Cauldron inside a themed Colosseum!
+      int minX = ch.cx * 16;
+      int minZ = ch.cz * 16;
+      if (minX > 32 || minX + 15 < -32 || minZ > 32 || minZ + 15 < -32) {
+         return;
+      }
+      int wallMat = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
+         case WorldSettings.MAP_CAVERN -> Blocks.MOSSY_COBBLE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.SANDSTONE;
+         default -> Blocks.STONEBRICK;
+      };
+      int trimMat = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.OBSIDIAN;
+         case WorldSettings.MAP_CAVERN -> Blocks.GLOWSTONE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.GOLD_BLOCK;
+         default -> Blocks.QUARTZ_BLOCK;
+      };
+
+      for (int lz = 0; lz < 16; lz++) {
+         int wz = minZ + lz;
+         for (int lx = 0; lx < 16; lx++) {
+            int wx = minX + lx;
+            double d = Math.hypot(wx, wz);
+            int ring = ((int)Math.floor(d / 3.2)) & 3;
+            int checker = (wx + wz) & 1;
+
+            // 1. Boiling Lava Cauldron at Y_DECK - 14 over Bedrock floor at Y_DECK - 15
+            if (d <= 22.2) {
+               setW(ch, wx, Y_DECK - 15, wz, Blocks.BEDROCK);
+               if (d <= 20.8) {
+                  setW(ch, wx, Y_DECK - 14, wz, Blocks.LAVA);
+                  setW(ch, wx, Y_DECK - 13, wz, Blocks.LAVA);
+               } else {
+                  for (int y = Y_DECK - 14; y <= Y_DECK + 5; y++) {
+                     setW(ch, wx, y, wz, (y == Y_DECK + 1 || y == Y_DECK - 5 || y == Y_DECK - 10) ? trimMat : wallMat);
+                  }
+                  if (((wx * 7 + wz * 13) & 7) == 0) {
+                     setW(ch, wx, Y_DECK + 6, wz, Blocks.GLOWSTONE);
+                  }
+               }
             }
-            setW(ch, wx, Y_DECK - 2, wz, Blocks.DIRT);
-            setW(ch, wx, Y_DECK - 1, wz, (wx == 0 && wz == 0) ? Blocks.SAND : Blocks.DIRT);
-            setW(ch, wx, Y_DECK, wz, Blocks.GRASS);
+
+            // 2. Three Destructible Tumble Layers: Layer 1 (Y_DECK), Layer 2 (Y_DECK - 5), Layer 3 (Y_DECK - 10)
+            if (d <= 18.5) {
+               int b1;
+               int b2;
+               int b3;
+               switch (this.mapId) {
+                  case WorldSettings.MAP_CRUCIBLE -> {
+                     b1 = ring == 0 ? Blocks.NETHER_BRICKS : (ring == 1 ? Blocks.NETHERRACK : (checker == 0 ? Blocks.QUARTZ_ORE : Blocks.NETHERRACK));
+                     b2 = ring == 0 ? Blocks.GLOWSTONE : (ring == 1 ? Blocks.SOUL_SAND : Blocks.COAL_BLOCK);
+                     b3 = ring == 0 ? Blocks.OBSIDIAN : (checker == 0 ? Redstone319.REDSTONE_BLOCK : (Blocks.GLASS0 + 14));
+                  }
+                  case WorldSettings.MAP_CAVERN -> {
+                     b1 = ring == 0 ? Blocks313.MYCELIUM : (ring == 1 ? Blocks313.MUSH_BLOCK_RED : (ring == 2 ? Blocks313.MUSH_BLOCK_BROWN : Blocks.MOSSY_COBBLE));
+                     b2 = ring == 0 ? Blocks.DIAMOND_ORE : (ring == 1 ? Blocks.GOLD_ORE : (ring == 2 ? Blocks.IRON_ORE : Blocks.COAL_ORE));
+                     b3 = ring == 0 ? Blocks313.PACKED_ICE : (checker == 0 ? Blocks313.ICE : (Blocks.GLASS0 + 11));
+                  }
+                  case WorldSettings.MAP_TEMPLE -> {
+                     b1 = ring == 0 ? Blocks.SNOW : (ring == 1 ? (Blocks.WOOL0 + 14) : (ring == 2 ? Blocks.WOOL0 : (Blocks.WOOL0 + 5)));
+                     b2 = ring == 0 ? Redstone319.SLIME_BLOCK : (ring == 1 ? Blocks.HAY_BALE : Blocks.SANDSTONE);
+                     b3 = ring == 0 ? Blocks.GOLD_BLOCK : (checker == 0 ? Redstone319.SEA_LANTERN : Blocks.GLASS);
+                  }
+                  default -> { // Cove / Classic Tumble
+                     b1 = (wx == 0 && wz == 0) ? Blocks.GRASS : (ring == 0 ? Blocks.GRASS : (ring == 1 ? Blocks313.COARSE_DIRT : (ring == 2 ? Blocks313.PODZOL : Blocks.PLANKS)));
+                     b2 = ring == 0 ? Redstone319.SEA_LANTERN : (ring == 1 ? Blocks.SANDSTONE : (ring == 2 ? Blocks313.RED_SANDSTONE : Blocks.CLAY));
+                     b3 = ring == 0 ? Blocks.DIAMOND_ORE : (ring == 1 ? Blocks.GOLD_ORE : (ring == 2 ? Blocks.IRON_ORE : Blocks.COBBLE));
+                  }
+               }
+               setW(ch, wx, Y_DECK, wz, b1);
+               setW(ch, wx, Y_DECK - 5, wz, b2);
+               setW(ch, wx, Y_DECK - 10, wz, b3);
+            }
          }
       }
+      // Keep central anchor & supply chest at (0, Y_DECK-2, 0) and (3, Y_DECK+1, 0)
+      setW(ch, 0, Y_DECK, 0, Blocks.GRASS);
       setW(ch, 0, Y_DECK - 2, 0, Blocks.BEDROCK);
-      buildSmallOak(ch, -1, Y_DECK + 1, 4);
       setW(ch, 3, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
-
-      // 2. East Desert Oasis Island around (48, 64, 0)
-      for (int wz = -2; wz <= 2; wz++) {
-         for (int wx = 46; wx <= 50; wx++) {
-            setW(ch, wx, Y_DECK - 2, wz, Blocks.SANDSTONE);
-            setW(ch, wx, Y_DECK - 1, wz, Blocks.SAND);
-            setW(ch, wx, Y_DECK, wz, Blocks.SAND);
-         }
-      }
-      setW(ch, 48, Y_DECK + 1, 0, Blocks.CACTUS);
-      setW(ch, 48, Y_DECK + 2, 0, Blocks.CACTUS);
-      setW(ch, 49, Y_DECK, 1, Blocks.WATER);
-      setW(ch, 49, Y_DECK + 1, 0, Blocks.SUGAR_CANE);
-      setW(ch, 47, Y_DECK + 1, -1, Blocks.CHEST_LOOT);
-
-      // 3. West Nether Shrine Island around (-48, 64, 0)
-      for (int wz = -2; wz <= 2; wz++) {
-         for (int wx = -50; wx <= -46; wx++) {
-            setW(ch, wx, Y_DECK - 2, wz, Blocks.OBSIDIAN);
-            setW(ch, wx, Y_DECK - 1, wz, Blocks.NETHERRACK);
-            setW(ch, wx, Y_DECK, wz, (Math.abs(wx + 48) <= 1 && Math.abs(wz) <= 1) ? Blocks.QUARTZ_BLOCK : Blocks.NETHERRACK);
-         }
-      }
-      setW(ch, -48, Y_DECK + 1, -2, Blocks.OBSIDIAN);
-      setW(ch, -48, Y_DECK + 2, -2, Blocks.OBSIDIAN);
-      setW(ch, -48, Y_DECK + 3, -2, Blocks.GLOWSTONE);
-      setW(ch, -47, Y_DECK + 1, 0, Blocks.CHEST_LOOT);
-
-      // 4. North Snowy Taiga & Quarry Island around (0, 64, -48)
-      for (int wz = -50; wz <= -46; wz++) {
-         for (int wx = -2; wx <= 2; wx++) {
-            setW(ch, wx, Y_DECK - 2, wz, (wx == 0 && wz == -48) ? Blocks.DIAMOND_ORE : Blocks.IRON_ORE);
-            setW(ch, wx, Y_DECK - 1, wz, Blocks313.ICE);
-            setW(ch, wx, Y_DECK, wz, Blocks.SNOW);
-         }
-      }
-      for (int y = 1; y <= 4; y++) {
-         setW(ch, -1, Y_DECK + y, -49, Blocks.LOG_SPRUCE);
-      }
-      for (int lz = -50; lz <= -48; lz++) {
-         for (int lx = -2; lx <= 0; lx++) {
-            setW(ch, lx, Y_DECK + 3, lz, Blocks.LEAVES_SPRUCE);
-            if (lx == -1 || lz == -49) {
-               setW(ch, lx, Y_DECK + 4, lz, Blocks.LEAVES_SPRUCE);
-            }
-         }
-      }
-      setW(ch, -1, Y_DECK + 5, -49, Blocks.LEAVES_SPRUCE);
-      setW(ch, 0, Y_DECK + 1, -47, Blocks.CHEST_LOOT);
-
-      // 5. South Jungle & Mushroom Trader Island around (0, 64, 48)
-      for (int wz = 46; wz <= 50; wz++) {
-         for (int wx = -2; wx <= 2; wx++) {
-            setW(ch, wx, Y_DECK - 2, wz, Blocks.STONEBRICK);
-            setW(ch, wx, Y_DECK - 1, wz, Blocks.DIRT);
-            setW(ch, wx, Y_DECK, wz, Blocks.GRASS);
-         }
-      }
-      for (int y = 1; y <= 4; y++) {
-         setW(ch, 1, Y_DECK + y, 49, Blocks313.LOG_JUNGLE);
-      }
-      for (int lz = 48; lz <= 50; lz++) {
-         for (int lx = 0; lx <= 2; lx++) {
-            setW(ch, lx, Y_DECK + 4, lz, Blocks.LEAVES_OAK);
-         }
-      }
-      setW(ch, -1, Y_DECK + 1, 49, Blocks313.MUSHROOM_RED);
-      setW(ch, -2, Y_DECK + 1, 48, Blocks313.MUSHROOM_BROWN);
-      setW(ch, 2, Y_DECK + 1, 47, Blocks.MELON);
-      setW(ch, -2, Y_DECK + 1, 47, Blocks.PUMPKIN);
-      setW(ch, 0, Y_DECK + 1, 47, Blocks.CHEST_LOOT);
    }
 
    private void generateSkywars(Chunk ch) {
-      // 1. Central Feast Island (radius 11)
-      buildConeIsland(ch, 0, 0, 11.2, 10, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
+      // Console Edition BATTLE Mini Game Arena with 4 distinct Maps: Cove (0), Crucible (1), Cavern (2), Temple (3)!
+      int topId = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHERRACK;
+         case WorldSettings.MAP_CAVERN -> Blocks.MOSSY_COBBLE;
+         case WorldSettings.MAP_TEMPLE -> Blocks.GRASS;
+         default -> Blocks.GRASS;
+      };
+      int midId = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
+         case WorldSettings.MAP_CAVERN -> Blocks.STONE;
+         case WorldSettings.MAP_TEMPLE -> Blocks313.COARSE_DIRT;
+         default -> Blocks.SAND;
+      };
+      int coreId = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.OBSIDIAN;
+         case WorldSettings.MAP_CAVERN -> Blocks.STONEBRICK;
+         case WorldSettings.MAP_TEMPLE -> Blocks.MOSSY_COBBLE;
+         default -> Blocks.STONE;
+      };
+      int bridgeId = switch (this.mapId) {
+         case WorldSettings.MAP_CRUCIBLE -> Blocks.NETHER_BRICKS;
+         case WorldSettings.MAP_CAVERN -> Blocks.STONEBRICK;
+         case WorldSettings.MAP_TEMPLE -> Blocks.MOSSY_COBBLE;
+         default -> Blocks.PLANKS;
+      };
+
+      // 1. Central Battle Courtyard / Shrine (radius 11.2)
+      buildConeIsland(ch, 0, 0, 11.2, 10, topId, midId, coreId, true);
       for (int dz = -2; dz <= 2; dz++) {
          for (int dx = -2; dx <= 2; dx++) {
             if (Math.abs(dx) == 2 && Math.abs(dz) == 2) {
                for (int y = 1; y <= 3; y++) {
-                  setW(ch, dx, Y_DECK + y, dz, Blocks.STONEBRICK);
+                  setW(ch, dx, Y_DECK + y, dz, bridgeId);
                }
                setW(ch, dx, Y_DECK + 4, dz, Blocks.GLOWSTONE);
             } else {
@@ -718,18 +860,82 @@ public final class SkyGen extends Gen {
       setW(ch, 0, Y_DECK + 1, -2, Blocks.CHEST_LOOT);
       setW(ch, 0, Y_DECK + 1, 2, Blocks.CHEST_LOOT);
 
-      // 2. 4 Mid-Ring Islands
-      for (int[] m : SKYWARS_MIDS) {
-         buildConeIsland(ch, m[0], m[1], 4.5, 6, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
-         setW(ch, m[0], Y_DECK + 1, m[1], Blocks.CHEST_LOOT);
+      // 2. Connected Console Edition Arena Walkways & Map Landmarks
+      int minX = ch.cx * 16;
+      int minZ = ch.cz * 16;
+      for (int lz = 0; lz < 16; lz++) {
+         int wz = minZ + lz;
+         for (int lx = 0; lx < 16; lx++) {
+            int wx = minX + lx;
+            double d = Math.hypot(wx, wz);
+            // Cardinal and diagonal walkways connecting the 8 spawn podiums to the mid-ring and central chests
+            boolean cardinalBridge = (Math.abs(wx) <= 1 && Math.abs(wz) >= 10 && Math.abs(wz) <= 38)
+               || (Math.abs(wz) <= 1 && Math.abs(wx) >= 10 && Math.abs(wx) <= 38);
+            boolean diagBridge = Math.abs(Math.abs(wx) - Math.abs(wz)) <= 1 && Math.abs(wx) >= 8 && Math.abs(wx) <= 27;
+            boolean ringWalkway = d >= 22.5 && d <= 25.2;
+            if (cardinalBridge || diagBridge || ringWalkway) {
+               setW(ch, wx, Y_DECK - 1, wz, bridgeId);
+               if (this.mapId == WorldSettings.MAP_CRUCIBLE && ((wx + wz) & 7) == 0) {
+                  setW(ch, wx, Y_DECK - 1, wz, Blocks.OBSIDIAN);
+               }
+            }
+            // Map-specific environmental hazards & landmarks
+            if (this.mapId == WorldSettings.MAP_CRUCIBLE && d >= 12.0 && d <= 21.5 && !cardinalBridge && !diagBridge) {
+               setW(ch, wx, Y_DECK - 5, wz, Blocks.NETHER_BRICKS);
+               setW(ch, wx, Y_DECK - 4, wz, Blocks.LAVA);
+            } else if (this.mapId == WorldSettings.MAP_CAVERN && d <= 36.0 && ((wx * 19 + wz * 31) & 31) == 0) {
+               setW(ch, wx, Y_DECK + 11, wz, Blocks.STONE);
+               setW(ch, wx, Y_DECK + 10, wz, Blocks.COBBLE);
+               setW(ch, wx, Y_DECK + 9, wz, Blocks.GLOWSTONE);
+            }
+         }
       }
 
-      // 3. 8 Player Spawn Islands
+      // 3. 4 Mid-Ring Landmarks & Chests
+      for (int[] m : SKYWARS_MIDS) {
+         buildConeIsland(ch, m[0], m[1], 4.5, 6, topId, midId, coreId, true);
+         setW(ch, m[0], Y_DECK + 1, m[1], Blocks.CHEST_LOOT);
+         if (this.mapId == WorldSettings.MAP_COVE) {
+            // Pirate Shipwreck Mast & Sail on Mid Islands
+            for (int y = 1; y <= 5; y++) {
+               setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks.LOG_OAK);
+            }
+            for (int sx = -1; sx <= 1; sx++) {
+               setW(ch, m[0] + 1 + sx, Y_DECK + 4, m[1] + 1, Blocks.WOOL0);
+               setW(ch, m[0] + 1 + sx, Y_DECK + 3, m[1] + 1, Blocks.WOOL0 + 14);
+            }
+         } else if (this.mapId == WorldSettings.MAP_CRUCIBLE) {
+            // Nether Blaze Brazier Towers
+            setW(ch, m[0] + 1, Y_DECK + 1, m[1] + 1, Blocks.NETHER_BRICKS);
+            setW(ch, m[0] + 1, Y_DECK + 2, m[1] + 1, Blocks.GLOWSTONE);
+         } else if (this.mapId == WorldSettings.MAP_CAVERN) {
+            // Giant Glowing Cavern Mushrooms
+            for (int y = 1; y <= 3; y++) {
+               setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks313.MUSH_STEM);
+            }
+            for (int dx = -1; dx <= 1; dx++) {
+               for (int dz = -1; dz <= 1; dz++) {
+                  setW(ch, m[0] + 1 + dx, Y_DECK + 4, m[1] + 1 + dz, Blocks313.MUSH_BLOCK_RED);
+               }
+            }
+         } else if (this.mapId == WorldSettings.MAP_TEMPLE) {
+            // Stepped Jungle Temple Pillars with Vines
+            for (int y = 1; y <= 4; y++) {
+               setW(ch, m[0] + 1, Y_DECK + y, m[1] + 1, Blocks.MOSSY_COBBLE);
+            }
+            setW(ch, m[0] + 1, Y_DECK + 5, m[1] + 1, Blocks.GOLD_BLOCK);
+         }
+      }
+
+      // 4. 8 Player Spawn Podiums
       for (int[] sp : SKYWARS_SPAWNS) {
          int sx = sp[0];
          int sz = sp[1];
-         buildConeIsland(ch, sx, sz, 4.6, 7, Blocks.GRASS, Blocks.DIRT, Blocks.STONE, true);
-         buildSmallOak(ch, sx - 2, Y_DECK + 1, sz - 1);
+         buildConeIsland(ch, sx, sz, 4.6, 7, topId, midId, coreId, true);
+         if (this.mapId == WorldSettings.MAP_COVE || this.mapId == WorldSettings.MAP_TEMPLE) {
+            buildSmallOak(ch, sx - 2, Y_DECK + 1, sz - 1);
+         }
+         setW(ch, sx, Y_DECK, sz, Blocks.GOLD_BLOCK);
          setW(ch, sx + 2, Y_DECK + 1, sz, Blocks.CHEST_LOOT);
          setW(ch, sx + 2, Y_DECK + 1, sz + 1, Blocks.CRAFTING_TABLE);
          setW(ch, sx + 1, Y_DECK + 1, sz + 2, Blocks.FURNACE);
@@ -881,87 +1087,39 @@ public final class SkyGen extends Gen {
       return false;
    }
 
-   public static void stockSkyblockChests(Game g, World w) {
-      // 0: Starter Island Chest at (3, 65, 0)
+   public static void stockTumbleArena(Game g, World w) {
+      if (w == null) {
+         return;
+      }
+      // Stock supply chest at (3, Y_DECK + 1, 0) with Tumble Shovels & Snowballs
       if (!sbIslandStocked[0] && putChestItems(
          w, 3, Y_DECK + 1, 0,
+         new Stack(Items.toolId(4, Items.C_SHOVEL), 1),
+         new Stack(Blocks.SNOW, 32),
          new Stack(Blocks313.ICE, 2),
          new Stack(Items.LAVA_BUCKET, 1),
          new Stack(Items.WATER_BUCKET, 1),
-         new Stack(Items.SEEDS, 8),
-         new Stack(Items.MELON_SLICE, 4),
-         new Stack(Items.PUMPKIN_SEEDS, 2),
-         new Stack(Items.MELON_SEEDS, 2),
-         new Stack(Blocks.SUGAR_CANE, 2),
-         new Stack(Items.CARROT, 2),
-         new Stack(Items.POTATO, 2),
-         new Stack(Items.BONE_MEAL, 12),
-         new Stack(Items.BREAD, 8),
-         new Stack(Blocks.COBBLE, 16)
+         new Stack(Items.STEAK, 8)
       )) {
          sbIslandStocked[0] = true;
       }
-      // 1: East Desert Island Chest at (47, 65, -1)
-      if (!sbIslandStocked[1] && putChestItems(
-         w, 47, Y_DECK + 1, -1,
-         new Stack(Items.GOLD_INGOT, 8),
-         new Stack(Blocks.SAND, 32),
-         new Stack(Blocks.CACTUS, 4),
-         new Stack(Blocks.SUGAR_CANE, 4),
-         new Stack(Items.toolId(2, Items.C_PICK), 1),
-         new Stack(Items.APPLE, 4)
-      )) {
-         sbIslandStocked[1] = true;
-      }
-      // 2: West Nether Shrine Chest at (-47, 65, 0)
-      if (!sbIslandStocked[2] && putChestItems(
-         w, -47, Y_DECK + 1, 0,
-         new Stack(Blocks.OBSIDIAN, 10),
-         new Stack(Items.FLINT_STEEL, 1),
-         new Stack(Items.BLAZE_ROD, 4),
-         new Stack(Items.QUARTZ, 16),
-         new Stack(Items.GHAST_TEAR, 2),
-         new Stack(Blocks.GLOWSTONE, 8)
-      )) {
-         sbIslandStocked[2] = true;
-      }
-      // 3: North Snowy Taiga Chest at (0, 65, -47)
-      if (!sbIslandStocked[3] && putChestItems(
-         w, 0, Y_DECK + 1, -47,
-         new Stack(Items.DIAMOND, 2),
-         new Stack(Blocks.LOG_SPRUCE, 8),
-         new Stack(Blocks313.ICE, 8),
-         new Stack(Items.BONE, 6),
-         new Stack(Items.toolId(2, Items.C_AXE), 1)
-      )) {
-         sbIslandStocked[3] = true;
-      }
-      // 4: South Jungle & Trader Chest at (0, 65, 47)
-      if (!sbIslandStocked[4] && putChestItems(
-         w, 0, Y_DECK + 1, 47,
-         new Stack(Items.EMERALD, 8),
-         new Stack(Blocks.BOOKSHELF, 4),
-         new Stack(Items.SHEARS, 1),
-         new Stack(Items.APPLE, 6),
-         new Stack(Items.CAKE, 1)
-      )) {
-         sbIslandStocked[4] = true;
-         if (g != null && g.mobs != null && w.chunkAt(0, 48) != null) {
-            boolean hasVillager = false;
-            for (Mobs.Mob m : g.mobs.list) {
-               if (!m.dead && m.type == Mobs.VILLAGER && Math.hypot(m.x - 0.5, m.z - 48.5) < 12.0) {
-                  hasVillager = true;
-                  break;
-               }
-            }
-            if (!hasVillager) {
-               Mobs.Mob v = g.mobs.spawn(Mobs.VILLAGER, 0.5, Y_DECK + 1.0, 48.5);
-               if (v != null) {
-                  v.color = Trades.FARMER;
-               }
+      // Spawn Tumble Competitor Bots around the ring in solo mode
+      if (!tumbleSpawnedBots && soloBots && !Net319.isActive() && g != null && g.mobs != null && w.chunk(0, 0) != null) {
+         tumbleSpawnedBots = true;
+         for (int i = 1; i < 6; i++) {
+            double ang = i * (2.0 * Math.PI / 6.0);
+            double bx = Math.cos(ang) * 11.0 + 0.5;
+            double bz = Math.sin(ang) * 11.0 + 0.5;
+            Mobs.Mob bot = g.mobs.spawn(i % 2 == 0 ? Mobs.SKELETON : Mobs.ZOMBIE, bx, Y_DECK + 1.0, bz);
+            if (bot != null) {
+               bot.teamTag = "TumbleBot:" + i;
             }
          }
       }
+   }
+
+   public static void stockSkyblockChests(Game g, World w) {
+      stockTumbleArena(g, w);
    }
 
    public static void stockSkywarsChests(Game g, World w, boolean refill) {
@@ -1150,7 +1308,15 @@ public final class SkyGen extends Gen {
       if (lobbyCountdownTicks > 0) {
          lobbyCountdownTicks--;
          if (lobbyCountdownTicks > 0 && lobbyCountdownTicks % 20 == 0 && lobbyCountdownTicks <= 100) {
-            g.say("\u00a7e[Lobby] Match starting in " + (lobbyCountdownTicks / 20) + "...");
+            int sec = lobbyCountdownTicks / 20;
+            g.say("\u00a7e[Lobby] Match starting in " + sec + "...");
+            if (sec == 3) {
+               SoundEngine.playMinigameSound("mg_count_3");
+            } else if (sec == 2) {
+               SoundEngine.playMinigameSound("mg_count_2");
+            } else if (sec == 1) {
+               SoundEngine.playMinigameSound("mg_count_1");
+            }
          }
          if (lobbyCountdownTicks == 0) {
             startMatch(g, Net319.isHosting());
@@ -1158,7 +1324,7 @@ public final class SkyGen extends Gen {
       }
    }
 
-   /** Runs per-tick gameplay logic for Skyblock, Skywars, and Bedwars worlds. */
+   /** Runs per-tick gameplay logic for Console Edition Tumble, Battle, and Bedwars worlds. */
    public static void tickMode(Game g, World w) {
       if (w == null || w.settings == null) {
          return;
@@ -1182,29 +1348,104 @@ public final class SkyGen extends Gen {
          g.player.hurt(20);
       }
 
-      // 1. SKYBLOCK: stock island chests & evaluate Skyblock Progression Quests
-      if (type == WorldSettings.SKYBLOCK) {
-         stockSkyblockChests(g, w);
-         if (g != null && g.player != null && w.tickCount % 20L == 0L) {
-            checkSkyblockQuests(g);
+      // 1. TUMBLE: 3-layer shovel & snowball Spleef over boiling lava!
+      if (type == WorldSettings.TUMBLE) {
+         stockTumbleArena(g, w);
+         if (g != null && g.player != null && !g.player.dead && !g.player.creative && !g.player.spectator) {
+            // Instant lava cauldron elimination at the bottom of the Tumble arena
+            if (g.player.y <= Y_DECK - 12.5) {
+               SoundEngine.playUi("lava_fizz", 0.9F, 1.0F);
+               SoundEngine.playMinigameSound("mg_lose");
+               g.player.hurt(20);
+            }
+         }
+         // Competitor bots actively mine Tumble blocks around the layers & get eliminated in lava
+         if (g != null && g.mobs != null && !Net319.isConnected()) {
+            int botIdx = 0;
+            for (Mobs.Mob m : g.mobs.list) {
+               botIdx++;
+               if (m == null || m.dead || !Mobs.hostile(m.type)) {
+                  continue;
+               }
+               if (m.y <= Y_DECK - 12.2) {
+                  m.dead = true;
+                  myKills++;
+                  g.say("\u00a7b[Tumble] \u00a7eAn opponent tumbled into the lava!");
+                  continue;
+               }
+               if (w.tickCount % 18L == 0L) {
+                  int dir = (int)((w.tickCount / 18L + botIdx) & 3);
+                  int ox = dir == 0 ? 1 : (dir == 1 ? -1 : 0);
+                  int oz = dir == 2 ? 1 : (dir == 3 ? -1 : 0);
+                  int bx = (int)Math.floor(m.x) + ox;
+                  int by = (int)Math.floor(m.y) - 1;
+                  int bz = (int)Math.floor(m.z) + oz;
+                  if (isTumbleLayerBlock(bx, by, bz) && !(bx == 0 && by == Y_DECK && bz == 0)) {
+                     int bid = w.getBlock(bx, by, bz);
+                     if (bid != 0 && !Blocks.isFluid(bid)) {
+                        g.spawnBreakParticles(bx, by, bz, bid, 6);
+                        SoundEngine.playBlockBreak(w, bid, bx, by, bz);
+                        w.setBlock(bx, by, bz, 0);
+                     }
+                  }
+               }
+            }
+         }
+         if (!tumbleWon && g != null && w.tickCount > 80L && w.tickCount % 30L == 0L) {
+            int enemies = countHostiles(g) + Net319.aliveEnemyPeers(-1);
+            if (enemies == 0 && (tumbleSpawnedBots || Net319.peerCount() > 0)) {
+               tumbleWon = true;
+               SoundEngine.playMinigameSound("mg_win");
+               g.say("\u00a7b\u00a7l[Tumble] VICTORY! \u00a7aYou outlasted every rival above the lava! (/tumble reset for a new round)");
+            }
          }
          return;
       }
 
-      // 2. SKYWARS: stock chests, periodic chest refills, and victory check
-      if (type == WorldSettings.SKYWARS) {
+      // 2. BATTLE: Console Edition grace period, chest refills, Showdown mode, and last-man-standing victory!
+      if (type == WorldSettings.BATTLE) {
          stockSkywarsChests(g, w, false);
-         if (w.tickCount > 0L && w.tickCount % 3600L == 0L) {
+         if (battleGraceTicks > 0) {
+            battleGraceTicks--;
+            if (g != null && g.player != null && !g.player.dead) {
+               g.player.invuln = Math.max(g.player.invuln, 10);
+            }
+            if (g != null && (battleGraceTicks == 200 || battleGraceTicks == 100)) {
+               g.say("\u00a7e[Battle] Invulnerability wears off in " + (battleGraceTicks / 20) + " seconds!");
+            } else if (g != null && battleGraceTicks > 0 && battleGraceTicks <= 60 && battleGraceTicks % 20 == 0) {
+               int sec = battleGraceTicks / 20;
+               SoundEngine.playMinigameSound("mg_count_" + sec);
+            } else if (g != null && battleGraceTicks == 0) {
+               SoundEngine.playMinigameSound("mg_count_go");
+               g.say("\u00a7c\u00a7l[Battle] Invulnerability has worn off! FIGHT!");
+            }
+         }
+         if (w.tickCount > 0L && w.tickCount % 2400L == 0L) {
             stockSkywarsChests(g, w, true);
+            SoundEngine.playMinigameSound("mg_refill");
             if (g != null) {
-               g.say("\u00a7b[Skywars] \u00a7eAll island and Feast chests have been REFILLED!");
+               g.say("\u00a7b\u00a7l[Battle] \u00a7eAll arena chests have been REFILLED!");
+            }
+         }
+         if (!showdownActive && w.tickCount >= 3600L) {
+            showdownActive = true;
+            SoundEngine.playMinigameSound("mg_showdown");
+            if (g != null) {
+               g.say("\u00a7c\u00a7l[Battle] SHOWDOWN! \u00a7eHead to the center courtyard — outer perimeter is now hazardous!");
+            }
+         }
+         if (showdownActive && w.tickCount % 40L == 0L && g != null && g.player != null && !g.player.dead && !g.player.creative && !g.player.spectator) {
+            if (Math.hypot(g.player.x, g.player.z) > 28.0) {
+               g.player.hurt(2);
+               g.say("\u00a7c[Showdown] Move toward the center shrine!");
             }
          }
          if (!skywarsWon && g != null && w.tickCount > 100L && w.tickCount % 40L == 0L) {
             int enemies = countHostiles(g) + Net319.aliveEnemyPeers(-1);
             if (enemies == 0 && swIslandStocked[0] && (soloBots || Net319.peerCount() > 0)) {
                skywarsWon = true;
-               g.say("\u00a76\u00a7l[Skywars] VICTORY! \u00a7aYou are the last champion standing! (/sw reset for a new round)");
+               SoundEngine.playMinigameSound("mg_win");
+               g.say("\u00a76\u00a7l[Battle] VICTORY! \u00a7aYou are the last champion standing! (/battle reset for a new round)");
             }
          }
          return;
@@ -1386,53 +1627,73 @@ public final class SkyGen extends Gen {
          g.setScreen(Game.S.WAITING);
          return true;
       }
-      if (c.equals("/sb") || c.equals("/challenges")) {
-         String sub = args.length > 1 ? args[1].toLowerCase() : "";
+      if (c.equals("/tumble") || c.equals("/sb") || c.equals("/challenges")) {
+         String sub = args.length > 1 ? args[1].toLowerCase() : "status";
+         if (sub.equals("reset")) {
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7b[Tumble] All 3 Tumble layers restored and new round started!");
+            return true;
+         }
+         if (sub.equals("mode") && args.length > 2) {
+            String mn = args[2].toLowerCase();
+            tumbleWeaponMode = mn.startsWith("sh") || mn.equals("1") ? 1 : (mn.startsWith("sn") || mn.equals("2") ? 2 : 0);
+            giveTumbleLoadout(g);
+            g.say("\u00a7b[Tumble] Weapon Mode: \u00a7e" + TUMBLE_MODE_NAMES[tumbleWeaponMode]);
+            return true;
+         }
+         if (sub.equals("map") && args.length > 2 && g.world.settings != null) {
+            int m = parseMapArg(args[2]);
+            g.world.settings.mapId = m;
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a7b[Tumble] Switched arena map to \u00a7e" + WorldSettings.MAP_NAMES[m] + "\u00a7b!");
+            return true;
+         }
          if (sub.equals("home") && g.player != null) {
             g.player.setPos(0.5, Y_DECK + 1.0, 0.5);
             g.player.fallDistance = 0.0F;
             g.player.updateBox();
-            g.say("\u00a7a[Skyblock] Teleported to Starter Island (0, 65, 0)!");
+            g.say("\u00a7b[Tumble] Teleported to Top Layer (0, 65, 0)!");
             return true;
          }
-         if (sub.equals("islands")) {
-            g.say("\u00a7b[Skyblock Islands]: \u00a7fStarter (0,0) | East Desert (48,0) | West Nether (-48,0) | North Snowy (0,-48) | South Jungle (0,48)");
-            return true;
-         }
-         int done = 0;
-         for (boolean b : sbQuestDone) {
-            if (b) {
-               done++;
-            }
-         }
-         g.say("\u00a7b[Skyblock Quests] (" + done + "/" + SB_QUEST_NAMES.length + " completed | /sb home | /sb islands):");
-         for (int i = 0; i < SB_QUEST_NAMES.length; i++) {
-            g.say((sbQuestDone[i] ? " \u00a7a\u2714 " : " \u00a77\u25cb ") + SB_QUEST_NAMES[i]);
-         }
+         int rivals = countHostiles(g) + Net319.aliveEnemyPeers(-1);
+         String mapName = g.world.settings != null ? g.world.settings.mapName() : "Cove";
+         g.say("\u00a7b[Tumble] Map: " + mapName + " | Mode: " + TUMBLE_MODE_NAMES[tumbleWeaponMode % 3] + " | Rivals: " + rivals + " (/tumble reset | /tumble mode <mixed|shovels|snowballs> | /tumble map <cove|crucible|cavern|temple>)");
          return true;
       }
-      if (c.equals("/sw")) {
+      if (c.equals("/battle") || c.equals("/sw")) {
          String sub = args.length > 1 ? args[1].toLowerCase() : "status";
          if (sub.equals("kit") && args.length > 2) {
             String kn = args[2].toLowerCase();
-            int k = kn.startsWith("a") || kn.equals("1") ? 1 : (kn.startsWith("p") || kn.equals("2") ? 2 : (kn.startsWith("e") || kn.equals("3") ? 3 : 0));
+            int k = kn.startsWith("h") || kn.equals("1") ? 1 : (kn.startsWith("a") || kn.equals("2") ? 2 : (kn.startsWith("p") || kn.equals("3") ? 3 : 0));
             giveSkywarsKit(g, k);
-            g.say("\u00a76[Skywars] Selected Kit: \u00a7e" + SW_KIT_NAMES[k] + " \u00a77(" + SW_KIT_DESC[k] + ")");
+            g.say("\u00a76[Battle] Selected Item Set: \u00a7e" + SW_KIT_NAMES[k] + " \u00a77(" + SW_KIT_DESC[k] + ")");
+            return true;
+         }
+         if (sub.equals("map") && args.length > 2 && g.world.settings != null) {
+            int m = parseMapArg(args[2]);
+            g.world.settings.mapId = m;
+            resetArenaMap(g, g.world, true);
+            matchState = STATE_PLAYING;
+            g.say("\u00a76[Battle] Switched arena map to \u00a7e" + WorldSettings.MAP_NAMES[m] + "\u00a76!");
             return true;
          }
          if (sub.equals("refill")) {
             stockSkywarsChests(g, g.world, true);
-            g.say("\u00a7b[Skywars] All chests refilled!");
+            SoundEngine.playMinigameSound("mg_refill");
+            g.say("\u00a7b[Battle] All chests refilled!");
          } else if (sub.equals("reset")) {
             resetArenaMap(g, g.world, true);
             matchState = STATE_PLAYING;
-            g.say("\u00a7b[Skywars] Arena map completely reset and all islands restocked!");
+            g.say("\u00a7b[Battle] Arena map completely reset and all chests restocked!");
          } else if (sub.equals("lobby")) {
             matchState = STATE_WAITING;
             g.setScreen(Game.S.WAITING);
          } else {
-            long rem = (3600L - (g.world.tickCount % 3600L)) / 20L;
-            g.say("\u00a7b[Skywars] Kit: " + SW_KIT_NAMES[swKit & 3] + " | Kills: " + myKills + " | Opponents: " + (countHostiles(g) + Net319.aliveEnemyPeers(-1)) + " | Refill in " + rem + "s (/sw kit <knight|archer|pyro|enderman> | /sw reset)");
+            long rem = (2400L - (g.world.tickCount % 2400L)) / 20L;
+            String mapName = g.world.settings != null ? g.world.settings.mapName() : "Cove";
+            g.say("\u00a76[Battle] Map: " + mapName + " | Set: " + SW_KIT_NAMES[swKit & 3] + " | Kills: " + myKills + " | Opponents: " + (countHostiles(g) + Net319.aliveEnemyPeers(-1)) + " | Refill in " + rem + "s (/battle kit | /battle map | /battle reset)");
          }
          return true;
       }
@@ -1488,7 +1749,24 @@ public final class SkyGen extends Gen {
       return false;
    }
 
-   /** Renders the top-right Scoreboard / Quest HUD for Skyblock, Skywars, and Bedwars. */
+   private static int parseMapArg(String s) {
+      if (s == null) {
+         return 0;
+      }
+      String m = s.toLowerCase();
+      if (m.startsWith("cr") || m.equals("1")) {
+         return WorldSettings.MAP_CRUCIBLE;
+      }
+      if (m.startsWith("ca") || m.equals("2")) {
+         return WorldSettings.MAP_CAVERN;
+      }
+      if (m.startsWith("t") || m.equals("3")) {
+         return WorldSettings.MAP_TEMPLE;
+      }
+      return WorldSettings.MAP_COVE;
+   }
+
+   /** Renders the top-right Scoreboard HUD for Console Edition Tumble, Battle, and Bedwars. */
    public static void drawModeHud(Game g) {
       if (g == null || g.world == null || g.world.settings == null || g.debug || g.screen == Game.S.WAITING) {
          return;
@@ -1497,33 +1775,30 @@ public final class SkyGen extends Gen {
       if (!g.world.settings.isVoidMode()) {
          return;
       }
+      String mapName = g.world.settings.mapName();
       Gui gui = g.gui;
       java.util.ArrayList<String> lines = new java.util.ArrayList<>();
-      if (type == WorldSettings.SKYBLOCK) {
-         lines.add("\u00a7b\u00a7lSKYBLOCK");
-         int done = 0;
-         int nextIdx = -1;
-         for (int i = 0; i < SB_QUEST_NAMES.length; i++) {
-            if (sbQuestDone[i]) {
-               done++;
-            } else if (nextIdx < 0) {
-               nextIdx = i;
-            }
-         }
-         lines.add("\u00a7fQuests: \u00a7a" + done + "/" + SB_QUEST_NAMES.length);
-         if (nextIdx >= 0) {
-            lines.add("\u00a7e" + SB_QUEST_NAMES[nextIdx]);
-         } else {
-            lines.add("\u00a76All Quests Complete!");
-         }
-         lines.add("\u00a77/sb | /sb home | /sb islands");
-      } else if (type == WorldSettings.SKYWARS) {
-         long rem = (3600L - (g.world.tickCount % 3600L)) / 20L;
+      if (type == WorldSettings.TUMBLE) {
+         int rivals = countHostiles(g) + Net319.aliveEnemyPeers(-1);
+         int layer = g.player != null ? (g.player.y >= Y_DECK - 2 ? 1 : (g.player.y >= Y_DECK - 7 ? 2 : 3)) : 1;
+         lines.add("\u00a7b\u00a7lTUMBLE \u00a77(" + mapName + ")");
+         lines.add("\u00a7fRivals Left: " + (rivals > 0 ? "\u00a7c" + rivals : "\u00a7a0 (VICTORY!)") + " \u00a77| Layer: \u00a7e" + layer + "/3");
+         lines.add("\u00a7fMode: \u00a7a" + (tumbleWeaponMode == 0 ? "Shovels+Snow" : (tumbleWeaponMode == 1 ? "Shovels" : "Snowballs")));
+         lines.add("\u00a77L-Click: Break | R-Click: Throw");
+         lines.add("\u00a77/tumble reset | /tumble map");
+      } else if (type == WorldSettings.BATTLE) {
+         long rem = (2400L - (g.world.tickCount % 2400L)) / 20L;
          int raiders = countHostiles(g) + Net319.aliveEnemyPeers(-1);
-         lines.add("\u00a76\u00a7lSKYWARS \u00a77(" + SW_KIT_NAMES[swKit & 3] + ")");
-         lines.add("\u00a7fOpponents: " + (raiders > 0 ? "\u00a7c" + raiders : "\u00a7a0 (VICTORY!)") + " \u00a77| Kills: \u00a7e" + myKills);
-         lines.add(String.format("\u00a7fChest Refill: \u00a7b%d:%02d", rem / 60L, rem % 60L));
-         lines.add("\u00a77/sw kit | /sw reset");
+         lines.add("\u00a76\u00a7lBATTLE \u00a77(" + mapName + " - " + SW_KIT_NAMES[swKit & 3] + ")");
+         lines.add("\u00a7fFighters: " + (raiders > 0 ? "\u00a7c" + raiders : "\u00a7a0 (VICTORY!)") + " \u00a77| Kills: \u00a7e" + myKills);
+         if (battleGraceTicks > 0) {
+            lines.add("\u00a7aGrace Period: \u00a7e" + ((battleGraceTicks + 19) / 20) + "s");
+         } else if (showdownActive) {
+            lines.add("\u00a7c\u00a7lSHOWDOWN ACTIVE!");
+         } else {
+            lines.add(String.format("\u00a7fChest Refill: \u00a7b%d:%02d", rem / 60L, rem % 60L));
+         }
+         lines.add("\u00a77/battle kit | /battle map | /battle reset");
       } else if (type == WorldSettings.BEDWARS) {
          int my = getPlayerTeam(g);
          long dPeriod = g.world.tickCount >= 9600L ? 150L : (g.world.tickCount >= 2400L ? 200L : 300L);

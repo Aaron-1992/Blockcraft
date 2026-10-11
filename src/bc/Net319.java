@@ -3020,8 +3020,8 @@ public final class Net319 {
       String title = isBedwars
          ? "§c§lBEDWARS §fARENA SCOREBOARD"
          : (isSkywars
-            ? "§e§lSKYWARS §fARENA SCOREBOARD"
-            : (wType == WorldSettings.SKYBLOCK ? "§b§lSKYBLOCK §fISLAND SCOREBOARD" : "§a§lBLOCKCRAFT §fMULTIPLAYER SCOREBOARD"));
+            ? "§6§lBATTLE §fARENA SCOREBOARD"
+            : (wType == WorldSettings.TUMBLE ? "§b§lTUMBLE §fARENA SCOREBOARD" : "§a§lBLOCKCRAFT §fMULTIPLAYER SCOREBOARD"));
       String roleStr = hosting
          ? ("§aHosting (" + (1 + peers.size()) + " online)")
          : (clientConnected ? ("§bConnected (" + myPingMs + "ms)") : "§7Local Session");

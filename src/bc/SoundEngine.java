@@ -124,12 +124,11 @@ public final class SoundEngine {
    /** Full music & sound attribution entries displayed in the End Credits screen. */
    public static final String[][] CREDITS_SECTIONS = {
       {
-         "MINECRAFT CONSOLE EDITION & BATTLE MINIGAME SOUNDTRACK",
+         "MINECRAFT CONSOLE EDITION & TUMBLE / BATTLE SOUNDTRACK",
          "Moog City 2 (Menu), Subwoofer Lullaby, Minecraft, Wet Hands, Sweden, Living Mice - C418 (Daniel Rosenfeld)",
          "Aria Math (Creative), Dead Voxel (Nether), Boss (The End), Alpha (End Credits) - C418 (Daniel Rosenfeld)",
-         "Battle Theme 1 (Double Time / Shrink - Skywars & Bedwars) - Gareth Coker (Minecraft Console Edition)",
-         "Battle Theme 2 (Nock / Growth - Bedwars & Skywars) - Gareth Coker (Minecraft Console Edition)",
-         "Battle Theme 3 (Swift - Skywars & Bedwars) - Gareth Coker (Minecraft Console Edition)",
+         "Double Time (Tumble Theme 1 / Plastic 1) & Nock (Tumble Theme 2) - Gareth Coker (Console Edition)",
+         "Festive Tumble, Shrink (Cove Battle), Frontier (Crucible Battle) & Spooky (Cavern Battle) - Gareth Coker",
          "Legacy Console Edition Soundpack & Minigame Audio curated via Freshwaffle, Legacy-Edition-Minigames & Wilyicaro"
       },
       {
@@ -170,6 +169,7 @@ public final class SoundEngine {
    private static volatile float masterSoundVol = 1.0F;
    private static volatile float masterMusicVol = 0.75F;
    private static volatile boolean realAcoustics = true;
+   private static volatile boolean constantMusic = false;
 
    // Listener state
    private static volatile double listenerX;
@@ -426,6 +426,18 @@ public final class SoundEngine {
 
    public static boolean isListenerUnderwater() {
       return listenerUnderwater;
+   }
+
+   public static void setConstantMusic(boolean constant) {
+      boolean was = constantMusic;
+      constantMusic = constant;
+      if (constant && !was && musicPauseSamples > MIX_RATE * 2) {
+         musicPauseSamples = 0;
+      }
+   }
+
+   public static boolean isConstantMusic() {
+      return constantMusic;
    }
 
    public static void setVolumes(float soundVol, float musicVol, boolean acousticsOn) {
@@ -764,16 +776,54 @@ public final class SoundEngine {
       canyonEchoWet = roomEnclosure < 0.55F && farCliffHits >= 2 ? Math.min(0.28F, farCliffHits * 0.07F) : 0.0F;
    }
 
-   /** Maps a block ID to its surface sound category ("grass", "stone", "wood", "sand", "gravel", "snow", "ice", "metal", "glass", "dirt"). */
+   /**
+    * Maps ANY block ID to its physical surface sound category:
+    * "grass", "leaves", "dirt", "sand", "gravel", "snow", "ice", "glass", "slime", "metal", "wood", or "stone".
+    */
    public static String blockMaterialCategory(int id) {
       if (id <= 0) {
          return "stone";
       }
-      if (id == Blocks.GRASS || Blocks.leafTable[id] || id == Blocks.TALLGRASS || id == Blocks.FLOWER_RED || id == Blocks.FLOWER_YELLOW
-         || id == Blocks.HAY_BALE || (id >= Blocks.WOOL0 && id < Blocks.WOOL0 + 16) || Shapes.isCarpet(id)) {
+      if (id == Redstone319.SLIME_BLOCK) {
+         return "slime";
+      }
+      // Leaves, vines, bushes, flowers, crops & foliage
+      if (Blocks.leafTable[id]
+         || id == Blocks.TALLGRASS
+         || id == Blocks.FLOWER_RED
+         || id == Blocks.FLOWER_YELLOW
+         || id == Blocks.SUGAR_CANE
+         || id == Blocks.CACTUS
+         || id == Blocks313.FERN
+         || id == Blocks313.DEAD_BUSH
+         || id == Blocks313.LILY_PAD
+         || id == Blocks313.MUSHROOM_BROWN
+         || id == Blocks313.MUSHROOM_RED
+         || Blocks313.isVine(id)
+         || (id >= Blocks313.FLOWER0 && id < Blocks313.FLOWER0 + Blocks313.FLOWERS)
+         || (id >= Blocks313.DOUBLE0 && id < Blocks313.DOUBLE0 + Blocks313.DOUBLES * 2)
+         || (id >= Blocks.WHEAT && id <= Blocks.POTATO0 + 3)) {
+         return "leaves";
+      }
+      // Grass, hay, wool, carpet & giant mushrooms
+      if (id == Blocks.GRASS
+         || id == Blocks.HAY_BALE
+         || id == Blocks313.MUSH_BLOCK_RED
+         || id == Blocks313.MUSH_BLOCK_BROWN
+         || id == Blocks313.MUSH_STEM
+         || (id >= Blocks.WOOL0 && id < Blocks.WOOL0 + 16)
+         || Shapes.isCarpet(id)) {
          return "grass";
       }
-      if (id == Blocks.DIRT || id == Blocks.FARMLAND || id == Blocks.FARMLAND_WET || id == Blocks313.PODZOL || id == Blocks313.MYCELIUM || id == Blocks.SOUL_SAND) {
+      // Dirt, Coarse Dirt, Podzol, Mycelium, Farmland, Clay & Soul Sand
+      if (id == Blocks.DIRT
+         || id == Blocks313.COARSE_DIRT
+         || id == Blocks313.PODZOL
+         || id == Blocks313.MYCELIUM
+         || id == Blocks.FARMLAND
+         || id == Blocks.FARMLAND_WET
+         || id == Blocks.CLAY
+         || id == Blocks.SOUL_SAND) {
          return "dirt";
       }
       if (id == Blocks.SAND || id == Blocks313.RED_SAND) {
@@ -795,9 +845,29 @@ public final class SoundEngine {
          || id == Redstone319.REDSTONE_BLOCK || id == Shapes.BARS) {
          return "metal";
       }
-      if (id == Blocks.PLANKS || Blocks.logKind[id] != 0 || Blocks.mineClass[id] == 2 || id == Blocks.CRAFTING_TABLE || id == Blocks.CHEST
-         || id == Blocks.FENCE || Blocks.isFence(id) || Shapes.isGate(id) || Shapes.isTrap(id) || Blocks.isDoor(id)) {
+      if (id == Blocks.PLANKS
+         || Blocks313.isPlanks(id)
+         || Blocks.logKind[id] != 0
+         || Blocks.mineClass[id] == Items.C_AXE
+         || id == Blocks.CRAFTING_TABLE
+         || id == Blocks.CHEST
+         || id == Blocks.CHEST_LOOT
+         || id == Blocks.BOOKSHELF
+         || id == Redstone319.NOTE_BLOCK
+         || id == Blocks.PUMPKIN
+         || id == Blocks.JACK_O_LANTERN
+         || id == Blocks.MELON
+         || id == Blocks.LADDER
+         || id == Blocks.FENCE
+         || Blocks.isFence(id)
+         || Shapes.isGate(id)
+         || Shapes.isTrap(id)
+         || Blocks.isDoor(id)) {
          return "wood";
+      }
+      // Catch any remaining shovel-mined earth block as dirt
+      if (Blocks.mineClass[id] == Items.C_SHOVEL) {
+         return "dirt";
       }
       return "stone";
    }
@@ -807,6 +877,7 @@ public final class SoundEngine {
       String mat = blockMaterialCategory(blockId);
       String key = switch (mat) {
          case "grass" -> "step_grass_" + (1 + RND.nextInt(3));
+         case "leaves" -> (hasSample("step_leaves_1") ? "step_leaves_" + (1 + RND.nextInt(2)) : "step_grass_" + (1 + RND.nextInt(3)));
          case "dirt" -> "step_dirt_" + (1 + RND.nextInt(2));
          case "wood" -> "step_wood_" + (1 + RND.nextInt(2));
          case "sand" -> "step_sand_" + (1 + RND.nextInt(2));
@@ -815,6 +886,7 @@ public final class SoundEngine {
          case "ice" -> "step_ice_" + (1 + RND.nextInt(2));
          case "metal" -> "step_metal_" + (1 + RND.nextInt(2));
          case "glass" -> "step_glass_1";
+         case "slime" -> (hasSample("slime_bounce") ? "slime_bounce" : "step_grass_1");
          default -> "step_stone_" + (1 + RND.nextInt(3));
       };
       float pitch = 0.92F + RND.nextFloat() * 0.16F;
@@ -830,11 +902,15 @@ public final class SoundEngine {
       String mat = blockMaterialCategory(blockId);
       String key = switch (mat) {
          case "wood" -> "dig_wood_" + (1 + RND.nextInt(2));
-         case "grass" -> "dig_foliage_1";
-         case "dirt", "sand", "snow" -> "dig_dirt_1";
+         case "leaves" -> (hasSample("step_leaves_1") ? "step_leaves_" + (1 + RND.nextInt(2)) : "dig_foliage_1");
+         case "grass" -> "step_grass_" + (1 + RND.nextInt(3));
+         case "dirt" -> "dig_dirt_1";
+         case "sand" -> "step_sand_" + (1 + RND.nextInt(2));
+         case "snow" -> "step_snow_" + (1 + RND.nextInt(3));
          case "gravel" -> "dig_gravel_1";
          case "ice", "glass" -> "dig_ice_1";
          case "metal" -> "dig_metal_1";
+         case "slime" -> (hasSample("slime_bounce") ? "slime_bounce" : "dig_foliage_1");
          default -> "dig_stone_" + (1 + RND.nextInt(2));
       };
       play3D(w, key, x + 0.5, y + 0.5, z + 0.5, 0.55F, 0.90F + RND.nextFloat() * 0.16F);
@@ -845,9 +921,16 @@ public final class SoundEngine {
       String mat = blockMaterialCategory(blockId);
       String key = switch (mat) {
          case "glass" -> "break_glass_" + (1 + RND.nextInt(2));
-         case "gravel", "sand" -> "break_gravel_1";
+         case "leaves" -> (hasSample("step_leaves_1") ? "step_leaves_" + (1 + RND.nextInt(2)) : "dig_foliage_1");
+         case "grass" -> "step_grass_" + (1 + RND.nextInt(3));
+         case "dirt" -> "dig_dirt_1";
+         case "sand" -> "step_sand_" + (1 + RND.nextInt(2));
+         case "snow" -> "step_snow_" + (1 + RND.nextInt(3));
+         case "gravel" -> "break_gravel_1";
+         case "wood" -> "dig_wood_" + (1 + RND.nextInt(2));
          case "ice" -> "break_ice_1";
          case "metal" -> "break_metal_1";
+         case "slime" -> (hasSample("slime_bounce") ? "slime_bounce" : "break_block_1");
          default -> "break_block_" + (1 + RND.nextInt(2));
       };
       play3D(w, key, x + 0.5, y + 0.5, z + 0.5, 0.85F, 0.88F + RND.nextFloat() * 0.20F);
@@ -858,10 +941,58 @@ public final class SoundEngine {
       String mat = blockMaterialCategory(blockId);
       String key = switch (mat) {
          case "metal" -> "place_metal_1";
+         case "grass" -> "step_grass_" + (1 + RND.nextInt(3));
+         case "leaves" -> (hasSample("step_leaves_1") ? "step_leaves_" + (1 + RND.nextInt(2)) : "dig_foliage_1");
+         case "dirt" -> "step_dirt_" + (1 + RND.nextInt(2));
+         case "sand" -> "step_sand_" + (1 + RND.nextInt(2));
+         case "gravel" -> "step_gravel_" + (1 + RND.nextInt(3));
+         case "snow" -> "step_snow_" + (1 + RND.nextInt(3));
+         case "slime" -> (hasSample("slime_bounce") ? "slime_bounce" : "place_block_1");
          case "stone", "ice", "glass" -> "place_stone_1";
          default -> "place_block_" + (1 + RND.nextInt(2));
       };
       play3D(w, key, x + 0.5, y + 0.5, z + 0.5, 0.80F, 0.90F + RND.nextFloat() * 0.18F);
+   }
+
+   /** Plays a weapon or hand air-swing ("whoosh") sound at (x, y, z). */
+   public static void playSwing(World w, double x, double y, double z) {
+      String key = hasSample("swing_1") ? "swing_" + (1 + RND.nextInt(2)) : "bow_shoot";
+      play3D(w, key, x, y, z, 0.55F, 0.92F + RND.nextFloat() * 0.18F);
+   }
+
+   /** Plays a melee attack impact sound (and critical-hit chime if crit is true) at (x, y, z). */
+   public static void playHit(World w, double x, double y, double z, boolean crit) {
+      String key = hasSample("hit_1") ? "hit_" + (1 + RND.nextInt(2)) : "player_hurt";
+      play3D(w, key, x, y, z, crit ? 0.95F : 0.78F, (crit ? 0.85F : 0.95F) + RND.nextFloat() * 0.15F);
+   }
+
+   /** Plays a mechanical click for levers, buttons, pressure plates, dispensers & droppers. */
+   public static void playClickBlock(World w, int x, int y, int z, boolean active) {
+      String key = hasSample("click_block") ? "click_block" : "ui_click";
+      play3D(w, key, x + 0.5, y + 0.5, z + 0.5, 0.65F, active ? 0.75F : 0.58F);
+   }
+
+   /** Plays a projectile throw sound (snowball, ender pearl, egg, etc.). */
+   public static void playThrow(World w, double x, double y, double z) {
+      String key = hasSample("swing_1") ? "swing_1" : "bow_shoot";
+      play3D(w, key, x, y, z, 0.68F, 1.18F + RND.nextFloat() * 0.16F);
+   }
+
+   /** Plays an authentic Console Edition Minigame announcer/event sound ("mg_count_1..3", "mg_count_go", "mg_refill", "mg_showdown", "mg_win", "mg_lose"). */
+   public static void playMinigameSound(String key) {
+      if (hasSample(key)) {
+         playUi(key, 0.85F, 1.0F);
+      } else {
+         playUi("ui_click", 0.75F, 1.0F);
+      }
+   }
+
+   /** Advances to the next Console Edition Battle / Tumble / Overworld track immediately. */
+   public static void nextBattleTrack() {
+      battleTrackIndex = (battleTrackIndex + 1) % BATTLE_TRACKS.length;
+      activeRandomOverworldTrack = OVERWORLD_TRACKS[RND.nextInt(OVERWORLD_TRACKS.length)];
+      musicPauseSamples = 0;
+      currentMusicKey = "";
    }
 
    /** Plays a Note Block note at (x, y, z) pitched according to the block underneath and note pitch (0..24). */
@@ -879,11 +1010,14 @@ public final class SoundEngine {
       return false;
    }
 
-   private static final String[] BATTLE_TRACKS = {"lce_battle_1", "lce_battle_2", "lce_battle_3"};
+   private static final String[] TUMBLE_TRACKS = {"lce_tumble_1", "lce_tumble_2", "lce_tumble_3", "lce_battle_1"};
+   private static final String[] BATTLE_TRACKS = {"lce_tumble_1", "lce_battle_1", "lce_battle_2", "lce_battle_3", "lce_tumble_2", "lce_tumble_3"};
+   private static final String[] OVERWORLD_TRACKS = {"lce_morning", "lce_day", "lce_afternoon", "lce_sunset", "lce_night"};
+   private static volatile String activeRandomOverworldTrack = "";
 
    /**
     * Selects the appropriate Minecraft Legacy Console Edition music track for the current screen,
-    * minigame mode (Gareth Coker Battle themes for Skywars & Bedwars), dimension, creative mode, and time of day.
+    * minigame mode (Gareth Coker Tumble & Battle themes), dimension, creative mode, and time of day.
     */
    public static String selectConsoleMusic(Game g) {
       if (g == null) {
@@ -891,6 +1025,9 @@ public final class SoundEngine {
       }
       if (g.screen == Game.S.CREDITS) {
          return "lce_credits"; // C418 - Alpha (End Poem & Credits)
+      }
+      if (g.screen == Game.S.MINIGAMES) {
+         return TUMBLE_TRACKS[0]; // Gareth Coker - Double Time (That One Tumble Song!)
       }
       if (g.pano != null
          || g.screen == Game.S.TITLE
@@ -910,13 +1047,17 @@ public final class SoundEngine {
          return ""; // Backrooms uses eerie fluorescent hum & stalker audio
       }
 
-      // Skywars & Bedwars: Gareth Coker's Minecraft Legacy Console Edition Battle Mini Game Themes!
+      // Console Edition Mini Games (Tumble, Battle & Bedwars): Gareth Coker's Tumble & Battle OST!
       if (g.world.settings != null) {
-         if (g.world.settings.type == WorldSettings.SKYWARS) {
-            return BATTLE_TRACKS[battleTrackIndex % BATTLE_TRACKS.length]; // Starts with Battle Theme 1 (Shrink / Double Time)
+         int map = Math.max(0, g.world.settings.mapId);
+         if (g.world.settings.type == WorldSettings.TUMBLE) {
+            return TUMBLE_TRACKS[(battleTrackIndex + map) % TUMBLE_TRACKS.length]; // Leads with Double Time (That One Tumble Song!)
+         }
+         if (g.world.settings.type == WorldSettings.BATTLE) {
+            return BATTLE_TRACKS[(battleTrackIndex + map) % BATTLE_TRACKS.length];
          }
          if (g.world.settings.type == WorldSettings.BEDWARS) {
-            return BATTLE_TRACKS[(battleTrackIndex + 1) % BATTLE_TRACKS.length]; // Starts with Battle Theme 2 (Growth / Nock)
+            return BATTLE_TRACKS[(battleTrackIndex + map + 1) % BATTLE_TRACKS.length];
          }
       }
 
@@ -928,7 +1069,7 @@ public final class SoundEngine {
          return "lce_nether"; // C418 - Dead Voxel
       }
 
-      // Overworld by time of day & game mode (dayTime 0 = 06:00 AM, 6000 = 12:00 PM, 12000 = 06:00 PM, 18000 = 12:00 AM)
+      // Overworld by time of day & game mode (or random track after a song completes)
       int tod = (int)((g.world.dayTime % 24000L + 24000L) % 24000L);
       if (tod < 3500) {
          return "lce_morning"; // 06:00 - 09:30 AM: C418 - Subwoofer Lullaby
@@ -956,16 +1097,26 @@ public final class SoundEngine {
       }
       if (g.opt != null) {
          setVolumes(g.opt.soundVolume, g.opt.musicVolume, g.opt.realAcoustics);
+         setConstantMusic(g.opt.constantMusic);
       }
 
       String desiredMusic = selectConsoleMusic(g);
-      boolean isBattle = desiredMusic.startsWith("lce_battle_");
+      boolean isMinigameTrack = desiredMusic.startsWith("lce_battle_") || desiredMusic.startsWith("lce_tumble_");
+      if (!isMinigameTrack && !desiredMusic.isEmpty() && !desiredMusic.equals("lce_menu") && !desiredMusic.equals("lce_credits")
+         && !desiredMusic.equals("lce_nether") && !desiredMusic.equals("lce_end") && !activeRandomOverworldTrack.isEmpty()) {
+         desiredMusic = activeRandomOverworldTrack;
+      } else if (desiredMusic.equals("lce_menu") || desiredMusic.equals("lce_credits") || isMinigameTrack) {
+         activeRandomOverworldTrack = "";
+      }
+
       boolean immediateSwitch = desiredMusic.isEmpty()
          || desiredMusic.equals("lce_menu")
          || desiredMusic.equals("lce_credits")
-         || isBattle
+         || isMinigameTrack
          || currentMusicKey.equals("lce_menu")
          || currentMusicKey.equals("lce_credits")
+         || currentMusicKey.startsWith("lce_battle_")
+         || currentMusicKey.startsWith("lce_tumble_")
          || currentMusicKey.isEmpty();
       if (immediateSwitch) {
          targetMusicKey = desiredMusic;
@@ -999,6 +1150,7 @@ public final class SoundEngine {
          || g.screen == Game.S.TITLE
          || g.screen == Game.S.WORLDS
          || g.screen == Game.S.NEWWORLD
+         || g.screen == Game.S.MINIGAMES
          || g.screen == Game.S.MULTIPLAYER
          || g.screen == Game.S.LOADING
          || g.screen == Game.S.CREDITS
@@ -1117,8 +1269,12 @@ public final class SoundEngine {
          } else if (!wasOnGround) {
             double fallen = fallStartY - p.y;
             int groundBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.2), (int)Math.floor(p.z));
-            if (fallen >= 0.75 && prevPlayerVy < -0.20 && groundBlock != 0 && !Blocks.isFluid(groundBlock)) {
-               playFootstep(w, groundBlock, p.x, p.y, p.z, 0.80F);
+            if (groundBlock == 0) {
+               groundBlock = w.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.6), (int)Math.floor(p.z));
+            }
+            if ((fallen >= 0.20 || prevPlayerVy < -0.10) && groundBlock != 0 && !Blocks.isFluid(groundBlock)) {
+               float landVol = (float)Math.min(1.0, 0.55 + Math.max(0.0, fallen) * 0.12);
+               playFootstep(w, groundBlock, p.x, p.y, p.z, landVol);
                stepCooldownTicks = 6;
                stepDistAcc = 0.0;
             }
@@ -1368,12 +1524,25 @@ public final class SoundEngine {
                      int idx0 = (int)musicPos;
                      if (idx0 >= mlen) {
                         musicPos = 0.0;
-                        if (currentMusicKey.startsWith("lce_battle_")) {
-                           // Advance to the next Gareth Coker Battle Mini Game theme!
+                        if (currentMusicKey.startsWith("lce_battle_") || currentMusicKey.startsWith("lce_tumble_")) {
+                           // Advance to the next Gareth Coker Tumble / Battle Mini Game theme!
                            battleTrackIndex = (battleTrackIndex + 1) % BATTLE_TRACKS.length;
                            musicPauseSamples = MIX_RATE * 2;
+                        } else if (currentMusicKey.equals("lce_menu") || currentMusicKey.equals("lce_credits")) {
+                           musicPauseSamples = MIX_RATE * 3;
                         } else {
-                           musicPauseSamples = MIX_RATE * 5; // 5-second natural breathing pause after C418 track finishes
+                           // Pick a random Overworld track next (just like real Minecraft!)
+                           String next = OVERWORLD_TRACKS[RND.nextInt(OVERWORLD_TRACKS.length)];
+                           if (next.equals(currentMusicKey)) {
+                              next = OVERWORLD_TRACKS[(RND.nextInt(OVERWORLD_TRACKS.length - 1) + 1) % OVERWORLD_TRACKS.length];
+                           }
+                           activeRandomOverworldTrack = next;
+                           if (constantMusic) {
+                              musicPauseSamples = MIX_RATE * 2; // Constant Music ON: play continuously with a 2s gap
+                           } else {
+                              // Real Minecraft random pause between songs (3 to 7 minutes of natural world ambience)
+                              musicPauseSamples = MIX_RATE * (180 + RND.nextInt(240));
+                           }
                         }
                         break;
                      }

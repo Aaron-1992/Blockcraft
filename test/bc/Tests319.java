@@ -640,16 +640,24 @@ final class Tests319 {
          check(mg.player.hardcore && mg.player.gameMode == 0 && mg.player.rawMode() == 4, "/gamemode hardcore activates Hardcore Mode");
          eq("Hardcore", mg.player.modeName(), "Hardcore modeName()");
 
-         // 5. Skyblock 5 islands & Bedwars Shop / Upgrades
-         Chunk sbNorth = sbGen.generate(0, -3); // North Snowy Taiga island at (0, -48) -> lz=0 in chunk -3
-         eq(Blocks.SNOW, sbNorth.blocks[Chunk.idx(0, SkyGen.Y_DECK, 0)] & 0xFFFF, "Skyblock North Snowy Taiga island generated");
-         Chunk sbSouth = sbGen.generate(0, 3); // South Jungle & Mushroom island at (0, 48) -> lz=0 in chunk 3
-         eq(Blocks.GRASS, sbSouth.blocks[Chunk.idx(0, SkyGen.Y_DECK, 0)] & 0xFFFF, "Skyblock South Jungle island generated");
+         // 5. Console Edition Tumble (3 layers over lava), Battle (4 maps: Cove, Crucible, Cavern, Temple) & Bedwars Shop / Upgrades
+         check((sbCh.blocks[Chunk.idx(5, SkyGen.Y_DECK, 5)] & 0xFFFF) != 0, "Tumble Layer 1 generated at Y_DECK");
+         check((sbCh.blocks[Chunk.idx(5, SkyGen.Y_DECK - 5, 5)] & 0xFFFF) != 0, "Tumble Layer 2 generated at Y_DECK - 5");
+         check((sbCh.blocks[Chunk.idx(5, SkyGen.Y_DECK - 10, 5)] & 0xFFFF) != 0, "Tumble Layer 3 generated at Y_DECK - 10");
+         eq(Blocks.LAVA, sbCh.blocks[Chunk.idx(5, SkyGen.Y_DECK - 14, 5)] & 0xFFFF, "Tumble Lava Cauldron generated at Y_DECK - 14");
+         for (int m = 0; m < WorldSettings.MAP_COUNT; m++) {
+            WorldSettings mapWs = new WorldSettings();
+            mapWs.type = WorldSettings.BATTLE;
+            mapWs.mapId = m;
+            Gen mapGen = Dim.makeGen(Dim.OVERWORLD, 12345L, mapWs);
+            Chunk mapCh = mapGen.generate(0, 0);
+            eq(Blocks.DIAMOND_BLOCK, mapCh.blocks[Chunk.idx(0, SkyGen.Y_DECK, 0)] & 0xFFFF, "Battle map " + WorldSettings.MAP_NAMES[m] + " center shrine generated");
+         }
          check(Trades.offers(Trades.BEDWARS_SHOP).length == 6, "Bedwars Item Shop has 6 trades");
          check(Trades.offers(Trades.BEDWARS_ARMOR).length == 6, "Bedwars Gear & Upgrades Shop has 6 trades");
 
          // 6. Minigame Ephemeral Non-Saving, Waiting Screen UI, Multi-Endpoint VPN Share Code & Bedwars Team/Bed Mechanics
-         check(swWs.isMinigame() && bwWs.isMinigame() && !sbWs.isMinigame(), "Only Skywars and Bedwars are ephemeral minigames");
+         check(swWs.isMinigame() && bwWs.isMinigame() && sbWs.isMinigame(), "Battle, Tumble, and Bedwars are all ephemeral Console Edition minigames");
 
          Game bwGame = new Game();
          bwGame.opt = new Options(new java.io.File(java.nio.file.Files.createTempDirectory("bcbw").toFile(), "opt"));
@@ -963,10 +971,11 @@ final class Tests319 {
          check(bwGame.useSpecial(new Stack(Redstone319.COMPASS, 1)), "Compass right-click displays Spawn direction and distance");
          check(bwGame.useSpecial(new Stack(Redstone319.CLOCK, 1)), "Clock right-click displays Day, Time and Weather");
 
-         // 10. Realistic Sounds, Minecraft Legacy Console Edition + Battle Minigame Music, Real-Life 3D Physical Acoustics & End Credits
+         // 10. Realistic Sounds, Minecraft Legacy Console Edition + Tumble & Battle Minigame Music, Real-Life 3D Physical Acoustics & End Credits
          SoundEngine.loadSoundbank();
-         check(SoundEngine.loadedSampleCount() >= 78, "Soundbank loaded >= 78 real sound effects & Minecraft Console Edition tracks (" + SoundEngine.loadedSampleCount() + ")");
+         check(SoundEngine.loadedSampleCount() >= 100, "Soundbank loaded >= 100 real sound effects & Minecraft Console Edition tracks (" + SoundEngine.loadedSampleCount() + ")");
          check(SoundEngine.hasSample("step_grass_1") && SoundEngine.hasSample("dig_stone_1") && SoundEngine.hasSample("break_block_1") && SoundEngine.hasSample("tnt_explode"), "Real surface footsteps, block dig/break, and explosion samples loaded");
+         check(SoundEngine.hasSample("swing_1") && SoundEngine.hasSample("hit_1") && SoundEngine.hasSample("step_leaves_1") && SoundEngine.hasSample("click_block") && SoundEngine.hasSample("mg_count_go") && SoundEngine.hasSample("mg_win"), "Swing, melee hit, leaves, click_block, and Console Edition minigame SFX loaded");
          check(!SoundEngine.hasSample("ac_morning") && !SoundEngine.hasSample("ac_kk_bossa"), "Animal Crossing tracks completely removed from soundbank");
          check(SoundEngine.hasSample("lce_menu")
             && SoundEngine.hasSample("lce_morning")
@@ -978,37 +987,47 @@ final class Tests319 {
             && SoundEngine.hasSample("lce_nether")
             && SoundEngine.hasSample("lce_end")
             && SoundEngine.hasSample("lce_credits")
+            && SoundEngine.hasSample("lce_tumble_1")
+            && SoundEngine.hasSample("lce_tumble_2")
+            && SoundEngine.hasSample("lce_tumble_3")
             && SoundEngine.hasSample("lce_battle_1")
             && SoundEngine.hasSample("lce_battle_2")
-            && SoundEngine.hasSample("lce_battle_3"), "All 13 Minecraft Console Edition (C418) & Battle Mini Game (Gareth Coker) tracks loaded");
-         SoundEngine.Sample battleSample = SoundEngine.getSample("lce_battle_1");
-         check(battleSample != null && battleSample.pcm.length >= battleSample.sampleRate * 120, "Minecraft Console Edition & Battle tracks are full-length (>120s, not truncated)");
+            && SoundEngine.hasSample("lce_battle_3"), "All 16 Minecraft Console Edition (C418) + Tumble & Battle Mini Game (Gareth Coker) tracks loaded");
+         SoundEngine.Sample tumbleSample = SoundEngine.getSample("lce_tumble_1");
+         check(tumbleSample != null && tumbleSample.pcm.length >= tumbleSample.sampleRate * 120, "Gareth Coker Tumble ('Double Time') & Battle tracks are full-length (>120s, not truncated)");
 
-         // Verify Minecraft Console Edition music selection by screen, Skywars/Bedwars mode, dimension, and time of day
+         // Verify fixed block material sound categories (Coarse Dirt, Podzol, Mycelium, Leaves, Planks, Slime Block)
+         eq("dirt", SoundEngine.blockMaterialCategory(Blocks313.COARSE_DIRT), "Coarse Dirt uses dirt sound category (not stone)");
+         eq("dirt", SoundEngine.blockMaterialCategory(Blocks313.PODZOL), "Podzol uses dirt sound category");
+         eq("dirt", SoundEngine.blockMaterialCategory(Blocks313.MYCELIUM), "Mycelium uses dirt sound category");
+         eq("dirt", SoundEngine.blockMaterialCategory(Blocks.FARMLAND), "Farmland uses dirt sound category");
+         eq("dirt", SoundEngine.blockMaterialCategory(Blocks.CLAY), "Clay uses dirt sound category");
+         eq("leaves", SoundEngine.blockMaterialCategory(Blocks.LEAVES_OAK), "Oak Leaves use leaves sound category");
+         eq("wood", SoundEngine.blockMaterialCategory(Blocks313.PLANKS_SPRUCE), "Spruce Planks use wood sound category");
+         eq("slime", SoundEngine.blockMaterialCategory(Redstone319.SLIME_BLOCK), "Slime Block uses slime sound category");
+
+         // Verify Minecraft Console Edition music selection by screen, Tumble/Battle/Bedwars mode, dimension, random Overworld, and Constant Music setting
          bwGame.screen = Game.S.TITLE;
          eq("lce_menu", SoundEngine.selectConsoleMusic(bwGame), "Title screen plays C418 - Moog City 2 (Menu)");
+         bwGame.screen = Game.S.MINIGAMES;
+         eq("lce_tumble_1", SoundEngine.selectConsoleMusic(bwGame), "Mini Games Hub plays Gareth Coker - Double Time (That One Tumble Song!)");
          bwGame.screen = Game.S.CREDITS;
          eq("lce_credits", SoundEngine.selectConsoleMusic(bwGame), "End Credits screen plays C418 - Alpha");
          bwGame.screen = Game.S.PLAY;
-         bwGame.world.settings.type = WorldSettings.SKYWARS;
-         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_battle_"), "Skywars mode plays Gareth Coker Battle Mini Game theme");
+         bwGame.world.settings.type = WorldSettings.TUMBLE;
+         bwGame.world.settings.mapId = WorldSettings.MAP_COVE;
+         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_tumble_"), "Tumble mode plays Gareth Coker Tumble Mini Game theme");
+         bwGame.world.settings.type = WorldSettings.BATTLE;
+         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_battle_") || SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_tumble_"), "Battle mode plays Gareth Coker Battle/Tumble Mini Game theme");
          bwGame.world.settings.type = WorldSettings.BEDWARS;
-         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_battle_"), "Bedwars mode plays Gareth Coker Battle Mini Game theme");
+         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_battle_") || SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_tumble_"), "Bedwars mode plays Gareth Coker Battle/Tumble Mini Game theme");
          bwGame.world.settings.type = WorldSettings.DEFAULT;
          bwGame.player.creative = false;
-         bwGame.world.dayTime = 2000L;
-         eq("lce_morning", SoundEngine.selectConsoleMusic(bwGame), "Morning (08:00) plays C418 - Subwoofer Lullaby");
-         bwGame.world.dayTime = 5000L;
-         eq("lce_day", SoundEngine.selectConsoleMusic(bwGame), "Midday Survival plays C418 - Minecraft");
-         bwGame.player.creative = true;
-         eq("lce_creative", SoundEngine.selectConsoleMusic(bwGame), "Midday Creative plays C418 - Aria Math");
-         bwGame.player.creative = false;
-         bwGame.world.dayTime = 9000L;
-         eq("lce_afternoon", SoundEngine.selectConsoleMusic(bwGame), "Afternoon plays C418 - Wet Hands");
-         bwGame.world.dayTime = 12000L;
-         eq("lce_sunset", SoundEngine.selectConsoleMusic(bwGame), "Sunset plays C418 - Sweden");
-         bwGame.world.dayTime = 18000L;
-         eq("lce_night", SoundEngine.selectConsoleMusic(bwGame), "Night plays C418 - Living Mice");
+         check(SoundEngine.selectConsoleMusic(bwGame).startsWith("lce_"), "Overworld plays random C418 Legacy Console Edition track");
+         SoundEngine.setConstantMusic(true);
+         check(SoundEngine.isConstantMusic(), "Constant Music setting toggles ON");
+         SoundEngine.setConstantMusic(false);
+         check(!SoundEngine.isConstantMusic(), "Constant Music setting toggles OFF (random delays between songs)");
 
          // Verify Real-Life 3D Physical Acoustics: wall occlusion & cave enclosure reverb
          for (int x = 18; x <= 26; x++) {
