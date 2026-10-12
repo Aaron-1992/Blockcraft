@@ -30,7 +30,7 @@ public final class World {
    public final long seed;
    /** Update 3.12: 0 = Overworld, -1 = Nether, 1 = End (see Dim). */
    public final int dim;
-   public final Gen gen;
+   public Gen gen;
    public final File dir;
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
@@ -80,6 +80,7 @@ public final class World {
    private final double[] res = new double[3];
    static final double[] FULL;
    public boolean rayFluids;
+   public boolean inPassiveTick;
    /** Update 3.13: what the world was created with (generator type, structures). */
    public final WorldSettings settings;
 
@@ -93,6 +94,7 @@ public final class World {
 
    /** Update 3.13: the world settings pick the Overworld generator (old worlds and the tests use the classic one). */
    public World(long var1, File var3, int dimension, WorldSettings st) {
+      FastChunkCache.clear();
       this.seed = var1;
       this.dim = dimension;
       this.settings = st == null ? WorldSettings.classic() : st;
@@ -134,20 +136,37 @@ public final class World {
    }
 
    public Chunk chunk(int var1, int var2) {
-      return (Chunk)this.chunks.get(key(var1, var2));
+      FastChunkCache cache = FastChunkCache.TL.get();
+      int slot = ((var1 & 31) << 5) | (var2 & 31);
+      if (cache.lastWorld == this) {
+         Chunk c = cache.chunks[slot];
+         if (c != null && !c.unloaded && c.cx == var1 && c.cz == var2) {
+            return c;
+         }
+         c = (Chunk)this.chunks.get(key(var1, var2));
+         if (c != null && !c.unloaded) {
+            cache.chunks[slot] = c;
+         }
+         return c;
+      }
+      Chunk c = (Chunk)this.chunks.get(key(var1, var2));
+      if (c != null && !c.unloaded) {
+         cache.switchWorld(this, c, slot);
+      }
+      return c;
    }
 
    public Chunk chunkAt(int var1, int var2) {
-      return (Chunk)this.chunks.get(key(var1 >> 4, var2 >> 4));
+      return this.chunk(var1 >> 4, var2 >> 4);
    }
 
    public boolean isLoaded(int var1, int var2) {
-      return this.chunkAt(var1, var2) != null;
+      return this.chunk(var1 >> 4, var2 >> 4) != null;
    }
 
    public int getBlock(int var1, int var2, int var3) {
       if (var2 >= 0 && var2 <= 255) {
-         Chunk var4 = (Chunk)this.chunks.get(key(var1 >> 4, var3 >> 4));
+         Chunk var4 = this.chunk(var1 >> 4, var3 >> 4);
          return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & 0xFFFF;
       } else {
          return 0;
@@ -183,9 +202,16 @@ public final class World {
    private void requestChunk(int var1, int var2) {
       long var3 = key(var1, var2);
       if (this.requested.add(var3)) {
+         Gen genSnap = this.gen;
          this.pool.execute(() -> {
+            if (this.gen != genSnap || !this.requested.contains(var3)) {
+               return;
+            }
             try {
-               Chunk var5 = this.gen.generate(var1, var2);
+               Chunk var5 = genSnap.generate(var1, var2);
+               if (this.gen != genSnap || !this.requested.contains(var3)) {
+                  return;
+               }
                File var6 = this.dir == null ? null : this.chunkFile(var1, var2);
                if (var6 != null && var6.exists()) {
                   try {
@@ -210,6 +236,10 @@ public final class World {
                   }
                }
 
+               if (this.gen != genSnap || !this.requested.contains(var3)) {
+                  return;
+               }
+               Net319.applyEditsToChunk(this, var5);
                this.ready.add(var5);
             } catch (Throwable var13) {
                var13.printStackTrace();
@@ -224,11 +254,22 @@ public final class World {
    }
 
    public void updateChunks(int var1, int var2, int var3, int var4, long var5) {
+      boolean isVoidArena = this.settings != null && this.settings.isVoidMode();
+      int maxVoidCoord = 6;
+      if (!isVoidArena && !this.requested.isEmpty()) {
+         int maxReqDist = var3 + 2;
+         this.requested.removeIf(rk -> {
+            int rcx = (int)(rk.longValue() >> 32);
+            int rcz = (int)rk.longValue();
+            return Math.max(Math.abs(rcx - var1), Math.abs(rcz - var2)) > maxReqDist;
+         });
+      }
       int var7 = this.requested.size();
-      int var8 = genThreads() * 4;
+      int var8 = genThreads() * 6;
       long var9 = System.nanoTime();
       if (var7 < var8) {
-         int var11 = (var3 + 1) * (var3 + 1) + 2;
+         int effR = isVoidArena ? Math.max(var3, 10) : var3;
+         int var11 = (effR + 1) * (effR + 1) + 2;
          int var12 = 0;
 
          for (int[] var16 : ORDER) {
@@ -238,7 +279,11 @@ public final class World {
 
             int var17 = var1 + var16[0];
             int var18 = var2 + var16[1];
-            if (!this.chunks.containsKey(key(var17, var18)) && !this.requested.contains(key(var17, var18))) {
+            if (isVoidArena && (var17 < -6 || var17 > 5 || var18 < -6 || var18 > 5)) {
+               continue;
+            }
+            long reqKey = key(var17, var18);
+            if (!this.chunks.containsKey(reqKey) && !this.requested.contains(reqKey)) {
                this.requestChunk(var17, var18);
                if (++var12 + var7 >= var8) {
                   break;
@@ -253,9 +298,17 @@ public final class World {
             break;
          }
 
-         this.requested.remove(key(var22.cx, var22.cz));
-         if (Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
-            this.chunks.put(key(var22.cx, var22.cz), var22);
+         long readyKey = key(var22.cx, var22.cz);
+         this.requested.remove(readyKey);
+         if (this.chunks.containsKey(readyKey)) {
+            continue;
+         }
+         if (isVoidArena && (Math.abs(var22.cx) > maxVoidCoord || Math.abs(var22.cz) > maxVoidCoord)) {
+            continue;
+         }
+         boolean inArenaBounds = isVoidArena && Math.abs(var22.cx) <= maxVoidCoord && Math.abs(var22.cz) <= maxVoidCoord;
+         if (inArenaBounds || Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
+            this.chunks.put(readyKey, var22);
             this.fire.scanChunk(var22);
             this.lightChunk(var22);
 
@@ -263,8 +316,16 @@ public final class World {
                for (int var25 = -1; var25 <= 1; var25++) {
                   Chunk var26 = this.chunk(var22.cx + var24, var22.cz + var25);
                   if (var26 != null) {
-                     for (Section var19 : var26.sections) {
-                        var19.dirty = true;
+                     if (var26 == var22 || !var26.everMeshed) {
+                        for (Section var19 : var26.sections) {
+                           var19.dirty = true;
+                        }
+                     } else if (Math.abs(var24) + Math.abs(var25) == 1) {
+                        for (int sy = 0; sy < 16; sy++) {
+                           if (!var26.isSectionEmpty(sy) && !var22.isSectionEmpty(sy)) {
+                              var26.sections[sy].dirty = true;
+                           }
+                        }
                      }
                   }
                }
@@ -273,7 +334,11 @@ public final class World {
       }
 
       for (Chunk var23 : this.chunks.values()) {
-         if (Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3) {
+         if (isVoidArena && Math.abs(var23.cx) <= maxVoidCoord && Math.abs(var23.cz) <= maxVoidCoord) {
+            continue; // Never unload active minigame arena chunks (-5..5 x -5..5)
+         }
+         if ((isVoidArena && (Math.abs(var23.cx) > maxVoidCoord || Math.abs(var23.cz) > maxVoidCoord))
+            || Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3) {
             if (var23.modified) {
                this.saveChunk(var23);
             }
@@ -282,6 +347,40 @@ public final class World {
             var23.unloaded = true;
             if (this.unloadHook != null) {
                this.unloadHook.accept(var23);
+            }
+         }
+      }
+   }
+
+   /** Synchronously ensures that chunk (cx, cz) is generated, lit, and resident in this.chunks. */
+   public Chunk ensureChunkLoaded(int cx, int cz) {
+      Chunk existing = this.chunk(cx, cz);
+      if (existing != null) {
+         return existing;
+      }
+      long k = key(cx, cz);
+      this.requested.remove(k);
+      Chunk fresh = this.gen.generate(cx, cz);
+      fresh.modified = false;
+      fresh.unloaded = false;
+      Net319.applyEditsToChunk(this, fresh);
+      this.chunks.put(k, fresh);
+      this.lightChunk(fresh);
+      for (Section s : fresh.sections) {
+         s.dirty = true;
+      }
+      return fresh;
+   }
+
+   /** Ensures all 12x12 minigame arena chunks (-6..5 x -6..5, including border ring around -5..4) are resident and lit. */
+   public void ensureArenaChunksLoaded() {
+      if (this.settings == null || !this.settings.isVoidMode()) {
+         return;
+      }
+      for (int cz = -6; cz <= 5; cz++) {
+         for (int cx = -6; cx <= 5; cx++) {
+            if (this.chunk(cx, cz) == null) {
+               this.ensureChunkLoaded(cx, cz);
             }
          }
       }
@@ -470,12 +569,23 @@ public final class World {
    }
 
    private void propagate(boolean var1) {
+      int minLightY = (this.settings != null && this.settings.isVoidMode()) ? 36 : 0;
+      Chunk lastC = null;
+      int lastCx = Integer.MIN_VALUE;
+      int lastCz = Integer.MIN_VALUE;
       while (!this.addQ.isEmpty()) {
          long var2 = this.addQ.poll();
          int var4 = ux(var2);
          int var5 = uy(var2);
          int var6 = uz(var2);
-         Chunk var7 = this.chunkAt(var4, var6);
+         int cx = var4 >> 4;
+         int cz = var6 >> 4;
+         if (cx != lastCx || cz != lastCz) {
+            lastC = this.chunk(cx, cz);
+            lastCx = cx;
+            lastCz = cz;
+         }
+         Chunk var7 = lastC;
          if (var7 != null) {
             int var8 = this.lightOf(var7, var1, var4 & 15, var5, var6 & 15);
             if (var8 > 1) {
@@ -483,8 +593,20 @@ public final class World {
                   int var10 = var4 + DX[var9];
                   int var11 = var5 + DY[var9];
                   int var12 = var6 + DZ[var9];
-                  if (var11 >= 0 && var11 <= 255) {
-                     Chunk var13 = var10 >> 4 == var7.cx && var12 >> 4 == var7.cz ? var7 : this.chunkAt(var10, var12);
+                  if (var11 >= minLightY && var11 <= 255) {
+                     int ncx = var10 >> 4;
+                     int ncz = var12 >> 4;
+                     Chunk var13;
+                     if (ncx == cx && ncz == cz) {
+                        var13 = var7;
+                     } else if (ncx == lastCx && ncz == lastCz) {
+                        var13 = lastC;
+                     } else {
+                        var13 = this.chunk(ncx, ncz);
+                        lastC = var13;
+                        lastCx = ncx;
+                        lastCz = ncz;
+                     }
                      if (var13 != null) {
                         int var14 = var10 & 15;
                         int var15 = var12 & 15;
@@ -515,6 +637,7 @@ public final class World {
    }
 
    private void removeLight(boolean var1, int var2, int var3, int var4, int var5) {
+      int minLightY = (this.settings != null && this.settings.isVoidMode()) ? 36 : 0;
       Chunk var6 = this.chunkAt(var2, var4);
       if (var1) {
          var6.setSky(var2 & 15, var3, var4 & 15, 0);
@@ -522,6 +645,9 @@ public final class World {
          var6.setBlk(var2 & 15, var3, var4 & 15, 0);
       }
 
+      Chunk lastC = var6;
+      int lastCx = var6.cx;
+      int lastCz = var6.cz;
       this.remQ.add(pack(var2, var3, var4) | (long)var5 << 60);
 
       while (!this.remQ.isEmpty()) {
@@ -535,8 +661,15 @@ public final class World {
             int var14 = var10 + DX[var13];
             int var15 = var11 + DY[var13];
             int var16 = var12 + DZ[var13];
-            if (var15 >= 0 && var15 <= 255) {
-               Chunk var17 = this.chunkAt(var14, var16);
+            if (var15 >= minLightY && var15 <= 255) {
+               int ncx = var14 >> 4;
+               int ncz = var16 >> 4;
+               if (ncx != lastCx || ncz != lastCz) {
+                  lastC = this.chunk(ncx, ncz);
+                  lastCx = ncx;
+                  lastCz = ncz;
+               }
+               Chunk var17 = lastC;
                if (var17 != null) {
                   int var18 = var14 & 15;
                   int var19 = var16 & 15;
@@ -569,36 +702,54 @@ public final class World {
          this.chunk(var1.cx + 1, var1.cz), this.chunk(var1.cx - 1, var1.cz), this.chunk(var1.cx, var1.cz + 1), this.chunk(var1.cx, var1.cz - 1)
       };
 
+      boolean isVoid = this.settings != null && this.settings.isVoidMode();
+      if (isVoid && this.dim == Dim.OVERWORLD && var1.isChunkEmpty()) {
+         Arrays.fill(var1.light, (byte)0xF0);
+         this.pullNeighbors(var1, false, var4);
+         this.propagate(false);
+         var1.lit = true;
+         for (Section var25 : var1.sections) {
+            var25.dirty = true;
+         }
+         this.markBounds();
+         return;
+      }
+
       if (this.dim == Dim.OVERWORLD) {
+         int voidMinY = isVoid ? 36 : 0;
+         int maxHm = 0;
+         for (int i = 0; i < 256; i++) {
+            if (var1.hm[i] > maxHm) {
+               maxHm = var1.hm[i];
+            }
+         }
+         int bulkStartY = Math.max(voidMinY, maxHm + 1);
+         if (bulkStartY < 256) {
+            Arrays.fill(var1.light, bulkStartY << 8, 65536, (byte)0xF0);
+         }
          // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
          for (int var5 = 0; var5 < 16; var5++) {
             for (int var6 = 0; var6 < 16; var6++) {
                int var7 = var1.hm[var5 * 16 + var6];
-
-               for (int var8 = var7 + 1; var8 < 256; var8++) {
+               int colTopY = Math.min(256, bulkStartY);
+               for (int var8 = Math.max(voidMinY, var7 + 1); var8 < colTopY; var8++) {
                   var1.setSky(var6, var8, var5, 15);
                }
 
                int var21 = var7;
-               int[][] var9 = new int[][]{{var6 + 1, var5}, {var6 - 1, var5}, {var6, var5 + 1}, {var6, var5 - 1}};
-
-               for (int[] var13 : var9) {
-                  int var14;
-                  if (var13[0] >= 0 && var13[0] < 16 && var13[1] >= 0 && var13[1] < 16) {
-                     var14 = var1.hm[var13[1] * 16 + var13[0]];
-                  } else {
-                     Chunk var15 = this.chunk(var2 + var13[0] >> 4, var3 + var13[1] >> 4);
-                     var14 = var15 == null ? var7 : var15.hm[(var13[1] & 15) * 16 + (var13[0] & 15)];
-                  }
-
-                  if (var14 > var21) {
-                     var21 = var14;
-                  }
-               }
+               int hE = var6 < 15 ? var1.hm[var5 * 16 + var6 + 1] : (var4[0] == null ? var7 : var4[0].hm[var5 * 16]);
+               if (hE > var21) var21 = hE;
+               int hW = var6 > 0 ? var1.hm[var5 * 16 + var6 - 1] : (var4[1] == null ? var7 : var4[1].hm[var5 * 16 + 15]);
+               if (hW > var21) var21 = hW;
+               int hS = var5 < 15 ? var1.hm[(var5 + 1) * 16 + var6] : (var4[2] == null ? var7 : var4[2].hm[var6]);
+               if (hS > var21) var21 = hS;
+               int hN = var5 > 0 ? var1.hm[(var5 - 1) * 16 + var6] : (var4[3] == null ? var7 : var4[3].hm[15 * 16 + var6]);
+               if (hN > var21) var21 = hN;
 
                int var26 = Math.min(255, Math.max(var7 + 1, var21));
+               int seedStartY = isVoid ? Math.max(36, var7 + 1) : (var7 + 1);
 
-               for (int var28 = var7 + 1; var28 <= var26; var28++) {
+               for (int var28 = seedStartY; var28 <= var26; var28++) {
                   this.addQ.add(pack(var2 + var6, var28, var3 + var5));
                }
             }
@@ -610,14 +761,21 @@ public final class World {
 
       short[] var16 = var1.blocks;
 
-      for (int var17 = 0; var17 < var16.length; var17++) {
-         int var19 = Blocks.emit[var16[var17] & 0xFFFF];
-         if (var19 > 0) {
-            var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
-            int var22 = var17 >> 8;
-            int var24 = var17 >> 4 & 15;
-            int var27 = var17 & 15;
-            this.addQ.add(pack(var2 + var27, var22, var3 + var24));
+      for (int sy = 0; sy < 16; sy++) {
+         if (var1.isSectionEmpty(sy)) {
+            continue;
+         }
+         int baseIdx = sy << 12;
+         int endIdx = baseIdx + 4096;
+         for (int var17 = baseIdx; var17 < endIdx; var17++) {
+            int var19 = Blocks.emit[var16[var17] & 0xFFFF];
+            if (var19 > 0) {
+               var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
+               int var22 = var17 >> 8;
+               int var24 = var17 >> 4 & 15;
+               int var27 = var17 & 15;
+               this.addQ.add(pack(var2 + var27, var22, var3 + var24));
+            }
          }
       }
 
@@ -633,35 +791,38 @@ public final class World {
    }
 
    private void pullNeighbors(Chunk var1, boolean var2, Chunk[] var3) {
+      boolean isVoid = this.settings != null && this.settings.isVoidMode();
+      int yLo = isVoid ? 36 : 0;
+      int yHi = isVoid ? 148 : 256;
       for (int var4 = 0; var4 < 4; var4++) {
          Chunk var5 = var3[var4];
          if (var5 != null) {
-            for (int var6 = 0; var6 < 256; var6++) {
-               for (int var7 = 0; var7 < 16; var7++) {
-                  int var8;
-                  int var9;
-                  switch (var4) {
-                     case 0:
-                        var8 = 0;
-                        var9 = var7;
-                        break;
-                     case 1:
-                        var8 = 15;
-                        var9 = var7;
-                        break;
-                     case 2:
-                        var8 = var7;
-                        var9 = 0;
-                        break;
-                     default:
-                        var8 = var7;
-                        var9 = 15;
-                  }
-
+            for (int var7 = 0; var7 < 16; var7++) {
+               int var8;
+               int var9;
+               switch (var4) {
+                  case 0:
+                     var8 = 0;
+                     var9 = var7;
+                     break;
+                  case 1:
+                     var8 = 15;
+                     var9 = var7;
+                     break;
+                  case 2:
+                     var8 = var7;
+                     var9 = 0;
+                     break;
+                  default:
+                     var8 = var7;
+                     var9 = 15;
+               }
+               byte var11 = (byte)(var4 == 0 ? 15 : (var4 == 1 ? 0 : var8));
+               byte var12 = (byte)(var4 == 2 ? 15 : (var4 == 3 ? 0 : var9));
+               int colYHi = var2 ? Math.min(yHi, Math.max(yLo, var1.hm[var12 * 16 + var11] + 1)) : yHi;
+               for (int var6 = yLo; var6 < colYHi; var6++) {
                   int var10 = this.lightOf(var5, var2, var8, var6, var9);
                   if (var10 > 1) {
-                     byte var11 = (byte)(var4 == 0 ? 15 : (var4 == 1 ? 0 : var8));
-                     byte var12 = (byte)(var4 == 2 ? 15 : (var4 == 3 ? 0 : var9));
                      if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & 0xFFFF] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
                         this.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
                      }
@@ -699,8 +860,17 @@ public final class World {
          this.resetBounds();
          this.touch(var1, var2, var3);
 
+         int oldOp = Blocks.opacity[var8];
+         int newOp = Blocks.opacity[var4];
+         int oldEm = Blocks.emit[var8];
+         int newEm = Blocks.emit[var4];
+
          for (int var9 = 0; var9 < 2; var9++) {
             boolean var10 = var9 == 0;
+            if (var10 ? oldOp == newOp : (oldOp == newOp && oldEm == newEm)) {
+               continue;
+            }
+
             int var11 = this.lightOf(var5, var10, var6, var2, var7);
             if (var11 > 0) {
                this.removeLight(var10, var1, var2, var3, var11);
@@ -748,6 +918,7 @@ public final class World {
          }
 
          this.notifyAround(var1, var2, var3);
+         Net319.onSetBlock(this, var1, var2, var3, var4);
          return true;
       } else {
          return false;
@@ -797,6 +968,57 @@ public final class World {
             }
          }
       }
+      Redstone319.onBlockChanged(this, var1, var2, var3);
+   }
+
+   public void resetAllChunks() {
+      FastChunkCache.clear();
+      this.fluidDue.clear();
+      this.fluidPending.clear();
+      this.blockUpdates.clear();
+      this.blockPending.clear();
+      this.fallers.clear();
+      this.items.clear();
+      this.tiles.clear();
+      this.ready.clear();
+      this.requested.clear();
+      if (this.lodMap != null) {
+         this.lodMap.sums.clear();
+      }
+      boolean isVoidReset = this.settings != null && this.settings.isVoidMode();
+      java.util.HashSet<Long> coords = new java.util.HashSet<Long>();
+      for (Chunk old : this.chunks.values()) {
+         old.unloaded = true;
+         if (!isVoidReset || (old.cx >= -6 && old.cx <= 5 && old.cz >= -6 && old.cz <= 5)) {
+            coords.add(key(old.cx, old.cz));
+         }
+      }
+      if (isVoidReset) {
+         for (int cx = -6; cx <= 5; cx++) {
+            for (int cz = -6; cz <= 5; cz++) {
+               coords.add(key(cx, cz));
+            }
+         }
+      }
+      this.chunks.clear();
+      ArrayList<Chunk> freshList = new ArrayList<Chunk>(coords.size());
+      for (long k : coords) {
+         int cx = (int)(k >> 32);
+         int cz = (int)k;
+         Chunk fresh = this.gen.generate(cx, cz);
+         fresh.modified = false;
+         fresh.unloaded = false;
+         this.chunks.put(k, fresh);
+         freshList.add(fresh);
+      }
+      for (Chunk ch : freshList) {
+         this.lightChunk(ch);
+         for (Section s : ch.sections) {
+            s.dirty = true;
+            s.inFlight = false;
+         }
+      }
+      FastChunkCache.clear();
    }
 
    public void tick() {
@@ -809,66 +1031,95 @@ public final class World {
          this.lodRefresh();
       }
 
-      int var1 = 0;
+      boolean remoteClientOnly = Net319.isClientConnected() && !Net319.isHosting();
+      this.inPassiveTick = true;
+      try {
+         if (!remoteClientOnly) {
+            int var1 = 0;
 
-      while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
-         for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
-            this.fluidPending.remove(var4);
-            this.fluidUpdate(ux(var4), uy(var4), uz(var4));
-            var1++;
-         }
-      }
+            while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
+               for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
+                  this.fluidPending.remove(var4);
+                  this.fluidUpdate(ux(var4), uy(var4), uz(var4));
+                  var1++;
+               }
+            }
 
-      int var7 = 0;
+            int var7 = 0;
 
-      while (!this.blockUpdates.isEmpty() && var7++ < 600) {
-         long var8 = (Long)this.blockUpdates.poll();
-         this.blockPending.remove(var8);
-         this.blockUpdate(ux(var8), uy(var8), uz(var8));
-      }
-
-      for (int var9 = 0; var9 < this.fallers.size(); var9++) {
-         World.Falling var12 = (World.Falling)this.fallers.get(var9);
-         var12.px = var12.x;
-         var12.py = var12.y;
-         var12.pz = var12.z;
-         if (var12.fuse > 0) {
-            this.tickTnt(var12);
+            while (!this.blockUpdates.isEmpty() && var7++ < 600) {
+               long var8 = (Long)this.blockUpdates.poll();
+               this.blockPending.remove(var8);
+               this.blockUpdate(ux(var8), uy(var8), uz(var8));
+            }
          } else {
-            this.tickFalling(var12);
+            this.fluidDue.clear();
+            this.fluidPending.clear();
+            this.blockUpdates.clear();
+            this.blockPending.clear();
          }
-      }
 
-      this.fallers.removeIf(var0 -> var0.dead);
-      this.tickCrops();
-      this.fire.tick();
-      this.trees.tick();
-      if (this.dim == Dim.OVERWORLD) {
-         // no sky, no weather, no earthquakes in the other dimensions
-         this.disasters.tick();
-         this.weather.tick();
-      }
+         for (int var9 = 0; var9 < this.fallers.size(); var9++) {
+            World.Falling var12 = (World.Falling)this.fallers.get(var9);
+            if (var12 == null) {
+               continue;
+            }
+            var12.px = var12.x;
+            var12.py = var12.y;
+            var12.pz = var12.z;
+            if (var12.fuse > 0) {
+               this.tickTnt(var12);
+            } else {
+               this.tickFalling(var12);
+            }
+         }
 
-      for (World.Item var13 : this.items) {
-         this.tickItem(var13);
-      }
+         this.fallers.removeIf(var0 -> var0 == null || var0.dead);
+         boolean isMinigame = this.settings != null && this.settings.isMinigame();
+         if (!remoteClientOnly && !isMinigame) {
+            this.tickCrops();
+            this.fire.tick();
+         }
+         this.trees.tick();
+         if (this.dim == Dim.OVERWORLD) {
+            // no sky, no weather, no earthquakes in the other dimensions
+            if (!remoteClientOnly && !isMinigame) {
+               this.disasters.tick();
+            }
+            this.weather.tick();
+         }
 
-      this.items.removeIf(var0 -> var0.dead);
-      if (!this.tiles.isEmpty()) {
-         for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
-            if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
-               int var5 = this.getBlock(var14.x, var14.y, var14.z);
-               if (var5 != 67 && var5 != 68) {
-                  this.tiles.remove(tkey(var14.x, var14.y, var14.z));
-               } else {
-                  var14.tickFurnace(this);
-                  int var6 = var14.burn > 0 ? 68 : 67;
-                  if (var5 != var6) {
-                     this.setBlock(var14.x, var14.y, var14.z, var6);
+         for (int itemIdx = 0; itemIdx < this.items.size(); itemIdx++) {
+            World.Item var13 = (World.Item)this.items.get(itemIdx);
+            if (var13 != null) {
+               this.tickItem(var13);
+            }
+         }
+
+         this.items.removeIf(var0 -> var0 == null || var0.dead);
+         if (!this.tiles.isEmpty()) {
+            for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
+               if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
+                  int var5 = this.getBlock(var14.x, var14.y, var14.z);
+                  if (var5 != 67 && var5 != 68) {
+                     this.tiles.remove(tkey(var14.x, var14.y, var14.z));
+                  } else if (!remoteClientOnly) {
+                     int prevCook = var14.cook;
+                     int prevBurn = var14.burn;
+                     var14.tickFurnace(this);
+                     int var6 = var14.burn > 0 ? 68 : 67;
+                     if (var5 != var6) {
+                        this.setBlock(var14.x, var14.y, var14.z, var6);
+                     }
+                     if ((prevCook == 0 && var14.cook > 0) || (prevCook > 0 && var14.cook == 0) || (prevBurn > 0 && var14.burn == 0)) {
+                        Net319.onTileChanged(this, var14);
+                     }
                   }
                }
             }
          }
+      } finally {
+         this.inPassiveTick = false;
       }
    }
 
@@ -881,9 +1132,27 @@ public final class World {
       var5.fuse = var4;
       var5.vy = 0.2;
       this.fallers.add(var5);
+      Net319.onPrimeTnt(this, var1, var2, var3, var4);
+   }
+
+   public void throwTntGrenade(double x, double y, double z, double vx, double vy, double vz, int fuse) {
+      World.Falling f = new World.Falling();
+      f.x = x;
+      f.y = y;
+      f.z = z;
+      f.px = x;
+      f.py = y;
+      f.pz = z;
+      f.id = 132;
+      f.fuse = fuse;
+      f.vy = vy;
+      SkyGen.registerThrownTnt(f, vx, vz);
+      this.fallers.add(f);
+      Net319.onPrimeTnt(this, (int)Math.floor(x + vx * 8.0), (int)Math.floor(y), (int)Math.floor(z + vz * 8.0), fuse);
    }
 
    private void tickTnt(World.Falling var1) {
+      SkyGen.tickThrownTntHorizontal(this, var1);
       var1.vy -= 0.04;
       var1.y = var1.y + var1.vy;
       int var2 = (int)Math.floor(var1.x);
@@ -900,7 +1169,17 @@ public final class World {
          var1.vy *= 0.98;
          if (--var1.fuse <= 0) {
             var1.dead = true;
-            if (this.game != null) {
+            SkyGen.removeThrownTnt(var1);
+            if (Net319.isClientConnected() && !Net319.isHosting()) {
+               if (this.game != null) {
+                  this.game.explosionParticles(var1.x, var1.y + 0.5, var1.z);
+               }
+            } else if (this.settings != null && (this.settings.type == WorldSettings.CS2 || this.settings.type == WorldSettings.MURDER)) {
+               if (this.game != null) {
+                  this.game.explosionParticles(var1.x, var1.y + 0.5, var1.z);
+                  SkyGen.onTntGrenadeDetonate(this.game, this, var1.x, var1.y + 0.5, var1.z);
+               }
+            } else if (this.game != null) {
                this.game.mobs.blast(var1.x, var1.y + 0.5, var1.z, 4, null);
             }
          }
@@ -1141,7 +1420,7 @@ public final class World {
          int var11 = var17 ? Decor315.foot(Decor315.bedColor(var4), var22) : Decor315.head(Decor315.bedColor(var4), var22);
          if (this.getBlock(var9, var2, var10) != var11) {
             this.setBlock(var1, var2, var3, 0);
-            if (!var17) {
+            if (!var17 && (this.settings == null || this.settings.type != WorldSettings.BEDWARS)) {
                this.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }
@@ -1300,7 +1579,9 @@ public final class World {
          var10.count = var8;
          var10.dmg = var9;
          var10.spin = this.rnd.nextFloat() * 360.0F;
+         var10.netId = Net319.nextItemId();
          this.items.add(var10);
+         Net319.onDropItem(this, var10);
          return var10;
       } else {
          return null;
@@ -1322,7 +1603,9 @@ public final class World {
          this.setBlock(var1, var2, var3, 69);
          var5 = new TileEntity(0, var1, var2, var3);
          this.fillLoot(var5);
+         Net319.applyPendingTile(this, var5);
          this.tiles.put(tkey(var1, var2, var3), var5);
+         Net319.onTileChanged(this, var5);
          return var5;
       }
 
@@ -1337,6 +1620,7 @@ public final class World {
             var5 = new TileEntity(1, var1, var2, var3);
          }
 
+         Net319.applyPendingTile(this, var5);
          this.tiles.put(tkey(var1, var2, var3), var5);
       }
 
@@ -1355,6 +1639,10 @@ public final class World {
    }
 
    void fillLoot(TileEntity var1) {
+      if (this.settings != null && this.settings.isMinigame()) {
+         SkyGen.fillRandomMinigameChest(this, var1);
+         return;
+      }
       Random var2 = new Random(this.seed * 31L + tkey(var1.x, var1.y, var1.z));
       int var3 = 0;
       int[][] table = this.dim == Dim.NETHER ? Items312.NETHER_LOOT : LOOT;
@@ -1561,6 +1849,19 @@ public final class World {
       }
    }
 
+   int cobbleOrSkyblockOre() {
+      if (this.settings != null && this.settings.type == WorldSettings.SKYBLOCK) {
+         int r = this.rnd.nextInt(100);
+         if (r < 12) return Blocks.COAL_ORE;
+         if (r < 19) return Blocks.IRON_ORE;
+         if (r < 22) return Blocks.GOLD_ORE;
+         if (r < 24) return Blocks.REDSTONE_ORE;
+         if (r < 25) return Blocks.LAPIS_ORE;
+         if (r < 26) return Blocks.DIAMOND_ORE;
+      }
+      return 4;
+   }
+
    private void fluidUpdate(int var1, int var2, int var3) {
       int var4 = this.getBlock(var1, var2, var3);
       if (Blocks.isFluid(var4)) {
@@ -1570,7 +1871,7 @@ public final class World {
          int var8 = var5 ? 7 : 3;
          int var9 = var5 ? 5 : 30;
          if (!var5 && this.touchesWater(var1, var2, var3)) {
-            this.setBlock(var1, var2, var3, var6 == 0 ? 26 : 4);
+            this.setBlock(var1, var2, var3, var6 == 0 ? 26 : this.cobbleOrSkyblockOre());
          } else {
             int var10 = this.getBlock(var1, var2 + 1, var3);
             if (var6 > 0) {
@@ -1619,7 +1920,7 @@ public final class World {
                if (!var5 && Blocks.isWater(var17)) {
                   this.setBlock(var1, var2 - 1, var3, 1);
                } else if (var5 && Blocks.isLava(var17)) {
-                  this.setBlock(var1, var2 - 1, var3, Blocks.isLava(var17) && Blocks.fluidLevel(var17) == 0 ? 26 : 4);
+                  this.setBlock(var1, var2 - 1, var3, Blocks.isLava(var17) && Blocks.fluidLevel(var17) == 0 ? 26 : this.cobbleOrSkyblockOre());
                } else {
                   if (!Blocks.isFluid(var17) || Blocks.fluidLevel(var17) != 1) {
                      this.setBlock(var1, var2 - 1, var3, var7 + 1);
@@ -1639,7 +1940,7 @@ public final class World {
                            if (!var5 && Blocks.isWater(var16)) {
                               this.setBlock(var21, var2, var22, 1);
                            } else if (var5 && Blocks.isLava(var16)) {
-                              this.setBlock(var21, var2, var22, Blocks.fluidLevel(var16) == 0 ? 26 : 4);
+                              this.setBlock(var21, var2, var22, Blocks.fluidLevel(var16) == 0 ? 26 : this.cobbleOrSkyblockOre());
                            } else if (!Blocks.isFluid(var16) || !Blocks.sameFluid(var16, var4) || Blocks.fluidLevel(var16) > var18) {
                               this.setBlock(var21, var2, var22, var7 + var18);
                            }
@@ -1879,6 +2180,7 @@ public final class World {
       public int dmg;
       public boolean dead;
       public float spin;
+      public long netId;
       /** Update 3.12: an Eye of Ender in flight: it flies from (lx, ly, lz) to above (ax, az) and then drops like any other item. */
       public boolean eye;
       public int eyeT;
@@ -1920,5 +2222,39 @@ public final class World {
 
          return var1;
       }
+   }
+}
+
+final class FastChunkCache {
+   static final java.util.concurrent.ConcurrentLinkedQueue<java.lang.ref.WeakReference<FastChunkCache>> ALL =
+      new java.util.concurrent.ConcurrentLinkedQueue<>();
+   static final ThreadLocal<FastChunkCache> TL = ThreadLocal.withInitial(() -> {
+      FastChunkCache c = new FastChunkCache();
+      ALL.add(new java.lang.ref.WeakReference<>(c));
+      return c;
+   });
+
+   final Chunk[] chunks = new Chunk[1024];
+   World lastWorld;
+
+   static void clear() {
+      java.util.Iterator<java.lang.ref.WeakReference<FastChunkCache>> it = ALL.iterator();
+      while (it.hasNext()) {
+         FastChunkCache c = it.next().get();
+         if (c == null) {
+            it.remove();
+         } else {
+            c.lastWorld = null;
+            Arrays.fill(c.chunks, null);
+         }
+      }
+   }
+
+   void switchWorld(World w, Chunk c, int slot) {
+      if (this.lastWorld != w) {
+         Arrays.fill(this.chunks, null);
+         this.lastWorld = w;
+      }
+      this.chunks[slot] = c;
    }
 }

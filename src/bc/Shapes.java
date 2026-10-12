@@ -94,7 +94,7 @@ final class Shapes {
 
    /** Blocks that have to be looked at when a neighbour changes. */
    static boolean handlesUpdate(int id) {
-      return isCarpet(id) || Decor315.handlesUpdate(id);
+      return isCarpet(id) || Decor315.handlesUpdate(id) || Redstone319.handlesUpdate(id);
    }
 
    // ------------------------------------------------------------------ static models: a fixed list of boxes per id (beds, banners, redstone parts ...)
@@ -107,7 +107,7 @@ final class Shapes {
    /** Makes the block a K_SHAPE block that is drawn as the given boxes (see {@link #px}). */
    static void model(int id, double[][] boxes) {
       MODEL[id] = boxes;
-      Blocks.kind[id] = K_SHAPE;
+      Blocks.kind[id] = boxes == null ? 0 : K_SHAPE;
    }
 
    static double[][] modelBoxes(int id) {
@@ -488,12 +488,16 @@ final class Shapes {
          return new double[][]{trapBox(trap(trapKind(id), false, false, 0))};
       }
 
+      if (id >= 1900 && id <= 2020 && isModel(id)) {
+         return MODEL[id];
+      }
+
       return isCarpet(id) ? new double[][]{{0.0, 0.0, 0.0, 1.0, 0.0625, 1.0}} : null;
    }
 
    /** Items that are drawn as a flat picture in the hand and in the inventory. */
    static boolean flatItem(int id) {
-      return isThin(id);
+      return isThin(id) || id == Redstone319.REDSTONE_TORCH || id == Redstone319.REDSTONE_TORCH_OFF;
    }
 
    // ------------------------------------------------------------------ meshing
@@ -515,6 +519,8 @@ final class Shapes {
          boxes = wallBoxes(nbr, false);
       } else if (isGate(id)) {
          boxes = gateBoxes(id);
+      } else if (Redstone319.isWire(id)) {
+         boxes = Redstone319.wireBoxes(nbr, id);
       } else if (isModel(id)) {
          boxes = MODEL[id];
       } else {
@@ -529,6 +535,7 @@ final class Shapes {
 
    /** One box of a shape: the six faces (except the hidden ones) with the texture laid over the whole block, so that the parts line up. */
    static void emitBox(Mesher.Scratch s, int x, int y, int z, int id, double[] b, int hide, Mesher.FB buf, float alpha) {
+      s.rot = 0;
       int cell = Mesher.ci(x + 1, y + 1, z + 1);
       int own = s.L[cell] & 255;
       float[] uv = new float[2];
@@ -562,7 +569,10 @@ final class Shapes {
          }
 
          float sky = light >> 4 & 15;
-         float blk = light & 15;
+         int selfGlow = (id > Redstone319.REDSTONE_WIRE0 && id <= Redstone319.REDSTONE_WIRE0 + 15)
+            ? 6 + (id - Redstone319.REDSTONE_WIRE0) * 9 / 15
+            : Blocks.emit[id];
+         float blk = Math.max(light & 15, selfGlow);
          for (int i = 0; i < 4; i++) {
             int[] corner = Mesher.FC[f][i];
             float px = (float)(corner[0] == 0 ? b[0] : b[3]);
@@ -597,18 +607,26 @@ final class Shapes {
             }
          }
 
+         s.rot = id >= 1900 && id <= 2008 ? Redstone319.faceRot(id, f) : 0;
          Mesher.emit(s, buf, tile, false);
+         s.rot = 0;
       }
    }
 
    // ------------------------------------------------------------------ the world: use, place, update
-   /** Right click: a gate or a wooden trapdoor opens or closes. */
+   /** Right click: a gate, wooden trapdoor, lever or button opens/closes/toggles. */
    static boolean use(Game g, int x, int y, int z, int id) {
+      if (Redstone319.use(g, x, y, z, id)) {
+         return true;
+      }
+
       if (!handToggles(id)) {
          return false;
       }
 
+      boolean opening = isGate(id) ? !gateOpen(id) : !trapOpen(id);
       g.world.setBlock(x, y, z, toggled(id));
+      SoundEngine.play3D(g.world, isGate(id) ? (opening ? "gate_open" : "gate_close") : (opening ? "door_open" : "door_close"), x + 0.5, y + 0.5, z + 0.5, 0.85F, 0.96F);
       g.meshNow(x, y, z);
       return true;
    }
@@ -620,6 +638,11 @@ final class Shapes {
          return;
       }
 
+      if (Redstone319.handlesUpdate(id)) {
+         Redstone319.update(w, x, y, z, id);
+         return;
+      }
+
       if (isCarpet(id) && !Blocks.solid[w.getBlock(x, y - 1, z)]) {
          w.setBlock(x, y, z, 0);
          w.dropItem(x + 0.5, y + 0.3, z + 0.5, id, 1);
@@ -627,7 +650,7 @@ final class Shapes {
    }
 
    static boolean placesSpecially(int id) {
-      return isGate(id) || isTrap(id) || isCarpet(id);
+      return isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
    }
 
    /** The way the player looks, as a facing (0 north, 1 south, 2 east, 3 west). */
@@ -685,12 +708,22 @@ final class Shapes {
          } else {
             put = trap(trapKind(id), ny == -1, false, playerFacing(g.player));
          }
+      } else if (Redstone319.placesOriented(id)) {
+         if (id == Redstone319.REPEATER_OFF && !Blocks.solid[w.getBlock(x, y - 1, z)]) {
+            return false;
+         }
+         put = Redstone319.orientForPlace(g, id, x, y, z);
       } else if (!Blocks.solid[w.getBlock(x, y - 1, z)]) {
          return false;
       }
 
       if (hitsPlayer(g, x, y, z, put) || !w.setBlock(x, y, z, put)) {
          return false;
+      }
+      SoundEngine.playBlockPlace(w, put, x, y, z);
+
+      if (Redstone319.handlesUpdate(put)) {
+         Redstone319.propagate(w, x, y, z);
       }
 
       g.meshNow(x, y, z);
