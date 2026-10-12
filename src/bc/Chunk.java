@@ -132,6 +132,88 @@ public final class Chunk {
       this.light[var5] = (byte)(this.light[var5] & 240 | var4);
    }
 
+   public boolean isSectionEmpty(int sy) {
+      int base = sy << 12;
+      int end = base + 4096;
+      short[] b = this.blocks;
+      for (int i = base; i < end; i++) {
+         if (b[i] != 0) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+   public boolean isChunkEmpty() {
+      short[] b = this.blocks;
+      for (int i = 0; i < b.length; i++) {
+         if (b[i] != 0) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+   /**
+    * Returns true if every block in section {@code sy} and its 6 adjacent boundary planes is opaque,
+    * so the section emits 0 vertices and has CaveCull connectivity 0L.
+    */
+   public boolean isSectionFullyEnclosedOpaque(World w, int sy) {
+      if (sy >= 15 || w == null) {
+         return false;
+      }
+      boolean[] op = Blocks.opaque;
+      short[] b = this.blocks;
+      int base = sy << 12;
+      int end = base + 4096;
+      for (int i = base; i < end; i++) {
+         if (!op[b[i] & 0xFFFF]) {
+            return false;
+         }
+      }
+      // Check plane immediately above (y = (sy << 4) + 16)
+      int topBase = (sy + 1) << 12;
+      for (int i = topBase; i < topBase + 256; i++) {
+         if (!op[b[i] & 0xFFFF]) {
+            return false;
+         }
+      }
+      // Check plane immediately below (if sy > 0; sy == 0 has solid bedrock below in Mesher)
+      if (sy > 0) {
+         int botBase = (sy << 12) - 256;
+         for (int i = botBase; i < botBase + 256; i++) {
+            if (!op[b[i] & 0xFFFF]) {
+               return false;
+            }
+         }
+      }
+      Chunk cW = w.chunk(this.cx - 1, this.cz);
+      Chunk cE = w.chunk(this.cx + 1, this.cz);
+      Chunk cN = w.chunk(this.cx, this.cz - 1);
+      Chunk cS = w.chunk(this.cx, this.cz + 1);
+      if (cW == null || cE == null || cN == null || cS == null) {
+         return false;
+      }
+      short[] bW = cW.blocks;
+      short[] bE = cE.blocks;
+      short[] bN = cN.blocks;
+      short[] bS = cS.blocks;
+      int y0 = sy << 4;
+      int y1 = y0 + 16;
+      for (int y = y0; y < y1; y++) {
+         int yOff = y << 8;
+         for (int k = 0; k < 16; k++) {
+            if (!op[bW[yOff | (k << 4) | 15] & 0xFFFF]
+               || !op[bE[yOff | (k << 4)] & 0xFFFF]
+               || !op[bN[yOff | (15 << 4) | k] & 0xFFFF]
+               || !op[bS[yOff | k] & 0xFFFF]) {
+               return false;
+            }
+         }
+      }
+      return true;
+   }
+
    public void computeHeightmap() {
       for (int var1 = 0; var1 < 16; var1++) {
          for (int var2 = 0; var2 < 16; var2++) {
