@@ -206,11 +206,11 @@ def main():
     work = tempfile.mkdtemp(prefix="blockcraft-pe-apk-")
     try:
         res_dir = os.path.join(work, "res")
-        icon_path = os.path.join(res_dir, "drawable-nodpi", "ic_launcher.png")
-        write_launcher_icon_png(icon_path, 192)
+        write_launcher_icon_png(os.path.join(res_dir, "mipmap-nodpi", "ic_launcher.png"), 192)
+        write_launcher_icon_png(os.path.join(res_dir, "drawable-nodpi", "ic_launcher.png"), 192)
 
         manifest_path = os.path.join(work, "AndroidManifest.xml")
-        update_manifest_icon(os.path.join(PE_DIR, "AndroidManifest.xml"), manifest_path)
+        shutil.copyfile(os.path.join(PE_DIR, "AndroidManifest.xml"), manifest_path)
 
         compiled_res_zip = os.path.join(work, "compiled_res.zip")
         run_cmd([aapt2, "compile", "--dir", res_dir, "-o", compiled_res_zip])

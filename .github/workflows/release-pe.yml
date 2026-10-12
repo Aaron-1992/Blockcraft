@@ -40,6 +40,7 @@ jobs:
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
+          set -eo pipefail
           VER="$INPUT_VERSION"
           if [ -z "$VER" ]; then VER="$(head -n1 ci/pe-release-trigger.txt | tr -d '[:space:]')"; fi
           if [ -z "$VER" ]; then VER="1.0"; fi
