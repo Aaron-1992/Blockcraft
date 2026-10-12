@@ -281,7 +281,7 @@ final class Fire {
    /** Lava near the player sets fire to flammable blocks next to it, now and then. */
    void lavaSparks() {
       Game g = w.game;
-      if (g == null || g.player == null || !this.spread) {
+      if (g == null || g.player == null || !this.spread || (w.settings != null && w.settings.isMinigame())) {
          return;
       }
 

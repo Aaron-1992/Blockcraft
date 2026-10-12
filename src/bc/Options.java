@@ -42,6 +42,15 @@ public final class Options {
    public int look = Look.DEFAULT;
    /** Update 3.19: how many of the new shader effects are on - 0 = LOW (none: the picture of 3.18), 1 = MEDIUM (glowing lava and torches, cloud shadows, wet ground in rain), 2 = HIGH (also soft contact shadows in corners). */
    public int fx = 1;
+   /** Update 3.19: 3D crossed foliage fronds protruding from tree canopy leaf blocks. */
+   public boolean bushyLeaves = true;
+   /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
+   public String resourcePack = ResourcePacks.ID_DEFAULT;
+   public float soundVolume = 1.0F;
+   public float musicVolume = 0.75F;
+   public boolean realAcoustics = true;
+   /** False = random Minecraft music intervals; True = plays music continuously back-to-back. */
+   public boolean constantMusic = false;
    final File file;
 
    public Options(File var1) {
@@ -79,6 +88,13 @@ public final class Options {
                this.maxFps = Math.max(0, Math.min(1000, Integer.parseInt(var2.getProperty("maxFps", "0"))));
                this.look = Look.clamp(Integer.parseInt(var2.getProperty("look", Look.DEFAULT + "")));
                this.fx = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("fx", "1"))));
+               this.bushyLeaves = Boolean.parseBoolean(var2.getProperty("bushyLeaves", "true"));
+               this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
+               this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
+               this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
+               this.realAcoustics = Boolean.parseBoolean(var2.getProperty("realAcoustics", "true"));
+               this.constantMusic = Boolean.parseBoolean(var2.getProperty("constantMusic", "false"));
+               ResourcePacks.setActiveId(this.resourcePack);
             } catch (Throwable var5) {
                try {
                   var1.close();
@@ -121,6 +137,12 @@ public final class Options {
       var1.setProperty("maxFps", this.maxFps + "");
       var1.setProperty("look", this.look + "");
       var1.setProperty("fx", this.fx + "");
+      var1.setProperty("bushyLeaves", this.bushyLeaves + "");
+      var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
+      var1.setProperty("soundVolume", this.soundVolume + "");
+      var1.setProperty("musicVolume", this.musicVolume + "");
+      var1.setProperty("realAcoustics", this.realAcoustics + "");
+      var1.setProperty("constantMusic", this.constantMusic + "");
 
       try {
          FileOutputStream var2 = new FileOutputStream(this.file);

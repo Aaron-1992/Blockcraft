@@ -316,6 +316,14 @@ final class PlayerAnim {
          bow(j, p.bow, clamp(lookPitch, -80.0F, 80.0F), 1.0F);
       } else if (p.eat >= 0.0F) {
          eat(j, p.eat);
+      } else if (Renderer.isGun(p.held)) {
+         float aim = 80.0F - clamp(lookPitch, -75.0F, 75.0F);
+         j.sh[0] = lerp(j.sh[0], aim, 0.92F);
+         j.el[0] = lerp(j.el[0], p.held == Redstone319.PISTOL ? 12.0F : 22.0F, 0.92F);
+         j.abd[0] = lerp(j.abd[0], -8.0F, 0.92F);
+         j.sh[1] = lerp(j.sh[1], aim - 6.0F, 0.88F);
+         j.el[1] = lerp(j.el[1], p.held == Redstone319.PISTOL ? 28.0F : 42.0F, 0.88F);
+         j.abd[1] = lerp(j.abd[1], -22.0F, 0.88F);
       }
 
       if (p.swing >= 0.0F && p.bow < 0.0F) {

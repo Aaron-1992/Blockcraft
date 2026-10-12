@@ -1,1 +1,2 @@
-3.18
+5.1
+Blockcraft V5.1 — Clean Self-Contained Multi-Level Maps, 3D Vertical AI Stair/Jump-Pad/Drop Pathfinding & Anti-Block-Spam, and Multiplayer Player 2 Map Sync

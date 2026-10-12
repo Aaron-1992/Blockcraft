@@ -11,13 +11,13 @@ import org.lwjgl.glfw.GLFW;
  * Everything is drawn through {@link Gui}, so the screens can also be drawn without OpenGL (test/bc/UiShots).
  */
 final class Ui {
-   static final int TEXT = 0xFFE8E8E8;
-   static final int DIM = 0xFF9A9AA6;
-   static final int FAINT = 0xFF70707C;
-   static final int GOLD = 0xFFFFD84A;
-   static final int ACCENT = 0xFF7FD04E;
-   static final int PANEL = 0xC40E1014;
-   static final int PANEL_EDGE = 0xFF000000;
+   static final int TEXT = 0xFFF0F4FA;
+   static final int DIM = 0xFFA6B2C8;
+   static final int FAINT = 0xFF727E96;
+   static final int GOLD = 0xFFFFDF58;
+   static final int ACCENT = 0xFF62E678;
+   static final int PANEL = 0xDC0D111A;
+   static final int PANEL_EDGE = 0xFF06080E;
 
    final Game g;
    /** The help text of the widget the mouse is over in this frame (set while drawing, shown by {@link #drawHint}). */
@@ -26,9 +26,13 @@ final class Ui {
    int focus;
    /** The options tab that is open. */
    int optTab;
+   /** The mods tab that is open (0 = Browse Modrinth Catalog, 1 = Installed Mods). */
+   int modTab;
    /** Scroll offsets of the lists (one element arrays, so that the wheel can change them). */
    final float[] optScroll = new float[1];
    final float[] worldScroll = new float[1];
+   final float[] packScroll = new float[1];
+   final float[] modScroll = new float[1];
    /** The scrolling area the mouse wheel acts on in this frame (set while drawing), the offset it changes, the largest offset and the step of one notch. */
    float[] wheelArea;
    float[] wheelHolder;
@@ -100,14 +104,28 @@ final class Ui {
    // ------------------------------------------------------------------ panels and text
    void panel(float x, float y, float w, float h) {
       Gui gui = this.g.gui;
+      // Outer drop shadow & obsidian frame
+      gui.rect(x + 1, y + 2, w + 2, h + 2, 0x60000000);
       gui.rect(x - 1, y - 1, w + 2, h + 2, PANEL_EDGE);
-      gui.rect(x, y, w, h, PANEL);
-      gui.rect(x, y, w, 1, 0x28FFFFFF);
+      // Deep dark-glass vertical gradient
+      gui.gradient(x, y, w, h, 0xDF121724, 0xEC090C14);
+      // Top specular rim & subtle inner border
+      gui.rect(x, y, w, 1.0F, 0x5078A8FF);
+      gui.rect(x, y + h - 1.0F, w, 1.0F, 0x80000000);
+      gui.rect(x, y + 1.0F, 1.0F, h - 2.0F, 0x22FFFFFF);
+      gui.rect(x + w - 1.0F, y + 1.0F, 1.0F, h - 2.0F, 0x22FFFFFF);
    }
 
    void title(String s, float y) {
       Gui gui = this.g.gui;
-      gui.centered(s, gui.w / 2.0F, y, 0xFFFFFFFF, true, 1.0F);
+      float tw = Gui.textWidth(s);
+      float cx = gui.w / 2.0F;
+      float pad = 12.0F;
+      float bx = Math.max(2.0F, cx - tw / 2.0F - pad);
+      float bw = Math.min(gui.w - 4.0F, tw + pad * 2.0F);
+      gui.gradient(bx, y - 2.0F, bw, 11.0F, 0x88161D2E, 0x440A0E18);
+      gui.rect(bx, y + 8.5F, bw, 1.0F, 0x66FFD84A);
+      gui.centered(s, cx, y, 0xFFFFF8E0, true, 1.0F);
    }
 
    void label(String s, float x, float y, int color) {
@@ -159,16 +177,18 @@ final class Ui {
          float tx = x + i * tw;
          boolean on = i == sel;
          boolean hov = this.over(tx, y, tw, h);
-         gui.rect(tx, y, tw, h, 0xFF000000);
-         int top = on ? 0xFF8E93A3 : (hov ? 0xFF5C6070 : 0xFF3E414C);
-         int bot = on ? 0xFF6E7383 : (hov ? 0xFF484B58 : 0xFF2E3039);
+         gui.rect(tx, y, tw, h, 0xFF080B12);
+         int top = on ? 0xFF384761 : (hov ? 0xFF2D384C : 0xFF1D2230);
+         int bot = on ? 0xFF242E42 : (hov ? 0xFF1E2636 : 0xFF131722);
          gui.gradient(tx + 1, y + 1, tw - 2, h - 1, top, bot);
          if (on) {
-            gui.rect(tx + 1, y + 1, tw - 2, 1, 0x60FFFFFF);
+            gui.rect(tx + 1, y + 1, tw - 2, 1, 0x7098C4FF);
             gui.rect(tx + 1, y + h - 2, tw - 2, 2, ACCENT);
+         } else if (hov) {
+            gui.rect(tx + 1, y + h - 1, tw - 2, 1, 0x80FFD84A);
          }
 
-         gui.centered(names[i], tx + tw / 2.0F, y + (h - 8.0F) / 2.0F - (on ? 1 : 0), on ? 0xFFFFFFFF : (hov ? 0xFFFFFFA0 : 0xFFB8B8C4), true, 1.0F);
+         gui.centered(names[i], tx + tw / 2.0F, y + (h - 8.0F) / 2.0F - (on ? 1 : 0), on ? 0xFFFFF8D0 : (hov ? 0xFFFFF090 : 0xFFAAB4C8), true, 1.0F);
          final int idx = i;
          this.g.hitbox(tx, y, tw, h, () -> pick.accept(idx));
          this.g.btns.get(this.g.btns.size() - 1).label = names[i];
@@ -178,8 +198,10 @@ final class Ui {
    /** A text field. The caret blinks while it has the keyboard; text that is too long shows its end. */
    void field(float x, float y, float w, float h, String text, String placeholder, boolean focused, Runnable click) {
       Gui gui = this.g.gui;
-      gui.rect(x, y, w, h, focused ? 0xFFFFFFFF : (this.over(x, y, w, h) ? 0xFFB0B0B0 : 0xFF8A8A92));
-      gui.rect(x + 1, y + 1, w - 2, h - 2, 0xFF000000);
+      int border = focused ? ACCENT : (this.over(x, y, w, h) ? 0xFF7890B8 : 0xFF3A4358);
+      gui.rect(x, y, w, h, border);
+      gui.gradient(x + 1, y + 1, w - 2, h - 2, 0xFF0A0D14, 0xFF121722);
+      gui.rect(x + 1, y + 1, w - 2, 1, 0x60000000);
       String shown = text;
       float max = w - 10;
       while (shown.length() > 1 && Gui.textWidth(shown) > max) {
@@ -190,7 +212,7 @@ final class Ui {
       if (text.isEmpty() && !focused) {
          gui.text(placeholder, x + 5, y + (h - 8.0F) / 2.0F, FAINT, true);
       } else {
-         gui.text(shown + (caret ? "_" : ""), x + 5, y + (h - 8.0F) / 2.0F, 0xFFFFFFFF, true);
+         gui.text(shown + (caret ? "_" : ""), x + 5, y + (h - 8.0F) / 2.0F, 0xFFF4F8FF, true);
       }
 
       this.g.hitbox(x, y, w, h, click);
@@ -208,10 +230,12 @@ final class Ui {
       }
 
       Gui gui = this.g.gui;
-      gui.rect(x - 1, y - 1, w + 2, h + 2, 0xFF000000);
-      gui.rect(x, y, w, h, 0xB0181A20);
+      gui.rect(x - 1, y - 1, w + 2, h + 2, 0xFF06080E);
+      gui.gradient(x, y, w, h, 0xDC141A28, 0xE80B0F18);
+      gui.rect(x, y, w, 1.0F, 0x3578A8FF);
+      gui.rect(x, y + 1.0F, 2.0F, h - 2.0F, this.hint != null ? GOLD : 0xFF425270);
       int lines = Math.max(1, (int)((h - 4) / 10.0F));
-      this.paragraph(s, x + 5, y + 4, w - 10, this.hint != null ? 0xFFFFFFFF : DIM, lines);
+      this.paragraph(s, x + 5, y + 4, w - 10, this.hint != null ? 0xFFFFF8E8 : DIM, lines);
    }
 
    // ------------------------------------------------------------------ scrolling
