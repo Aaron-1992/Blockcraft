@@ -70,10 +70,10 @@ final class Trades {
             int woolColor = SkyGen.BEDWARS_COLORS[Math.abs(SkyGen.myTeam) & 3];
             return new Trade[]{
                t(Items.IRON_INGOT, 4, Blocks.WOOL0 + woolColor, 16),
-               t(Items.IRON_INGOT, 12, Blocks.SANDSTONE, 16),
+               t(Items.IRON_INGOT, 12, Blocks.END_STONE, 12),
                t(Items.IRON_INGOT, 10, Items.toolId(1, Items.C_SWORD), 1),
                t(Items.GOLD_INGOT, 6, Items.toolId(2, Items.C_SWORD), 1),
-               t(Items.GOLD_INGOT, 3, Items.BLAZE_ROD, 1),
+               t(Items.GOLD_INGOT, 3, Redstone319.GOLDEN_APPLE, 1),
                t(Items.EMERALD, 4, Items.toolId(4, Items.C_SWORD), 1)
             };
          }
@@ -81,10 +81,10 @@ final class Trades {
             return new Trade[]{
                t(Items.IRON_INGOT, 20, Items.armorId(1, 1), 1),
                t(Items.GOLD_INGOT, 4, Blocks.TNT, 2),
-               t(Items.GOLD_INGOT, 10, Items.BOW, 1),
-               t(Items.GOLD_INGOT, 2, Items.ARROW, 8),
+               t(Items.GOLD_INGOT, 3, Items.BLAZE_ROD, 1),
+               t(Items.EMERALD, 4, Blocks.OBSIDIAN, 4),
                t(Items.EMERALD, 2, Items.ENDER_PEARL, 1),
-               t(Items.DIAMOND, 4, Items.BOOK, 1)
+               t(Items.DIAMOND, 2, Items.BOOK, 1)
             };
          default:
             return new Trade[0];
@@ -102,6 +102,45 @@ final class Trades {
          return false;
       }
 
+      boolean isBedwars = g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS;
+      if (isBedwars) {
+         if (t.out == Items.BOOK && t.a == Items.DIAMOND) {
+            if (!SkyGen.unlockNextTeamUpgrade(g, SkyGen.getPlayerTeam(g), true)) {
+               return false;
+            }
+            if (!g.player.creative) {
+               g.removeItems(t.a, t.an);
+               if (t.bn > 0) {
+                  g.removeItems(t.b, t.bn);
+               }
+            }
+            SoundEngine.playUi("levelup", 0.7F, 1.15F);
+            g.adv.award(g, "adventure/trade");
+            return true;
+         }
+         if (Items.isArmor(t.out)) {
+            int tier = (t.out - Items.ARMOR_BASE) / 4;
+            int curTier = (g.armor[1] != null && Items.isArmor(g.armor[1].id)) ? (g.armor[1].id - Items.ARMOR_BASE) / 4 : -1;
+            if (curTier >= tier) {
+               g.say("\u00a7e[Bedwars Shop] You already have equal or stronger permanent armor equipped!");
+               return false;
+            }
+            if (!g.player.creative) {
+               g.removeItems(t.a, t.an);
+               if (t.bn > 0) {
+                  g.removeItems(t.b, t.bn);
+               }
+            }
+            for (int slot = 1; slot <= 3; slot++) {
+               g.armor[slot] = new Stack(Items.armorId(tier, slot), 1);
+            }
+            SoundEngine.playUi("pop", 0.75F, 1.15F);
+            g.say("\u00a7a[Bedwars Shop] Equipped permanent " + (tier >= 3 ? "Diamond" : "Iron") + " Armor!");
+            g.adv.award(g, "adventure/trade");
+            return true;
+         }
+      }
+
       if (!g.player.creative) {
          g.removeItems(t.a, t.an);
          if (t.bn > 0) {
@@ -109,21 +148,12 @@ final class Trades {
          }
       }
 
-      if (g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS) {
-         if (t.out == Items.BOOK && t.a == Items.DIAMOND) {
-            SkyGen.unlockNextTeamUpgrade(g, SkyGen.getPlayerTeam(g), true);
-            g.adv.award(g, "adventure/trade");
-            return true;
-         }
-         if (Items.isArmor(t.out)) {
-            int tier = (t.out - Items.ARMOR_BASE) / 4;
-            for (int slot = 1; slot <= 3; slot++) {
-               g.armor[slot] = new Stack(Items.armorId(tier, slot), 1);
-            }
-            g.say("\u00a7a[Bedwars Shop] Equipped permanent " + (tier >= 3 ? "Diamond" : "Iron") + " Armor!");
-            g.adv.award(g, "adventure/trade");
-            return true;
-         }
+      if (isBedwars && Items.isTool(t.out) && Items.toolClass(t.out) == Items.C_SWORD
+         && g.inv[0] != null && g.inv[0].id == Items.TOOL_BASE) {
+         g.inv[0] = new Stack(t.out, t.outN);
+         SoundEngine.playUi("pop", 0.75F, 1.15F);
+         g.adv.award(g, "adventure/trade");
+         return true;
       }
 
       Stack s = new Stack(t.out, t.outN);
@@ -132,6 +162,7 @@ final class Trades {
          g.dropFromPlayer(s.id, s.n, s.dmg);
       }
 
+      SoundEngine.playUi("pop", 0.75F, 1.15F);
       g.adv.award(g, "adventure/trade");
       return true;
    }

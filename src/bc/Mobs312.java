@@ -155,6 +155,27 @@ final class Mobs312 {
 
    /** Wanders about the village; runs from monsters that come close and from whoever hurt it; looks at you. */
    private static void villager(Mobs ms, Mob m, double dx, double dz, double d2, Intent in) {
+      if (ms.g != null && ms.g.world != null && ms.g.world.settings != null && ms.g.world.settings.type == WorldSettings.BEDWARS) {
+         // Stationary Bedwars Base Shopkeeper NPC: stays anchored at shop booth and turns to greet nearby players!
+         if (m.hy == 0.0) {
+            m.hx = m.x;
+            m.hy = m.y;
+            m.hz = m.z;
+         } else if (Math.hypot(m.x - m.hx, m.z - m.hz) > 0.35 || m.y < m.hy - 0.5) {
+            m.setPos(m.hx, m.hy, m.hz);
+         }
+         m.flee = 0;
+         m.moving = false;
+         m.vx = 0.0;
+         m.vz = 0.0;
+         in.moving = false;
+         in.speed = 0.0;
+         if (d2 < 8.0) {
+            in.headYaw = Mobs.angleTo(dx, dz);
+         }
+         return;
+      }
+
       if (m.flee > 0) {
          m.flee--;
          m.dirYaw = Mobs.angleTo(m.x - m.fleeX, m.z - m.fleeZ);
@@ -1097,6 +1118,12 @@ final class Mobs312 {
       if (spot == null) {
          return;
       }
+      if (f.remote) {
+         for (int k = 0; k < 16; k++) {
+            g.portalParticle(spot[0] + (ms.rnd.nextDouble() - 0.5) * 0.6, spot[1] + ms.rnd.nextDouble() * 1.8, spot[2] + (ms.rnd.nextDouble() - 0.5) * 0.6, 0.55F, 0.25F, 0.9F);
+         }
+         return;
+      }
 
       for (int k = 0; k < 24; k++) {
          g.portalParticle(p.x + (ms.rnd.nextDouble() - 0.5) * 0.6, p.y + ms.rnd.nextDouble() * 1.8, p.z + (ms.rnd.nextDouble() - 0.5) * 0.6, 0.55F, 0.25F, 0.9F);
@@ -1238,6 +1265,8 @@ final class Mobs312 {
       int y0 = (int)Math.floor(f.y);
       int z0 = (int)Math.floor(f.z);
       int n = (int)Math.ceil(r);
+      boolean isMinigame = w.settings != null && w.settings.isMinigame();
+      boolean isBedwars = w.settings != null && w.settings.type == WorldSettings.BEDWARS;
       for (int dx = -n; dx <= n; dx++) {
          for (int dy = -n; dy <= n; dy++) {
             for (int dz = -n; dz <= n; dz++) {
@@ -1245,16 +1274,33 @@ final class Mobs312 {
                   continue;
                }
 
-               int id = w.getBlock(x0 + dx, y0 + dy, z0 + dz);
-               if (f.big && id != 0 && Blocks.breakable(id) && id != Blocks.OBSIDIAN && !Blocks.isFluid(id) && !Blocks.isPortal(id) && ms.rnd.nextInt(3) != 0) {
-                  w.setBlock(x0 + dx, y0 + dy, z0 + dz, 0);
+               int bx = x0 + dx;
+               int by = y0 + dy;
+               int bz = z0 + dz;
+               int id = w.getBlock(bx, by, bz);
+               if (f.big && id != 0 && Blocks.breakable(id) && id != Blocks.OBSIDIAN && !Blocks.isFluid(id) && !Blocks.isPortal(id)) {
+                  if (isMinigame) {
+                     if (Decor315.isBed(id) || id == Blocks.END_STONE || id == Blocks.CHEST_LOOT || id == Blocks.CHEST || id == Redstone319.SLIME_BLOCK) {
+                        continue;
+                     }
+                     if (isBedwars && by <= SkyGen.Y_DECK
+                        && !(id >= Blocks.WOOL0 && id < Blocks.WOOL0 + 16)
+                        && id != Blocks.PLANKS
+                        && !Blocks313.isPlanks(id)
+                        && id != Blocks.SANDSTONE) {
+                        continue;
+                     }
+                  }
+                  if (ms.rnd.nextInt(3) != 0) {
+                     w.setBlock(bx, by, bz, 0);
+                  }
                }
             }
          }
       }
 
-      // fires on the floor around
-      int fires = f.big ? 5 : 1;
+      // fires on the floor around (suppressed in Bedwars so Fireball Jumps don't burn bridges/players)
+      int fires = isBedwars ? 0 : (f.big ? 5 : 1);
       for (int k = 0; k < fires * 3 && fires > 0; k++) {
          int fx = x0 + ms.rnd.nextInt(5) - 2;
          int fz = z0 + ms.rnd.nextInt(5) - 2;
@@ -1281,10 +1327,12 @@ final class Mobs312 {
                // Bedwars Fireball Jump impulse!
                double hd = Math.hypot(dx, dz);
                if (hd > 0.05) {
-                  p.vx += dx / hd * 0.65;
-                  p.vz += dz / hd * 0.65;
+                  p.vx += dx / hd * 0.68;
+                  p.vz += dz / hd * 0.68;
                }
-               p.vy = Math.max(p.vy, 0.56);
+               p.vy = Math.max(p.vy, 0.58);
+               p.onGround = false;
+               p.fallDistance = 0.0F;
                p.hurt(2);
             } else {
                p.invuln = 0;

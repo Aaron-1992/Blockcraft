@@ -76,8 +76,8 @@ public final class Net319 {
       int deaths = 0;
       float swing = -1.0F;
       float pswing = -1.0F;
-      float eat = 0.0F;
-      float bow = 0.0F;
+      float eat = -1.0F;
+      float bow = -1.0F;
       int heldId;
       int skinIdx;
       float age;
@@ -2261,6 +2261,12 @@ public final class Net319 {
          p.amp += (Math.min(1.0F, step * 4.2F) - p.amp) * 0.45F;
          p.limb += step * 2.4F;
          p.age += 1.0F;
+         if (p.onGround && !p.spectator && !p.fly && step > 0.035F && g != null && g.world != null && g.world.dim == p.dim && (((int)p.age + p.id) % 8 == 0)) {
+            int under = g.world.getBlock((int)Math.floor(p.x), (int)Math.floor(p.y - 0.2), (int)Math.floor(p.z));
+            if (under != 0 && !Blocks.isFluid(under)) {
+               SoundEngine.playFootstep(g.world, under, p.x, p.y, p.z, p.sneak ? 0.14F : 0.34F);
+            }
+         }
       }
    }
 
@@ -2744,6 +2750,7 @@ public final class Net319 {
                      double ey = Double.parseDouble(p[3]);
                      double ez = Double.parseDouble(p[4]);
                      if (w.dim == edim) {
+                        SoundEngine.play3DMoving(w, "tnt_explode", ex, ey, ez, 0.0, 0.0, 0.0, 1.55F, 0.95F, true);
                         g.explosionParticles(ex, ey, ez);
                      }
                   }
@@ -2781,8 +2788,8 @@ public final class Net319 {
                      peer.hurt = (flags & 16) != 0;
                      peer.spectator = (flags & 32) != 0;
                      peer.fly = (flags & 64) != 0;
-                     peer.eat = (flags & 128) != 0 ? 0.5F : 0.0F;
-                     peer.bow = (flags & 256) != 0 ? 0.85F : 0.0F;
+                     peer.eat = (flags & 128) != 0 ? 0.5F : -1.0F;
+                     peer.bow = (flags & 256) != 0 ? 0.85F : -1.0F;
                      peer.eliminated = (flags & 512) != 0;
                      peer.swing = Float.parseFloat(p[10]);
                      peer.heldId = Integer.parseInt(p[11]);

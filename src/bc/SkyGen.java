@@ -325,6 +325,15 @@ public final class SkyGen extends Gen {
 
    /** Called when the local player dies in-game; marks localEliminated if they cannot respawn this round and notifies peers. */
    public static void onLocalPlayerDied(Game g) {
+      if (g != null && g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.MURDER) {
+         if (myMurderRole == MURDER_ROLE_SHERIFF && !murderGunDropped && g.player != null) {
+            murderGunDropped = true;
+            murderDroppedGunX = g.player.x;
+            murderDroppedGunY = g.player.y;
+            murderDroppedGunZ = g.player.z;
+            g.say("\u00a7e\u00a7l[Murder Mystery] THE SHERIFF WAS KILLED! \u00a7aTheir Pistol has been dropped!");
+         }
+      }
       if (shouldStayEliminated(g)) {
          localEliminated = true;
          if (Net319.isActive()) {
@@ -403,7 +412,13 @@ public final class SkyGen extends Gen {
       }
       World w = g.world;
       int wType = (w != null && w.settings != null) ? w.settings.type : WorldSettings.BATTLE;
-      lastRoundMode = wType == WorldSettings.BEDWARS ? "Bedwars" : (wType == WorldSettings.TUMBLE ? "Tumble" : "Battle");
+      lastRoundMode = switch (wType) {
+         case WorldSettings.BEDWARS -> "Bedwars";
+         case WorldSettings.TUMBLE -> "Tumble";
+         case WorldSettings.CS2 -> "CS2 Strike";
+         case WorldSettings.MURDER -> "Murder Mystery";
+         default -> "Battle";
+      };
       lastRoundMap = (w != null && w.settings != null) ? w.settings.mapName() : "Cove";
       lastRoundWon = won;
       lastRoundKills = myKills;
@@ -590,6 +605,9 @@ public final class SkyGen extends Gen {
 
    /** Returns true if (x, y, z) is a destructible block in the multi-height 3-layer Tumble arena. */
    public static boolean isTumbleLayerBlock(int x, int y, int z) {
+      if (Math.abs(x) == 9 && Math.abs(z) == 9 && y == Y_DECK - 5) {
+         return false; // Indestructible Slime Block Jump Pads on the Middle Ring
+      }
       return Math.hypot(x, z) <= 19.2 && y >= Y_DECK - 11 && y <= Y_DECK + 5 && !(x == 0 && y == Y_DECK - 2 && z == 0);
    }
 
@@ -624,15 +642,36 @@ public final class SkyGen extends Gen {
          if ((step & 1) == 0) {
             g.spawnBreakParticles((int)Math.floor(rx), (int)Math.floor(ry), (int)Math.floor(rz), Blocks.SNOW, 1);
          }
+         if (step >= 2 && g.mobs != null) {
+            boolean hitBot = false;
+            for (int mi = 0; mi < g.mobs.list.size(); mi++) {
+               Mobs.Mob m = g.mobs.list.get(mi);
+               if (m != null && !m.dead && rx > m.bb[0] - 0.2 && rx < m.bb[3] + 0.2 && ry > m.bb[1] - 0.1 && ry < m.bb[4] + 0.2 && rz > m.bb[2] - 0.2 && rz < m.bb[5] + 0.2) {
+                  m.vx += dx * 0.52;
+                  m.vz += dz * 0.52;
+                  if (m.onGround) {
+                     m.vy = Math.max(m.vy, 0.34);
+                  }
+                  m.hurtTime = 6;
+                  SoundEngine.playHit(g.world, m.x, m.y + 0.9, m.z, false);
+                  hitBot = true;
+                  break;
+               }
+            }
+            if (hitBot) {
+               break;
+            }
+         }
          int bx = (int)Math.floor(rx);
          int by = (int)Math.floor(ry);
          int bz = (int)Math.floor(rz);
          int b = g.world.getBlock(bx, by, bz);
          if (b != 0 && !Blocks.isFluid(b)) {
-            if (isTumbleLayerBlock(bx, by, bz) && !(bx == 0 && by == Y_DECK && bz == 0 && g.world.tickCount < 40L)) {
+            if (b != Redstone319.SLIME_BLOCK && isTumbleLayerBlock(bx, by, bz) && !(bx == 0 && by == Y_DECK && bz == 0 && g.world.tickCount < 40L)) {
                g.spawnBreakParticles(bx, by, bz, b, 10);
                SoundEngine.playBlockBreak(g.world, b, bx, by, bz);
                g.world.setBlock(bx, by, bz, 0);
+               g.meshNow(bx, by, bz);
             }
             break;
          }
@@ -784,7 +823,7 @@ public final class SkyGen extends Gen {
       if (g == null || w == null) {
          return;
       }
-      SoundEngine.play3D(w, "explode", gx, gy, gz, 1.0F, 0.95F);
+      SoundEngine.play3D(w, "tnt_explode", gx, gy, gz, 1.0F, 0.95F);
       double radius = 5.2;
       if (g.player != null && !g.player.dead && !g.player.creative && !g.player.spectator) {
          double d = Math.sqrt((g.player.x - gx) * (g.player.x - gx) + (g.player.y + 0.9 - gy) * (g.player.y + 0.9 - gy) + (g.player.z - gz) * (g.player.z - gz));
@@ -876,7 +915,7 @@ public final class SkyGen extends Gen {
          double jy = dy + (g.rnd.nextDouble() - 0.5) * spread;
          double jz = dz + (g.rnd.nextDouble() - 0.5) * spread;
          g.mobs.shootGunArrow(sx, sy, sz, jx, jy, jz, speed, dmg, true);
-         SoundEngine.play3D(g.world, "bow", p.x, p.y + p.eye, p.z, 0.9F, id == Redstone319.SNIPER_RIFLE ? 0.68F : (id == Redstone319.MACHINE_GUN ? 1.45F : 1.25F));
+         SoundEngine.play3D(g.world, "bow_shoot", p.x, p.y + p.eye, p.z, 0.9F, id == Redstone319.SNIPER_RIFLE ? 0.68F : (id == Redstone319.MACHINE_GUN ? 1.45F : 1.25F));
          SoundEngine.play3D(g.world, "hit_1", p.x, p.y + p.eye, p.z, 0.55F, id == Redstone319.SNIPER_RIFLE ? 0.72F : 1.55F);
          return true;
       }
@@ -888,7 +927,7 @@ public final class SkyGen extends Gen {
          }
          playerGunCooldown = 12;
          SoundEngine.playThrow(g.world, p.x, p.y + p.eye, p.z);
-         SoundEngine.play3D(g.world, "tnt_prime", p.x, p.y + p.eye, p.z, 0.8F, 1.25F);
+         SoundEngine.play3D(g.world, "tnt_ignite", p.x, p.y + p.eye, p.z, 0.8F, 1.25F);
          g.world.throwTntGrenade(p.x + dx * 0.65, sy - 0.45, p.z + dz * 0.65, dx * 0.92, dy * 0.75 + 0.14, dz * 0.92, 35);
          if (!p.creative) {
             held.n--;
@@ -959,7 +998,7 @@ public final class SkyGen extends Gen {
       int bx = cs2BombSite == 1 ? -22 : 22;
       if (g != null && g.world != null) {
          g.world.setBlock(bx, Y_DECK + 1, 0, Redstone319.REDSTONE_LAMP_LIT);
-         SoundEngine.play3D(g.world, "tnt_prime", bx + 0.5, Y_DECK + 1.5, 0.5, 1.0F, 0.9F);
+         SoundEngine.play3D(g.world, "tnt_ignite", bx + 0.5, Y_DECK + 1.5, 0.5, 1.0F, 0.9F);
       }
       if (g != null) {
          String sName = cs2BombSite == 1 ? "SITE A" : "SITE B";
@@ -1136,7 +1175,6 @@ public final class SkyGen extends Gen {
          g.world.dropItem(g.player.x, g.player.y + 0.5, g.player.z, Redstone319.PISTOL, 1);
       }
       if (victim.dead) {
-         myKills++;
          onBotKilled(g, victim);
       }
    }
@@ -1302,6 +1340,7 @@ public final class SkyGen extends Gen {
          g.rend.clearWorldMeshes(targetW);
       }
       if (targetW != null) {
+         lastWorldRef = targetW;
          targetW.tickCount = 0L;
          if (targetW.settings != null) {
             targetW.gen = new SkyGen(targetW.seed, targetW.settings);
@@ -1370,6 +1409,9 @@ public final class SkyGen extends Gen {
          g.world.settings.mapId = winningVotedMap(g.world.settings.mapId);
       }
       resetArenaMap(g, g != null ? g.world : null, false);
+      if (g != null && g.world != null) {
+         lastWorldRef = g.world;
+      }
       ensureRoundBotsSpawned(g, g != null ? g.world : null);
       matchState = STATE_PLAYING;
       lobbyCountdownTicks = -1;
@@ -3161,6 +3203,24 @@ public final class SkyGen extends Gen {
       int type = g.world.settings.type;
       int bSlot = Math.abs(bot.netId) & 31;
       if (type == WorldSettings.BEDWARS) {
+         if (bot.y >= 1.0) {
+            if (botIron[bSlot] > 0) {
+               g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Items.IRON_INGOT, Math.min(64, botIron[bSlot]));
+               botIron[bSlot] = 0;
+            }
+            if (botGold[bSlot] > 0) {
+               g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Items.GOLD_INGOT, Math.min(32, botGold[bSlot]));
+               botGold[bSlot] = 0;
+            }
+            if (botDiamonds[bSlot] > 0) {
+               g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Items.DIAMOND, Math.min(16, botDiamonds[bSlot]));
+               botDiamonds[bSlot] = 0;
+            }
+            if (botEmeralds[bSlot] > 0) {
+               g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Items.EMERALD, Math.min(16, botEmeralds[bSlot]));
+               botEmeralds[bSlot] = 0;
+            }
+         }
          int team = botTeamIndex(bot);
          int role = bot.variant & 1;
          if (team >= 0 && team < 4) {
@@ -3172,6 +3232,15 @@ public final class SkyGen extends Gen {
                bwBotRespawnTicks[slot] = 0;
                g.say("\u00a7e\u00a7l[FINAL KILL] " + BEDWARS_CODES[team] + botDisplayName(bot) + " \u00a77has been permanently eliminated!");
             }
+         }
+      } else if (type == WorldSettings.BATTLE && bot.y >= 1.0) {
+         if (botApples[bSlot] > 0) {
+            g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Redstone319.GOLDEN_APPLE, botApples[bSlot]);
+            botApples[bSlot] = 0;
+         }
+         if (botArrows[bSlot] > 0) {
+            g.world.dropItem(bot.x, bot.y + 0.5, bot.z, Items.ARROW, Math.min(16, botArrows[bSlot]));
+            botArrows[bSlot] = 0;
          }
       } else if (type == WorldSettings.MURDER) {
          int role = botMurderRole[bSlot];
@@ -4289,7 +4358,7 @@ public final class SkyGen extends Gen {
          botHealsUsed[bSlot]++;
          botEatTicks[bSlot] = 18;
          bot.health = Math.min(20, bot.health + 6);
-         SoundEngine.play3D(w, "eat_1", bot.x, bot.y + 1.4, bot.z, 0.7F, 1.0F);
+         SoundEngine.play3D(w, "eat_bite", bot.x, bot.y + 1.4, bot.z, 0.7F, 1.0F);
       }
       // 3. Compute escape vector away from the attacker (biased toward safe base/anchor if provided)
       double dx = bot.x - enemyX;
@@ -4388,7 +4457,7 @@ public final class SkyGen extends Gen {
          botHealsUsed[botSlot]++;
          botEatTicks[botSlot] = 18;
          bot.health = Math.min(20, bot.health + 6);
-         SoundEngine.play3D(w, "eat_1", bot.x, bot.y + 1.4, bot.z, 0.7F, 1.0F);
+         SoundEngine.play3D(w, "eat_bite", bot.x, bot.y + 1.4, bot.z, 0.7F, 1.0F);
          if (mobs.g != null) {
             mobs.g.spawnBreakParticles((int)Math.floor(bot.x), (int)Math.floor(bot.y + 1.2), (int)Math.floor(bot.z), Blocks.GOLD_BLOCK, 6);
          }
@@ -5550,6 +5619,19 @@ public final class SkyGen extends Gen {
          g.player.hurt(20);
       }
 
+      // Human Player Slime Block Jump Pad launch in all Minigame arenas!
+      if (g != null && g.player != null && !g.player.dead && !g.player.spectator && g.player.onGround && !g.player.sneaking) {
+         int pbx = (int)Math.floor(g.player.x);
+         int pby = (int)Math.floor(g.player.y - 0.05);
+         int pbz = (int)Math.floor(g.player.z);
+         if (w.getBlock(pbx, pby, pbz) == Redstone319.SLIME_BLOCK) {
+            g.player.vy = 1.04;
+            g.player.onGround = false;
+            g.player.fallDistance = -8.0F;
+            SoundEngine.play3D(w, "slime_bounce", g.player.x, g.player.y, g.player.z, 0.85F, 1.0F);
+         }
+      }
+
       // 4. CS2 STRIKE: Counter-Terrorists vs Terrorists, C4 Bomb Plant/Defuse, Tactical Guns & TNT Grenades!
       if (type == WorldSettings.CS2) {
          ensureRoundBotsSpawned(g, w);
@@ -5560,7 +5642,7 @@ public final class SkyGen extends Gen {
                // Audible C4 beep that accelerates as detonation approaches!
                int beepInterval = cs2BombTimerTicks > 400 ? 30 : (cs2BombTimerTicks > 160 ? 15 : 6);
                if (cs2BombTimerTicks % beepInterval == 0) {
-                  double bx = (cs2BombSite == 0 ? -22.0 : 22.0) + 0.5;
+                  double bx = (cs2BombSite == 1 ? -22.0 : 22.0) + 0.5;
                   SoundEngine.play3D(w, "click_block", bx, Y_DECK + 1.5, 0.5, 0.95F, cs2BombTimerTicks < 160 ? 1.85F : 1.45F);
                }
                // CT player defusing by crouching or standing right on the planted C4 at the bomb site
@@ -6404,7 +6486,7 @@ public final class SkyGen extends Gen {
          lines.add("\u00a7fYour Side: " + (myCs == 0 ? "\u00a79CT (Defend/Defuse)" : "\u00a7cTerrorist (Plant C4)"));
          lines.add("\u00a7fAmmo: \u00a7e" + ammo + " \u00a77| Grenades: \u00a7c" + nades + " \u00a77| Kills: \u00a7a" + myKills);
          if (cs2BombPlanted) {
-            lines.add("\u00a7c\u00a7lC4 SITE " + (cs2BombSite == 0 ? "A" : "B") + ": \u00a7e" + ((cs2BombTimerTicks + 19) / 20) + "s!");
+            lines.add("\u00a7c\u00a7lC4 SITE " + (cs2BombSite == 1 ? "A" : "B") + ": \u00a7e" + ((cs2BombTimerTicks + 19) / 20) + "s!");
          } else {
             lines.add("\u00a77Site A: (-22,0) | Site B: (+22,0)");
          }
@@ -6446,7 +6528,7 @@ public final class SkyGen extends Gen {
       if (type == WorldSettings.CS2 && cs2BombPlanted && !cs2RoundOver) {
          float cx = gui.w / 2.0F;
          int sec = (cs2BombTimerTicks + 19) / 20;
-         gui.centered("\u00a7c\u00a7l\u26a0 C4 PLANTED AT SITE " + (cs2BombSite == 0 ? "A" : "B") + " — " + sec + "s \u26a0", cx, 24.0F, 0xFFFF5555, true, 1.15F);
+         gui.centered("\u00a7c\u00a7l\u26a0 C4 PLANTED AT SITE " + (cs2BombSite == 1 ? "A" : "B") + " — " + sec + "s \u26a0", cx, 24.0F, 0xFFFF5555, true, 1.15F);
          if (cs2DefuseTicks > 0) {
             gui.centered("\u00a7bDefusing C4... " + cs2DefuseTicks + "%", cx, 36.0F, 0xFF68D8FF, true, 1.0F);
          }

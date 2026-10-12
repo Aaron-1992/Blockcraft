@@ -302,9 +302,21 @@ public final class SoundEngine {
 
       // Synthesize crisp acoustic supplements (UI click, bow twang, arrow whoosh, thunder clap, rain patter, note instruments)
       synthesizeAcousticSupplements();
+      aliasSample("eat_1", "eat_bite");
+      aliasSample("bow", "bow_shoot");
+      aliasSample("tnt_prime", "tnt_ignite");
+      aliasSample("explode", "tnt_explode");
+      aliasSample("item_pickup", "item_pop");
+      aliasSample("pop", "item_pop");
 
       if (System.getProperty("bc.test") == null && !Boolean.getBoolean("java.awt.headless")) {
          startAudioThread();
+      }
+   }
+
+   private static void aliasSample(String alias, String target) {
+      if (!BANK.containsKey(alias) && BANK.containsKey(target)) {
+         BANK.put(alias, BANK.get(target));
       }
    }
 
@@ -1061,7 +1073,7 @@ public final class SoundEngine {
          return ""; // Backrooms uses eerie fluorescent hum & stalker audio
       }
 
-      // Console Edition Mini Games (Tumble, Battle & Bedwars): Gareth Coker's Tumble & Battle OST!
+      // Console Edition Mini Games (Tumble, Battle, Bedwars, CS2 Strike & Murder Mystery): Gareth Coker's Tumble & Battle OST!
       if (g.world.settings != null) {
          int map = Math.max(0, g.world.settings.mapId);
          if (g.world.settings.type == WorldSettings.TUMBLE) {
@@ -1072,6 +1084,12 @@ public final class SoundEngine {
          }
          if (g.world.settings.type == WorldSettings.BEDWARS) {
             return BATTLE_TRACKS[(battleTrackIndex + map + 1) % BATTLE_TRACKS.length];
+         }
+         if (g.world.settings.type == WorldSettings.CS2) {
+            return BATTLE_TRACKS[(battleTrackIndex + map + 2) % BATTLE_TRACKS.length];
+         }
+         if (g.world.settings.type == WorldSettings.MURDER) {
+            return BATTLE_TRACKS[(battleTrackIndex + map + 3) % BATTLE_TRACKS.length];
          }
       }
 

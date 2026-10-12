@@ -950,7 +950,7 @@ final class Redstone319 {
       if (id == LEVER_OFF || id == LEVER_ON) {
          int next = id == LEVER_OFF ? LEVER_ON : LEVER_OFF;
          g.world.setBlock(x, y, z, next);
-         SoundEngine.play3D(g.world, "ui_click", x + 0.5, y + 0.5, z + 0.5, 0.7F, next == LEVER_ON ? 1.15F : 0.9F);
+         SoundEngine.playClickBlock(g.world, x, y, z, next == LEVER_ON);
          propagate(g.world, x, y, z);
          g.meshNow(x, y, z);
          return true;
@@ -959,7 +959,7 @@ final class Redstone319 {
       if (id == STONE_BUTTON || id == WOOD_BUTTON) {
          int next = id == STONE_BUTTON ? STONE_BUTTON_ON : WOOD_BUTTON_ON;
          g.world.setBlock(x, y, z, next);
-         SoundEngine.play3D(g.world, "ui_click", x + 0.5, y + 0.5, z + 0.5, 0.7F, 1.1F);
+         SoundEngine.playClickBlock(g.world, x, y, z, true);
          buttonTimers.put(pack(x, y, z), id == STONE_BUTTON ? 20 : 30);
          propagate(g.world, x, y, z);
          g.meshNow(x, y, z);
@@ -1335,6 +1335,7 @@ final class Redstone319 {
                   }
                } else if (Blocks.isDoorLo(id)) {
                   boolean open = Blocks.doorOpen(id);
+                  boolean iron = Blocks.mineClass[id] == Items.C_PICK;
                   int hi = w.getBlock(x, y + 1, z);
                   if (Blocks.isDoorHi(hi)) {
                      if (pow) {
@@ -1342,14 +1343,14 @@ final class Redstone319 {
                         if (!open) {
                            w.setBlock(x, y, z, id + 4);
                            w.setBlock(x, y + 1, z, hi + 4);
-                           SoundEngine.play3D(w, "door_open", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
+                           SoundEngine.play3D(w, iron ? "iron_door_open" : "door_open", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
                            remesh.add(key);
                            remesh.add(pack(x, y + 1, z));
                         }
                      } else if (open && redstoneOpened.remove(key)) {
                         w.setBlock(x, y, z, id - 4);
                         w.setBlock(x, y + 1, z, hi - 4);
-                           SoundEngine.play3D(w, "door_close", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
+                        SoundEngine.play3D(w, iron ? "iron_door_close" : "door_close", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
                         remesh.add(key);
                         remesh.add(pack(x, y + 1, z));
                      }
@@ -1479,6 +1480,7 @@ final class Redstone319 {
       int hz = z + dz;
       w.setBlock(hx, hy, hz, PISTON_HEAD + f);
       w.setBlock(x, y, z, (sticky ? STICKY_PISTON_EXT : PISTON_EXT) + f);
+      SoundEngine.play3D(w, "place_metal_1", x + 0.5, y + 0.5, z + 0.5, 0.78F, 0.78F);
       remesh.add(pack(hx, hy, hz));
       remesh.add(pack(x, y, z));
       return true;
@@ -1492,6 +1494,7 @@ final class Redstone319 {
       int hy = y + dy;
       int hz = z + dz;
       w.setBlock(x, y, z, (sticky ? STICKY_PISTON : PISTON) + f);
+      SoundEngine.play3D(w, "place_metal_1", x + 0.5, y + 0.5, z + 0.5, 0.72F, 0.68F);
       remesh.add(pack(x, y, z));
       if (w.getBlock(hx, hy, hz) == PISTON_HEAD + f) {
          w.setBlock(hx, hy, hz, 0);
@@ -1554,6 +1557,7 @@ final class Redstone319 {
                int id = w.getBlock(x, y, z);
                if (id == STONE_BUTTON_ON || id == WOOD_BUTTON_ON) {
                   w.setBlock(x, y, z, id == STONE_BUTTON_ON ? STONE_BUTTON : WOOD_BUTTON);
+                  SoundEngine.playClickBlock(w, x, y, z, false);
                   propagate(w, x, y, z);
                   g.meshNow(x, y, z);
                } else if (id >= OBSERVER_ON && id < OBSERVER_ON + 4) {
@@ -1587,6 +1591,7 @@ final class Redstone319 {
                   if (stood != wasOn) {
                      int next = (id == STONE_PLATE || id == STONE_PLATE_ON) ? (stood ? STONE_PLATE_ON : STONE_PLATE) : (stood ? WOOD_PLATE_ON : WOOD_PLATE);
                      w.setBlock(x, y, z, next);
+                     SoundEngine.playClickBlock(w, x, y, z, stood);
                      propagate(w, x, y, z);
                      g.meshNow(x, y, z);
                   }

@@ -1622,6 +1622,86 @@ final class Tests319 {
          boolean brokeWall = SkyGen.tryBreakBlockingObstacle(econBot, bwGame.world, 0.5, SkyGen.Y_DECK + 1.0, 3.5, breakIntent);
          check(brokeWall && bwGame.world.getBlock(0, SkyGen.Y_DECK + 2, 1) == 0,
             "tryBreakBlockingObstacle mines through an obstructing wall block when the bot's path is blocked");
+
+         // --- Update 4.8: Play Now startMatch -> tickMode race fix, Audio Aliases, Remote Pose, Shopkeeper Anchor, Blast Protection & Bot Loot ---
+         SoundEngine.ensureLoaded();
+         check(SoundEngine.hasSample("bow")
+               && SoundEngine.hasSample("tnt_prime")
+               && SoundEngine.hasSample("explode")
+               && SoundEngine.hasSample("eat_1")
+               && SoundEngine.hasSample("item_pickup"),
+            "SoundEngine registers fallback aliases for bow, tnt_prime, explode, eat_1, and item_pickup");
+
+         Net319.Peer testPeer = new Net319.Peer(2, "Buddy");
+         PlayerModel.Pose peerPose = new PlayerModel.Pose();
+         peerPose.eat = testPeer.eat;
+         peerPose.bow = testPeer.bow;
+         peerPose.swing = 0.5F;
+         PlayerAnim.Joints solvedPeer = PlayerAnim.solve(peerPose);
+         check(testPeer.eat < 0.0F && testPeer.bow < 0.0F && Math.abs(solvedPeer.sh[0]) > 10.0F,
+            "Net319.Peer initializes eat/bow to -1.0F so remote player arm swings are not locked by bow-draw pose");
+
+         SkyGen.switchMinigameMode(bwGame, WorldSettings.CS2, false);
+         SkyGen.startMatch(bwGame, false);
+         bwGame.screen = Game.S.PLAY;
+         SkyGen.tickMode(bwGame, bwGame.world);
+         check(SkyGen.matchState == SkyGen.STATE_PLAYING,
+            "SkyGen.startMatch updates lastWorldRef so first tickMode does not wipe matchState via resetMatchState");
+         String cs2Track = SoundEngine.selectConsoleMusic(bwGame);
+         check(cs2Track.startsWith("lce_battle_") || cs2Track.startsWith("lce_tumble_"),
+            "SoundEngine.selectConsoleMusic selects Console Edition Minigame music for active CS2 Strike matches");
+
+         // Bedwars Shopkeeper invulnerability & stationary anchoring + Bot resource drop on elimination + single kill count
+         SkyGen.switchMinigameMode(bwGame, WorldSettings.BEDWARS, false);
+         SkyGen.startMatch(bwGame, false);
+         Mobs.Mob shopVillager = null;
+         Mobs.Mob enemyBot = null;
+         for (Mobs.Mob m : bwGame.mobs.list) {
+            if (m != null && m.type == Mobs.VILLAGER) {
+               shopVillager = m;
+            } else if (m != null && !m.dead && SkyGen.isMinigameBot(m) && SkyGen.botTeamIndex(m) != SkyGen.getPlayerTeam(bwGame)) {
+               enemyBot = m;
+            }
+         }
+         check(shopVillager != null && !bwGame.mobs.hurtMob(shopVillager, 10, 0.0, 0.0, 0.4, true),
+            "Bedwars Shopkeeper Villagers are invulnerable to player/bot attacks and explosions");
+
+         if (enemyBot != null) {
+            int enemySlot = Math.abs(enemyBot.netId) & 31;
+            SkyGen.botDiamonds[enemySlot] = 3;
+            SkyGen.botEmeralds[enemySlot] = 2;
+            enemyBot.setPos(0.5, SkyGen.Y_DECK + 1.0, -38.5);
+            int killsBefore = SkyGen.myKills;
+            bwGame.inv[0] = new Stack(Items.toolId(4, Items.C_SWORD), 1);
+            bwGame.sel = 0;
+            enemyBot.health = 2;
+            bwGame.atkTicks = 40;
+            bwGame.attackMob(enemyBot);
+            boolean droppedDia = false;
+            boolean droppedRottenFlesh = false;
+            for (World.Item it : bwGame.world.items) {
+               if (it != null && !it.dead) {
+                  if (it.id == Items.DIAMOND && it.count == 3) {
+                     droppedDia = true;
+                  }
+                  if (it.id == Items.ROTTEN_FLESH || it.id == Items.BONE) {
+                     droppedRottenFlesh = true;
+                  }
+               }
+            }
+            check(SkyGen.myKills == killsBefore + 1 && droppedDia && !droppedRottenFlesh,
+               "Eliminating a Bedwars AI bot increments myKills by 1, drops carried Diamonds/Emeralds, and suppresses Rotten Flesh/Bone drops");
+         }
+
+         // Human player Slime Block Jump Pad launch in Minigame arenas
+         bwGame.world.setBlock(0, SkyGen.Y_DECK, -38, Redstone319.SLIME_BLOCK);
+         bwGame.player.setPos(0.5, SkyGen.Y_DECK + 1.0, -37.5);
+         bwGame.player.onGround = true;
+         bwGame.player.sneaking = false;
+         bwGame.player.vy = 0.0;
+         SkyGen.tickMode(bwGame, bwGame.world);
+         check(bwGame.player.vy > 0.9 && !bwGame.player.onGround,
+            "Stepping on a Slime Block Jump Pad in a minigame launches the human player into the air");
       });
    }
 }

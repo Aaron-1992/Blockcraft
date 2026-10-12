@@ -599,6 +599,7 @@ public final class Player {
             if (this.fallDistance > 1.0F && !this.flying) {
                this.vy = Math.min(1.15, Math.sqrt(this.fallDistance) * 0.28);
                this.onGround = false;
+               SoundEngine.play3D(var1, "slime_bounce", this.x, this.y, this.z, 0.8F, 1.0F);
             }
 
             this.fallDistance = 0.0F;
@@ -607,7 +608,10 @@ public final class Player {
                var1.trample(landX, landY, landZ, this.fallDistance);
             }
 
-            if (this.fallDistance > 3.0F && !this.creative && !this.flying) {
+            boolean noFallMode = var1.settings != null
+               && (var1.settings.type == WorldSettings.TUMBLE
+                  || (var1.settings.type == WorldSettings.BATTLE && SkyGen.battleGraceTicks > 0));
+            if (this.fallDistance > 3.0F && !this.creative && !this.flying && !noFallMode) {
                int var29 = (int)Math.ceil(this.fallDistance - 3.0F);
                if (below == Blocks.HAY_BALE) {
                   var29 = (int)Math.ceil(var29 * 0.2F);

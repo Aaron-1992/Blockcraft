@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "4.7";
+   public static final String VERSION_STR = "4.8";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -4097,14 +4097,25 @@ public final class Game {
             SkyGen.myDeaths++;
             SkyGen.onLocalPlayerDied(this);
             if (!this.player.creative) {
+               boolean isBedwars = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+               boolean isMurder = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.MURDER;
                for (int var7 = 0; var7 < 36; var7++) {
                   if (this.inv[var7] != null) {
-                     this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, this.inv[var7].id, this.inv[var7].n, this.inv[var7].dmg);
+                     int dropId = this.inv[var7].id;
+                     boolean shouldDrop = true;
+                     if (isBedwars) {
+                        shouldDrop = dropId == Items.IRON_INGOT || dropId == Items.GOLD_INGOT || dropId == Items.DIAMOND || dropId == Items.EMERALD;
+                     } else if (isMurder && dropId == Redstone319.MURDER_KNIFE) {
+                        shouldDrop = false;
+                     }
+                     if (shouldDrop) {
+                        this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, dropId, this.inv[var7].n, this.inv[var7].dmg);
+                     }
                      this.inv[var7] = null;
                   }
                }
 
-               boolean keepBwArmor = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+               boolean keepBwArmor = isBedwars;
                if (!keepBwArmor) {
                   for (int var12 = 0; var12 < 4; var12++) {
                      if (this.armor[var12] != null) {
@@ -4412,6 +4423,8 @@ public final class Game {
                   this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[eatenId]);
                   if (eatenId == Redstone319.GOLDEN_APPLE) {
                      this.player.health = Math.min(20, this.player.health + 8);
+                     this.player.burn = 0;
+                     SoundEngine.playUi("levelup", 0.55F, 1.35F);
                   } else if (eatenId == Redstone319.GOLDEN_CARROT) {
                      this.player.health = Math.min(20, this.player.health + 2);
                   }
@@ -4667,6 +4680,11 @@ public final class Game {
          }
       }
       int var2 = this.heldId();
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.MURDER
+         && var2 != Redstone319.MURDER_KNIFE && !this.player.creative) {
+         this.say("§e[Murder Mystery] Use a Detective/Sheriff Pistol (Right-Click) to stop the Murderer!");
+         return;
+      }
       boolean var3 = Items.isTool(var2) || var2 == Redstone319.MURDER_KNIFE;
       float var4 = var3 ? Items.attackDamage(var2) : 1.0F;
       if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamSharpness(SkyGen.getPlayerTeam(this))) {
@@ -4695,7 +4713,6 @@ public final class Game {
       if (var8) {
          SoundEngine.playHit(this.world, var1.x, var1.y + 0.8, var1.z, crit);
          if (var1.dead) {
-            SkyGen.myKills++;
             SkyGen.onBotKilled(this, var1);
          }
       }
@@ -4818,7 +4835,30 @@ public final class Game {
    void breakBlock(int var1, int var2, int var3) {
       int var4 = this.world.getBlock(var1, var2, var3);
       if (Blocks.breakable(var4)) {
+         boolean isMinigame = this.world.settings != null && this.world.settings.isMinigame();
          boolean isBedwars = this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+         boolean isTumble = this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE;
+         if (isMinigame && !this.player.creative) {
+            int wType = this.world.settings.type;
+            if (wType == WorldSettings.CS2 || wType == WorldSettings.MURDER) {
+               return;
+            }
+            if (var4 == Redstone319.SLIME_BLOCK || var4 == Blocks.CHEST_LOOT) {
+               return;
+            }
+            if (isTumble && !SkyGen.isTumbleLayerBlock(var1, var2, var3)) {
+               return;
+            }
+            if (isBedwars && var2 <= SkyGen.Y_DECK
+               && !(var4 >= Blocks.WOOL0 && var4 < Blocks.WOOL0 + 16)
+               && var4 != Blocks.PLANKS
+               && !Blocks313.isPlanks(var4)
+               && var4 != Blocks.SANDSTONE
+               && var4 != Blocks.END_STONE
+               && var4 != Blocks.OBSIDIAN) {
+               return;
+            }
+         }
          int bedTeam = isBedwars && Blocks.isBed(var4) ? SkyGen.getBedTeamAt(var1, var2, var3) : -1;
          if (isBedwars && bedTeam >= 0 && bedTeam == SkyGen.getPlayerTeam(this) && !this.player.creative) {
             this.say("\u00a7c[Bedwars] You cannot break your own team's bed!");
@@ -4873,7 +4913,7 @@ public final class Game {
          }
 
          if (!this.player.creative) {
-            if (!isBedwars || !Blocks.isBed(var4)) {
+            if (!isTumble && (!isBedwars || !Blocks.isBed(var4))) {
                this.blockDrops(var1, var2, var3, var4, var5);
             }
             this.player.addExhaustion(0.025F);
@@ -5347,7 +5387,7 @@ public final class Game {
       }
 
       if (var2 == Redstone319.FIRE_CHARGE && this.world != null && !this.player.adventure) {
-         if (this.target != null) {
+         if (this.target != null && (this.world.settings == null || !this.world.settings.isMinigame())) {
             int fx = this.target.x + this.target.nx;
             int fy = this.target.y + this.target.ny;
             int fz = this.target.z + this.target.nz;
@@ -6529,6 +6569,10 @@ public final class Game {
    }
 
    void damagePlayer(int var1, double var2, double var4) {
+      if (this.screen == Game.S.WAITING
+         || (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BATTLE && SkyGen.battleGraceTicks > 0)) {
+         return;
+      }
       if (!this.player.creative && !this.player.dead && this.player.invuln <= 0) {
          if (this.player.hardcore) {
             var1 = Math.max(1, (var1 * 3 + 1) / 2);
