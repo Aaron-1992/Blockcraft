@@ -2493,19 +2493,12 @@ public final class Net319 {
                         }
                         SkyGen.switchMinigameMode(g, newMode, false);
                      } else if ("BOMB_PLANT".equals(act) && p.length >= 3) {
-                        int site = Integer.parseInt(p[2]) & 1;
-                        String planter = p.length >= 4 ? p[3] : "Terrorist";
-                        SkyGen.cs2BombPlanted = true;
-                        SkyGen.cs2BombSite = site;
-                        SkyGen.cs2BombTimerTicks = 800;
-                        SkyGen.cs2DefuseTicks = 0;
-                        SoundEngine.playMinigameSound("mg_showdown");
-                        g.say("\u00a7c\u00a7l[CS2 Strike] BOMB HAS BEEN PLANTED AT SITE " + (site == 0 ? "A" : "B") + " \u00a77by \u00a7e" + planter + "\u00a77!");
+                        int site = Integer.parseInt(p[2]) == 2 ? 2 : 1;
+                        String planter = p.length >= 4 ? p[3].replace('_', ' ') : "Terrorist";
+                        SkyGen.plantCs2Bomb(g, site, planter, false);
                      } else if ("BOMB_DEFUSE".equals(act)) {
-                        String defuser = p.length >= 3 ? p[2] : "Counter-Terrorist";
-                        SkyGen.cs2BombPlanted = false;
-                        SkyGen.cs2RoundOver = true;
-                        g.say("\u00a7b\u00a7l[CS2 Strike] BOMB HAS BEEN DEFUSED \u00a77by \u00a7a" + defuser + "\u00a77! Counter-Terrorists Win!");
+                        String defuser = p.length >= 3 ? p[2].replace('_', ' ') : "Counter-Terrorist";
+                        SkyGen.defuseCs2Bomb(g, defuser, false);
                      }
                   }
                }

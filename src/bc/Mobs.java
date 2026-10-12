@@ -729,7 +729,7 @@ public final class Mobs {
          var1.x = (var1.bb[0] + var1.bb[3]) / 2.0;
          var1.y = var1.bb[1];
          var1.z = (var1.bb[2] + var1.bb[5]) / 2.0;
-         if (var37 && var12 && var1.onGround) {
+         if (var37 && var12 && var1.onGround && canStepUpOnCollision(var2, var1, var45, var46, this.res[0], this.res[2])) {
             var1.vy = JUMP;
          }
 
@@ -748,6 +748,52 @@ public final class Mobs {
             }
          }
       }
+   }
+
+   static boolean canStepUpOnCollision(World w, Mobs.Mob m, double reqVx, double reqVz, double resX, double resZ) {
+      if (w == null || m == null || !SkyGen.isMinigameBot(m)) {
+         return true;
+      }
+      int mx = (int)Math.floor(m.x);
+      int mby = (int)Math.floor(m.y + 0.05);
+      int mz = (int)Math.floor(m.z);
+      // Never jump if a ceiling/overhang is directly above the mob's head!
+      if (SkyGen.isSolidObstacle(w, mx, mby + 2, mz)) {
+         return false;
+      }
+      boolean xBlocked = Math.abs(resX - reqVx) > 1.0E-6;
+      boolean zBlocked = Math.abs(resZ - reqVz) > 1.0E-6;
+      int sx = reqVx > 1.0E-6 ? 1 : (reqVx < -1.0E-6 ? -1 : 0);
+      int sz = reqVz > 1.0E-6 ? 1 : (reqVz < -1.0E-6 ? -1 : 0);
+      if (xBlocked && sx != 0) {
+         int bx = (int)Math.floor(m.x + sx * 0.48);
+         if (SkyGen.isSolidObstacle(w, bx, mby, mz) && !SkyGen.isSolidObstacle(w, bx, mby + 1, mz) && !SkyGen.isSolidObstacle(w, bx, mby + 2, mz)) {
+            return true;
+         }
+         // Check if the blocked X wall is 2+ blocks tall
+         if (SkyGen.isSolidObstacle(w, bx, mby + 1, mz) || SkyGen.isSolidObstacle(w, bx, mby + 2, mz)) {
+            if (!zBlocked) {
+               return false;
+            }
+         }
+      }
+      if (zBlocked && sz != 0) {
+         int bz = (int)Math.floor(m.z + sz * 0.48);
+         if (SkyGen.isSolidObstacle(w, mx, mby, bz) && !SkyGen.isSolidObstacle(w, mx, mby + 1, bz) && !SkyGen.isSolidObstacle(w, mx, mby + 2, bz)) {
+            return true;
+         }
+         if (SkyGen.isSolidObstacle(w, mx, mby + 1, bz) || SkyGen.isSolidObstacle(w, mx, mby + 2, bz)) {
+            return false;
+         }
+      }
+      if (sx != 0 && sz != 0) {
+         int bx = (int)Math.floor(m.x + sx * 0.48);
+         int bz = (int)Math.floor(m.z + sz * 0.48);
+         if (SkyGen.isSolidObstacle(w, bx, mby + 1, bz) || SkyGen.isSolidObstacle(w, bx, mby + 2, bz)) {
+            return false;
+         }
+      }
+      return true;
    }
 
    /** The player holds the food this animal likes and is within 9 blocks: it walks over to have a look. */
@@ -1210,23 +1256,11 @@ public final class Mobs {
                   int by = var12 + var15;
                   int bz = var13 + var16;
                   int var19 = var9.getBlock(bx, by, bz);
-                  if (var19 != 0 && Blocks.breakable(var19) && var19 != 26 && !Blocks.isFluid(var19)) {
-                     if (isNoBreakArena) {
-                        continue;
-                     }
-                     if (isMinigame) {
-                        if (Decor315.isBed(var19) || var19 == Blocks.CHEST_LOOT || var19 == Redstone319.SLIME_BLOCK) {
-                           continue;
-                        }
-                        if (isBedwars && by <= SkyGen.Y_DECK
-                           && !(var19 >= Blocks.WOOL0 && var19 < Blocks.WOOL0 + 16)
-                           && var19 != Blocks.PLANKS
-                           && !Blocks313.isPlanks(var19)
-                           && var19 != Blocks.END_STONE
-                           && var19 != Blocks.SANDSTONE) {
-                           continue;
-                        }
-                     }
+                  if (var19 != 0
+                     && Blocks.breakable(var19)
+                     && var19 != 26
+                     && !Blocks.isFluid(var19)
+                     && SkyGen.canExplosionBreakBlock(var9, bx, by, bz, var19)) {
                      if (var19 == 132) {
                         var9.setBlock(bx, by, bz, 0);
                         var9.primeTnt(bx, by, bz, 8 + this.rnd.nextInt(20));
@@ -1277,7 +1311,11 @@ public final class Mobs {
          }
          Mobs.Mob var28 = (Mobs.Mob)this.list.get(blastIdx);
          if (var28 != null && var28 != var8 && !var28.dead && !(isBedwars && var28.type == VILLAGER)) {
-            double var29 = Math.sqrt((var28.x - var1) * (var28.x - var1) + (var28.z - var5) * (var28.z - var5));
+            double var29 = Math.sqrt(
+               (var28.x - var1) * (var28.x - var1)
+                  + (var28.y + 0.5 - var3) * (var28.y + 0.5 - var3)
+                  + (var28.z - var5) * (var28.z - var5)
+            );
             if (var29 < var25 - 1.0) {
                int mobDmg = (int)(1.0 + 14.0 * (1.0 - var29 / (var25 - 1.0)));
                if (isMinigame) {

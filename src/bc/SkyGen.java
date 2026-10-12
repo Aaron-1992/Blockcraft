@@ -301,11 +301,18 @@ public final class SkyGen extends Gen {
       myKills = 0;
       myDeaths = 0;
       myBedsBroken = 0;
+      playerBwArmorTier = 0;
       localEliminated = false;
       pendingOverviewWon = true;
       pendingOverviewChamp = null;
       victoryTransitionTicks = -1;
       lobbyCountdownTicks = -1;
+   }
+
+   public static volatile int playerBwArmorTier = 0; // 0 = Leather, 1 = Iron, 3 = Diamond
+
+   public static boolean isMinigame(World w) {
+      return w != null && w.settings != null && w.settings.isMinigame();
    }
 
    /** Returns true if a player who dies in the current minigame mode is permanently eliminated for this round. */
@@ -325,13 +332,13 @@ public final class SkyGen extends Gen {
 
    /** Called when the local player dies in-game; marks localEliminated if they cannot respawn this round and notifies peers. */
    public static void onLocalPlayerDied(Game g) {
-      if (g != null && g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.MURDER) {
-         if (myMurderRole == MURDER_ROLE_SHERIFF && !murderGunDropped && g.player != null) {
+      if (g != null && g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.MURDER && g.player != null) {
+         if (myMurderRole == MURDER_ROLE_SHERIFF && !murderGunDropped) {
             murderGunDropped = true;
             murderDroppedGunX = g.player.x;
             murderDroppedGunY = g.player.y;
             murderDroppedGunZ = g.player.z;
-            g.say("\u00a7e\u00a7l[Murder Mystery] THE SHERIFF WAS KILLED! \u00a7aTheir Pistol has been dropped!");
+            g.say("\u00a7e\u00a7l[Murder Mystery] THE SHERIFF WAS KILLED! \u00a7aTheir Pistol has been dropped at (" + (int)g.player.x + ", " + (int)g.player.z + ")!");
          }
       }
       if (shouldStayEliminated(g)) {
@@ -973,6 +980,175 @@ public final class SkyGen extends Gen {
       return false;
    }
 
+   /** Launches a blazing explosive Fireball along the player's look vector when right-clicking a Fire Charge! */
+   public static boolean throwFireball(Game g, Stack held) {
+      if (g == null || g.world == null || g.player == null || held == null) {
+         return false;
+      }
+      if (playerGunCooldown > 0) {
+         return true;
+      }
+      playerGunCooldown = 14;
+      Player p = g.player;
+      double yawRad = Math.toRadians(p.yaw);
+      double pitchRad = Math.toRadians(p.pitch);
+      double cosP = Math.cos(pitchRad);
+      double dx = -Math.sin(yawRad) * cosP;
+      double dy = -Math.sin(pitchRad);
+      double dz = Math.cos(yawRad) * cosP;
+      double sy = p.y + p.eye - 0.1;
+      SoundEngine.play3D(g.world, "fireball", p.x, p.y + p.eye, p.z, 0.9F, 0.95F + g.rnd.nextFloat() * 0.12F);
+      g.world.throwTntGrenade(p.x + dx * 0.75, sy - 0.35, p.z + dz * 0.75, dx * 1.35, dy * 1.15 + 0.08, dz * 1.35, 28);
+      if (!p.creative) {
+         held.n--;
+         if (held.n <= 0 && g.inv[g.sel] == held) {
+            g.inv[g.sel] = null;
+         }
+      }
+      return true;
+   }
+
+   private static String compassDirection(double dx, double dz) {
+      double angle = Math.toDegrees(Math.atan2(dx, -dz));
+      if (angle < 0.0) {
+         angle += 360.0;
+      }
+      String[] dirs = new String[]{"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
+      return dirs[(int)Math.round(angle / 45.0) & 7];
+   }
+
+   /**
+    * Tactical & Survival Tracker Compass:
+    * - In Bedwars: tracks nearest enemy fighter + nearest intact enemy bed.
+    * - In Battle / Tumble: tracks nearest alive competitor (Name, HP, Distance, Direction).
+    * - In CS2 Strike: tracks planted C4 Bomb Site + timer, or nearest enemy operative + Site A/B distances.
+    * - In Murder Mystery: tracks nearest survivor (Murderer), dropped Sheriff Gun / Gold (Innocent), or nearest suspect (Sheriff).
+    * - In Survival / Creative: displays Spawn, Home Bed (if set), and current Biome!
+    */
+   public static boolean useTrackerCompass(Game g) {
+      if (g == null || g.world == null || g.player == null) {
+         return false;
+      }
+      World w = g.world;
+      Player p = g.player;
+      SoundEngine.playUi("ui_click", 0.65F, 1.25F);
+      if (isMinigame(w) && w.settings != null) {
+         int type = w.settings.type;
+         int myTeam = getPlayerTeam(g);
+         // Find nearest enemy bot or multiplayer peer
+         String enemyName = null;
+         double enemyX = 0.0;
+         double enemyZ = 0.0;
+         int enemyHp = 20;
+         double bestDist = 9999.0;
+         if (g.mobs != null) {
+            for (Mobs.Mob m : g.mobs.list) {
+               if (m != null && !m.dead && isMinigameBot(m)) {
+                  int bt = botTeamIndex(m);
+                  boolean isEnemy;
+                  if (type == WorldSettings.BEDWARS) {
+                     isEnemy = bt != myTeam;
+                  } else if (type == WorldSettings.CS2) {
+                     isEnemy = (bt & 1) != (myTeam & 1);
+                  } else if (type == WorldSettings.MURDER) {
+                     int bSlot = Math.abs(m.netId) & 31;
+                     isEnemy = myMurderRole == MURDER_ROLE_MURDERER || botMurderRole[bSlot] == MURDER_ROLE_MURDERER;
+                  } else {
+                     isEnemy = true;
+                  }
+                  if (isEnemy) {
+                     double d = Math.hypot(m.x - p.x, m.z - p.z);
+                     if (d < bestDist) {
+                        bestDist = d;
+                        enemyName = botDisplayName(m);
+                        enemyX = m.x;
+                        enemyZ = m.z;
+                        enemyHp = m.health;
+                     }
+                  }
+               }
+            }
+         }
+         if (type == WorldSettings.BEDWARS) {
+            int bestBedTeam = -1;
+            double bestBedDist = 9999.0;
+            for (int t = 0; t < 4; t++) {
+               if (t != myTeam && isTeamBedIntact(w, t)) {
+                  int[] bf = getTeamBedFoot(t);
+                  double d = Math.hypot(bf[0] + 0.5 - p.x, bf[2] + 0.5 - p.z);
+                  if (d < bestBedDist) {
+                     bestBedDist = d;
+                     bestBedTeam = t;
+                  }
+               }
+            }
+            String enemyInfo = enemyName != null
+               ? ("Nearest Enemy: \u00a7e" + enemyName + " \u00a77(" + (int)Math.round(bestDist) + "m " + compassDirection(enemyX - p.x, enemyZ - p.z) + ")")
+               : "No enemies nearby";
+            String bedInfo = bestBedTeam >= 0
+               ? (" | Nearest Enemy Bed: " + BEDWARS_CODES[bestBedTeam] + BEDWARS_NAMES[bestBedTeam] + " \u00a77(" + (int)Math.round(bestBedDist) + "m)")
+               : " | All Enemy Beds Destroyed!";
+            g.say("\u00a7b[Tracker Compass] \u00a7f" + enemyInfo + bedInfo);
+            return true;
+         }
+         if (type == WorldSettings.CS2) {
+            if (cs2BombPlanted) {
+               double bx = (cs2BombSite == 1 ? -22.0 : 22.0) + 0.5;
+               int bDist = (int)Math.round(Math.hypot(bx - p.x, 0.5 - p.z));
+               String bDir = compassDirection(bx - p.x, 0.5 - p.z);
+               g.say("\u00a7c\u00a7l[Tactical Compass] PLANTED C4 AT SITE " + (cs2BombSite == 1 ? "A" : "B")
+                  + " \u00a7e(" + bDist + "m " + bDir + ", " + ((cs2BombTimerTicks + 19) / 20) + "s left!)");
+            } else {
+               int dA = (int)Math.round(Math.hypot(-21.5 - p.x, 0.5 - p.z));
+               int dB = (int)Math.round(Math.hypot(22.5 - p.x, 0.5 - p.z));
+               String eStr = enemyName != null ? (" | Enemy: \u00a7e" + enemyName + " (" + (int)Math.round(bestDist) + "m " + compassDirection(enemyX - p.x, enemyZ - p.z) + ")") : "";
+               g.say("\u00a7b[Tactical Compass] \u00a7fSite A: \u00a7e" + dA + "m W \u00a77| \u00a7fSite B: \u00a7e" + dB + "m E" + eStr);
+            }
+            return true;
+         }
+         if (type == WorldSettings.MURDER) {
+            if (myMurderRole != MURDER_ROLE_MURDERER && murderGunDropped) {
+               int gd = (int)Math.round(Math.hypot(murderDroppedGunX - p.x, murderDroppedGunZ - p.z));
+               String gdir = compassDirection(murderDroppedGunX - p.x, murderDroppedGunZ - p.z);
+               g.say("\u00a7e\u00a7l[Tracker Compass] Dropped Sheriff Pistol: \u00a7a" + gd + "m " + gdir + " \u00a77at (" + (int)murderDroppedGunX + ", " + (int)murderDroppedGunZ + ")!");
+               return true;
+            }
+            if (enemyName != null) {
+               g.say("\u00a7d[Tracker Compass] \u00a7fTarget: \u00a7e" + enemyName + " \u00a77(" + (int)Math.round(bestDist) + "m " + compassDirection(enemyX - p.x, enemyZ - p.z) + ")");
+            } else {
+               g.say("\u00a7d[Tracker Compass] \u00a7fCollect 5 Gold Ingots around the halls to unlock a Detective Pistol! (" + myMurderGold + "/5 Gold)");
+            }
+            return true;
+         }
+         // Battle or Tumble
+         if (enemyName != null) {
+            g.say("\u00a76[Tracker Compass] \u00a7fNearest Fighter: \u00a7e" + enemyName + " \u00a7c(" + enemyHp + " HP) \u00a77— \u00a7a"
+               + (int)Math.round(bestDist) + "m " + compassDirection(enemyX - p.x, enemyZ - p.z));
+         } else {
+            g.say("\u00a76[Tracker Compass] \u00a7aArena Clear — Center at (0, 0) (" + (int)Math.round(Math.hypot(p.x, p.z)) + "m)");
+         }
+         return true;
+      }
+
+      // Survival / Creative World Compass: Spawn + Home Bed + Biome
+      double dx = g.spawnXZ[0] + 0.5 - p.x;
+      double dz = g.spawnXZ[1] + 0.5 - p.z;
+      int dist = (int)Math.round(Math.hypot(dx, dz));
+      String dir = compassDirection(dx, dz);
+      int px = (int)Math.floor(p.x);
+      int pz = (int)Math.floor(p.z);
+      Chunk ch = w.chunkAt(px, pz);
+      String biome = ch != null ? Biomes.name(ch.biome[(pz & 15) * 16 + (px & 15)]) : "Unknown";
+      String bedStr = "";
+      if (g.bedPos != null) {
+         int bDist = (int)Math.round(Math.hypot(g.bedPos[0] + 0.5 - p.x, g.bedPos[2] + 0.5 - p.z));
+         String bDir = compassDirection(g.bedPos[0] + 0.5 - p.x, g.bedPos[2] + 0.5 - p.z);
+         bedStr = " \u00a77| \u00a7aHome Bed: \u00a7f(" + g.bedPos[0] + ", " + g.bedPos[2] + ") " + bDist + "m " + bDir;
+      }
+      g.say("\u00a7e[Compass] \u00a7fSpawn: (" + g.spawnXZ[0] + ", " + g.spawnXZ[1] + ") — " + dist + "m " + dir + bedStr + " \u00a77| Biome: \u00a7b" + biome);
+      return true;
+   }
+
    public static int nearCs2BombSite(double x, double y, double z) {
       return Math.abs(y - (Y_DECK + 1.0)) <= 4.5 ? nearCs2BombSite(x, z) : 0;
    }
@@ -1204,10 +1380,12 @@ public final class SkyGen extends Gen {
          return;
       }
       int t = Math.abs(team) & 3;
+      playerBwArmorTier = 0;
       Arrays.fill(g.inv, null);
       Arrays.fill(g.armor, null);
       g.inv[0] = new Stack(Items.TOOL_BASE, 1); // Wooden Sword
       g.inv[1] = new Stack(Blocks.WOOL0 + BEDWARS_COLORS[t], 32); // Team Wool
+      g.inv[8] = new Stack(Redstone319.COMPASS, 1); // Tracker Compass
       g.armor[0] = new Stack(Items.ARMOR_BASE, 1); // Leather Cap
       g.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1); // Leather Tunic
       g.sel = 0;
@@ -1220,10 +1398,15 @@ public final class SkyGen extends Gen {
       int t = Math.abs(team) & 3;
       g.inv[0] = new Stack(Items.TOOL_BASE, 1);
       g.inv[1] = new Stack(Blocks.WOOL0 + BEDWARS_COLORS[t], 16);
+      g.inv[8] = new Stack(Redstone319.COMPASS, 1);
       if (g.armor[0] == null) {
          g.armor[0] = new Stack(Items.ARMOR_BASE, 1);
       }
-      if (g.armor[1] == null) {
+      if (playerBwArmorTier >= 1) {
+         for (int slot = 1; slot <= 3; slot++) {
+            g.armor[slot] = new Stack(Items.armorId(playerBwArmorTier, slot), 1);
+         }
+      } else if (g.armor[1] == null) {
          g.armor[1] = new Stack(Items.ARMOR_BASE + 1, 1);
       }
       for (int i = 0; i < 4; i++) {
@@ -3328,6 +3511,137 @@ public final class SkyGen extends Gen {
    }
 
    /**
+    * Returns true if an explosion in World {@code w} is allowed to break block {@code id} at {@code (x, y, z)}.
+    * In Battle, CS2, and Murder Mystery, arena structures are protected; in Bedwars, only destructible defense/bridge blocks
+    * above Y_DECK (excluding Beds) can be blown up; in Tumble and normal worlds, breakable blocks can be destroyed.
+    */
+   public static boolean canExplosionBreakBlock(World w, int x, int y, int z, int id) {
+      if (w == null || w.settings == null || !w.settings.isMinigame()) {
+         return true;
+      }
+      int type = w.settings.type;
+      if (type == WorldSettings.TUMBLE) {
+         return id != Blocks.BEDROCK;
+      }
+      if (type == WorldSettings.BEDWARS) {
+         if (y <= Y_DECK || Decor315.isBed(id)) {
+            return false;
+         }
+         return isBotBreakableObstacle(w, x, y, z, -1);
+      }
+      return false;
+   }
+
+   private static final int BFS_RADIUS = 6;
+   private static final int BFS_SIDE = BFS_RADIUS * 2 + 1;
+   private static final int BFS_CELLS = BFS_SIDE * BFS_SIDE;
+   private static final int[] bfsQueueX = new int[BFS_CELLS];
+   private static final int[] bfsQueueY = new int[BFS_CELLS];
+   private static final int[] bfsQueueZ = new int[BFS_CELLS];
+   private static final int[] bfsFirstStepX = new int[BFS_CELLS];
+   private static final int[] bfsFirstStepZ = new int[BFS_CELLS];
+   private static final int[] bfsVisited = new int[BFS_CELLS];
+   private static int bfsStamp = 1;
+   private static final int[] DIRS8_X = new int[]{0, 0, 1, -1, 1, 1, -1, -1};
+   private static final int[] DIRS8_Z = new int[]{-1, 1, 0, 0, -1, 1, -1, 1};
+
+   /**
+    * Zero-allocation 3D Local BFS Grid Pathfinder over a 13x13 neighborhood around (startX, startY, startZ).
+    * Finds the shortest obstacle-free path (including 1-block step-ups, safe step-downs, and corner-safe diagonals)
+    * around L-shaped walls, doorways, pillars, and low ceilings toward (goalX, goalZ).
+    * Returns {@code int[]{nextCellX, nextCellZ}} for the immediate first step, or {@code null} if boxed in.
+    */
+   public static int[] findLocalBfsStep(World w, int startX, int startY, int startZ, double goalX, double goalZ) {
+      if (w == null) {
+         return null;
+      }
+      int goalCellX = (int)Math.floor(goalX);
+      int goalCellZ = (int)Math.floor(goalZ);
+      if (startX == goalCellX && startZ == goalCellZ) {
+         return null;
+      }
+      synchronized (bfsVisited) {
+         if (++bfsStamp <= 0) {
+            Arrays.fill(bfsVisited, 0);
+            bfsStamp = 1;
+         }
+         int centerIdx = BFS_RADIUS * BFS_SIDE + BFS_RADIUS;
+         bfsVisited[centerIdx] = bfsStamp;
+         bfsQueueX[0] = startX;
+         bfsQueueY[0] = startY;
+         bfsQueueZ[0] = startZ;
+         bfsFirstStepX[0] = startX;
+         bfsFirstStepZ[0] = startZ;
+         int head = 0;
+         int tail = 1;
+         double startDistSq = (startX + 0.5 - goalX) * (startX + 0.5 - goalX) + (startZ + 0.5 - goalZ) * (startZ + 0.5 - goalZ);
+         double bestDistSq = startDistSq - 0.15;
+         int bestIdx = -1;
+
+         while (head < tail) {
+            int cx = bfsQueueX[head];
+            int cy = bfsQueueY[head];
+            int cz = bfsQueueZ[head];
+            if (head > 0 && cx == goalCellX && cz == goalCellZ) {
+               return new int[]{bfsFirstStepX[head], bfsFirstStepZ[head]};
+            }
+            for (int d = 0; d < 8; d++) {
+               int dx = DIRS8_X[d];
+               int dz = DIRS8_Z[d];
+               int nx = cx + dx;
+               int nz = cz + dz;
+               int gx = nx - startX + BFS_RADIUS;
+               int gz = nz - startZ + BFS_RADIUS;
+               if (gx < 0 || gx >= BFS_SIDE || gz < 0 || gz >= BFS_SIDE) {
+                  continue;
+               }
+               int cellIdx = gz * BFS_SIDE + gx;
+               if (bfsVisited[cellIdx] == bfsStamp) {
+                  continue;
+               }
+               if (d >= 4) {
+                  // Corner-safe diagonal move: both orthogonal neighbors must be clear at foot & head height
+                  if (isSolidObstacle(w, cx + dx, cy, cz)
+                     || isSolidObstacle(w, cx + dx, cy + 1, cz)
+                     || isSolidObstacle(w, cx, cy, cz + dz)
+                     || isSolidObstacle(w, cx, cy + 1, cz + dz)) {
+                     continue;
+                  }
+               }
+               if (!canBotWalkThrough(w, cx, cy, cz, nx, nz)) {
+                  continue;
+               }
+               int ny = cy;
+               if (isSolidObstacle(w, nx, cy, nz)) {
+                  ny = cy + 1;
+               } else if (!isSolidObstacle(w, nx, cy - 1, nz) && isSolidObstacle(w, nx, cy - 2, nz)) {
+                  ny = cy - 1;
+               }
+               bfsVisited[cellIdx] = bfsStamp;
+               if (tail < BFS_CELLS) {
+                  bfsQueueX[tail] = nx;
+                  bfsQueueY[tail] = ny;
+                  bfsQueueZ[tail] = nz;
+                  bfsFirstStepX[tail] = head == 0 ? nx : bfsFirstStepX[head];
+                  bfsFirstStepZ[tail] = head == 0 ? nz : bfsFirstStepZ[head];
+                  double dSq = (nx + 0.5 - goalX) * (nx + 0.5 - goalX) + (nz + 0.5 - goalZ) * (nz + 0.5 - goalZ);
+                  if (dSq < bestDistSq) {
+                     bestDistSq = dSq;
+                     bestIdx = tail;
+                  }
+                  tail++;
+               }
+            }
+            head++;
+         }
+         if (bestIdx > 0) {
+            return new int[]{bfsFirstStepX[bestIdx], bfsFirstStepZ[bestIdx]};
+         }
+         return null;
+      }
+   }
+
+   /**
     * Returns true if the block at (x, y, z) is a destructible obstacle that an AI bot is allowed to mine through
     * when trapped or when its path is blocked (never breaks permanent arena deck at y <= Y_DECK, Bedrock, Chests, Slime Pads, or own Bed defense).
     */
@@ -3375,6 +3689,8 @@ public final class SkyGen extends Gen {
          stepX = bbx + (int)Math.round(-Math.sin(rad));
          stepZ = bbz + (int)Math.round(Math.cos(rad));
       }
+      int stepX2 = (int)Math.floor(bot.x - Math.sin(rad) * 1.85);
+      int stepZ2 = (int)Math.floor(bot.z + Math.cos(rad) * 1.85);
 
       // Candidate obstacle blocks in priority order:
       // 1. Inside bot's head/body ((bbx, by+1, bbz), (bbx, by, bbz))
@@ -3382,13 +3698,16 @@ public final class SkyGen extends Gen {
       // 3. Eye-level wall ahead ((stepX, by+1, stepZ))
       // 4. Overhang above step ahead ((stepX, by+2, stepZ))
       // 5. Foot-level obstacle ahead ((stepX, by, stepZ))
+      // 6. 2-block-reach obstacle ahead ((stepX2, by+1, stepZ2), (stepX2, by, stepZ2))
       int[][] candidates = new int[][]{
          {bbx, by + 1, bbz},
          {bbx, by, bbz},
          {bbx, by + 2, bbz},
          {stepX, by + 1, stepZ},
          {stepX, by + 2, stepZ},
-         {stepX, by, stepZ}
+         {stepX, by, stepZ},
+         {stepX2, by + 1, stepZ2},
+         {stepX2, by, stepZ2}
       };
       for (int[] c : candidates) {
          int ox = c[0];
@@ -3937,8 +4256,25 @@ public final class SkyGen extends Gen {
          }
       }
 
-      // Smart Block Breaking: if trapped under an overhead block, stuck against a wall, or no clean detour exists around an obstacle, break it!
+      // Smart Block Breaking & 3D Local BFS Grid Pathfinding:
+      // When the direct path is blocked by a wall, doorway, pillar, or low ceiling, first query the 13x13 3D BFS grid
+      // for the shortest obstacle-free step around the wall; if boxed in or stuck, mine through the blocking obstacle!
       boolean directBlocked = !canBotWalkThrough(w, bbx, by, bbz, stepX, stepZ) || (hasCeilingAbove && (ty > bot.y + 0.8 || frontFootSolid));
+      if (directBlocked || bestSafetyScore < 135) {
+         int[] bfsStep = findLocalBfsStep(w, bbx, by, bbz, tx, tz);
+         if (bfsStep != null) {
+            float bfsYaw = Mobs.angleTo((bfsStep[0] + 0.5) - bot.x, (bfsStep[1] + 0.5) - bot.z);
+            bestYaw = bfsYaw;
+            bestSafetyScore = Math.max(bestSafetyScore, 142);
+            if (bot.onGround
+               && !hasCeilingAbove
+               && isSolidObstacle(w, bfsStep[0], by, bfsStep[1])
+               && !isSolidObstacle(w, bfsStep[0], by + 1, bfsStep[1])
+               && !isSolidObstacle(w, bfsStep[0], by + 2, bfsStep[1])) {
+               bot.vy = Mobs.JUMP;
+            }
+         }
+      }
       if (directBlocked && (bestSafetyScore < 95 || botStuckTicks[bSlot] >= 5 || isSolidObstacle(w, bbx, by + 1, bbz))) {
          if (tryBreakBlockingObstacle(bot, w, tx, ty, tz, out)) {
             botStuckTicks[bSlot] = 0;
@@ -6228,7 +6564,7 @@ public final class SkyGen extends Gen {
             return true;
          }
          g.say("\u00a7b[CS2 Strike] CT Alive: " + countCs2TeamAlive(g, 0) + " | T Alive: " + countCs2TeamAlive(g, 1)
-            + " | Bomb: " + (cs2BombPlanted ? ("\u00a7cPLANTED AT SITE " + (cs2BombSite == 0 ? "A" : "B")) : "\u00a7aNOT PLANTED")
+            + " | Bomb: " + (cs2BombPlanted ? ("\u00a7cPLANTED AT SITE " + (cs2BombSite == 1 ? "A" : "B")) : "\u00a7aNOT PLANTED")
             + " (/cs2 reset | /cs2 kit <0..3> | /cs2 team <ct|t>)");
          return true;
       }

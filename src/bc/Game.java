@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "4.8";
+   public static final String VERSION_STR = "4.9";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -5348,29 +5348,7 @@ public final class Game {
       }
 
       if (var2 == Redstone319.COMPASS && this.world != null) {
-         double dx = this.spawnXZ[0] + 0.5 - this.player.x;
-         double dz = this.spawnXZ[1] + 0.5 - this.player.z;
-         int dist = (int)Math.round(Math.hypot(dx, dz));
-         String[] dirs = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
-         int dirIdx = Math.floorMod((int)Math.round(((this.player.yaw % 360.0F + 360.0F) % 360.0F) / 45.0F), 8);
-         this.say(
-            "§e[Compass] §fFacing: §b"
-               + dirs[dirIdx]
-               + " §7| §fSpawn: §a("
-               + this.spawnXZ[0]
-               + ", "
-               + this.spawnXZ[1]
-               + ") §7(§e"
-               + dist
-               + "m§7) §7| §fPos: §b("
-               + (int)Math.floor(this.player.x)
-               + ", "
-               + (int)Math.floor(this.player.y)
-               + ", "
-               + (int)Math.floor(this.player.z)
-               + ")"
-         );
-         return true;
+         return SkyGen.useTrackerCompass(this);
       }
 
       if (var2 == Redstone319.CLOCK && this.world != null) {
@@ -5387,7 +5365,7 @@ public final class Game {
       }
 
       if (var2 == Redstone319.FIRE_CHARGE && this.world != null && !this.player.adventure) {
-         if (this.target != null && (this.world.settings == null || !this.world.settings.isMinigame())) {
+         if (this.target != null && !SkyGen.isMinigame(this.world)) {
             int fx = this.target.x + this.target.nx;
             int fy = this.target.y + this.target.ny;
             int fz = this.target.z + this.target.nz;
@@ -6169,7 +6147,10 @@ public final class Game {
       boolean hc = this.player != null && this.player.hardcore;
       boolean isRoundMode = this.world != null
          && this.world.settings != null
-         && (this.world.settings.type == WorldSettings.BATTLE || this.world.settings.type == WorldSettings.TUMBLE);
+         && (this.world.settings.type == WorldSettings.BATTLE
+            || this.world.settings.type == WorldSettings.TUMBLE
+            || this.world.settings.type == WorldSettings.CS2
+            || this.world.settings.type == WorldSettings.MURDER);
       boolean bwEliminated = this.world != null
          && this.world.settings != null
          && this.world.settings.type == WorldSettings.BEDWARS
@@ -7056,7 +7037,37 @@ public final class Game {
          float var3 = this.menuOx();
          float var4 = this.menuOy();
          this.menu.draw(this.gui, var1, var2, var3, var4);
-         if (this.menu.kind == 4) {
+         if (this.menu.kind == Menu.TRADE && this.menu.profession >= Trades.BEDWARS_SHOP) {
+            int curProf = this.menu.profession;
+            float tabY = Math.max(2.0F, var4 - 16.0F);
+            this.button(
+               curProf == Trades.BEDWARS_SHOP ? "[Items]" : "Items",
+               var3,
+               tabY,
+               56.0F,
+               14.0F,
+               true,
+               () -> this.menu = new Menu(this, Menu.TRADE, null, Trades.BEDWARS_SHOP)
+            );
+            this.button(
+               curProf == Trades.BEDWARS_ARMOR ? "[Gear & Upg]" : "Gear & Upg",
+               var3 + 58.0F,
+               tabY,
+               60.0F,
+               14.0F,
+               true,
+               () -> this.menu = new Menu(this, Menu.TRADE, null, Trades.BEDWARS_ARMOR)
+            );
+            this.button(
+               curProf == Trades.BEDWARS_TOOLS ? "[Tools & Def]" : "Tools & Def",
+               var3 + 120.0F,
+               tabY,
+               56.0F,
+               14.0F,
+               true,
+               () -> this.menu = new Menu(this, Menu.TRADE, null, Trades.BEDWARS_TOOLS)
+            );
+         } else if (this.menu.kind == 4) {
             int var5 = this.menu.pages();
             if (var5 > 1) {
                String var6 = this.menu.page + 1 + "/" + var5;

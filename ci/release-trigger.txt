@@ -1,1 +1,2 @@
-4.8
+4.9
+Blockcraft Update 4.9 — 3D Local BFS Grid Pathfinder & Wall-Slide Physics, Tactical Tracker Compass, 3-Tab Bedwars Shop & Permanent Armor Persistence, Audio/Multiplayer/Redstone/Minigame Fixes

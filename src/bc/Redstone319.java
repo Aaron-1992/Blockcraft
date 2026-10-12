@@ -1420,7 +1420,21 @@ final class Redstone319 {
       if (id == 0 || Blocks.replaceable[id]) {
          return true;
       }
-      if (y <= 0 || y >= 255 || id == Blocks.BEDROCK || id == Blocks.OBSIDIAN || id == Blocks.FURNACE || id == Blocks.FURNACE_LIT || id == Blocks.CHEST || id == Blocks.CHEST_LOOT || Blocks.isDoor(id)) {
+      if (y <= 0
+         || y >= 255
+         || id == Blocks.BEDROCK
+         || id == Blocks.OBSIDIAN
+         || id == Blocks.FURNACE
+         || id == Blocks.FURNACE_LIT
+         || id == Blocks.CHEST
+         || id == Blocks.CHEST_LOOT
+         || id == Blocks.SPAWNER
+         || Blocks.isPortal(id)
+         || id == Blocks.END_PORTAL
+         || id == Blocks.END_FRAME
+         || id == Blocks.END_FRAME_EYE
+         || Blocks.isDoor(id)
+         || Decor315.isBed(id)) {
          return false;
       }
       return !isPistonExtended(id) && !(id >= PISTON_HEAD && id < PISTON_HEAD + 6);
@@ -1535,6 +1549,8 @@ final class Redstone319 {
       return (int)(k & 0xFFFL);
    }
 
+   private static final java.util.Set<Long> activePlates = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
    /** Called every tick from {@link Game}: button/observer timers, pressure plates, daylight sensors, and Slime Block bounce. */
    static void tick(Game g) {
       if (g == null || g.world == null || g.player == null) {
@@ -1572,7 +1588,24 @@ final class Redstone319 {
          }
       }
 
-      // 2. Pressure plates and daylight sensors around the player
+      // 2. Re-check any currently depressed pressure plates so they release even if the player sprinted/teleported/died off them!
+      if (!activePlates.isEmpty()) {
+         for (Long k : activePlates.toArray(new Long[0])) {
+            if (k != null) {
+               int x = unpackX(k);
+               int y = unpackY(k);
+               int z = unpackZ(k);
+               int id = w.getBlock(x, y, z);
+               if (id != STONE_PLATE_ON && id != WOOD_PLATE_ON) {
+                  activePlates.remove(k);
+               } else {
+                  checkPlateAt(g, w, x, y, z);
+               }
+            }
+         }
+      }
+
+      // 3. Pressure plates and daylight sensors around the player, mobs, and dropped items
       int px = (int)Math.floor(g.player.x);
       int py = (int)Math.floor(g.player.y);
       int pz = (int)Math.floor(g.player.z);
@@ -1586,15 +1619,7 @@ final class Redstone319 {
                int z = pz + dz;
                int id = w.getBlock(x, y, z);
                if (id >= STONE_PLATE && id <= WOOD_PLATE_ON) {
-                  boolean stood = entityOnPlate(g, x, y, z);
-                  boolean wasOn = id == STONE_PLATE_ON || id == WOOD_PLATE_ON;
-                  if (stood != wasOn) {
-                     int next = (id == STONE_PLATE || id == STONE_PLATE_ON) ? (stood ? STONE_PLATE_ON : STONE_PLATE) : (stood ? WOOD_PLATE_ON : WOOD_PLATE);
-                     w.setBlock(x, y, z, next);
-                     SoundEngine.playClickBlock(w, x, y, z, stood);
-                     propagate(w, x, y, z);
-                     g.meshNow(x, y, z);
-                  }
+                  checkPlateAt(g, w, x, y, z);
                } else if ((id == DAYLIGHT_SENSOR || id == DAYLIGHT_SENSOR_ON) && (w.tickCount & 19L) == 0L) {
                   int want = day && w.getSky(x, y, z) >= 10 ? DAYLIGHT_SENSOR_ON : DAYLIGHT_SENSOR;
                   if (id != want) {
@@ -1606,16 +1631,75 @@ final class Redstone319 {
             }
          }
       }
+      if (g.mobs != null) {
+         for (int i = 0; i < g.mobs.list.size(); i++) {
+            Mobs.Mob m = g.mobs.list.get(i);
+            if (m != null && !m.dead) {
+               int mx = (int)Math.floor(m.x);
+               int my = (int)Math.floor(m.y + 0.05);
+               int mz = (int)Math.floor(m.z);
+               if (w.getBlock(mx, my, mz) >= STONE_PLATE && w.getBlock(mx, my, mz) <= WOOD_PLATE_ON) {
+                  checkPlateAt(g, w, mx, my, mz);
+               }
+            }
+         }
+      }
+      if (w.items != null) {
+         for (int i = 0; i < w.items.size(); i++) {
+            World.Item it = w.items.get(i);
+            if (it != null && !it.dead) {
+               int ix = (int)Math.floor(it.x);
+               int iy = (int)Math.floor(it.y + 0.05);
+               int iz = (int)Math.floor(it.z);
+               int bid = w.getBlock(ix, iy, iz);
+               if (bid == WOOD_PLATE || bid == WOOD_PLATE_ON) {
+                  checkPlateAt(g, w, ix, iy, iz);
+               }
+            }
+         }
+      }
    }
 
-   private static boolean entityOnPlate(Game g, int x, int y, int z) {
-      if (!g.player.spectator && Math.abs(g.player.x - (x + 0.5)) < 0.7 && Math.abs(g.player.z - (z + 0.5)) < 0.7 && Math.abs(g.player.y - y) < 0.8) {
+   private static void checkPlateAt(Game g, World w, int x, int y, int z) {
+      int id = w.getBlock(x, y, z);
+      if (id < STONE_PLATE || id > WOOD_PLATE_ON) {
+         activePlates.remove(pack(x, y, z));
+         return;
+      }
+      boolean isWood = id == WOOD_PLATE || id == WOOD_PLATE_ON;
+      boolean stood = entityOnPlate(g, x, y, z, isWood);
+      boolean wasOn = id == STONE_PLATE_ON || id == WOOD_PLATE_ON;
+      long key = pack(x, y, z);
+      if (stood) {
+         activePlates.add(key);
+      } else {
+         activePlates.remove(key);
+      }
+      if (stood != wasOn) {
+         int next = isWood ? (stood ? WOOD_PLATE_ON : WOOD_PLATE) : (stood ? STONE_PLATE_ON : STONE_PLATE);
+         w.setBlock(x, y, z, next);
+         SoundEngine.playClickBlock(w, x, y, z, stood);
+         propagate(w, x, y, z);
+         g.meshNow(x, y, z);
+      }
+   }
+
+   private static boolean entityOnPlate(Game g, int x, int y, int z, boolean isWood) {
+      if (!g.player.dead && !g.player.spectator && Math.abs(g.player.x - (x + 0.5)) < 0.7 && Math.abs(g.player.z - (z + 0.5)) < 0.7 && Math.abs(g.player.y - y) < 0.8) {
          return true;
       }
 
       if (g.mobs != null) {
          for (Mobs.Mob m : g.mobs.list) {
             if (!m.dead && Math.abs(m.x - (x + 0.5)) < 0.7 && Math.abs(m.z - (z + 0.5)) < 0.7 && Math.abs(m.y - y) < 0.8) {
+               return true;
+            }
+         }
+      }
+
+      if (isWood && g.world != null && g.world.items != null) {
+         for (World.Item it : g.world.items) {
+            if (it != null && !it.dead && Math.abs(it.x - (x + 0.5)) < 0.7 && Math.abs(it.z - (z + 0.5)) < 0.7 && Math.abs(it.y - y) < 0.8) {
                return true;
             }
          }

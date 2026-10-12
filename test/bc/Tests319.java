@@ -1623,7 +1623,60 @@ final class Tests319 {
          check(brokeWall && bwGame.world.getBlock(0, SkyGen.Y_DECK + 2, 1) == 0,
             "tryBreakBlockingObstacle mines through an obstructing wall block when the bot's path is blocked");
 
-         // --- Update 4.8: Play Now startMatch -> tickMode race fix, Audio Aliases, Remote Pose, Shopkeeper Anchor, Blast Protection & Bot Loot ---
+         // =========================================================================
+         // Verify Update 4.8: 3D Local BFS Grid Pathfinder, Wall-Slide Physics, Tracker Compass, Bedwars Tools Shop & Redstone Plates
+         // =========================================================================
+         // 5a. Verify Mobs.canStepUpOnCollision prevents bonk-jumping against 2-block walls & low ceilings while allowing 1-block steps
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 1, 1, Blocks.COBBLE);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 1, Blocks.COBBLE);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 3, 0, 0);
+         econBot.setPos(0.5, SkyGen.Y_DECK + 1.0, 0.65);
+         check(!Mobs.canStepUpOnCollision(bwGame.world, econBot, 0.0, 0.2, 0.0, 0.0),
+            "Mobs.canStepUpOnCollision returns false against a 2-block-high wall so bots slide smoothly along walls on the ground");
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 1, 0);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 3, 1, 0);
+         check(Mobs.canStepUpOnCollision(bwGame.world, econBot, 0.0, 0.2, 0.0, 0.0),
+            "Mobs.canStepUpOnCollision returns true for a 1-block step-up ledge with clear headroom");
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 3, 0, Blocks.STONE);
+         check(!Mobs.canStepUpOnCollision(bwGame.world, econBot, 0.0, 0.2, 0.0, 0.0),
+            "Mobs.canStepUpOnCollision returns false when a ceiling block is directly above the mob's head");
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 3, 0, 0);
+
+         // 5b. Verify SkyGen.findLocalBfsStep routes around a wide 2-block wall through an open doorway!
+         for (int dz = -2; dz <= 6; dz++) {
+            for (int dx = -4; dx <= 4; dx++) {
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK, dz, Blocks.STONE);
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK + 1, dz, 0);
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK + 2, dz, 0);
+            }
+         }
+         // Build a 2-block-tall wall at z = 2 from x = -2 to x = +1, leaving a doorway open at x = +2, z = 2
+         for (int wx = -2; wx <= 1; wx++) {
+            bwGame.world.setBlock(wx, SkyGen.Y_DECK + 1, 2, Blocks.STONEBRICK);
+            bwGame.world.setBlock(wx, SkyGen.Y_DECK + 2, 2, Blocks.STONEBRICK);
+         }
+         int[] bfsStep = SkyGen.findLocalBfsStep(bwGame.world, 0, SkyGen.Y_DECK + 1, 0, 0.5, 5.5);
+         check(bfsStep != null && bfsStep[0] >= 1,
+            "findLocalBfsStep routes East toward the open doorway at x=2 to bypass the wide wall at z=2");
+
+         // 5c. Verify Bedwars Tools & Defense Shop (Trades.BEDWARS_TOOLS) and Permanent Armor Persistence across respawns!
+         eq(6, Trades.offers(Trades.BEDWARS_TOOLS).length, "Bedwars Tools & Defense Shop has 6 trades");
+         bwGame.inv[0] = new Stack(Items.IRON_INGOT, 32);
+         check(Trades.buy(bwGame, Trades.offers(Trades.BEDWARS_ARMOR)[0]), "Bought permanent Iron Armor in Bedwars");
+         eq(1, SkyGen.playerBwArmorTier, "playerBwArmorTier upgraded to 1 (Iron)");
+         java.util.Arrays.fill(bwGame.armor, null);
+         SkyGen.giveBedwarsRespawnKit(bwGame, 0);
+         check(bwGame.armor[1] != null && bwGame.armor[1].id == Items.armorId(1, 1),
+            "giveBedwarsRespawnKit restores permanent Iron Armor after respawning");
+
+         // 5d. Verify Tactical Tracker Compass works in Bedwars and Survival!
+         check(SkyGen.useTrackerCompass(bwGame), "useTrackerCompass reports nearest enemy and intact bed in Bedwars");
+         check(SkyGen.canExplosionBreakBlock(bwGame.world, 0, SkyGen.Y_DECK + 1, 2, Blocks.WOOL0)
+            && !SkyGen.canExplosionBreakBlock(bwGame.world, 0, SkyGen.Y_DECK, 0, Blocks.STONE)
+            && !SkyGen.canExplosionBreakBlock(bwGame.world, blueBf[0], blueBf[1], blueBf[2], Decor315.foot(11, 0)),
+            "canExplosionBreakBlock allows blowing up defense blocks above Y_DECK while protecting arena floor and Beds");
+
+         // 5e. Play Now startMatch -> tickMode race fix, Audio Aliases, Remote Pose, Shopkeeper Anchor, Blast Protection & Bot Loot
          SoundEngine.ensureLoaded();
          check(SoundEngine.hasSample("bow")
                && SoundEngine.hasSample("tnt_prime")
