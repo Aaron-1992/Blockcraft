@@ -133,10 +133,16 @@ public final class TerraGen extends Gen {
       }
 
       // mountains: where the land is high and rugged, in blobs
-      double mm = this.nMt.fbm(x * k / 380.0 + 211.0, z * k / 380.0 + 55.0, 3);
-      double mtn = smooth(0.12, 0.46, c) * smooth(0.08, -0.42, e) * smooth(-0.05, 0.30, mm);
-      double pk = clamp(1.0 - Math.abs(this.nPk.fbm(x * k / 210.0, z * k / 210.0, 4)) * 2.3, 0.0, 1.0);
-      hd += mtn * (12.0 + 118.0 * pk * pk * this.vs);
+      double mtnBase = smooth(0.12, 0.46, c) * smooth(0.08, -0.42, e);
+      double mtn = 0.0;
+      if (mtnBase > 0.0) {
+         double mm = this.nMt.fbm(x * k / 380.0 + 211.0, z * k / 380.0 + 55.0, 3);
+         mtn = mtnBase * smooth(-0.05, 0.30, mm);
+         if (mtn > 0.0) {
+            double pk = clamp(1.0 - Math.abs(this.nPk.fbm(x * k / 210.0, z * k / 210.0, 4)) * 2.3, 0.0, 1.0);
+            hd += mtn * (12.0 + 118.0 * pk * pk * this.vs);
+         }
+      }
       if (hd > 168.0) {
          hd = 168.0 + (hd - 168.0) * 0.55;
       }
@@ -163,27 +169,33 @@ public final class TerraGen extends Gen {
       }
 
       // mushroom islands in the deep sea
-      double mu = this.nMu.fbm(x / 300.0 + 5.0, z / 300.0 - 8.0, 3);
-      double isle = smooth(0.30, 0.50, mu) * smooth(-0.30, -0.54, c);
-      if (isle > 0.0) {
-         hd = hd + (67.0 + d2 * 1.4 + 5.0 * smooth(0.4, 0.62, mu) - hd) * isle;
+      double isleC = smooth(-0.30, -0.54, c);
+      double isle = 0.0;
+      if (isleC > 0.0) {
+         double mu = this.nMu.fbm(x / 300.0 + 5.0, z / 300.0 - 8.0, 3);
+         isle = smooth(0.30, 0.50, mu) * isleC;
+         if (isle > 0.0) {
+            hd = hd + (67.0 + d2 * 1.4 + 5.0 * smooth(0.4, 0.62, mu) - hd) * isle;
+         }
       }
 
       // rivers along the zero lines of a noise; the distance to the line (in blocks) makes them the same width everywhere
-      double rx = x / 540.0 + 33.0;
-      double rz = z / 540.0 - 71.0;
-      double rn = this.nRv.fbm(rx, rz, 3);
       double rf = 0.0;
-      if (Math.abs(rn) < 0.10 && c > -0.12 && !(isle > 0.2)) {
-         double gx = this.nRv.fbm(rx + 6.0 / 540.0, rz, 3) - this.nRv.fbm(rx - 6.0 / 540.0, rz, 3);
-         double gz = this.nRv.fbm(rx, rz + 6.0 / 540.0, 3) - this.nRv.fbm(rx, rz - 6.0 / 540.0, 3);
-         double grad = Math.max(1.0e-5, Math.sqrt(gx * gx + gz * gz) / 12.0);
-         double dist = Math.abs(rn) / grad;
-         rf = (1.0 - smooth(4.5, 21.0, dist)) * smooth(-0.12, 0.03, c) * smooth(104.0, 80.0, hd);
-         if (rf > 0.0) {
-            double bed = 56.0 + d2 * 1.1;
-            if (hd > bed) {
-               hd += (bed - hd) * rf;
+      if (c > -0.12 && !(isle > 0.2) && hd < 104.0) {
+         double rx = x / 540.0 + 33.0;
+         double rz = z / 540.0 - 71.0;
+         double rn = this.nRv.fbm(rx, rz, 3);
+         if (Math.abs(rn) < 0.10) {
+            double gx = this.nRv.fbm(rx + 6.0 / 540.0, rz, 3) - this.nRv.fbm(rx - 6.0 / 540.0, rz, 3);
+            double gz = this.nRv.fbm(rx, rz + 6.0 / 540.0, 3) - this.nRv.fbm(rx, rz - 6.0 / 540.0, 3);
+            double grad = Math.max(1.0e-5, Math.sqrt(gx * gx + gz * gz) / 12.0);
+            double dist = Math.abs(rn) / grad;
+            rf = (1.0 - smooth(4.5, 21.0, dist)) * smooth(-0.12, 0.03, c) * smooth(104.0, 80.0, hd);
+            if (rf > 0.0) {
+               double bed = 56.0 + d2 * 1.1;
+               if (hd > bed) {
+                  hd += (bed - hd) * rf;
+               }
             }
          }
       }
@@ -913,7 +925,7 @@ public final class TerraGen extends Gen {
                long ts = tr.nextLong();
                int wx = ncx * 16 + lx;
                int wz = ncz * 16 + lz;
-               if (wx < ch.cx * 16 - 10 || wx > ch.cx * 16 + 25 || wz < ch.cz * 16 - 10 || wz > ch.cz * 16 + 25) {
+               if (p >= 0.63F || wx < ch.cx * 16 - 10 || wx > ch.cx * 16 + 25 || wz < ch.cz * 16 - 10 || wz > ch.cz * 16 + 25) {
                   continue;
                }
 

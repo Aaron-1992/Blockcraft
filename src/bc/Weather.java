@@ -740,6 +740,9 @@ public final class Weather {
          double dz = z - g.player.z;
          if (dx * dx + dz * dz < 140.0 * 140.0 && this.world.isLoaded((int)Math.floor(x), (int)Math.floor(z))) {
             b.real = true;
+            if (g.pano == null) {
+               SoundEngine.play3DMoving(this.world, "thunder", x, b.ground, z, 0.0, 0.0, 0.0, 1.8F, 0.88F + this.rnd.nextFloat() * 0.16F, true);
+            }
             this.strikeEffects(g, (int)Math.floor(x), gy, (int)Math.floor(z));
          }
       }

@@ -34,9 +34,8 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String TITLE_STR = "Blockcraft 1.12 - Update 3.18";
-   /** "3.8": the version without the words, for the title screen and the F3 screen. */
-   public static final String VERSION_STR = TITLE_STR.substring(TITLE_STR.indexOf("Update ") + 7);
+   public static final String VERSION_STR = "5.5";
+   public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
    public Player player;
@@ -54,10 +53,13 @@ public final class Game {
    File root;
    Game.S screen = Game.S.TITLE;
    Game.S optionsReturn = Game.S.TITLE;
+   Game.S mpReturn = Game.S.TITLE;
    final Stack[] inv = new Stack[36];
    final Stack[] armor = new Stack[4];
    Stack cursor;
    final Mobs mobs = new Mobs(this);
+   Mob spectatingMob;
+   boolean spectatorNightVision;
    /** Update 3.12: the advancements of the world that is open. */
    final Adv312 adv = new Adv312();
    Mob targetMob;
@@ -122,6 +124,14 @@ public final class Game {
    double[] spawnPos = new double[]{0.0, 80.0, 0.0};
    final StringBuilder chat = new StringBuilder();
    long chatOpenedAt;
+   static String clipboardFallback = "";
+   final ArrayList<String> chatHistory = new ArrayList();
+   int chatHistoryPos = -1;
+   String chatDraft = "";
+   final ArrayList<String> addrHistory = new ArrayList(Arrays.asList("127.0.0.1:25565", "lan"));
+   int addrHistoryPos = -1;
+   final ArrayList<String> seedHistory = new ArrayList();
+   int seedHistoryPos = -1;
    final ArrayList<String> chatLog = new ArrayList();
    final ArrayList<Long> chatTimes = new ArrayList();
    final ArrayList<Game.Particle> particles = new ArrayList();
@@ -185,6 +195,13 @@ public final class Game {
    boolean skinFocus;
    String skinMsg = "";
    Game.S skinReturn = Game.S.TITLE;
+   Game.S packsReturn = Game.S.TITLE;
+   Game.S modsReturn = Game.S.TITLE;
+   Game.S mgReturn = Game.S.TITLE;
+   int mgTab = 0;
+   Game.S creditsReturn = Game.S.TITLE;
+   float creditsScroll = 0.0F;
+   boolean pendingEndCredits = false;
    volatile boolean skinBrowsing;
    /** the game was fullscreen when the file dialog opened: go back to it once the dialog is gone */
    volatile boolean skinRefull;
@@ -256,7 +273,12 @@ public final class Game {
          this.opt.leaves = Math.max(0, Math.min(2, Integer.getInteger("bc.leaves")));
       }
 
+      if (System.getProperty("bc.bushy") != null) {
+         this.opt.bushyLeaves = Boolean.getBoolean("bc.bushy");
+      }
+
       Mesher.leafMode = this.opt.leaves;
+      Mesher.bushyLeaves = this.opt.bushyLeaves;
       if (System.getProperty("bc.guiscale") != null) {
          this.opt.guiScale = Integer.getInteger("bc.guiscale"); // test hook: force the GUI scale (screens must cope with narrow windows)
       }
@@ -341,8 +363,9 @@ public final class Game {
       System.out.println("GL: " + GL11.glGetString(7938) + " / " + this.gpuName);
       // (-Dbc.gpuforce=1, a test hook: behave as if the first process had got the small chip - the Windows smoke test proves with it that the second start works)
       boolean gpuForce = Boolean.getBoolean("bc.gpuforce");
-      if ((gpuChanged || gpuForce) && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
-         // the entry for Windows was written just now but this process already got the small chip: start once more, the new process gets the real one
+      boolean wantDedicated = gpuChanged || gpuForce || this.opt.gpuHigh && GpuPref.windows() && !"off".equals(System.getProperty("bc.gpu"));
+      if (wantDedicated && GpuPref.retryOf() == null && (gpuForce || GpuPref.isIntegrated(this.gpuName))) {
+         // the first process got the integrated processor GPU (e.g. started as javaw.exe before Optimus/PowerXpress saw blockcraft-gpu.exe): relaunch once
          System.out.println("GPU: " + this.gpuName + " is part of the processor; starting again with the high performance preference");
          if (GpuPref.relaunch(this.gpuName)) {
             GLFW.glfwDestroyWindow(this.window);
@@ -375,7 +398,7 @@ public final class Game {
          this.winH = Math.max(1, var4);
       });
       GLFW.glfwSetWindowFocusCallback(this.window, (var1x, var3x) -> {
-         if (!var3x && this.screen == Game.S.PLAY) {
+         if (!var3x && this.screen == Game.S.PLAY && !Net319.isActive()) {
             this.setScreen(Game.S.PAUSE);
          }
       });
@@ -950,6 +973,10 @@ public final class Game {
                } catch (Exception var14) {
                }
 
+               if (var7.settings != null && var7.settings.isMinigame()) {
+                  deleteDir(var5);
+                  continue;
+               }
                this.worldList.add(var7);
             }
          }
@@ -1028,6 +1055,13 @@ public final class Game {
 
    void startWorld(boolean var1, String var2, int var3) {
       Panorama.stop(this); // Update 3.13: the turning world behind the menus makes room for the real one
+      if (this.world != null) {
+         if (this.rend != null) {
+            this.rend.clearWorldMeshes(this.world);
+         }
+         this.world.shutdown();
+         this.world = null;
+      }
       Properties var4 = new Properties();
       String var5 = this.newName;
       if (var1) {
@@ -1038,7 +1072,6 @@ public final class Game {
       File var8 = this.worldDir();
       long var6;
       if (var1) {
-         deleteDir(var8);
          this.worldDisplayName = var5;
          if (var2 != null && !var2.trim().isEmpty()) {
             try {
@@ -1074,8 +1107,6 @@ public final class Game {
          this.worldDisplayName = var4.getProperty("name", this.worldName);
       }
 
-      var8.mkdirs();
-      this.rootDir = var8;
       int startDim = var1 ? Dim.OVERWORLD : (int)d(var4, "dim", 0.0);
       if (!Dim.valid(startDim)) {
          startDim = Dim.OVERWORLD;
@@ -1100,14 +1131,35 @@ public final class Game {
          ws = WorldSettings.load(var4);
       }
 
+      boolean ephemeralMinigame = ws.isMinigame();
+      if (ephemeralMinigame) {
+         deleteDir(var8);
+         this.rootDir = null;
+         SkyGen.myTeam = 0;
+         SkyGen.matchState = SkyGen.STATE_WAITING;
+         SkyGen.resetMatchState();
+      } else {
+         if (var1) {
+            deleteDir(var8);
+         }
+         var8.mkdirs();
+         this.rootDir = var8;
+      }
+
       this.worldSettings = ws;
-      this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD;
-      this.world = new World(var6, Dim.dir(var8, startDim), startDim, ws);
+      Net319.clearWorldState();
+      this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD && !ephemeralMinigame;
+      this.world = new World(var6, ephemeralMinigame ? null : Dim.dir(var8, startDim), startDim, ws);
+      if (ephemeralMinigame) {
+         this.world.saveEnabled = false;
+      }
       this.world.game = this;
-      this.rend.setLod(this.world);
+      if (this.rend != null) {
+         this.rend.setLod(this.world);
+         this.world.unloadHook = this.rend::onUnload;
+      }
       this.mobs.clear();
       this.targetMob = null;
-      this.world.unloadHook = this.rend::onUnload;
       this.player = new Player();
       Arrays.fill(this.inv, null);
       Arrays.fill(this.armor, null);
@@ -1121,13 +1173,14 @@ public final class Game {
       this.chatTimes.clear();
       this.sayShaderProblems();
       this.bedPos = null;
-      if (var1) {
+      if (var1 || ephemeralMinigame) {
          this.player.setMode(var3);
          this.world.dayTime = 1000L;
          this.world.weather.startFair();
          int[] var16 = this.world.gen.findSpawn();
          this.spawnXZ = new int[]{var16[0], var16[2]};
-         this.player.setPos(var16[0] + 0.5, 200.0, var16[2] + 0.5);
+         double startY = (this.world.gen instanceof BackroomsGen) ? (BackroomsGen.FLOOR_Y + 1.0) : 200.0;
+         this.player.setPos(var16[0] + 0.5, startY, var16[2] + 0.5);
          this.needSpawn = true;
          if (var3 == 1) {
             int[] var10 = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
@@ -1135,6 +1188,22 @@ public final class Game {
             for (int var11 = 0; var11 < var10.length; var11++) {
                this.inv[var11] = new Stack(var10[var11], 64);
             }
+         } else if (ws.type == WorldSettings.BEDWARS) {
+            SkyGen.giveBedwarsLoadout(this, SkyGen.myTeam);
+            this.bedPos = SkyGen.getTeamBedFoot(SkyGen.myTeam);
+            this.player.yaw = SkyGen.getTeamYaw(SkyGen.myTeam);
+         } else if (ws.type == WorldSettings.BATTLE) {
+            SkyGen.giveSkywarsKit(this, SkyGen.swKit);
+            this.player.yaw = SkyGen.getSkywarsYaw(0);
+         } else if (ws.type == WorldSettings.TUMBLE) {
+            SkyGen.giveTumbleLoadout(this);
+            this.player.yaw = SkyGen.getSkywarsYaw(0);
+         } else if (ws.type == WorldSettings.CS2) {
+            SkyGen.giveCs2Loadout(this, SkyGen.swKit);
+            this.player.yaw = (SkyGen.myTeam & 1) == 0 ? 0.0F : 180.0F;
+         } else if (ws.type == WorldSettings.MURDER) {
+            SkyGen.assignMurderMysteryRoles(this, this.world);
+            this.player.yaw = 0.0F;
          }
 
          this.sel = 0;
@@ -1164,7 +1233,129 @@ public final class Game {
 
       this.adv.load(this.rootDir); // Update 3.12: advancements (a new world starts with none)
       this.player.updateBox();
+      if (Net319.isHosting()) {
+         Net319.onHostWorldSwitched(this);
+      }
       this.setScreen(Game.S.LOADING);
+   }
+
+   /** Update 3.19: synchronizes a multiplayer client into the host's world seed, dimension, time of day, and position near the host. */
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz) {
+      joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, WorldSettings.DEFAULT, 1);
+   }
+
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz, int worldType, int gameMode) {
+      int defaultMap = (this.worldSettings != null) ? this.worldSettings.mapId : 0;
+      joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, worldType, gameMode, defaultMap);
+   }
+
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz, int worldType, int gameMode, int mapId) {
+      int targetDim = Dim.valid(dim) ? dim : Dim.OVERWORLD;
+      int wType = Math.max(0, Math.min(WorldSettings.TYPES - 1, worldType));
+      int gMode = Math.max(0, Math.min(4, gameMode));
+      int targetMapId = Math.floorMod(mapId, WorldSettings.MAP_COUNT);
+      if (this.world == null
+         || this.world.seed != seed
+         || this.world.dim != targetDim
+         || this.world.settings == null
+         || this.world.settings.type != wType) {
+         Panorama.stop(this);
+
+         if (this.world != null) {
+            for (Chunk c : this.world.chunks.values()) {
+               c.unloaded = true;
+               if (this.rend != null) {
+                  this.rend.onUnload(c);
+               }
+            }
+
+            this.world.chunks.clear();
+            this.world.shutdown();
+         }
+
+         WorldSettings ws = new WorldSettings();
+         ws.type = wType;
+         ws.mapId = targetMapId;
+         this.worldSettings = ws;
+         this.rootDir = null;
+         this.bonusPending = false;
+         this.worldDisplayName = WorldSettings.TYPE_NAME[wType] + " (Multiplayer)";
+         this.world = new World(seed, null, targetDim, ws);
+         this.world.saveEnabled = false;
+         this.world.game = this;
+         if (ws.isMinigame()) {
+            SkyGen.lastWorldRef = this.world;
+            this.world.ensureArenaChunksLoaded();
+         }
+         if (this.rend != null) {
+            this.rend.setLod(this.world);
+            this.world.unloadHook = this.rend::onUnload;
+         }
+
+         this.mobs.clear();
+         this.targetMob = null;
+         if (this.player == null) {
+            this.player = new Player();
+         }
+         this.player.setMode(gMode);
+         Arrays.fill(this.inv, null);
+         Arrays.fill(this.armor, null);
+         if (gMode == 1) {
+            int[] startItems = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
+            for (int i = 0; i < startItems.length; i++) {
+               this.inv[i] = new Stack(startItems[i], 64);
+            }
+         } else if (wType == WorldSettings.BEDWARS) {
+            int myTeam = SkyGen.getPlayerTeam(this);
+            SkyGen.giveBedwarsLoadout(this, myTeam);
+         } else if (wType == WorldSettings.BATTLE) {
+            SkyGen.giveSkywarsKit(this, SkyGen.swKit);
+         } else if (wType == WorldSettings.TUMBLE) {
+            SkyGen.giveTumbleLoadout(this);
+         } else if (wType == WorldSettings.CS2) {
+            SkyGen.giveCs2Loadout(this, SkyGen.swKit);
+         } else if (wType == WorldSettings.MURDER) {
+            SkyGen.assignMurderMysteryRoles(this, this.world);
+         }
+
+         this.cursor = null;
+         this.menu = null;
+         this.eatTicks = 0;
+         this.bowCharge = 0;
+         this.deathHandled = false;
+         this.particles.clear();
+      } else if (this.world.settings != null && this.world.settings.mapId != targetMapId) {
+         this.world.settings.mapId = targetMapId;
+         SkyGen.resetArenaMap(this, this.world, false);
+      }
+
+      this.world.dayTime = dayTime;
+      this.needSpawn = false;
+      if (wType == WorldSettings.BEDWARS) {
+         int myTeam = SkyGen.getPlayerTeam(this);
+         int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
+         this.spawnXZ = new int[]{sp[0], sp[2]};
+         this.bedPos = SkyGen.getTeamBedFoot(myTeam);
+         this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
+         this.player.yaw = SkyGen.getTeamYaw(myTeam);
+      } else {
+         this.bedPos = null;
+         this.spawnXZ = new int[]{(int)Math.floor(sx), (int)Math.floor(sz)};
+         double px = wsIsVoid(wType) ? sx : sx + 1.6;
+         double py = Math.max(4.0, sy);
+         double pz = sz;
+         this.player.setPos(px, py, pz);
+         this.player.yaw = wType == WorldSettings.SKYWARS ? (float)Math.toDegrees(Math.atan2(sx, -sz)) : -90.0F;
+      }
+      this.player.pitch = 0.0F;
+      this.player.updateBox();
+      if (this.screen != Game.S.PLAY && this.screen != Game.S.LOADING && this.screen != Game.S.WAITING) {
+         this.setScreen(Game.S.LOADING);
+      }
+   }
+
+   private static boolean wsIsVoid(int t) {
+      return WorldSettings.isVoidMode(t);
    }
 
    static void parseStacks(String var0, Stack[] var1) {
@@ -1231,7 +1422,10 @@ public final class Game {
    }
 
    void saveWorld() {
-      if (this.world != null && this.pano == null) {
+      if (this.world != null
+         && this.pano == null
+         && this.world.saveEnabled
+         && (this.world.settings == null || !this.world.settings.isMinigame())) {
          this.world.saveAll();
          this.mobs.save(this.world.dir);
          if (this.world.fight != null) {
@@ -1255,7 +1449,7 @@ public final class Game {
          var1.setProperty("pitch", this.player.pitch + "");
          var1.setProperty("health", Math.max(1, this.player.health) + "");
          var1.setProperty("creative", this.player.creative + "");
-         var1.setProperty("mode", this.player.gameMode + "");
+         var1.setProperty("mode", this.player.rawMode() + "");
          var1.setProperty("food", this.player.food + "");
          var1.setProperty("sat", this.player.sat + "");
          var1.setProperty("flying", this.player.flying + "");
@@ -1440,16 +1634,23 @@ public final class Game {
    }
 
    void quitToTitle() {
-      this.saveWorld();
-
-      for (Chunk var2 : this.world.chunks.values()) {
-         var2.unloaded = true;
-         this.rend.onUnload(var2);
+      // Keep the host server alive when switching worlds or gamemodes so connected players never get disconnected!
+      if (!Net319.isHosting()) {
+         Net319.disconnect(this);
       }
-
-      this.world.chunks.clear();
-      this.world.shutdown();
-      this.world = null;
+      this.saveWorld();
+      if (this.world != null) {
+         if (this.rend != null) {
+            this.rend.clearWorldMeshes(this.world);
+         } else {
+            for (Chunk var2 : this.world.chunks.values()) {
+               var2.unloaded = true;
+            }
+         }
+         this.world.chunks.clear();
+         this.world.shutdown();
+         this.world = null;
+      }
       this.player = null;
       this.target = null;
       this.setScreen(Game.S.TITLE);
@@ -1457,6 +1658,27 @@ public final class Game {
    }
 
    double[] findStand(int var1, int var2) {
+      if (this.world != null && this.world.gen instanceof BackroomsGen) {
+         int fy = BackroomsGen.FLOOR_Y;
+         for (int r = 0; r <= 10; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+               for (int dz = -r; dz <= r; dz++) {
+                  if (Math.max(Math.abs(dx), Math.abs(dz)) == r) {
+                     int bx = var1 + dx;
+                     int bz = var2 + dz;
+                     if (this.world.isLoaded(bx, bz)) {
+                        if (this.world.getBlock(bx, fy + 1, bz) == Blocks.AIR
+                           && this.world.getBlock(bx, fy + 2, bz) == Blocks.AIR) {
+                           return new double[]{bx + 0.5, fy + 1.0, bz + 0.5};
+                        }
+                     }
+                  }
+               }
+            }
+         }
+         return new double[]{var1 + 0.5, fy + 1.0, var2 + 0.5};
+      }
+
       for (int var3 = 0; var3 <= 10; var3++) {
          for (int var4 = -var3; var4 <= var3; var4++) {
             for (int var5 = -var3; var5 <= var3; var5++) {
@@ -1488,6 +1710,69 @@ public final class Game {
    }
 
    void respawn() {
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         int myTeam = SkyGen.getPlayerTeam(this);
+         boolean bedIntact = SkyGen.isTeamBedIntact(this.world, myTeam) && !SkyGen.localEliminated;
+         this.player.dead = false;
+         this.player.burn = 0;
+         this.player.health = 20;
+         this.player.food = 20;
+         this.player.sat = 5.0F;
+         this.player.exh = 0.0F;
+         this.player.air = 300;
+         this.player.fallDistance = 0.0F;
+         this.player.invuln = 40;
+         this.deathHandled = false;
+         if (bedIntact) {
+            int[] sp = SkyGen.getTeamSpawnBlock(myTeam);
+            this.spawnXZ = new int[]{sp[0], sp[2]};
+            this.bedPos = SkyGen.getTeamBedFoot(myTeam);
+            this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 1.0, sp[2] + 0.5);
+            this.player.yaw = SkyGen.getTeamYaw(myTeam);
+            this.player.pitch = 0.0F;
+            this.player.updateBox();
+            SkyGen.giveBedwarsRespawnKit(this, myTeam);
+            this.say("\u00a7a[Bedwars] Respawned at " + SkyGen.BEDWARS_CODES[myTeam] + SkyGen.BEDWARS_NAMES[myTeam] + " Base\u00a7a!");
+         } else {
+            SkyGen.localEliminated = true;
+            this.bedPos = null;
+            this.player.setMode(3);
+            this.player.setPos(0.5, SkyGen.Y_DECK + 16.0, 0.5);
+            this.player.updateBox();
+            this.say("\u00a7c\u00a7l[Bedwars] ELIMINATED! \u00a77Your bed was destroyed — spectating match until next round...");
+         }
+         return;
+      }
+
+      if (this.world != null
+         && this.world.settings != null
+         && (this.world.settings.type == WorldSettings.BATTLE
+            || this.world.settings.type == WorldSettings.TUMBLE
+            || this.world.settings.type == WorldSettings.CS2
+            || this.world.settings.type == WorldSettings.MURDER)) {
+         int mType = this.world.settings.type;
+         SkyGen.localEliminated = true;
+         this.bedPos = null;
+         this.player.dead = false;
+         this.player.burn = 0;
+         this.player.health = 20;
+         this.player.food = 20;
+         this.player.sat = 5.0F;
+         this.player.exh = 0.0F;
+         this.player.air = 300;
+         this.player.fallDistance = 0.0F;
+         this.player.invuln = 40;
+         this.deathHandled = false;
+         this.player.setMode(3);
+         this.player.setPos(0.5, SkyGen.Y_DECK + 14.0, 0.5);
+         this.player.updateBox();
+         String tag = mType == WorldSettings.TUMBLE ? "\u00a7b\u00a7l[Tumble]"
+            : (mType == WorldSettings.CS2 ? "\u00a7b\u00a7l[CS2 Strike]"
+            : (mType == WorldSettings.MURDER ? "\u00a7d\u00a7l[Murder Mystery]" : "\u00a76\u00a7l[Battle]"));
+         this.say(tag + " ELIMINATED! \u00a77You cannot respawn this round — spectating match...");
+         return;
+      }
+
       double[] var1 = null;
       if (this.world.dim != Dim.OVERWORLD) {
          // Update 3.12: whoever dies in the Nether or in the End wakes up at home in the Overworld
@@ -1621,6 +1906,10 @@ public final class Game {
             if (var1 != 0.0) {
                this.zoomFactor = Math.max(1.5F, Math.min(12.0F, this.zoomFactor * (var1 > 0.0 ? 1.25F : 0.8F)));
             }
+         } else if (this.screen == Game.S.PLAY && (this.player.spectator || (this.player.creative && this.player.flying && (this.key(341) || this.key(345))))) {
+            if (var1 != 0.0) {
+               this.player.flySpeed = Math.max(0.01F, Math.min(0.25F, this.player.flySpeed + (float)Math.signum(var1) * 0.01F));
+            }
          } else if (this.screen == Game.S.PLAY) {
             if (var1 != 0.0) {
                this.sel = ((this.sel - (int)Math.signum(var1)) % 9 + 9) % 9;
@@ -1654,6 +1943,10 @@ public final class Game {
                this.seedField = this.seedField + (char)var1;
             }
          }
+      } else if (this.screen == Game.S.MULTIPLAYER) {
+         if (var1 >= 32 && var1 < 127 && Net319.serverAddr.length() < 64) {
+            Net319.serverAddr = Net319.serverAddr + (char)var1;
+         }
       } else if (this.screen == Game.S.INV && this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
          if (System.currentTimeMillis() - this.menu.openedAt > 100L) {
             this.menu.typed((char)var1);
@@ -1663,10 +1956,75 @@ public final class Game {
       }
    }
 
+   public String getClipboard() {
+      if (this.window != 0L) {
+         try {
+            String s = GLFW.glfwGetClipboardString(this.window);
+            if (s != null) {
+               clipboardFallback = s;
+               return s;
+            }
+         } catch (Throwable ignored) {
+         }
+      }
+      return clipboardFallback != null ? clipboardFallback : "";
+   }
+
+   public void setClipboard(String s) {
+      String val = s == null ? "" : s;
+      clipboardFallback = val;
+      if (this.window != 0L) {
+         try {
+            GLFW.glfwSetClipboardString(this.window, val);
+         } catch (Throwable ignored) {
+         }
+      }
+   }
+
+   static String sanitizePaste(String raw, int maxLen) {
+      if (raw == null || raw.isEmpty() || maxLen <= 0) {
+         return "";
+      }
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < raw.length() && sb.length() < maxLen; i++) {
+         char c = raw.charAt(i);
+         if (c >= 32 && c < 127) {
+            sb.append(c);
+         }
+      }
+      return sb.toString();
+   }
+
+   static String deleteLastWord(String s) {
+      if (s == null || s.isEmpty()) {
+         return "";
+      }
+      int i = s.length() - 1;
+      while (i >= 0 && s.charAt(i) == ' ') {
+         i--;
+      }
+      while (i >= 0 && s.charAt(i) != ' ') {
+         i--;
+      }
+      return s.substring(0, i + 1);
+   }
+
+   static void recordHistory(ArrayList<String> hist, String val) {
+      if (val == null || val.trim().isEmpty()) {
+         return;
+      }
+      String t = val.trim();
+      if (hist.isEmpty() || !hist.get(hist.size() - 1).equals(t)) {
+         hist.add(t);
+      }
+   }
+
    void openChat(String var1) {
       this.setScreen(Game.S.CHAT);
       this.chat.setLength(0);
       this.chat.append(var1);
+      this.chatDraft = var1;
+      this.chatHistoryPos = this.chatHistory.size();
       this.chatOpenedAt = System.currentTimeMillis();
    }
 
@@ -1704,8 +2062,30 @@ public final class Game {
                               }
 
                               return;
+                           case 70:
+                              if (!this.player.spectator && this.sel != 8) {
+                                 Stack tmp = this.inv[this.sel];
+                                 this.inv[this.sel] = this.inv[8];
+                                 this.inv[8] = tmp;
+                                 this.nameTimer = 40.0F;
+                                 this.equip = 0.0F;
+                              }
+
+                              return;
+                           case 71:
+                              Net319.sendWorldPing(this);
+                              return;
                            case 76:
                               this.setScreen(Game.S.ADV); // Update 3.12: the advancements
+                              return;
+                           case 78:
+                              if (this.key(292) || (var3 & 2) != 0) {
+                                 int nextM = this.player.spectator ? 1 : 3;
+                                 this.spectatingMob = null;
+                                 this.player.setMode(nextM);
+                                 this.say("Set own game mode to " + this.player.modeName() + " Mode");
+                              }
+
                               return;
                            case 81:
                               this.dropHeld((var3 & 2) != 0);
@@ -1740,14 +2120,27 @@ public final class Game {
                               }
 
                               return;
+                           case 293:
+                              if (this.key(292) || (var3 & 2) != 0) {
+                                 int nextM = (this.player.rawMode() + 1) % 5;
+                                 this.spectatingMob = null;
+                                 this.player.setMode(nextM);
+                                 this.say("Set own game mode to " + this.player.modeName() + " Mode");
+                              }
+
+                              return;
                            case 294:
                               this.view = (this.view + 1) % 3;
                               this.say("Camera: " + new String[]{"first person", "behind you", "in front of you"}[this.view]);
                               return;
                            default:
                               if (var1 >= 49 && var1 <= 57) {
-                                 this.sel = var1 - 49;
-                                 this.nameTimer = 40.0F;
+                                 if (this.player.spectator) {
+                                    this.spectatorAction(var1 - 48);
+                                 } else {
+                                    this.sel = var1 - 49;
+                                    this.nameTimer = 40.0F;
+                                 }
                               }
                         }
                      }
@@ -1763,13 +2156,82 @@ public final class Game {
                   }
 
                   return;
-               case NEWWORLD:
-                  if (var1 == 259) {
-                     if (this.focusField == 0 && this.newName.length() > 0) {
-                        this.newName = this.newName.substring(0, this.newName.length() - 1);
-                     } else if (this.focusField == 1 && this.seedField.length() > 0) {
-                        this.seedField = this.seedField.substring(0, this.seedField.length() - 1);
+               case MULTIPLAYER: {
+                  boolean ctrl = (var3 & 10) != 0;
+                  if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(Net319.serverAddr);
+                  } else if (ctrl && var1 == 88 && var2 == 1) {
+                     this.setClipboard(Net319.serverAddr);
+                     Net319.serverAddr = "";
+                  } else if (ctrl && var1 == 86) {
+                     String paste = sanitizePaste(this.getClipboard(), 64 - Net319.serverAddr.length());
+                     Net319.serverAddr = Net319.serverAddr + paste;
+                  } else if ((var1 == 259 || var1 == 261) && Net319.serverAddr.length() > 0) {
+                     Net319.serverAddr = ctrl
+                        ? deleteLastWord(Net319.serverAddr)
+                        : Net319.serverAddr.substring(0, Net319.serverAddr.length() - 1);
+                  } else if (var1 == 265 && !this.addrHistory.isEmpty()) {
+                     if (this.addrHistoryPos < 0 || this.addrHistoryPos > this.addrHistory.size()) {
+                        this.addrHistoryPos = this.addrHistory.size();
                      }
+                     if (this.addrHistoryPos > 0) {
+                        this.addrHistoryPos--;
+                        Net319.serverAddr = this.addrHistory.get(this.addrHistoryPos);
+                     }
+                  } else if (var1 == 264 && !this.addrHistory.isEmpty()) {
+                     if (this.addrHistoryPos >= 0 && this.addrHistoryPos < this.addrHistory.size() - 1) {
+                        this.addrHistoryPos++;
+                        Net319.serverAddr = this.addrHistory.get(this.addrHistoryPos);
+                     }
+                  } else if (var1 == 256 && var2 == 1) {
+                     this.setScreen(this.mpReturn != null ? this.mpReturn : Game.S.TITLE);
+                  } else if ((var1 == 257 || var1 == 335) && var2 == 1) {
+                     recordHistory(this.addrHistory, Net319.serverAddr);
+                     this.addrHistoryPos = this.addrHistory.size();
+                     Net319.joinFromMenu(this, Net319.serverAddr);
+                  }
+
+                  return;
+               }
+               case NEWWORLD: {
+                  boolean ctrl = (var3 & 10) != 0;
+                  if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(this.focusField == 0 ? this.newName : this.seedField);
+                     return;
+                  }
+                  if (ctrl && var1 == 88 && var2 == 1) {
+                     this.setClipboard(this.focusField == 0 ? this.newName : this.seedField);
+                     if (this.focusField == 0) {
+                        this.newName = "";
+                     } else {
+                        this.seedField = "";
+                     }
+                     return;
+                  }
+                  if (ctrl && var1 == 86) {
+                     if (this.focusField == 0) {
+                        this.newName = this.newName + sanitizePaste(this.getClipboard(), 24 - this.newName.length());
+                     } else {
+                        this.seedField = this.seedField + sanitizePaste(this.getClipboard(), 30 - this.seedField.length());
+                     }
+                     return;
+                  }
+                  if (var1 == 259 || var1 == 261) {
+                     if (this.focusField == 0 && this.newName.length() > 0) {
+                        this.newName = ctrl ? deleteLastWord(this.newName) : this.newName.substring(0, this.newName.length() - 1);
+                     } else if (this.focusField == 1 && this.seedField.length() > 0) {
+                        this.seedField = ctrl ? deleteLastWord(this.seedField) : this.seedField.substring(0, this.seedField.length() - 1);
+                     }
+                  }
+
+                  if (var1 == 265 && var2 == 1) {
+                     if (this.focusField == 1 && !this.seedHistory.isEmpty() && this.seedField.isEmpty()) {
+                        this.seedField = this.seedHistory.get(this.seedHistory.size() - 1);
+                     } else {
+                        this.focusField = 0;
+                     }
+                  } else if (var1 == 264 && var2 == 1) {
+                     this.focusField = 1;
                   }
 
                   if (var1 == 258 && var2 == 1) {
@@ -1782,30 +2244,96 @@ public final class Game {
                   }
 
                   if (var1 == 257 && var2 == 1) {
+                     recordHistory(this.seedHistory, this.seedField);
                      Screens.createWorld(this);
                   }
 
                   return;
+               }
                case LOADING:
                   return;
-               case CHAT:
+               case MINIGAMES: {
+                  if (var1 == 256 && var2 == 1) {
+                     this.setScreen(this.mgReturn != null ? this.mgReturn : Game.S.TITLE);
+                  }
+                  return;
+               }
+               case WAITING: {
+                  if (var1 == 256 && var2 == 1) {
+                     this.quitToTitle();
+                  } else if (var1 == 257 && var2 == 1) {
+                     SkyGen.startMatch(this, true);
+                  }
+                  return;
+               }
+               case CHAT: {
+                  boolean ctrl = (var3 & 10) != 0;
                   if (var1 == 256 && var2 == 1) {
                      this.setScreen(Game.S.PLAY);
-                  } else if (var1 == 259 && this.chat.length() > 0) {
-                     this.chat.setLength(this.chat.length() - 1);
+                  } else if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(this.chat.toString());
+                  } else if (ctrl && var1 == 88 && var2 == 1) {
+                     this.setClipboard(this.chat.toString());
+                     this.chat.setLength(0);
+                  } else if (ctrl && var1 == 86) {
+                     String paste = sanitizePaste(this.getClipboard(), 100 - this.chat.length());
+                     this.chat.append(paste);
+                  } else if ((var1 == 259 || var1 == 261) && this.chat.length() > 0) {
+                     if (ctrl) {
+                        String rest = deleteLastWord(this.chat.toString());
+                        this.chat.setLength(0);
+                        this.chat.append(rest);
+                     } else {
+                        this.chat.setLength(this.chat.length() - 1);
+                     }
+                  } else if (var1 == 265 && !this.chatHistory.isEmpty()) {
+                     if (this.chatHistoryPos < 0 || this.chatHistoryPos >= this.chatHistory.size()) {
+                        this.chatDraft = this.chat.toString();
+                        this.chatHistoryPos = this.chatHistory.size();
+                     }
+                     if (this.chatHistoryPos > 0) {
+                        this.chatHistoryPos--;
+                        this.chat.setLength(0);
+                        this.chat.append(this.chatHistory.get(this.chatHistoryPos));
+                     }
+                  } else if (var1 == 264 && !this.chatHistory.isEmpty()) {
+                     if (this.chatHistoryPos >= 0 && this.chatHistoryPos < this.chatHistory.size() - 1) {
+                        this.chatHistoryPos++;
+                        this.chat.setLength(0);
+                        this.chat.append(this.chatHistory.get(this.chatHistoryPos));
+                     } else if (this.chatHistoryPos == this.chatHistory.size() - 1) {
+                        this.chatHistoryPos = this.chatHistory.size();
+                        this.chat.setLength(0);
+                        this.chat.append(this.chatDraft);
+                     }
                   } else if ((var1 == 257 || var1 == 335) && var2 == 1) {
                      String var4 = this.chat.toString().trim();
                      this.setScreen(Game.S.PLAY);
                      if (!var4.isEmpty()) {
+                        recordHistory(this.chatHistory, var4);
+                        this.chatHistoryPos = this.chatHistory.size();
                         this.runCommand(var4);
                      }
                   }
 
                   return;
+               }
                case INV:
                   if (this.menu != null && this.menu.kind == 4 && this.menu.tab == Creative.SEARCH) {
                      // the search tab: letters are for the search field, only Esc closes
-                     if (var2 != 0 && var1 == 259) {
+                     boolean ctrl = (var3 & 10) != 0;
+                     if (ctrl && var1 == 67 && var2 == 1) {
+                        this.setClipboard(this.menu.search.toString());
+                     } else if (ctrl && var1 == 88 && var2 == 1) {
+                        this.setClipboard(this.menu.search.toString());
+                        this.menu.clearSearch();
+                     } else if (ctrl && var1 == 86) {
+                        this.menu.pasteSearch(sanitizePaste(this.getClipboard(), 24 - this.menu.search.length()));
+                     } else if (var1 == 265) {
+                        this.menu.stepSearchHistory(-1);
+                     } else if (var1 == 264) {
+                        this.menu.stepSearchHistory(1);
+                     } else if (var2 != 0 && (var1 == 259 || var1 == 261)) {
                         this.menu.backspace();
                      } else if (var2 == 1 && var1 == 256) {
                         this.setScreen(Game.S.PLAY);
@@ -1832,6 +2360,24 @@ public final class Game {
                case ADV:
                   if (var2 == 1 && (var1 == 256 || var1 == 76)) {
                      this.setScreen(Game.S.PLAY);
+                  }
+
+                  return;
+               case PACKS:
+                  if (var2 == 1 && var1 == 256) {
+                     this.setScreen(this.packsReturn != null ? this.packsReturn : Game.S.TITLE);
+                  }
+
+                  return;
+               case MODS:
+                  if (var2 == 1 && var1 == 256) {
+                     this.setScreen(this.modsReturn != null ? this.modsReturn : Game.S.TITLE);
+                  }
+
+                  return;
+               case CREDITS:
+                  if (var2 == 1 && var1 == 256) {
+                     this.setScreen(this.creditsReturn != null ? this.creditsReturn : (this.world != null ? Game.S.PLAY : Game.S.TITLE));
                   }
 
                   return;
@@ -1878,6 +2424,7 @@ public final class Game {
                   for (int var8 = 0; var8 < this.activeBtns.size(); var8++) {
                      Game.Btn var9 = (Game.Btn)this.activeBtns.get(var8);
                      if (var4 >= var9.x && var4 <= var9.x + var9.w && var5 >= var9.y && var5 <= var9.y + var9.h && var9.action != null) {
+                        SoundEngine.playUi("ui_click", 0.55F, 1.0F);
                         var9.action.run();
                         return;
                      }
@@ -1892,6 +2439,7 @@ public final class Game {
                      if (var7.slider != null) {
                         this.dragging = var6;
                      } else if (var7.action != null) {
+                        SoundEngine.playUi("ui_click", 0.55F, 1.0F);
                         var7.action.run();
                      }
                      break;
@@ -1951,9 +2499,15 @@ public final class Game {
    }
 
    void runCommand(String var1) {
+      recordHistory(this.chatHistory, var1);
+      this.chatHistoryPos = this.chatHistory.size();
       if (!var1.startsWith("/")) {
-         this.say("<Player> " + var1);
+         this.say("<" + Net319.selfName + "> " + var1);
+         Net319.sendChat(this, var1);
       } else {
+         if (Net319.onNetCommand(this, var1)) {
+            return;
+         }
          String[] var2 = var1.substring(1).split("\\s+");
 
          try {
@@ -1969,21 +2523,24 @@ public final class Game {
                         var19 = 2;
                      } else if (var16.equals("3") || var16.startsWith("sp")) {
                         var19 = 3;
+                     } else if (var16.equals("4") || var16.startsWith("h")) {
+                        var19 = 4;
                      }
                   } else {
                      var19 = 0;
                   }
 
                   if (var19 < 0) {
-                     this.say("§cUsage: /gamemode <survival|creative|adventure|spectator>");
+                     this.say("§cUsage: /gamemode <survival|creative|adventure|spectator|hardcore>");
                   } else {
+                     this.spectatingMob = null;
                      this.player.setMode(var19);
-                     String[] var23 = new String[]{"Survival", "Creative", "Adventure", "Spectator"};
+                     String[] var23 = new String[]{"Survival", "Creative", "Adventure", "Spectator", "Hardcore"};
                      this.say("Set own game mode to " + var23[var19] + " Mode");
                   }
                   break;
                case "time":
-                  if (var2.length >= 3 && var2[1].equals("set")) {
+                  if (var2.length >= 3 && var2[1].equalsIgnoreCase("set")) {
                      String var15 = var2[2].toLowerCase();
                      long var18;
                      switch (var15) {
@@ -1993,11 +2550,19 @@ public final class Game {
                         case "noon":
                            var18 = 6000L;
                            break;
+                        case "sunset":
+                        case "dusk":
+                           var18 = 12000L;
+                           break;
                         case "night":
                            var18 = 13000L;
                            break;
                         case "midnight":
                            var18 = 18000L;
+                           break;
+                        case "sunrise":
+                        case "dawn":
+                           var18 = 23000L;
                            break;
                         default:
                            var18 = Long.parseLong(var15);
@@ -2005,8 +2570,14 @@ public final class Game {
 
                      this.world.dayTime = var18;
                      this.say("Set the time to " + var18);
+                  } else if (var2.length >= 3 && var2[1].equalsIgnoreCase("add")) {
+                     long delta = Long.parseLong(var2[2]);
+                     this.world.dayTime = Math.max(0L, this.world.dayTime + delta);
+                     this.say("Added " + delta + " to time (now " + this.world.dayTime + ")");
+                  } else if (var2.length == 1 || var2[1].equalsIgnoreCase("query")) {
+                     this.say("Current time is " + this.world.dayTime + " (day " + (this.world.dayTime / 24000L) + ")");
                   } else {
-                     this.say("§cUsage: /time set <day|noon|night|midnight|ticks>");
+                     this.say("§cUsage: /time <set|add|query> <day|noon|sunset|night|midnight|sunrise|ticks>");
                   }
                   break;
                case "tp":
@@ -2120,8 +2691,122 @@ public final class Game {
                   }
                   break;
                case "kill":
-                  this.player.health = 0;
-                  this.player.dead = true;
+                  if (var2.length > 1 && (var2[1].equalsIgnoreCase("mobs") || var2[1].equalsIgnoreCase("all") || var2[1].equalsIgnoreCase("@e"))) {
+                     int removed = this.mobs.list.size();
+                     this.mobs.list.clear();
+                     this.say("Removed " + removed + " mob(s)");
+                  } else {
+                     this.player.health = 0;
+                     this.player.dead = true;
+                  }
+                  break;
+               case "butcher":
+               case "killall":
+                  int butchered = this.mobs.list.size();
+                  this.mobs.list.clear();
+                  this.say("Removed " + butchered + " mob(s)");
+                  break;
+               case "clear":
+                  String clearFilter = var2.length > 1 ? var2[1].toLowerCase().replace('_', ' ') : "";
+                  int cleared = 0;
+                  for (int si = 0; si < this.inv.length; si++) {
+                     Stack st = this.inv[si];
+                     if (st != null && st.n > 0 && (clearFilter.isEmpty() || Items.name(st.id).toLowerCase().contains(clearFilter))) {
+                        cleared += st.n;
+                        this.inv[si] = null;
+                     }
+                  }
+                  this.say("Cleared " + cleared + " item(s) from inventory");
+                  break;
+               case "spawn":
+               case "home":
+                  double[] hxz = this.homeXZ();
+                  int hx = (int)Math.floor(hxz[0]);
+                  int hz = (int)Math.floor(hxz[1]);
+                  double[] stand = this.findStand(hx, hz);
+                  this.player.setPos(stand[0], stand[1], stand[2]);
+                  this.player.fallDistance = 0.0F;
+                  this.say("Teleported to spawn [" + (int)Math.floor(stand[0]) + ", " + (int)Math.floor(stand[1]) + ", " + (int)Math.floor(stand[2]) + "]");
+                  break;
+               case "spawnpoint":
+               case "setspawn":
+                  int spx = var2.length >= 4 ? (int)Math.floor(rel(var2[1], this.player.x)) : (int)Math.floor(this.player.x);
+                  int spy = var2.length >= 4 ? (int)Math.floor(rel(var2[2], this.player.y)) : (int)Math.floor(this.player.y);
+                  int spz = var2.length >= 4 ? (int)Math.floor(rel(var2[3], this.player.z)) : (int)Math.floor(this.player.z);
+                  this.spawnXZ = new int[]{spx, spz};
+                  this.say("Set world spawn point to [" + spx + ", " + spy + ", " + spz + "]");
+                  break;
+               case "top":
+                  int tx = (int)Math.floor(this.player.x);
+                  int tz = (int)Math.floor(this.player.z);
+                  double[] tStand = this.findStand(tx, tz);
+                  this.player.setPos(tStand[0], tStand[1], tStand[2]);
+                  this.player.fallDistance = 0.0F;
+                  this.say("Teleported to surface [" + tx + ", " + (int)Math.floor(tStand[1]) + ", " + tz + "]");
+                  break;
+               case "setblock":
+                  if (var2.length < 5) {
+                     this.say("§cUsage: /setblock <x> <y> <z> <block>");
+                  } else {
+                     int sbx = (int)Math.floor(rel(var2[1], this.player.x));
+                     int sby = (int)Math.floor(rel(var2[2], this.player.y));
+                     int sbz = (int)Math.floor(rel(var2[3], this.player.z));
+                     int bid = resolveBlockArg(var2[4]);
+                     if (bid < 0) {
+                        this.say("§cUnknown block: " + var2[4]);
+                     } else {
+                        this.world.setBlock(sbx, sby, sbz, bid);
+                        if (Redstone319.handlesUpdate(bid)) {
+                           Redstone319.propagate(this.world, sbx, sby, sbz);
+                        }
+                        this.meshNow(sbx, sby, sbz);
+                        this.say("Set block at [" + sbx + ", " + sby + ", " + sbz + "] to [" + (bid == 0 ? "Air" : Items.name(bid)) + "]");
+                     }
+                  }
+                  break;
+               case "fill":
+                  if (var2.length < 8) {
+                     this.say("§cUsage: /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>");
+                  } else {
+                     int fx1 = (int)Math.floor(rel(var2[1], this.player.x));
+                     int fy1 = (int)Math.floor(rel(var2[2], this.player.y));
+                     int fz1 = (int)Math.floor(rel(var2[3], this.player.z));
+                     int fx2 = (int)Math.floor(rel(var2[4], this.player.x));
+                     int fy2 = (int)Math.floor(rel(var2[5], this.player.y));
+                     int fz2 = (int)Math.floor(rel(var2[6], this.player.z));
+                     int x0 = Math.min(fx1, fx2);
+                     int x1 = Math.max(fx1, fx2);
+                     int y0 = Math.max(0, Math.min(fy1, fy2));
+                     int y1 = Math.min(255, Math.max(fy1, fy2));
+                     int z0 = Math.min(fz1, fz2);
+                     int z1 = Math.max(fz1, fz2);
+                     long vol = (long)(x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1);
+                     int bid = resolveBlockArg(var2[7]);
+                     if (bid < 0) {
+                        this.say("§cUnknown block: " + var2[7]);
+                     } else if (vol > 4096L) {
+                        this.say("§cToo many blocks in the specified area (" + vol + " > 4096)");
+                     } else {
+                        int count = 0;
+                        for (int yy = y0; yy <= y1; yy++) {
+                           for (int zz = z0; zz <= z1; zz++) {
+                              for (int xx = x0; xx <= x1; xx++) {
+                                 if (this.world.setBlock(xx, yy, zz, bid)) {
+                                    count++;
+                                 }
+                              }
+                           }
+                        }
+                        this.meshNow(x0, y0, z0);
+                        this.meshNow(x1, y1, z1);
+                        this.say("Filled " + count + " block(s) with [" + (bid == 0 ? "Air" : Items.name(bid)) + "]");
+                     }
+                  }
+                  break;
+               case "locate":
+               case "find":
+               case "locatebiome":
+                  this.locateCommand(var2);
                   break;
                case "heal":
                   this.player.health = 20;
@@ -2165,16 +2850,365 @@ public final class Game {
 
                   this.say("The hand bobs when you walk: " + (this.opt.bobbing ? "on" : "off") + "  (/bobbing on|off)");
                   break;
+               case "host":
+                  int hPort = var2.length > 1 ? Integer.parseInt(var2[1]) : Net319.DEFAULT_PORT;
+                  this.say(Net319.host(this, hPort));
+                  break;
+               case "join":
+               case "connect":
+                  String target = var2.length > 1 ? var2[1] : "lan";
+                  this.say(Net319.join(this, target));
+                  break;
+               case "disconnect":
+               case "leave":
+                  Net319.disconnect(this);
+                  this.say("Disconnected from multiplayer");
+                  break;
+               case "mp":
+               case "peers":
+                  this.say(
+                     Net319.isHosting()
+                        ? "Hosting LAN world (" + Net319.peerCount() + " peer(s) connected)"
+                        : (Net319.isConnected() ? "Connected to multiplayer (" + Net319.peerCount() + " peer(s))" : "Multiplayer inactive (/host [port] or /join [host:port])")
+                  );
+                  break;
+               case "pack":
+               case "resourcepack":
+                  if (var2.length < 2) {
+                     StringBuilder sb = new StringBuilder("Resource Packs (active: " + ResourcePacks.activeId() + "): ");
+                     boolean firstP = true;
+                     for (ResourcePacks.Pack p : ResourcePacks.list()) {
+                        if (!firstP) {
+                           sb.append(", ");
+                        }
+                        sb.append(p.id);
+                        firstP = false;
+                     }
+                     this.say(sb.toString());
+                  } else {
+                     ResourcePacks.select(var2[1], this);
+                     this.say("Activated Resource Pack: " + ResourcePacks.active().title);
+                  }
+                  break;
+               case "mods":
+                  ModLoader.onCommand(this, "/mods", var2);
+                  break;
+               case "credits":
+               case "endcredits":
+                  this.creditsReturn = this.world != null ? Game.S.PLAY : Game.S.TITLE;
+                  this.creditsScroll = 0.0F;
+                  this.setScreen(Game.S.CREDITS);
+                  break;
+               case "music":
+               case "sound":
+               case "acoustics":
+                  this.say("§6[Audio] §fNow playing: §e" + SoundEngine.currentMusicName()
+                     + " §7| §fSound: §a" + Math.round(this.opt.soundVolume * 100.0F) + "% §7| §fMusic: §a" + Math.round(this.opt.musicVolume * 100.0F)
+                     + "% §7| §f3D Acoustics: §b" + (this.opt.realAcoustics ? "ON" : "OFF"));
+                  break;
+               case "sb":
+               case "challenges":
+               case "sw":
+               case "bw":
+               case "shop":
+               case "upgrades":
+                  SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
+                  break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /seed /dim /give /kill /heal /fly /summon /firespread /weather /treefall /disaster /bobbing");
+                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
-                  this.say("§cUnknown command. Try /help");
+                  if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
+                     this.say("§cUnknown command. Try /help");
+                  }
             }
          } catch (Exception var12) {
             this.say("§cInvalid arguments");
          }
       }
+   }
+
+   static int resolveBlockArg(String raw) {
+      String q = raw.toLowerCase().trim();
+      if (q.equals("air") || q.equals("0")) {
+         return 0;
+      }
+      try {
+         int id = Integer.parseInt(q);
+         if (id > 0 && id < Blocks.MAX && Blocks.name[id] != null && !Items.isItem(id)) {
+            return id;
+         }
+      } catch (NumberFormatException ignored) {
+      }
+      String norm = q.replace('_', ' ');
+      int partial = -1;
+      for (int id : Blocks.creativeList()) {
+         if (!Items.isItem(id)) {
+            String nm = Items.name(id).toLowerCase();
+            if (nm.equals(norm)) {
+               return id;
+            }
+            if (partial < 0 && nm.contains(norm)) {
+               partial = id;
+            }
+         }
+      }
+      return partial;
+   }
+
+   void locateCommand(String[] args) {
+      if (args.length < 2) {
+         this.say("§cUsage: /locate <village|stronghold|fortress|mineshaft|pyramid|temple|witch_hut|igloo|outpost|biome_name>");
+         return;
+      }
+      boolean forceBiome = args[0].equalsIgnoreCase("locatebiome") || (args.length >= 3 && args[1].equalsIgnoreCase("biome"));
+      String target = (args.length >= 3 && args[1].equalsIgnoreCase("biome") ? args[2] : args[1]).toLowerCase().trim();
+      int px = (int)Math.floor(this.player.x);
+      int pz = (int)Math.floor(this.player.z);
+
+      if (!forceBiome) {
+         switch (target) {
+            case "village":
+            case "villages": {
+               int r0x = Math.floorDiv(px, 320);
+               int r0z = Math.floorDiv(pz, 320);
+               Structs.Village best = null;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 18; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        Structs.Village v = this.world.gen.structs.village(r0x + dx, r0z + dz);
+                        if (v != null && v.valid) {
+                           double d2 = (double)(v.cx - px) * (v.cx - px) + (double)(v.cz - pz) * (v.cz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              best = v;
+                           }
+                        }
+                     }
+                  }
+                  if (best != null && r >= 2) {
+                     break;
+                  }
+               }
+               if (best != null) {
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  this.say("Located Village at [" + best.cx + ", " + best.cy + ", " + best.cz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Village nearby");
+               }
+               return;
+            }
+            case "stronghold":
+            case "portal": {
+               Stronghold sh = Stronghold.nearest(this.world.seed, px, pz);
+               if (sh != null) {
+                  int dist = (int)Math.round(Math.hypot(sh.cx - px, sh.cz - pz));
+                  int sy = sh.plan() != null ? sh.plan().oy : 28;
+                  this.say("Located Stronghold at [" + sh.cx + ", " + sy + ", " + sh.cz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Stronghold");
+               }
+               return;
+            }
+            case "fortress":
+            case "nether_fortress": {
+               NetherFortress nf = new NetherFortress(this.world.seed);
+               int r0x = Math.floorDiv(px, NetherFortress.REG);
+               int r0z = Math.floorDiv(pz, NetherFortress.REG);
+               NetherFortress.Plan best = null;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 12; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        NetherFortress.Plan p = nf.plan(r0x + dx, r0z + dz);
+                        if (p != null && p.present) {
+                           double d2 = (double)(p.ox - px) * (p.ox - px) + (double)(p.oz - pz) * (p.oz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              best = p;
+                           }
+                        }
+                     }
+                  }
+                  if (best != null && r >= 1) {
+                     break;
+                  }
+               }
+               if (best != null) {
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  this.say("Located Nether Fortress at [" + best.ox + ", " + (best.oy + 1) + ", " + best.oz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Nether Fortress nearby");
+               }
+               return;
+            }
+            case "mineshaft":
+            case "shaft": {
+               int r0x = Math.floorDiv(px, 128);
+               int r0z = Math.floorDiv(pz, 128);
+               int bestX = 0;
+               int bestY = 0;
+               int bestZ = 0;
+               boolean foundShaft = false;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 16; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        Structs.Shaft sh = this.world.gen.structs.shaft(r0x + dx, r0z + dz);
+                        if (sh != null && sh.valid && !sh.cs.isEmpty()) {
+                           Structs.Corr c0 = (Structs.Corr)sh.cs.get(0);
+                           int sx = (c0.x0 + c0.x1) / 2;
+                           int sz = (c0.z0 + c0.z1) / 2;
+                           double d2 = (double)(sx - px) * (sx - px) + (double)(sz - pz) * (sz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              bestX = sx;
+                              bestY = c0.y + 1;
+                              bestZ = sz;
+                              foundShaft = true;
+                           }
+                        }
+                     }
+                  }
+                  if (foundShaft && r >= 1) {
+                     break;
+                  }
+               }
+               if (foundShaft) {
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  this.say("Located Mineshaft at [" + bestX + ", " + bestY + ", " + bestZ + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find a Mineshaft nearby");
+               }
+               return;
+            }
+            case "pyramid":
+            case "desert_pyramid":
+            case "desert_temple":
+            case "temple":
+            case "jungle_temple":
+            case "witch_hut":
+            case "swamp_hut":
+            case "hut":
+            case "igloo":
+            case "outpost":
+            case "watchtower":
+            case "tower":
+            case "landmark":
+            case "structure": {
+               int wantKind = 0;
+               String label = "Landmark";
+               if (target.contains("pyramid") || target.equals("desert_temple")) {
+                  wantKind = Landmarks319.K_PYRAMID;
+                  label = "Desert Pyramid";
+               } else if (target.contains("temple")) {
+                  wantKind = Landmarks319.K_JUNGLE;
+                  label = "Jungle Temple";
+               } else if (target.contains("witch") || target.contains("hut")) {
+                  wantKind = Landmarks319.K_WITCH;
+                  label = "Witch Hut";
+               } else if (target.equals("igloo")) {
+                  wantKind = Landmarks319.K_IGLOO;
+                  label = "Igloo";
+               } else if (target.equals("outpost") || target.equals("watchtower") || target.equals("tower")) {
+                  wantKind = Landmarks319.K_OUTPOST;
+                  label = "Ruined Watchtower";
+               }
+               int r0x = Math.floorDiv(px, Landmarks319.REG);
+               int r0z = Math.floorDiv(pz, Landmarks319.REG);
+               Landmarks319.Site best = null;
+               double bestD2 = Double.MAX_VALUE;
+               for (int r = 0; r <= 24; r++) {
+                  for (int dz = -r; dz <= r; dz++) {
+                     for (int dx = -r; dx <= r; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                           continue;
+                        }
+                        Landmarks319.Site s = Landmarks319.plan(this.world.gen.structs, r0x + dx, r0z + dz);
+                        if (s != null && (wantKind == 0 || s.kind == wantKind)) {
+                           int cx = s.x0 + s.w / 2;
+                           int cz = s.z0 + s.d / 2;
+                           double d2 = (double)(cx - px) * (cx - px) + (double)(cz - pz) * (cz - pz);
+                           if (d2 < bestD2) {
+                              bestD2 = d2;
+                              best = s;
+                           }
+                        }
+                     }
+                  }
+                  if (best != null && r >= 2) {
+                     break;
+                  }
+               }
+               if (best != null) {
+                  int cx = best.x0 + best.w / 2;
+                  int cy = best.y0 + 1;
+                  int cz = best.z0 + best.d / 2;
+                  int dist = (int)Math.round(Math.sqrt(bestD2));
+                  String[] kindNames = {"Landmark", "Desert Pyramid", "Jungle Temple", "Witch Hut", "Igloo", "Ruined Watchtower"};
+                  String foundLabel = best.kind >= 1 && best.kind < kindNames.length ? kindNames[best.kind] : label;
+                  this.say("Located " + foundLabel + " at [" + cx + ", " + cy + ", " + cz + "] (" + dist + " blocks away)");
+               } else {
+                  this.say("§cCould not find " + label + " nearby");
+               }
+               return;
+            }
+            default:
+               break;
+         }
+      }
+
+      // Biome search
+      String normB = target.replace('_', ' ');
+      if (normB.equals("mesa")) {
+         normB = "badlands";
+      } else if (normB.equals("mountains") || normB.equals("hills")) {
+         normB = "extreme hills";
+      }
+      int wantBiome = -1;
+      for (int b = 0; b < Biomes.N; b++) {
+         String bn = Biomes.NAME[b].toLowerCase();
+         if (bn.equals(normB) || (wantBiome < 0 && bn.contains(normB))) {
+            wantBiome = b;
+            if (bn.equals(normB)) {
+               break;
+            }
+         }
+      }
+      if (wantBiome < 0) {
+         this.say("§cUnknown structure or biome '" + target + "'. Try: village, stronghold, fortress, mineshaft, pyramid, temple, witch_hut, igloo, outpost, or a biome name.");
+         return;
+      }
+
+      int step = 32;
+      for (int r = 0; r <= 150; r++) {
+         for (int dz = -r; dz <= r; dz++) {
+            for (int dx = -r; dx <= r; dx++) {
+               if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                  continue;
+               }
+               int wx = px + dx * step;
+               int wz = pz + dz * step;
+               Gen.Col col = this.world.gen.column(wx, wz);
+               if (col.biome == wantBiome) {
+                  int dist = (int)Math.round(Math.hypot(wx - px, wz - pz));
+                  this.say("Located biome " + Biomes.name(wantBiome) + " at [" + wx + ", " + (col.h + 1) + ", " + wz + "] (" + dist + " blocks away)");
+                  return;
+               }
+            }
+         }
+      }
+      this.say("§cCould not find biome " + Biomes.name(wantBiome) + " within 4800 blocks");
    }
 
    void setCreativeFlight() {
@@ -2229,16 +3263,30 @@ public final class Game {
          var14.vz = Math.cos(var4) * Math.cos(var6) * 0.3;
          var14.vy = -Math.sin(var6) * 0.3 + 0.1;
          var14.delay = 40;
+         Net319.onDropItem(this.world, var14);
       }
    }
 
    void openMenu(int var1, TileEntity var2) {
+      if (var1 == 3 && this.world != null) {
+         double cx = var2 != null ? var2.x + 0.5 : this.player.x;
+         double cy = var2 != null ? var2.y + 0.5 : this.player.y + 0.5;
+         double cz = var2 != null ? var2.z + 0.5 : this.player.z;
+         SoundEngine.play3D(this.world, "chest_open", cx, cy, cz, 0.85F, 0.96F + this.rnd.nextFloat() * 0.08F);
+      }
       this.menu = new Menu(this, var1, var2);
       this.setScreen(Game.S.INV);
    }
 
    void closeMenu() {
       if (this.menu != null) {
+         if (this.menu.kind == 3 && this.world != null) {
+            TileEntity var2 = this.menu.tile;
+            double cx = var2 != null ? var2.x + 0.5 : this.player.x;
+            double cy = var2 != null ? var2.y + 0.5 : this.player.y + 0.5;
+            double cz = var2 != null ? var2.z + 0.5 : this.player.z;
+            SoundEngine.play3D(this.world, "chest_close", cx, cy, cz, 0.85F, 0.96F + this.rnd.nextFloat() * 0.08F);
+         }
          this.menu.close();
          this.menu = null;
       }
@@ -2290,7 +3338,16 @@ public final class Game {
    }
 
    void pickBlock() {
-      if (this.player.creative && !this.player.spectator && this.target != null) {
+      if (this.player.spectator) {
+         if (this.targetMob != null) {
+            this.spectatingMob = this.targetMob;
+            this.say("\u00a7b[Spectator] Spectating " + Mobs.NAME[this.targetMob.type] + " (press Shift to exit POV)");
+         } else if (this.target != null) {
+            this.player.setPos(this.target.x + 0.5, this.target.y + 1.0, this.target.z + 0.5);
+         }
+         return;
+      }
+      if (this.target != null) {
          int var1 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
          if (var1 != 0) {
             if (var1 == 70) {
@@ -2311,8 +3368,98 @@ public final class Game {
                   }
                }
 
-               this.inv[this.sel] = new Stack(var1, 64);
-               this.nameTimer = 40.0F;
+               if (this.player.creative) {
+                  this.inv[this.sel] = new Stack(var1, 64);
+                  this.nameTimer = 40.0F;
+               } else {
+                  // V4.1 Survival & Adventure Pick-Block: swap matching stack from main inventory (9..35) into active hotbar slot
+                  for (int i = 9; i < 36; i++) {
+                     if (this.inv[i] != null && this.inv[i].id == var1) {
+                        Stack tmp = this.inv[this.sel];
+                        this.inv[this.sel] = this.inv[i];
+                        this.inv[i] = tmp;
+                        this.nameTimer = 40.0F;
+                        this.equip = 0.0F;
+                        return;
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   void spectatorAction(int action) {
+      if (this.world == null || this.player == null) {
+         return;
+      }
+      switch (action) {
+         case 1 -> {
+            this.spectatingMob = null;
+            double[] st = this.findStand(this.spawnXZ[0], this.spawnXZ[1]);
+            double sy = st != null ? st[1] : 80.0;
+            this.player.setPos(this.spawnXZ[0] + 0.5, sy, this.spawnXZ[1] + 0.5);
+            this.say("\u00a7b[Spectator] Teleported to World Spawn (" + this.spawnXZ[0] + ", " + (int)sy + ", " + this.spawnXZ[1] + ")");
+         }
+         case 2 -> {
+            Mob best = null;
+            double bestD = Double.MAX_VALUE;
+            for (Mob m : this.mobs.list) {
+               if (!m.dead && m != this.spectatingMob) {
+                  double d = Math.hypot(m.x - this.player.x, m.z - this.player.z);
+                  if (d < bestD) {
+                     bestD = d;
+                     best = m;
+                  }
+               }
+            }
+            if (best != null) {
+               this.spectatingMob = best;
+               this.player.setPos(best.x, best.y, best.z);
+               this.say("\u00a7b[Spectator] Spectating " + Mobs.NAME[best.type] + " (HP: " + best.health + ", press Shift to exit POV)");
+            } else {
+               this.say("\u00a77[Spectator] No mobs nearby to spectate.");
+            }
+         }
+         case 3 -> {
+            this.spectatingMob = null;
+            if (this.world.settings != null && this.world.settings.isVoidMode()) {
+               this.player.setPos(0.5, SkyGen.Y_DECK + 4.0, 0.5);
+               this.say("\u00a7b[Spectator] Teleported to Center Island (0, " + (SkyGen.Y_DECK + 4) + ", 0)");
+            } else {
+               this.locateCommand(new String[]{"locate", "village"});
+            }
+         }
+         case 4 -> {
+            this.spectatingMob = null;
+            int bx = (int)Math.floor(this.player.x);
+            int bz = (int)Math.floor(this.player.z);
+            double[] st = this.findStand(bx, bz);
+            double sy = st != null ? st[1] : 90.0;
+            this.player.setPos(bx + 0.5, sy, bz + 0.5);
+            this.say("\u00a7b[Spectator] Teleported to Surface (" + bx + ", " + (int)sy + ", " + bz + ")");
+         }
+         case 5 -> {
+            this.spectatorNightVision = !this.spectatorNightVision;
+            this.say("\u00a7b[Spectator] Night Vision: " + (this.spectatorNightVision ? "\u00a7aON" : "\u00a7cOFF"));
+         }
+         case 6 -> {
+            if (this.spectatingMob != null) {
+               this.spectatingMob = null;
+               this.say("\u00a7b[Spectator] Exited Mob POV.");
+            } else if (this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+               int idx = (int)((this.tickCount / 5) % 4);
+               int[] b = SkyGen.BEDWARS_BASES[idx];
+               this.player.setPos(b[0] + 0.5, SkyGen.Y_DECK + 3.0, b[1] + 0.5);
+               this.say("\u00a7b[Spectator] Teleported to " + SkyGen.BEDWARS_NAMES[idx] + " Base");
+            } else if (this.world.settings != null && this.world.settings.type == WorldSettings.SKYWARS) {
+               int idx = (int)((this.tickCount / 5) % SkyGen.SKYWARS_SPAWNS.length);
+               int[] sp = SkyGen.SKYWARS_SPAWNS[idx];
+               this.player.setPos(sp[0] + 0.5, SkyGen.Y_DECK + 3.0, sp[1] + 0.5);
+               this.say("\u00a7b[Spectator] Teleported to Skywars Island #" + (idx + 1));
+            } else {
+               this.player.flySpeed = 0.05F;
+               this.say("\u00a7b[Spectator] Reset Fly Speed to 100%.");
             }
          }
       }
@@ -2368,6 +3515,41 @@ public final class Game {
 
       if (Items.isFood(id)) {
          var4.add("§6Restores " + Items.foodPts[id] / 2.0F + " hunger");
+         if (id == Redstone319.GOLDEN_APPLE) {
+            var4.add("§e+4 Hearts Regeneration (eat anytime)");
+         } else if (id == Redstone319.GOLDEN_CARROT) {
+            var4.add("§e+1 Heart Regeneration");
+         }
+      } else if (id == Redstone319.COMPASS) {
+         var4.add("§7Right-click to check World Spawn direction");
+      } else if (id == Redstone319.CLOCK) {
+         var4.add("§7Right-click to check Day, Time & Weather");
+      } else if (id == Redstone319.FIRE_CHARGE) {
+         var4.add("§7Right-click to ignite fire or launch fireball");
+      } else if (id == Redstone319.PISTOL) {
+         var4.add("§b6.0 Ranged Damage §7(Semi-Auto Sidearm)");
+         var4.add("§7Left/Right-click to fire high-velocity arrows");
+      } else if (id == Redstone319.MACHINE_GUN) {
+         var4.add("§b4.0 Ranged Damage §7(Full-Auto Assault Rifle)");
+         var4.add("§7Hold Left/Right-click for rapid-fire arrows");
+      } else if (id == Redstone319.SNIPER_RIFLE) {
+         var4.add("§b14.0 Ranged Damage §7(AWP Precision Rifle)");
+         var4.add("§7Left/Right-click to fire armor-piercing rounds");
+      } else if (id == Redstone319.TNT_GRENADE) {
+         var4.add("§cExplosive Fragmentation Grenade");
+         var4.add("§7Right-click to throw primed TNT grenade");
+      } else if (id == Redstone319.MURDER_KNIFE) {
+         var4.add("§c24.0 Lethal Strike Damage");
+         var4.add("§7Left-click to strike | Right-click to throw knife");
+      } else if (id == Redstone319.C4_BOMB) {
+         var4.add("§eTactical Explosive Charge (CS2 Strike)");
+         var4.add("§7Click at Bomb Site A or B to plant the C4");
+      } else if (id == Redstone319.SIEGE_CANNON) {
+         var4.add("§6Heavy Siege Artillery Cannon (Castle Siege)");
+         var4.add("§7Fires explosive cannonballs that breach castle gates (0 friendly blast dmg)");
+      } else if (id == Redstone319.MORTAR_STRIKE) {
+         var4.add("§6High-Arc Siege Mortar Launcher (Castle Siege)");
+         var4.add("§7Lobs arcing explosive shells over fortress walls (0 friendly blast dmg)");
       }
 
       int fuel = Recipes.fuelTime(new Stack(id, 1));
@@ -2434,13 +3616,20 @@ public final class Game {
             var5 = 0.25;
          }
 
-         GLFW.glfwPollEvents();
-         this.update(var5);
-         if (System.getProperty("bc.auto") != null) {
-            this.autoTest();
-         }
+         try {
+            GLFW.glfwPollEvents();
+            this.update(var5);
+            if (System.getProperty("bc.auto") != null) {
+               this.autoTest();
+            }
 
-         this.render();
+            this.render();
+         } catch (Throwable varErr) {
+            varErr.printStackTrace();
+            if (System.getProperty("bc.test") != null) {
+               throw varErr;
+            }
+         }
          if (this.autoShotNow) {
             this.screenshot();
             System.out.println("AUTO screenshot; chunks=" + (this.world == null ? 0 : this.world.chunks.size()) + " fps=" + this.fps);
@@ -2474,8 +3663,8 @@ public final class Game {
       }
 
       int cap = this.opt.maxFps;
-      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.OPTIONS
-         || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE;
+      boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
+         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE || this.screen == Game.S.CREDITS;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -2539,6 +3728,13 @@ public final class Game {
          this.pano.update(var1); // Update 3.13: the turning world behind the title and the menus
       }
 
+      if (this.world == null && Net319.isActive()) {
+         Net319.tick(this);
+      }
+      if (this.world == null) {
+         SoundEngine.tick(this);
+      }
+
       if (this.world != null) {
          int var3 = (int)Math.floor(this.player.x) >> 4;
          int var4 = (int)Math.floor(this.player.z) >> 4;
@@ -2546,10 +3742,30 @@ public final class Game {
          this.rend.camY = this.player.y + this.player.eye;
          this.rend.camZ = this.player.z;
          boolean var5 = this.screen == Game.S.LOADING;
-         this.world.updateChunks(var3, var4, this.opt.renderDistance + 1, 256, var5 ? 30000000L : 4000000L);
-         this.rend.scheduleMeshes(this.world, var5 ? 64 : 48);
-         this.rend.uploadMeshes(256, var5 ? 20000000L : 4000000L);
+         boolean isPanoWorld = this.pano != null && this.world == this.pano.world;
+         int chunkRad = this.opt.renderDistance + 1;
+         if (var5) {
+            long loadDeadline = System.nanoTime() + 28000000L;
+            for (int burst = 0; burst < 4; burst++) {
+               int r = this.world.loadedAround(var3, var4, 2) < 25 ? Math.min(3, chunkRad) : chunkRad;
+               this.world.updateChunks(var3, var4, r, 256, 10000000L);
+               this.rend.scheduleMeshes(this.world, 96);
+               this.rend.uploadMeshes(256, 8000000L);
+               if (System.nanoTime() >= loadDeadline) {
+                  break;
+               }
+            }
+         } else {
+            this.world.updateChunks(var3, var4, chunkRad, 256, 4000000L);
+            this.rend.scheduleMeshes(this.world, 48);
+            this.rend.uploadMeshes(256, 4000000L);
+         }
          if (this.screen == Game.S.LOADING) {
+            SoundEngine.tick(this);
+            if (Net319.isActive()) {
+               Net319.tick(this);
+            }
+
             int var16 = 25;
             int var18 = this.world.loadedAround(var3, var4, 2);
             boolean var19 = var18 >= var16;
@@ -2599,11 +3815,30 @@ public final class Game {
                      this.player.setPos(this.player.x, this.player.y + 1.0, this.player.z);
                   }
 
-                  this.setScreen(Game.S.PLAY);
+                  if (this.pendingEndCredits) {
+                     this.pendingEndCredits = false;
+                     this.creditsReturn = Game.S.PLAY;
+                     this.creditsScroll = 0.0F;
+                     this.setScreen(Game.S.CREDITS);
+                  } else if (this.world.settings != null
+                     && this.world.settings.isMinigame()
+                     && SkyGen.matchState == SkyGen.STATE_WAITING
+                     && this.window != 0L
+                     && System.getProperty("bc.auto") == null) {
+                     this.setScreen(Game.S.WAITING);
+                  } else {
+                     this.setScreen(Game.S.PLAY);
+                  }
                }
             }
          } else {
-            boolean var6 = this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.CHAT || this.screen == Game.S.DEAD;
+            boolean var6 = !isPanoWorld
+               && (this.screen == Game.S.PLAY
+                  || this.screen == Game.S.WAITING
+                  || this.screen == Game.S.INV
+                  || this.screen == Game.S.CHAT
+                  || this.screen == Game.S.DEAD
+                  || Net319.isActive());
             if (var6) {
                this.acc += var1 * 20.0;
 
@@ -2627,12 +3862,15 @@ public final class Game {
                float var9 = (var8 - var17.x - 4.0F) / (var17.w - 8.0F);
                var17.slider.accept(Math.max(0.0F, Math.min(1.0F, var9)));
             }
+            if (!var6) {
+               SoundEngine.tick(this);
+            }
          }
       }
    }
 
    boolean key(int var1) {
-      return GLFW.glfwGetKey(this.window, var1) == 1;
+      return this.window != 0L && GLFW.glfwGetKey(this.window, var1) == 1;
    }
 
    /** Update 3.9: the walking / turning state of the body that the third-person view and the skin preview draw. */
@@ -2826,7 +4064,7 @@ public final class Game {
       this.world.tick();
       this.world.fire.particles(this);
       this.Tex_tick();
-      if (this.screen != Game.S.PAUSE) {
+      if (this.screen != Game.S.PAUSE && this.screen != Game.S.WAITING) {
          this.mobs.tick();
       }
 
@@ -2862,11 +4100,17 @@ public final class Game {
          this.sprintToggle = false;
       }
 
-      if (!this.player.dead) {
+      if (!this.player.dead && this.screen != Game.S.WAITING) {
          this.player.tick(this.world, var2, var3, var4, var5, var6);
          this.tickPose();
       }
 
+      Redstone319.tick(this);
+      Net319.tick(this);
+      SkyGen.tickCrosshair();
+      SkyGen.tickMode(this, this.world);
+      ModLoader.onGameTick(this);
+      SoundEngine.tick(this);
       this.adv.tick();
       if (this.tickCount % 10 == 0) {
          this.adv.poll(this);
@@ -2875,18 +4119,34 @@ public final class Game {
       if (this.player.dead && this.screen != Game.S.DEAD) {
          if (!this.deathHandled) {
             this.deathHandled = true;
+            SkyGen.myDeaths++;
+            SkyGen.onLocalPlayerDied(this);
             if (!this.player.creative) {
+               boolean isBedwars = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+               boolean isMurder = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.MURDER;
                for (int var7 = 0; var7 < 36; var7++) {
                   if (this.inv[var7] != null) {
-                     this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, this.inv[var7].id, this.inv[var7].n, this.inv[var7].dmg);
+                     int dropId = this.inv[var7].id;
+                     boolean shouldDrop = true;
+                     if (isBedwars) {
+                        shouldDrop = dropId == Items.IRON_INGOT || dropId == Items.GOLD_INGOT || dropId == Items.DIAMOND || dropId == Items.EMERALD;
+                     } else if (isMurder && dropId == Redstone319.MURDER_KNIFE) {
+                        shouldDrop = false;
+                     }
+                     if (shouldDrop) {
+                        this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, dropId, this.inv[var7].n, this.inv[var7].dmg);
+                     }
                      this.inv[var7] = null;
                   }
                }
 
-               for (int var12 = 0; var12 < 4; var12++) {
-                  if (this.armor[var12] != null) {
-                     this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, this.armor[var12].id, this.armor[var12].n, this.armor[var12].dmg);
-                     this.armor[var12] = null;
+               boolean keepBwArmor = isBedwars;
+               if (!keepBwArmor) {
+                  for (int var12 = 0; var12 < 4; var12++) {
+                     if (this.armor[var12] != null) {
+                        this.world.dropItem(this.player.x, this.player.y + 0.5, this.player.z, this.armor[var12].id, this.armor[var12].n, this.armor[var12].dmg);
+                        this.armor[var12] = null;
+                     }
                   }
                }
             }
@@ -2974,6 +4234,15 @@ public final class Game {
          this.world.fight.tick(this);
       }
 
+      if (this.player.spectator && this.spectatingMob != null) {
+         if (this.spectatingMob.dead || this.player.sneaking) {
+            this.spectatingMob = null;
+         } else {
+            this.player.setPos(this.spectatingMob.x, this.spectatingMob.y, this.spectatingMob.z);
+            this.player.yaw = this.spectatingMob.yaw;
+         }
+      }
+
       this.voidCheck();
    }
 
@@ -2989,27 +4258,23 @@ public final class Game {
    }
 
    void updateTarget() {
-      if (this.player.spectator) {
+      double var1 = Math.toRadians(this.player.yaw);
+      double var3 = Math.toRadians(this.player.pitch);
+      double var5 = -Math.sin(var1) * Math.cos(var3);
+      double var7 = -Math.sin(var3);
+      double var9 = Math.cos(var1) * Math.cos(var3);
+      double var11 = this.player.spectator ? 8.0 : (this.player.creative ? 5.0 : 4.5);
+      this.target = this.world.raycast(this.player.x, this.player.y + this.player.eye, this.player.z, var5, var7, var9, var11);
+      this.targetMob = null;
+      double[] var13 = new double[1];
+      double var14 = this.player.x;
+      double var16 = this.player.y + this.player.eye;
+      double var18 = this.player.z;
+      Mob var20 = this.mobs.pick(var14, var16, var18, var5, var7, var9, this.player.spectator ? 8.0 : (this.player.creative ? 5.0 : 3.0), var13);
+      if (var20 != null && (this.target == null || var13[0] < this.target.t)) {
+         this.targetMob = var20;
+         this.targetMobT = var13[0];
          this.target = null;
-      } else {
-         double var1 = Math.toRadians(this.player.yaw);
-         double var3 = Math.toRadians(this.player.pitch);
-         double var5 = -Math.sin(var1) * Math.cos(var3);
-         double var7 = -Math.sin(var3);
-         double var9 = Math.cos(var1) * Math.cos(var3);
-         double var11 = this.player.creative ? 5.0 : 4.5;
-         this.target = this.world.raycast(this.player.x, this.player.y + this.player.eye, this.player.z, var5, var7, var9, var11);
-         this.targetMob = null;
-         double[] var13 = new double[1];
-         double var14 = this.player.x;
-         double var16 = this.player.y + this.player.eye;
-         double var18 = this.player.z;
-         Mob var20 = this.mobs.pick(var14, var16, var18, var5, var7, var9, this.player.creative ? 5.0 : 3.0, var13);
-         if (var20 != null && (this.target == null || var13[0] < this.target.t)) {
-            this.targetMob = var20;
-            this.targetMobT = var13[0];
-            this.target = null;
-         }
       }
    }
 
@@ -3037,16 +4302,49 @@ public final class Game {
       if (this.player.spectator) {
          this.breakProg = 0.0F;
          this.eatTicks = 0;
+         if (var1 && this.targetMob != null) {
+            this.spectatingMob = this.targetMob;
+            this.say("\u00a7b[Spectator] Spectating " + Mobs.NAME[this.targetMob.type] + " (press Shift to exit POV)");
+         } else if (var2) {
+            if (this.spectatingMob != null) {
+               this.spectatingMob = null;
+               this.say("\u00a7b[Spectator] Returned to free-flight camera.");
+            } else if (this.target != null) {
+               int b = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+               if (b == 69 || b == 70 || b == 67 || b == 68) {
+                  TileEntity te = this.world.getOrCreateTile(this.target.x, this.target.y, this.target.z);
+                  if (te != null) {
+                     this.openMenu((b == 67 || b == 68) ? 2 : 3, te);
+                  }
+               }
+            }
+         }
       } else {
          Stack var3 = this.held();
          int var4 = this.heldId();
          if (this.leftDown && !this.swinging) {
             this.swinging = true;
             this.swing = 1.0E-4F;
+            if (this.target == null || this.targetMob != null) {
+               SoundEngine.playSwing(this.world, this.player.x, this.player.y + 1.4, this.player.z);
+            }
          }
 
          boolean var5 = false;
-         if (this.targetMob != null) {
+         if ((var1 || (this.leftDown && var4 == Redstone319.MACHINE_GUN))
+            && (var4 == Redstone319.PISTOL
+               || var4 == Redstone319.MACHINE_GUN
+               || var4 == Redstone319.SNIPER_RIFLE
+               || var4 == Redstone319.C4_BOMB
+               || var4 == Redstone319.SIEGE_CANNON
+               || var4 == Redstone319.MORTAR_STRIKE)
+            && SkyGen.tryUseTacticalWeapon(this, var4)) {
+            var5 = true;
+            this.breakProg = 0.0F;
+         } else if (var1 && Net319.tryAttackPeer(this)) {
+            var5 = true;
+            this.breakProg = 0.0F;
+         } else if (this.targetMob != null) {
             if (var1) {
                this.attackMob(this.targetMob);
             }
@@ -3057,8 +4355,14 @@ public final class Game {
 
          if (!var5 && this.leftDown && this.target != null) {
             int var6 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
-            if (!Blocks.breakable(var6) || this.player.adventure) {
+            if (!Blocks.breakable(var6) || (this.player.adventure && !Items.canAdventureBreak(var4, var6))) {
                this.breakProg = 0.0F;
+            } else if (this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE && SkyGen.isTumbleLayerBlock(this.target.x, this.target.y, this.target.z)) {
+               if (this.breakDelay <= 0) {
+                  this.breakBlock(this.target.x, this.target.y, this.target.z);
+                  this.breakProg = 0.0F;
+                  this.breakDelay = 3;
+               }
             } else if (this.player.creative) {
                boolean var7 = Items.isTool(var4) && Items.toolClass(var4) == 4;
                if (this.breakDelay <= 0 && !var7) {
@@ -3077,6 +4381,9 @@ public final class Game {
                this.breakProg += 1.0F / var20;
                if (this.rnd.nextInt(3) == 0) {
                   this.spawnBreakParticles(this.target.x, this.target.y, this.target.z, var6, 1);
+               }
+               if ((this.tickCount & 3) == 0) {
+                  SoundEngine.playBlockDig(this.world, var6, this.target.x, this.target.y, this.target.z);
                }
 
                if (this.breakProg >= 1.0F) {
@@ -3101,30 +4408,74 @@ public final class Game {
 
          if (!var19 && var2 && this.target != null && (!this.player.sneaking || var3 == null)) {
             var19 = this.useBlock();
+            if (var19) {
+               this.swinging = true;
+               this.swing = 1.0E-4F;
+            }
          }
 
          if (var19) {
             this.rightDown = false;
-         } else if (var2 && var3 != null && this.useSpecial(var3)) {
-            this.rightDown = false;
+         } else if ((var2 || (this.rightDown && var4 == Redstone319.MACHINE_GUN)) && var3 != null && this.useSpecial(var3)) {
+            if (var4 != Redstone319.MACHINE_GUN) {
+               this.rightDown = false;
+            }
             this.swinging = true;
             this.swing = 1.0E-4F;
-         } else if (this.rightDown && var3 != null && Items.isFood(var3.id) && this.player.food < 20 && !this.player.creative) {
-            this.eatTicks++;
-            if (this.eatTicks >= 32) {
+         } else if (this.rightDown
+            && var3 != null
+            && Items.isFood(var3.id)
+            && !this.player.creative
+            && (var3.id == Redstone319.GOLDEN_APPLE || (ModLoader.isClassicHudNoHunger() ? this.player.health < 20 : this.player.food < 20))) {
+            int eatenId = var3.id;
+            if (ModLoader.isClassicHudNoHunger()) {
+               // Classic Minecraft Infdev: food heals hearts immediately on right-click with no eating delay
                this.eatTicks = 0;
-               this.player.food = Math.min(20, this.player.food + Items.foodPts[var3.id]);
-               this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[var3.id]);
+               this.rightDown = false;
+               int heal = eatenId == Redstone319.GOLDEN_APPLE ? 8 : Items.foodPts[eatenId];
+               this.player.health = Math.min(20, this.player.health + heal);
+               SoundEngine.play3D(this.world, "eat_bite", this.player.x, this.player.y + 1.5, this.player.z, 0.85F, 0.95F + this.rnd.nextFloat() * 0.1F);
                var3.n--;
                if (var3.n <= 0) {
                   this.inv[this.sel] = null;
+               }
+               if (eatenId == Redstone319.MUSHROOM_STEW && !this.addItem(new Stack(Redstone319.BOWL, 1))) {
+                  this.dropFromPlayer(Redstone319.BOWL, 1, 0);
+               }
+            } else {
+               this.eatTicks++;
+               if ((this.eatTicks & 3) == 1) {
+                  SoundEngine.play3D(this.world, "eat_bite", this.player.x, this.player.y + 1.5, this.player.z, 0.72F, 0.92F + this.rnd.nextFloat() * 0.16F);
+               }
+               if (this.eatTicks >= 32) {
+                  this.eatTicks = 0;
+                  this.player.food = Math.min(20, this.player.food + Items.foodPts[eatenId]);
+                  this.player.sat = Math.min(this.player.food, this.player.sat + Items.foodSat[eatenId]);
+                  if (eatenId == Redstone319.GOLDEN_APPLE) {
+                     this.player.health = Math.min(20, this.player.health + 8);
+                     this.player.burn = 0;
+                     SoundEngine.playUi("levelup", 0.55F, 1.35F);
+                  } else if (eatenId == Redstone319.GOLDEN_CARROT) {
+                     this.player.health = Math.min(20, this.player.health + 2);
+                  }
+                  var3.n--;
+                  if (var3.n <= 0) {
+                     this.inv[this.sel] = null;
+                  }
+                  if (eatenId == Redstone319.MUSHROOM_STEW && !this.addItem(new Stack(Redstone319.BOWL, 1))) {
+                     this.dropFromPlayer(Redstone319.BOWL, 1, 0);
+                  }
                }
             }
          } else {
             this.eatTicks = 0;
             if (var4 != 268) {
                this.bowCharge = 0;
-               if (this.rightDown && this.placeDelay <= 0 && this.target != null && !this.player.adventure && this.placeBlock()) {
+               if (this.rightDown
+                  && this.placeDelay <= 0
+                  && this.target != null
+                  && (!this.player.adventure || Items.canAdventurePlace(var4, this.world.getBlock(this.target.x, this.target.y, this.target.z)))
+                  && this.placeBlock()) {
                   this.placeDelay = 4;
                   this.swinging = true;
                   this.swing = 1.0E-4F;
@@ -3158,6 +4509,7 @@ public final class Game {
                               var17,
                               3.0F * var8
                            );
+                        SoundEngine.play3D(this.world, "bow_shoot", this.player.x, this.player.y + this.player.eye, this.player.z, 0.9F, 1.0F / (1.0F + (this.rnd.nextFloat() - 0.5F) * 0.2F));
                         if (!this.player.creative) {
                            this.removeItems(267, 1);
                            this.damageHeld(1);
@@ -3179,7 +4531,11 @@ public final class Game {
 
    boolean useBlock() {
       int var1 = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+      if (BackroomsStalkerMod.isActive() && BackroomsStalkerMod.onUseBlock(this, this.target.x, this.target.y, this.target.z, var1)) {
+         return true;
+      }
       if (Shapes.use(this, this.target.x, this.target.y, this.target.z, var1)) {
+         SoundEngine.playClickBlock(this.world, this.target.x, this.target.y, this.target.z, true);
          return true;
       }
 
@@ -3188,7 +4544,15 @@ public final class Game {
          return true;
       }
 
+      if (this.world.settings != null && this.world.settings.type == WorldSettings.CASTLE_SIEGE
+         && SkyGen.tryFireEmplacedCannon(this, this.target.x, this.target.y, this.target.z)) {
+         return true;
+      }
+
       if (Blocks.isBed(var1)) {
+         if (this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+            return false;
+         }
          this.sleepAt(this.target.x, this.target.y, this.target.z);
          return true;
       }
@@ -3201,7 +4565,7 @@ public final class Game {
          return this.carvePumpkin();
       }
 
-      if ((var1 == Blocks.END_FRAME || var1 == Blocks.END_FRAME_EYE) && this.heldId() == Items.EYE_OF_ENDER && !this.player.adventure) {
+      if ((var1 == Blocks.END_FRAME || var1 == Blocks.END_FRAME_EYE) && this.heldId() == Items.EYE_OF_ENDER) {
          return EndPortals.insertEye(this, this.target.x, this.target.y, this.target.z);
       }
 
@@ -3233,6 +4597,10 @@ public final class Game {
    }
 
    void blockDrops(int var1, int var2, int var3, int var4, int var5) {
+      if (BackroomsStalkerMod.isActive() && var4 == Blocks313.ICE && this.world.getBlock(var1, var2 - 1, var3) == Blocks.QUARTZ_BLOCK) {
+         this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, BackroomsStalkerMod.ALMOND_WATER, 2);
+         return;
+      }
       if (Items.canHarvest(var5, var4)) {
          int var6 = Blocks.drop[var4];
          int var7 = 1;
@@ -3270,6 +4638,10 @@ public final class Game {
                   break;
                case 22:
                   var6 = 260;
+                  break;
+               case 23:
+                  var6 = Redstone319.ITEM_REDSTONE; // Update 3.19: redstone ore gives 4 - 5 redstone dust
+                  var7 = 4 + this.rnd.nextInt(2);
                   break;
                case 24:
                   var6 = Color312.dyeItem(11); // Update 3.12: lapis lazuli ore gives 4 - 8 blue dye
@@ -3330,26 +4702,56 @@ public final class Game {
    }
 
    void attackMob(Mob var1) {
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         if (SkyGen.botTeamIndex(var1) == SkyGen.getPlayerTeam(this)) {
+            this.say("§c[Bedwars] That is your own team's teammate!");
+            return;
+         }
+      }
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.CS2) {
+         if (SkyGen.botTeamIndex(var1) == (SkyGen.getPlayerTeam(this) & 1)) {
+            this.say("§c[CS2 Strike] Hold your fire — that is your teammate!");
+            return;
+         }
+      }
       int var2 = this.heldId();
-      boolean var3 = Items.isTool(var2);
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.MURDER
+         && var2 != Redstone319.MURDER_KNIFE && !this.player.creative) {
+         this.say("§e[Murder Mystery] Use a Detective/Sheriff Pistol (Right-Click) to stop the Murderer!");
+         return;
+      }
+      boolean var3 = Items.isTool(var2) || var2 == Redstone319.MURDER_KNIFE;
       float var4 = var3 ? Items.attackDamage(var2) : 1.0F;
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamSharpness(SkyGen.getPlayerTeam(this))) {
+         var4 += 2.0F;
+      }
       float var5 = 4.0F;
-      if (var3) {
+      if (Items.isTool(var2)) {
          int var6 = Items.toolClass(var2);
          var5 = var6 == 4 ? 1.6F : (var6 == 1 ? 1.2F : (var6 == 2 ? (Items.toolTier(var2) >= 3 ? 1.0F : 0.8F) : 1.0F));
       }
 
-      float var10 = Math.min(1.0F, (this.atkTicks + 0.5F) / (20.0F / var5));
+      float var10 = var2 == Redstone319.MURDER_KNIFE ? 1.0F : Math.min(1.0F, (this.atkTicks + 0.5F) / (20.0F / var5));
       var4 *= 0.2F + var10 * var10 * 0.8F;
+      boolean crit = false;
       if (var10 > 0.9F && !this.player.onGround && this.player.vy < 0.0 && !this.player.inWater && !this.player.sprinting) {
          var4 *= 1.5F;
+         crit = true;
       }
 
       boolean var7 = this.player.sprinting;
       this.atkTicks = 0;
       this.swinging = true;
       this.swing = 1.0E-4F;
+      SoundEngine.playSwing(this.world, this.player.x, this.player.y + 1.4, this.player.z);
       boolean var8 = this.mobs.hurtMob(var1, Math.max(1, Math.round(var4)), this.player.x, this.player.z, 0.4 + (var7 ? 0.5 : 0.0), true);
+      if (var8) {
+         SkyGen.triggerHitmarker(crit, var1.dead);
+         SoundEngine.playHit(this.world, var1.x, var1.y + 0.8, var1.z, crit);
+         if (var1.dead) {
+            SkyGen.onBotKilled(this, var1);
+         }
+      }
       if (var7) {
          this.player.sprinting = false;
       }
@@ -3461,6 +4863,7 @@ public final class Game {
          var2.dmg += var1;
          if (var2.dmg >= Items.maxDamage(var2.id)) {
             this.inv[this.sel] = null;
+            SoundEngine.play3D(this.world, "tool_break", this.player.x, this.player.y + 1.2, this.player.z, 0.9F, 0.96F + this.rnd.nextFloat() * 0.08F);
          }
       }
    }
@@ -3468,7 +4871,43 @@ public final class Game {
    void breakBlock(int var1, int var2, int var3) {
       int var4 = this.world.getBlock(var1, var2, var3);
       if (Blocks.breakable(var4)) {
+         boolean isMinigame = this.world.settings != null && this.world.settings.isMinigame();
+         boolean isBedwars = this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS;
+         boolean isTumble = this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE;
+         if (isMinigame && !this.player.creative) {
+            int wType = this.world.settings.type;
+            if (wType == WorldSettings.CS2 || wType == WorldSettings.MURDER) {
+               return;
+            }
+            if (wType == WorldSettings.CASTLE_SIEGE
+               && var2 <= SkyGen.Y_DECK
+               && !SkyGen.isSiegeDestructibleWall(var4)) {
+               return;
+            }
+            if (var4 == Redstone319.SLIME_BLOCK || var4 == Blocks.CHEST_LOOT) {
+               return;
+            }
+            if (isTumble && !SkyGen.isTumbleLayerBlock(var1, var2, var3)) {
+               return;
+            }
+            if (isBedwars && var2 <= SkyGen.Y_DECK
+               && !(var4 >= Blocks.WOOL0 && var4 < Blocks.WOOL0 + 16)
+               && var4 != Blocks.PLANKS
+               && !Blocks313.isPlanks(var4)
+               && var4 != Blocks.SANDSTONE
+               && var4 != Blocks.END_STONE
+               && var4 != Blocks.OBSIDIAN) {
+               return;
+            }
+         }
+         int bedTeam = isBedwars && Blocks.isBed(var4) ? SkyGen.getBedTeamAt(var1, var2, var3) : -1;
+         if (isBedwars && bedTeam >= 0 && bedTeam == SkyGen.getPlayerTeam(this) && !this.player.creative) {
+            this.say("\u00a7c[Bedwars] You cannot break your own team's bed!");
+            return;
+         }
+
          int var5 = this.heldId();
+         SoundEngine.playBlockBreak(this.world, var4, var1, var2, var3);
          this.spawnBreakParticles(var1, var2, var3, var4, 16);
          boolean var6 = var4 == 69 || var4 == 70 || var4 == 67 || var4 == 68;
          if (var4 == 70 && !this.player.creative) {
@@ -3488,15 +4927,19 @@ public final class Game {
             int var12 = var7 ? var3 - var10 : var3 + var10;
             this.world.setBlock(var11, var2, var12, 0);
             this.meshNow(var11, var2, var12);
-            if (var7 && !this.player.creative) {
+            if (var7 && !this.player.creative && !isBedwars) {
                this.world.dropItem(var1 + 0.5, var2 + 0.3, var3 + 0.5, Decor315.bedItem(Decor315.bedColor(var4)), 1);
             }
          }
 
          this.world.setBlock(var1, var2, var3, 0);
+         if (isBedwars && bedTeam >= 0) {
+            SkyGen.onBedDestroyed(this, this.world, bedTeam, Net319.selfName, true);
+         }
          if (var4 == Blocks313.ICE && !this.player.creative && this.world.getBlock(var1, var2 - 1, var3) != 0) {
             this.world.setBlock(var1, var2, var3, Blocks.WATER); // Update 3.13: broken ice melts to water
          }
+         ModLoader.onBlockBroken(this.world, var1, var2, var3, var4);
 
          if (Blocks.isDoor(var4)) {
             int var13 = Blocks.isDoorLo(var4) ? var2 + 1 : var2 - 1;
@@ -3511,7 +4954,9 @@ public final class Game {
          }
 
          if (!this.player.creative) {
-            this.blockDrops(var1, var2, var3, var4, var5);
+            if (!isTumble && (!isBedwars || !Blocks.isBed(var4))) {
+               this.blockDrops(var1, var2, var3, var4, var5);
+            }
             this.player.addExhaustion(0.025F);
             if (Blocks.hardness[var4] > 0.0F) {
                this.damageHeld(Items.isTool(var5) && Items.toolClass(var5) == 4 ? 2 : 1);
@@ -3519,6 +4964,13 @@ public final class Game {
          }
 
          this.meshNow(var1, var2, var3);
+         if (Redstone319.handlesUpdate(var4)) {
+            Redstone319.propagate(this.world, var1, var2, var3);
+            this.meshNow(var1 + 1, var2, var3);
+            this.meshNow(var1 - 1, var2, var3);
+            this.meshNow(var1, var2, var3 + 1);
+            this.meshNow(var1, var2, var3 - 1);
+         }
          if (Blocks.isLog(var4)) {
             // Update 3.10: cutting through a trunk makes the tree above fall over
             this.world.trees.fell(var1, var2, var3, this.player.x, this.player.z);
@@ -3614,21 +5066,25 @@ public final class Game {
    /** Right-click on a mob with an item in hand: shear a sheep, or feed an animal (breeding / growing up). */
    /** Update 3.12: right click on a villager opens its trades. */
    boolean openTrade(Mob v) {
-      this.menu = new Menu(this, Menu.TRADE, null, v.color);
+      int prof = v.color;
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         prof = v.color == Trades.PRIEST ? Trades.BEDWARS_ARMOR : Trades.BEDWARS_SHOP;
+      }
+      this.menu = new Menu(this, Menu.TRADE, null, prof);
       this.setScreen(Game.S.INV);
       return true;
    }
 
    boolean useOnMob(Mob var1, Stack var2) {
-      if (var1.type == Mobs.PARROT && !var1.dead && !this.player.spectator && !this.player.adventure && Mobs312.useParrot(this, var1, var2)) {
+      if (var1.type == Mobs.PARROT && !var1.dead && !this.player.spectator && Mobs312.useParrot(this, var1, var2)) {
          return true;
       }
 
-      if (var1.type == Mobs.VILLAGER && !var1.dead && !this.player.spectator && !this.player.adventure) {
+      if (var1.type == Mobs.VILLAGER && !var1.dead && !this.player.spectator) {
          return this.openTrade(var1);
       }
 
-      if (var2 == null || var1.dead || this.player.adventure || this.player.spectator) {
+      if (var2 == null || var1.dead || this.player.spectator) {
          return false;
       }
 
@@ -3767,7 +5223,7 @@ public final class Game {
       int y = this.target.y;
       int z = this.target.z;
       int id = this.world.getBlock(x, y, z);
-      if (!Blocks.isCake(id) || this.player.food >= 20 || this.player.adventure) {
+      if (!Blocks.isCake(id) || this.player.food >= 20) {
          return false;
       }
 
@@ -3775,6 +5231,7 @@ public final class Game {
       this.player.sat = Math.min(this.player.food, this.player.sat + 0.4F);
       this.world.setBlock(x, y, z, id >= Blocks.CAKE + 6 ? 0 : id + 1);
       this.meshNow(x, y, z);
+      SoundEngine.play3D(this.world, "eat_bite", x + 0.5, y + 0.5, z + 0.5, 0.8F, 1.0F);
       return true;
    }
 
@@ -3798,10 +5255,16 @@ public final class Game {
    }
 
    boolean placeBed(Stack var1) {
+      boolean isEndFight = this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.END_FIGHT;
+      int clickedId = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+      if (isEndFight && Blocks.isBed(clickedId)) {
+         SkyGen.detonateBedExplosion(this, this.world, this.target.x + 0.5, this.target.y + 0.5, this.target.z + 0.5, this.player, null);
+         return true;
+      }
       int var2 = this.target.x;
       int var3 = this.target.y;
       int var4 = this.target.z;
-      if (!Blocks.replaceable[this.world.getBlock(var2, var3, var4)]) {
+      if (!Blocks.replaceable[clickedId]) {
          var2 += this.target.nx;
          var3 += this.target.ny;
          var4 += this.target.nz;
@@ -3814,17 +5277,24 @@ public final class Game {
          int var9 = var7 == 0 ? -1 : (var7 == 1 ? 1 : 0);
          int var10 = var2 + var8;
          int var11 = var4 + var9;
-         if (!Blocks.replaceable[this.world.getBlock(var2, var3, var4)] || !Blocks.replaceable[this.world.getBlock(var10, var3, var11)]) {
+         if (!Blocks.replaceable[this.world.getBlock(var2, var3, var4)]) {
+            return false;
+         }
+         boolean headOk = Blocks.replaceable[this.world.getBlock(var10, var3, var11)]
+            && (Blocks.solid[this.world.getBlock(var10, var3 - 1, var11)] || isEndFight);
+         if (!headOk && !isEndFight) {
             return false;
          }
 
-         if (Blocks.solid[this.world.getBlock(var2, var3 - 1, var4)] && Blocks.solid[this.world.getBlock(var10, var3 - 1, var11)]) {
+         if (Blocks.solid[this.world.getBlock(var2, var3 - 1, var4)]) {
             int var12 = Decor315.bedItemColor(var1.id);
             this.world.setBlock(var2, var3, var4, Decor315.foot(var12, var7));
-            this.world.setBlock(var10, var3, var11, Decor315.head(var12, var7));
+            if (headOk) {
+               this.world.setBlock(var10, var3, var11, Decor315.head(var12, var7));
+               this.meshNow(var10, var3, var11);
+            }
             this.meshNow(var2, var3, var4);
-            this.meshNow(var10, var3, var11);
-            if (!this.player.creative) {
+            if (!this.player.creative && !isEndFight) {
                var1.n--;
                if (var1.n <= 0) {
                   this.inv[this.sel] = null;
@@ -3841,6 +5311,13 @@ public final class Game {
    }
 
    void sleepAt(int var1, int var2, int var3) {
+      if (this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS) {
+         return;
+      }
+      if (this.world.settings != null && this.world.settings.type == WorldSettings.END_FIGHT) {
+         SkyGen.detonateBedExplosion(this, this.world, var1 + 0.5, var2 + 0.5, var3 + 0.5, this.player, null);
+         return;
+      }
       if (this.world.dim != Dim.OVERWORLD) {
          // Update 3.12: a bed in the Nether or the End blows up (as in Minecraft)
          this.world.setBlock(var1, var2, var3, 0);
@@ -3878,7 +5355,34 @@ public final class Game {
    }
 
    boolean useSpecial(Stack var1) {
+      if (this.player.spectator) {
+         return false;
+      }
       int var2 = var1.id;
+      if (SkyGen.tryUseTacticalWeapon(this, var2)) {
+         return true;
+      }
+      if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.TUMBLE && SkyGen.useTumbleItem(this, var1)) {
+         return true;
+      }
+      if (var2 == BackroomsStalkerMod.ALMOND_WATER && BackroomsStalkerMod.drinkAlmondWater(this, var1)) {
+         return true;
+      }
+      if (Items.isArmor(var2)) {
+         int slot = Items.armorSlot(var2);
+         Stack prev = this.armor[slot];
+         this.armor[slot] = new Stack(var1.id, 1, var1.dmg);
+         if (var1.n > 1) {
+            var1.n--;
+            if (prev != null && !this.addItem(prev)) {
+               this.dropFromPlayer(prev.id, prev.n, prev.dmg);
+            }
+         } else {
+            this.inv[this.sel] = prev;
+         }
+         this.equip = 0.0F;
+         return true;
+      }
       double var3 = Math.toRadians(this.player.yaw);
       double var5 = Math.toRadians(this.player.pitch);
       double var7 = -Math.sin(var3) * Math.cos(var5);
@@ -3886,7 +5390,7 @@ public final class Game {
       double var11 = Math.cos(var3) * Math.cos(var5);
       double var13 = this.player.creative ? 5.0 : 4.5;
       if (var2 == 336 || var2 == 337) {
-         return this.target != null && !this.player.adventure && this.placeSeeds(var1);
+         return this.target != null && this.placeSeeds(var1);
       }
 
       if (var2 == 339) {
@@ -3897,8 +5401,49 @@ public final class Game {
          return !this.player.adventure && Mobs312.throwPearl(this, var1);
       }
 
+      if (var2 == Items.BLAZE_ROD && (this.player.creative || (this.world != null && this.world.settings != null && this.world.settings.isMinigame()))) {
+         return Mobs312.throwFireball(this, var1);
+      }
+
+      if (var2 == Redstone319.COMPASS && this.world != null) {
+         return SkyGen.useTrackerCompass(this);
+      }
+
+      if (var2 == Redstone319.CLOCK && this.world != null) {
+         long ticks = this.world.dayTime;
+         long day = ticks / 24000L + 1L;
+         int tod = (int)(ticks % 24000L);
+         int totalMin = ((tod + 6000) % 24000) * 1440 / 24000;
+         int hh = totalMin / 60;
+         int mm = totalMin % 60;
+         String phase = tod < 1000 ? "Sunrise" : (tod < 11000 ? "Day" : (tod < 13000 ? "Sunset" : "Night"));
+         String weather = this.world.weather != null ? this.world.weather.describe(this.player.x, this.player.z) : "Clear";
+         this.say(String.format("§6[Clock] §fDay §e%d §7| §fTime: §e%02d:%02d §7(§b%s§7) | §fWeather: §b%s", day, hh, mm, phase, weather));
+         return true;
+      }
+
+      if (var2 == Redstone319.FIRE_CHARGE && this.world != null && !this.player.adventure) {
+         if (this.target != null && !SkyGen.isMinigame(this.world)) {
+            int fx = this.target.x + this.target.nx;
+            int fy = this.target.y + this.target.ny;
+            int fz = this.target.z + this.target.nz;
+            if (this.world.fire.ignite(fx, fy, fz)) {
+               this.meshNow(fx, fy, fz);
+               SoundEngine.play3D(this.world, "flint_steel", fx + 0.5, fy + 0.5, fz + 0.5, 0.85F, 1.0F);
+               if (!this.player.creative) {
+                  var1.n--;
+                  if (var1.n <= 0) {
+                     this.inv[this.sel] = null;
+                  }
+               }
+               return true;
+            }
+         }
+         return Mobs312.throwFireball(this, var1);
+      }
+
       if (var2 == Items.EYE_OF_ENDER) {
-         boolean thrown = !this.player.adventure && EndPortals.throwEye(this, var1);
+         boolean thrown = EndPortals.throwEye(this, var1);
          if (thrown) {
             this.adv.award(this, "story/follow_ender_eye");
          }
@@ -3919,6 +5464,7 @@ public final class Game {
             int var22 = Blocks.isWater(var21) ? 283 : 284;
             this.world.setBlock(var19.x, var19.y, var19.z, 0);
             this.meshNow(var19.x, var19.y, var19.z);
+            SoundEngine.play3D(this.world, Blocks.isWater(var21) ? "step_water_1" : "lava_fizz", var19.x + 0.5, var19.y + 0.5, var19.z + 0.5, 0.80F, 1.0F);
             var1.n--;
             if (var1.n <= 0) {
                this.inv[this.sel] = new Stack(var22, 1);
@@ -3947,6 +5493,7 @@ public final class Game {
                   }
 
                   this.meshNow(fx, fy, fz);
+                  SoundEngine.play3D(this.world, "flint_steel", fx + 0.5, fy + 0.5, fz + 0.5, 0.85F, 1.0F);
                   this.damageHeld(1);
                   return true;
                }
@@ -3954,6 +5501,7 @@ public final class Game {
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 0);
                this.meshNow(this.target.x, this.target.y, this.target.z);
                this.world.primeTnt(this.target.x, this.target.y, this.target.z, 80);
+               SoundEngine.play3D(this.world, "tnt_ignite", this.target.x + 0.5, this.target.y + 0.5, this.target.z + 0.5, 0.9F, 1.0F);
                this.damageHeld(1);
                return true;
             } else {
@@ -3974,6 +5522,7 @@ public final class Game {
                this.world.setBlock(this.target.x, this.target.y, this.target.z, 123);
                this.meshNow(this.target.x, this.target.y, this.target.z);
                this.meshNow(this.target.x, this.target.y + 1, this.target.z);
+               SoundEngine.playBlockPlace(this.world, 123, this.target.x, this.target.y, this.target.z);
                this.damageHeld(1);
                return true;
             } else {
@@ -3995,6 +5544,7 @@ public final class Game {
          if (var16 >= 0 && var16 <= 255 && Blocks.replaceable[this.world.getBlock(var15, var16, var17)]) {
             this.world.setBlock(var15, var16, var17, var2 == 283 ? 50 : 58);
             this.meshNow(var15, var16, var17);
+            SoundEngine.play3D(this.world, var2 == 283 ? "step_water_1" : "lava_fizz", var15 + 0.5, var16 + 0.5, var17 + 0.5, 0.80F, 1.0F);
             if (!this.player.creative) {
                this.inv[this.sel] = new Stack(282, 1);
             }
@@ -4066,11 +5616,13 @@ public final class Game {
       int var6 = this.world.getBlock(var1, var5, var3);
       int var7 = this.world.getBlock(var1, var5 + 1, var3);
       if (Blocks.isDoorLo(var6) && Blocks.isDoorHi(var7)) {
-         int var8 = Blocks.doorOpen(var6) ? -4 : 4;
+         boolean opening = !Blocks.doorOpen(var6);
+         int var8 = opening ? 4 : -4;
          this.world.setBlock(var1, var5, var3, var6 + var8);
          this.world.setBlock(var1, var5 + 1, var3, var7 + var8);
          this.meshNow(var1, var5, var3);
          this.meshNow(var1, var5 + 1, var3);
+         SoundEngine.play3D(this.world, opening ? "door_open" : "door_close", var1 + 0.5, var5 + 1.0, var3 + 0.5, 0.85F, 0.94F + this.rnd.nextFloat() * 0.12F);
       }
    }
 
@@ -4184,6 +5736,10 @@ public final class Game {
 
       if (var1 != null && Items.plantBlock(var1.id) != 0) {
          return this.placeSeeds(var1);
+      }
+
+      if (var1 != null && var1.id == Redstone319.ITEM_REDSTONE) {
+         return Redstone319.placeWire(this, var1);
       }
 
       if (var1 != null && Blocks.isBlockId(var1.id)) {
@@ -4334,10 +5890,22 @@ public final class Game {
                if (!this.world.setBlock(var3, var4, var5, var2)) {
                   return false;
                }
+               SoundEngine.playBlockPlace(this.world, var2, var3, var4, var5);
+               ModLoader.onBlockPlaced(this.world, var3, var4, var5, var2);
+
+               if (var2 == Blocks.TNT && this.world.settings != null && this.world.settings.isMinigame()) {
+                  this.world.setBlock(var3, var4, var5, 0);
+                  this.world.primeTnt(var3, var4, var5, 55);
+                  SoundEngine.play3D(this.world, "tnt_ignite", var3 + 0.5, var4 + 0.5, var5 + 0.5, 0.9F, 1.0F);
+               }
 
                if (tallPlant) {
                   this.world.setBlock(var3, var4 + 1, var5, var2 + 1);
                   this.meshNow(var3, var4 + 1, var5);
+               }
+
+               if (Redstone319.handlesUpdate(var2) || var2 == Redstone319.DAYLIGHT_SENSOR) {
+                  Redstone319.propagate(this.world, var3, var4, var5);
                }
 
                this.meshNow(var3, var4, var5);
@@ -4369,6 +5937,7 @@ public final class Game {
          return false;
       }
 
+      SoundEngine.playBlockPlace(this.world, Blocks.STAIR_MAT[mat], x, y, z);
       this.meshNow(x, y, z);
       return true;
    }
@@ -4382,9 +5951,16 @@ public final class Game {
                double var7 = var2.y - (this.player.y + 0.5);
                if (var3 * var3 + var5 * var5 < 1.44 && Math.abs(var7) < 1.3) {
                   Stack var9 = new Stack(var2.id, var2.count, var2.dmg);
+                  int prevCount = var2.count;
                   this.addItem(var9);
                   if (var9.n <= 0) {
                      var2.dead = true;
+                     SoundEngine.play3D(this.world, "item_pop", this.player.x, this.player.y + 1.0, this.player.z, 0.55F, 0.9F + this.rnd.nextFloat() * 0.3F);
+                     Net319.onPickupItem(var2);
+                  } else if (var9.n < prevCount) {
+                     var2.count = var9.n;
+                     SoundEngine.play3D(this.world, "item_pop", this.player.x, this.player.y + 1.0, this.player.z, 0.55F, 0.9F + this.rnd.nextFloat() * 0.3F);
+                     Net319.onPickupItem(var2);
                   } else {
                      var2.count = var9.n;
                   }
@@ -4482,11 +6058,21 @@ public final class Game {
          }
 
          this.rend.renderWorld(this.partial, sceneW, sceneH);
-         Perf.mark(Perf.HAND);
          if (var3) {
             this.rend.sh.skyMask(sceneW, sceneH);
+            this.rend.sh.aoPass(sceneW, sceneH);
+            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
+            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
+            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
+               this.rend.sh.underwater = uwTarget;
+            }
+
+            Perf.mark(Perf.POST);
+            this.rend.sh.look = this.opt.look;
+            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
 
+         Perf.mark(Perf.HAND);
          if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {
             float var4 = this.swingPrev + (this.swing - this.swingPrev) * this.partial;
             float var5 = this.rend.brightnessAt(this.world, this.player.x, this.player.y + 1.0, this.player.z);
@@ -4497,26 +6083,14 @@ public final class Game {
                   HAND_SWING != null ? Float.parseFloat(HAND_SWING) : (this.swinging ? var4 : 0.0F),
                   HAND_EAT != null ? Float.parseFloat(HAND_EAT) : (this.eatTicks > 0 ? (this.eatTicks + this.partial) / 32.0F : -1.0F),
                   var5,
-                  sceneW,
-                  sceneH,
+                  this.fbW,
+                  this.fbH,
                   this.pEquip + (this.equip - this.pEquip) * this.partial,
                   (this.player.pitch - (this.pArmPitch + (this.armPitch - this.pArmPitch) * this.partial)) * 0.1F,
                   (this.player.yaw - (this.pArmYaw + (this.armYaw - this.pArmYaw) * this.partial)) * 0.1F,
                   this.opt.bobbing ? -(this.pBobDist + (this.bobDist - this.pBobDist) * this.partial) : 0.0F,
                   this.opt.bobbing ? this.pBobAmp + (this.bobAmp - this.pBobAmp) * this.partial : 0.0F
                );
-         }
-
-         if (var3) {
-            float uwTarget = this.player.eyeInWater && !this.player.spectator ? 1.0F : 0.0F;
-            this.rend.sh.underwater += (uwTarget - this.rend.sh.underwater) * 0.12F;
-            if (Math.abs(uwTarget - this.rend.sh.underwater) < 0.004F) {
-               this.rend.sh.underwater = uwTarget;
-            }
-
-            Perf.mark(Perf.POST);
-            this.rend.sh.look = this.opt.look;
-            this.rend.sh.endScene(sceneW, sceneH, this.fbW, this.fbH, 0.45F);
          }
       } else {
          GL11.glClearColor(0.0F, 0.0F, 0.0F, 1.0F);
@@ -4532,11 +6106,20 @@ public final class Game {
          case WORLDS:
             Screens.worlds(this);
             break;
+         case MULTIPLAYER:
+            Screens.multiplayer(this);
+            break;
          case NEWWORLD:
             Screens.newWorld(this);
             break;
+         case MINIGAMES:
+            Screens.minigames(this);
+            break;
          case LOADING:
             Screens.loading(this);
+            break;
+         case WAITING:
+            Screens.waiting(this);
             break;
          case CHAT:
          case INV:
@@ -4556,6 +6139,15 @@ public final class Game {
          case SKINS:
             this.ui.backdrop(0.5F);
             this.drawSkins();
+            break;
+         case PACKS:
+            Screens.resourcePacks(this);
+            break;
+         case MODS:
+            Screens.mods(this);
+            break;
+         case CREDITS:
+            Screens.credits(this);
             break;
          case OPTIONS:
             Screens.options(this);
@@ -4610,12 +6202,58 @@ public final class Game {
    void drawDead() {
       this.gui.gradient(0.0F, 0.0F, this.gui.w, this.gui.h, 1615855616, -1600126976);
       float var1 = this.gui.w / 2.0F;
-      this.gui.centered("You died!", var1, 40.0F, -1, true, 3.0F);
-      this.button("Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
-         this.respawn();
-         this.setScreen(Game.S.PLAY);
-      });
-      this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      boolean hc = this.player != null && this.player.hardcore;
+      boolean isRoundMode = this.world != null
+         && this.world.settings != null
+         && (this.world.settings.type == WorldSettings.BATTLE
+            || this.world.settings.type == WorldSettings.TUMBLE
+            || this.world.settings.type == WorldSettings.CS2
+            || this.world.settings.type == WorldSettings.MURDER);
+      boolean bwEliminated = this.world != null
+         && this.world.settings != null
+         && this.world.settings.type == WorldSettings.BEDWARS
+         && !SkyGen.isTeamBedIntact(this.world, SkyGen.getPlayerTeam(this));
+      boolean roundEliminated = bwEliminated || isRoundMode || SkyGen.localEliminated;
+      this.gui.centered(hc ? "Game Over!" : (roundEliminated ? "ELIMINATED!" : "You died!"), var1, 40.0F, -1, true, 3.0F);
+      long daysLived = this.world != null ? (this.world.dayTime / 24000L + 1L) : 1L;
+      this.gui.centered("§7Day " + daysLived + "  |  Kills: §e" + SkyGen.myKills + "  §7|  Deaths: §c" + Math.max(1, SkyGen.myDeaths), var1, 63.0F, -1, true, 1.0F);
+      if (hc) {
+         this.gui.centered("\u00a7cYou cannot respawn in Hardcore Mode!", var1, 74.0F, 0xFFFF5555, true, 1.0F);
+         this.button("Spectate World", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+            this.player.dead = false;
+            this.player.burn = 0;
+            this.player.health = 20;
+            this.player.setMode(3);
+            this.deathHandled = false;
+            this.setScreen(Game.S.PLAY);
+         });
+      } else if (roundEliminated) {
+         String elimMsg = bwEliminated
+            ? "\u00a7cYour bed was destroyed — you cannot respawn!"
+            : "\u00a7cYou were eliminated — you cannot respawn this round!";
+         this.gui.centered(elimMsg, var1, 74.0F, 0xFFFF5555, true, 1.0F);
+         this.button("Spectate Match", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+            this.respawn();
+            this.setScreen(Game.S.PLAY);
+         });
+      } else {
+         this.button("Respawn", var1 - 100.0F, this.gui.h / 2.0F - 10.0F, 200.0F, 20.0F, true, () -> {
+            this.respawn();
+            this.setScreen(Game.S.PLAY);
+         });
+      }
+      boolean isMinigame = this.world != null && this.world.settings != null && this.world.settings.isMinigame();
+      if (isMinigame && !Net319.isClientConnected()) {
+         this.button("Overview & Lobby", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 98.0F, 20.0F, true, () -> {
+            SkyGen.openMatchOverview(this, false);
+         });
+         this.button("New Round", var1 + 2.0F, this.gui.h / 2.0F + 14.0F, 98.0F, 20.0F, true, () -> {
+            SkyGen.startMatch(this, true);
+         });
+         this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 38.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      } else {
+         this.button("Title Screen", var1 - 100.0F, this.gui.h / 2.0F + 14.0F, 200.0F, 20.0F, true, this::quitToTitle);
+      }
    }
 
    String onOff(boolean var1) {
@@ -4791,11 +6429,21 @@ public final class Game {
          this.skins.importUser(this.skinField);
       } else if (key == 258 && action == 1) {
          this.skinFocus = !this.skinFocus;
-      } else if (key == 86 && action == 1 && (mods & 2) != 0) {
-         String text = GLFW.glfwGetClipboardString(this.window);
-         File f = this.skins.importFromText(text);
-         if (f != null) {
-            this.importSkin(f);
+      } else if (key == 67 && action == 1 && (mods & 10) != 0 && this.skinFocus) {
+         this.setClipboard(this.skinField);
+      } else if (key == 88 && action == 1 && (mods & 10) != 0 && this.skinFocus) {
+         this.setClipboard(this.skinField);
+         this.skinField = "";
+      } else if (key == 86 && action == 1 && (mods & 10) != 0) {
+         String text = this.getClipboard();
+         if (this.skinFocus && text != null && text.trim().matches("[A-Za-z0-9_]{1,16}")) {
+            String clean = text.trim();
+            this.skinField = (this.skinField + clean).substring(0, Math.min(16, this.skinField.length() + clean.length()));
+         } else {
+            File f = this.skins.importFromText(text);
+            if (f != null) {
+               this.importSkin(f);
+            }
          }
       } else if ((key == 265 || key == 264) && !this.skinFocus) {
          int i = Math.max(0, Math.min(names.size() - 1, (this.skinSel < 0 ? 0 : this.skinSel) + (key == 264 ? 1 : -1)));
@@ -4879,18 +6527,38 @@ public final class Game {
       if (!this.hideGui) {
          this.drawOverlays();
          if ((this.screen == Game.S.PLAY || this.screen == Game.S.CHAT) && this.view == 0) {
-            GL11.glBlendFunc(775, 769);
             float var1 = (float)Math.floor(this.gui.w / 2.0F);
             float var2 = (float)Math.floor(this.gui.h / 2.0F);
-            this.gui.rect(var1 - 7.0F, var2 - 0.5F, 15.0F, 1.0F, -1);
-            this.gui.rect(var1 - 0.5F, var2 - 7.0F, 1.0F, 6.5F, -1);
-            this.gui.rect(var1 - 0.5F, var2 + 0.5F, 1.0F, 6.5F, -1);
-            GL11.glBlendFunc(770, 771);
+            SkyGen.drawCrosshairAndHitmarker(this, var1, var2);
          }
 
          this.drawHotbar();
+         if (this.player.spectator) {
+            this.drawSpectatorHud();
+         } else if (this.player.adventure && this.target != null && this.world != null && this.screen == Game.S.PLAY) {
+            int tbid = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+            if (tbid > 0) {
+               boolean canBrk = Items.canAdventureBreak(this.heldId(), tbid);
+               String advHint = (canBrk ? "§a[Can Break: " : "§c[Need Tool: ") + Items.name(tbid) + "]";
+               this.gui.centered(advHint, this.gui.w / 2.0F, this.gui.h - 48.0F, 0xFFFFFFFF, true, 1.0F);
+            }
+         }
+         SkyGen.drawModeHud(this);
          this.drawBossBar();
          this.adv.drawToast(this);
+         if (this.window != 0L && this.screen == Game.S.PLAY && GLFW.glfwGetKey(this.window, 258) == 1) {
+            Net319.drawTabOverlay(this);
+         }
+         String wm = ModLoader.hudWatermark();
+         if (wm != null && !this.debug) {
+            this.gui.text(wm, 4.0F, 4.0F, 0xFFFFFFFF, true, 1.0F);
+         }
+         if (BackroomsStalkerMod.isActive()) {
+            BackroomsStalkerMod.drawHudOverlay(this);
+         }
+         if (ModLoader.isWaystonesHudActive() && !this.debug && this.world != null) {
+            this.drawWaystonesHud();
+         }
       }
 
       if (this.debug) {
@@ -4936,7 +6604,17 @@ public final class Game {
    }
 
    void damagePlayer(int var1, double var2, double var4) {
+      if (this.screen == Game.S.WAITING
+         || (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BATTLE && SkyGen.battleGraceTicks > 0)) {
+         return;
+      }
       if (!this.player.creative && !this.player.dead && this.player.invuln <= 0) {
+         if (this.player.hardcore) {
+            var1 = Math.max(1, (var1 * 3 + 1) / 2);
+         }
+         if (this.world != null && this.world.settings != null && this.world.settings.type == WorldSettings.BEDWARS && SkyGen.hasTeamProtection(SkyGen.getPlayerTeam(this))) {
+            var1 = Math.max(1, Math.round(var1 * 0.8F));
+         }
          int var6 = this.armorPoints();
          float var7 = Math.min(20.0F, Math.max(var6 / 5.0F, var6 - var1 / 2.0F)) / 25.0F;
          int var8 = Math.max(1, Math.round(var1 * (1.0F - var7)));
@@ -4945,6 +6623,7 @@ public final class Game {
          }
 
          this.player.hurt(var8);
+         SoundEngine.play3D(this.world, "player_hurt", this.player.x, this.player.y + 1.0, this.player.z, 0.9F, 0.94F + this.rnd.nextFloat() * 0.12F);
          double var9 = this.player.x - var2;
          double var11 = this.player.z - var4;
          double var13 = Math.sqrt(var9 * var9 + var11 * var11);
@@ -4984,31 +6663,35 @@ public final class Game {
       if (!this.player.spectator) {
          float var1 = (float)Math.floor((this.gui.w - 182.0F) / 2.0F);
          float var2 = this.gui.h - 22.0F;
-         this.gui.rect(var1, var2, 182.0F, 22.0F, -16777216);
-         this.gui.rect(var1 + 1.0F, var2 + 1.0F, 180.0F, 20.0F, -11184811);
-         this.gui.rect(var1 + 1.0F, var2 + 1.0F, 180.0F, 1.0F, -8750470);
+         // Sleek dark-glass hotbar dock
+         this.gui.rect(var1 - 1.0F, var2 - 1.0F, 184.0F, 23.0F, 0x70000000);
+         this.gui.rect(var1, var2, 182.0F, 22.0F, 0xFF080B12);
+         this.gui.gradient(var1 + 1.0F, var2 + 1.0F, 180.0F, 20.0F, 0xEE181E2C, 0xF5101420);
+         this.gui.rect(var1 + 1.0F, var2 + 1.0F, 180.0F, 1.0F, 0x4878A8FF);
 
          for (int var3 = 0; var3 < 9; var3++) {
             float var4 = var1 + 3.0F + var3 * 20;
             float var5 = var2 + 3.0F;
-            this.gui.rect(var4, var5, 16.0F, 16.0F, -13750738);
-            this.gui.rect(var4 + 1.0F, var5 + 1.0F, 14.0F, 14.0F, -7631989);
-            this.gui.rect(var4, var5, 16.0F, 1.0F, -13158601);
-            this.gui.rect(var4, var5, 1.0F, 16.0F, -13158601);
-            this.gui.rect(var4 + 15.0F, var5 + 1.0F, 1.0F, 15.0F, -1);
-            this.gui.rect(var4 + 1.0F, var5 + 15.0F, 15.0F, 1.0F, -1);
-            this.gui.rect(var4 + 1.0F, var5 + 1.0F, 14.0F, 14.0F, -7631989);
+            boolean activeSlot = var3 == this.sel;
+            this.gui.rect(var4, var5, 16.0F, 16.0F, activeSlot ? 0xFF283448 : 0xFF0E121B);
+            this.gui.gradient(var4 + 1.0F, var5 + 1.0F, 14.0F, 14.0F, activeSlot ? 0xFF32405A : 0xFF1E2434, activeSlot ? 0xFF222C40 : 0xFF283044);
+            this.gui.rect(var4, var5, 16.0F, 1.0F, 0xFF0B0E16);
+            this.gui.rect(var4, var5, 1.0F, 16.0F, 0xFF0B0E16);
+            this.gui.rect(var4 + 15.0F, var5 + 1.0F, 1.0F, 15.0F, 0xFF46526A);
+            this.gui.rect(var4 + 1.0F, var5 + 15.0F, 15.0F, 1.0F, 0xFF46526A);
          }
 
          for (int var10 = 0; var10 < 9; var10++) {
             this.drawStack(this.inv[var10], var1 + 3.0F + var10 * 20, var2 + 3.0F);
          }
 
-         float var11 = var1 + 3.0F + this.sel * 20 - 4.0F;
-         this.gui.rect(var11, var2 - 1.0F, 24.0F, 2.0F, -1);
-         this.gui.rect(var11, var2 + 21.0F, 24.0F, 2.0F, -1);
-         this.gui.rect(var11, var2 - 1.0F, 2.0F, 24.0F, -1);
-         this.gui.rect(var11 + 22.0F, var2 - 1.0F, 2.0F, 24.0F, -1);
+         float var11 = var1 + 3.0F + this.sel * 20 - 3.0F;
+         this.gui.rect(var11 - 1.0F, var2 - 1.0F, 24.0F, 24.0F, 0x80000000);
+         this.gui.rect(var11, var2 - 1.0F, 22.0F, 2.0F, 0xFFFFE670);
+         this.gui.rect(var11, var2 + 21.0F, 22.0F, 2.0F, 0xFFD8A828);
+         this.gui.rect(var11, var2 - 1.0F, 2.0F, 24.0F, 0xFFFFE670);
+         this.gui.rect(var11 + 20.0F, var2 - 1.0F, 2.0F, 24.0F, 0xFFFFE670);
+         this.gui.rect(var11 + 2.0F, var2 + 1.0F, 18.0F, 1.0F, 0x6078FF90);
          if (!this.player.creative) {
             float var12 = var2 - 11.0F;
 
@@ -5016,26 +6699,40 @@ public final class Game {
                int var6 = this.player.health - var14 * 2;
                int var7 = var6 >= 2 ? 2 : (var6 == 1 ? 1 : 0);
                float var8 = this.player.health <= 4 && (this.tickCount / 2 + var14) % 5 == 0 ? 1.0F : 0.0F;
-               this.gui.heart(var1 + var14 * 8, var12 + var8, 0);
+               float hx = var1 + var14 * 8;
+               float hy = var12 + var8;
+               this.gui.heart(hx, hy, 0);
                if (var7 > 0) {
-                  this.gui.heart(var1 + var14 * 8, var12 + var8, var7);
+                  this.gui.heart(hx, hy, var7);
+                  if (this.player.hardcore) {
+                     // Hardcore Mode heart inner marks
+                     this.gui.rect(hx + 2.0F, hy + 3.0F, 1.0F, 2.0F, 0xFF280000);
+                     if (var7 == 2) {
+                        this.gui.rect(hx + 5.0F, hy + 3.0F, 1.0F, 2.0F, 0xFF280000);
+                     }
+                  }
                }
             }
 
             int var15 = this.armorPoints();
+            boolean infdevHud = ModLoader.isClassicHudNoHunger();
             if (var15 > 0) {
                for (int var17 = 0; var17 < 10; var17++) {
-                  this.gui.armorIcon(var1 + var17 * 8, var12 - 10.0F, var15 - var17 * 2 >= 2 ? 2 : (var15 - var17 * 2 == 1 ? 1 : 0));
+                  float ax = infdevHud ? (var1 + 182.0F - 9.0F - var17 * 8) : (var1 + var17 * 8);
+                  float ay = infdevHud ? var12 : (var12 - 10.0F);
+                  this.gui.armorIcon(ax, ay, var15 - var17 * 2 >= 2 ? 2 : (var15 - var17 * 2 == 1 ? 1 : 0));
                }
             }
 
-            for (int var18 = 0; var18 < 10; var18++) {
-               int var20 = this.player.food - var18 * 2;
-               int var22 = var20 >= 2 ? 2 : (var20 == 1 ? 1 : 0);
-               float var9 = this.player.sat <= 0.0F && this.player.food <= 6 && (this.tickCount / 3 + var18) % 6 == 0 ? 1.0F : 0.0F;
-               this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, 0);
-               if (var22 > 0) {
-                  this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, var22);
+            if (!infdevHud) {
+               for (int var18 = 0; var18 < 10; var18++) {
+                  int var20 = this.player.food - var18 * 2;
+                  int var22 = var20 >= 2 ? 2 : (var20 == 1 ? 1 : 0);
+                  float var9 = this.player.sat <= 0.0F && this.player.food <= 6 && (this.tickCount / 3 + var18) % 6 == 0 ? 1.0F : 0.0F;
+                  this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, 0);
+                  if (var22 > 0) {
+                     this.gui.hunger(var1 + 182.0F - 9.0F - var18 * 8, var12 + var9, var22);
+                  }
                }
             }
 
@@ -5044,7 +6741,8 @@ public final class Game {
 
                for (int var21 = 0; var21 < 10; var21++) {
                   if (var21 < var19) {
-                     this.gui.bubble(var1 + 182.0F - 9.0F - var21 * 8, var12 - 10.0F);
+                     float bx = infdevHud ? (var1 + var21 * 8) : (var1 + 182.0F - 9.0F - var21 * 8);
+                     this.gui.bubble(bx, var12 - 10.0F);
                   }
                }
             }
@@ -5056,6 +6754,37 @@ public final class Game {
             this.gui.centered(var13, this.gui.w / 2.0F, var2 - (this.player.creative ? 16 : 38), var16 << 24 | 16777215, true, 1.0F);
          }
       }
+   }
+
+   void drawSpectatorHud() {
+      float cx = this.gui.w / 2.0F;
+      int pct = Math.round(this.player.flySpeed / 0.05F * 100.0F);
+      String pov = this.spectatingMob != null && !this.spectatingMob.dead
+         ? (" | POV: \u00a7e" + Mobs.NAME[this.spectatingMob.type] + " \u00a77(Shift to exit)")
+         : (this.targetMob != null ? (" | Target: \u00a7e" + Mobs.NAME[this.targetMob.type] + " (" + this.targetMob.health + " HP)") : "");
+      if (pov.isEmpty() && this.target != null && this.world != null) {
+         int bid = this.world.getBlock(this.target.x, this.target.y, this.target.z);
+         if (bid > 0) {
+            pov = " | Looking at: \u00a7f" + Items.name(bid);
+         }
+      }
+      String top = String.format(
+         "\u00a7bSPECTATOR \u00a77| Speed: \u00a7f%d%% \u00a77(Scroll) | XYZ: \u00a7f%d, %d, %d\u00a77%s",
+         pct,
+         (int)Math.floor(this.player.x),
+         (int)Math.floor(this.player.y),
+         (int)Math.floor(this.player.z),
+         pov
+      );
+      float tw = Gui.textWidth(Gui.stripCodes(top)) + 10.0F;
+      this.gui.rect(cx - tw / 2.0F, 3.0F, tw, 12.0F, 0x90000000);
+      this.gui.centered(top, cx, 5.0F, 0xFFFFFFFF, true, 1.0F);
+
+      String bar = "\u00a7e[1]\u00a7f Spawn  \u00a7e[2]\u00a7f Mob POV  \u00a7e[3]\u00a7f Center/Village  \u00a7e[4]\u00a7f Surface  \u00a7e[5]\u00a7f NightVis  \u00a7e[6]\u00a7f Next/Reset";
+      float bw = Gui.textWidth(Gui.stripCodes(bar)) + 12.0F;
+      float by = this.gui.h - 16.0F;
+      this.gui.rect(cx - bw / 2.0F, by - 2.0F, bw, 13.0F, 0xA010141C);
+      this.gui.centered(bar, cx, by, 0xFFFFFFFF, true, 1.0F);
    }
 
    /** Update 3.18: the frame timer's panel (Shift+F3), below the F3 text when that is open too. */
@@ -5200,19 +6929,135 @@ public final class Game {
          if (var15.isEmpty()) {
             var11 += 5.0F;
          } else {
-            this.gui.rect(1.0F, var11 - 1.0F, Gui.textWidth(var15) + 2, 10.0F, -1873784752);
-            this.gui.text(var15, 2.0F, var11, -2039584, false);
-            var11 += 10.0F;
+            int maxDbgW = Math.max(60, (int)this.gui.w - 6);
+            for (String dbgLine : wrapChatLine(var15, maxDbgW)) {
+               float bw = Math.min(this.gui.w - 2.0F, Gui.textWidth(Gui.stripCodes(dbgLine)) + 2.0F);
+               this.gui.rect(1.0F, var11 - 1.0F, bw, 10.0F, -1873784752);
+               this.gui.text(dbgLine, 2.0F, var11, -2039584, false);
+               var11 += 10.0F;
+            }
          }
       }
+   }
+
+   static java.util.List<String> wrapChatLine(String msg, int maxWidth) {
+      java.util.ArrayList<String> out = new java.util.ArrayList<>();
+      if (msg == null) {
+         out.add("");
+         return out;
+      }
+      int limit = Math.max(24, maxWidth);
+      if (Gui.textWidth(Gui.stripCodes(msg)) <= limit) {
+         out.add(msg);
+         return out;
+      }
+
+      String activeColor = "";
+      StringBuilder cur = new StringBuilder();
+      int i = 0;
+      int n = msg.length();
+      while (i < n) {
+         if (msg.charAt(i) == ' ') {
+            if (cur.length() > activeColor.length()) {
+               String candidate = cur.toString() + " ";
+               if (Gui.textWidth(Gui.stripCodes(candidate)) <= limit) {
+                  cur.append(' ');
+               } else {
+                  out.add(cur.toString());
+                  cur.setLength(0);
+                  cur.append(activeColor);
+               }
+            }
+            i++;
+            continue;
+         }
+
+         int wStart = i;
+         while (i < n && msg.charAt(i) != ' ') {
+            i++;
+         }
+         String word = msg.substring(wStart, i);
+         String nextColor = lastColorCode(word, activeColor);
+
+         if (cur.length() > activeColor.length()) {
+            String candidate = cur.toString() + word;
+            if (Gui.textWidth(Gui.stripCodes(candidate)) <= limit) {
+               cur.append(word);
+               activeColor = nextColor;
+               continue;
+            }
+            out.add(cur.toString());
+            cur.setLength(0);
+            cur.append(activeColor);
+         }
+
+         if (Gui.textWidth(Gui.stripCodes(cur.toString() + word)) <= limit) {
+            cur.append(word);
+            activeColor = nextColor;
+         } else {
+            // Split an overlong token character-by-character while preserving § codes
+            int wi = 0;
+            while (wi < word.length()) {
+               char c = word.charAt(wi);
+               if (c == 167 && wi + 1 < word.length()) {
+                  String code = word.substring(wi, wi + 2);
+                  cur.append(code);
+                  activeColor = code.equalsIgnoreCase("§r") ? "" : code;
+                  wi += 2;
+                  continue;
+               }
+               String cand = cur.toString() + c;
+               if (Gui.textWidth(Gui.stripCodes(cand)) > limit && cur.length() > activeColor.length()) {
+                  out.add(cur.toString());
+                  cur.setLength(0);
+                  cur.append(activeColor);
+               }
+               cur.append(c);
+               wi++;
+            }
+         }
+      }
+
+      if (cur.length() > activeColor.length() || out.isEmpty()) {
+         out.add(cur.toString());
+      }
+      return out;
+   }
+
+   private static String lastColorCode(String s, String current) {
+      String c = current;
+      for (int i = 0; i + 1 < s.length(); i++) {
+         if (s.charAt(i) == 167) {
+            String code = s.substring(i, i + 2);
+            c = code.equalsIgnoreCase("§r") ? "" : code;
+            i++;
+         }
+      }
+      return c;
+   }
+
+   static String clipChatInput(String text, int maxWidth) {
+      if (text == null || text.isEmpty()) {
+         return "";
+      }
+      int limit = Math.max(16, maxWidth);
+      if (Gui.textWidth(Gui.stripCodes(text)) <= limit) {
+         return text;
+      }
+      int start = 0;
+      while (start < text.length() - 1 && Gui.textWidth(Gui.stripCodes(text.substring(start))) > limit) {
+         start++;
+      }
+      return text.substring(start);
    }
 
    void drawChat() {
       long var1 = System.currentTimeMillis();
       float var3 = this.gui.h - 40.0F;
       int var4 = 0;
+      int maxChatW = Math.max(60, (int)Math.min(this.gui.w - 10.0F, 320.0F));
 
-      for (int var5 = this.chatLog.size() - 1; var5 >= 0 && var4 < 10; var5--) {
+      for (int var5 = this.chatLog.size() - 1; var5 >= 0 && var4 < 12 && var3 >= 6.0F; var5--) {
          long var6 = var1 - (Long)this.chatTimes.get(var5);
          if (var6 > 10000L && this.screen != Game.S.CHAT) {
             break;
@@ -5220,15 +7065,20 @@ public final class Game {
 
          float var8 = this.screen == Game.S.CHAT ? 1.0F : Math.max(0.0F, Math.min(1.0F, (float)(10000L - var6) / 2000.0F));
          String var9 = (String)this.chatLog.get(var5);
-         this.gui.rect(2.0F, var3 - 1.0F, Gui.textWidth(Gui.stripCodes(var9)) + 3, 10.0F, (int)(var8 * 100.0F) << 24);
-         this.gui.text(var9, 3.0F, var3, (int)(var8 * 255.0F) << 24 | 16777215, true);
-         var3 -= 10.0F;
-         var4++;
+         java.util.List<String> wrapped = wrapChatLine(var9, maxChatW);
+         for (int li = wrapped.size() - 1; li >= 0 && var4 < 12 && var3 >= 6.0F; li--) {
+            String line = wrapped.get(li);
+            float bw = Math.min(this.gui.w - 4.0F, Gui.textWidth(Gui.stripCodes(line)) + 4.0F);
+            this.gui.rect(2.0F, var3 - 1.0F, bw, 10.0F, (int)(var8 * 100.0F) << 24);
+            this.gui.text(line, 3.0F, var3, (int)(var8 * 255.0F) << 24 | 16777215, true);
+            var3 -= 10.0F;
+            var4++;
+         }
       }
 
       if (this.screen == Game.S.CHAT) {
          this.gui.rect(2.0F, this.gui.h - 14.0F, this.gui.w - 4.0F, 12.0F, Integer.MIN_VALUE);
-         String var10 = this.chat + ((int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : "");
+         String var10 = clipChatInput(this.chat + ((int)(GLFW.glfwGetTime() * 2.0) % 2 == 0 ? "_" : ""), Math.max(20, (int)this.gui.w - 12));
          this.gui.text(var10, 4.0F, this.gui.h - 12.0F, -2039584, false);
       }
    }
@@ -5241,7 +7091,37 @@ public final class Game {
          float var3 = this.menuOx();
          float var4 = this.menuOy();
          this.menu.draw(this.gui, var1, var2, var3, var4);
-         if (this.menu.kind == 4) {
+         if (this.menu.kind == Menu.TRADE && this.menu.profession >= Trades.BEDWARS_SHOP) {
+            int curProf = this.menu.profession;
+            float tabY = Math.max(2.0F, var4 - 16.0F);
+            this.button(
+               curProf == Trades.BEDWARS_SHOP ? "[Items]" : "Items",
+               var3,
+               tabY,
+               56.0F,
+               14.0F,
+               true,
+               () -> this.menu = new Menu(this, Menu.TRADE, null, Trades.BEDWARS_SHOP)
+            );
+            this.button(
+               curProf == Trades.BEDWARS_ARMOR ? "[Gear & Upg]" : "Gear & Upg",
+               var3 + 58.0F,
+               tabY,
+               60.0F,
+               14.0F,
+               true,
+               () -> this.menu = new Menu(this, Menu.TRADE, null, Trades.BEDWARS_ARMOR)
+            );
+            this.button(
+               curProf == Trades.BEDWARS_TOOLS ? "[Tools & Def]" : "Tools & Def",
+               var3 + 120.0F,
+               tabY,
+               56.0F,
+               14.0F,
+               true,
+               () -> this.menu = new Menu(this, Menu.TRADE, null, Trades.BEDWARS_TOOLS)
+            );
+         } else if (this.menu.kind == 4) {
             int var5 = this.menu.pages();
             if (var5 > 1) {
                String var6 = this.menu.page + 1 + "/" + var5;
@@ -5250,6 +7130,15 @@ public final class Game {
                this.button("<", var3 + this.menu.w - 70.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page > 0, () -> var7.page--);
                this.button(">", var3 + this.menu.w - 56.0F, var4 + 3.0F, 12.0F, 12.0F, this.menu.page < var5 - 1, () -> var7.page++);
             }
+            this.button("X", var3 + this.menu.w - 42.0F, var4 + 3.0F, 12.0F, 12.0F, true, () -> {
+               if (this.cursor != null) {
+                  this.cursor = null;
+               } else {
+                  for (int i = 0; i < 9; i++) {
+                     this.inv[i] = null;
+                  }
+               }
+            });
 
             if (this.menu.palette.length == 0) {
                this.gui.centered("Nothing found", var3 + this.menu.w / 2.0F, var4 + 52.0F, -9408400, false, 1.0F);
@@ -5384,11 +7273,36 @@ public final class Game {
       float alpha = 1.0F;
    }
 
+   public void chatMsg(String msg) {
+      this.say(msg);
+   }
+
+   void drawWaystonesHud() {
+      int px = (int)Math.floor(this.player.x);
+      int py = (int)Math.floor(this.player.y);
+      int pz = (int)Math.floor(this.player.z);
+      float yaw = ((this.player.yaw % 360.0F) + 360.0F) % 360.0F;
+      String[] dirs = {"S", "SW", "W", "NW", "N", "NE", "E", "SE"};
+      String dir = dirs[Math.round(yaw / 45.0F) & 7];
+      long day = this.world.dayTime / 24000L + 1L;
+      String line1 = String.format("XYZ: %d, %d, %d  [%s]", px, py, pz, dir);
+      String line2 = "Day " + day + "  |  " + this.fps + " FPS";
+      float w = Math.max(Gui.textWidth(line1), Gui.textWidth(line2)) + 10.0F;
+      float x = this.gui.w - w - 4.0F;
+      float y = 4.0F;
+      this.gui.rect(x, y, w, 24.0F, 0x9010141A);
+      this.gui.text(line1, x + 5.0F, y + 3.0F, 0xFF8FE060, true);
+      this.gui.text(line2, x + 5.0F, y + 13.0F, 0xFFD6D6E0, true);
+   }
+
    enum S {
       TITLE,
       WORLDS,
+      MULTIPLAYER,
       NEWWORLD,
+      MINIGAMES,
       LOADING,
+      WAITING,
       PLAY,
       PAUSE,
       INV,
@@ -5396,6 +7310,9 @@ public final class Game {
       CHAT,
       OPTIONS,
       SKINS,
+      PACKS,
+      MODS,
+      CREDITS,
       DEAD;
    }
 

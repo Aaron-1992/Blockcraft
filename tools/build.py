@@ -91,11 +91,12 @@ def compile_java(out_dir, source_roots, classpath, debug=True):
 
 
 def game_version():
-    """'3.6' etc, parsed from Game.TITLE_STR (single source of truth)."""
+    """'4.0' etc, parsed from Game.VERSION_STR or Game.TITLE_STR (single source of truth)."""
     with open(os.path.join(ROOT, "src", "bc", "Game.java"), encoding="utf-8") as f:
-        m = re.search(r'TITLE_STR\s*=\s*"[^"]*Update\s+([0-9.]+)"', f.read())
+        txt = f.read()
+    m = re.search(r'VERSION_STR\s*=\s*"([0-9.]+)"', txt) or re.search(r'TITLE_STR\s*=\s*"[^"]*(?:Update\s+|V)([0-9.]+)"', txt)
     if not m:
-        sys.exit("could not find the version in Game.TITLE_STR")
+        sys.exit("could not find the version in Game.java")
     return m.group(1)
 
 
@@ -111,7 +112,10 @@ def build_jar(classes_dir, jar_path):
         for dp, _, fs in os.walk(base):
             for f in fs:
                 p = os.path.join(dp, f)
-                entries[os.path.relpath(p, base).replace(os.sep, "/")] = open(p, "rb").read()
+                rel = os.path.relpath(p, base).replace(os.sep, "/")
+                if rel == "sounds/soundbank.bin":
+                    continue
+                entries[rel] = open(p, "rb").read()
     os.makedirs(os.path.dirname(jar_path), exist_ok=True)
     with zipfile.ZipFile(jar_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         zi = zipfile.ZipInfo("META-INF/MANIFEST.MF", FIXED_TIME)
@@ -149,7 +153,39 @@ def package_files():
     return {n: open(os.path.join(pkg, n), "rb").read() for n in sorted(os.listdir(pkg))}
 
 
-def build_patch_zip(ver, exe_path, jar_path):
+def build_infdev_mod_jar(classes_dir):
+    """Packages the external Minecraft Infdev (2010) total-conversion mod into mods/infdev-2010.jar."""
+    mod_jar = os.path.join(ROOT, "mods", "infdev-2010.jar")
+    os.makedirs(os.path.dirname(mod_jar), exist_ok=True)
+    with zipfile.ZipFile(mod_jar, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        add(z, "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\r\nMod-Class: bc.InfdevMod\r\n\r\n")
+        add(z, "META-INF/services/bc.BlockcraftMod", "bc.InfdevMod\n")
+        bc_dir = os.path.join(classes_dir, "bc")
+        if os.path.isdir(bc_dir):
+            for fn in sorted(os.listdir(bc_dir)):
+                if fn.startswith("Infdev") and fn.endswith(".class"):
+                    add(z, "bc/" + fn, open(os.path.join(bc_dir, fn), "rb").read())
+    print("[build] %s  (%.1f KB)" % (os.path.relpath(mod_jar, ROOT), os.path.getsize(mod_jar) / 1e3))
+    return mod_jar
+
+
+def build_backrooms_mod_jar(classes_dir):
+    """Packages the Backrooms & Stalker horror mod into mods/backrooms-stalker.jar."""
+    mod_jar = os.path.join(ROOT, "mods", "backrooms-stalker.jar")
+    os.makedirs(os.path.dirname(mod_jar), exist_ok=True)
+    with zipfile.ZipFile(mod_jar, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        add(z, "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\r\nMod-Class: bc.BackroomsStalkerMod\r\n\r\n")
+        add(z, "META-INF/services/bc.BlockcraftMod", "bc.BackroomsStalkerMod\n")
+        bc_dir = os.path.join(classes_dir, "bc")
+        if os.path.isdir(bc_dir):
+            for fn in sorted(os.listdir(bc_dir)):
+                if fn.startswith("Backrooms") and fn.endswith(".class"):
+                    add(z, "bc/" + fn, open(os.path.join(bc_dir, fn), "rb").read())
+    print("[build] %s  (%.1f KB)" % (os.path.relpath(mod_jar, ROOT), os.path.getsize(mod_jar) / 1e3))
+    return mod_jar
+
+
+def build_patch_zip(ver, exe_path, jar_path, mod_jar_path=None):
     out = os.path.join(ROOT, "releases", "Blockcraft-UPDATE%s-patch.zip" % ver)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     howto = (
@@ -172,6 +208,20 @@ def build_patch_zip(ver, exe_path, jar_path):
         add(z, "Blockcraft/blockcraft.jar", open(jar_path, "rb").read())
         for n, data in package_files().items():
             add(z, "Blockcraft/" + n, data)
+        if mod_jar_path and os.path.isfile(mod_jar_path):
+            add(z, "Blockcraft/mods/infdev-2010.jar", open(mod_jar_path, "rb").read())
+        br_jar = os.path.join(ROOT, "mods", "backrooms-stalker.jar")
+        if os.path.isfile(br_jar):
+            add(z, "Blockcraft/mods/backrooms-stalker.jar", open(br_jar, "rb").read())
+        mod_readme = os.path.join(ROOT, "mods", "README.txt")
+        if os.path.isfile(mod_readme):
+            add(z, "Blockcraft/mods/README.txt", open(mod_readme, "rb").read())
+        mod_doc = os.path.join(ROOT, "docs", "MODDING.md")
+        if os.path.isfile(mod_doc):
+            add(z, "Blockcraft/MODDING.md", open(mod_doc, "rb").read())
+        sb_bin = os.path.join(ROOT, "res", "sounds", "soundbank.bin")
+        if os.path.isfile(sb_bin):
+            add(z, "Blockcraft/sounds/soundbank.bin", open(sb_bin, "rb").read())
     print("[build] %s  (%.2f MB)" % (os.path.relpath(out, ROOT), os.path.getsize(out) / 1e6))
     return out
 
@@ -198,7 +248,7 @@ def compose_full_zip(out, replacements):
     return out
 
 
-def build_full_zip(ver, exe_path, jar_path):
+def build_full_zip(ver, exe_path, jar_path, mod_jar_path=None):
     out = os.path.join(ROOT, "releases", "Blockcraft-1.12-UPDATE%s-windows.zip" % ver)
     rep = {
         "Blockcraft/Blockcraft.exe": (open(exe_path, "rb").read(), 0o755),
@@ -206,6 +256,20 @@ def build_full_zip(ver, exe_path, jar_path):
     }
     for n, data in package_files().items():
         rep["Blockcraft/" + n] = (data, 0o644)
+    if mod_jar_path and os.path.isfile(mod_jar_path):
+        rep["Blockcraft/mods/infdev-2010.jar"] = (open(mod_jar_path, "rb").read(), 0o644)
+    br_jar = os.path.join(ROOT, "mods", "backrooms-stalker.jar")
+    if os.path.isfile(br_jar):
+        rep["Blockcraft/mods/backrooms-stalker.jar"] = (open(br_jar, "rb").read(), 0o644)
+    mod_readme = os.path.join(ROOT, "mods", "README.txt")
+    if os.path.isfile(mod_readme):
+        rep["Blockcraft/mods/README.txt"] = (open(mod_readme, "rb").read(), 0o644)
+    mod_doc = os.path.join(ROOT, "docs", "MODDING.md")
+    if os.path.isfile(mod_doc):
+        rep["Blockcraft/MODDING.md"] = (open(mod_doc, "rb").read(), 0o644)
+    sb_bin = os.path.join(ROOT, "res", "sounds", "soundbank.bin")
+    if os.path.isfile(sb_bin):
+        rep["Blockcraft/sounds/soundbank.bin"] = (open(sb_bin, "rb").read(), 0o644)
     return compose_full_zip(out, rep)
 
 
@@ -225,10 +289,12 @@ def main():
     exe = os.path.join(BUILD, "Blockcraft.exe")
     build_jar(classes, jar)
     build_exe(jar, exe)
+    mod_jar = build_infdev_mod_jar(classes)
+    build_backrooms_mod_jar(classes)
     if a.patch:
-        build_patch_zip(ver, exe, jar)
+        build_patch_zip(ver, exe, jar, mod_jar)
     if a.full:
-        build_full_zip(ver, exe, jar)
+        build_full_zip(ver, exe, jar, mod_jar)
     print("[build] OK  (Update %s)" % ver)
 
 

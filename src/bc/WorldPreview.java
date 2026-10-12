@@ -73,21 +73,23 @@ final class WorldPreview {
    void render(Gen gen) {
       int cx = 0;
       int cz = 0;
+      boolean voidMap = gen instanceof SkyGen;
       try {
          int[] sp = gen.findSpawn();
-         cx = sp[0];
-         cz = sp[2];
+         cx = voidMap ? 0 : sp[0];
+         cz = voidMap ? 0 : sp[2];
       } catch (RuntimeException e) {
          // the map is centred on 0,0 then
       }
 
       this.spawnX = cx;
       this.spawnZ = cz;
+      int effStep = voidMap ? 2 : this.step;
       int[] hs = new int[this.w * this.h];
       int[] bs = new int[this.w * this.h];
       for (int j = 0; j < this.h; j++) {
          for (int i = 0; i < this.w; i++) {
-            Gen.Col col = gen.column(cx + (i - this.w / 2) * this.step, cz + (j - this.h / 2) * this.step);
+            Gen.Col col = gen.column(cx + (i - this.w / 2) * effStep, cz + (j - this.h / 2) * effStep);
             hs[j * this.w + i] = col.h;
             bs[j * this.w + i] = col.biome;
          }
@@ -97,6 +99,10 @@ final class WorldPreview {
          for (int i = 0; i < this.w; i++) {
             int idx = j * this.w + i;
             int hgt = hs[idx];
+            if (voidMap && hgt <= 1) {
+               this.img.px[idx] = 0xFF141828;
+               continue;
+            }
             int b = bs[idx];
             int base = COL[Math.max(0, Math.min(Biomes.N - 1, b))];
             float shade;

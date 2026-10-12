@@ -273,7 +273,11 @@ final class Tpl {
             for (int y = y0, n = 0; y >= 1 && n < 12; y--, n++) {
                int id = c.blocks[Chunk.idx(lx, y, lz)] & 0xFFFF;
                if (id != 0 && !Structs.soft(id) && !vegetation(id)) {
-                  break;
+                  if (n >= 2) {
+                     break;
+                  }
+
+                  continue;
                }
 
                c.blocks[Chunk.idx(lx, y, lz)] = (short)(y == y0 ? ground : st.base);

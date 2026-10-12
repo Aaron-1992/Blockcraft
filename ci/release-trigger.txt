@@ -1,1 +1,2 @@
-3.18
+5.5
+Blockcraft V5.5 — Map-Wide Situational AI, CS2 Map Bomb Spots + No-Bombs Mode, Bed-Bombing End Fight Mode & Castle Siege with Cannons
