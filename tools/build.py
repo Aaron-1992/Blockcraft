@@ -112,7 +112,10 @@ def build_jar(classes_dir, jar_path):
         for dp, _, fs in os.walk(base):
             for f in fs:
                 p = os.path.join(dp, f)
-                entries[os.path.relpath(p, base).replace(os.sep, "/")] = open(p, "rb").read()
+                rel = os.path.relpath(p, base).replace(os.sep, "/")
+                if rel == "sounds/soundbank.bin":
+                    continue
+                entries[rel] = open(p, "rb").read()
     os.makedirs(os.path.dirname(jar_path), exist_ok=True)
     with zipfile.ZipFile(jar_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         zi = zipfile.ZipInfo("META-INF/MANIFEST.MF", FIXED_TIME)
@@ -216,6 +219,9 @@ def build_patch_zip(ver, exe_path, jar_path, mod_jar_path=None):
         mod_doc = os.path.join(ROOT, "docs", "MODDING.md")
         if os.path.isfile(mod_doc):
             add(z, "Blockcraft/MODDING.md", open(mod_doc, "rb").read())
+        sb_bin = os.path.join(ROOT, "res", "sounds", "soundbank.bin")
+        if os.path.isfile(sb_bin):
+            add(z, "Blockcraft/sounds/soundbank.bin", open(sb_bin, "rb").read())
     print("[build] %s  (%.2f MB)" % (os.path.relpath(out, ROOT), os.path.getsize(out) / 1e6))
     return out
 
@@ -261,6 +267,9 @@ def build_full_zip(ver, exe_path, jar_path, mod_jar_path=None):
     mod_doc = os.path.join(ROOT, "docs", "MODDING.md")
     if os.path.isfile(mod_doc):
         rep["Blockcraft/MODDING.md"] = (open(mod_doc, "rb").read(), 0o644)
+    sb_bin = os.path.join(ROOT, "res", "sounds", "soundbank.bin")
+    if os.path.isfile(sb_bin):
+        rep["Blockcraft/sounds/soundbank.bin"] = (open(sb_bin, "rb").read(), 0o644)
     return compose_full_zip(out, rep)
 
 

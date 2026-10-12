@@ -124,13 +124,15 @@ public final class SoundEngine {
    /** Full music & sound attribution entries displayed in the End Credits screen. */
    public static final String[][] CREDITS_SECTIONS = {
       {
-         "MINECRAFT CONSOLE EDITION & TUMBLE / BATTLE SOUNDTRACK (33 TRACKS)",
-         "Moog City 2, Mutation & Floating Trees (Menu OST) - C418 (Daniel Rosenfeld)",
-         "Subwoofer Lullaby, Minecraft, Wet Hands, Sweden, Living Mice, Clark, Haggstrom, Mice on Venus - C418",
-         "Aria Math & Blind Spots (Creative), Dead Voxel & Ballad of the Cats (Nether), Boss & Alpha - C418",
-         "Double Time (Plastic 1), Nock (Plastic 2), Festive Tumble 1 & 2, Spooky Tumble 1 & 2 - Gareth Coker",
-         "Standard Battle Themes 1-4 (Cove, Crucible, Cavern, Lair) & Shrink (Plastic 3) - Gareth Coker",
-         "Frontier (Western), Fantasy, Greek Mythology, Chinese Mythology & Steampunk Battle Packs - Gareth Coker",
+         "MINECRAFT CONSOLE EDITION & TUMBLE / BATTLE SOUNDTRACK (64 TRACKS)",
+         "Moog City 2, Mutation, Beginning 2 & Floating Trees (Complete Menu OST) - C418 (Daniel Rosenfeld)",
+         "Minecraft, Clark, Sweden, Subwoofer Lullaby, Living Mice, Haggstrom & Danny - C418",
+         "Key, Oxygene, Dry Hands, Wet Hands & Mice on Venus (Complete Overworld OST) - C418",
+         "Biome Fest, Blind Spots, Haunt Muskie, Aria Math, Dreiton & Taswell (Complete Creative OST) - C418",
+         "Concrete Halls, Dead Voxel, Warmth, Ballad of the Cats, Boss, The End & Alpha - C418",
+         "Standard / Vanilla Battle 1-4 (Cove, Crucible, Cavern) & Plastic 1-3 (Double Time, Nock, Shrink) - Gareth Coker",
+         "Chinese Mythology 1-4 (Temple), Fantasy 1-3 & Greek Mythology 1-3 (Lair, Castle) - Gareth Coker",
+         "Steampunk 1-4 (Castle), Western 1-3 & City 1-5 (Frontier), Halloween 1-3 & Festive 1-3 - Gareth Coker",
          "Legacy Console Edition Soundpack & Minigame Audio curated via Freshwaffle, Legacy-Edition-Minigames & Wilyicaro"
       },
       {
@@ -268,10 +270,33 @@ public final class SoundEngine {
       bankLoaded = true;
       InputStream stream = SoundEngine.class.getResourceAsStream("/sounds/soundbank.bin");
       if (stream == null) {
+         String[] candidatePaths = new String[]{
+            "res/sounds/soundbank.bin",
+            "sounds/soundbank.bin"
+         };
+         for (String cp : candidatePaths) {
+            try {
+               java.io.File f = new java.io.File(cp);
+               if (f.isFile()) {
+                  stream = new java.io.FileInputStream(f);
+                  break;
+               }
+            } catch (Throwable ignored) {
+            }
+         }
+      }
+      if (stream == null) {
          try {
-            java.io.File f = new java.io.File("res/sounds/soundbank.bin");
-            if (f.isFile()) {
-               stream = new java.io.FileInputStream(f);
+            java.io.File codeFile = new java.io.File(SoundEngine.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            java.io.File baseDir = codeFile.isFile() ? codeFile.getParentFile() : codeFile;
+            if (baseDir != null) {
+               java.io.File f1 = new java.io.File(baseDir, "sounds/soundbank.bin");
+               java.io.File f2 = new java.io.File(baseDir, "res/sounds/soundbank.bin");
+               if (f1.isFile()) {
+                  stream = new java.io.FileInputStream(f1);
+               } else if (f2.isFile()) {
+                  stream = new java.io.FileInputStream(f2);
+               }
             }
          } catch (Throwable ignored) {
          }
@@ -1089,23 +1114,58 @@ public final class SoundEngine {
       return false;
    }
 
-   private static final String[] MENU_TRACKS = {"lce_menu", "lce_menu_2", "lce_menu_3"};
+   private static final String[] MENU_TRACKS = {
+      "lce_menu", "lce_menu_2", "lce_menu_4", "lce_menu_3"
+   };
    private static final String[] TUMBLE_TRACKS = {
-      "lce_tumble_1", "lce_tumble_2", "lce_tumble_3", "lce_tumble_4", "lce_tumble_5"
+      "lce_tumble_1", "lce_tumble_2", "lce_tumble_3", "lce_tumble_4", "lce_tumble_5", "lce_tumble_festive_3"
    };
    private static final String[] BATTLE_TRACKS = {
       "lce_tumble_1",
       "lce_battle_4", "lce_battle_5", "lce_battle_6", "lce_battle_7",
       "lce_battle_1", "lce_battle_2", "lce_battle_3",
-      "lce_battle_8", "lce_battle_9", "lce_battle_10", "lce_battle_11",
-      "lce_tumble_2", "lce_tumble_3", "lce_tumble_4", "lce_tumble_5"
+      "lce_battle_8", "lce_battle_fantasy_2", "lce_battle_fantasy_3",
+      "lce_battle_9", "lce_battle_greek_2", "lce_battle_greek_3",
+      "lce_battle_10", "lce_battle_chinese_2", "lce_battle_chinese_3", "lce_battle_chinese_4",
+      "lce_battle_11", "lce_battle_steampunk_2", "lce_battle_steampunk_3", "lce_battle_steampunk_4",
+      "lce_battle_western_2", "lce_battle_western_3",
+      "lce_battle_city_1", "lce_battle_city_2", "lce_battle_city_3", "lce_battle_city_4", "lce_battle_city_5",
+      "lce_battle_halloween_3",
+      "lce_tumble_2", "lce_tumble_3", "lce_tumble_4", "lce_tumble_5", "lce_tumble_festive_3"
+   };
+   /** Official Console Edition Map-Specific Battle Soundtrack Packs for all 8 Maps (Cove, Crucible, Cavern, Temple, Lair, Castle, Frontier, Shrunk). */
+   private static final String[][] MAP_MUSIC_PACKS = {
+      // 0: Cove (Standard / Vanilla Battle Pack 1-4)
+      {"lce_battle_4", "lce_battle_5", "lce_battle_6", "lce_battle_7"},
+      // 1: Crucible (Standard / Vanilla Battle 1-4 + Halloween Spooky 1-3)
+      {"lce_battle_5", "lce_battle_6", "lce_battle_7", "lce_battle_4", "lce_battle_3", "lce_tumble_5", "lce_battle_halloween_3"},
+      // 2: Cavern (Standard / Vanilla Battle 1-4 + Halloween Spooky 1-3)
+      {"lce_battle_6", "lce_battle_7", "lce_battle_4", "lce_battle_5", "lce_battle_3", "lce_tumble_5", "lce_battle_halloween_3"},
+      // 3: Temple (Chinese Mythology Pack 1-4 + Greek Mythology Pack 1-3)
+      {"lce_battle_10", "lce_battle_chinese_2", "lce_battle_chinese_3", "lce_battle_chinese_4", "lce_battle_9", "lce_battle_greek_2", "lce_battle_greek_3"},
+      // 4: Lair (Fantasy Pack 1-3 + Greek Mythology Pack 1-3)
+      {"lce_battle_8", "lce_battle_fantasy_2", "lce_battle_fantasy_3", "lce_battle_9", "lce_battle_greek_2", "lce_battle_greek_3"},
+      // 5: Castle (Fantasy Pack 1-3 + Steampunk Pack 1-4)
+      {"lce_battle_fantasy_2", "lce_battle_fantasy_3", "lce_battle_8", "lce_battle_11", "lce_battle_steampunk_2", "lce_battle_steampunk_3", "lce_battle_steampunk_4"},
+      // 6: Frontier (Western Pack 1-3 + City Pack 1-5)
+      {"lce_battle_2", "lce_battle_western_2", "lce_battle_western_3", "lce_battle_city_1", "lce_battle_city_2", "lce_battle_city_3", "lce_battle_city_4", "lce_battle_city_5"},
+      // 7: Shrunk (Plastic Pack 1-3 + Festive Pack 1-3)
+      {"lce_battle_1", "lce_tumble_1", "lce_tumble_2", "lce_tumble_3", "lce_tumble_4", "lce_tumble_festive_3"}
    };
    private static final String[] OVERWORLD_TRACKS = {
-      "lce_morning", "lce_day", "lce_afternoon", "lce_sunset", "lce_night",
-      "lce_overworld_6", "lce_overworld_7", "lce_overworld_8"
+      "lce_morning", "lce_day", "lce_overworld_6", "lce_sunset", "lce_night",
+      "lce_overworld_7", "lce_hal4", "lce_nuance1", "lce_nuance2",
+      "lce_piano1", "lce_afternoon", "lce_overworld_8"
    };
-   private static final String[] CREATIVE_TRACKS = {"lce_creative", "lce_creative_2"};
-   private static final String[] NETHER_TRACKS = {"lce_nether", "lce_nether_2"};
+   private static final String[] CREATIVE_TRACKS = {
+      "lce_creative", "lce_creative_1", "lce_creative_2", "lce_creative_3", "lce_creative_5", "lce_creative_6"
+   };
+   private static final String[] NETHER_TRACKS = {
+      "lce_nether", "lce_nether_1", "lce_nether_3", "lce_nether_2"
+   };
+   private static final String[] END_TRACKS = {
+      "lce_end", "lce_end_2"
+   };
    private static volatile String activeRandomOverworldTrack = "";
    private static volatile String activeRandomMenuTrack = "";
    private static volatile int menuTrackIndex = 0;
@@ -1120,43 +1180,80 @@ public final class SoundEngine {
       return n;
    }
 
+   /** Returns the map-specific Console Edition soundtrack playlist for the given mapId (0..7). */
+   public static String[] mapMusicPlaylist(int mapId) {
+      int m = Math.max(0, Math.min(MAP_MUSIC_PACKS.length - 1, mapId));
+      return MAP_MUSIC_PACKS[m];
+   }
+
    public static String musicTrackTitle(String key) {
       if (key == null || key.isEmpty()) return "Silent";
       switch (key) {
-         case "lce_menu":        return "C418 - Moog City 2";
-         case "lce_menu_2":      return "C418 - Mutation";
-         case "lce_menu_3":      return "C418 - Floating Trees";
-         case "lce_morning":     return "C418 - Subwoofer Lullaby";
-         case "lce_day":         return "C418 - Minecraft";
-         case "lce_afternoon":   return "C418 - Wet Hands";
-         case "lce_sunset":      return "C418 - Sweden";
-         case "lce_night":       return "C418 - Living Mice";
-         case "lce_overworld_6": return "C418 - Clark";
-         case "lce_overworld_7": return "C418 - Haggstrom";
-         case "lce_overworld_8": return "C418 - Mice on Venus";
-         case "lce_creative":    return "C418 - Aria Math";
-         case "lce_creative_2":  return "C418 - Blind Spots";
-         case "lce_nether":      return "C418 - Dead Voxel";
-         case "lce_nether_2":    return "C418 - Ballad of the Cats";
-         case "lce_end":         return "C418 - Boss (The End)";
-         case "lce_credits":     return "C418 - Alpha (Credits)";
-         case "lce_tumble_1":    return "Gareth Coker - Double Time";
-         case "lce_tumble_2":    return "Gareth Coker - Nock";
-         case "lce_tumble_3":    return "Gareth Coker - Festive 1";
-         case "lce_tumble_4":    return "Gareth Coker - Festive 2";
-         case "lce_tumble_5":    return "Gareth Coker - Spooky 2";
-         case "lce_battle_1":    return "Gareth Coker - Shrink";
-         case "lce_battle_2":    return "Gareth Coker - Frontier";
-         case "lce_battle_3":    return "Gareth Coker - Spooky 1";
-         case "lce_battle_4":    return "Gareth Coker - Cove Battle";
-         case "lce_battle_5":    return "Gareth Coker - Crucible Battle";
-         case "lce_battle_6":    return "Gareth Coker - Cavern Battle";
-         case "lce_battle_7":    return "Gareth Coker - Showdown";
-         case "lce_battle_8":    return "Gareth Coker - Fantasy Pack";
-         case "lce_battle_9":    return "Gareth Coker - Greek Pack";
-         case "lce_battle_10":   return "Gareth Coker - Mythology Pack";
-         case "lce_battle_11":   return "Gareth Coker - Steampunk Pack";
-         default:                return key;
+         case "lce_menu":               return "C418 - Moog City 2";
+         case "lce_menu_2":             return "C418 - Mutation";
+         case "lce_menu_3":             return "C418 - Floating Trees";
+         case "lce_menu_4":             return "C418 - Beginning 2";
+         case "lce_morning":            return "C418 - Subwoofer Lullaby";
+         case "lce_day":                return "C418 - Minecraft";
+         case "lce_overworld_6":        return "C418 - Clark";
+         case "lce_sunset":             return "C418 - Sweden";
+         case "lce_night":              return "C418 - Living Mice";
+         case "lce_overworld_7":        return "C418 - Haggstrom";
+         case "lce_hal4":               return "C418 - Danny";
+         case "lce_nuance1":            return "C418 - Key";
+         case "lce_nuance2":            return "C418 - Oxygene";
+         case "lce_piano1":             return "C418 - Dry Hands";
+         case "lce_afternoon":          return "C418 - Wet Hands";
+         case "lce_overworld_8":        return "C418 - Mice on Venus";
+         case "lce_creative":           return "C418 - Aria Math";
+         case "lce_creative_1":         return "C418 - Biome Fest";
+         case "lce_creative_2":         return "C418 - Blind Spots";
+         case "lce_creative_3":         return "C418 - Haunt Muskie";
+         case "lce_creative_5":         return "C418 - Dreiton";
+         case "lce_creative_6":         return "C418 - Taswell";
+         case "lce_nether":             return "C418 - Dead Voxel";
+         case "lce_nether_1":           return "C418 - Concrete Halls";
+         case "lce_nether_3":           return "C418 - Warmth";
+         case "lce_nether_2":           return "C418 - Ballad of the Cats";
+         case "lce_end":                return "C418 - Boss (The End)";
+         case "lce_end_2":              return "C418 - The End";
+         case "lce_credits":            return "C418 - Alpha (Credits)";
+         case "lce_tumble_1":           return "Gareth Coker - Double Time (Plastic 1)";
+         case "lce_tumble_2":           return "Gareth Coker - Nock (Plastic 2)";
+         case "lce_tumble_3":           return "Gareth Coker - Festive 1";
+         case "lce_tumble_4":           return "Gareth Coker - Festive 2";
+         case "lce_tumble_5":           return "Gareth Coker - Halloween 2";
+         case "lce_tumble_festive_3":   return "Gareth Coker - Festive 3";
+         case "lce_battle_1":           return "Gareth Coker - Shrink (Plastic 3)";
+         case "lce_battle_2":           return "Gareth Coker - Frontier (Western 1)";
+         case "lce_battle_3":           return "Gareth Coker - Halloween 1";
+         case "lce_battle_4":           return "Gareth Coker - Cove Battle (Standard 1)";
+         case "lce_battle_5":           return "Gareth Coker - Crucible Battle (Standard 2)";
+         case "lce_battle_6":           return "Gareth Coker - Cavern Battle (Standard 3)";
+         case "lce_battle_7":           return "Gareth Coker - Showdown (Standard 4)";
+         case "lce_battle_8":           return "Gareth Coker - Fantasy Pack 1";
+         case "lce_battle_fantasy_2":   return "Gareth Coker - Fantasy Pack 2";
+         case "lce_battle_fantasy_3":   return "Gareth Coker - Fantasy Pack 3";
+         case "lce_battle_9":           return "Gareth Coker - Greek Mythology 1";
+         case "lce_battle_greek_2":     return "Gareth Coker - Greek Mythology 2";
+         case "lce_battle_greek_3":     return "Gareth Coker - Greek Mythology 3";
+         case "lce_battle_10":          return "Gareth Coker - Chinese Mythology 1";
+         case "lce_battle_chinese_2":   return "Gareth Coker - Chinese Mythology 2";
+         case "lce_battle_chinese_3":   return "Gareth Coker - Chinese Mythology 3";
+         case "lce_battle_chinese_4":   return "Gareth Coker - Chinese Mythology 4";
+         case "lce_battle_11":          return "Gareth Coker - Steampunk Pack 1";
+         case "lce_battle_steampunk_2": return "Gareth Coker - Steampunk Pack 2";
+         case "lce_battle_steampunk_3": return "Gareth Coker - Steampunk Pack 3";
+         case "lce_battle_steampunk_4": return "Gareth Coker - Steampunk Pack 4";
+         case "lce_battle_western_2":   return "Gareth Coker - Frontier (Western 2)";
+         case "lce_battle_western_3":   return "Gareth Coker - Frontier (Western 3)";
+         case "lce_battle_city_1":      return "Gareth Coker - City Pack 1";
+         case "lce_battle_city_2":      return "Gareth Coker - City Pack 2";
+         case "lce_battle_city_3":      return "Gareth Coker - City Pack 3";
+         case "lce_battle_city_4":      return "Gareth Coker - City Pack 4";
+         case "lce_battle_city_5":      return "Gareth Coker - City Pack 5";
+         case "lce_battle_halloween_3": return "Gareth Coker - Halloween 3";
+         default:                       return key;
       }
    }
 
@@ -1167,7 +1264,7 @@ public final class SoundEngine {
 
    /**
     * Selects the appropriate Minecraft Legacy Console Edition music track for the current screen,
-    * minigame mode (Gareth Coker Tumble & Battle themes), dimension, creative mode, and time of day.
+    * minigame mode & respective map pack (Gareth Coker Tumble & Battle themes), dimension, creative mode, and time of day.
     */
    public static String selectConsoleMusic(Game g) {
       if (g == null) {
@@ -1195,57 +1292,47 @@ public final class SoundEngine {
          return ""; // Backrooms uses eerie fluorescent hum & stalker audio
       }
 
-      // Console Edition Mini Games (Tumble, Battle, Bedwars, CS2 Strike & Murder Mystery): Gareth Coker's Tumble & Battle OST
-      // Plays continuously across the Waiting Lobby, Active Round, and Post-Match Overview!
+      // Console Edition Mini Games (Tumble, Battle, Bedwars, CS2 Strike & Murder Mystery):
+      // Each map (Cove, Crucible, Cavern, Temple, Lair, Castle, Frontier, Shrunk) plays its own official Console Edition music pack!
       if (g.world.settings != null && g.world.settings.isMinigame()) {
          int idx = Math.max(0, battleTrackIndex);
          if (g.world.settings.type == WorldSettings.TUMBLE) {
             return TUMBLE_TRACKS[idx % TUMBLE_TRACKS.length];
          }
+         String[] pack = mapMusicPlaylist(g.world.settings.mapId);
          if (g.world.settings.type == WorldSettings.BATTLE) {
-            return BATTLE_TRACKS[idx % BATTLE_TRACKS.length];
+            return pack[idx % pack.length];
          }
          if (g.world.settings.type == WorldSettings.BEDWARS) {
-            return BATTLE_TRACKS[(idx + 1) % BATTLE_TRACKS.length];
+            return pack[(idx + 1) % pack.length];
          }
          if (g.world.settings.type == WorldSettings.CS2) {
-            return BATTLE_TRACKS[(idx + 2) % BATTLE_TRACKS.length];
+            return pack[(idx + 2) % pack.length];
          }
          if (g.world.settings.type == WorldSettings.MURDER) {
-            return BATTLE_TRACKS[(idx + 3) % BATTLE_TRACKS.length];
+            return pack[(idx + 3) % pack.length];
          }
       }
       if (g.screen == Game.S.LOADING || g.screen == Game.S.WAITING) {
          return "lce_menu";
       }
 
-      // Dimension-specific Legacy Console Edition themes
+      // Dimension-specific Legacy Console Edition themes (4 Nether tracks + 2 End tracks)
       if (g.world.dim == Dim.END) {
-         return "lce_end"; // C418 - Boss / The End
+         return END_TRACKS[Math.max(0, battleTrackIndex) % END_TRACKS.length]; // C418 - Boss & The End
       }
       if (g.world.dim == Dim.NETHER) {
-         return NETHER_TRACKS[Math.max(0, battleTrackIndex) % NETHER_TRACKS.length]; // C418 - Dead Voxel & Ballad of the Cats
+         return NETHER_TRACKS[Math.max(0, battleTrackIndex) % NETHER_TRACKS.length]; // C418 - Dead Voxel, Concrete Halls, Warmth, Ballad of the Cats
       }
 
-      // Overworld by time of day & game mode (8 C418 Overworld tracks + 2 C418 Creative tracks)
+      // Overworld by time of day & game mode (All 12 C418 Overworld tracks + All 6 C418 Creative tracks)
       int tod = (int)((g.world.dayTime % 24000L + 24000L) % 24000L);
-      if (tod < 2500) {
-         return "lce_morning"; // C418 - Subwoofer Lullaby
-      } else if (tod < 5500) {
-         return g.player.creative ? CREATIVE_TRACKS[Math.max(0, battleTrackIndex) % CREATIVE_TRACKS.length] : "lce_day"; // Aria Math / Blind Spots or Minecraft
-      } else if (tod < 8500) {
-         return g.player.creative ? "lce_creative_2" : "lce_overworld_6"; // Blind Spots (Creative) / Clark (Survival)
-      } else if (tod < 11500) {
-         return "lce_afternoon"; // C418 - Wet Hands
-      } else if (tod < 14500) {
-         return "lce_sunset"; // C418 - Sweden
-      } else if (tod < 17500) {
-         return "lce_overworld_7"; // C418 - Haggstrom
-      } else if (tod < 20500) {
-         return "lce_night"; // C418 - Living Mice
-      } else {
-         return "lce_overworld_8"; // C418 - Mice on Venus
+      if (g.player.creative) {
+         int cIdx = (tod / 4000 + Math.max(0, battleTrackIndex)) % CREATIVE_TRACKS.length;
+         return CREATIVE_TRACKS[cIdx]; // Aria Math, Biome Fest, Blind Spots, Haunt Muskie, Dreiton, Taswell
       }
+      int oIdx = (tod / 2000) % OVERWORLD_TRACKS.length;
+      return OVERWORLD_TRACKS[oIdx];
    }
 
    /** Compatibility alias for selectConsoleMusic. */

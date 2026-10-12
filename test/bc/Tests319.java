@@ -1948,7 +1948,8 @@ final class Tests319 {
          }
          check(highCanopyBlocks > 0, "Cavern Console Edition .mca map preserves high cavern ceiling/stalactites above Y_DECK+35 without vertical cutoff");
 
-         // 2. Verify Console Edition Minigame music plays continuously during WAITING lobby, LOADING, and PLAY without resetting on map vote
+         // 2. Verify Console Edition Minigame music plays continuously during WAITING lobby, LOADING, and PLAY,
+         // and that each Console Edition map selects its respective Console Edition music pack!
          bwGame.world.settings.type = WorldSettings.BATTLE;
          bwGame.world.settings.mapId = WorldSettings.MAP_COVE;
          bwGame.screen = Game.S.WAITING;
@@ -1956,38 +1957,72 @@ final class Tests319 {
          check(waitTrack0.startsWith("lce_battle_") || waitTrack0.startsWith("lce_tumble_"),
             "Minigame Waiting Lobby plays Gareth Coker Console Edition Minigame music instead of cutting back to menu music");
          bwGame.world.settings.mapId = WorldSettings.MAP_TEMPLE;
-         String waitTrackVoted = SoundEngine.selectConsoleMusic(bwGame);
-         eq(waitTrack0, waitTrackVoted, "Voting on a different map in the Waiting Lobby does not restart or switch the active music track");
+         String templeTrack = SoundEngine.selectConsoleMusic(bwGame);
+         check(!templeTrack.equals(waitTrack0) && (templeTrack.contains("chinese") || templeTrack.equals("lce_battle_10") || templeTrack.contains("greek") || templeTrack.equals("lce_battle_9")),
+            "Temple map selects its respective Chinese / Greek Mythology Console Edition Battle music pack");
+         bwGame.world.settings.mapId = WorldSettings.MAP_FRONTIER;
+         String frontierTrack = SoundEngine.selectConsoleMusic(bwGame);
+         check(frontierTrack.equals("lce_battle_2") || frontierTrack.contains("western") || frontierTrack.contains("city"),
+            "Frontier map selects its respective Western / City Console Edition Battle music pack");
+         bwGame.world.settings.mapId = WorldSettings.MAP_COVE;
          SoundEngine.nextBattleTrack();
          String nextTrack = SoundEngine.selectConsoleMusic(bwGame);
          check(!nextTrack.equals(waitTrack0), "Clicking Next Track in the Waiting Lobby immediately advances to the next Console Edition theme");
 
          // =========================================================================
-         // Update 5.3: Expanded 33-Track Minecraft Console Edition Soundtrack
+         // Update 5.4: Complete 64-Track Normal Game (C418) + Map-Specific Battle/Tumble (Gareth Coker) Soundtrack
          // =========================================================================
-         check(SoundEngine.totalConsoleMusicTrackCount() >= 33,
-            "Soundbank contains at least 33 Console Edition music tracks (" + SoundEngine.totalConsoleMusicTrackCount() + ")");
+         check(SoundEngine.totalConsoleMusicTrackCount() >= 64,
+            "Soundbank contains all 64 Normal Game & Console Edition Minigame music tracks (" + SoundEngine.totalConsoleMusicTrackCount() + ")");
          check(SoundEngine.hasSample("lce_battle_4")
             && SoundEngine.hasSample("lce_battle_5")
             && SoundEngine.hasSample("lce_battle_6")
             && SoundEngine.hasSample("lce_battle_7")
             && SoundEngine.hasSample("lce_battle_8")
+            && SoundEngine.hasSample("lce_battle_fantasy_2")
+            && SoundEngine.hasSample("lce_battle_fantasy_3")
             && SoundEngine.hasSample("lce_battle_9")
+            && SoundEngine.hasSample("lce_battle_greek_2")
+            && SoundEngine.hasSample("lce_battle_greek_3")
             && SoundEngine.hasSample("lce_battle_10")
+            && SoundEngine.hasSample("lce_battle_chinese_2")
+            && SoundEngine.hasSample("lce_battle_chinese_3")
+            && SoundEngine.hasSample("lce_battle_chinese_4")
             && SoundEngine.hasSample("lce_battle_11")
+            && SoundEngine.hasSample("lce_battle_steampunk_2")
+            && SoundEngine.hasSample("lce_battle_steampunk_3")
+            && SoundEngine.hasSample("lce_battle_steampunk_4")
+            && SoundEngine.hasSample("lce_battle_western_2")
+            && SoundEngine.hasSample("lce_battle_western_3")
+            && SoundEngine.hasSample("lce_battle_city_1")
+            && SoundEngine.hasSample("lce_battle_city_5")
+            && SoundEngine.hasSample("lce_battle_halloween_3")
             && SoundEngine.hasSample("lce_tumble_4")
             && SoundEngine.hasSample("lce_tumble_5")
+            && SoundEngine.hasSample("lce_tumble_festive_3")
             && SoundEngine.hasSample("lce_menu_2")
             && SoundEngine.hasSample("lce_menu_3")
+            && SoundEngine.hasSample("lce_menu_4")
             && SoundEngine.hasSample("lce_overworld_6")
             && SoundEngine.hasSample("lce_overworld_7")
             && SoundEngine.hasSample("lce_overworld_8")
+            && SoundEngine.hasSample("lce_hal4")
+            && SoundEngine.hasSample("lce_nuance1")
+            && SoundEngine.hasSample("lce_nuance2")
+            && SoundEngine.hasSample("lce_piano1")
+            && SoundEngine.hasSample("lce_creative_1")
             && SoundEngine.hasSample("lce_creative_2")
-            && SoundEngine.hasSample("lce_nether_2"),
-            "All 17 newly added Gareth Coker (Vanilla 1-4, Fantasy, Greek, Chinese, Steampunk, Festive 2, Spooky 2) & C418 (Mutation, Floating Trees, Clark, Haggstrom, Mice on Venus, Blind Spots, Ballad of the Cats) tracks loaded");
+            && SoundEngine.hasSample("lce_creative_3")
+            && SoundEngine.hasSample("lce_creative_5")
+            && SoundEngine.hasSample("lce_creative_6")
+            && SoundEngine.hasSample("lce_nether_1")
+            && SoundEngine.hasSample("lce_nether_2")
+            && SoundEngine.hasSample("lce_nether_3")
+            && SoundEngine.hasSample("lce_end_2"),
+            "All 64 C418 Normal Game (Menu 1-4, Overworld 1-12, Creative 1-6, Nether 1-4, End 1-2, Credits) & Gareth Coker Map Pack tracks loaded");
          check(SoundEngine.musicTrackTitle("lce_battle_4").contains("Gareth Coker")
             && SoundEngine.musicTrackTitle("lce_overworld_6").contains("C418"),
-            "musicTrackTitle resolves artist & track names for expanded Console Edition soundtrack");
+            "musicTrackTitle resolves artist & track names for expanded 64-track soundtrack");
       });
    }
 }
