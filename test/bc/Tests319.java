@@ -1571,6 +1571,57 @@ final class Tests319 {
          SkyGen.tickBotAI(bwGame.mobs, econBot, bwGame.world, bwGame.player);
          eq(Blocks.END_STONE, bwGame.world.getBlock(blueBf[0], blueBf[1] + 2, blueBf[2]),
             "Once inner 6-block bed core is sealed, AI bot builds Layer-2 End Stone defense above the bed");
+
+         // =========================================================================
+         // Verify 3D Obstacle-Aware Detour Pathfinding, Overhead Clearance & Smart Block Breaking
+         // =========================================================================
+         // 4a. Verify canBotWalkThrough rejects 2-block walls and low overhead blocks, and pathfinding detours around walls!
+         for (int dz = -2; dz <= 4; dz++) {
+            for (int dx = -3; dx <= 3; dx++) {
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK, dz, Blocks.STONE);
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK + 1, dz, 0);
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK + 2, dz, 0);
+               bwGame.world.setBlock(dx, SkyGen.Y_DECK + 3, dz, 0);
+            }
+         }
+         // Place a 2-block-high pillar/wall directly ahead at (0, Y_DECK+1..2, 1) while side lanes (dx = ±1, ±2) are open
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 1, 1, Blocks.COBBLE);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 1, Blocks.COBBLE);
+         check(!SkyGen.canBotWalkThrough(bwGame.world, 0, SkyGen.Y_DECK + 1, 0, 0, 1),
+            "canBotWalkThrough rejects a 2-block-high wall so AI bots never treat walls as walkable ground");
+         check(SkyGen.canBotWalkThrough(bwGame.world, 0, SkyGen.Y_DECK + 1, 0, 1, 1),
+            "canBotWalkThrough accepts the open side lane around the wall");
+
+         // Drop an Emerald at (0.5, Y_DECK + 1.0, 3.5) behind the wall and verify the bot steers around the wall!
+         bwGame.world.items.clear();
+         bwGame.world.dropItem(0.5, SkyGen.Y_DECK + 1.0, 3.5, Items.EMERALD, 1);
+         econBot.setPos(0.5, SkyGen.Y_DECK + 1.0, 0.0);
+         econBot.onGround = true;
+         SkyGen.botStuckTicks[eSlot] = 0;
+         SkyGen.tickBotAI(bwGame.mobs, econBot, bwGame.world, bwGame.player);
+         float directYaw = Mobs.angleTo(0.0, 3.5);
+         check(Math.abs(Mobs.wrap(econBot.dirYaw - directYaw)) >= 20.0F,
+            "AI pathfinding steers around a 2-block wall instead of walking straight into it");
+
+         // 4b. Verify overhead block clearance: when a block is directly above the bot's head at (0, Y_DECK + 3, 0),
+         // canBotWalkThrough rejects step-jumping into a ledge and tryBotBuildUp mines the overhead block!
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 3, 0, Blocks.PLANKS);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 1, 1, Blocks.COBBLE);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 1, 0);
+         check(!SkyGen.canBotWalkThrough(bwGame.world, 0, SkyGen.Y_DECK + 1, 0, 0, 1),
+            "canBotWalkThrough rejects step-up jumping when a block directly above the bot's head would bonk its head");
+         SkyGen.botBlocks[eSlot] = 8;
+         SkyGen.tryBotBuildUp(econBot, bwGame.world, 0.5, SkyGen.Y_DECK + 5.0, 0.0, Blocks.COBBLE);
+         eq(0, bwGame.world.getBlock(0, SkyGen.Y_DECK + 3, 0),
+            "tryBotBuildUp mines a breakable block directly above the bot's head so it never gets stuck under a ceiling");
+
+         // 4c. Verify tryBreakBlockingObstacle mines through a blocking wall when boxed in / no detour exists!
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 1, 1, Blocks.PLANKS);
+         bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 1, Blocks.PLANKS);
+         SkyGen.BotIntent breakIntent = new SkyGen.BotIntent();
+         boolean brokeWall = SkyGen.tryBreakBlockingObstacle(econBot, bwGame.world, 0.5, SkyGen.Y_DECK + 1.0, 3.5, breakIntent);
+         check(brokeWall && bwGame.world.getBlock(0, SkyGen.Y_DECK + 2, 1) == 0,
+            "tryBreakBlockingObstacle mines through an obstructing wall block when the bot's path is blocked");
       });
    }
 }

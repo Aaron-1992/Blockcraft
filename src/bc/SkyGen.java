@@ -86,6 +86,10 @@ public final class SkyGen extends Gen {
    public static final int[] botPickaxeTier = new int[32];
    public static final int[] botMurderRole = new int[32];
    private static final int[] botBuildUpCooldown = new int[32];
+   public static final int[] botStuckTicks = new int[32];
+   private static final double[] botLastX = new double[32];
+   private static final double[] botLastZ = new double[32];
+   private static final int[] botWallFollowSide = new int[32];
    public static final String[] botThought = new String[32];
 
    // Team Mind / Team Thoughts coordination state per team (0..3)
@@ -268,6 +272,12 @@ public final class SkyGen extends Gen {
       Arrays.fill(botPickaxeTier, 0);
       Arrays.fill(botMurderRole, 0);
       Arrays.fill(botBuildUpCooldown, 0);
+      Arrays.fill(botStuckTicks, 0);
+      Arrays.fill(botLastX, 0.0);
+      Arrays.fill(botLastZ, 0.0);
+      for (int i = 0; i < 32; i++) {
+         botWallFollowSide[i] = (i & 1) == 0 ? 1 : -1;
+      }
       Arrays.fill(botThought, "Ready");
       Arrays.fill(teamObjective, TEAM_OBJ_FORTIFY_AND_FARM);
       Arrays.fill(teamTargetBed, -1);
@@ -3184,13 +3194,155 @@ public final class SkyGen extends Gen {
       }
    }
 
+   /** Returns true if block at (x, y, z) is a full colliding obstacle block (excluding low beds which bots can step onto). */
+   public static boolean isSolidObstacle(World w, int x, int y, int z) {
+      int id = w.getBlock(x, y, z);
+      return id != 0 && Blocks.coll[id] != null && !Decor315.isBed(id);
+   }
+
    private static boolean hasFootingAt(World w, int bx, int by, int bz) {
-      for (int dy = -2; dy <= 5; dy++) {
+      // Never treat a 2-block-high wall at (bx, by..by+1, bz) as walkable floor!
+      if (isSolidObstacle(w, bx, by, bz) && isSolidObstacle(w, bx, by + 1, bz)) {
+         return false;
+      }
+      for (int dy = 0; dy <= 5; dy++) {
          int id = w.getBlock(bx, by - dy, bz);
          if (Blocks.isLava(id)) {
             return false;
          }
          if (id != 0 && Blocks.coll[id] != null) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   /**
+    * Evaluates whether a 1.8-block-tall AI bot at (botX, botY, botZ) can physically walk or step-jump into (nx, nz):
+    * - Rejects 2-block walls (solid at botY and botY+1).
+    * - Rejects low 1-block ceilings/overhangs (solid at botY+1 when walking level, or solid at botY+2 when stepping up onto botY).
+    * - Rejects step-jumps when a block is directly above the bot's head at (botX, botY+2, botZ) (which would bonk the bot's head!).
+    * - Requires solid non-lava footing beneath (nx, nz) within 5 blocks below botY.
+    */
+   public static boolean canBotWalkThrough(World w, int botX, int botY, int botZ, int nx, int nz) {
+      if (w == null) {
+         return false;
+      }
+      if (nx == botX && nz == botZ) {
+         return hasFootingAt(w, nx, botY, nz);
+      }
+      boolean footBlocked = isSolidObstacle(w, nx, botY, nz);
+      boolean headBlocked = isSolidObstacle(w, nx, botY + 1, nz);
+      if (!footBlocked) {
+         // Level or step-down: head space at (nx, botY + 1, nz) must be clear AND there must be floor below!
+         if (headBlocked) {
+            return false;
+         }
+         for (int dy = 1; dy <= 5; dy++) {
+            int id = w.getBlock(nx, botY - dy, nz);
+            if (Blocks.isLava(id)) {
+               return false;
+            }
+            if (id != 0 && Blocks.coll[id] != null) {
+               return true;
+            }
+         }
+         return false;
+      } else {
+         // 1-block step-up onto (nx, botY, nz): requires clear space at (nx, botY + 1, nz) AND (nx, botY + 2, nz),
+         // PLUS clear jump headroom directly above the bot at (botX, botY + 2, botZ)!
+         if (headBlocked || isSolidObstacle(w, nx, botY + 2, nz) || isSolidObstacle(w, botX, botY + 2, botZ)) {
+            return false;
+         }
+         return true;
+      }
+   }
+
+   /**
+    * Returns true if the block at (x, y, z) is a destructible obstacle that an AI bot is allowed to mine through
+    * when trapped or when its path is blocked (never breaks permanent arena deck at y <= Y_DECK, Bedrock, Chests, Slime Pads, or own Bed defense).
+    */
+   public static boolean isBotBreakableObstacle(World w, int x, int y, int z, int myBotTeam) {
+      if (w == null || y <= Y_DECK || w.chunkAt(x, z) == null) {
+         return false;
+      }
+      int id = w.getBlock(x, y, z);
+      if (id == 0
+         || id == Blocks.BEDROCK
+         || Blocks.isFluid(id)
+         || id == Blocks.CHEST
+         || id == Blocks.CHEST_LOOT
+         || id == Blocks.CRAFTING_TABLE
+         || id == Redstone319.SLIME_BLOCK
+         || Decor315.isBed(id)) {
+         return false;
+      }
+      if (w.settings != null && w.settings.type == WorldSettings.BEDWARS && myBotTeam >= 0 && isTeamBedIntact(w, myBotTeam)) {
+         int[] ownBf = getTeamBedFoot(myBotTeam);
+         if (Math.hypot(x - ownBf[0], z - ownBf[2]) <= 3.0) {
+            return false;
+         }
+      }
+      return Blocks.coll[id] != null;
+   }
+
+   /**
+    * Breaks an obstructing block above the bot's head or directly in front of the bot when it cannot walk around it!
+    */
+   public static boolean tryBreakBlockingObstacle(Mobs.Mob bot, World w, double tx, double ty, double tz, BotIntent out) {
+      if (bot == null || w == null) {
+         return false;
+      }
+      int bSlot = Math.abs(bot.netId) & 31;
+      int myTeam = botTeamIndex(bot);
+      int bbx = (int)Math.floor(bot.x);
+      int by = (int)Math.floor(bot.y);
+      int bbz = (int)Math.floor(bot.z);
+      float desiredYaw = Mobs.angleTo(tx - bot.x, tz - bot.z);
+      double rad = Math.toRadians(desiredYaw);
+      int stepX = (int)Math.floor(bot.x - Math.sin(rad) * 1.15);
+      int stepZ = (int)Math.floor(bot.z + Math.cos(rad) * 1.15);
+      if (stepX == bbx && stepZ == bbz) {
+         stepX = bbx + (int)Math.round(-Math.sin(rad));
+         stepZ = bbz + (int)Math.round(Math.cos(rad));
+      }
+
+      // Candidate obstacle blocks in priority order:
+      // 1. Inside bot's head/body ((bbx, by+1, bbz), (bbx, by, bbz))
+      // 2. Directly above bot's head ((bbx, by+2, bbz)) preventing jump/build-up
+      // 3. Eye-level wall ahead ((stepX, by+1, stepZ))
+      // 4. Overhang above step ahead ((stepX, by+2, stepZ))
+      // 5. Foot-level obstacle ahead ((stepX, by, stepZ))
+      int[][] candidates = new int[][]{
+         {bbx, by + 1, bbz},
+         {bbx, by, bbz},
+         {bbx, by + 2, bbz},
+         {stepX, by + 1, stepZ},
+         {stepX, by + 2, stepZ},
+         {stepX, by, stepZ}
+      };
+      for (int[] c : candidates) {
+         int ox = c[0];
+         int oy = c[1];
+         int oz = c[2];
+         if (isBotBreakableObstacle(w, ox, oy, oz, myTeam)) {
+            int bid = w.getBlock(ox, oy, oz);
+            w.setBlock(ox, oy, oz, 0);
+            bot.attackAnim = 8;
+            bot.cd = Math.max(bot.cd, 8);
+            if (out != null) {
+               out.headYaw = Mobs.angleTo(ox + 0.5 - bot.x, oz + 0.5 - bot.z);
+               out.headPitch = (float)(-Math.toDegrees(Math.atan2((oy + 0.5) - (bot.y + 1.45), Math.max(0.5, Math.hypot(ox + 0.5 - bot.x, oz + 0.5 - bot.z)))));
+            }
+            botThought[bSlot] = "Breaking Obstacle Block";
+            SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
+            SoundEngine.playBlockBreak(w, bid, ox, oy, oz);
+            if (lastMobsRef != null && lastMobsRef.g != null) {
+               lastMobsRef.g.spawnBreakParticles(ox, oy, oz, bid, 8);
+            }
+            if (!Items.isItem(bid) && Blocks.solid[bid]) {
+               botBlocks[bSlot] = Math.min(64, botBlocks[bSlot] + 1);
+            }
             return true;
          }
       }
@@ -3485,6 +3637,7 @@ public final class SkyGen extends Gen {
    /**
     * Allows an AI bot to build up vertically (pillar-jump / step-build) when its target is on higher ground
     * or when scaling a tall ledge, strictly consuming blocks from botBlocks[bSlot]!
+    * If a breakable block is directly above the bot's head at (bx, by+2, bz), mines it first so the bot never gets stuck!
     */
    public static boolean tryBotBuildUp(Mobs.Mob bot, World w, double tx, double ty, double tz, int blockId) {
       int bSlot = Math.abs(bot.netId) & 31;
@@ -3495,7 +3648,7 @@ public final class SkyGen extends Gen {
       int bx = (int)Math.floor(bot.x);
       int by = (int)Math.floor(bot.y);
       int bz = (int)Math.floor(bot.z);
-      if (by >= Y_DECK + 9 || w.getBlock(bx, by + 2, bz) != 0) {
+      if (by >= Y_DECK + 9) {
          return false;
       }
       boolean targetHigher = (ty - bot.y >= 1.8) && dist <= 9.5;
@@ -3508,6 +3661,18 @@ public final class SkyGen extends Gen {
          wallBlocked = Blocks.solid[w.getBlock(ax, by, az)] && Blocks.solid[w.getBlock(ax, by + 1, az)] && w.getBlock(ax, by + 2, az) == 0;
       }
       if (!targetHigher && !wallBlocked) {
+         return false;
+      }
+      if (w.getBlock(bx, by + 2, bz) != 0) {
+         int myTeam = botTeamIndex(bot);
+         if (isBotBreakableObstacle(w, bx, by + 2, bz, myTeam)) {
+            int bid = w.getBlock(bx, by + 2, bz);
+            w.setBlock(bx, by + 2, bz, 0);
+            bot.attackAnim = 8;
+            botBuildUpCooldown[bSlot] = 8;
+            botThought[bSlot] = "Mining Overhead Block";
+            SoundEngine.playBlockBreak(w, bid, bx, by + 2, bz);
+         }
          return false;
       }
       if (w.chunkAt(bx, bz) != null && w.getBlock(bx, by, bz) == 0 && Blocks.solid[w.getBlock(bx, by - 1, bz)]) {
@@ -3542,6 +3707,7 @@ public final class SkyGen extends Gen {
    }
 
    private static void steerBotSafely3D(Mobs.Mob bot, World w, double tx, double ty, double tz, BotIntent out, double baseSpeed) {
+      int bSlot = Math.abs(bot.netId) & 31;
       int bbx = (int)Math.floor(bot.x);
       int bby = (int)Math.floor(bot.y);
       int bbz = (int)Math.floor(bot.z);
@@ -3580,7 +3746,7 @@ public final class SkyGen extends Gen {
          if (repX != 0.0 || repZ != 0.0) {
             int candX = (int)Math.floor(bot.x + repX);
             int candZ = (int)Math.floor(bot.z + repZ);
-            if (hasFootingAt(w, candX, bby, candZ)) {
+            if (canBotWalkThrough(w, bbx, bby, bbz, candX, candZ)) {
                tx += repX * 1.4;
                tz += repZ * 1.4;
             }
@@ -3617,34 +3783,69 @@ public final class SkyGen extends Gen {
       double dist = Math.hypot(dx, dz);
       if (dist < 0.45) {
          out.moving = false;
+         botStuckTicks[bSlot] = 0;
+         botLastX[bSlot] = bot.x;
+         botLastZ[bSlot] = bot.z;
          return;
       }
+
+      // Track horizontal progress to detect if the bot is stuck against a wall, corner, or low overhang!
+      double movedHoriz = Math.hypot(bot.x - botLastX[bSlot], bot.z - botLastZ[bSlot]);
+      if (bot.age > 5 && movedHoriz < 0.025 && dist > 0.85) {
+         botStuckTicks[bSlot]++;
+         if (botStuckTicks[bSlot] % 16 == 0) {
+            botWallFollowSide[bSlot] = (botWallFollowSide[bSlot] >= 0) ? -1 : 1;
+         }
+      } else {
+         botStuckTicks[bSlot] = Math.max(0, botStuckTicks[bSlot] - 1);
+      }
+      botLastX[bSlot] = bot.x;
+      botLastZ[bSlot] = bot.z;
+
       float desiredYaw = Mobs.angleTo(dx, dz);
-      int by = (int)Math.floor(bot.y);
+      int by = bby;
 
       double rad = Math.toRadians(desiredYaw);
-      int stepX = (int)Math.floor(bot.x - Math.sin(rad) * 0.95);
-      int stepZ = (int)Math.floor(bot.z + Math.cos(rad) * 0.95);
-      int frontBlock = w.getBlock(stepX, by, stepZ);
-      if (bot.onGround && frontBlock != 0 && Blocks.coll[frontBlock] != null && w.getBlock(stepX, by + 1, stepZ) == 0) {
-         // Step-up jump onto 1-block higher terrace, bridge arch, or staircase!
+      int stepX = (int)Math.floor(bot.x - Math.sin(rad) * 1.15);
+      int stepZ = (int)Math.floor(bot.z + Math.cos(rad) * 1.15);
+      if (stepX == bbx && stepZ == bbz) {
+         stepX = bbx + (int)Math.round(-Math.sin(rad));
+         stepZ = bbz + (int)Math.round(Math.cos(rad));
+      }
+      boolean hasCeilingAbove = isSolidObstacle(w, bbx, by + 2, bbz);
+      boolean frontFootSolid = isSolidObstacle(w, stepX, by, stepZ);
+      boolean frontHeadSolid = isSolidObstacle(w, stepX, by + 1, stepZ);
+      boolean frontOverhangSolid = isSolidObstacle(w, stepX, by + 2, stepZ);
+
+      // Step-up jump onto 1-block higher terrace, bridge arch, or staircase ONLY when headroom above both bot and step is clear!
+      if (bot.onGround && !hasCeilingAbove && frontFootSolid && !frontHeadSolid && !frontOverhangSolid) {
          bot.vy = Mobs.JUMP;
       }
 
-      // Surroundings-aware multi-angle raycast: score candidate angles by continuous footing (1..3 blocks ahead) & target alignment!
-      float[] offsets = new float[]{0.0F, 22.0F, -22.0F, 45.0F, -45.0F, 70.0F, -70.0F, 95.0F, -95.0F, 130.0F, -130.0F};
+      // 3D Obstacle-Aware Multi-Angle Pathfinding: score candidate angles (0..±155 deg) by true 1.8m walkability & wall-following!
+      float[] offsets = new float[]{
+         0.0F, 22.0F, -22.0F, 45.0F, -45.0F, 70.0F, -70.0F, 95.0F, -95.0F, 125.0F, -125.0F, 155.0F, -155.0F
+      };
       float bestYaw = desiredYaw;
       int bestSafetyScore = -1;
+      int wallSide = botWallFollowSide[bSlot] == 0 ? 1 : botWallFollowSide[bSlot];
       for (float off : offsets) {
          float candYaw = desiredYaw + off;
          double crad = Math.toRadians(candYaw);
          double sx = -Math.sin(crad);
          double sz = Math.cos(crad);
-         boolean ok1 = hasFootingAt(w, (int)Math.floor(bot.x + sx * 1.15), by, (int)Math.floor(bot.z + sz * 1.15));
-         boolean ok2 = hasFootingAt(w, (int)Math.floor(bot.x + sx * 2.15), by, (int)Math.floor(bot.z + sz * 2.15));
-         boolean ok3 = hasFootingAt(w, (int)Math.floor(bot.x + sx * 3.10), by, (int)Math.floor(bot.z + sz * 3.10));
+         int nx1 = (int)Math.floor(bot.x + sx * 1.15);
+         int nz1 = (int)Math.floor(bot.z + sz * 1.15);
+         int nx2 = (int)Math.floor(bot.x + sx * 2.15);
+         int nz2 = (int)Math.floor(bot.z + sz * 2.15);
+         int nx3 = (int)Math.floor(bot.x + sx * 3.10);
+         int nz3 = (int)Math.floor(bot.z + sz * 3.10);
+         boolean ok1 = canBotWalkThrough(w, bbx, by, bbz, nx1, nz1);
+         boolean ok2 = ok1 && canBotWalkThrough(w, nx1, by, nz1, nx2, nz2);
+         boolean ok3 = ok2 && canBotWalkThrough(w, nx2, by, nz2, nx3, nz3);
          if (ok1) {
-            int score = 100 - (int)(Math.abs(off) * 0.65F) + (ok2 ? 35 : 0) + (ok3 ? 20 : 0);
+            int wallBonus = (off != 0.0F && ((off > 0.0F) == (wallSide > 0))) ? 8 : 0;
+            int score = 100 - (int)(Math.abs(off) * 0.58F) + (ok2 ? 35 : 0) + (ok3 ? 20 : 0) + wallBonus;
             if (score > bestSafetyScore) {
                bestSafetyScore = score;
                bestYaw = candYaw;
@@ -3652,12 +3853,30 @@ public final class SkyGen extends Gen {
             if (score >= 155) {
                break;
             }
-         } else if (Math.abs(off) <= 25.0F && bot.onGround && dist > 2.2 && (ok2 || ok3)) {
-            // Parkour jump across a 1-2 block gap with confirmed landing on the far side!
+         } else if (Math.abs(off) <= 25.0F
+            && bot.onGround
+            && !hasCeilingAbove
+            && !isSolidObstacle(w, nx1, by, nz1)
+            && !isSolidObstacle(w, nx1, by + 1, nz1)
+            && dist > 2.2
+            && (hasFootingAt(w, nx2, by, nz2) || hasFootingAt(w, nx3, by, nz3))) {
+            // Parkour jump across a 1-2 block gap with confirmed landing on the far side and clear headroom!
             bot.vy = Mobs.JUMP * 1.08;
             bestSafetyScore = 90;
             bestYaw = candYaw;
             break;
+         }
+      }
+
+      // Smart Block Breaking: if trapped under an overhead block, stuck against a wall, or no clean detour exists around an obstacle, break it!
+      boolean directBlocked = !canBotWalkThrough(w, bbx, by, bbz, stepX, stepZ) || (hasCeilingAbove && (ty > bot.y + 0.8 || frontFootSolid));
+      if (directBlocked && (bestSafetyScore < 95 || botStuckTicks[bSlot] >= 5 || isSolidObstacle(w, bbx, by + 1, bbz))) {
+         if (tryBreakBlockingObstacle(bot, w, tx, ty, tz, out)) {
+            botStuckTicks[bSlot] = 0;
+            if (bestSafetyScore < 0) {
+               bestSafetyScore = 80;
+               bestYaw = desiredYaw;
+            }
          }
       }
 
@@ -3666,15 +3885,15 @@ public final class SkyGen extends Gen {
          out.moving = false;
          return;
       }
-      int bSlot = Math.abs(bot.netId) & 31;
       bot.dirYaw = bestYaw;
       out.headYaw = bestYaw;
       out.moving = true;
       // Scale bot speed to match real human player sprinting speed (~0.22..0.25 blocks/tick)
       out.speedMul = baseSpeed * 1.38;
 
-      // Player-like Sprint-Jumping (Bunny-Hopping) across confirmed safe straightaways!
+      // Player-like Sprint-Jumping (Bunny-Hopping) across confirmed safe straightaways (NEVER when a block is above the bot's head!)
       if (bot.onGround
+         && !hasCeilingAbove
          && dist > 5.5
          && bestSafetyScore >= 135
          && botHoldingBlockTicks[bSlot] <= 0
