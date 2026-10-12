@@ -93,6 +93,9 @@ public final class MainActivity extends Activity {
    @Override
    protected void onPause() {
       if (this.glView != null) {
+         if (this.glView.world != null) {
+            this.glView.world.saveWorld(this);
+         }
          this.glView.onPause();
       }
       super.onPause();
@@ -101,10 +104,31 @@ public final class MainActivity extends Activity {
    @Override
    @SuppressWarnings("deprecation")
    public void onBackPressed() {
-      if (this.glView != null && this.glView.touch != null) {
-         if (this.glView.touch.showModeMenu || this.glView.touch.showPaletteMenu) {
-            this.glView.touch.showModeMenu = false;
-            this.glView.touch.showPaletteMenu = false;
+      if (this.glView != null && this.glView.world != null) {
+         PeWorld w = this.glView.world;
+         if (w.screen == PeWorld.SCREEN_INVENTORY) {
+            w.screen = PeWorld.SCREEN_PLAY;
+            return;
+         }
+         if (w.screen == PeWorld.SCREEN_SETTINGS) {
+            w.screen = w.previousScreen;
+            return;
+         }
+         if (w.screen == PeWorld.SCREEN_PLAY) {
+            w.saveWorld(this);
+            w.screen = PeWorld.SCREEN_PAUSE;
+            return;
+         }
+         if (w.screen == PeWorld.SCREEN_PAUSE) {
+            w.screen = PeWorld.SCREEN_PLAY;
+            return;
+         }
+         if (w.screen == PeWorld.SCREEN_CREATE_WORLD) {
+            w.screen = PeWorld.SCREEN_WORLD_SELECT;
+            return;
+         }
+         if (w.screen == PeWorld.SCREEN_WORLD_SELECT) {
+            w.screen = PeWorld.SCREEN_TITLE;
             return;
          }
       }

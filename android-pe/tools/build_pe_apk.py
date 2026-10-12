@@ -114,74 +114,67 @@ Note: This is the standalone Android Pocket Edition release of Blockcraft.
 PC and PE releases are strictly separated — this release contains ONLY the
 Android Pocket Edition build and no PC files.
 
-TARGET DEVICE & HARDWARE OPTIMIZATIONS
---------------------------------------
-* Samsung Galaxy A55 5G (SM-A556B / SM-A556E, Android 14 / One UI 6, API 26-34)
-* Exynos 1480 Octa-Core + Xclipse 530 GPU (RDNA2 mobile architecture)
-* 6.6" 1080x2340 (19.5:9) Super AMOLED @ 120Hz High Refresh Rate
-* Native OpenGL ES 3.0 / 2.0 Hardware VBO Chunk Renderer:
-  - 16x16x16 chunk section Vertex Buffer Objects (GL_STATIC_DRAW) with
-    hidden-face culling, directional sunlight + torch lighting, and view-cone
-    frustum culling for locked 120 FPS gameplay on mobile GPUs.
-* Multi-Touch Pocket Edition Controls:
-  - Left Classic PE 5-Button D-Pad OR Virtual Analog Thumbstick (toggleable in
-    the top bar via [CTRL: D-PAD / STICK]).
-  - Right-side Touch-Look + Quick-Tap Attack/Place + Hold-to-Mine progress circle,
-    plus dedicated [JUMP/FLY], [ATK], and [USE] thumb buttons.
-  - Bottom 9-slot Touch Hotbar + [...] 28-item Block & Weapon Palette Drawer.
-  - Hole-punch camera cutout safe-area margins for landscape play.
-
-8 INCLUDED GAMEMODES & 24 ARENA MAPS
-------------------------------------
-1. Survival World   — Procedural Overworld biomes, trees, ores, village cabin & mobs
-2. Creative World   — Infinite blocks, double-tap JUMP to toggle 3D Creative Flight
-3. Battle Brawl     — Authentic 160x160x96 Console Edition .mca arenas (Cove, Crucible,
-                      Cavern, Temple, Lair, Castle, Frontier, Shrunk) with outer-map
-                      AI waypoint dispersion & randomized loot
-4. Tumble Spleef    — 3-layer multi-material spleef arena with Snowballs & Tumble Shovel
-5. Bedwars 4-Team   — Spawn islands, Diamond/Emerald generators, beds & dynamic AI teams
-6. CS2 Tactical     — 8 dedicated 3-lane maps (Dust II, Mirage, Inferno, Nuke, Overpass,
-                      Train, Vertigo, Anubis) with Bomb Sites A & B, SMGs, Pistols & AWPs
-7. End Bed Fight    — Obsidian pillars, Ender Pearls & zero-self-damage Bed-Bombing
-8. Castle Siege     — 8 dedicated fortresses (Ironkeep, Helm's Deep, Dragonstone,
-                      Frosthold, Sandstorm, Blackrock, Skyhaven, Dreadfort) with
-                      Siege Cannons, Mortars, destructible gates & Control Zones A/B
+WHAT'S IN THIS SINGLE-PLAYER POCKET EDITION BUILD
+-------------------------------------------------
+* Single-Player World Generation & Persistent Saving:
+  - Title Screen -> World Select (3 persistent Save Slots: World 1, 2, 3) ->
+    Create New World (Survival / Creative, Large Biomes Recommended / Default /
+    Superflat, Seed Presets).
+  - Multi-Biome Overworld with Mountains, Forests, Deserts, Snowy Taiga,
+    Underground 3D Caves, Ore Veins (Coal, Iron, Gold, Redstone, Diamond),
+    Water Lakes, Trees, and a furnished Starter Village Cabin.
+  - Automatic & Manual World Saving (`world_0..2.bcpe` in app storage): saves
+    every placed/mined block, player position, inventory, mode, and day time.
+* Redesigned Mobile Controls (Samsung Galaxy A55 5G 2340x1080 @ 120Hz):
+  - Fixed Right-Handed Camera & Movement Math: walking Left (-X) and Right (+X)
+    and turning the camera match your thumb direction 100% accurately.
+  - Pure Camera Look (No Accidental Mining or Placing): dragging your finger to
+    look around ONLY rotates the camera and never triggers unwanted mining,
+    attacks, or block placements.
+  - Dedicated Right-Thumb Action Buttons:
+    * [MINE / HIT]: Hold to mine blocks (you can also drag your thumb while
+      holding [MINE / HIT] to aim the crosshair while mining!) or tap to attack.
+    * [PLACE / USE]: Tap to place your selected block, open a Crafting Table /
+      Chest, eat food, or sleep in a Bed.
+    * [JUMP / FLY]: Hold to jump/swim up, double-tap in Creative to fly.
+  - Left Movement Pad: Smooth Analog Joystick (default) OR Classic 5-Button
+    Minecraft PE D-Pad (toggleable in Settings), plus a [SNEAK] toggle button.
+* Crisp, High-Contrast Readable Text:
+  - Decodes the authentic 16x6 (8x11 cell) `font.bin` bitmap font with large
+    1080p scaling and drop shadows.
 
 HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
 ---------------------------------------
-1. Download `{apk_name}` directly to your Samsung Galaxy A55 5G
-   (or copy it over USB from this zip).
-2. Tap `{apk_name}` in Samsung "My Files" or your browser Downloads.
-3. If prompted by Android 14 ("Install unknown apps"), tap Settings -> Allow
-   from this source, then tap Install.
-4. If Google Play Protect shows "Unrecognized app developer" (because this is
-   an indie self-signed APK), tap "More details" -> "Install anyway".
-5. Launch "Blockcraft PE" in landscape mode!
+1. Download `{apk_name}` directly to your Samsung Galaxy A55 5G.
+2. Tap `{apk_name}` in Samsung "My Files" or your browser Downloads and tap
+   Install / Update.
+3. Launch "Blockcraft PE" in landscape mode!
 """
 
 
 def build_release_notes(version, apk_name, bundle_name):
-    return f"""## Blockcraft PE (Pocket Edition) v{version} — Android (Samsung Galaxy A55 5G)
+    return f"""## Blockcraft PE (Pocket Edition) v{version} — Singleplayer Edition (Samsung Galaxy A55 5G)
 
 > **Separate Pocket Edition Release**: This release contains **only** the Android Pocket Edition (`com.blockcraft.pe`) and does **not** include any PC files. PC (`v*`) and PE (`pe-v*`) releases are kept strictly separated.
 
 ### Download & Install on Samsung Galaxy A55 5G (Android 14 / One UI 6)
-1. Download **`{apk_name}`** below under **Assets** directly on your phone (or download `{bundle_name}` which includes the APK + installation guide).
-2. Open **`{apk_name}`** from your browser downloads or Samsung **My Files** and tap **Install**.
-3. If prompted to allow installation from your browser/My Files, toggle **Allow from this source**; if Play Protect prompts about an indie self-signed APK, tap **More details -> Install anyway**.
+1. Download **`{apk_name}`** below under **Assets** directly on your phone (or download `{bundle_name}`).
+2. Open **`{apk_name}`** from your browser downloads or Samsung **My Files** and tap **Install / Update**.
 
-### Engineered for Samsung Galaxy A55 5G (`1080x2340` Super AMOLED @ `120Hz`)
-* **Rebuilt Mobile OpenGL ES 3.0 / 2.0 Hardware VBO Renderer**:
-  * Replaces desktop immediate-mode rendering with `16x16x16` hardware **Vertex Buffer Objects (`GL_STATIC_DRAW`)**, 6-face hidden-surface culling, per-face sunlight/torch shading, distance fog shaders (`PeShaders`), and 3D view-cone frustum culling for smooth **120Hz** rendering on the **Xclipse 530 GPU** (Exynos 1480).
-  * Native `120Hz` display mode negotiation (`preferredDisplayModeId` / `preferredRefreshRate = 120.0f`) and edge-to-edge landscape safe-area margins around the Galaxy A55 5G punch-hole camera.
-* **Multi-Touch Pocket Edition Controls (`PeTouchController`)**:
-  * **Left Movement Pad**: Switch anytime between the classic **5-Button PE D-Pad** (with center sneak/descend) and a **Virtual Analog Thumbstick** via `[CTRL: D-PAD / STICK]`.
-  * **Right Touch-Look & Combat Buttons**: Simultaneous multi-finger camera look, hold-to-mine touch progress circle, tactical crosshair with animated hitmarkers, and dedicated **`[JUMP/FLY]`**, **`[ATK]`**, and **`[USE]`** buttons.
-  * **9-Slot Touch Hotbar + `[...]` Palette Drawer**: Instant tap-to-equip for 28 blocks, tools, swords, bows, CS2 firearms, and siege weapons.
-* **All 8 Gamemodes & Dynamic AI Bots Included**:
-  * **Survival World** & **Creative World** (double-tap `JUMP` to fly)
-  * **Battle Brawl** (loads all 8 authentic `160x160x96` Console Edition `.mca` arenas from `console_arenas.bin` with outer-map AI roaming & dynamic combat)
-  * **Tumble Spleef**, **Bedwars 4-Team**, **CS2 Tactical** (8 maps), **End Bed Fight** (zero-self-damage bed-bombing), and **Castle Siege** (8 fortresses with cannons & destructible gates)
+### What's New & Fixed in Singleplayer Pocket Edition
+* **Single-Player World Generation & Persistent World Saving (`PeWorld`)**:
+  * **Title Screen & 3 Persistent World Save Slots (`World 1..3`)**: Create, load, and delete single-player worlds saved automatically in GZIP format (`world_0..2.bcpe`) across app restarts.
+  * **Create World Options**: Choose **Survival** or **Creative**, **Large Biomes (Recommended)**, **Default Biomes**, or **Superflat**, and custom **Seed Presets** (*Random, Mountain Peaks, Village Valley, Desert Oasis*).
+  * **Rich Overworld Terrain & Survival Crafting**: Multi-biome terrain, underground 3D caves, Coal/Iron/Gold/Redstone/Diamond ore veins, trees, starter Village Cabin with Crafting Table/Furnace/Chest/Bed, and an in-game **Crafting & Inventory screen (`[CRAFT / INV]`)**.
+* **Completely Reworked Touch Controls (`PeTouchController`)**:
+  * **Fixed Left / Right Walking Direction**: Corrected the right-handed camera and movement basis (`Forward = (+sin(yaw), -cos(yaw))`, `Right = (+cos(yaw), +sin(yaw))`) so walking Left and Right and rotating the camera match your thumb direction at every angle.
+  * **Pure Camera Look (Zero Unwanted Actions While Moving Camera)**: Dragging your finger on the screen **only rotates the camera** — it never triggers accidental block breaking, block placement, or attacks while panning.
+  * **Dedicated Ergonomic Action Buttons**:
+    * **`[MINE / HIT]`**: Hold to mine blocks (supports dragging your thumb while holding `[MINE / HIT]` to aim while mining!) or tap to attack.
+    * **`[PLACE / USE]`**: Tap to place blocks, use Crafting Tables/Chests/Beds, or eat food.
+    * **`[JUMP / FLY]`** & **`[SNEAK]`**: Dedicated jump/fly and crouch toggle buttons, plus choice of **Smooth Analog Joystick** or **Classic 5-Button D-Pad** in **Controls & Settings**.
+* **Crisp, Readable Bitmap Font (`PeTextures` & `PeChunkMesher`)**:
+  * Properly decodes the `16x6` (`8x11` cell) `font.bin` alpha bitmap font with large `1080x2340` UI scaling so all menus, buttons, and HUD labels are sharp and easy to read.
 """
 
 
@@ -263,15 +256,12 @@ def main():
             "--output", dex_dir,
         ] + class_files)
 
-        # Add classes.dex and game assets (font.bin + maps/console_arenas.bin) into unaligned_apk
+        # Add classes.dex and font.bin asset into unaligned_apk
         with zipfile.ZipFile(unaligned_apk, "a") as zf:
             zf.write(os.path.join(dex_dir, "classes.dex"), "classes.dex", compress_type=zipfile.ZIP_DEFLATED)
             font_bin = os.path.join(ROOT, "res", "font.bin")
             if os.path.exists(font_bin):
                 zf.write(font_bin, "assets/font.bin", compress_type=zipfile.ZIP_STORED)
-            arenas_bin = os.path.join(ROOT, "res", "maps", "console_arenas.bin")
-            if os.path.exists(arenas_bin):
-                zf.write(arenas_bin, "assets/maps/console_arenas.bin", compress_type=zipfile.ZIP_STORED)
 
         aligned_apk = os.path.join(work, "aligned.apk")
         run_cmd([zipalign, "-f", "-p", "4", unaligned_apk, aligned_apk])

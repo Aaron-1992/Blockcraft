@@ -353,17 +353,28 @@ public final class PeChunkMesher {
    public void addText2D(PeTextures tex, String text, float x, float y, float scale, int argb) {
       if (text == null || text.isEmpty()) return;
       float curX = x;
+      float cw = PeTextures.FONT_CELL_W * scale;
+      float ch = PeTextures.FONT_CELL_H * scale;
       for (int i = 0; i < text.length(); i++) {
          char c = text.charAt(i);
          if (c < 32 || c >= 128) continue;
-         float u0 = ((c & 15) * 8.0F) / 128.0F;
-         float v0 = ((c >> 4) * 8.0F) / 128.0F;
-         float u1 = u0 + 8.0F / 128.0F;
-         float v1 = v0 + 8.0F / 128.0F;
-         addTexturedQuad2D(curX + scale, y + scale, 8.0F * scale, 8.0F * scale, u0, v0, u1, v1, 0xB0101010);
-         addTexturedQuad2D(curX, y, 8.0F * scale, 8.0F * scale, u0, v0, u1, v1, argb);
-         curX += (tex.fontWidths[c] + 1) * scale;
+         int idx = c - 32;
+         int col = idx & 15;
+         int row = idx >> 4;
+         float u0 = (col * 8.0F) / 128.0F;
+         float v0 = (row * 11.0F) / 128.0F;
+         float u1 = (col * 8.0F + 8.0F) / 128.0F;
+         float v1 = (row * 11.0F + 11.0F) / 128.0F;
+         addTexturedQuad2D(curX + scale, y + scale, cw, ch, u0, v0, u1, v1, 0xD00A0C10);
+         addTexturedQuad2D(curX, y, cw, ch, u0, v0, u1, v1, argb);
+         curX += tex.fontWidths[c] * scale;
       }
+   }
+
+   public void addTextCentered2D(PeTextures tex, String text, float centerX, float y, float scale, int argb) {
+      if (text == null || text.isEmpty()) return;
+      float totalW = tex.measureText(text) * scale;
+      addText2D(tex, text, centerX - totalW * 0.5F, y, scale, argb);
    }
 
    private void addTexturedQuad2D(float x, float y, float w, float h, float u0, float v0, float u1, float v1, int argb) {

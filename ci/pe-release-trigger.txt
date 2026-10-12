@@ -1,2 +1,2 @@
 1.0
-# Blockcraft PE v1.0 release trigger (Samsung Galaxy A55 5G)
+# Blockcraft PE v1.0 Singleplayer Edition (World Gen, Saving, Fixed Controls & Font)

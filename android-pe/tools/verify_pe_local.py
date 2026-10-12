@@ -41,9 +41,12 @@ public class AssetManager {
     "android/content/Context.java": """
 package android.content;
 import android.content.res.AssetManager;
+import java.io.File;
 public class Context {
    private final AssetManager assets = new AssetManager();
+   private final File filesDir = new File(System.getProperty("java.io.tmpdir", "/tmp"), "pe-test-files");
    public AssetManager getAssets() { return assets; }
+   public File getFilesDir() { filesDir.mkdirs(); return filesDir; }
 }
 """,
     "android/view/Display.java": """
@@ -329,63 +332,97 @@ public class PeCoreTest {
    public static void main(String[] args) {
       Context ctx = new Context();
 
-      // 1. Verify Texture Atlas & Font generation
+      // 1. Verify Texture Atlas & Authentic 16x6 (8x11 cell) font.bin decoding
       int[] atlas = PeTextures.generateAtlasPixels();
       check(atlas.length == 256 * 256, "Atlas pixel count must be 65536");
       PeTextures tex = new PeTextures();
       int[] font = tex.generateFontPixels(ctx);
       check(font.length == 128 * 128, "Font pixel count must be 16384");
-      check(tex.measureText("BLOCKCRAFT PE") > 40, "Font measureText must return positive pixel width");
+      check(tex.measureText("BLOCKCRAFT PE") > 50, "Font measureText must return positive pixel width");
+      // Verify glyph 'A' (idx=33, gx=8, gy=22) has opaque pixels at row gy+2=24, col gx+1=9
+      int glyphAPixel = font[24 * 128 + 9];
+      check((glyphAPixel >>> 24) > 128, "Glyph 'A' from font.bin must have opaque pixels at (9, 24)");
 
-      // 2. Verify all 8 Gamemodes (including Console Edition .mca Battle loading, Tumble, Bedwars, CS2, End Fight, Castle Siege)
+      // 2. Verify Single-Player World Gen, Persistent Save & Load (world_0.bcpe)
       PeWorld world = new PeWorld();
-      float[] scratch = new float[72000 * 9];
-      PeChunkMesher mesher = new PeChunkMesher();
+      world.deleteWorldSlot(ctx, 0);
+      world.createNewSinglePlayerWorld(ctx, 0, PeWorld.MODE_SURVIVAL, PeWorld.WTYPE_LARGE_BIOMES, 884219551L);
+      check(world.screen == PeWorld.SCREEN_PLAY, "New world must enter SCREEN_PLAY");
+      check(world.slotExists[0], "World slot 0 must exist on disk after creation");
+
+      // Place custom blocks & move player, then save
+      world.setBlock(3, 72, -3, PeWorld.B_GOLD_BLOCK);
+      world.setBlock(4, 72, -3, PeWorld.B_CRAFTING_TABLE);
+      world.px = 12.5;
+      world.py = 71.0;
+      world.pz = -8.5;
+      world.yaw = 45.0F;
+      check(world.saveWorld(ctx), "saveWorld must succeed");
+
+      // Wipe in-memory state and reload from disk
+      PeWorld loaded = new PeWorld();
+      check(loaded.loadWorld(ctx, 0), "loadWorld(0) must succeed");
+      check(loaded.getBlock(3, 72, -3) == PeWorld.B_GOLD_BLOCK, "Saved Gold Block must be restored from disk");
+      check(loaded.getBlock(4, 72, -3) == PeWorld.B_CRAFTING_TABLE, "Saved Crafting Table must be restored from disk");
+      check(Math.abs(loaded.px - 12.5) < 0.01 && Math.abs(loaded.pz - (-8.5)) < 0.01, "Saved player position must be restored");
+
+      // 3. Verify Right-Handed Walking Left (-X) and Right (+X) at yaw = 0 (facing -Z)
+      PeWorld moveWorld = new PeWorld();
+      moveWorld.createNewSinglePlayerWorld(ctx, 1, PeWorld.MODE_CREATIVE, PeWorld.WTYPE_SUPERFLAT, 12345L);
+      moveWorld.flying = true;
+      moveWorld.yaw = 0.0F;
       PeTouchController touch = new PeTouchController();
       touch.updateLayout(2340, 1080);
 
-      for (int mode = 0; mode < PeWorld.MODE_NAMES.length; mode++) {
-         world.generateWorld(ctx, mode, mode & 7);
-         check(world.mode == mode, "World mode must match " + mode);
-         check(world.mobs.size() >= 4, "Mode " + PeWorld.MODE_NAMES[mode] + " must spawn dynamic AI bots/mobs");
+      double startX = moveWorld.px;
+      touch.moveForward = 0.0F;
+      touch.moveStrafe = -1.0F; // Walk LEFT
+      moveWorld.tick(touch, null);
+      check(moveWorld.px < startX, "Walking LEFT at yaw=0 must decrease X (move left), got dx=" + (moveWorld.px - startX));
 
-         touch.moveForward = 0.8F;
-         touch.moveStrafe = 0.2F;
-         for (int t = 0; t < 25; t++) {
-            touch.jumpHeld = (t % 10 == 0);
-            touch.miningHeld = (t % 5 == 0);
-            world.tick(touch, null);
-         }
-         world.triggerPrimaryAction(null);
-      }
+      startX = moveWorld.px;
+      touch.moveStrafe = 1.0F; // Walk RIGHT
+      moveWorld.tick(touch, null);
+      moveWorld.tick(touch, null);
+      check(moveWorld.px > startX, "Walking RIGHT at yaw=0 must increase X (move right), got dx=" + (moveWorld.px - startX));
 
-      // 3. Verify VBO Chunk Section Mesher produces culled geometry
-      world.generateWorld(ctx, PeWorld.MODE_BATTLE, 0); // Cove .mca
+      double startZ = moveWorld.pz;
+      touch.moveStrafe = 0.0F;
+      touch.moveForward = 1.0F; // Walk FORWARD
+      moveWorld.tick(touch, null);
+      check(moveWorld.pz < startZ, "Walking FORWARD at yaw=0 must decrease Z (move toward -Z)");
+
+      // 4. Verify Camera Look Isolation (Dragging camera NEVER triggers mining, attack, or block place!)
+      touch.resetPointers(moveWorld);
+      float lookX0 = 1400.0F, lookY0 = 450.0F;
+      touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, lookX0, lookY0), ctx, moveWorld, null);
+      touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_MOVE, 0, 0, lookX0 + 120.0F, lookY0 - 40.0F), ctx, moveWorld, null);
+      check(touch.consumeYawDelta() > 5.0F, "Dragging right must rotate camera yaw right (+)");
+      check(!touch.miningHeld && !touch.attackHeld && !touch.attackTapped && !touch.placeTapped,
+         "Moving the camera must NEVER trigger mining, attacking, or placing!");
+      touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_UP, 0, 0, lookX0 + 120.0F, lookY0 - 40.0F), ctx, moveWorld, null);
+      check(!touch.miningHeld && !touch.attackTapped && !touch.placeTapped,
+         "Releasing finger after camera look must NEVER trigger attack or block placement!");
+
+      // 5. Verify Single-Player Crafting & VBO Mesher + GL Draw
+      world.giveItem(PeWorld.B_LOG_OAK, 2);
+      check(world.tryCraftRecipe(0, null), "Crafting Oak Planks x4 from 1 Oak Log must succeed");
+      float[] scratch = new float[72000 * 9];
+      PeChunkMesher mesher = new PeChunkMesher();
       int totalVerts = 0;
       for (int sy = 0; sy < PeWorld.SECTIONS_Y; sy++) {
          totalVerts += mesher.buildSectionGeometry(world, 5, sy, 5, scratch);
       }
-      check(totalVerts > 100, "Center chunk VBO mesher must emit > 100 vertices on Cove .mca, got " + totalVerts);
+      check(totalVerts > 100, "Center chunk VBO mesher must emit > 100 vertices, got " + totalVerts);
 
-      // 4. Verify Samsung Galaxy A55 5G (2340x1080) Multi-Touch Controller
-      touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, touch.dpadCenterX, touch.dpadCenterY - touch.dpadRadius * 0.7F), ctx, world, null);
-      check(touch.moveForward > 0.5F, "D-Pad Up must set positive moveForward");
-      touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_UP, 0, 0, touch.dpadCenterX, touch.dpadCenterY), ctx, world, null);
-      check(touch.moveForward == 0.0F, "D-Pad release must reset moveForward");
-
-      // Tap Hotbar Slot 3
-      float slot3X = touch.hotbarX + touch.hotbarSlotSize * 3.5F;
-      float slot3Y = touch.hotbarY + touch.hotbarSlotSize * 0.5F;
-      touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 1, slot3X, slot3Y), ctx, world, null);
-      check(world.selectedSlot == 3, "Hotbar tap must select slot 3");
-
-      // 5. Verify full OpenGL ES SurfaceView lifecycle & frame draw
       PeGLSurfaceView glView = new PeGLSurfaceView(ctx);
       glView.onSurfaceCreated(null, null);
       glView.onSurfaceChanged(null, 2340, 1080);
-      glView.onDrawFrame(null);
+      glView.onDrawFrame(null); // Draw Title Screen
+      glView.world.screen = PeWorld.SCREEN_PLAY;
+      glView.onDrawFrame(null); // Draw Play Screen
 
-      System.out.println("PeCoreTest PASSED: All 8 modes, .mca loader, VBO chunk mesher, textures, GL draw, and A55 5G multi-touch verified!");
+      System.out.println("PeCoreTest PASSED: Font readability, Single-Player World Gen & Save/Load, Left/Right movement math, and Pure Camera Look verified!");
    }
 }
 """

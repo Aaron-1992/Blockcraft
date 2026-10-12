@@ -143,6 +143,12 @@ public final class PeTextures {
    public static final int T_ITEM_SNOWBALL = 151;
    public static final int T_HEART_FULL = 152;
    public static final int T_HEART_EMPTY = 153;
+   public static final int T_HUNGER_FULL = 154;
+   public static final int T_HUNGER_EMPTY = 155;
+
+   public static final int FONT_COLS = 16;
+   public static final int FONT_CELL_W = 8;
+   public static final int FONT_CELL_H = 11;
 
    public int atlasTexId = 0;
    public int fontTexId = 0;
@@ -308,8 +314,10 @@ public final class PeTextures {
       paintRoundItem(px, T_ITEM_C4_BOMB, 0xFF4A5838, 0xFFFF2424);
       paintGun(px, T_ITEM_SIEGE_CANNON, 0xFF222226, 0xFFF2C028, true);
       paintGun(px, T_ITEM_MORTAR, 0xFF3E4838, 0xFFE86A1C, true);
-      paintRoundItem(px, T_HEART_FULL, 0xFFE82424, 0xFFFF8888);
-      paintRoundItem(px, T_HEART_EMPTY, 0xFF382020, 0xFF604040);
+      paintHeart(px, T_HEART_FULL, 0xFFE82424, 0xFFFF7878, 0xFF280808);
+      paintHeart(px, T_HEART_EMPTY, 0xFF301C1C, 0xFF482C2C, 0xFF140808);
+      paintRoundItem(px, T_HUNGER_FULL, 0xFFC87428, 0xFFF2A852);
+      paintRoundItem(px, T_HUNGER_EMPTY, 0xFF382818, 0xFF543C28);
 
       return px;
    }
@@ -702,13 +710,44 @@ public final class PeTextures {
       }
    }
 
+   private static final String[] HEART_MASK = new String[]{
+      "................",
+      "..OOOO....OOOO..",
+      ".OXXXXO..OXXXXO.",
+      "OXXHHXXOOXXXXXXO",
+      "OXXHXXXXXXXXXXXO",
+      "OXXXXXXXXXXXXXXO",
+      "OXXXXXXXXXXXXXXO",
+      ".OXXXXXXXXXXXXO.",
+      "..OXXXXXXXXXXO..",
+      "...OXXXXXXXXO...",
+      "....OXXXXXXO....",
+      ".....OXXXXO.....",
+      "......OXXO......",
+      ".......OO.......",
+      "................",
+      "................"
+   };
+
+   private static void paintHeart(int[] px, int tile, int fillCol, int hiCol, int outlineCol) {
+      for (int y = 0; y < 16; y++) {
+         String row = HEART_MASK[y];
+         for (int x = 0; x < 16; x++) {
+            char c = row.charAt(x);
+            if (c == 'O') putPx(px, tile, x, y, outlineCol);
+            else if (c == 'H') putPx(px, tile, x, y, hiCol);
+            else if (c == 'X') putPx(px, tile, x, y, fillCol);
+         }
+      }
+   }
+
    public int measureText(String s) {
       if (s == null) return 0;
       int w = 0;
       for (int i = 0; i < s.length(); i++) {
          char c = s.charAt(i);
          if (c >= 32 && c < 128) {
-            w += this.fontWidths[c] + 1;
+            w += this.fontWidths[c];
          }
       }
       return w;
@@ -717,7 +756,7 @@ public final class PeTextures {
    public int[] generateFontPixels(Context context) {
       int[] px = new int[128 * 128];
       for (int i = 0; i < 128; i++) {
-         this.fontWidths[i] = 6;
+         this.fontWidths[i] = 7;
       }
       this.fontWidths[' '] = 4;
       try {
@@ -732,25 +771,32 @@ public final class PeTextures {
             in = PeTextures.class.getResourceAsStream("/font.bin");
          }
          if (in != null) {
-            byte[] data = new byte[96 * 9];
-            int off = 0;
-            while (off < data.length) {
-               int r = in.read(data, off, data.length - off);
+            byte[] data = new byte[16384];
+            int total = 0;
+            while (total < data.length) {
+               int r = in.read(data, total, data.length - total);
                if (r <= 0) break;
-               off += r;
+               total += r;
             }
             in.close();
-            if (off >= 96 * 9) {
-               for (int ch = 32; ch < 128; ch++) {
-                  int idx = (ch - 32) * 9;
-                  this.fontWidths[ch] = Math.max(2, Math.min(8, data[idx] & 0xFF));
-                  int gx = (ch & 15) * 8;
-                  int gy = (ch >> 4) * 8;
-                  for (int row = 0; row < 8; row++) {
-                     int bits = data[idx + 1 + row] & 0xFF;
-                     for (int col = 0; col < 8; col++) {
-                        if ((bits & (1 << col)) != 0) {
-                           px[(gy + row) * 128 + (gx + col)] = 0xFFFFFFFF;
+            if (total >= 100) {
+               int cols = data[0] & 0xFF;
+               int rows = data[1] & 0xFF;
+               int cellW = data[2] & 0xFF;
+               int cellH = data[3] & 0xFF;
+               for (int i = 0; i < 96; i++) {
+                  this.fontWidths[32 + i] = Math.max(2, Math.min(10, data[4 + i] & 0xFF));
+               }
+               int bmpW = cols * cellW;
+               int bmpH = rows * cellH;
+               int offset = 100;
+               for (int y = 0; y < bmpH && y < 128; y++) {
+                  for (int x = 0; x < bmpW && x < 128; x++) {
+                     int idx = offset + y * bmpW + x;
+                     if (idx < total) {
+                        int a = data[idx] & 0xFF;
+                        if (a > 0) {
+                           px[y * 128 + x] = (a << 24) | 0x00FFFFFF;
                         }
                      }
                   }
