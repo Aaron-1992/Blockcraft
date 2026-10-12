@@ -1968,6 +1968,7 @@ final class Tests319 {
          SoundEngine.nextBattleTrack();
          String nextTrack = SoundEngine.selectConsoleMusic(bwGame);
          check(!nextTrack.equals(waitTrack0), "Clicking Next Track in the Waiting Lobby immediately advances to the next Console Edition theme");
+         bwGame.screen = Game.S.PLAY;
 
          // =========================================================================
          // Update 5.4: Complete 64-Track Normal Game (C418) + Map-Specific Battle/Tumble (Gareth Coker) Soundtrack
@@ -2210,6 +2211,20 @@ final class Tests319 {
          SkyGen.BotIntent brawlIntent = SkyGen.tickBotAI(bwGame.mobs, brawlBot, bwGame.world, bwGame.player);
          check(brawlIntent != null && brawlIntent.moving && SkyGen.botSituation[bbSlot] == SkyGen.SIT_ROAMING,
             "Brawl AI bot immediately disperses toward its outer map landmark instead of staying around the middle");
+
+         // 4. Verify Brawl AI Bot Dynamically Targets, Chases & Attacks the Human Player even when other bots exist!
+         SkyGen.battleGraceTicks = 0;
+         Mobs.Mob distantBot = bwGame.mobs.spawn(Mobs.SKELETON, 28.5, SkyGen.Y_DECK + 1.0, -22.5);
+         distantBot.teamTag = "BattleBot:3:Vortex";
+         brawlBot.setPos(18.5, SkyGen.Y_DECK + 1.0, 12.5);
+         brawlBot.cd = 0;
+         bwGame.player.setPos(19.8, SkyGen.Y_DECK + 1.0, 12.5);
+         bwGame.player.health = 20;
+         bwGame.player.hurtTime = 0;
+         bwGame.player.invuln = 0;
+         SkyGen.tickBotAI(bwGame.mobs, brawlBot, bwGame.world, bwGame.player);
+         check(bwGame.player.health < 20,
+            "Brawl AI bot dynamically targets and attacks the human player in combat range even when other rival bots exist");
       });
    }
 }

@@ -1,2 +1,2 @@
 5.6
-Blockcraft V5.6 — 8 Separate Dedicated CS2 Maps, 8 Separate Dedicated Castle Siege Maps & Brawl AI Map-Wide Dispersion Fix
+Blockcraft V5.6 — 8 Separate Dedicated CS2 Maps, 8 Separate Castle Siege Maps & Dynamic Aggressive Brawl AI + Map-Wide Dispersion

@@ -426,7 +426,7 @@ public final class SkyGen extends Gen {
       skywarsWon = false;
       tumbleSpawnedBots = false;
       tumbleWon = false;
-      battleGraceTicks = 300; // 15-second Console Edition Battle invulnerability timer
+      battleGraceTicks = 100; // 5-second initial dispersion grace period before full PvP combat
       showdownActive = false;
       Arrays.fill(bwBaseStocked, false);
       Arrays.fill(bwBotInitialSpawned, false);
@@ -5841,24 +5841,28 @@ public final class SkyGen extends Gen {
          }
          return getMapWideRoamWaypoint(w, bot, bSlot);
       }
-      if (sit == SIT_OUTNUMBERED_KITE && enemyDist < 14.0) {
+      if (sit == SIT_OUTNUMBERED_KITE && enemyDist < 14.0 && (bot.health <= 8 || (botRangedItem[bSlot] != 0 && botArrows[bSlot] > 0))) {
          double ang = Math.atan2(bot.z - tz, bot.x - tx) + 0.65 * (bot.strafeDir == 0 ? 1 : bot.strafeDir);
-         return new double[]{tx + Math.cos(ang) * 11.5, bot.y, tz + Math.sin(ang) * 11.5};
+         return new double[]{tx + Math.cos(ang) * 9.5, bot.y, tz + Math.sin(ang) * 9.5};
       }
-      if ((sit == SIT_FLANKING || arch == ARCH_FLANKER) && enemyDist > 4.8 && enemyDist < 26.0) {
+      if ((sit == SIT_FLANKING || arch == ARCH_FLANKER) && enemyDist > 8.5 && enemyDist < 26.0) {
          double side = ((bSlot & 1) == 0) ? 1.0 : -1.0;
          double baseAng = Math.atan2(tz - bot.z, tx - bot.x);
-         double flankAng = baseAng + side * 1.08;
+         double flankAng = baseAng + side * 1.05;
          double stepDist = Math.min(9.5, enemyDist * 0.65);
          return new double[]{bot.x + Math.cos(flankAng) * stepDist, ty, bot.z + Math.sin(flankAng) * stepDist};
       }
-      if ((sit == SIT_HIGH_GROUND || arch == ARCH_SNIPER) && enemyDist > 4.0 && enemyDist < 20.0) {
+      if ((sit == SIT_HIGH_GROUND || arch == ARCH_SNIPER)
+         && botRangedItem[bSlot] != 0
+         && botArrows[bSlot] > 0
+         && enemyDist > 4.0
+         && enemyDist < 20.0) {
          double[] roam = getMapWideRoamWaypoint(w, bot, bSlot);
          if (roam[1] > bot.y + 2.0 && Math.hypot(roam[0] - bot.x, roam[2] - bot.z) <= 18.0) {
             return roam;
          }
          double ang = Math.atan2(bot.z - tz, bot.x - tx) + 0.55 * (bot.strafeDir == 0 ? 1 : bot.strafeDir);
-         return new double[]{tx + Math.cos(ang) * 10.0, Math.max(ty, bot.y), tz + Math.sin(ang) * 10.0};
+         return new double[]{tx + Math.cos(ang) * 8.5, Math.max(ty, bot.y), tz + Math.sin(ang) * 8.5};
       }
       return new double[]{tx, ty, tz};
    }
@@ -5978,21 +5982,21 @@ public final class SkyGen extends Gen {
          }
       }
 
-      // 3. Scan map-wide chests in w.tiles (up to 64m for Tactical Looters or under-geared bots, 24m otherwise)
+      // 3. Scan map-wide chests in w.tiles (up to 48m during Grace Period / Looters, 16m otherwise)
       int modeType = w.settings == null ? -1 : w.settings.type;
-      if (modeType == WorldSettings.TUMBLE) {
+      if (modeType == WorldSettings.TUMBLE
+         || modeType == WorldSettings.CS2
+         || modeType == WorldSettings.MURDER
+         || modeType == WorldSettings.CASTLE_SIEGE) {
          return null;
       }
       int arch = Math.floorMod(botArchetype[bSlot], ARCHETYPE_COUNT);
-      boolean wantsMapWideLoot = arch == ARCH_LOOTER
-         || botGearTier[bSlot] < 2
-         || (modeType == WorldSettings.END_FIGHT && botBeds[bSlot] <= 4);
-      if (!wantsMapWideLoot && (modeType == WorldSettings.CS2 || modeType == WorldSettings.MURDER || modeType == WorldSettings.CASTLE_SIEGE)) {
-         return null;
-      }
-      int maxChestH = wantsMapWideLoot ? 64 : 18;
-      int maxChestUp = wantsMapWideLoot ? 24 : 5;
-      int maxChestDown = wantsMapWideLoot ? 16 : 4;
+      boolean wantsMapWideLoot = (modeType == WorldSettings.BATTLE && battleGraceTicks > 0)
+         || (arch == ARCH_LOOTER && botGearTier[bSlot] < 2)
+         || (modeType == WorldSettings.END_FIGHT && botBeds[bSlot] <= 3);
+      int maxChestH = wantsMapWideLoot ? 48 : 14;
+      int maxChestUp = wantsMapWideLoot ? 18 : 5;
+      int maxChestDown = wantsMapWideLoot ? 12 : 4;
       int bbx = (int)Math.floor(bot.x);
       int bby = (int)Math.floor(bot.y);
       int bbz = (int)Math.floor(bot.z);
@@ -7033,11 +7037,16 @@ public final class SkyGen extends Gen {
          double targVx = 0.0;
          double targVz = 0.0;
          double bestDist = 999.0;
+         double bestScore = 1e9;
          boolean targetIsPlayer = false;
+         int arch = Math.floorMod(botArchetype[botSlot], ARCHETYPE_COUNT);
 
          if (player != null && mobs.targetable(player)) {
             double d = Math.hypot(player.x - bot.x, player.z - bot.z);
-            if (d < bestDist) {
+            // Prioritize engaging the human player when in combat range so bots dynamically fight the player!
+            double score = d - (d <= 18.0 ? 3.5 : 1.0);
+            if (score < bestScore) {
+               bestScore = score;
                bestDist = d;
                targX = player.x;
                targY = player.y;
@@ -7046,12 +7055,15 @@ public final class SkyGen extends Gen {
                targVz = player.vz;
                targetIsPlayer = true;
                targetPeerId = -1;
+               rivalBot = null;
             }
          }
          for (Net319.Peer peer : Net319.peers().values()) {
             if (peer != null && !peer.spectator && !peer.eliminated && peer.health > 0 && peer.gameMode != 1 && peer.gameMode != 3) {
                double d = Math.hypot(peer.x - bot.x, peer.z - bot.z);
-               if (d < bestDist) {
+               double score = d - (d <= 18.0 ? 3.0 : 0.5);
+               if (score < bestScore) {
+                  bestScore = score;
                   bestDist = d;
                   targX = peer.x;
                   targY = peer.y;
@@ -7064,13 +7076,11 @@ public final class SkyGen extends Gen {
                }
             }
          }
-         int arch = Math.floorMod(botArchetype[botSlot], ARCHETYPE_COUNT);
-         double bestScore = 1e9;
          for (Mobs.Mob other : mobs.list) {
             if (other != null && other != bot && !other.dead && Mobs.hostile(other.type)) {
                double d = Math.hypot(other.x - bot.x, other.z - bot.z);
-               // Penalize targets standing inside the center pedestal area (r < 12) when not Showdown so bots disperse into the outer map!
-               double score = d + ((!showdownActive && arch != ARCH_RUSHER && Math.hypot(other.x, other.z) < 12.0) ? 16.0 : 0.0);
+               // Slightly penalize bot-vs-bot mosh-pits in the center (r < 10) during early match so fights spread across the map!
+               double score = d + ((!showdownActive && w.tickCount < 600L && arch != ARCH_RUSHER && Math.hypot(other.x, other.z) < 10.0) ? 7.5 : 0.0);
                if (score < bestScore) {
                   bestScore = score;
                   bestDist = d;
@@ -7086,80 +7096,96 @@ public final class SkyGen extends Gen {
             }
          }
 
+         // If a player or rival attacks this bot during the grace period, immediately end grace period and fight back!
+         if (battleGraceTicks > 0 && bot.hurtTime > 0) {
+            battleGraceTicks = 0;
+         }
+
          // Low-HP Tactical Retreat: run away & eat Golden Apple when low HP (never spam blocks on enclosed Battle arenas)!
          if (battleGraceTicks <= 0 && shouldBotRetreat(bot, botSlot, bestDist)) {
             return executeTacticalRetreat(mobs, bot, w, botSlot, targX, targY, targZ, bestDist, 0, 0.5, 0.5, out);
          }
 
-         // Map-Wide Dispersion: During Grace Period (or whenever a non-Rusher bot is still near the center r < 15.0 before Showdown),
-         // immediately sprint outward from the center toward the bot's assigned outer map landmark (r = 22..50)!
-         double distFromCenter = Math.hypot(bot.x, bot.z);
-         boolean shouldLeaveCenter = !showdownActive
-            && (botSlot % 5 != 0)
-            && distFromCenter < 15.0
-            && (battleGraceTicks > 0 || arch != ARCH_RUSHER || bestDist > 3.8);
-         if (shouldLeaveCenter) {
+         // 1. Grace Period (first 5s while dispersing): immediately sprint outward from center (0, 0) to outer Map Landmarks (r = 22..50)!
+         if (battleGraceTicks > 0) {
+            if ((botSlot % 5 != 0) && Math.hypot(bot.x, bot.z) < 15.0) {
+               botSituation[botSlot] = SIT_ROAMING;
+               botThought[botSlot] = "[" + BOT_ARCHETYPE_NAMES[arch] + "] Dispersing to Outer Map Landmark";
+               double[] roam = getMapWideRoamWaypoint(w, bot, botSlot);
+               steerBotSafely3D(bot, w, roam[0], roam[1], roam[2], out, 1.28);
+               return out;
+            }
+            double[] graceLoot = trySmartLootSurroundings(mobs, bot, w, player, -1, 999.0, targX, targZ);
+            if (graceLoot != null) {
+               botThought[botSlot] = "Looting Supply Chest";
+               steerBotSafely3D(bot, w, graceLoot[0], graceLoot[1], graceLoot[2], out, 1.26);
+               return out;
+            }
             botSituation[botSlot] = SIT_ROAMING;
-            botThought[botSlot] = "[" + BOT_ARCHETYPE_NAMES[arch] + "] Dispersing to Outer Map Landmark";
-            double[] roam = getMapWideRoamWaypoint(w, bot, botSlot);
-            steerBotSafely3D(bot, w, roam[0], roam[1], roam[2], out, 1.28);
-            return out;
-         }
-
-         // Check surroundings: if it is safe (or during Grace Period, or if the bot needs weapons), loot nearby outer chests & dropped items!
-         double effectiveEnemyDist = (battleGraceTicks > 0 || (botWeaponItem[botSlot] == 0 && botRangedItem[botSlot] == 0)) ? 999.0 : bestDist;
-         double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, effectiveEnemyDist, targX, targZ);
-         if (lootGoal != null) {
-            botThought[botSlot] = "Looting Supply Chest";
-            steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.24);
-            return out;
-         }
-
-         // During Grace Period (first 15s) or when no enemy is in close range (> 8.5m) before Showdown: actively roam outer Map Landmarks!
-         if (battleGraceTicks > 0 || (!showdownActive && bestDist > 8.5)) {
-            botSituation[botSlot] = SIT_ROAMING;
-            botThought[botSlot] = battleGraceTicks > 0 ? "Grace Period Map Roaming" : ("[" + BOT_ARCHETYPE_NAMES[arch] + "] Patroling Outer Map");
+            botThought[botSlot] = "Grace Period Map Roaming";
             double[] roam = getMapWideRoamWaypoint(w, bot, botSlot);
             steerBotSafely3D(bot, w, roam[0], roam[1], roam[2], out, 1.26);
             return out;
          }
 
-         // Showdown active: if outside center courtyard, urgently sprint to a spread position at center!
-         if (showdownActive && Math.hypot(bot.x, bot.z) > 16.0) {
+         // 2. Post-Grace Dynamic Looting (ONLY when no enemy is within 12.5m, or when unarmed and enemy > 8.5m):
+         if (bestDist > 12.5 || (botWeaponItem[botSlot] == 0 && botRangedItem[botSlot] == 0 && bestDist > 8.5)) {
+            double[] lootGoal = trySmartLootSurroundings(mobs, bot, w, player, -1, bestDist, targX, targZ);
+            if (lootGoal != null) {
+               botThought[botSlot] = "Looting Supply Chest";
+               steerBotSafely3D(bot, w, lootGoal[0], lootGoal[1], lootGoal[2], out, 1.26);
+               return out;
+            }
+         }
+
+         // 3. Showdown active: if outside center courtyard, urgently sprint to a spread position at center!
+         if (showdownActive && Math.hypot(bot.x, bot.z) > 16.0 && bestDist > 6.5) {
             botThought[botSlot] = "Showdown! Sprinting to Center";
             double[] centerSpread = applyBotSpreadOffset(bot, 0.5, 0.5, 3.5);
             steerBotSafely3D(bot, w, centerSpread[0], Y_DECK + 1.0, centerSpread[1], out, 1.34);
             return out;
          }
+
+         // 4. Dynamic Map Roaming vs Aggressive Combat Pursuit:
          int enemyHp = targetIsPlayer && player != null ? player.health : (rivalBot != null ? rivalBot.health : 20);
          evaluateBotSituation(mobs, bot, w, botSlot, -1, bestDist, enemyHp);
-         double[] sitGoal = computeSituationalApproachWaypoint(w, bot, botSlot, targX, targY, targZ, bestDist);
-
          boolean hasBowAndAmmo = botRangedItem[botSlot] != 0 && botArrows[botSlot] > 0;
-         if (hasBowAndAmmo && bestDist < 11.5 && bestDist > 3.5) {
-            // Archer strafes at mid-range and seeks high ground while firing bow
-            if (bot.age % 40 == 0) {
+
+         if (!showdownActive && (bestDist > 20.0 || (Math.hypot(bot.x, bot.z) < 11.0 && !targetIsPlayer && bestDist > 6.5 && arch != ARCH_RUSHER))) {
+            // Patrol across outer map landmarks (r = 22..50) while remaining ready to attack any enemy encountered!
+            botSituation[botSlot] = SIT_ROAMING;
+            botThought[botSlot] = "[" + BOT_ARCHETYPE_NAMES[arch] + "] Hunting Across Outer Map";
+            double[] roam = getMapWideRoamWaypoint(w, bot, botSlot);
+            steerBotSafely3D(bot, w, roam[0], roam[1], roam[2], out, 1.28);
+         } else if (hasBowAndAmmo && bestDist < 11.5 && bestDist > 3.8) {
+            // Archer strafes dynamically at mid-range while firing bow
+            if (bot.age % 30 == 0) {
                bot.strafeDir = -bot.strafeDir;
             }
             double ang = Math.atan2(bot.z - targZ, bot.x - targX) + 0.95 * bot.strafeDir;
-            steerBotSafely3D(bot, w, targX + Math.cos(ang) * 7.8, targY, targZ + Math.sin(ang) * 7.8, out, 1.08);
+            steerBotSafely3D(bot, w, targX + Math.cos(ang) * 7.2, targY, targZ + Math.sin(ang) * 7.2, out, 1.18);
          } else {
+            double[] sitGoal = computeSituationalApproachWaypoint(w, bot, botSlot, targX, targY, targZ, bestDist);
             double moveX = sitGoal[0];
             double moveY = sitGoal[1];
             double moveZ = sitGoal[2];
-            if (bestDist < 5.5 && bestDist > 1.8 && Math.abs(targY - bot.y) < 1.8) {
-               if (bot.age % 25 == 0) {
+            // Dynamic PvP Strafe-Weave at 2.0..5.5m so bots weave around the player while closing into melee strike range!
+            if (bestDist < 5.2 && bestDist > 2.0 && Math.abs(targY - bot.y) < 2.0) {
+               if (bot.age % 20 == 0) {
                   bot.strafeDir = -bot.strafeDir;
                }
-               double perp = Math.atan2(targZ - bot.z, targX - bot.x) + (Math.PI * 0.35) * bot.strafeDir;
-               moveX = bot.x + Math.cos(perp) * 2.5;
-               moveZ = bot.z + Math.sin(perp) * 2.5;
+               double perp = Math.atan2(targZ - bot.z, targX - bot.x) + (Math.PI * 0.24) * bot.strafeDir;
+               moveX = bot.x + Math.cos(perp) * 2.4;
+               moveZ = bot.z + Math.sin(perp) * 2.4;
                moveY = targY;
             }
-            if (bestDist < 3.0 && Math.abs(targY - bot.y) < 1.8 && bot.onGround && bot.age % 18 == 0) {
-               bot.vy = Mobs.JUMP; // Jump-crit!
+            // Sprint-jump pursuit when chasing a target at 4.5..12m or jump-crit in close melee (< 3.2m)!
+            if (bot.onGround && Math.abs(targY - bot.y) < 1.8) {
+               if ((bestDist < 3.2 && bot.age % 16 == 0) || (bestDist >= 4.5 && bestDist <= 12.0 && bot.age % 22 == (botSlot & 7))) {
+                  bot.vy = Mobs.JUMP;
+               }
             }
-            steerBotSafely3D(bot, w, moveX, moveY, moveZ, out, bestDist < 7.5 ? 1.28 : 1.22);
+            steerBotSafely3D(bot, w, moveX, moveY, moveZ, out, bestDist < 9.0 ? 1.32 : 1.25);
          }
 
          double leadX = targX + targVx * Math.min(8.0, bestDist * 0.45);
@@ -7169,9 +7195,9 @@ public final class SkyGen extends Gen {
 
          boolean isCrit = !bot.onGround && bot.vy < -0.05;
          int wep = botWeaponItem[botSlot];
-         int dmg = (wep != 0 ? Math.max(3, (int)Items.attackDamage(wep) / 2) : 1) + (isCrit ? 1 : 0);
-         if (bestDist < 2.25 && Math.abs(targY - bot.y) < 2.4 && bot.cd <= 0) {
-            bot.cd = 16;
+         int dmg = (wep != 0 ? Math.max(3, (int)Items.attackDamage(wep) / 2) : 2) + (isCrit ? 1 : 0);
+         if (bestDist < 2.65 && Math.abs(targY - bot.y) < 2.75 && bot.cd <= 0) {
+            bot.cd = 13;
             bot.attackAnim = 8;
             SoundEngine.playSwing(w, bot.x, bot.y + 1.2, bot.z);
             SoundEngine.playHit(w, targX, targY + 1.0, targZ, isCrit);
@@ -7185,20 +7211,20 @@ public final class SkyGen extends Gen {
                   mobs.g.say("\u00a76[Battle] \u00a7e" + botDisplayName(bot) + " \u00a77eliminated \u00a7c" + botDisplayName(rivalBot) + "\u00a77!");
                }
             }
-         } else if (botGrenades[botSlot] > 0 && bestDist >= 5.0 && bestDist <= 14.0 && bot.cd <= 0 && bot.age % 50 == 0
+         } else if (botGrenades[botSlot] > 0 && bestDist >= 4.5 && bestDist <= 14.5 && bot.cd <= 0 && (bot.age + botSlot * 7) % 40 == 0
             && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
             botGrenades[botSlot]--;
-            bot.cd = 28;
+            bot.cd = 24;
             bot.attackAnim = 8;
             double dx = (leadX - bot.x) / bestDist;
             double dz = (leadZ - bot.z) / bestDist;
             w.throwTntGrenade(bot.x + dx * 0.7, bot.y + 0.95, bot.z + dz * 0.7, dx * 0.65, 0.30, dz * 0.65, 45);
-         } else if (hasBowAndAmmo && bestDist >= 2.5 && bestDist < 18.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
-            if (bot.cd > 0 && bot.cd <= 16) {
-               botBowDrawTicks[botSlot] = 17 - bot.cd;
+         } else if (hasBowAndAmmo && bestDist >= 2.5 && bestDist < 20.0 && mobs.hasLOS(w, bot.x, bot.y + 1.5, bot.z, targX, targY + 1.0, targZ)) {
+            if (bot.cd > 0 && bot.cd <= 14) {
+               botBowDrawTicks[botSlot] = 15 - bot.cd;
             } else if (bot.cd <= 0) {
                botArrows[botSlot]--;
-               bot.cd = 32;
+               bot.cd = 26;
                botBowDrawTicks[botSlot] = 0;
                SoundEngine.playThrow(w, bot.x, bot.y + 1.5, bot.z);
                double arcY = targY + 1.1 + bestDist * 0.04;
@@ -8181,7 +8207,7 @@ public final class SkyGen extends Gen {
          }
          teamThoughtSummary[mySiegeTeam & 1] = botThought[botSlot];
 
-         if (enemyDist < 12.0 && intactGate == null) {
+         if (enemyDist < 11.0 && (intactGate == null || enemyDist < 6.5)) {
             double[] sitGoal = computeSituationalApproachWaypoint(w, bot, botSlot, enemyX, enemyY, enemyZ, enemyDist);
             goalX = sitGoal[0];
             goalY = sitGoal[1];
