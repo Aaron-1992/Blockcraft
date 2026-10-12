@@ -515,6 +515,144 @@ final class Buildings314 {
          b.set('_', 1, 1, 5).set('_', 2, 1, 5);
          add(b.build());
       }
+      // ---- the inn / tavern: 11 x 7, two storeys with a hearth, bar counter and upstairs guest beds
+      {
+         Tpl.B b = cottage("inn", 11, 7, 7, 5, false);
+         b.box('E', 1, 4, 2, 9, 4, 6);
+         b.box('X', 1, 4, 1, 9, 4, 1);
+         b.box('X', 1, 4, 7, 9, 4, 7);
+         b.box('Z', 0, 4, 2, 0, 4, 6);
+         b.box('Z', 10, 4, 2, 10, 4, 6);
+         for (int y = 1; y <= 5; y++) {
+            b.set('H', 8, y, 6);
+         }
+
+         for (int[] p : new int[][]{{2, 1}, {8, 1}, {0, 3}, {0, 5}, {10, 3}, {10, 5}, {3, 7}, {7, 7}}) {
+            b.set('G', p[0], 2, p[1]);
+            b.set('G', p[0], 6, p[1]);
+         }
+
+         b.set('_', 1, 1, 4).set('_', 2, 1, 4).set('_', 3, 1, 4);
+         b.set('k', 1, 1, 6);
+         b.set('x', 2, 1, 6);
+         b.set('q', 9, 1, 6).set('q', 9, 2, 6);
+         b.box('+', 4, 1, 3, 7, 1, 5);
+         b.set(':', 5, 1, 4).set(':', 6, 1, 4);
+         b.set('*', 5, 3, 6).set('*', 2, 3, 2).set('*', 8, 3, 2);
+         bed(b, 1, 5, 5);
+         bed(b, 4, 5, 5);
+         bed(b, 6, 5, 5);
+         b.set('x', 2, 5, 2);
+         b.set('*', 5, 6, 6).set('*', 4, 6, 2);
+         chimney(b, 9, 2, 13);
+         veranda(b, 11, 3, true);
+         add(b.build());
+      }
+      // ---- the bakery: 7 x 7, twin ovens, brick chimney, display counter and striped awning
+      {
+         Tpl.B b = cottage("bakery", 7, 7, 3, 3, false);
+         window(b, 1, 1);
+         window(b, 5, 1);
+         window(b, 0, 4);
+         window(b, 6, 4);
+         b.set('u', 2, 1, 6).set('u', 4, 1, 6);
+         for (int y = 1; y <= 9; y++) {
+            b.set('K', 3, y, 6);
+         }
+
+         b.set('_', 1, 1, 3).set('_', 2, 1, 3);
+         b.set('k', 5, 1, 3);
+         b.set('x', 5, 1, 6);
+         b.set('h', 5, 1, 2);
+         b.set('+', 3, 1, 3).set(':', 3, 1, 4);
+         b.set('*', 1, 2, 6).set('*', 5, 2, 3);
+         for (int x = 1; x <= 5; x++) {
+            b.set((x & 1) == 0 ? 'w' : 'W', x, 3, 0);
+         }
+
+         b.set('z', 0, 1, 0).set('z', 6, 1, 0);
+         add(b.build());
+      }
+      // ---- the windmill: 7 x 7, two-storey grain mill with upper loft and sails on the front
+      {
+         Tpl.B b = cottage("windmill", 7, 7, 7, 3, false);
+         b.box('E', 1, 4, 2, 5, 4, 6);
+         b.box('X', 1, 4, 1, 5, 4, 1);
+         b.box('X', 1, 4, 7, 5, 4, 7);
+         b.box('Z', 0, 4, 2, 0, 4, 6);
+         b.box('Z', 6, 4, 2, 6, 4, 6);
+         for (int y = 1; y <= 5; y++) {
+            b.set('H', 5, y, 6);
+         }
+
+         b.set('G', 0, 2, 4).set('G', 6, 2, 4).set('G', 3, 2, 7);
+         b.set('G', 0, 6, 4).set('G', 6, 6, 4).set('G', 3, 6, 7);
+         b.set('h', 1, 1, 2).set('h', 1, 2, 2).set('h', 2, 1, 2);
+         b.set('k', 1, 1, 6);
+         b.set('x', 3, 1, 6);
+         b.set('x', 1, 5, 6);
+         b.set('*', 2, 3, 6).set('*', 4, 3, 2).set('*', 2, 6, 6);
+         // Windmill hub and sails on the front facade (z = 0)
+         b.set('L', 3, 6, 1);
+         for (int dy = -2; dy <= 2; dy++) {
+            b.set('F', 3, 6 + dy, 0);
+            if (dy != 0) {
+               b.set('w', 2, 6 + dy, 0);
+               b.set('W', 4, 6 + dy, 0);
+            }
+         }
+
+         for (int dx = -2; dx <= 2; dx++) {
+            b.set('F', 3 + dx, 6, 0);
+         }
+
+         add(b.build());
+      }
+      // ---- the gazebo: 7 x 7 town pavilion with corner pillars, benches and lantern
+      {
+         Tpl.B b = new Tpl.B("gazebo", 7, 8, 7);
+         b.box('E', 1, 0, 1, 5, 0, 5);
+         b.walls('C', 0, 0, 0, 6, 0, 6);
+         b.set('m', 3, 0, 0).set('m', 3, 0, 6).set('m', 0, 0, 3).set('m', 6, 0, 3);
+         for (int[] p : new int[][]{{1, 1}, {5, 1}, {1, 5}, {5, 5}}) {
+            b.box('L', p[0], 1, p[1], p[0], 3, p[1]);
+         }
+
+         b.set('_', 2, 1, 1).set('_', 4, 1, 1).set('_', 2, 1, 5).set('_', 4, 1, 5);
+         b.set('+', 2, 1, 2).set(':', 3, 1, 2).set('+', 4, 1, 2);
+         b.set(':', 2, 1, 3).set('+', 3, 1, 3).set(':', 4, 1, 3);
+         b.set('+', 2, 1, 4).set(':', 3, 1, 4).set('+', 4, 1, 4);
+         b.set('$', 3, 3, 3);
+         b.hip(4, 1, 5, 1, 5);
+         add(b.build());
+      }
+      // ---- the archery range: 9 x 7, covered shooting stand and bullseye targets
+      {
+         Tpl.B b = new Tpl.B("archery", 9, 5, 7);
+         b.box('m', 0, 0, 0, 8, 0, 6);
+         b.box('E', 1, 0, 0, 7, 0, 2);
+         for (int x : new int[]{1, 7}) {
+            b.box('F', x, 1, 0, x, 3, 0);
+            b.box('F', x, 1, 2, x, 3, 2);
+         }
+
+         b.box('_', 1, 4, 0, 7, 4, 2);
+         for (int z = 2; z <= 6; z++) {
+            b.set('F', 0, 1, z);
+            b.set('F', 8, 1, z);
+         }
+
+         b.set('k', 2, 1, 1);
+         b.set('x', 6, 1, 1);
+         for (int tx : new int[]{2, 6}) {
+            b.set('h', tx, 1, 6);
+            b.set('w', tx, 2, 6);
+            b.set('F', tx, 3, 6);
+            b.set('T', tx, 4, 6);
+         }
+
+         add(b.build());
+      }
    }
 
    static {

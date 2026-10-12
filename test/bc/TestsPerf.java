@@ -729,5 +729,26 @@ final class TestsPerf {
             Tests311.deleteAll(dir);
          }
       });
+
+      test("gpu: PE export patching adds NvOptimusEnablement=1 and AmdPowerXpressRequestHighPerformance=1 to Blockcraft.exe and blockcraft-gpu.exe", () -> {
+         byte[] stub = java.nio.file.Files.readAllBytes(new File("launcher/launch4j-stub.bin").toPath());
+         byte[] patchedStub = GpuPref.patchPeExports(stub);
+         check(patchedStub != null && GpuPref.hasPeExports(patchedStub), "Launch4j PE32 stub exports NvOptimusEnablement=1 and AmdPowerXpressRequestHighPerformance=1");
+         File dir = java.nio.file.Files.createTempDirectory("jre-pe").toFile();
+         try {
+            File bin = new File(dir, "bin");
+            bin.mkdirs();
+            java.nio.file.Files.write(new File(bin, "javaw.exe").toPath(), stub);
+            File gpuExe = GpuPref.ensureGpuExe(dir.getPath());
+            check(gpuExe != null && gpuExe.isFile(), "blockcraft-gpu.exe created from PE javaw.exe");
+            check(GpuPref.hasPeExports(java.nio.file.Files.readAllBytes(gpuExe.toPath())), "blockcraft-gpu.exe has discrete GPU PE exports");
+            List<String> progs = GpuPref.programs(dir.getPath(), null);
+            check(progs.contains(gpuExe.getPath()), "programs() registers blockcraft-gpu.exe for Windows DirectX GPU preference");
+            List<String> cmd = GpuPref.relaunchCommand(dir.getPath(), Arrays.asList("-Xmx2G"), "C:\\g\\Blockcraft.exe", "bc.Main");
+            eq(gpuExe.getPath(), cmd.get(0), "relaunchCommand prefers blockcraft-gpu.exe when javaw.exe is a real PE binary");
+         } finally {
+            Tests311.deleteAll(dir);
+         }
+      });
    }
 }

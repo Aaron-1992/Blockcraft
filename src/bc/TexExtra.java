@@ -69,7 +69,10 @@ final class TexExtra {
 
       Tex.blit(212, haySide());
       Tex.blit(213, hayTop());
-      TexPaint.blocks(); // Update 3.18: repaints some of the tiles above (mossy cobblestone ...)
+      boolean classic = ResourcePacks.isClassicBase();
+      if (!classic) {
+         TexPaint.blocks(); // Update 3.18: repaints some of the tiles above (mossy cobblestone ...)
+      }
       TexArt37.blocks();
       TexArt310.blocks();
       TexArt312.blocks();
@@ -83,6 +86,10 @@ final class TexExtra {
                Tex.blit(Items.tile[var2], var1);
             }
          }
+      }
+
+      if (!classic) {
+         TexPaint319.blocks();
       }
    }
 
