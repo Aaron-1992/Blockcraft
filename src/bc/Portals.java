@@ -186,6 +186,7 @@ final class Portals {
             g.portalTime = 0;
             if (w.dim == Dim.END) {
                double[] home = g.homeXZ();
+               g.pendingEndCredits = true;
                g.switchDimension(Dim.OVERWORLD, home[0], home[1], 1);
             } else {
                g.switchDimension(Dim.END, EndGen.PLATFORM_X + 0.5, EndGen.PLATFORM_Y + 1.0, EndGen.PLATFORM_Z + 0.5, 2);

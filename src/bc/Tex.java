@@ -750,18 +750,114 @@ public final class Tex {
       }
    }
 
+   /**
+    * Downsamples one {@code size x size} tile to {@code (size/2) x (size/2)} strictly inside the tile's own borders (never mixing with neighbour
+    * tiles in the atlas) while keeping opaque tiles at alpha 255 and averaging cutout RGB only over visible texels so transparent neighbours never
+    * bleed holes or dark fringes into distant blocks.
+    */
+   static int[] downsampleTile(int[] src, int size) {
+      int half = size >> 1;
+      int[] dst = new int[half * half];
+      boolean anyTrans = false;
+      boolean anyOpaque = false;
+      for (int p : src) {
+         int a = p >>> 24;
+         if (a < 250) {
+            anyTrans = true;
+         }
+
+         if (a >= 128) {
+            anyOpaque = true;
+         }
+      }
+
+      boolean cutout = anyTrans && anyOpaque;
+      for (int y = 0; y < half; y++) {
+         for (int x = 0; x < half; x++) {
+            int p0 = src[(y * 2) * size + x * 2];
+            int p1 = src[(y * 2) * size + x * 2 + 1];
+            int p2 = src[(y * 2 + 1) * size + x * 2];
+            int p3 = src[(y * 2 + 1) * size + x * 2 + 1];
+            int[] quad = new int[]{p0, p1, p2, p3};
+            if (!anyTrans) {
+               int r = ((p0 >> 16 & 255) + (p1 >> 16 & 255) + (p2 >> 16 & 255) + (p3 >> 16 & 255) + 2) >> 2;
+               int g = ((p0 >> 8 & 255) + (p1 >> 8 & 255) + (p2 >> 8 & 255) + (p3 >> 8 & 255) + 2) >> 2;
+               int b = ((p0 & 255) + (p1 & 255) + (p2 & 255) + (p3 & 255) + 2) >> 2;
+               dst[y * half + x] = 0xFF000000 | r << 16 | g << 8 | b;
+            } else if (cutout) {
+               int r = 0;
+               int g = 0;
+               int b = 0;
+               int n = 0;
+               for (int p : quad) {
+                  if ((p >>> 24) >= 128) {
+                     r += p >> 16 & 255;
+                     g += p >> 8 & 255;
+                     b += p & 255;
+                     n++;
+                  }
+               }
+
+               if (n >= 2) {
+                  dst[y * half + x] = 0xFF000000 | (r / n) << 16 | (g / n) << 8 | (b / n);
+               } else {
+                  dst[y * half + x] = 0;
+               }
+            } else {
+               int a = ((p0 >>> 24) + (p1 >>> 24) + (p2 >>> 24) + (p3 >>> 24) + 2) >> 2;
+               int r = ((p0 >> 16 & 255) + (p1 >> 16 & 255) + (p2 >> 16 & 255) + (p3 >> 16 & 255) + 2) >> 2;
+               int g = ((p0 >> 8 & 255) + (p1 >> 8 & 255) + (p2 >> 8 & 255) + (p3 >> 8 & 255) + 2) >> 2;
+               int b = ((p0 & 255) + (p1 & 255) + (p2 & 255) + (p3 & 255) + 2) >> 2;
+               dst[y * half + x] = a << 24 | r << 16 | g << 8 | b;
+            }
+         }
+      }
+
+      return dst;
+   }
+
+   /** Builds mip levels 1..3 (8x8, 4x4, 2x2 per tile) on the CPU per 16x16 tile so adjacent transparent/cutout tiles never bleed into solid blocks. */
+   static void uploadAtlasMips() {
+      int totalTiles = COLS * COLS;
+      int[][] curTiles = new int[totalTiles][256];
+      for (int t = 0; t < totalTiles; t++) {
+         int tx0 = tx(t);
+         int ty0 = ty(t);
+         int[] tile = curTiles[t];
+         for (int r = 0; r < 16; r++) {
+            System.arraycopy(atlasPixels, (ty0 + r) * PX + tx0, tile, r * 16, 16);
+         }
+      }
+
+      int tileSize = 16;
+      for (int level = 1; level <= 3; level++) {
+         int nextSize = tileSize >> 1;
+         int mipPx = COLS * nextSize;
+         int[] mipAtlas = new int[mipPx * mipPx];
+         for (int t = 0; t < totalTiles; t++) {
+            int[] down = downsampleTile(curTiles[t], tileSize);
+            curTiles[t] = down;
+            int tx0 = (t % COLS) * nextSize;
+            int ty0 = (t / COLS) * nextSize;
+            for (int r = 0; r < nextSize; r++) {
+               System.arraycopy(down, r * nextSize, mipAtlas, (ty0 + r) * mipPx + tx0, nextSize);
+            }
+         }
+
+         ByteBuffer buf = toBuffer(mipAtlas);
+         GL11.glTexImage2D(3553, level, 32856, mipPx, mipPx, 0, 6408, 5121, buf);
+         MemoryUtil.memFree(buf);
+         tileSize = nextSize;
+      }
+   }
+
    public static void init() {
       initPixels();
       atlas = upload(PX, PX, atlasPixels, false, false);
       GL11.glBindTexture(3553, atlas);
       GL11.glTexParameteri(3553, 10241, 9986);
-      GL11.glTexParameteri(3553, 33085, 4);
-      GL30.glGenerateMipmap(3553);
-      // Update 3.18: anisotropic filtering keeps the ground sharp where you look along it (the mip levels alone blur it)
-      if (GL.getCapabilities().GL_EXT_texture_filter_anisotropic) {
-         float maxAniso = GL11.glGetFloat(EXTTextureFilterAnisotropic.GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-         GL11.glTexParameterf(3553, EXTTextureFilterAnisotropic.GL_TEXTURE_MAX_ANISOTROPY_EXT, Math.min(8.0F, maxAniso));
-      }
+      GL11.glTexParameteri(3553, 33085, 3);
+      uploadAtlasMips();
 
       crack = upload(160, 16, crackPixels(), false, false);
       clouds = upload(256, 256, cloudPixels(), false, true);
@@ -771,58 +867,126 @@ public final class Tex {
       loadFont();
    }
 
+   public static void reloadPixels() {
+      initPixels();
+      lastBlendKey = -1;
+      if (atlas != 0) {
+         try {
+            GL11.glBindTexture(3553, atlas);
+            ByteBuffer buf = toBuffer(atlasPixels);
+            GL11.glPixelStorei(3317, 1);
+            GL11.glTexSubImage2D(3553, 0, 0, 0, PX, PX, 6408, 5121, buf);
+            MemoryUtil.memFree(buf);
+            uploadAtlasMips();
+         } catch (Throwable ignored) {
+         }
+      }
+   }
+
    /** Update 3.11: paints every tile into {@link #atlasPixels} without touching OpenGL (the LOD colours and the tests read them). */
    static void initPixels() {
-      // Update 3.18: the texture overhaul - the tiles of the old blocks are painted by TexPaint (the old painters below stay: the equivalence test still runs them)
-      blit(0, TexPaint.grassTop());
-      blit(1, TexPaint.dirt());
-      blit(2, TexPaint.grassSide());
-      blit(3, TexPaint.stone());
-      blit(4, TexPaint.cobble());
-      blit(5, TexPaint.sand());
-      blit(6, TexPaint.gravel());
-      blit(7, TexPaint.oakSide());
-      blit(8, TexPaint.oakTop());
-      blit(9, TexPaint.leaves());
-      blit(10, TexPaint.oakPlanks());
-      blit(11, tBedrock());
-      blit(12, TexPaint.coalOre());
-      blit(13, TexPaint.ironOre());
-      blit(14, TexPaint.goldOre());
-      blit(15, TexPaint.diamondOre());
-      blit(16, TexPaint.redstoneOre());
-      blit(17, TexPaint.lapisOre());
-      blit(18, TexPaint.snow());
-      blit(19, tGlass());
-      blit(20, tBricks());
-      blit(21, TexPaint.sandstoneSide());
-      blit(22, TexPaint.sand());
+      boolean classic = ResourcePacks.isClassicBase();
+      if (classic) {
+         blit(0, tGrassTop());
+         blit(1, dirt());
+         blit(2, tGrassOverlay());
+         blit(3, tStone(1L, 125));
+         blit(4, tVoronoi(2L, new int[]{115, 115, 115}, -28, 12));
+         blit(5, tNoise(4L, 218, 210, 158, 10));
+         blit(6, tGravel());
+         blit(7, tLogSide(6L, 102, 81, 50));
+         blit(8, tLogTop(7L, new int[]{102, 81, 50}, new int[]{175, 143, 89}, new int[]{155, 124, 73}));
+         blit(9, tLeaves());
+         blit(10, tPlanks());
+         blit(11, tBedrock());
+         blit(12, tOre(8L, 38, 38, 38));
+         blit(13, tOre(9L, 216, 175, 147));
+         blit(14, tOre(10L, 250, 228, 48));
+         blit(15, tOre(11L, 92, 237, 229));
+         blit(16, tOre(12L, 215, 25, 25));
+         blit(17, tOre(13L, 28, 66, 195));
+         blit(18, tNoise(14L, 240, 248, 255, 6));
+         blit(19, tGlass());
+         blit(20, tBricks());
+         blit(21, tSandstoneSide());
+         blit(22, tNoise(4L, 218, 210, 158, 10));
 
-      for (int var0 = 0; var0 < 16; var0++) {
-         waterFrames[var0] = TexPaint.waterFrame(var0);
-         lavaFrames[var0] = TexPaint.lavaFrame(var0);
-      }
+         for (int var0 = 0; var0 < 16; var0++) {
+            waterFrames[var0] = waterFrame(var0);
+            lavaFrames[var0] = lavaFrame(var0);
+         }
 
-      blit(23, waterFrames[0]);
-      blit(24, lavaFrames[0]);
-      blit(25, tTallGrass());
-      blit(26, tFlower(222, 32, 32));
-      blit(27, tFlower(252, 232, 44));
-      blit(28, tCactusSide());
-      blit(29, tCactusTop());
-      blit(30, TexPaint.glowstone());
-      blit(31, TexPaint.spruceSide());
-      blit(32, TexPaint.spruceTop());
-      blit(33, TexPaint.birchSide());
-      blit(34, TexPaint.obsidian());
-      blit(35, TexPaint.stoneBrick());
-      blit(36, tTorch());
+         blit(23, waterFrames[0]);
+         blit(24, lavaFrames[0]);
+         blit(25, tTallGrass());
+         blit(26, tFlower(222, 32, 32));
+         blit(27, tFlower(252, 232, 44));
+         blit(28, tCactusSide());
+         blit(29, tCactusTop());
+         blit(30, tGlowstone());
+         blit(31, tLogSide(15L, 58, 39, 19));
+         blit(32, tLogTop(16L, new int[]{58, 39, 19}, new int[]{126, 98, 56}, new int[]{110, 84, 46}));
+         blit(33, tBirchSide());
+         blit(34, tObsidian());
+         blit(35, tStoneBrick());
+         blit(36, tTorch());
 
-      for (int var1 = 0; var1 < 16; var1++) {
-         blit(48 + var1, TexPaint.wool(var1));
+         for (int var1 = 0; var1 < 16; var1++) {
+            blit(48 + var1, tWool(var1));
+         }
+      } else {
+         // Update 3.18: the texture overhaul - the tiles of the old blocks are painted by TexPaint (the old painters below stay: the equivalence test still runs them)
+         blit(0, TexPaint.grassTop());
+         blit(1, TexPaint.dirt());
+         blit(2, TexPaint.grassSide());
+         blit(3, TexPaint.stone());
+         blit(4, TexPaint.cobble());
+         blit(5, TexPaint.sand());
+         blit(6, TexPaint.gravel());
+         blit(7, TexPaint.oakSide());
+         blit(8, TexPaint.oakTop());
+         blit(9, TexPaint.leaves());
+         blit(10, TexPaint.oakPlanks());
+         blit(11, tBedrock());
+         blit(12, TexPaint.coalOre());
+         blit(13, TexPaint.ironOre());
+         blit(14, TexPaint.goldOre());
+         blit(15, TexPaint.diamondOre());
+         blit(16, TexPaint.redstoneOre());
+         blit(17, TexPaint.lapisOre());
+         blit(18, TexPaint.snow());
+         blit(19, tGlass());
+         blit(20, tBricks());
+         blit(21, TexPaint.sandstoneSide());
+         blit(22, TexPaint.sand());
+
+         for (int var0 = 0; var0 < 16; var0++) {
+            waterFrames[var0] = TexPaint.waterFrame(var0);
+            lavaFrames[var0] = TexPaint.lavaFrame(var0);
+         }
+
+         blit(23, waterFrames[0]);
+         blit(24, lavaFrames[0]);
+         blit(25, tTallGrass());
+         blit(26, tFlower(222, 32, 32));
+         blit(27, tFlower(252, 232, 44));
+         blit(28, tCactusSide());
+         blit(29, tCactusTop());
+         blit(30, TexPaint.glowstone());
+         blit(31, TexPaint.spruceSide());
+         blit(32, TexPaint.spruceTop());
+         blit(33, TexPaint.birchSide());
+         blit(34, TexPaint.obsidian());
+         blit(35, TexPaint.stoneBrick());
+         blit(36, tTorch());
+
+         for (int var1 = 0; var1 < 16; var1++) {
+            blit(48 + var1, TexPaint.wool(var1));
+         }
       }
 
       TexExtra.blocks();
+      ResourcePacks.applyPostProcess(atlasPixels);
    }
 
    static int[] dirt() {
@@ -865,28 +1029,35 @@ public final class Tex {
       float pos = animPos(var0, partial);
       int f0 = (int)Math.floor(pos);
       float w = pos - f0;
-      int step = Math.min(15, (int)(w * 16.0F));
+      int step = Math.min(15, (int)(w * 16.0F)) & ~1;
       int key = (f0 & 15) * 16 + step;
       if (key != lastBlendKey) {
          lastBlendKey = key;
          float mix = step / 16.0F;
          int a = f0 & 15;
          int b = a + 1 & 15;
+         boolean mips = (step & 3) == 0;
          GL11.glBindTexture(3553, atlas);
-         upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix));
-         upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix));
-         upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix));
-         upload(tx(TexArt312.PORTAL), ty(TexArt312.PORTAL), blendFrames(TexArt312.portalFrames[a], TexArt312.portalFrames[b], mix));
-         if ((key & 3) == 0) {
-            GL30.glGenerateMipmap(3553);
-         }
+         upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix), mips);
+         upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix), mips);
+         upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix), mips);
+         upload(tx(TexArt312.PORTAL), ty(TexArt312.PORTAL), blendFrames(TexArt312.portalFrames[a], TexArt312.portalFrames[b], mix), mips);
       }
    }
 
-   private static void upload(int x, int y, int[] pixels) {
-      ByteBuffer buf = toBuffer(pixels);
-      GL11.glTexSubImage2D(3553, 0, x, y, 16, 16, 6408, 5121, buf);
-      MemoryUtil.memFree(buf);
+   private static void upload(int x, int y, int[] pixels, boolean mips) {
+      int[] cur = pixels;
+      int size = 16;
+      int maxLevel = mips ? 3 : 0;
+      for (int level = 0; level <= maxLevel; level++) {
+         ByteBuffer buf = toBuffer(cur);
+         GL11.glTexSubImage2D(3553, level, x >> level, y >> level, size, size, 6408, 5121, buf);
+         MemoryUtil.memFree(buf);
+         if (level < maxLevel) {
+            cur = downsampleTile(cur, size);
+            size >>= 1;
+         }
+      }
    }
 
    /** The pixel-wise mix of two same-sized ARGB pictures: a at weight 1 - w, b at weight w (every channel, alpha included). */

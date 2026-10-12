@@ -85,8 +85,9 @@ public final class Renderer {
          this.lod.dispose();
       }
 
-      // Update 3.12: only the Overworld has distant terrain (LOD); the Nether and the End are drawn as far as the view distance goes
-      this.lod = var1 == null || var1.dim != Dim.OVERWORLD ? null : new Lod(this, var1.gen, var1.lodMap);
+      // Update 3.12: only the Overworld has distant terrain (LOD); the Nether, the End, and void modes (Skyblock/Skywars/Bedwars) have open sky/void
+      boolean voidMode = var1 != null && var1.settings != null && var1.settings.isVoidMode();
+      this.lod = var1 == null || var1.dim != Dim.OVERWORLD || voidMode ? null : new Lod(this, var1.gen, var1.lodMap);
    }
 
    public Renderer(Game var1) {
@@ -114,6 +115,15 @@ public final class Renderer {
    public void shutdown() {
       this.meshPool.shutdownNow();
       this.wfx.dispose();
+      if (this.lod != null) {
+         this.lod.dispose();
+      }
+   }
+
+   public static void clearItemGeo() {
+      synchronized (itemGeo) {
+         itemGeo.clear();
+      }
    }
 
    public void onUnload(Chunk var1) {
@@ -128,6 +138,26 @@ public final class Renderer {
 
          var5.vboO = var5.vboT = 0;
          var5.nO = var5.nT = 0;
+      }
+   }
+
+   /** Completely purges all GPU section VBOs and in-flight mesh jobs when an arena world is reset. */
+   public void clearWorldMeshes(World w) {
+      if (w != null && this.g != null && this.g.window != 0L) {
+         for (Chunk c : w.chunks.values()) {
+            this.onUnload(c);
+         }
+      }
+      Renderer.Done d;
+      while ((d = (Renderer.Done)this.done.poll()) != null) {
+         this.inflight.decrementAndGet();
+         d.c.sections[d.sy].inFlight = false;
+         free(d.r);
+      }
+      this.vis.clear();
+      this.shadowDirty = true;
+      if (this.lod != null) {
+         this.lod.invalidateAll();
       }
    }
 
@@ -163,7 +193,8 @@ public final class Renderer {
       if (this.inflight.get() < var3) {
          int var4 = (int)Math.floor(this.camX) >> 4;
          int var5 = (int)Math.floor(this.camZ) >> 4;
-         int var6 = this.g.opt.renderDistance;
+         boolean isVoid = var1.settings != null && var1.settings.isVoidMode();
+         int var6 = isVoid ? Math.min(5, this.g.opt.renderDistance) : this.g.opt.renderDistance;
          int var7 = (var6 + 1) * (var6 + 1);
          boolean var8 = this.g.opt.smooth;
          int var9 = 0;
@@ -173,21 +204,48 @@ public final class Renderer {
             if (var13[0] * var13[0] + var13[1] * var13[1] <= var7) {
                Chunk var14 = var1.chunk(var4 + var13[0], var5 + var13[1]);
                if (var14 != null) {
-                  boolean var15 = false;
-                  boolean var16 = false;
+                  boolean hasDirty = false;
+                  for (int sy = 0; sy < 16; sy++) {
+                     if (var14.sections[sy].dirty && !var14.sections[sy].inFlight) {
+                        hasDirty = true;
+                        break;
+                     }
+                  }
+                  if (!hasDirty) {
+                     continue;
+                  }
+                  if (!this.ready(var1, var14)) {
+                     continue label56;
+                  }
 
-                  for (int var17 = 0; var17 < 16; var17++) {
+                  // Fast inline pass: clear empty air sections immediately without scanning underground rock on the main thread
+                  for (int sy = 0; sy < 16; sy++) {
+                     Section sec = var14.sections[sy];
+                     if (sec.dirty && !sec.inFlight && var14.isSectionEmpty(sy)) {
+                        sec.dirty = false;
+                        sec.conn = CaveCull.ALL;
+                        sec.nO = 0;
+                        sec.nT = 0;
+                        var14.markMeshed(sy);
+                        if (sec.vboO != 0) {
+                           GL15.glDeleteBuffers(sec.vboO);
+                           sec.vboO = 0;
+                        }
+                        if (sec.vboT != 0) {
+                           GL15.glDeleteBuffers(sec.vboT);
+                           sec.vboT = 0;
+                        }
+                     }
+                  }
+
+                  int surfSy = Math.max(3, Math.min(14, var14.hm[136] >> 4));
+                  for (int step = 0; step < 16; step++) {
+                     int var17 = surfSy + ((step & 1) == 0 ? -(step >> 1) : ((step + 1) >> 1));
+                     if (var17 < 0 || var17 >= 16) {
+                        continue;
+                     }
                      Section var18 = var14.sections[var17];
                      if (var18.dirty && !var18.inFlight) {
-                        if (!var16) {
-                           var15 = this.ready(var1, var14);
-                           var16 = true;
-                        }
-
-                        if (!var15) {
-                           continue label56;
-                        }
-
                         if (var9 >= var2 || this.inflight.get() >= var3) {
                            return;
                         }
@@ -326,9 +384,21 @@ public final class Renderer {
    }
 
    public void meshNow(World var1, int var2, int var3, int var4) {
-      for (int var5 = -1; var5 <= 1; var5++) {
-         for (int var6 = -1; var6 <= 1; var6++) {
-            for (int var7 = -1; var7 <= 1; var7++) {
+      int lx = var2 & 15;
+      int ly = var3 & 15;
+      int lz = var4 & 15;
+      int minDx = lx == 0 ? -1 : 0;
+      int maxDx = lx == 15 ? 1 : 0;
+      int minDy = ly == 0 ? -1 : 0;
+      int maxDy = ly == 15 ? 1 : 0;
+      int minDz = lz == 0 ? -1 : 0;
+      int maxDz = lz == 15 ? 1 : 0;
+      for (int var5 = minDx; var5 <= maxDx; var5++) {
+         for (int var6 = minDz; var6 <= maxDz; var6++) {
+            for (int var7 = minDy; var7 <= maxDy; var7++) {
+               if (Math.abs(var5) + Math.abs(var6) + Math.abs(var7) > 1) {
+                  continue;
+               }
                int var8 = var2 + var5 * 16;
                int var9 = var3 + var7 * 16;
                int var10 = var4 + var6 * 16;
@@ -339,7 +409,22 @@ public final class Renderer {
                      Section var13 = var11.sections[var12];
                      if (var13.dirty && !var13.inFlight && this.ready(var1, var11)) {
                         var13.dirty = false;
-                        this.upload(var11, var12, Mesher.build(var1, var11, var12, this.g.opt.smooth));
+                        if (var11.isSectionEmpty(var12)) {
+                           var13.conn = CaveCull.ALL;
+                           var13.nO = 0;
+                           var13.nT = 0;
+                           var11.markMeshed(var12);
+                           if (var13.vboO != 0) {
+                              GL15.glDeleteBuffers(var13.vboO);
+                              var13.vboO = 0;
+                           }
+                           if (var13.vboT != 0) {
+                              GL15.glDeleteBuffers(var13.vboT);
+                              var13.vboT = 0;
+                           }
+                        } else {
+                           this.upload(var11, var12, Mesher.build(var1, var11, var12, this.g.opt.smooth));
+                        }
                      }
                   }
                }
@@ -383,6 +468,24 @@ public final class Renderer {
       this.fogR = this.skyTmp[3];
       this.fogG = this.skyTmp[4];
       this.fogB = this.skyTmp[5];
+      if (ModLoader.isInfdevActive()) {
+         float d = Math.max(0.18F, this.daylight);
+         this.topR = 0.56F * d;
+         this.topG = 0.78F * d;
+         this.topB = 1.00F * d;
+         this.fogR = 0.76F * d;
+         this.fogG = 0.87F * d;
+         this.fogB = 1.00F * d;
+      }
+      if (BackroomsStalkerMod.isActive()) {
+         float[] bfc = BackroomsStalkerMod.getFogColor((float)Perf.seconds(1.0E9));
+         this.topR = this.fogR = bfc[0];
+         this.topG = this.fogG = bfc[1];
+         this.topB = this.fogB = bfc[2];
+         this.daylight = BackroomsStalkerMod.isBlackout() ? 0.12F : 0.35F;
+         this.skyLightFactor = this.daylight;
+         return;
+      }
 
       // Update 3.8 - weather: overcast skies are grey and dark, storms darker still, lightning lights everything up
       this.wfx.updateLocal(var3);
@@ -428,10 +531,16 @@ public final class Renderer {
          ambient = Math.max(ambient, AMBIENT_HOOK); // test hook -Dbc.ambient=0.8: caves and the night can be photographed
       }
 
-      if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient) {
+      if (Math.abs(this.skyLightFactor - this.lastLm) > 0.004F || var1 != this.lastGamma || ambient != this.lastAmbient || BackroomsStalkerMod.isActive()) {
          float[] tint = Dim.ambientTint(this.g.world == null ? Dim.OVERWORLD : this.g.world.dim);
-         Tex.ambG = tint[0];
-         Tex.ambB = tint[1];
+         if (BackroomsStalkerMod.isActive()) {
+            float panic = BackroomsStalkerMod.getPanicLevel();
+            Tex.ambG = 0.90F - panic * 0.45F;
+            Tex.ambB = 0.54F - panic * 0.35F;
+         } else {
+            Tex.ambG = tint[0];
+            Tex.ambB = tint[1];
+         }
          GL13.glActiveTexture(33985);
          Tex.updateLightmap(this.skyLightFactor, ambient, var1);
          GL13.glActiveTexture(33984);
@@ -615,12 +724,12 @@ public final class Renderer {
       }
 
       // Update 3.12: the Nether and the End have no sky: nothing of the sky is drawn, and being "under ground" does not darken the fog
-      final boolean skyOn = var5.dim == Dim.OVERWORLD;
+      final boolean skyOn = var5.dim == Dim.OVERWORLD && !BackroomsStalkerMod.isActive();
       if (!skyOn) {
          var11 = 1.0F;
       }
 
-      this.caveF = this.caveF + (var11 - this.caveF) * 0.04F;
+      this.caveF = BackroomsStalkerMod.isActive() ? 1.0F : (this.caveF + (var11 - this.caveF) * 0.04F);
       float var12 = 0.04F + 0.96F * this.caveF;
       this.fogR *= var12;
       this.fogG *= var12;
@@ -636,6 +745,7 @@ public final class Renderer {
       int var15 = this.g.opt.lodDistance;
       boolean var16 = this.lod != null && var15 > var13;
       if (var16) {
+         var15 = Math.max(var15, var13 * 3);
          var14 = var15 * 16.0F;
       }
 
@@ -644,6 +754,10 @@ public final class Renderer {
       if (var5.dim == Dim.NETHER) {
          var12 = Math.min(var12, 104.0F); // the thick red haze of the Nether
          var11 = var12 * 0.1F;
+      }
+      if (BackroomsStalkerMod.isActive()) {
+         var11 = BackroomsStalkerMod.getFogNear();
+         var12 = BackroomsStalkerMod.getFogFar();
       }
       // Update 3.8: rain and storms pull the haze in close
       float wxFog = Math.min(1.0F, this.wfx.rain * 0.9F + this.wfx.storm * 0.1F);
@@ -671,8 +785,11 @@ public final class Renderer {
       GL11.glViewport(0, 0, var2, var3);
       // Update 3.19: the scene's alpha channel is the glow mask of the light sources (0 everywhere, the terrain pass writes it); nothing else may touch it
       boolean glow = this.shadersOn() && this.sh.sceneActive && this.sh.fxOk && this.g.opt.fx >= 1;
-      this.sh.glowOn = glow;
-      this.sh.fxLevel = this.g.opt.fx;
+      if (this.sh != null) {
+         this.sh.glowOn = glow;
+         this.sh.fxLevel = this.g.opt.fx;
+      }
+
       GL11.glColorMask(true, true, true, true);
       GL11.glClearColor(var41, var42, var43, glow ? 0.0F : 1.0F);
       GL11.glClear(16640);
@@ -709,6 +826,8 @@ public final class Renderer {
          this.drawEndSky();
       }
 
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
       GL11.glEnable(2912);
       GL11.glFogi(2917, 9729);
       GL11.glFogf(2915, var11);
@@ -717,29 +836,6 @@ public final class Renderer {
       float[] var26 = new float[]{var41, var42, var43};
       float[] var27 = new float[]{this.topR, this.topG, this.topB};
       float[] var28 = new float[]{this.fogR, this.fogG, this.fogB};
-      this.sh.sunAtten = this.wfx.sunVis;
-      Perf.mark(Perf.LOD);
-      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
-         GL11.glEnable(2929);
-         GL11.glDepthMask(true);
-         boolean var29 = this.sh.lodOk;
-         if (var29) {
-            boolean var30 = this.shadersOn();
-            if (var30) {
-               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
-            } else {
-               this.sh.setSun(0.0F, 1.0F, 0.0F);
-            }
-
-            this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
-         }
-
-         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
-         if (var29) {
-            this.sh.stopLod();
-         }
-      }
-
       this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.CULL);
       this.vis.clear();
@@ -798,6 +894,15 @@ public final class Renderer {
          } else {
             this.sh.mapValid = false;
          }
+      }
+
+      if (var50 && glow) {
+         // Update 3.19: the shadows of the clouds (a small map, drawn before the terrain that reads it) and the wetness of the world in rain
+         this.sh.wet = this.g.opt.weather ? Math.min(1.0F, this.wfx.rain * 1.15F) * (1.0F - Math.min(1.0F, this.wfx.snowy)) : 0.0F;
+         this.sh.cloudShadows(this.camX, this.camY, this.camZ, this.wfx, skyOn && this.g.opt.clouds, var2, var3);
+      } else if (var50) {
+         this.sh.wet = 0.0F;
+         this.sh.cloudShadows(this.camX, this.camY, this.camZ, this.wfx, false, var2, var3);
       }
 
       Perf.mark(Perf.TERRAIN);
@@ -864,6 +969,33 @@ public final class Renderer {
       }
 
       lightmapUnit(false);
+      Perf.mark(Perf.LOD);
+      if (var16 && !var6 && !var7 && !(var4.spectator && underGround(var5, this.camX, this.camY, this.camZ))) {
+         GL11.glEnable(2929);
+         GL11.glDepthMask(true);
+         boolean var29 = this.sh.lodOk;
+         if (var29) {
+            boolean var30 = this.shadersOn();
+            if (var30) {
+               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
+            } else {
+               this.sh.setSun(0.0F, 1.0F, 0.0F);
+            }
+
+            this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
+         }
+
+         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
+         if (var29) {
+            this.sh.stopLod();
+         }
+
+         GL11.glEnable(3008);
+         GL11.glAlphaFunc(516, 0.5F);
+         GL11.glBindTexture(3553, Tex.atlas);
+      }
+
+      this.sh.sunAtten = this.wfx.sunVis;
       Perf.mark(Perf.ENTITIES);
       // Update 3.11: with shaders on, animals, monsters, items, falling blocks and your own body are lit like the terrain (sun, shade, shadows, torches, fog)
       this.entFogNear = var11;
@@ -888,7 +1020,11 @@ public final class Renderer {
       }
 
       if (skyOn && this.g.opt.clouds && !var6 && !var7 && (!var50 || !this.sh.cloudsOk || !this.sh.sceneActive)) {
-         this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
+         if (ModLoader.isInfdevActive()) {
+            this.drawClouds(var1, var41, var42, var43);
+         } else {
+            this.wfx.drawClouds(var1, var41, var42, var43, var11, var12);
+         }
          if (glow) {
             GL11.glColorMask(true, true, true, false);   // the plain clouds switch the colour mask back on
          }
@@ -978,24 +1114,36 @@ public final class Renderer {
       ArrayList<float[]> var5 = new ArrayList<>();
       int var6 = (int)Math.floor(this.camX) >> 4;
       int var7 = (int)Math.floor(this.camZ) >> 4;
+      int syLo = var3 >> 4;
+      int syHi = var4 >> 4;
 
       for (int var8 = -2; var8 <= 2; var8++) {
          for (int var9 = -2; var9 <= 2; var9++) {
             Chunk var10 = this.g.world.chunk(var6 + var9, var7 + var8);
             if (var10 != null) {
-               for (int var11 = var3; var11 <= var4; var11++) {
-                  for (int var12 = 0; var12 < 16; var12++) {
-                     for (int var13 = 0; var13 < 16; var13++) {
-                        int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
-                        if (var14 != 0 && Blocks.emit[var14] >= 10) {
-                           float var15 = var10.cx * 16 + var13 + 0.5F;
-                           float var16 = var10.cz * 16 + var12 + 0.5F;
-                           float var17 = (float)(var15 - this.camX);
-                           float var18 = (float)(var16 - this.camZ);
-                           float var19 = (float)(var11 + 0.5 - this.camY);
-                           float var20 = var17 * var17 + var19 * var19 + var18 * var18;
-                           if (!(var20 > 576.0F)) {
-                              var5.add(new float[]{var15, var11 + 0.5F, var16, var14, var20});
+               for (int sy = syLo; sy <= syHi; sy++) {
+                  if (var10.isSectionEmpty(sy)) {
+                     continue;
+                  }
+                  int yStart = Math.max(var3, sy << 4);
+                  int yEnd = Math.min(var4, (sy << 4) + 15);
+                  for (int var11 = yStart; var11 <= yEnd; var11++) {
+                     for (int var12 = 0; var12 < 16; var12++) {
+                        for (int var13 = 0; var13 < 16; var13++) {
+                           int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
+                           if (var14 != 0 && Blocks.emit[var14] >= 7) {
+                              if (Blocks.isLava(var14) && ((var13 + var12) & 3) != 0) {
+                                 continue;
+                              }
+                              float var15 = var10.cx * 16 + var13 + 0.5F;
+                              float var16 = var10.cz * 16 + var12 + 0.5F;
+                              float var17 = (float)(var15 - this.camX);
+                              float var18 = (float)(var16 - this.camZ);
+                              float var19 = (float)(var11 + 0.5 - this.camY);
+                              float var20 = var17 * var17 + var19 * var19 + var18 * var18;
+                              if (!(var20 > 576.0F)) {
+                                 var5.add(new float[]{var15, var11 + 0.5F, var16, var14, var20});
+                              }
                            }
                         }
                      }
@@ -1037,9 +1185,13 @@ public final class Renderer {
    }
 
    static float[] lightColor(int var0) {
-      if (var0 == 25) {
-         return new float[]{1.0F, 0.82F, 0.5F};
-      } else if (Blocks.isLava(var0)) {
+      if (var0 == 25 || var0 == Redstone319.REDSTONE_LAMP_LIT) {
+         return new float[]{1.0F, 0.84F, 0.52F};
+      } else if (var0 == Redstone319.SEA_LANTERN) {
+         return new float[]{0.68F, 0.96F, 1.0F};
+      } else if (var0 == Redstone319.REDSTONE_TORCH) {
+         return new float[]{1.0F, 0.22F, 0.16F};
+      } else if (Blocks.isLava(var0) || var0 == Blocks.MAGMA) {
          return new float[]{1.0F, 0.42F, 0.1F};
       } else if (Blocks.isPortal(var0)) {
          return new float[]{0.62F, 0.3F, 1.0F};
@@ -1077,6 +1229,45 @@ public final class Renderer {
          this.sh.dynC[2] = var15[2] * var16;
          this.sh.dynC[3] = 1.0F;
          var1 = 1;
+      } else if (BackroomsStalkerMod.isActive()) {
+         // Camcorder handheld flashlight beam projected ahead of the player
+         float flk = 1.0F + 0.08F * (float)Math.sin(var2 * 47.0F) * BackroomsStalkerMod.getPanicLevel();
+         if (BackroomsStalkerMod.isBlackout() && ((int)(var2 * 18.0F) & 3) == 0) {
+            flk *= 0.35F;
+         }
+         float fdx = -this.mv[2];
+         float fdy = -this.mv[6];
+         float fdz = -this.mv[10];
+         this.sh.dynL[0] = fdx * 1.65F;
+         this.sh.dynL[1] = fdy * 1.65F - 0.1F;
+         this.sh.dynL[2] = fdz * 1.65F;
+         this.sh.dynL[3] = 8.5F * flk;
+         this.sh.dynC[0] = 1.0F * flk;
+         this.sh.dynC[1] = 0.91F * flk;
+         this.sh.dynC[2] = 0.62F * flk;
+         this.sh.dynC[3] = 1.0F;
+         var1 = 1;
+      }
+
+      if (BackroomsStalkerMod.isActive() && var1 < 8) {
+         Mobs.Mob stalker = BackroomsStalkerMod.getStalker();
+         if (stalker != null) {
+            double sx = stalker.x - this.camX;
+            double sy = stalker.y + 2.1 - this.camY;
+            double sz = stalker.z - this.camZ;
+            if (sx * sx + sy * sy + sz * sz < 1200.0) {
+               float pulse = 0.75F + 0.25F * (float)Math.sin(var2 * 14.0F);
+               this.sh.dynL[var1 * 4] = (float)sx;
+               this.sh.dynL[var1 * 4 + 1] = (float)sy;
+               this.sh.dynL[var1 * 4 + 2] = (float)sz;
+               this.sh.dynL[var1 * 4 + 3] = (BackroomsStalkerMod.getPhase() == BackroomsStalkerMod.PHASE_CHASE ? 11.5F : 7.5F) * pulse;
+               this.sh.dynC[var1 * 4] = 1.0F * pulse;
+               this.sh.dynC[var1 * 4 + 1] = 0.07F * pulse;
+               this.sh.dynC[var1 * 4 + 2] = 0.05F * pulse;
+               this.sh.dynC[var1 * 4 + 3] = 1.0F;
+               var1++;
+            }
+         }
       }
 
       for (Item var19 : this.g.world.items) {
@@ -1135,6 +1326,10 @@ public final class Renderer {
    }
 
    void renderShadowPass(int var1, int var2) {
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(2884);
       this.sh.beginShadow();
       arrays(true);
       GL13.glActiveTexture(33984);
@@ -1142,7 +1337,9 @@ public final class Renderer {
       GL11.glBindTexture(3553, Tex.atlas);
       int var3 = (int)Math.floor(this.camX) >> 4;
       int var4 = (int)Math.floor(this.camZ) >> 4;
-      int var5 = 9;
+      boolean isVoidShadow = this.g.world != null && this.g.world.settings != null && this.g.world.settings.isVoidMode();
+      boolean isPanoShadow = this.g.pano != null && this.g.world == this.g.pano.world;
+      int var5 = Math.min(9, isPanoShadow ? Math.min(4, this.g.opt.renderDistance) : (isVoidShadow ? 5 : this.g.opt.renderDistance));
       // Update 3.18: only what can land inside the map is drawn into it (the map is a 168 m square of light space: the 19 x 19 chunks round the player were
       // 90 000 m2, with the vertices of every section, underground ones too, going through the vertex shader to be clipped away) - same picture, a third of the work
       float[] sm = this.sh.shadowM;
@@ -1338,8 +1535,26 @@ public final class Renderer {
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
+   private static boolean[] infdevCloudGrid;
+
+   private static boolean isInfdevCloudCell(int gx, int gz) {
+      if (infdevCloudGrid == null) {
+         int[] px = Tex.cloudPixels();
+         boolean[] grid = new boolean[64 * 64];
+         for (int z = 0; z < 64; z++) {
+            for (int x = 0; x < 64; x++) {
+               grid[z * 64 + x] = px[(z * 4) * 256 + (x * 4)] != 0;
+            }
+         }
+         infdevCloudGrid = grid;
+      }
+      return infdevCloudGrid[(gz & 63) * 64 + (gx & 63)];
+   }
+
    void drawClouds(float var1, float var2, float var3, float var4) {
-      double var5 = 130.0 - this.camY;
+      boolean infdev = ModLoader.isInfdevActive();
+      double baseAlt = infdev ? 108.0 : 130.0;
+      double var5 = baseAlt - this.camY;
       float var7 = Math.max(250.0F, this.g.opt.renderDistance * 16.0F * 1.4F);
       double var8 = ((float)this.g.world.dayTime + var1) * 0.03;
       double var10 = 3072.0;
@@ -1353,17 +1568,96 @@ public final class Renderer {
       GL11.glEnable(3042);
       GL11.glBlendFunc(770, 771);
       GL11.glDisable(3008);
-      GL11.glColor4f(var20, var20, var20 * 1.0F, 0.82F);
-      GL11.glBegin(7);
-      GL11.glTexCoord2d(var12, var16);
-      GL11.glVertex3d(-var7, var5, -var7);
-      GL11.glTexCoord2d(var14, var16);
-      GL11.glVertex3d(var7, var5, -var7);
-      GL11.glTexCoord2d(var14, var18);
-      GL11.glVertex3d(var7, var5, var7);
-      GL11.glTexCoord2d(var12, var18);
-      GL11.glVertex3d(-var7, var5, var7);
-      GL11.glEnd();
+      if (infdev) {
+         // Classic Minecraft Infdev 4-block-thick 3D blocky clouds at Y=108..112
+         double topY = var5 + 4.0;
+         // Bottom face (0.70 brightness)
+         GL11.glColor4f(var20 * 0.72F, var20 * 0.72F, var20 * 0.76F, 0.85F);
+         GL11.glBegin(7);
+         GL11.glTexCoord2d(var12, var16);
+         GL11.glVertex3d(-var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var16);
+         GL11.glVertex3d(var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var18);
+         GL11.glVertex3d(var7, var5, var7);
+         GL11.glTexCoord2d(var12, var18);
+         GL11.glVertex3d(-var7, var5, var7);
+         GL11.glEnd();
+         // Top face (1.00 brightness)
+         GL11.glColor4f(var20, var20, var20, 0.85F);
+         GL11.glBegin(7);
+         GL11.glTexCoord2d(var12, var16);
+         GL11.glVertex3d(-var7, topY, -var7);
+         GL11.glTexCoord2d(var14, var16);
+         GL11.glVertex3d(var7, topY, -var7);
+         GL11.glTexCoord2d(var14, var18);
+         GL11.glVertex3d(var7, topY, var7);
+         GL11.glTexCoord2d(var12, var18);
+         GL11.glVertex3d(-var7, topY, var7);
+         GL11.glEnd();
+         // 3D extruded side walls around cloud cells near the camera (48x48 block cells matching 3072/64)
+         GL11.glDisable(3553);
+         double cell = 48.0;
+         double worldX = this.camX + var8;
+         int cx0 = (int)Math.floor(worldX / cell);
+         int cz0 = (int)Math.floor(this.camZ / cell);
+         GL11.glBegin(7);
+         for (int dz = -5; dz <= 5; dz++) {
+            for (int dx = -5; dx <= 5; dx++) {
+               int gx = cx0 + dx;
+               int gz = cz0 + dz;
+               if (!isInfdevCloudCell(gx, gz)) {
+                  continue;
+               }
+               double x0 = gx * cell - worldX;
+               double x1 = x0 + cell;
+               double z0 = gz * cell - this.camZ;
+               double z1 = z0 + cell;
+               if (!isInfdevCloudCell(gx - 1, gz)) {
+                  GL11.glColor4f(var20 * 0.90F, var20 * 0.90F, var20 * 0.92F, 0.85F);
+                  GL11.glVertex3d(x0, var5, z0);
+                  GL11.glVertex3d(x0, var5, z1);
+                  GL11.glVertex3d(x0, topY, z1);
+                  GL11.glVertex3d(x0, topY, z0);
+               }
+               if (!isInfdevCloudCell(gx + 1, gz)) {
+                  GL11.glColor4f(var20 * 0.90F, var20 * 0.90F, var20 * 0.92F, 0.85F);
+                  GL11.glVertex3d(x1, var5, z1);
+                  GL11.glVertex3d(x1, var5, z0);
+                  GL11.glVertex3d(x1, topY, z0);
+                  GL11.glVertex3d(x1, topY, z1);
+               }
+               if (!isInfdevCloudCell(gx, gz - 1)) {
+                  GL11.glColor4f(var20 * 0.80F, var20 * 0.80F, var20 * 0.84F, 0.85F);
+                  GL11.glVertex3d(x1, var5, z0);
+                  GL11.glVertex3d(x0, var5, z0);
+                  GL11.glVertex3d(x0, topY, z0);
+                  GL11.glVertex3d(x1, topY, z0);
+               }
+               if (!isInfdevCloudCell(gx, gz + 1)) {
+                  GL11.glColor4f(var20 * 0.80F, var20 * 0.80F, var20 * 0.84F, 0.85F);
+                  GL11.glVertex3d(x0, var5, z1);
+                  GL11.glVertex3d(x1, var5, z1);
+                  GL11.glVertex3d(x1, topY, z1);
+                  GL11.glVertex3d(x0, topY, z1);
+               }
+            }
+         }
+         GL11.glEnd();
+         GL11.glEnable(3553);
+      } else {
+         GL11.glColor4f(var20, var20, var20 * 1.0F, 0.82F);
+         GL11.glBegin(7);
+         GL11.glTexCoord2d(var12, var16);
+         GL11.glVertex3d(-var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var16);
+         GL11.glVertex3d(var7, var5, -var7);
+         GL11.glTexCoord2d(var14, var18);
+         GL11.glVertex3d(var7, var5, var7);
+         GL11.glTexCoord2d(var12, var18);
+         GL11.glVertex3d(-var7, var5, var7);
+         GL11.glEnd();
+      }
       GL11.glDisable(3042);
       GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
@@ -1668,7 +1962,186 @@ public final class Renderer {
       return var1;
    }
 
+   public static boolean isGun(int id) {
+      return id == Redstone319.PISTOL || id == Redstone319.MACHINE_GUN || id == Redstone319.SNIPER_RIFLE;
+   }
+
+   private static void gunBox(float x0, float y0, float z0, float x1, float y1, float z1, int rgb, float bright) {
+      float r = ((rgb >> 16) & 255) / 255.0F;
+      float g = ((rgb >> 8) & 255) / 255.0F;
+      float b = (rgb & 255) / 255.0F;
+      // Top (+Y)
+      float s0 = bright * 1.00F;
+      GL11.glColor3f(r * s0, g * s0, b * s0);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y1, z0);
+      GL11.glVertex3f(x0, y1, z1);
+      GL11.glVertex3f(x1, y1, z1);
+      GL11.glVertex3f(x1, y1, z0);
+      // Bottom (-Y)
+      float s1 = bright * 0.56F;
+      GL11.glColor3f(r * s1, g * s1, b * s1);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y0, z1);
+      GL11.glVertex3f(x0, y0, z0);
+      GL11.glVertex3f(x1, y0, z0);
+      GL11.glVertex3f(x1, y0, z1);
+      // Front/Muzzle (+X)
+      float s2 = bright * 0.88F;
+      GL11.glColor3f(r * s2, g * s2, b * s2);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x1, y0, z1);
+      GL11.glVertex3f(x1, y0, z0);
+      GL11.glVertex3f(x1, y1, z0);
+      GL11.glVertex3f(x1, y1, z1);
+      // Rear/Butt (-X)
+      float s3 = bright * 0.74F;
+      GL11.glColor3f(r * s3, g * s3, b * s3);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y0, z0);
+      GL11.glVertex3f(x0, y0, z1);
+      GL11.glVertex3f(x0, y1, z1);
+      GL11.glVertex3f(x0, y1, z0);
+      // Right Side (+Z)
+      float s4 = bright * 0.82F;
+      GL11.glColor3f(r * s4, g * s4, b * s4);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x0, y0, z1);
+      GL11.glVertex3f(x1, y0, z1);
+      GL11.glVertex3f(x1, y1, z1);
+      GL11.glVertex3f(x0, y1, z1);
+      // Left Side (-Z)
+      float s5 = bright * 0.78F;
+      GL11.glColor3f(r * s5, g * s5, b * s5);
+      GL11.glTexCoord2f(0.5F, 0.5F);
+      GL11.glVertex3f(x1, y0, z0);
+      GL11.glVertex3f(x0, y0, z0);
+      GL11.glVertex3f(x0, y1, z0);
+      GL11.glVertex3f(x1, y1, z0);
+   }
+
+   /** Renders a multi-box 3D firearm model for PISTOL (459), MACHINE_GUN (460), and SNIPER_RIFLE (461). */
+   public static void drawGunModel3D(int id, float bright) {
+      boolean prevCull = GL11.glIsEnabled(2884);
+      GL11.glDisable(2884);
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, SkyGen.whiteTex());
+      GL11.glDisable(3008);
+      GL11.glBegin(7);
+
+      if (id == Redstone319.PISTOL) {
+         // 1. Angled Ergonomic Polymer Grip & Magazine Baseplate
+         gunBox(-0.27F, -0.36F, -0.052F, -0.09F, -0.18F, 0.052F, 0x242830, bright);
+         gunBox(-0.24F, -0.20F, -0.052F, -0.06F, -0.02F, 0.052F, 0x282C35, bright);
+         gunBox(-0.23F, -0.32F, -0.060F, -0.11F, -0.06F, 0.060F, 0x1A1D24, bright); // Textured side grip panels
+         gunBox(-0.29F, -0.40F, -0.058F, -0.08F, -0.36F, 0.058F, 0x15181E, bright); // Flared mag baseplate
+         // 2. Trigger Guard & Curved Steel Trigger
+         gunBox(-0.06F, -0.14F, -0.022F, 0.09F, -0.115F, 0.022F, 0x2C313A, bright);
+         gunBox(0.065F, -0.14F, -0.022F, 0.09F, -0.02F, 0.022F, 0x2C313A, bright);
+         gunBox(-0.02F, -0.11F, -0.015F, 0.02F, -0.03F, 0.015F, 0x9098A6, bright); // Silver trigger
+         // 3. Lower Receiver Frame & Under-Barrel Tactical Laser/Light Module
+         gunBox(-0.28F, -0.03F, -0.054F, 0.34F, 0.04F, 0.054F, 0x353B46, bright);
+         gunBox(0.09F, -0.095F, -0.042F, 0.29F, -0.03F, 0.042F, 0x22262E, bright); // Under-barrel tac-laser housing
+         gunBox(0.285F, -0.082F, -0.026F, 0.305F, -0.042F, 0.026F, 0xFF3830, 1.0F); // Glowing red laser lens
+         // 4. Machined Gunmetal Upper Slide, Ejection Port & Rear Hammer
+         gunBox(-0.30F, 0.04F, -0.062F, 0.36F, 0.155F, 0.062F, 0x626C7C, bright);
+         gunBox(-0.28F, 0.145F, -0.048F, 0.34F, 0.165F, 0.048F, 0x7A8596, bright); // Top slide bevel highlight
+         gunBox(-0.05F, 0.09F, 0.010F, 0.11F, 0.160F, 0.065F, 0xC8D0DC, bright); // Silver barrel hood / ejection port
+         gunBox(-0.33F, 0.065F, -0.020F, -0.29F, 0.125F, 0.020F, 0x454C58, bright); // Rear hammer spur
+         // Rear slide serrations
+         gunBox(-0.25F, 0.055F, -0.066F, -0.23F, 0.14F, 0.066F, 0x3E4450, bright);
+         gunBox(-0.20F, 0.055F, -0.066F, -0.18F, 0.14F, 0.066F, 0x3E4450, bright);
+         gunBox(-0.15F, 0.055F, -0.066F, -0.13F, 0.14F, 0.066F, 0x3E4450, bright);
+         // 5. Extended Threaded Barrel & Dark Bore
+         gunBox(0.36F, 0.068F, -0.032F, 0.44F, 0.132F, 0.032F, 0x3C424E, bright);
+         gunBox(0.435F, 0.082F, -0.020F, 0.446F, 0.118F, 0.020F, 0x0E1014, bright); // Muzzle bore
+         // 6. Glowing Tritium 3-Dot Iron Sights
+         gunBox(-0.28F, 0.162F, -0.048F, -0.22F, 0.195F, -0.016F, 0x262A32, bright);
+         gunBox(-0.28F, 0.162F, 0.016F, -0.22F, 0.195F, 0.048F, 0x262A32, bright);
+         gunBox(-0.285F, 0.172F, -0.038F, -0.275F, 0.188F, -0.024F, 0x50FF78, 1.0F); // Left rear tritium dot
+         gunBox(-0.285F, 0.172F, 0.024F, -0.275F, 0.188F, 0.038F, 0x50FF78, 1.0F);  // Right rear tritium dot
+         gunBox(0.29F, 0.162F, -0.016F, 0.34F, 0.198F, 0.016F, 0x262A32, bright);    // Front sight blade
+         gunBox(0.285F, 0.175F, -0.012F, 0.305F, 0.195F, 0.012F, 0x50FF78, 1.0F);    // Front tritium dot
+      } else if (id == Redstone319.MACHINE_GUN) {
+         // 1. Tactical Collapsible Buttstock & Rubber Recoil Pad
+         gunBox(-0.54F, -0.18F, -0.052F, -0.48F, 0.08F, 0.052F, 0x181B20, bright);  // Rubberized shoulder pad
+         gunBox(-0.48F, -0.06F, -0.044F, -0.24F, 0.075F, 0.044F, 0x2A2F38, bright); // Upper stock tube
+         gunBox(-0.48F, -0.14F, -0.032F, -0.26F, -0.09F, 0.032F, 0x383E4A, bright); // Lower stock strut
+         // 2. Heavy Steel Upper & Lower Receiver
+         gunBox(-0.24F, -0.045F, -0.066F, 0.17F, 0.140F, 0.066F, 0x464E5C, bright);
+         gunBox(-0.22F, 0.010F, -0.070F, 0.14F, 0.115F, 0.070F, 0x586272, bright);  // Receiver side stamping
+         gunBox(-0.04F, 0.055F, 0.010F, 0.11F, 0.120F, 0.074F, 0xB8C2D0, bright);   // Steel bolt carrier in ejection port
+         gunBox(0.08F, 0.085F, 0.066F, 0.14F, 0.115F, 0.125F, 0x282C34, bright);    // Side charging handle
+         gunBox(-0.14F, 0.015F, -0.076F, -0.06F, 0.045F, 0.076F, 0xD83830, bright); // Red fire-selector switch
+         // 3. Ergonomic Pistol Grip & Trigger Guard
+         gunBox(-0.21F, -0.35F, -0.048F, -0.07F, -0.045F, 0.048F, 0x22262E, bright);
+         gunBox(-0.07F, -0.14F, -0.022F, 0.02F, -0.115F, 0.022F, 0x2E333D, bright);
+         gunBox(-0.04F, -0.115F, -0.015F, -0.01F, -0.045F, 0.015F, 0x9098A6, bright);
+         // 4. Curved 30-Round Banana Magazine (2 stepped boxes + brass ammo window)
+         gunBox(-0.01F, -0.23F, -0.044F, 0.12F, -0.045F, 0.044F, 0x262B34, bright);
+         gunBox(0.02F, -0.43F, -0.042F, 0.15F, -0.22F, 0.042F, 0x20252D, bright);
+         gunBox(0.045F, -0.36F, -0.046F, 0.095F, -0.12F, 0.046F, 0xD8A438, bright); // Brass 5.56mm ammo window stripe!
+         // 5. Ventilated Quad-Rail Handguard & Vertical Tactical Foregrip
+         gunBox(0.17F, -0.025F, -0.058F, 0.41F, 0.120F, 0.058F, 0x343A45, bright);
+         gunBox(0.20F, 0.025F, -0.064F, 0.38F, 0.075F, 0.064F, 0x22262E, bright);   // Side Picatinny rail & cooling vents
+         gunBox(0.23F, -0.26F, -0.038F, 0.31F, -0.025F, 0.038F, 0x1E222A, bright);  // Vertical tactical foregrip
+         // 6. Rifled Barrel, Front Sight Post & Slotted Flash Hider
+         gunBox(0.41F, 0.025F, -0.030F, 0.56F, 0.085F, 0.030F, 0x525A68, bright);
+         gunBox(0.50F, 0.012F, -0.042F, 0.59F, 0.098F, 0.042F, 0x2C313A, bright);   // Slotted muzzle brake / flash hider
+         gunBox(0.36F, 0.120F, -0.018F, 0.40F, 0.195F, 0.018F, 0x2C313A, bright);   // Front iron sight tower
+         // 7. Top Picatinny Rail & 3D Holographic Red-Dot Reflex Sight
+         gunBox(-0.20F, 0.140F, -0.038F, 0.35F, 0.165F, 0.038F, 0x2A2F38, bright);
+         gunBox(-0.14F, 0.165F, -0.052F, 0.04F, 0.195F, 0.052F, 0x1E222A, bright);  // Holo sight base
+         gunBox(-0.12F, 0.195F, -0.052F, 0.02F, 0.270F, -0.036F, 0x282D36, bright); // Holo sight left wall
+         gunBox(-0.12F, 0.195F, 0.036F, 0.02F, 0.270F, 0.052F, 0x282D36, bright);   // Holo sight right wall
+         gunBox(-0.12F, 0.254F, -0.052F, 0.02F, 0.272F, 0.052F, 0x282D36, bright);  // Holo sight top hood
+         gunBox(-0.06F, 0.218F, -0.014F, -0.03F, 0.242F, 0.014F, 0xFF3830, 1.0F);   // Glowing red holographic reticle dot!
+      } else if (id == Redstone319.SNIPER_RIFLE) {
+         // 1. AWP Olive-Drab Tactical Stock, Adjustable Cheek Rest & Rubber Buttpad
+         gunBox(-0.64F, -0.19F, -0.058F, -0.58F, 0.085F, 0.058F, 0x181B20, bright); // Heavy rubber recoil pad
+         gunBox(-0.58F, -0.15F, -0.054F, -0.20F, 0.080F, 0.054F, 0x3A5834, bright); // Olive-drab AWP stock body
+         gunBox(-0.46F, 0.080F, -0.048F, -0.26F, 0.135F, 0.048F, 0x22262E, bright); // Black adjustable cheek rest
+         // 2. Olive-Drab Sniper Chassis & Pistol Grip
+         gunBox(-0.20F, -0.055F, -0.062F, 0.32F, 0.080F, 0.062F, 0x44663C, bright);
+         gunBox(-0.22F, -0.33F, -0.048F, -0.09F, -0.055F, 0.048F, 0x2E4628, bright);
+         // 3. Heavy Detachable Box Magazine (.338 Lapua)
+         gunBox(-0.03F, -0.26F, -0.046F, 0.14F, -0.055F, 0.046F, 0x242830, bright);
+         gunBox(-0.04F, -0.28F, -0.050F, 0.15F, -0.25F, 0.050F, 0x181B20, bright);
+         // 4. Machined Steel Bolt-Action Receiver & Protruding Bolt Handle
+         gunBox(-0.18F, 0.080F, -0.056F, 0.22F, 0.155F, 0.056F, 0x586272, bright);
+         gunBox(-0.05F, 0.095F, 0.010F, 0.12F, 0.150F, 0.062F, 0xC8D2DE, bright);   // Polished steel bolt body
+         gunBox(-0.12F, 0.095F, 0.056F, -0.06F, 0.130F, 0.145F, 0x909AA8, bright);  // Protruding bolt handle & knob
+         // 5. Long Free-Floating Fluted Bull Barrel & Dual-Baffle Tank Muzzle Brake
+         gunBox(0.32F, 0.048F, -0.032F, 0.68F, 0.112F, 0.032F, 0x4E5664, bright);
+         gunBox(0.65F, 0.028F, -0.056F, 0.76F, 0.132F, 0.056F, 0x2C313A, bright);   // Heavy rectangular muzzle brake
+         // 6. Folded Front Bipod Legs Under Fore-End
+         gunBox(0.18F, -0.125F, -0.068F, 0.38F, -0.055F, -0.028F, 0x262A32, bright);
+         gunBox(0.18F, -0.125F, 0.028F, 0.38F, -0.055F, 0.068F, 0x262A32, bright);
+         // 7. Dual Scope Rings & Large 3D Telescopic Sniper Scope (8x)
+         gunBox(-0.13F, 0.155F, -0.036F, -0.07F, 0.210F, 0.036F, 0x22262E, bright); // Rear scope mount ring
+         gunBox(0.07F, 0.155F, -0.036F, 0.13F, 0.210F, 0.036F, 0x22262E, bright);   // Front scope mount ring
+         gunBox(-0.22F, 0.205F, -0.044F, 0.24F, 0.288F, 0.044F, 0x262B34, bright);  // Main scope tube
+         gunBox(-0.31F, 0.190F, -0.056F, -0.20F, 0.302F, 0.056F, 0x1E222A, bright); // Rear eyepiece bell
+         gunBox(0.22F, 0.182F, -0.064F, 0.34F, 0.310F, 0.064F, 0x1E222A, bright);   // Front objective bell
+         gunBox(-0.03F, 0.288F, -0.028F, 0.03F, 0.328F, 0.028F, 0x383E4A, bright);  // Top elevation turret knob
+         gunBox(-0.03F, 0.225F, 0.044F, 0.03F, 0.270F, 0.082F, 0x383E4A, bright);   // Side windage turret knob
+         gunBox(0.335F, 0.198F, -0.048F, 0.346F, 0.294F, 0.048F, 0x48E8FF, 1.0F);   // Glowing cyan coated front lens
+         gunBox(-0.315F, 0.205F, -0.040F, -0.305F, 0.286F, 0.040F, 0x48E8FF, 1.0F); // Glowing cyan rear eyepiece lens
+      }
+
+      GL11.glEnd();
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
+      GL11.glBindTexture(3553, Tex.atlas);
+      if (prevCull) {
+         GL11.glEnable(2884);
+      }
+   }
+
    public static void drawItemModel(int var0, float var1) {
+      if (isGun(var0)) {
+         drawGunModel3D(var0, var1);
+         return;
+      }
       drawSprite(itemGeometry(var0), var1, null);
    }
 
@@ -1707,6 +2180,10 @@ public final class Renderer {
    }
 
    public static void drawBlockModel(int var0, float var1) {
+      if (var0 == Redstone319.PISTON || var0 == Redstone319.STICKY_PISTON || var0 == Redstone319.OBSERVER) {
+         var0++;
+      }
+
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, Tex.atlas);
       GL11.glEnable(3008);
@@ -1725,6 +2202,13 @@ public final class Renderer {
             for (int var28 = 0; var28 < 2; var28++) {
                for (int var29 = 0; var29 < 6; var29++) {
                   int var30 = var28 == 0 ? Blocks.tiles[var0][var29] : 2;
+                  if (var28 == 0 && var27.length > 10) {
+                     double ov = var29 == 0 ? var27[9] : (var29 == 1 ? var27[10] : var27[8]);
+                     if (ov >= 0) {
+                        var30 = (int)ov;
+                     }
+                  }
+
                   if (var28 != 1 || var0 == 2 && var29 >= 2) {
                      float var31 = Mesher.SHADE[var29] * var1;
                      float var32 = var31;
@@ -1735,6 +2219,13 @@ public final class Renderer {
                         var32 *= var3[0] / 255.0F;
                         var33 *= var3[1] / 255.0F;
                         var34 *= var3[2] / 255.0F;
+                     }
+
+                     if (var28 == 0 && var27.length > 7 && var27[7] >= 0) {
+                        int c = (int)var27[7];
+                        var32 *= (c >> 16 & 255) / 255.0F;
+                        var33 *= (c >> 8 & 255) / 255.0F;
+                        var34 *= (c & 255) / 255.0F;
                      }
 
                      GL11.glColor3f(var32, var33, var34);
@@ -1811,6 +2302,7 @@ public final class Renderer {
 
    /** Update 3.9: the player's own body (skin, walking, hitting, sneaking) in the third-person views. */
    void drawSelf(float partial) {
+      Net319.drawPeers(this, partial);
       Game g = this.g;
       Player pl = g.player;
       if (g.view == 0 || pl.spectator || pl.dead) {
@@ -1838,10 +2330,16 @@ public final class Renderer {
          double var5 = var4.x + var4.vx * var1;
          double var7 = var4.y + var4.vy * var1;
          double var9 = var4.z + var4.vz * var1;
+         double dx = var5 - this.camX;
+         double dy = var7 - this.camY;
+         double dz = var9 - this.camZ;
+         if (dx * dx + dy * dy + dz * dz > 4096.0 || !this.visible((float)dx, (float)dy + 0.25F, (float)dz, 0.65F)) {
+            continue;
+         }
          float var11 = this.brightnessAt(var2, var5, var7 + 0.2, var9);
          float var12 = (float)(Math.sin((var4.age + var1) / 10.0) * 0.1 + 0.1);
          GL11.glPushMatrix();
-         GL11.glTranslated(var5 - this.camX, var7 - this.camY + 0.25 + var12, var9 - this.camZ);
+         GL11.glTranslated(dx, dy + 0.25 + var12, dz);
          GL11.glRotatef(var4.spin + var1 * 3.0F, 0.0F, 1.0F, 0.0F);
          float var13 = Blocks.isBlockId(var4.id) && Blocks.kind[var4.id] == 0 ? 0.25F : 0.35F;
          if (Items.isItem(var4.id)) {
@@ -1862,13 +2360,19 @@ public final class Renderer {
          double fx = Double.isNaN(var15.px) ? var15.x : var15.px + (var15.x - var15.px) * var1;
          double fy = Double.isNaN(var15.px) ? var15.y : var15.py + (var15.y - var15.py) * var1;
          double fz = Double.isNaN(var15.px) ? var15.z : var15.pz + (var15.z - var15.pz) * var1;
+         double fdx = fx - this.camX;
+         double fdy = fy - this.camY;
+         double fdz = fz - this.camZ;
+         if (fdx * fdx + fdy * fdy + fdz * fdz > 6400.0 || !this.visible((float)fdx, (float)fdy + 0.5F, (float)fdz, 0.85F)) {
+            continue;
+         }
          float var16 = this.brightnessAt(var2, fx, fy + 0.5, fz);
          if (var15.fuse > 0 && var15.fuse / 5 % 2 == 0) {
             var16 = 3.0F;
          }
 
          GL11.glPushMatrix();
-         GL11.glTranslated(fx - this.camX, fy - this.camY + 0.5, fz - this.camZ);
+         GL11.glTranslated(fdx, fdy + 0.5, fdz);
          if (var15.fuse > 0 && var15.fuse < 10) {
             // (the swelling of a TNT about to blow used to be applied before the translation, which also scaled its position)
             float var6 = 1.0F + (10 - var15.fuse) * 0.03F;
@@ -1971,6 +2475,9 @@ public final class Renderer {
                double var11 = var10.x + var10.vx * var1 - this.camX;
                double var13 = var10.y + var10.vy * var1 - this.camY;
                double var15 = var10.z + var10.vz * var1 - this.camZ;
+               if (var11 * var11 + var13 * var13 + var15 * var15 > 2304.0 || !this.visible((float)var11, (float)var13, (float)var15, 0.65F)) {
+                  continue;
+               }
                float var17 = var10.glow ? var10.shade : this.brightnessAt(var2, var10.x, var10.y, var10.z) * var10.shade;
                float left = var10.life0 > 0 ? Math.max(0.0F, Math.min(1.0F, (var10.life - var1) / var10.life0)) : 1.0F;
                float alpha = var10.alpha;
@@ -2024,6 +2531,12 @@ public final class Renderer {
     * @param swayPitch the hand's lag behind the camera, degrees (already scaled)
     */
    public void renderHand(float partial, Stack item, float swing, float use, float bright, int fbW, int fbH, float equip, float swayPitch, float swayYaw, float bobDist, float bobAmp) {
+      GL11.glDepthMask(true);
+      GL11.glEnable(2929);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(3042);
+      GL11.glDisable(2884);
+      GL11.glColorMask(true, true, true, true);
       GL11.glClear(256);
       GL11.glMatrixMode(5889);
       GL11.glLoadIdentity();
@@ -2034,20 +2547,45 @@ public final class Renderer {
       GL11.glMatrixMode(5888);
       GL11.glLoadIdentity();
       GL11.glDisable(2912);
-      GL11.glEnable(2929);
       float p = 1.0F - equip;
-      if (bobAmp > 0.0F) {
-         // Minecraft's EntityRenderer.applyBobbing: the view (here only the hand) rocks and dips with every step
-         GL11.glTranslatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 0.5F, -Math.abs((float)Math.cos(bobDist * Math.PI) * bobAmp), 0.0F);
-         GL11.glRotatef((float)Math.sin(bobDist * Math.PI) * bobAmp * 3.0F, 0.0F, 0.0F, 1.0F);
-         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.0F, 1.0F, 0.0F, 0.0F);
+      // Smooth equip curve (ease-out)
+      p = p * p * (3.0F - 2.0F * p);
+      // Organic idle breathing + vertical jump/fall inertia + sprint cadence
+      float idleT = (float)Perf.seconds(600.0);
+      float breathX = (float)Math.cos(idleT * 1.15F) * 0.008F;
+      float breathY = (float)Math.sin(idleT * 2.10F) * 0.013F;
+      float breathPitch = (float)Math.cos(idleT * 2.10F) * 1.15F;
+      float breathRoll = (float)Math.sin(idleT * 1.15F) * 0.85F;
+      Player pl = this.g != null ? this.g.player : null;
+      float vyOff = 0.0F;
+      float vyTilt = 0.0F;
+      float sprintPitch = 0.0F;
+      if (pl != null) {
+         vyOff = Math.max(-0.065F, Math.min(0.065F, (float)(-pl.vy * 0.085)));
+         vyTilt = Math.max(-7.5F, Math.min(7.5F, (float)(-pl.vy * 10.5)));
+         if (pl.sprinting && bobAmp > 0.01F) {
+            sprintPitch = -5.5F * Math.min(1.0F, bobAmp * 8.0F);
+         }
       }
 
-      GL11.glRotatef(swayPitch, 1.0F, 0.0F, 0.0F);
-      GL11.glRotatef(swayYaw, 0.0F, 1.0F, 0.0F);
-      boolean entShader = this.shadersOn() && this.sh.entityOk && this.sh.sceneActive;
+      GL11.glTranslatef(breathX, breathY + vyOff, 0.0F);
+      if (bobAmp > 0.0F) {
+         // Minecraft's EntityRenderer.applyBobbing + figure-8 wrist roll
+         float bSin = (float)Math.sin(bobDist * Math.PI);
+         float bCos = (float)Math.cos(bobDist * Math.PI);
+         GL11.glTranslatef(bSin * bobAmp * 0.58F, -Math.abs(bCos * bobAmp) * 1.08F, -Math.abs(bSin * bobAmp) * 0.18F);
+         GL11.glRotatef(bSin * bobAmp * 3.8F, 0.0F, 0.0F, 1.0F);
+         GL11.glRotatef(Math.abs((float)Math.cos(bobDist * Math.PI - 0.2F) * bobAmp) * 5.6F, 1.0F, 0.0F, 0.0F);
+      }
+
+      float clPitch = Math.max(-14.0F, Math.min(14.0F, swayPitch * 1.35F));
+      float clYaw = Math.max(-16.0F, Math.min(16.0F, swayYaw * 1.35F));
+      GL11.glRotatef(clPitch + breathPitch + vyTilt + sprintPitch, 1.0F, 0.0F, 0.0F);
+      GL11.glRotatef(clYaw, 0.0F, 1.0F, 0.0F);
+      GL11.glRotatef(-clYaw * 0.32F + breathRoll, 0.0F, 0.0F, 1.0F);
+      boolean entShader = this.shadersOn() && this.sh.entityOk;
       if (entShader) {
-         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, this.entFogNear, this.entFogFar, this.entFogCol, this.entShadow, this.lastSky, this.lastBlk);
+         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, 80.0F, 160.0F, this.entFogCol, false, this.lastSky, this.lastBlk);
       }
 
       float s1 = (float)Math.sqrt(swing);
@@ -2055,46 +2593,72 @@ public final class Renderer {
          PlayerModel.drawArmFirstPerson(this.g.skinPixels(), this.g.skinSlim(), bright, swing, p);
       } else {
          int id = item.id;
-         if (use >= 0.0F) {
-            float f = 32.0F * (1.0F - use) + 1.0F; // ticks left
-            float f1 = f / 32.0F;
-            if (f1 < 0.8F) {
-               GL11.glTranslatef(0.0F, Math.abs((float)Math.cos(f / 4.0F * Math.PI) * 0.1F), 0.0F);
+         if (isGun(id)) {
+            int maxCd = id == Redstone319.SNIPER_RIFLE ? 22 : (id == Redstone319.PISTOL ? 7 : 3);
+            float cd = Math.max(0.0F, SkyGen.playerGunCooldown - partial);
+            float recoil = cd > maxCd - 3.5F ? Math.min(1.0F, (cd - (maxCd - 3.5F)) / 3.0F) : 0.0F;
+            boolean flash = SkyGen.playerGunCooldown >= maxCd - 1;
+            GL11.glTranslatef(0.46F, -0.36F + p * -0.45F + recoil * 0.045F, -0.68F + recoil * 0.11F);
+            GL11.glRotatef(-84.0F, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(4.0F + recoil * 12.0F, 0.0F, 0.0F, 1.0F);
+            float gunScale = id == Redstone319.SNIPER_RIFLE ? 0.78F : (id == Redstone319.MACHINE_GUN ? 0.74F : 0.68F);
+            GL11.glScalef(gunScale, gunScale, gunScale);
+            drawGunModel3D(id, bright);
+            if (flash) {
+               float mx = id == Redstone319.SNIPER_RIFLE ? 0.78F : (id == Redstone319.MACHINE_GUN ? 0.60F : 0.46F);
+               float my = id == Redstone319.SNIPER_RIFLE ? 0.08F : (id == Redstone319.MACHINE_GUN ? 0.055F : 0.10F);
+               GL11.glEnable(3553);
+               GL11.glBindTexture(3553, SkyGen.whiteTex());
+               GL11.glBegin(7);
+               gunBox(mx, my - 0.09F, -0.015F, mx + 0.16F, my + 0.09F, 0.015F, 0xFFE868, 1.0F);
+               gunBox(mx, my - 0.015F, -0.09F, mx + 0.16F, my + 0.015F, 0.09F, 0xFF9828, 1.0F);
+               gunBox(mx - 0.02F, my - 0.045F, -0.045F, mx + 0.08F, my + 0.045F, 0.045F, 0xFFFFFF, 1.0F);
+               GL11.glEnd();
+               GL11.glBindTexture(3553, Tex.atlas);
             }
-
-            float f3 = 1.0F - (float)Math.pow(f1, 27.0);
-            GL11.glTranslatef(f3 * 0.6F, f3 * -0.5F, 0.0F);
-            GL11.glRotatef(f3 * 90.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(f3 * 10.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
          } else {
-            GL11.glTranslatef(-0.4F * (float)Math.sin(s1 * Math.PI), 0.2F * (float)Math.sin(s1 * Math.PI * 2.0), -0.2F * (float)Math.sin(swing * Math.PI));
-            GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
-            float f = (float)Math.sin(swing * swing * Math.PI);
-            GL11.glRotatef(45.0F - f * 20.0F, 0.0F, 1.0F, 0.0F);
-            float f1 = (float)Math.sin(s1 * Math.PI);
-            GL11.glRotatef(f1 * -20.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glRotatef(f1 * -80.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
-         }
+            if (use >= 0.0F) {
+               float f = 32.0F * (1.0F - use) + 1.0F; // ticks left
+               float f1 = f / 32.0F;
+               if (f1 < 0.8F) {
+                  GL11.glTranslatef(0.0F, Math.abs((float)Math.cos(f / 4.0F * Math.PI) * 0.1F), 0.0F);
+               }
 
-         if (Items.isItem(id) || flatBlock(id)) {
-            // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
-            GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
-            GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(25.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glScalef(0.68F, 0.68F, 0.68F);
-            if (Items.isItem(id)) {
-               drawItemModel(id, bright);
+               float f3 = 1.0F - (float)Math.pow(f1, 27.0);
+               GL11.glTranslatef(f3 * 0.6F, f3 * -0.5F, 0.0F);
+               GL11.glRotatef(f3 * 90.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(f3 * 10.0F, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(f3 * 30.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
             } else {
-               drawFlatBlock(id, bright);
+               float swArc = (float)Math.sin(s1 * Math.PI);
+               float swSnap = (float)Math.sin(swing * Math.PI);
+               GL11.glTranslatef(-0.42F * swArc, 0.24F * (float)Math.sin(s1 * Math.PI * 2.0), -0.28F * swSnap);
+               GL11.glTranslatef(0.56F, -0.52F + p * -0.6F, -0.72F);
+               float f = (float)Math.sin(swing * swing * Math.PI);
+               GL11.glRotatef(45.0F - f * 24.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(swArc * -24.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glRotatef(swArc * -84.0F, 1.0F, 0.0F, 0.0F);
+               GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
             }
-         } else {
-            // block/block, "firstperson_righthand": rotation [0, 45, 0], scale 0.4
-            GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glScalef(0.4F, 0.4F, 0.4F);
-            drawBlockModel(id, bright);
+
+            if (Items.isItem(id) || flatBlock(id)) {
+               // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
+               GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
+               GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(25.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glScalef(0.68F, 0.68F, 0.68F);
+               if (Items.isItem(id)) {
+                  drawItemModel(id, bright);
+               } else {
+                  drawFlatBlock(id, bright);
+               }
+            } else {
+               // block/block, "firstperson_righthand": rotation [0, 45, 0], scale 0.4
+               GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
+               GL11.glScalef(0.4F, 0.4F, 0.4F);
+               drawBlockModel(id, bright);
+            }
          }
       }
 

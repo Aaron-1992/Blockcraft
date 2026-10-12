@@ -1,1 +1,2 @@
-3.18
+5.0
+Blockcraft V5.0 — 8 Ported Console Edition Maps & Multi-Level Architecture Across All 5 Gamemodes, Truly Randomized Chest Loot, Redesigned Tactical Crosshair & Animated Hitmarker

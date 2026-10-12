@@ -11,6 +11,9 @@ final class Trades {
    static final int SMITH = 3;
    static final int BUTCHER = 4;
    static final int NITWIT = 5;
+   static final int BEDWARS_SHOP = 6;
+   static final int BEDWARS_ARMOR = 7;
+   static final int BEDWARS_TOOLS = 8;
    static final String[] NAMES = {"Farmer", "Librarian", "Priest", "Blacksmith", "Butcher", "Nitwit"};
    /** The robe colours of the professions (RGB). */
    static final int[] ROBE = {0x7A5230, 0xEDEDED, 0x8B3FA8, 0x3A3A3A, 0xC8C8C8, 0x4E9A3E};
@@ -41,6 +44,15 @@ final class Trades {
    }
 
    static String name(int profession) {
+      if (profession == BEDWARS_SHOP) {
+         return "Bedwars Item Shop";
+      }
+      if (profession == BEDWARS_ARMOR) {
+         return "Bedwars Gear & Upgrades";
+      }
+      if (profession == BEDWARS_TOOLS) {
+         return "Bedwars Tools & Defense";
+      }
       return NAMES[Math.max(0, Math.min(NAMES.length - 1, profession))];
    }
 
@@ -58,6 +70,37 @@ final class Trades {
             return new Trade[]{t(Items.COAL, 16, e, 1), t(Items.IRON_INGOT, 4, e, 1), t(e, 5, Items.toolId(2, Items.C_AXE), 1), t(e, 7, Items.toolId(2, Items.C_SWORD), 1), t(e, 9, Items.armorId(1, 1), 1), t(e, 13, Items.toolId(4, Items.C_PICK), 1)};
          case BUTCHER:
             return new Trade[]{t(Items.RAW_PORK, 14, e, 1), t(Items.RAW_CHICKEN, 14, e, 1), t(Items.RAW_BEEF, 10, e, 1), t(e, 1, Items.COOKED_PORK, 5), t(e, 1, Items.COOKED_CHICKEN, 4), t(e, 2, Items.STEAK, 4)};
+         case BEDWARS_SHOP: {
+            int woolColor = SkyGen.BEDWARS_COLORS[Math.abs(SkyGen.myTeam) & 3];
+            return new Trade[]{
+               t(Items.IRON_INGOT, 4, Blocks.WOOL0 + woolColor, 16),
+               t(Items.IRON_INGOT, 12, Blocks.END_STONE, 12),
+               t(Items.IRON_INGOT, 10, Items.toolId(1, Items.C_SWORD), 1),
+               t(Items.GOLD_INGOT, 6, Items.toolId(2, Items.C_SWORD), 1),
+               t(Items.GOLD_INGOT, 3, Redstone319.GOLDEN_APPLE, 1),
+               t(Items.EMERALD, 4, Items.toolId(4, Items.C_SWORD), 1)
+            };
+         }
+         case BEDWARS_ARMOR:
+            return new Trade[]{
+               SkyGen.playerBwArmorTier >= 1
+                  ? t(Items.EMERALD, 6, Items.armorId(3, 1), 1)
+                  : t(Items.IRON_INGOT, 20, Items.armorId(1, 1), 1),
+               t(Items.GOLD_INGOT, 4, Blocks.TNT, 2),
+               t(Items.GOLD_INGOT, 3, Items.BLAZE_ROD, 1),
+               t(Items.EMERALD, 4, Blocks.OBSIDIAN, 4),
+               t(Items.EMERALD, 2, Items.ENDER_PEARL, 1),
+               t(Items.DIAMOND, 2, Items.BOOK, 1)
+            };
+         case BEDWARS_TOOLS:
+            return new Trade[]{
+               t(Items.IRON_INGOT, 10, Items.toolId(2, Items.C_PICK), 1),
+               t(Items.IRON_INGOT, 10, Items.toolId(2, Items.C_AXE), 1),
+               t(Items.IRON_INGOT, 20, Items.SHEARS, 1),
+               t(Items.IRON_INGOT, 24, Blocks.END_STONE, 12),
+               t(Items.EMERALD, 4, Blocks.OBSIDIAN, 4),
+               t(Items.GOLD_INGOT, 8, Redstone319.FIRE_CHARGE, 2)
+            };
          default:
             return new Trade[0];
       }
@@ -74,11 +117,62 @@ final class Trades {
          return false;
       }
 
+      boolean isBedwars = g.world != null && g.world.settings != null && g.world.settings.type == WorldSettings.BEDWARS;
+      if (isBedwars) {
+         if (t.out == Items.BOOK && t.a == Items.DIAMOND) {
+            if (!SkyGen.unlockNextTeamUpgrade(g, SkyGen.getPlayerTeam(g), true)) {
+               return false;
+            }
+            if (!g.player.creative) {
+               g.removeItems(t.a, t.an);
+               if (t.bn > 0) {
+                  g.removeItems(t.b, t.bn);
+               }
+            }
+            SoundEngine.playUi("levelup", 0.7F, 1.15F);
+            g.adv.award(g, "adventure/trade");
+            return true;
+         }
+         if (Items.isArmor(t.out)) {
+            int tier = (t.out - Items.ARMOR_BASE) / 4;
+            int curTier = (g.armor[1] != null && Items.isArmor(g.armor[1].id)) ? (g.armor[1].id - Items.ARMOR_BASE) / 4 : -1;
+            if (curTier >= tier && SkyGen.playerBwArmorTier >= tier) {
+               g.say("\u00a7e[Bedwars Shop] You already have equal or stronger permanent armor equipped!");
+               return false;
+            }
+            if (!g.player.creative) {
+               g.removeItems(t.a, t.an);
+               if (t.bn > 0) {
+                  g.removeItems(t.b, t.bn);
+               }
+            }
+            SkyGen.playerBwArmorTier = Math.max(SkyGen.playerBwArmorTier, tier);
+            for (int slot = 1; slot <= 3; slot++) {
+               g.armor[slot] = new Stack(Items.armorId(SkyGen.playerBwArmorTier, slot), 1);
+            }
+            SoundEngine.playUi("pop", 0.75F, 1.15F);
+            g.say("\u00a7a[Bedwars Shop] Equipped permanent " + (SkyGen.playerBwArmorTier >= 3 ? "Diamond" : "Iron") + " Armor!");
+            if (g.menu != null && g.menu.kind == Menu.TRADE && g.menu.profession == BEDWARS_ARMOR) {
+               g.menu = new Menu(g, Menu.TRADE, null, BEDWARS_ARMOR);
+            }
+            g.adv.award(g, "adventure/trade");
+            return true;
+         }
+      }
+
       if (!g.player.creative) {
          g.removeItems(t.a, t.an);
          if (t.bn > 0) {
             g.removeItems(t.b, t.bn);
          }
+      }
+
+      if (isBedwars && Items.isTool(t.out) && Items.toolClass(t.out) == Items.C_SWORD
+         && g.inv[0] != null && g.inv[0].id == Items.TOOL_BASE) {
+         g.inv[0] = new Stack(t.out, t.outN);
+         SoundEngine.playUi("pop", 0.75F, 1.15F);
+         g.adv.award(g, "adventure/trade");
+         return true;
       }
 
       Stack s = new Stack(t.out, t.outN);
@@ -87,6 +181,7 @@ final class Trades {
          g.dropFromPlayer(s.id, s.n, s.dmg);
       }
 
+      SoundEngine.playUi("pop", 0.75F, 1.15F);
       g.adv.award(g, "adventure/trade");
       return true;
    }
