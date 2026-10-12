@@ -1,0 +1,72 @@
+name: Release PE
+
+# Publishes Blockcraft PE (Pocket Edition for Android / Samsung Galaxy A55 5G) as a strictly
+# separated GitHub Release (tag pe-v<ver>) containing ONLY the Android APK & PE bundle —
+# never including PC versions, while .github/workflows/release.yml remains strictly for PC releases.
+#
+# Trigger: Actions tab -> Release PE -> Run workflow, or push a change to ci/pe-release-trigger.txt
+# (first line = PE version to publish, e.g. 1.0).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "PE version to publish, e.g. 1.0"
+        default: "1.0"
+  push:
+    branches: ["arena/**"]
+    paths: ["ci/pe-release-trigger.txt"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-pe
+  cancel-in-progress: false
+
+jobs:
+  publish-pe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build & Verify Blockcraft PE APK (Samsung Galaxy A55 5G)
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          VER="$INPUT_VERSION"
+          if [ -z "$VER" ]; then VER="$(head -n1 ci/pe-release-trigger.txt | tr -d '[:space:]')"; fi
+          if [ -z "$VER" ]; then VER="1.0"; fi
+          echo "PE version: '$VER'"
+          mkdir -p build
+          python3 android-pe/tools/build_pe_apk.py "$VER" 2>&1 | tee build/release-pe.log
+
+      - name: Publish Separate Blockcraft PE Release on GitHub
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="$(cat build/release-pe/VERSION | tr -d '[:space:]')"
+          TAG="pe-v$VER"
+          TITLE="Blockcraft PE v$VER (Android / Samsung Galaxy A55 5G)"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "PE release $TAG exists -> replacing its PE assets"
+            gh release upload "$TAG" build/release-pe/*.apk build/release-pe/*.zip --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file build/release-pe/release-notes.md
+          else
+            gh release create "$TAG" build/release-pe/*.apk build/release-pe/*.zip \
+              --target "$GITHUB_SHA" --title "$TITLE" \
+              --notes-file build/release-pe/release-notes.md
+          fi
+          gh release view "$TAG" --json url,assets --jq '.url, (.assets[] | "\(.name)  \(.size) bytes")' | tee build/release-pe-url.txt
+
+      - name: Result (readable through the check-run API)
+        if: always()
+        run: |
+          cat build/release-pe.log build/release-pe-url.txt > build/release-pe-result.txt 2>/dev/null || true
+          python3 tools/ci_annotate.py build/release-pe-result.txt "PE release result" notice
