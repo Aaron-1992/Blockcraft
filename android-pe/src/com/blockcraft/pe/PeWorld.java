@@ -153,7 +153,11 @@ public final class PeWorld {
    public static final byte B_MELON = 82;
    public static final byte B_HAY_BALE = 83;
    public static final byte B_MOSSY_STONEBRICK = 84;
-   public static final int MAX_BLOCK_ID = 84;
+   public static final byte B_STAIR_OAK = 85;
+   public static final byte B_STAIR_COBBLE = 86;
+   public static final byte B_STAIR_STONEBRICK = 87;
+   public static final byte B_DOOR_OAK_OPEN = 88;
+   public static final int MAX_BLOCK_ID = 88;
 
    // Item IDs (98+)
    public static final int I_SWORD_WOOD = 98;
@@ -401,12 +405,12 @@ public final class PeWorld {
    };
 
    public static final int[][] CREATIVE_TABS = new int[][]{
-      // Tab 0: Building Blocks
+      // Tab 0: Building Blocks, Slabs & Stairs
       {
          B_GRASS, B_DIRT, B_STONE, B_COBBLE, B_MOSSY_COBBLE, B_STONEBRICK,
-         B_MOSSY_STONEBRICK, B_CRACKED_STONEBRICK, B_BRICKS, B_PLANKS_OAK, B_PLANKS_SPRUCE, B_PLANKS_BIRCH,
-         B_LOG_OAK, B_LOG_SPRUCE, B_LOG_BIRCH, B_SLAB_OAK, B_SLAB_COBBLE, B_SLAB_STONEBRICK,
-         B_SAND, B_SANDSTONE, B_RED_SANDSTONE, B_GLASS, B_QUARTZ_BLOCK, B_OBSIDIAN
+         B_MOSSY_STONEBRICK, B_BRICKS, B_PLANKS_OAK, B_PLANKS_SPRUCE, B_PLANKS_BIRCH, B_LOG_OAK,
+         B_LOG_SPRUCE, B_LOG_BIRCH, B_SLAB_OAK, B_SLAB_COBBLE, B_STAIR_OAK, B_STAIR_COBBLE,
+         B_STAIR_STONEBRICK, B_SAND, B_SANDSTONE, B_GLASS, B_QUARTZ_BLOCK, B_OBSIDIAN
       },
       // Tab 1: Nature, Foliage, Crops & Utility
       {
@@ -442,14 +446,14 @@ public final class PeWorld {
    }
 
    public static final CraftRecipe[] RECIPES = new CraftRecipe[]{
-      // Category 0 (0..7): Wood, Stone & Building Blocks
+      // Category 0 (0..7): Wood, Stone, Slabs & Stairs
       new CraftRecipe("Oak Planks x4 (1 Oak Log)", B_PLANKS_OAK, 4, B_LOG_OAK, 1),
       new CraftRecipe("Spruce Planks x4 (1 Spruce)", B_PLANKS_SPRUCE, 4, B_LOG_SPRUCE, 1),
       new CraftRecipe("Birch Planks x4 (1 Birch)", B_PLANKS_BIRCH, 4, B_LOG_BIRCH, 1),
       new CraftRecipe("Oak Slabs x6 (3 Planks)", B_SLAB_OAK, 6, B_PLANKS_OAK, 3),
-      new CraftRecipe("Cobble Slabs x6 (3 Cobble)", B_SLAB_COBBLE, 6, B_COBBLE, 3),
+      new CraftRecipe("Oak Stairs x4 (4 Planks)", B_STAIR_OAK, 4, B_PLANKS_OAK, 4),
+      new CraftRecipe("Cobble Stairs x4 (4 Cobble)", B_STAIR_COBBLE, 4, B_COBBLE, 4),
       new CraftRecipe("Stone Bricks x4 (4 Stone)", B_STONEBRICK, 4, B_STONE, 4),
-      new CraftRecipe("Sandstone x2 (2 Sand)", B_SANDSTONE, 2, B_SAND, 2),
       new CraftRecipe("Glass x4 (Smelt 4 Sand)", B_GLASS, 4, B_SAND, 4),
 
       // Category 1 (8..15): Utility, Decor, Lighting & Farming
@@ -1250,8 +1254,8 @@ public final class PeWorld {
                   setChunkLocal(c, lx, oy + dy, lz, B_AIR);
                }
             }
-            // Pitched Oak Slab & Spruce Plank roof
-            setChunkLocal(c, lx, oy + 5, lz, (Math.abs(dx) == 3 || Math.abs(dz) == 3) ? B_SLAB_OAK : B_PLANKS_SPRUCE);
+            // Pitched Oak Stair & Spruce Plank roof
+            setChunkLocal(c, lx, oy + 5, lz, (Math.abs(dx) == 3 || Math.abs(dz) == 3) ? B_STAIR_OAK : B_PLANKS_SPRUCE);
             if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
                setChunkLocal(c, lx, oy + 6, lz, B_SLAB_OAK);
             }
@@ -1478,18 +1482,23 @@ public final class PeWorld {
       return id == B_SLAB_OAK || id == B_SLAB_COBBLE || id == B_SLAB_STONEBRICK;
    }
 
+   public static boolean isStair(byte id) {
+      return id == B_STAIR_OAK || id == B_STAIR_COBBLE || id == B_STAIR_STONEBRICK;
+   }
+
    public static boolean isCrossPlant(byte id) {
       return id == B_TORCH || id == B_TALL_GRASS || id == B_FLOWER_RED || id == B_FLOWER_YELLOW
          || id == B_WHEAT || id == B_SUGAR_CANE;
    }
 
    public static boolean isSolid(byte id) {
-      return id != B_AIR && id != B_WATER && id != B_LAVA && !isCrossPlant(id) && id != B_LADDER && id != B_DOOR_OAK;
+      return id != B_AIR && id != B_WATER && id != B_LAVA && !isCrossPlant(id)
+         && id != B_LADDER && id != B_DOOR_OAK_OPEN;
    }
 
    public static double getBlockHeight(byte id) {
       if (!isSolid(id)) return 0.0;
-      if (isSlab(id)) return 0.5;
+      if (isSlab(id) || isStair(id)) return 0.5;
       if (id == B_BED_RED) return 0.5625;
       if (id == B_FARMLAND) return 0.9375;
       return 1.0;
@@ -1497,10 +1506,10 @@ public final class PeWorld {
 
    public static boolean isOpaque(byte id) {
       return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_GLASS
-         && !isLeaves(id) && !isSlab(id)
+         && !isLeaves(id) && !isSlab(id) && !isStair(id)
          && id != B_ICE && id != B_SLIME_BLOCK && !isCrossPlant(id)
          && id != B_BARS && id != B_BED_RED && id != B_FENCE_OAK
-         && id != B_DOOR_OAK && id != B_LADDER && id != B_CHEST && id != B_CACTUS;
+         && id != B_DOOR_OAK && id != B_DOOR_OAK_OPEN && id != B_LADDER && id != B_CHEST && id != B_CACTUS;
    }
 
    public static boolean isLightEmitter(byte id) {
@@ -1514,9 +1523,11 @@ public final class PeWorld {
          case B_GRASS: return face == 0 ? PeTextures.T_GRASS_TOP : (face == 1 ? PeTextures.T_DIRT : PeTextures.T_GRASS_SIDE);
          case B_DIRT: return PeTextures.T_DIRT;
          case B_COBBLE:
-         case B_SLAB_COBBLE: return PeTextures.T_COBBLE;
+         case B_SLAB_COBBLE:
+         case B_STAIR_COBBLE: return PeTextures.T_COBBLE;
          case B_PLANKS_OAK:
          case B_SLAB_OAK:
+         case B_STAIR_OAK:
          case B_FENCE_OAK: return PeTextures.T_PLANKS_OAK;
          case B_BEDROCK: return PeTextures.T_BEDROCK;
          case B_WATER: return PeTextures.T_WATER;
@@ -1559,7 +1570,8 @@ public final class PeWorld {
          case B_SOUL_SAND: return PeTextures.T_SOUL_SAND;
          case B_GLOWSTONE: return PeTextures.T_GLOWSTONE;
          case B_STONEBRICK:
-         case B_SLAB_STONEBRICK: return PeTextures.T_STONEBRICK;
+         case B_SLAB_STONEBRICK:
+         case B_STAIR_STONEBRICK: return PeTextures.T_STONEBRICK;
          case B_MOSSY_STONEBRICK: return PeTextures.T_MOSSY_STONEBRICK;
          case B_NETHER_BRICKS: return PeTextures.T_NETHER_BRICKS;
          case B_END_STONE: return PeTextures.T_END_STONE;
@@ -1585,7 +1597,8 @@ public final class PeWorld {
          case B_TALL_GRASS: return PeTextures.T_TALL_GRASS;
          case B_FLOWER_RED: return PeTextures.T_FLOWER_RED;
          case B_FLOWER_YELLOW: return PeTextures.T_FLOWER_YELLOW;
-         case B_DOOR_OAK: return PeTextures.T_DOOR_TOP;
+         case B_DOOR_OAK:
+         case B_DOOR_OAK_OPEN: return PeTextures.T_DOOR_TOP;
          case B_LADDER: return PeTextures.T_LADDER;
          case B_FARMLAND: return face == 0 ? PeTextures.T_FARM_WET : PeTextures.T_DIRT;
          case B_WHEAT: return PeTextures.T_WHEAT;
@@ -1642,8 +1655,12 @@ public final class PeWorld {
          case B_SLAB_OAK: return "Oak Slab";
          case B_SLAB_COBBLE: return "Cobblestone Slab";
          case B_SLAB_STONEBRICK: return "Stone Brick Slab";
+         case B_STAIR_OAK: return "Oak Stairs";
+         case B_STAIR_COBBLE: return "Cobblestone Stairs";
+         case B_STAIR_STONEBRICK: return "Stone Brick Stairs";
          case B_FENCE_OAK: return "Oak Fence";
          case B_DOOR_OAK: return "Oak Door";
+         case B_DOOR_OAK_OPEN: return "Oak Door (Open)";
          case B_LADDER: return "Ladder";
          case B_BRICKS: return "Bricks";
          case B_STONEBRICK: return "Stone Bricks";
@@ -1849,6 +1866,15 @@ public final class PeWorld {
             if (audio != null) audio.playSound("levelup", 0.85F, 1.0F);
             return;
          }
+         if (targetBlock == B_DOOR_OAK || targetBlock == B_DOOR_OAK_OPEN) {
+            setBlock(hit[0], hit[1], hit[2], targetBlock == B_DOOR_OAK ? B_DOOR_OAK_OPEN : B_DOOR_OAK);
+            if (audio != null) audio.playSound("click_block", 0.85F, targetBlock == B_DOOR_OAK ? 1.15F : 0.9F);
+            return;
+         }
+         if (targetBlock == B_TNT) {
+            detonateTnt(hit[0], hit[1], hit[2], audio);
+            return;
+         }
       }
 
       // 2. Eat Food if holding Golden Apple, Steak, or Bread
@@ -1875,13 +1901,37 @@ public final class PeWorld {
             && pyPlace < this.py + 1.75;
          byte existing = getBlock(pxPlace, pyPlace, pzPlace);
          if (!overlapsPlayer && (existing == B_AIR || existing == B_WATER || existing == B_TALL_GRASS)) {
-            setBlock(pxPlace, pyPlace, pzPlace, heldByte);
+            int finalY = pyPlace;
+            if (heldByte == B_SAND || heldByte == B_GRAVEL) {
+               while (finalY > 1 && getBlockFast(pxPlace, finalY - 1, pzPlace) == B_AIR) {
+                  finalY--;
+               }
+            }
+            setBlock(pxPlace, finalY, pzPlace, heldByte);
             if (this.mode != MODE_CREATIVE) {
                consumeSelectedSlot(1);
             }
             if (audio != null) audio.playSound("click_block", 0.8F, 1.05F);
          }
       }
+   }
+
+   public void detonateTnt(int tx, int ty, int tz, PeAudio audio) {
+      setBlock(tx, ty, tz, B_AIR);
+      for (int dy = -2; dy <= 2; dy++) {
+         for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+               if (dx * dx + dy * dy + dz * dz <= 6) {
+                  byte b = getBlockFast(tx + dx, ty + dy, tz + dz);
+                  if (b != B_AIR && b != B_BEDROCK && b != B_OBSIDIAN) {
+                     setBlock(tx + dx, ty + dy, tz + dz, B_AIR);
+                  }
+               }
+            }
+         }
+      }
+      showBanner("BOOOOM! TNT Detonated!");
+      if (audio != null) audio.playSound("explode", 1.0F, 0.9F);
    }
 
    // Legacy alias for tests

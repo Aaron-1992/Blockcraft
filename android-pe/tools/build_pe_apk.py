@@ -180,16 +180,17 @@ def build_release_notes(version, apk_name, bundle_name):
   * **3D Bushy Leaf Fronds & Birch Trees**: Added `T_BUSHY_FROND_OAK`, `T_BUSHY_FROND_SPRUCE`, and `T_BUSHY_FROND_BIRCH` crossed 3D foliage fronds protruding from exposed tree canopy leaves, plus white-bark **Birch Logs (`T_LOG_BIRCH_SIDE`)** and golden-olive **Birch Leaves (`T_LEAVES_BIRCH`)**.
   * **Animated Water & Lava**: Smoothly animates `T_WATER` and `T_LAVA` on the GPU texture atlas via `glTexSubImage2D`.
 * **PC Update 3.5+ Blocks, Crops, Structures, Tree Felling & Categorized Inventory**:
-  * **Custom 3D Block Shapes**: Added half-height **Oak, Cobblestone & Stone Brick Slabs**, connecting **Oak Fences** (post + auto-connecting rails), 2-block **Oak Doors** with window lattice, climbable **Wall Ladders**, recessed **Wet Farmland**, inset **Storage Chests & Cacti**, and **Beds** (with night-skipping & spawn point setting).
+      * **Custom 3D Block Shapes**: Added 3D **Oak, Cobblestone & Stone Brick Stairs** (`B_STAIR_*`), half-height **Oak, Cobblestone & Stone Brick Slabs**, connecting **Oak Fences** (post + auto-connecting rails), interactive 2-block **Oak Doors** (`B_DOOR_OAK` / `B_DOOR_OAK_OPEN` swinging 90 degrees open on tap), climbable **Wall Ladders**, recessed **Wet Farmland**, inset **Storage Chests & Cacti**, and **Beds** (with night-skipping & spawn point setting).
+  * **Interactive TNT Explosions, Gravity Sand/Gravel & Neighbor Torchlight**: Tapping `[PLACE]` on `B_TNT` detonates a 3-block radius blast crater, placing `B_SAND` or `B_GRAVEL` over air drops it to the floor below, and Torches/Glowstone/Jack o'Lanterns/Lava cast warm neighbor illumination onto adjacent blocks.
   * **Farming Crops & Autumn Blocks**: Added **Ripe Wheat**, **Sugar Cane** along water shores, **Pumpkins**, glowing **Jack o'Lanterns**, **Melons**, and banded **Hay Bales**.
-  * **Multi-Building Starter Village, Desert Pyramids & Watchtowers**: Generates a starter village with an **Oak Cottage**, **Fenced Wheat & Pumpkin Farm**, and **Blacksmith Forge**, plus **Desert Pyramids** (with hidden Gold/Chest treasure chamber) and **Stonebrick Watchtowers** across the infinite world.
+  * **Multi-Building Starter Village, Desert Pyramids & Watchtowers**: Generates a starter village with a pitched-stair-roof **Oak Cottage**, **Fenced Wheat & Pumpkin Farm**, and **Blacksmith Forge**, plus **Desert Pyramids** (with hidden Gold/Chest treasure chamber) and **Stonebrick Watchtowers** across the infinite world.
   * **Tree Felling (Update 3.10)**: Chopping the base log of a natural tree in Survival mode fells the connected trunk logs above it and awards the harvested wood.
   * **3-Tab Categorized Inventory & 24 Crafting/Smelting Recipes**: Added **Building Blocks**, **Nature & Decor**, and **Tools & Combat** category tabs in the Inventory & Crafting Workshop (`72` items & `24` survival recipes).
 """
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.2"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.3"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")

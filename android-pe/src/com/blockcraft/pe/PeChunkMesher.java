@@ -231,6 +231,16 @@ public final class PeChunkMesher {
 
                int x = x0 + lx;
                float boost = PeWorld.isLightEmitter(b) ? 1.0F : 0.0F;
+               if (boost == 0.0F) {
+                  // Check 6 cardinal neighbors for Torch / Glowstone / Jack o'Lantern / Lava illumination
+                  if (PeWorld.isLightEmitter(world.getBlockFast(x, y + 1, z))
+                     || PeWorld.isLightEmitter(world.getBlockFast(x + 1, y, z))
+                     || PeWorld.isLightEmitter(world.getBlockFast(x - 1, y, z))
+                     || PeWorld.isLightEmitter(world.getBlockFast(x, y, z + 1))
+                     || PeWorld.isLightEmitter(world.getBlockFast(x, y, z - 1))) {
+                     boost = 0.55F;
+                  }
+               }
                float varJit = blockVariation(x, y, z);
 
                // 1. Torch: 3D slim wooden post with glowing flame tip
@@ -251,9 +261,9 @@ public final class PeChunkMesher {
                   continue;
                }
 
-               // 4. Oak Door (B_DOOR_OAK: 2-block tall wooden door with window lattice)
-               if (b == PeWorld.B_DOOR_OAK) {
-                  ptr = emitDoor(out, ptr, x, y, z);
+               // 4. Oak Door (B_DOOR_OAK closed or B_DOOR_OAK_OPEN swung 90 degrees open)
+               if (b == PeWorld.B_DOOR_OAK || b == PeWorld.B_DOOR_OAK_OPEN) {
+                  ptr = emitDoor(out, ptr, x, y, z, b == PeWorld.B_DOOR_OAK_OPEN);
                   continue;
                }
 
@@ -263,21 +273,28 @@ public final class PeChunkMesher {
                   continue;
                }
 
-               // 6. Half-Height Slabs, Beds, Recessed Farmland, Inset Chests & Cacti
+               // 6. 3D Stairs (B_STAIR_OAK, B_STAIR_COBBLE, B_STAIR_STONEBRICK)
+               if (PeWorld.isStair(b)) {
+                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.5F, 1.0F, b, varJit, boost);
+                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.5F, 0.0F, 1.0F, 1.0F, 0.5F, b, varJit, boost);
+                  continue;
+               }
+
+               // 7. Half-Height Slabs, Beds, Recessed Farmland, Inset Chests & Cacti
                if (PeWorld.isSlab(b)) {
-                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.5F, 1.0F, b, varJit, 0.0F);
+                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.5F, 1.0F, b, varJit, boost);
                   continue;
                }
                if (b == PeWorld.B_BED_RED) {
-                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.5625F, 1.0F, b, varJit, 0.0F);
+                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.5625F, 1.0F, b, varJit, boost);
                   continue;
                }
                if (b == PeWorld.B_FARMLAND) {
-                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.9375F, 1.0F, b, varJit, 0.0F);
+                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0F, 0.0F, 0.0F, 1.0F, 0.9375F, 1.0F, b, varJit, boost);
                   continue;
                }
                if (b == PeWorld.B_CHEST || b == PeWorld.B_CACTUS) {
-                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0625F, 0.0F, 0.0625F, 0.9375F, 0.9375F, 0.9375F, b, varJit, 0.0F);
+                  ptr = emitCustomBox(out, ptr, x, y, z, 0.0625F, 0.0F, 0.0625F, 0.9375F, 0.9375F, 0.9375F, b, varJit, boost);
                   continue;
                }
 
@@ -472,7 +489,7 @@ public final class PeChunkMesher {
       return ptr;
    }
 
-   private static int emitDoor(float[] out, int ptr, int x, int y, int z) {
+   private static int emitDoor(float[] out, int ptr, int x, int y, int z, boolean open) {
       // Lower half (y .. y+1) with T_DOOR_BOTTOM, upper half (y+1 .. y+2) with T_DOOR_TOP
       float u0B = ((PeTextures.T_DOOR_BOTTOM & 15) * 16.0F + 0.15F) / 256.0F;
       float v0B = ((PeTextures.T_DOOR_BOTTOM >> 4) * 16.0F + 0.15F) / 256.0F;
@@ -483,6 +500,21 @@ public final class PeChunkMesher {
       float v0T = ((PeTextures.T_DOOR_TOP >> 4) * 16.0F + 0.15F) / 256.0F;
       float u1T = ((PeTextures.T_DOOR_TOP & 15) * 16.0F + 15.85F) / 256.0F;
       float v1T = ((PeTextures.T_DOOR_TOP >> 4) * 16.0F + 15.85F) / 256.0F;
+
+      if (open) {
+         float xPos = x + 0.08F;
+         ptr = emitQuadTwoSidedAO(out, ptr, u0B, v0B, u1B, v1B, 0.92F, 0.84F, 0.0F,
+            xPos, y + 1.0F, z,
+            xPos, y + 1.0F, z + 1,
+            xPos, y,        z + 1,
+            xPos, y,        z);
+         ptr = emitQuadTwoSidedAO(out, ptr, u0T, v0T, u1T, v1T, 0.95F, 0.90F, 0.0F,
+            xPos, y + 2.0F, z,
+            xPos, y + 2.0F, z + 1,
+            xPos, y + 1.0F, z + 1,
+            xPos, y + 1.0F, z);
+         return ptr;
+      }
 
       float zPos = z + 0.5F;
       ptr = emitQuadTwoSidedAO(out, ptr, u0B, v0B, u1B, v1B, 0.92F, 0.84F, 0.0F,
