@@ -49,16 +49,10 @@ def find_sources(*roots):
 def toolchain():
     """Returns ('javac', None) or ('ecj', {java, ecj, winjre})."""
     if shutil.which("javac"):
-        try:
-            out = subprocess.check_output(["javac", "--version"], text=True, stderr=subprocess.STDOUT)
-            m = re.search(r"(\d+)", out)
-            if m and int(m.group(1)) >= 21:
-                return "javac", None
-        except Exception:
-            pass
+        return "javac", None
     cfg = os.path.join(TC, "toolchain.json")
     if not os.path.exists(cfg):
-        print("No JDK 21+ on PATH and no toolchain yet -> running tools/bootstrap.py")
+        print("No JDK on PATH and no toolchain yet -> running tools/bootstrap.py")
         sh([sys.executable, os.path.join(ROOT, "tools", "bootstrap.py")], check=True)
     with open(cfg) as f:
         return "ecj", json.load(f)
