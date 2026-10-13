@@ -11,17 +11,18 @@ import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Blockcraft PE (Pocket Edition) v1.1 — Infinite World Single-Player Engine:
- * - True Infinite Streaming World: 16x128x16 chunks generated deterministically at ANY (cx, cz) coordinate
- *   around the player using a lock-free O(1) 16x16 active spatial ring buffer + persistent modified chunk storage
- * - Multi-Biome Overworld Generation (Large Biomes Recommended, Default Biomes, Superflat)
- *   with Caves, Ore Veins, Oak/Spruce/Birch Forests, Flower Meadows, Desert Cacti, Snowy Peaks & Explorer Cabins
- * - Per-section non-air tracking (sectionNonAir[0..7]) so empty sky sections skip VBO meshing in O(1)
- * - Zero AI bots / mobs for pure, lag-free 120Hz single-player exploration, mining, crafting & building
+ * Blockcraft PE (Pocket Edition) v1.2 — PC Update 3.5+ Single-Player Infinite World Engine:
+ * - 120Hz Sub-Tick Camera & Movement Interpolation (prevPx/prevPy/prevPz, prevWalkDist, prevEyeHeight)
+ *   + Smooth Independent-Axis AABB Box Physics (0.58 x 1.78) with 0.5-Slab Step-Up, Auto-Jump & Ladder Climbing
+ * - PC Update 3.5 Perlin Noise Terrain Generator (Noise.java: Continents, Ridges, Temperature/Humidity Biomes & 3D Caves)
+ *   with zero Math.sin/Math.cos overhead during chunk streaming
+ * - Multi-Building Villages, Desert Pyramids, Ruined Watchtowers, Oak/Spruce/Birch Trees, Tree Felling (Update 3.10),
+ *   Slabs, Fences, Doors, Ladders, Crops (Wheat, Sugar Cane, Pumpkins, Melons, Hay Bales) & 24 Crafting/Smelting Recipes
  */
 public final class PeWorld {
    // Screen States
@@ -64,7 +65,7 @@ public final class PeWorld {
       "Desert Oasis"
    };
 
-   // Block IDs (0..63)
+   // Block IDs (0..84)
    public static final byte B_AIR = 0;
    public static final byte B_STONE = 1;
    public static final byte B_GRASS = 2;
@@ -130,12 +131,29 @@ public final class PeWorld {
    public static final byte B_PURPUR = 62;
    public static final byte B_BARS = 63;
 
-   // Plant & Foliage Sub-Blocks
+   // Plant, Foliage & Update 3.5+ Sub-Blocks (64..84)
    public static final byte B_LEAVES_SPRUCE = 64;
    public static final byte B_CACTUS = 65;
    public static final byte B_TALL_GRASS = 66;
    public static final byte B_FLOWER_RED = 67;
    public static final byte B_FLOWER_YELLOW = 68;
+   public static final byte B_LOG_BIRCH = 69;
+   public static final byte B_LEAVES_BIRCH = 70;
+   public static final byte B_SLAB_OAK = 71;
+   public static final byte B_SLAB_COBBLE = 72;
+   public static final byte B_SLAB_STONEBRICK = 73;
+   public static final byte B_FENCE_OAK = 74;
+   public static final byte B_DOOR_OAK = 75;
+   public static final byte B_LADDER = 76;
+   public static final byte B_FARMLAND = 77;
+   public static final byte B_WHEAT = 78;
+   public static final byte B_SUGAR_CANE = 79;
+   public static final byte B_PUMPKIN = 80;
+   public static final byte B_JACK_O_LANTERN = 81;
+   public static final byte B_MELON = 82;
+   public static final byte B_HAY_BALE = 83;
+   public static final byte B_MOSSY_STONEBRICK = 84;
+   public static final int MAX_BLOCK_ID = 84;
 
    // Item IDs (98+)
    public static final int I_SWORD_WOOD = 98;
@@ -151,9 +169,13 @@ public final class PeWorld {
    public static final int I_GOLDEN_APPLE = 108;
    public static final int I_STEAK = 109;
    public static final int I_ENDER_PEARL = 110;
+   public static final int I_IRON_INGOT = 111;
+   public static final int I_GOLD_INGOT = 112;
+   public static final int I_DIAMOND = 113;
+   public static final int I_COAL = 114;
+   public static final int I_BREAD = 115;
 
    // Infinite Streaming Chunk Ring-Buffer Constants
-   // 16x16 active chunk ring buffer (256 chunk slots covering up to 256x256 blocks around the player at any (cx, cz))
    public static final int ACTIVE_GRID = 16;
    public static final int ACTIVE_MASK = 15;
    public static final int ACTIVE_SLOTS = ACTIVE_GRID * ACTIVE_GRID; // 256
@@ -165,6 +187,93 @@ public final class PeWorld {
 
    private static final int SAVE_MAGIC = 0x42435045; // "BCPE"
    private static final int SAVE_VERSION_INFINITE = 2;
+
+   /**
+    * PC Update 3.5 Perlin Noise Generator (ported from src/bc/Noise.java).
+    * Pure integer/polynomial operations — zero Math.sin/Math.cos calls!
+    */
+   public static final class PerlinNoise {
+      private final int[] p = new int[512];
+
+      public PerlinNoise(long seed) {
+         Random r = new Random(seed);
+         int[] perm = new int[256];
+         for (int i = 0; i < 256; i++) perm[i] = i;
+         for (int i = 255; i > 0; i--) {
+            int j = r.nextInt(i + 1);
+            int tmp = perm[i];
+            perm[i] = perm[j];
+            perm[j] = tmp;
+         }
+         for (int i = 0; i < 512; i++) {
+            this.p[i] = perm[i & 255];
+         }
+      }
+
+      private static double fade(double t) {
+         return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+      }
+
+      private static double lerp(double t, double a, double b) {
+         return a + t * (b - a);
+      }
+
+      private static double grad(int h, double x, double y, double z) {
+         h &= 15;
+         double u = h < 8 ? x : y;
+         double v = h < 4 ? y : (h != 12 && h != 14 ? z : x);
+         return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+      }
+
+      public double noise3(double x, double y, double z) {
+         int X = (int)Math.floor(x);
+         int Y = (int)Math.floor(y);
+         int Z = (int)Math.floor(z);
+         x -= X;
+         y -= Y;
+         z -= Z;
+         X &= 255;
+         Y &= 255;
+         Z &= 255;
+         double u = fade(x);
+         double v = fade(y);
+         double w = fade(z);
+         int A = this.p[X] + Y;
+         int AA = this.p[A] + Z;
+         int AB = this.p[A + 1] + Z;
+         int B = this.p[X + 1] + Y;
+         int BA = this.p[B] + Z;
+         int BB = this.p[B + 1] + Z;
+         return lerp(w,
+            lerp(v,
+               lerp(u, grad(this.p[AA], x, y, z), grad(this.p[BA], x - 1.0, y, z)),
+               lerp(u, grad(this.p[AB], x, y - 1.0, z), grad(this.p[BB], x - 1.0, y - 1.0, z))
+            ),
+            lerp(v,
+               lerp(u, grad(this.p[AA + 1], x, y, z - 1.0), grad(this.p[BA + 1], x - 1.0, y, z - 1.0)),
+               lerp(u, grad(this.p[AB + 1], x, y - 1.0, z - 1.0), grad(this.p[BB + 1], x - 1.0, y - 1.0, z - 1.0))
+            )
+         );
+      }
+
+      public double noise2(double x, double z) {
+         return noise3(x, 137.31, z);
+      }
+
+      public double fbm2(double x, double z, int octaves) {
+         double sum = 0.0;
+         double amp = 1.0;
+         double freq = 1.0;
+         double norm = 0.0;
+         for (int i = 0; i < octaves; i++) {
+            sum += noise3(x * freq, 137.31 + i * 17.7, z * freq) * amp;
+            norm += amp;
+            amp *= 0.5;
+            freq *= 2.0;
+         }
+         return (sum / norm) * 1.45;
+      }
+   }
 
    /**
     * Represents one 16x128x16 chunk column in the active 16x16 spatial ring buffer.
@@ -208,13 +317,10 @@ public final class PeWorld {
    }
 
    public final PeChunk[] chunkGrid = new PeChunk[ACTIVE_SLOTS];
-   // Stores player-modified chunks at ANY (cx, cz) across the infinite world
    private final HashMap<Long, byte[]> savedChunks = new HashMap<Long, byte[]>();
 
-   //Configurable active chunk streaming radius around the player (4=9x9, 5=11x11, 6=13x13 chunks)
    public int viewRadiusChunks = 5;
-   private int lastStreamCenterCx = Integer.MIN_VALUE;
-   private int lastStreamCenterCz = Integer.MIN_VALUE;
+   public boolean bushyLeaves = true;
 
    // Current Screen & World Slot
    public int screen = SCREEN_TITLE;
@@ -224,6 +330,7 @@ public final class PeWorld {
    public int createMode = MODE_SURVIVAL;
    public int createWorldType = WTYPE_LARGE_BIOMES;
    public int createSeedIdx = 0;
+   public int invCategory = 0; // 0 = Building, 1 = Nature & Utility, 2 = Tools & Smelting
 
    // Saved World Metadata Cache for Slots 0..2
    public final boolean[] slotExists = new boolean[3];
@@ -232,18 +339,35 @@ public final class PeWorld {
    public int mode = MODE_SURVIVAL;
    public int worldType = WTYPE_LARGE_BIOMES;
    public long seed = 884219551L;
+   private long noiseSeed = 0L;
+   private PerlinNoise nCont;
+   private PerlinNoise nMount;
+   private PerlinNoise nDetail;
+   private PerlinNoise nTemp;
+   private PerlinNoise nHum;
+   private PerlinNoise nCave1;
+   private PerlinNoise nCave2;
+
    public long tickCount = 0L;
    public float dayTime = 0.22F;
 
-   // Player State (Supports arbitrary infinite coordinates!)
+   // Player State + 120Hz Sub-Tick Interpolation State
    public double px = 0.5;
    public double py = 72.0;
    public double pz = 0.5;
+   public double prevPx = 0.5;
+   public double prevPy = 72.0;
+   public double prevPz = 0.5;
+   public double spawnX = 0.5;
+   public double spawnY = 66.0;
+   public double spawnZ = 0.5;
    public double vx = 0.0;
    public double vy = 0.0;
    public double vz = 0.0;
    public float yaw = 0.0F;
    public float pitch = 10.0F;
+   public float eyeHeight = 1.62F;
+   public float prevEyeHeight = 1.62F;
    public boolean onGround = false;
    public boolean flying = false;
    public boolean sneaking = false;
@@ -254,7 +378,9 @@ public final class PeWorld {
    public int hurtTime = 0;
    public int invulnTicks = 0;
    public float swingAnim = -1.0F;
+   public float prevSwingAnim = -1.0F;
    public float walkDist = 0.0F;
+   public float prevWalkDist = 0.0F;
    public int selectedSlot = 0;
    public final int[] hotbarId = new int[9];
    public final int[] hotbarCount = new int[9];
@@ -267,7 +393,38 @@ public final class PeWorld {
    public String bannerMessage = "";
    public int bannerTicks = 0;
 
-   // Crafting Recipes for Single-Player Survival
+   // Categorized Creative Palette (3 Tabs x 24 Items = 72 Blocks/Items)
+   public static final String[] INV_TAB_NAMES = new String[]{
+      "Building Blocks",
+      "Nature & Decor",
+      "Tools & Combat"
+   };
+
+   public static final int[][] CREATIVE_TABS = new int[][]{
+      // Tab 0: Building Blocks
+      {
+         B_GRASS, B_DIRT, B_STONE, B_COBBLE, B_MOSSY_COBBLE, B_STONEBRICK,
+         B_MOSSY_STONEBRICK, B_CRACKED_STONEBRICK, B_BRICKS, B_PLANKS_OAK, B_PLANKS_SPRUCE, B_PLANKS_BIRCH,
+         B_LOG_OAK, B_LOG_SPRUCE, B_LOG_BIRCH, B_SLAB_OAK, B_SLAB_COBBLE, B_SLAB_STONEBRICK,
+         B_SAND, B_SANDSTONE, B_RED_SANDSTONE, B_GLASS, B_QUARTZ_BLOCK, B_OBSIDIAN
+      },
+      // Tab 1: Nature, Foliage, Crops & Utility
+      {
+         B_LEAVES_OAK, B_LEAVES_SPRUCE, B_LEAVES_BIRCH, B_FLOWER_RED, B_FLOWER_YELLOW, B_TALL_GRASS,
+         B_SUGAR_CANE, B_WHEAT, B_CACTUS, B_PUMPKIN, B_JACK_O_LANTERN, B_MELON,
+         B_HAY_BALE, B_TORCH, B_GLOWSTONE, B_SEA_LANTERN, B_CRAFTING_TABLE, B_FURNACE,
+         B_CHEST, B_BOOKSHELF, B_BED_RED, B_FENCE_OAK, B_DOOR_OAK, B_LADDER
+      },
+      // Tab 2: Tools, Weapons, Food, Ores & Gems
+      {
+         I_PICK_DIAMOND, I_SWORD_DIAMOND, I_SHOVEL_DIAMOND, I_PICK_IRON, I_SWORD_IRON, I_AXE_IRON,
+         I_PICK_WOOD, I_SWORD_WOOD, I_GOLDEN_APPLE, I_STEAK, I_BREAD, B_TNT,
+         B_GOLD_BLOCK, B_IRON_BLOCK, B_DIAMOND_BLOCK, B_EMERALD_BLOCK, B_WOOL_WHITE, B_WOOL_RED,
+         B_WOOL_BLUE, B_WOOL_GREEN, B_WOOL_YELLOW, B_SNOW, B_ICE, B_SLIME_BLOCK
+      }
+   };
+
+   // Crafting & Furnace Smelting Recipes for Single-Player Survival (3 Tabs x 8 Recipes = 24 Recipes)
    public static final class CraftRecipe {
       public final String label;
       public final int outId;
@@ -285,15 +442,27 @@ public final class PeWorld {
    }
 
    public static final CraftRecipe[] RECIPES = new CraftRecipe[]{
-      new CraftRecipe("Oak Planks x4 (1 Log)", B_PLANKS_OAK, 4, B_LOG_OAK, 1),
+      // Category 0 (0..7): Wood, Stone & Building Blocks
+      new CraftRecipe("Oak Planks x4 (1 Oak Log)", B_PLANKS_OAK, 4, B_LOG_OAK, 1),
       new CraftRecipe("Spruce Planks x4 (1 Spruce)", B_PLANKS_SPRUCE, 4, B_LOG_SPRUCE, 1),
+      new CraftRecipe("Birch Planks x4 (1 Birch)", B_PLANKS_BIRCH, 4, B_LOG_BIRCH, 1),
+      new CraftRecipe("Oak Slabs x6 (3 Planks)", B_SLAB_OAK, 6, B_PLANKS_OAK, 3),
+      new CraftRecipe("Cobble Slabs x6 (3 Cobble)", B_SLAB_COBBLE, 6, B_COBBLE, 3),
+      new CraftRecipe("Stone Bricks x4 (4 Stone)", B_STONEBRICK, 4, B_STONE, 4),
+      new CraftRecipe("Sandstone x2 (2 Sand)", B_SANDSTONE, 2, B_SAND, 2),
+      new CraftRecipe("Glass x4 (Smelt 4 Sand)", B_GLASS, 4, B_SAND, 4),
+
+      // Category 1 (8..15): Utility, Decor, Lighting & Farming
       new CraftRecipe("Crafting Table (4 Planks)", B_CRAFTING_TABLE, 1, B_PLANKS_OAK, 4),
-      new CraftRecipe("Furnace (8 Cobble)", B_FURNACE, 1, B_COBBLE, 8),
+      new CraftRecipe("Furnace (8 Cobblestone)", B_FURNACE, 1, B_COBBLE, 8),
       new CraftRecipe("Storage Chest (8 Planks)", B_CHEST, 1, B_PLANKS_OAK, 8),
       new CraftRecipe("Torches x4 (1 Coal)", B_TORCH, 4, B_COAL_ORE, 1),
-      new CraftRecipe("Stone Bricks x4 (4 Stone)", B_STONEBRICK, 4, B_STONE, 4),
-      new CraftRecipe("Glass x4 (4 Sand)", B_GLASS, 4, B_SAND, 4),
-      new CraftRecipe("Sandstone x2 (2 Sand)", B_SANDSTONE, 2, B_SAND, 2),
+      new CraftRecipe("Oak Fence x4 (4 Planks)", B_FENCE_OAK, 4, B_PLANKS_OAK, 4),
+      new CraftRecipe("Oak Door x2 (6 Planks)", B_DOOR_OAK, 2, B_PLANKS_OAK, 6),
+      new CraftRecipe("Ladders x4 (4 Planks)", B_LADDER, 4, B_PLANKS_OAK, 4),
+      new CraftRecipe("Cozy Bed (3 Planks)", B_BED_RED, 1, B_PLANKS_OAK, 3),
+
+      // Category 2 (16..23): Tools, Weapons, Smelting & Food
       new CraftRecipe("Wood Pickaxe (3 Planks)", I_PICK_WOOD, 1, B_PLANKS_OAK, 3),
       new CraftRecipe("Wood Sword (2 Planks)", I_SWORD_WOOD, 1, B_PLANKS_OAK, 2),
       new CraftRecipe("Iron Pickaxe (3 Iron Ore)", I_PICK_IRON, 1, B_IRON_ORE, 3),
@@ -301,14 +470,36 @@ public final class PeWorld {
       new CraftRecipe("Iron Axe (3 Iron Ore)", I_AXE_IRON, 1, B_IRON_ORE, 3),
       new CraftRecipe("Diamond Pick (3 Diamond)", I_PICK_DIAMOND, 1, B_DIAMOND_ORE, 3),
       new CraftRecipe("Diamond Sword (2 Diamond)", I_SWORD_DIAMOND, 1, B_DIAMOND_ORE, 2),
-      new CraftRecipe("Golden Apple (2 Gold Ore)", I_GOLDEN_APPLE, 1, B_GOLD_ORE, 2),
-      new CraftRecipe("Bed (3 Planks)", B_BED_RED, 1, B_PLANKS_OAK, 3)
+      new CraftRecipe("Golden Apple (2 Gold Ore)", I_GOLDEN_APPLE, 1, B_GOLD_ORE, 2)
    };
 
    public PeWorld() {
       for (int i = 0; i < ACTIVE_SLOTS; i++) {
          this.chunkGrid[i] = new PeChunk();
       }
+      ensureNoiseInitialized();
+   }
+
+   private void ensureNoiseInitialized() {
+      if (this.nCont != null && this.noiseSeed == this.seed) return;
+      this.noiseSeed = this.seed;
+      Random r = new Random(this.seed);
+      this.nCont = new PerlinNoise(r.nextLong());
+      this.nMount = new PerlinNoise(r.nextLong());
+      this.nDetail = new PerlinNoise(r.nextLong());
+      this.nTemp = new PerlinNoise(r.nextLong());
+      this.nHum = new PerlinNoise(r.nextLong());
+      this.nCave1 = new PerlinNoise(r.nextLong());
+      this.nCave2 = new PerlinNoise(r.nextLong());
+   }
+
+   public void syncInterpolationState() {
+      this.prevPx = this.px;
+      this.prevPy = this.py;
+      this.prevPz = this.pz;
+      this.prevWalkDist = this.walkDist;
+      this.prevEyeHeight = this.eyeHeight;
+      this.prevSwingAnim = this.swingAnim;
    }
 
    public static int slotIndex(int cx, int cz) {
@@ -466,6 +657,7 @@ public final class PeWorld {
          this.mode = in.readInt();
          this.worldType = in.readInt();
          this.seed = in.readLong();
+         ensureNoiseInitialized();
          this.tickCount = in.readLong();
          this.dayTime = in.readFloat();
          this.px = in.readDouble();
@@ -500,6 +692,8 @@ public final class PeWorld {
          this.vx = this.vy = this.vz = 0.0;
          this.mineY = -1;
          this.mineProgress = 0.0F;
+         this.eyeHeight = 1.62F;
+         syncInterpolationState();
          ensureChunksAroundPlayer(256);
          this.screen = SCREEN_PLAY;
          showBanner("Loaded World " + (slot + 1) + " (" + MODE_NAMES[this.mode] + ")");
@@ -517,8 +711,6 @@ public final class PeWorld {
          c.cx = Integer.MIN_VALUE;
          c.cz = Integer.MIN_VALUE;
       }
-      this.lastStreamCenterCx = Integer.MIN_VALUE;
-      this.lastStreamCenterCz = Integer.MIN_VALUE;
    }
 
    public void createNewSinglePlayerWorld(Context context, int slot, int newMode, int newWorldType, long customSeed) {
@@ -526,6 +718,7 @@ public final class PeWorld {
       this.mode = newMode;
       this.worldType = newWorldType;
       this.seed = (customSeed != 0L) ? customSeed : (System.currentTimeMillis() ^ 0x5DEECE66DL);
+      ensureNoiseInitialized();
 
       resetActiveChunks();
       this.savedChunks.clear();
@@ -534,6 +727,7 @@ public final class PeWorld {
       this.hurtTime = 0;
       this.invulnTicks = 40;
       this.flying = false;
+      this.sneaking = false;
       this.tickCount = 0L;
       this.dayTime = 0.22F;
 
@@ -541,13 +735,20 @@ public final class PeWorld {
       this.pz = 0.5;
       ensureChunksAroundPlayer(256);
 
-      int spawnY = topSolidY(0, 0) + 1;
+      int sy = topSolidY(0, 0) + 1;
       this.px = 0.5;
-      this.py = spawnY + 0.05;
+      this.py = sy;
       this.pz = 0.5;
+      this.spawnX = this.px;
+      this.spawnY = this.py;
+      this.spawnZ = this.pz;
       this.vx = this.vy = this.vz = 0.0;
       this.yaw = 0.0F;
       this.pitch = 6.0F;
+      this.onGround = true;
+      this.eyeHeight = 1.62F;
+      this.walkDist = 0.0F;
+      syncInterpolationState();
 
       equipDefaultLoadout();
       this.screen = SCREEN_PLAY;
@@ -579,10 +780,10 @@ public final class PeWorld {
          setSlot(2, B_PLANKS_OAK, 64);
          setSlot(3, B_LOG_OAK, 64);
          setSlot(4, B_LEAVES_OAK, 64);
-         setSlot(5, B_BRICKS, 64);
-         setSlot(6, B_GLASS, 64);
+         setSlot(5, B_SLAB_OAK, 64);
+         setSlot(6, B_FENCE_OAK, 64);
          setSlot(7, B_TORCH, 64);
-         setSlot(8, B_GLOWSTONE, 64);
+         setSlot(8, B_JACK_O_LANTERN, 64);
       } else {
          setSlot(0, I_PICK_WOOD, 1);
          setSlot(1, I_SWORD_WOOD, 1);
@@ -665,9 +866,10 @@ public final class PeWorld {
    }
 
    // ====================================================================
-   //  Infinite World Streaming & Deterministic Chunk Generation
+   //  Infinite World Streaming & Deterministic Perlin Chunk Generation
    // ====================================================================
    public void ensureChunksAroundPlayer(int maxNewChunks) {
+      ensureNoiseInitialized();
       int pCx = ((int)Math.floor(this.px)) >> 4;
       int pCz = ((int)Math.floor(this.pz)) >> 4;
       int rad = Math.max(3, Math.min(7, this.viewRadiusChunks));
@@ -687,8 +889,6 @@ public final class PeWorld {
             }
          }
       }
-      this.lastStreamCenterCx = pCx;
-      this.lastStreamCenterCz = pCz;
    }
 
    private PeChunk getOrLoadChunk(int cx, int cz) {
@@ -700,7 +900,7 @@ public final class PeWorld {
    }
 
    private void loadOrGenerateChunkIntoSlot(PeChunk slot, int cx, int cz) {
-      // Save old modified chunk before evicting
+      ensureNoiseInitialized();
       if (slot.loaded && slot.modified && (slot.cx != cx || slot.cz != cz)) {
          byte[] copy = new byte[CHUNK_BYTES];
          System.arraycopy(slot.blocks, 0, copy, 0, CHUNK_BYTES);
@@ -727,7 +927,6 @@ public final class PeWorld {
          Arrays.fill(slot.sectionDirty, true);
       }
 
-      // Mark adjacent neighbor chunks dirty so cross-chunk faces remesh cleanly
       markChunkDirtyIfLoaded(cx - 1, cz);
       markChunkDirtyIfLoaded(cx + 1, cz);
       markChunkDirtyIfLoaded(cx, cz - 1);
@@ -766,7 +965,7 @@ public final class PeWorld {
       int colBase = (lz << 11) | (lx << 7);
       for (int y = WORLD_H - 2; y >= 1; y--) {
          byte b = c.blocks[colBase | y];
-         if (isSolid(b) && b != B_LEAVES_OAK && b != B_LEAVES_SPRUCE) {
+         if (isSolid(b) && !isLeaves(b)) {
             return y;
          }
       }
@@ -781,17 +980,15 @@ public final class PeWorld {
 
    public int getBiomeAt(int wx, int wz) {
       if (this.worldType == WTYPE_SUPERFLAT) return 0;
-      double biomeFreq = (this.worldType == WTYPE_LARGE_BIOMES) ? 0.015 : 0.032;
-      double sOffX = ((this.seed & 0xFFFFL) - 32768.0) * 0.01;
-      double sOffZ = (((this.seed >>> 16) & 0xFFFFL) - 32768.0) * 0.01;
-      double bx = (wx + sOffX) * biomeFreq;
-      double bz = (wz + sOffZ) * biomeFreq;
-      double temp = Math.sin(bx + 0.5) * Math.cos(bz - 0.3);
-      double humid = Math.cos(bx * 0.8 - 1.1) * Math.sin(bz * 0.8 + 0.7);
-      if (temp > 0.38 && humid < 0.12) return 1; // Golden Desert
-      if (temp < -0.36) return 2;                // Snowy Taiga
-      if (humid > 0.42) return 3;                // Mountain Peaks
-      if (temp > 0.12 && humid > 0.15) return 4; // Flower Meadow
+      ensureNoiseInitialized();
+      double scale = (this.worldType == WTYPE_LARGE_BIOMES) ? 640.0 : 320.0;
+      double temp = this.nTemp.fbm2(wx / scale + 500.0, wz / scale, 2) * 0.5 + 0.5;
+      double hum = this.nHum.fbm2(wx / scale - 300.0, wz / scale + 120.0, 2) * 0.5 + 0.5;
+      double mtn = this.nMount.fbm2(wx / 320.0 + 77.0, wz / 320.0 - 33.0, 2);
+      if (mtn > 0.34) return 3;                  // Mountain Peaks
+      if (temp > 0.62 && hum < 0.45) return 1;   // Golden Desert
+      if (temp < 0.30) return 2;                 // Snowy Taiga
+      if (temp > 0.48 && hum > 0.54) return 4;   // Birch & Flower Meadow
       return 0;                                  // Emerald Forest
    }
 
@@ -800,7 +997,7 @@ public final class PeWorld {
          case 1: return "Golden Desert";
          case 2: return "Snowy Taiga";
          case 3: return "Mountain Peaks";
-         case 4: return "Flower Meadow";
+         case 4: return "Birch Flower Meadow";
          default: return this.worldType == WTYPE_SUPERFLAT ? "Superflat Plains" : "Emerald Forest";
       }
    }
@@ -819,13 +1016,13 @@ public final class PeWorld {
          }
       }
       if (cx == 0 && cz == -1) {
-         buildCabinInChunk(c, 8, 63, 6);
+         buildVillageCottageInChunk(c, 8, 63, 8);
+      } else if (cx == 1 && cz == -1) {
+         buildVillageFarmInChunk(c, 8, 63, 8);
       }
    }
 
    private void generateOverworldChunk(PeChunk c, int cx, int cz) {
-      double sOffX = ((this.seed & 0xFFFFL) - 32768.0) * 0.01;
-      double sOffZ = (((this.seed >>> 16) & 0xFFFFL) - 32768.0) * 0.01;
       int wx0 = cx << 4;
       int wz0 = cz << 4;
 
@@ -839,45 +1036,48 @@ public final class PeWorld {
             int biome = getBiomeAt(wx, wz);
             biomeMap[lz][lx] = biome;
 
-            double n1 = Math.sin((wx + sOffX) * 0.042) * Math.cos((wz + sOffZ) * 0.042);
-            double n2 = Math.sin((wx + wz) * 0.085) * 0.5 + Math.cos((wx - wz) * 0.105) * 0.5;
-            double mtn = Math.max(0.0, Math.sin((wx - sOffX) * 0.025) * Math.sin((wz - sOffZ) * 0.025));
-            double hillScale = (biome == 3) ? 20.0 : 10.0;
-            int h = (int)Math.round(62.0 + n1 * 5.5 + n2 * 2.5 + mtn * hillScale);
+            double cont = this.nCont.fbm2(wx / 260.0, wz / 260.0, 3);
+            double detail = this.nDetail.fbm2(wx / 56.0, wz / 56.0, 3);
+            double ridge = Math.max(0.0, this.nMount.fbm2(wx / 140.0 + 31.0, wz / 140.0 - 19.0, 2));
+            double hillAmp = (biome == 3) ? 28.0 : (biome == 1 ? 7.0 : 12.0);
+            int h = (int)Math.round(62.5 + cont * 7.5 + detail * 4.5 + ridge * hillAmp);
 
-            // Keep spawn area around (0, 0) flat and welcoming
-            double spawnDist = Math.hypot(wx, wz);
-            if (spawnDist < 12.0) {
-               double blend = spawnDist / 12.0;
+            // Keep spawn village area around (-8..24, -24..12) gently leveled
+            double spawnDist = Math.hypot(wx - 4.0, wz + 6.0);
+            if (spawnDist < 22.0) {
+               double blend = Math.max(0.0, (spawnDist - 10.0) / 12.0);
                h = (int)Math.round(64.0 * (1.0 - blend) + h * blend);
             }
+            h = Math.max(8, Math.min(112, h));
             surfaceY[lz][lx] = h;
 
             setChunkLocal(c, lx, 0, lz, B_BEDROCK);
             for (int y = 1; y <= h; y++) {
-               // Underground 3D Cave tunnels
-               if (y > 4 && y < h - 4 && spawnDist > 10.0) {
-                  double cave = Math.sin(wx * 0.14 + y * 0.18) * Math.cos(wz * 0.14 - y * 0.15)
-                     + Math.cos((wx - wz) * 0.11 + y * 0.22) * 0.5;
-                  if (cave > 1.08) {
-                     continue;
+               // Update 3.5 3D Perlin Cave Tunnels (skip near spawn village)
+               if (y > 5 && y < h - 4 && spawnDist > 18.0 && (y & 1) == 0) {
+                  double c1 = this.nCave1.noise3(wx * 0.045, y * 0.06, wz * 0.045);
+                  if (c1 * c1 < 0.0055) {
+                     double c2 = this.nCave2.noise3(wx * 0.045 + 19.3, y * 0.06 + 7.1, wz * 0.045 - 23.7);
+                     if (c1 * c1 + c2 * c2 < 0.0052) {
+                        continue;
+                     }
                   }
                }
 
                byte b;
                if (y == h) {
-                  if (h <= Y_SEA) b = B_SAND;
+                  if (h <= Y_SEA + 1) b = B_SAND;
                   else if (biome == 1) b = B_SAND;
-                  else if (biome == 2 || h >= 77) b = B_SNOW;
+                  else if (biome == 2 || h >= 80) b = B_SNOW;
                   else b = B_GRASS;
                } else if (y >= h - 3) {
-                  b = (biome == 1) ? B_SANDSTONE : B_DIRT;
+                  b = (biome == 1 || h <= Y_SEA + 1) ? B_SANDSTONE : B_DIRT;
                } else {
                   int hash = ((wx * 734287) ^ (y * 912931) ^ (wz * 439829) ^ (int)this.seed) & 255;
                   if (y <= 16 && hash <= 1) b = B_DIAMOND_ORE;
                   else if (y <= 28 && hash <= 4) b = B_GOLD_ORE;
                   else if (y <= 24 && hash == 5) b = B_REDSTONE_ORE;
-                  else if (y <= 52 && hash <= 11) b = B_IRON_ORE;
+                  else if (y <= 54 && hash <= 11) b = B_IRON_ORE;
                   else if (hash <= 19) b = B_COAL_ORE;
                   else if (hash == 20) b = B_GRAVEL;
                   else b = B_STONE;
@@ -890,17 +1090,41 @@ public final class PeWorld {
          }
       }
 
-      // Starter Cabin at chunk (0, -1), or rare Explorer Cabins across the infinite world
-      boolean hasCabin = (cx == 0 && cz == -1) || ((cx != 0 || cz != 0) && (chunkHash(cx, cz, this.seed + 77L) % 44 == 0));
-      if (hasCabin) {
+      // 1. Starter Village around Spawn:
+      //    Chunk (0, -1): Village Cottage + Street Lamp
+      //    Chunk (1, -1): Fenced Wheat & Pumpkin Farm + Hay Bales
+      //    Chunk (-1, -1): Blacksmith Forge + Loot Chest
+      if (cx == 0 && cz == -1) {
+         buildVillageCottageInChunk(c, 8, surfaceY[8][8], 8);
+         return;
+      }
+      if (cx == 1 && cz == -1) {
+         buildVillageFarmInChunk(c, 8, surfaceY[8][8], 8);
+         return;
+      }
+      if (cx == -1 && cz == -1) {
+         buildBlacksmithInChunk(c, 8, surfaceY[8][8], 8);
+         return;
+      }
+
+      // 2. Infinite World Structures (Desert Pyramids, Ruined Watchtowers, Explorer Cabins)
+      int structRoll = chunkHash(cx, cz, this.seed + 77L) % 36;
+      if ((Math.abs(cx) > 1 || Math.abs(cz) > 1) && structRoll == 0) {
          int hy = surfaceY[8][8];
-         if (hy > Y_SEA + 1 && hy < 76) {
-            buildCabinInChunk(c, 8, hy, 8);
+         int centerBiome = biomeMap[8][8];
+         if (hy > Y_SEA + 1 && hy < 78) {
+            if (centerBiome == 1) {
+               buildDesertPyramidInChunk(c, 8, hy, 8);
+            } else if (centerBiome == 3) {
+               buildWatchtowerInChunk(c, 8, hy, 8);
+            } else {
+               buildVillageCottageInChunk(c, 8, hy, 8);
+            }
             return;
          }
       }
 
-      // Deterministic Trees, Cacti, Flowers & Tall Grass inside chunk bounds (lx, lz in 2..13)
+      // 3. Deterministic Oak, Birch & Spruce Trees + Desert Cacti (lx, lz in 3..12)
       for (int gz = 0; gz < 2; gz++) {
          for (int gx = 0; gx < 2; gx++) {
             int cellH = chunkHash(cx * 2 + gx, cz * 2 + gz, this.seed);
@@ -908,17 +1132,20 @@ public final class PeWorld {
             int lz = 3 + gz * 6 + ((cellH >>> 2) & 3);
             int wx = wx0 + lx;
             int wz = wz0 + lz;
-            if (Math.hypot(wx, wz) < 8.5) continue;
+            if (Math.hypot(wx, wz) < 9.0) continue;
 
             int ty = surfaceY[lz][lx];
             int biome = biomeMap[lz][lx];
             byte top = c.blocks[(lz << 11) | (lx << 7) | ty];
-            if (ty <= Y_SEA + 1 || ty >= 76) continue;
+            if (ty <= Y_SEA + 1 || ty >= 79) continue;
 
             if ((top == B_GRASS || top == B_SNOW) && (cellH % 3 != 0)) {
                boolean spruce = (top == B_SNOW) || (biome == 2) || ((cellH & 7) == 0);
-               placeTreeInChunk(c, lx, ty + 1, lz, spruce ? B_LOG_SPRUCE : B_LOG_OAK, spruce ? B_LEAVES_SPRUCE : B_LEAVES_OAK);
-            } else if (top == B_SAND && (cellH & 3) == 0) {
+               boolean birch = !spruce && ((biome == 4 && (cellH & 1) == 0) || ((cellH & 7) == 3));
+               byte logId = spruce ? B_LOG_SPRUCE : (birch ? B_LOG_BIRCH : B_LOG_OAK);
+               byte leafId = spruce ? B_LEAVES_SPRUCE : (birch ? B_LEAVES_BIRCH : B_LEAVES_OAK);
+               placeTreeInChunk(c, lx, ty + 1, lz, logId, leafId, spruce);
+            } else if (top == B_SAND && biome == 1 && (cellH & 3) == 0) {
                for (int ch = 1; ch <= 3; ch++) {
                   setChunkLocal(c, lx, ty + ch, lz, B_CACTUS);
                }
@@ -926,33 +1153,53 @@ public final class PeWorld {
          }
       }
 
-      // Surface Flowers & Tall Grass tufts on open grass blocks
+      // 4. Sugar Cane on water shores, Pumpkin/Melon patches, Flowers & Tall Grass
       for (int lz = 1; lz < 15; lz++) {
          for (int lx = 1; lx < 15; lx++) {
             int ty = surfaceY[lz][lx];
-            if (ty <= Y_SEA + 1 || ty >= 75) continue;
             int colBase = (lz << 11) | (lx << 7);
-            if (c.blocks[colBase | ty] == B_GRASS && c.blocks[colBase | (ty + 1)] == B_AIR) {
-               int fh = chunkHash(wx0 + lx, wz0 + lz, this.seed + 313L) & 63;
-               int biome = biomeMap[lz][lx];
-               if (fh == 0 || (biome == 4 && fh <= 3)) {
-                  setChunkLocal(c, lx, ty + 1, lz, B_FLOWER_RED);
-               } else if (fh == 1 || (biome == 4 && fh <= 7)) {
-                  setChunkLocal(c, lx, ty + 1, lz, B_FLOWER_YELLOW);
-               } else if (fh <= 6) {
-                  setChunkLocal(c, lx, ty + 1, lz, B_TALL_GRASS);
+            byte ground = c.blocks[colBase | ty];
+            if (c.blocks[colBase | (ty + 1)] != B_AIR) continue;
+
+            int fh = chunkHash(wx0 + lx, wz0 + lz, this.seed + 313L) & 127;
+
+            // Sugar cane along water level shores (Y_SEA or Y_SEA + 1)
+            if ((ty == Y_SEA || ty == Y_SEA + 1) && (ground == B_SAND || ground == B_GRASS) && fh <= 10) {
+               boolean nearWater = c.blocks[((lz - 1) << 11) | (lx << 7) | Y_SEA] == B_WATER
+                  || c.blocks[((lz + 1) << 11) | (lx << 7) | Y_SEA] == B_WATER
+                  || c.blocks[(lz << 11) | ((lx - 1) << 7) | Y_SEA] == B_WATER
+                  || c.blocks[(lz << 11) | ((lx + 1) << 7) | Y_SEA] == B_WATER;
+               if (nearWater) {
+                  setChunkLocal(c, lx, ty + 1, lz, B_SUGAR_CANE);
+                  setChunkLocal(c, lx, ty + 2, lz, B_SUGAR_CANE);
+                  if ((fh & 1) == 0) setChunkLocal(c, lx, ty + 3, lz, B_SUGAR_CANE);
+                  continue;
                }
+            }
+
+            if (ty <= Y_SEA + 1 || ty >= 77 || ground != B_GRASS) continue;
+            int biome = biomeMap[lz][lx];
+            if (fh == 0) {
+               setChunkLocal(c, lx, ty + 1, lz, (biome == 4) ? B_MELON : B_PUMPKIN);
+            } else if (fh <= 2 || (biome == 4 && fh <= 7)) {
+               setChunkLocal(c, lx, ty + 1, lz, B_FLOWER_RED);
+            } else if (fh <= 4 || (biome == 4 && fh <= 13)) {
+               setChunkLocal(c, lx, ty + 1, lz, B_FLOWER_YELLOW);
+            } else if (fh <= 16) {
+               setChunkLocal(c, lx, ty + 1, lz, B_TALL_GRASS);
             }
          }
       }
    }
 
-   private static void placeTreeInChunk(PeChunk c, int lx, int y, int lz, byte logId, byte leafId) {
-      for (int dy = 3; dy <= 6; dy++) {
-         int r = (dy >= 5) ? 1 : 2;
+   private static void placeTreeInChunk(PeChunk c, int lx, int y, int lz, byte logId, byte leafId, boolean spruce) {
+      int trunkH = spruce ? 6 : 5;
+      for (int dy = 2; dy <= trunkH + 1; dy++) {
+         int r = spruce ? ((dy == trunkH + 1) ? 0 : ((dy & 1) == 0 ? 2 : 1)) : ((dy >= trunkH) ? 1 : 2);
+         if (!spruce && dy == 2) continue;
          for (int dz = -r; dz <= r; dz++) {
             for (int dx = -r; dx <= r; dx++) {
-               if (Math.abs(dx) == 2 && Math.abs(dz) == 2 && (dy == 3 || dy == 4)) continue;
+               if (r == 2 && Math.abs(dx) == 2 && Math.abs(dz) == 2 && (!spruce || dy > 2)) continue;
                int nx = lx + dx;
                int nz = lz + dz;
                if ((nx & ~15) == 0 && (nz & ~15) == 0 && (y + dy) < WORLD_H - 1) {
@@ -964,24 +1211,38 @@ public final class PeWorld {
             }
          }
       }
-      for (int dy = 0; dy < 5; dy++) {
+      for (int dy = 0; dy < trunkH; dy++) {
          setChunkLocal(c, lx, y + dy, lz, logId);
       }
    }
 
-   private static void buildCabinInChunk(PeChunk c, int ox, int oy, int oz) {
-      for (int dz = -3; dz <= 3; dz++) {
+   private static void buildVillageCottageInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int dz = -3; dz <= 4; dz++) {
          for (int dx = -3; dx <= 3; dx++) {
             int lx = ox + dx;
             int lz = oz + dz;
             if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+            if (dz == 4) {
+               // Front cobblestone path & porch step
+               for (int y = oy - 3; y <= oy; y++) {
+                  setChunkLocal(c, lx, y, lz, Math.abs(dx) <= 1 ? B_COBBLE : B_GRASS);
+               }
+               if (dx == -2) {
+                  setChunkLocal(c, lx, oy + 1, lz, B_FENCE_OAK);
+                  setChunkLocal(c, lx, oy + 2, lz, B_FENCE_OAK);
+                  setChunkLocal(c, lx, oy + 3, lz, B_GLOWSTONE);
+               }
+               continue;
+            }
             for (int y = oy - 3; y <= oy; y++) {
                setChunkLocal(c, lx, y, lz, B_COBBLE);
             }
             boolean wall = Math.abs(dx) == 3 || Math.abs(dz) == 3;
             boolean door = (dz == 3 && dx == 0);
             for (int dy = 1; dy <= 4; dy++) {
-               if (wall && !(door && dy <= 2)) {
+               if (door && dy <= 2) {
+                  setChunkLocal(c, lx, oy + dy, lz, dy == 1 ? B_DOOR_OAK : B_AIR);
+               } else if (wall) {
                   boolean corner = Math.abs(dx) == 3 && Math.abs(dz) == 3;
                   boolean win = dy == 2 && (dx == 0 || dz == 0) && !door;
                   setChunkLocal(c, lx, oy + dy, lz, corner ? B_LOG_OAK : (win ? B_GLASS : B_PLANKS_OAK));
@@ -989,14 +1250,147 @@ public final class PeWorld {
                   setChunkLocal(c, lx, oy + dy, lz, B_AIR);
                }
             }
-            setChunkLocal(c, lx, oy + 5, lz, B_PLANKS_SPRUCE);
+            // Pitched Oak Slab & Spruce Plank roof
+            setChunkLocal(c, lx, oy + 5, lz, (Math.abs(dx) == 3 || Math.abs(dz) == 3) ? B_SLAB_OAK : B_PLANKS_SPRUCE);
+            if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) {
+               setChunkLocal(c, lx, oy + 6, lz, B_SLAB_OAK);
+            }
          }
       }
       setChunkLocal(c, ox - 2, oy + 1, oz - 2, B_CRAFTING_TABLE);
       setChunkLocal(c, ox, oy + 1, oz - 2, B_FURNACE);
       setChunkLocal(c, ox + 2, oy + 1, oz - 2, B_CHEST);
+      setChunkLocal(c, ox + 2, oy + 1, oz, B_BOOKSHELF);
+      setChunkLocal(c, ox + 2, oy + 2, oz, B_BOOKSHELF);
       setChunkLocal(c, ox - 2, oy + 1, oz + 1, B_BED_RED);
       setChunkLocal(c, ox, oy + 3, oz, B_TORCH);
+   }
+
+   private static void buildVillageFarmInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int dz = -4; dz <= 4; dz++) {
+         for (int dx = -4; dx <= 4; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+            for (int y = oy - 3; y < oy; y++) {
+               setChunkLocal(c, lx, y, lz, B_DIRT);
+            }
+            for (int dy = 1; dy <= 5; dy++) {
+               setChunkLocal(c, lx, oy + dy, lz, B_AIR);
+            }
+            boolean border = Math.abs(dx) == 4 || Math.abs(dz) == 4;
+            if (border) {
+               setChunkLocal(c, lx, oy, lz, B_LOG_OAK);
+               if (!(dz == 4 && dx == 0)) {
+                  setChunkLocal(c, lx, oy + 1, lz, B_FENCE_OAK);
+               }
+            } else if (dx == 0) {
+               setChunkLocal(c, lx, oy, lz, B_WATER);
+            } else {
+               setChunkLocal(c, lx, oy, lz, B_FARMLAND);
+               setChunkLocal(c, lx, oy + 1, lz, (dx > 0 && dz >= 2) ? B_PUMPKIN : B_WHEAT);
+            }
+         }
+      }
+      setChunkLocal(c, ox - 3, oy + 1, oz - 3, B_HAY_BALE);
+      setChunkLocal(c, ox - 3, oy + 2, oz - 3, B_JACK_O_LANTERN);
+   }
+
+   private static void buildBlacksmithInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int dz = -3; dz <= 3; dz++) {
+         for (int dx = -3; dx <= 3; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+            for (int y = oy - 3; y <= oy; y++) {
+               setChunkLocal(c, lx, y, lz, B_STONEBRICK);
+            }
+            boolean wall = Math.abs(dx) == 3 || Math.abs(dz) == 3;
+            boolean openFront = (dz == 3 && dx >= -1 && dx <= 1);
+            for (int dy = 1; dy <= 4; dy++) {
+               if (wall && !(openFront && dy <= 2)) {
+                  setChunkLocal(c, lx, oy + dy, lz, (dy == 2 && !openFront) ? B_BARS : B_COBBLE);
+               } else {
+                  setChunkLocal(c, lx, oy + dy, lz, B_AIR);
+               }
+            }
+            setChunkLocal(c, lx, oy + 5, lz, B_SLAB_STONEBRICK);
+         }
+      }
+      setChunkLocal(c, ox - 2, oy + 1, oz - 2, B_FURNACE);
+      setChunkLocal(c, ox - 1, oy + 1, oz - 2, B_LAVA);
+      setChunkLocal(c, ox, oy + 1, oz - 2, B_STONEBRICK);
+      setChunkLocal(c, ox + 2, oy + 1, oz - 2, B_CHEST);
+      setChunkLocal(c, ox + 2, oy + 1, oz + 1, B_IRON_BLOCK);
+      setChunkLocal(c, ox, oy + 3, oz, B_TORCH);
+   }
+
+   private static void buildDesertPyramidInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int layer = 0; layer <= 5; layer++) {
+         int r = 5 - layer;
+         for (int dz = -r; dz <= r; dz++) {
+            for (int dx = -r; dx <= r; dx++) {
+               int lx = ox + dx;
+               int lz = oz + dz;
+               if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+               if (layer == 0) {
+                  for (int y = oy - 3; y <= oy; y++) {
+                     setChunkLocal(c, lx, y, lz, B_SANDSTONE);
+                  }
+               }
+               boolean shell = Math.abs(dx) == r || Math.abs(dz) == r || layer == 5;
+               boolean doorway = layer <= 2 && dz == r && dx == 0;
+               if (doorway) {
+                  setChunkLocal(c, lx, oy + layer, lz, B_AIR);
+               } else if (shell) {
+                  byte b = (layer == 2 && (Math.abs(dx) == 2 || Math.abs(dz) == 2)) ? B_RED_SANDSTONE : B_SANDSTONE;
+                  setChunkLocal(c, lx, oy + layer, lz, b);
+               } else if (layer >= 1) {
+                  setChunkLocal(c, lx, oy + layer, lz, B_AIR);
+               }
+            }
+         }
+      }
+      setChunkLocal(c, ox, oy + 1, oz, B_GOLD_BLOCK);
+      setChunkLocal(c, ox - 1, oy + 1, oz - 1, B_CHEST);
+      setChunkLocal(c, ox + 1, oy + 1, oz - 1, B_TORCH);
+   }
+
+   private static void buildWatchtowerInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int dz = -2; dz <= 2; dz++) {
+         for (int dx = -2; dx <= 2; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+            for (int y = oy - 3; y <= oy; y++) {
+               setChunkLocal(c, lx, y, lz, B_STONEBRICK);
+            }
+            boolean wall = Math.abs(dx) == 2 || Math.abs(dz) == 2;
+            for (int dy = 1; dy <= 7; dy++) {
+               if (dz == 2 && dx == 0 && dy <= 2) {
+                  setChunkLocal(c, lx, oy + dy, lz, B_AIR);
+               } else if (dy == 7) {
+                  if (wall && ((dx + dz) & 1) == 0) {
+                     setChunkLocal(c, lx, oy + dy, lz, B_STONEBRICK);
+                  } else {
+                     setChunkLocal(c, lx, oy + dy, lz, B_AIR);
+                  }
+               } else if (dy == 6) {
+                  setChunkLocal(c, lx, oy + dy, lz, B_PLANKS_OAK);
+               } else if (wall) {
+                  byte brick = ((dy + dx + dz) % 3 == 0) ? B_MOSSY_STONEBRICK : B_STONEBRICK;
+                  setChunkLocal(c, lx, oy + dy, lz, brick);
+               } else {
+                  setChunkLocal(c, lx, oy + dy, lz, B_AIR);
+               }
+            }
+         }
+      }
+      for (int dy = 1; dy <= 6; dy++) {
+         setChunkLocal(c, ox, oy + dy, oz - 1, B_LADDER);
+      }
+      setChunkLocal(c, ox + 1, oy + 1, oz - 1, B_CHEST);
+      setChunkLocal(c, ox, oy + 7, oz, B_TORCH);
    }
 
    // ====================================================================
@@ -1009,7 +1403,6 @@ public final class PeWorld {
       return topSolidLocal(c, wx & 15, wz & 15);
    }
 
-   /** Fast O(1) lookup in the active 16x16 chunk ring buffer (returns B_AIR if chunk is outside active ring). */
    public byte getBlockFast(int wx, int wy, int wz) {
       if ((wy & ~127) != 0) return B_AIR;
       int cx = wx >> 4;
@@ -1021,7 +1414,6 @@ public final class PeWorld {
       return c.blocks[((wz & 15) << 11) | ((wx & 15) << 7) | wy];
    }
 
-   /** Full infinite-world block getter: automatically loads/generates chunk (cx, cz) if not yet in the active ring. */
    public byte getBlock(int wx, int wy, int wz) {
       if ((wy & ~127) != 0) return B_AIR;
       int cx = wx >> 4;
@@ -1074,23 +1466,46 @@ public final class PeWorld {
       }
    }
 
+   public static boolean isLeaves(byte id) {
+      return id == B_LEAVES_OAK || id == B_LEAVES_SPRUCE || id == B_LEAVES_BIRCH;
+   }
+
+   public static boolean isLog(byte id) {
+      return id == B_LOG_OAK || id == B_LOG_SPRUCE || id == B_LOG_BIRCH;
+   }
+
+   public static boolean isSlab(byte id) {
+      return id == B_SLAB_OAK || id == B_SLAB_COBBLE || id == B_SLAB_STONEBRICK;
+   }
+
    public static boolean isCrossPlant(byte id) {
-      return id == B_TORCH || id == B_TALL_GRASS || id == B_FLOWER_RED || id == B_FLOWER_YELLOW;
+      return id == B_TORCH || id == B_TALL_GRASS || id == B_FLOWER_RED || id == B_FLOWER_YELLOW
+         || id == B_WHEAT || id == B_SUGAR_CANE;
    }
 
    public static boolean isSolid(byte id) {
-      return id != B_AIR && id != B_WATER && id != B_LAVA && !isCrossPlant(id);
+      return id != B_AIR && id != B_WATER && id != B_LAVA && !isCrossPlant(id) && id != B_LADDER && id != B_DOOR_OAK;
+   }
+
+   public static double getBlockHeight(byte id) {
+      if (!isSolid(id)) return 0.0;
+      if (isSlab(id)) return 0.5;
+      if (id == B_BED_RED) return 0.5625;
+      if (id == B_FARMLAND) return 0.9375;
+      return 1.0;
    }
 
    public static boolean isOpaque(byte id) {
       return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_GLASS
-         && id != B_LEAVES_OAK && id != B_LEAVES_SPRUCE
+         && !isLeaves(id) && !isSlab(id)
          && id != B_ICE && id != B_SLIME_BLOCK && !isCrossPlant(id)
-         && id != B_BARS && id != B_BED_RED;
+         && id != B_BARS && id != B_BED_RED && id != B_FENCE_OAK
+         && id != B_DOOR_OAK && id != B_LADDER && id != B_CHEST && id != B_CACTUS;
    }
 
    public static boolean isLightEmitter(byte id) {
-      return id == B_TORCH || id == B_GLOWSTONE || id == B_SEA_LANTERN || id == B_LAVA || id == B_REDSTONE_BLOCK;
+      return id == B_TORCH || id == B_GLOWSTONE || id == B_SEA_LANTERN
+         || id == B_LAVA || id == B_REDSTONE_BLOCK || id == B_JACK_O_LANTERN;
    }
 
    public static int getFaceTile(byte id, int face) {
@@ -1098,8 +1513,11 @@ public final class PeWorld {
          case B_STONE: return PeTextures.T_STONE;
          case B_GRASS: return face == 0 ? PeTextures.T_GRASS_TOP : (face == 1 ? PeTextures.T_DIRT : PeTextures.T_GRASS_SIDE);
          case B_DIRT: return PeTextures.T_DIRT;
-         case B_COBBLE: return PeTextures.T_COBBLE;
-         case B_PLANKS_OAK: return PeTextures.T_PLANKS_OAK;
+         case B_COBBLE:
+         case B_SLAB_COBBLE: return PeTextures.T_COBBLE;
+         case B_PLANKS_OAK:
+         case B_SLAB_OAK:
+         case B_FENCE_OAK: return PeTextures.T_PLANKS_OAK;
          case B_BEDROCK: return PeTextures.T_BEDROCK;
          case B_WATER: return PeTextures.T_WATER;
          case B_LAVA: return PeTextures.T_LAVA;
@@ -1109,8 +1527,11 @@ public final class PeWorld {
          case B_IRON_ORE: return PeTextures.T_IRON_ORE;
          case B_COAL_ORE: return PeTextures.T_COAL_ORE;
          case B_LOG_OAK: return (face <= 1) ? PeTextures.T_LOG_OAK_TOP : PeTextures.T_LOG_OAK_SIDE;
+         case B_LOG_SPRUCE: return (face <= 1) ? PeTextures.T_LOG_OAK_TOP : PeTextures.T_LOG_SPRUCE;
+         case B_LOG_BIRCH: return (face <= 1) ? PeTextures.T_LOG_OAK_TOP : PeTextures.T_LOG_BIRCH_SIDE;
          case B_LEAVES_OAK: return PeTextures.T_LEAVES_OAK;
          case B_LEAVES_SPRUCE: return PeTextures.T_LEAVES_SPRUCE;
+         case B_LEAVES_BIRCH: return PeTextures.T_LEAVES_BIRCH;
          case B_GLASS: return PeTextures.T_GLASS;
          case B_SANDSTONE: return (face <= 1) ? PeTextures.T_SANDSTONE_TOP : PeTextures.T_SANDSTONE_SIDE;
          case B_WOOL_WHITE: return PeTextures.T_WOOL_WHITE;
@@ -1126,7 +1547,7 @@ public final class PeWorld {
          case B_MOSSY_COBBLE: return PeTextures.T_MOSSY_COBBLE;
          case B_OBSIDIAN: return PeTextures.T_OBSIDIAN;
          case B_TORCH: return PeTextures.T_TORCH;
-         case B_CHEST: return face == 0 || face == 1 ? PeTextures.T_CHEST_TOP : (face == 3 ? PeTextures.T_CHEST_FRONT : PeTextures.T_CHEST_SIDE);
+         case B_CHEST: return face <= 1 ? PeTextures.T_CHEST_TOP : (face == 3 ? PeTextures.T_CHEST_FRONT : PeTextures.T_CHEST_SIDE);
          case B_DIAMOND_ORE: return PeTextures.T_DIAMOND_ORE;
          case B_DIAMOND_BLOCK: return PeTextures.T_DIAMOND_BLOCK;
          case B_CRAFTING_TABLE: return face == 0 ? PeTextures.T_CRAFT_TOP : (face == 1 ? PeTextures.T_PLANKS_OAK : PeTextures.T_CRAFT_SIDE);
@@ -1137,7 +1558,9 @@ public final class PeWorld {
          case B_NETHERRACK: return PeTextures.T_NETHERRACK;
          case B_SOUL_SAND: return PeTextures.T_SOUL_SAND;
          case B_GLOWSTONE: return PeTextures.T_GLOWSTONE;
-         case B_STONEBRICK: return PeTextures.T_STONEBRICK;
+         case B_STONEBRICK:
+         case B_SLAB_STONEBRICK: return PeTextures.T_STONEBRICK;
+         case B_MOSSY_STONEBRICK: return PeTextures.T_MOSSY_STONEBRICK;
          case B_NETHER_BRICKS: return PeTextures.T_NETHER_BRICKS;
          case B_END_STONE: return PeTextures.T_END_STONE;
          case B_EMERALD_BLOCK: return PeTextures.T_EMERALD_BLOCK;
@@ -1149,9 +1572,8 @@ public final class PeWorld {
          case B_COAL_BLOCK: return PeTextures.T_COAL_BLOCK;
          case B_PLANKS_SPRUCE: return PeTextures.T_PLANKS_SPRUCE;
          case B_PLANKS_BIRCH: return PeTextures.T_PLANKS_BIRCH;
-         case B_LOG_SPRUCE: return (face <= 1) ? PeTextures.T_LOG_OAK_TOP : PeTextures.T_LOG_SPRUCE;
          case B_PACKED_ICE: return PeTextures.T_PACKED_ICE;
-         case B_BED_RED: return PeTextures.T_BED_RED;
+         case B_BED_RED: return face == 0 ? PeTextures.T_BED_RED : PeTextures.T_PLANKS_OAK;
          case B_RED_SANDSTONE: return PeTextures.T_RED_SANDSTONE;
          case B_TERRACOTTA: return PeTextures.T_TERRACOTTA;
          case B_CONCRETE_GRAY: return PeTextures.T_CONCRETE_GRAY;
@@ -1163,6 +1585,15 @@ public final class PeWorld {
          case B_TALL_GRASS: return PeTextures.T_TALL_GRASS;
          case B_FLOWER_RED: return PeTextures.T_FLOWER_RED;
          case B_FLOWER_YELLOW: return PeTextures.T_FLOWER_YELLOW;
+         case B_DOOR_OAK: return PeTextures.T_DOOR_TOP;
+         case B_LADDER: return PeTextures.T_LADDER;
+         case B_FARMLAND: return face == 0 ? PeTextures.T_FARM_WET : PeTextures.T_DIRT;
+         case B_WHEAT: return PeTextures.T_WHEAT;
+         case B_SUGAR_CANE: return PeTextures.T_SUGAR_CANE;
+         case B_PUMPKIN: return face <= 1 ? PeTextures.T_PUMPKIN_TOP : (face == 3 ? PeTextures.T_PUMPKIN_FACE : PeTextures.T_PUMPKIN_SIDE);
+         case B_JACK_O_LANTERN: return face <= 1 ? PeTextures.T_PUMPKIN_TOP : (face == 3 ? PeTextures.T_JACK_O_LANTERN : PeTextures.T_PUMPKIN_SIDE);
+         case B_MELON: return face <= 1 ? PeTextures.T_MELON_TOP : PeTextures.T_MELON_SIDE;
+         case B_HAY_BALE: return face <= 1 ? PeTextures.T_HAY_TOP : PeTextures.T_HAY_SIDE;
          default: return PeTextures.T_STONE;
       }
    }
@@ -1170,7 +1601,8 @@ public final class PeWorld {
    public static int getItemTile(int id) {
       if (id == B_GRASS) return PeTextures.T_GRASS_SIDE;
       if (id == B_SNOW) return PeTextures.T_SNOW_SIDE;
-      if (id > 0 && id <= 68) {
+      if (id == B_BED_RED) return PeTextures.T_BED_RED;
+      if (id > 0 && id <= MAX_BLOCK_ID) {
          return getFaceTile((byte)id, 3);
       }
       switch (id) {
@@ -1187,6 +1619,11 @@ public final class PeWorld {
          case I_GOLDEN_APPLE: return PeTextures.T_ITEM_GOLDEN_APPLE;
          case I_STEAK: return PeTextures.T_ITEM_STEAK;
          case I_ENDER_PEARL: return PeTextures.T_ITEM_ENDER_PEARL;
+         case I_IRON_INGOT: return PeTextures.T_ITEM_IRON_INGOT;
+         case I_GOLD_INGOT: return PeTextures.T_ITEM_GOLD_INGOT;
+         case I_DIAMOND: return PeTextures.T_ITEM_DIAMOND;
+         case I_COAL: return PeTextures.T_ITEM_COAL;
+         case I_BREAD: return PeTextures.T_ITEM_BREAD;
          default: return PeTextures.T_ITEM_PICK_WOOD;
       }
    }
@@ -1198,19 +1635,31 @@ public final class PeWorld {
          case B_STONE: return "Stone";
          case B_DIRT: return "Dirt";
          case B_COBBLE: return "Cobblestone";
+         case B_MOSSY_COBBLE: return "Mossy Cobblestone";
          case B_PLANKS_OAK: return "Oak Planks";
          case B_PLANKS_SPRUCE: return "Spruce Planks";
          case B_PLANKS_BIRCH: return "Birch Planks";
+         case B_SLAB_OAK: return "Oak Slab";
+         case B_SLAB_COBBLE: return "Cobblestone Slab";
+         case B_SLAB_STONEBRICK: return "Stone Brick Slab";
+         case B_FENCE_OAK: return "Oak Fence";
+         case B_DOOR_OAK: return "Oak Door";
+         case B_LADDER: return "Ladder";
          case B_BRICKS: return "Bricks";
          case B_STONEBRICK: return "Stone Bricks";
+         case B_MOSSY_STONEBRICK: return "Mossy Stone Bricks";
+         case B_CRACKED_STONEBRICK: return "Cracked Stone Bricks";
          case B_SAND: return "Sand";
          case B_GRAVEL: return "Gravel";
          case B_SANDSTONE: return "Sandstone";
+         case B_RED_SANDSTONE: return "Red Sandstone";
          case B_GLASS: return "Glass";
          case B_LOG_OAK: return "Oak Log";
          case B_LOG_SPRUCE: return "Spruce Log";
+         case B_LOG_BIRCH: return "Birch Log";
          case B_LEAVES_OAK: return "Oak Leaves";
          case B_LEAVES_SPRUCE: return "Spruce Leaves";
+         case B_LEAVES_BIRCH: return "Birch Leaves";
          case B_WOOL_WHITE: return "White Wool";
          case B_WOOL_RED: return "Red Wool";
          case B_WOOL_BLUE: return "Blue Wool";
@@ -1244,6 +1693,13 @@ public final class PeWorld {
          case B_TALL_GRASS: return "Tall Grass";
          case B_FLOWER_RED: return "Red Poppy";
          case B_FLOWER_YELLOW: return "Dandelion";
+         case B_FARMLAND: return "Farmland";
+         case B_WHEAT: return "Ripe Wheat";
+         case B_SUGAR_CANE: return "Sugar Cane";
+         case B_PUMPKIN: return "Pumpkin";
+         case B_JACK_O_LANTERN: return "Jack o'Lantern";
+         case B_MELON: return "Melon";
+         case B_HAY_BALE: return "Hay Bale";
          case I_SWORD_WOOD: return "Wooden Sword";
          case I_PICK_WOOD: return "Wooden Pickaxe";
          case I_SWORD_IRON: return "Iron Sword";
@@ -1256,19 +1712,22 @@ public final class PeWorld {
          case I_ARROW: return "Arrows";
          case I_GOLDEN_APPLE: return "Golden Apple";
          case I_STEAK: return "Cooked Steak";
+         case I_BREAD: return "Fresh Bread";
          case I_ENDER_PEARL: return "Ender Pearl";
+         case I_IRON_INGOT: return "Iron Ingot";
+         case I_GOLD_INGOT: return "Gold Ingot";
+         case I_DIAMOND: return "Diamond";
+         case I_COAL: return "Coal";
          default: return "Block";
       }
    }
 
    // ====================================================================
    //  Right-Handed Camera Forward Vector & Raycasting
-   //  Forward = ( +sin(yaw)*cos(pitch), -sin(pitch), -cos(yaw)*cos(pitch) )
-   //  Right   = ( +cos(yaw),             0,          +sin(yaw)            )
    // ====================================================================
    public int[] raycastBlock(double maxReach) {
       double ex = this.px;
-      double ey = this.py + (this.sneaking && !this.flying ? 1.46 : 1.62);
+      double ey = this.py + this.eyeHeight;
       double ez = this.pz;
       double yawRad = Math.toRadians(this.yaw);
       double pitchRad = Math.toRadians(this.pitch);
@@ -1280,7 +1739,7 @@ public final class PeWorld {
       int prevX = (int)Math.floor(ex);
       int prevY = (int)Math.floor(ey);
       int prevZ = (int)Math.floor(ez);
-      for (double t = 0.2; t <= maxReach; t += 0.06) {
+      for (double t = 0.2; t <= maxReach; t += 0.05) {
          int bx = (int)Math.floor(ex + dx * t);
          int by = (int)Math.floor(ey + dy * t);
          int bz = (int)Math.floor(ez + dz * t);
@@ -1295,17 +1754,66 @@ public final class PeWorld {
       return null;
    }
 
+   /**
+    * Update 3.10 Tree Felling: when chopping the base log of a natural tree in Survival mode,
+    * fells the connected trunk logs above it and awards the harvested logs!
+    */
+   private void fellTreeIfNatural(int x, int y, int z, byte logType) {
+      int leavesAround = 0;
+      for (int dy = 1; dy <= 7; dy++) {
+         for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+               if (isLeaves(getBlockFast(x + dx, y + dy, z + dz))) {
+                  leavesAround++;
+               }
+            }
+         }
+      }
+      if (leavesAround < 4) return;
+
+      int felledLogs = 0;
+      for (int dy = 1; dy <= 7; dy++) {
+         byte above = getBlockFast(x, y + dy, z);
+         if (above == logType) {
+            setBlock(x, y + dy, z, B_AIR);
+            felledLogs++;
+         } else {
+            break;
+         }
+      }
+      if (felledLogs > 0) {
+         // Clear inner leaves directly above the trunk so canopy crumbles naturally
+         for (int dy = 2; dy <= felledLogs + 3; dy++) {
+            for (int dz = -1; dz <= 1; dz++) {
+               for (int dx = -1; dx <= 1; dx++) {
+                  if (isLeaves(getBlockFast(x + dx, y + dy, z + dz))) {
+                     setBlock(x + dx, y + dy, z + dz, B_AIR);
+                  }
+               }
+            }
+         }
+         if (this.mode == MODE_SURVIVAL) {
+            giveItem(logType, felledLogs);
+         }
+         showBanner("Felled Tree! (+" + (felledLogs + 1) + " " + getItemName(logType) + ")");
+      }
+   }
+
    // Dedicated Break / Mine tap action
    public void triggerAttackAction(PeAudio audio) {
       this.swingAnim = 0.0F;
-      // In Creative Mode (or on instant-break plants/torches), tapping MINE breaks immediately
       int[] hit = raycastBlock(5.5);
       if (hit != null && hit[6] != B_BEDROCK) {
          byte target = (byte)hit[6];
          if (this.mode == MODE_CREATIVE || isCrossPlant(target)) {
             setBlock(hit[0], hit[1], hit[2], B_AIR);
-            if (this.mode == MODE_SURVIVAL && target == B_TORCH) {
-               giveItem(B_TORCH, 1);
+            if (isLog(target)) {
+               fellTreeIfNatural(hit[0], hit[1], hit[2], target);
+            }
+            if (this.mode == MODE_SURVIVAL) {
+               if (target == B_TORCH) giveItem(B_TORCH, 1);
+               else if (target == B_WHEAT) giveItem(I_BREAD, 1);
+               else if (target == B_SUGAR_CANE) giveItem(B_SUGAR_CANE, 1);
             }
             if (audio != null) audio.playSound("dig_stone", 0.8F, 1.0F);
             return;
@@ -1334,34 +1842,40 @@ public final class PeWorld {
          if (targetBlock == B_BED_RED) {
             this.dayTime = 0.22F;
             this.health = 20;
-            showBanner("You slept through the night! Spawn point set.");
+            this.spawnX = hit[0] + 0.5;
+            this.spawnY = hit[1] + 1.0;
+            this.spawnZ = hit[2] + 0.5;
+            showBanner("Slept through the night! Spawn point set.");
             if (audio != null) audio.playSound("levelup", 0.85F, 1.0F);
             return;
          }
       }
 
-      // 2. Eat Food if holding Golden Apple or Steak
-      if (held == I_GOLDEN_APPLE || held == I_STEAK) {
+      // 2. Eat Food if holding Golden Apple, Steak, or Bread
+      if (held == I_GOLDEN_APPLE || held == I_STEAK || held == I_BREAD) {
          if (this.health < 20 || this.hunger < 20) {
-            this.health = Math.min(20, this.health + (held == I_GOLDEN_APPLE ? 8 : 6));
+            int heal = (held == I_GOLDEN_APPLE) ? 8 : (held == I_STEAK ? 6 : 5);
+            this.health = Math.min(20, this.health + heal);
             this.hunger = Math.min(20, this.hunger + 6);
             consumeSelectedSlot(1);
-            showBanner("Ate " + getItemName(held) + " (+HP)");
+            showBanner("Ate " + getItemName(held) + " (+" + (heal / 2) + " Hearts)");
             if (audio != null) audio.playSound("eat_bite", 0.85F, 1.0F);
          }
          return;
       }
 
       // 3. Place Block at targeted block face
-      if (hit != null && held > 0 && held <= 68) {
+      if (hit != null && held > 0 && held <= MAX_BLOCK_ID) {
          int pxPlace = hit[3], pyPlace = hit[4], pzPlace = hit[5];
-         boolean overlapsPlayer = isSolid((byte)held)
-            && Math.abs((pxPlace + 0.5) - this.px) < 0.75
-            && Math.abs((pzPlace + 0.5) - this.pz) < 0.75
-            && pyPlace >= Math.floor(this.py) && pyPlace <= Math.floor(this.py + 1.7);
+         byte heldByte = (byte)held;
+         boolean overlapsPlayer = isSolid(heldByte)
+            && Math.abs((pxPlace + 0.5) - this.px) < 0.76
+            && Math.abs((pzPlace + 0.5) - this.pz) < 0.76
+            && (pyPlace + getBlockHeight(heldByte)) > this.py + 0.05
+            && pyPlace < this.py + 1.75;
          byte existing = getBlock(pxPlace, pyPlace, pzPlace);
          if (!overlapsPlayer && (existing == B_AIR || existing == B_WATER || existing == B_TALL_GRASS)) {
-            setBlock(pxPlace, pyPlace, pzPlace, (byte)held);
+            setBlock(pxPlace, pyPlace, pzPlace, heldByte);
             if (this.mode != MODE_CREATIVE) {
                consumeSelectedSlot(1);
             }
@@ -1373,7 +1887,7 @@ public final class PeWorld {
    // Legacy alias for tests
    public void triggerPrimaryAction(PeAudio audio) {
       int held = this.hotbarId[this.selectedSlot];
-      if (held > 0 && held <= 68) {
+      if (held > 0 && held <= MAX_BLOCK_ID) {
          triggerPlaceOrUseAction(audio);
       } else {
          triggerAttackAction(audio);
@@ -1393,6 +1907,14 @@ public final class PeWorld {
       if (this.screen != SCREEN_PLAY) {
          return;
       }
+      // Snapshot previous tick state for 120Hz sub-tick camera & view-bobbing interpolation!
+      this.prevPx = this.px;
+      this.prevPy = this.py;
+      this.prevPz = this.pz;
+      this.prevWalkDist = this.walkDist;
+      this.prevEyeHeight = this.eyeHeight;
+      this.prevSwingAnim = this.swingAnim;
+
       this.tickCount++;
       if (this.hurtTime > 0) this.hurtTime--;
       if (this.invulnTicks > 0) this.invulnTicks--;
@@ -1403,8 +1925,12 @@ public final class PeWorld {
       }
       this.dayTime = (this.dayTime + 0.00008F) % 1.0F;
 
-      // Stream infinite chunks around player (up to 2 new chunks per tick for zero stutter!)
-      ensureChunksAroundPlayer(2);
+      // Smoothly interpolate eye height when sneaking vs standing
+      float targetEye = (this.sneaking && !this.flying) ? 1.46F : 1.62F;
+      this.eyeHeight += (targetEye - this.eyeHeight) * 0.45F;
+
+      // Stream at most 1 new chunk per tick while moving for zero frame hitches at 120Hz
+      ensureChunksAroundPlayer(1);
 
       // 1. Player Movement & Right-Handed Camera Basis:
       //    Forward = ( +sin(yaw), -cos(yaw) )
@@ -1415,23 +1941,40 @@ public final class PeWorld {
       boolean wantDescend = touch != null && touch.sneakHeld;
 
       this.sprinting = (moveFwd > 0.72 && !this.sneaking);
-      double speed = this.flying ? 0.36 : (this.sneaking ? 0.10 : (this.sprinting ? 0.235 : 0.185));
+      double speed = this.flying ? 0.36 : (this.sneaking ? 0.10 : (this.sprinting ? 0.232 : 0.182));
       double yawRad = Math.toRadians(this.yaw);
       double sinY = Math.sin(yawRad);
       double cosY = Math.cos(yawRad);
       double wishX = (sinY * moveFwd + cosY * moveStrafe) * speed;
       double wishZ = (-cosY * moveFwd + sinY * moveStrafe) * speed;
 
-      this.vx = this.vx * 0.50 + wishX * 0.50;
-      this.vz = this.vz * 0.50 + wishZ * 0.50;
+      // Smooth horizontal velocity damping
+      this.vx = this.vx * 0.42 + wishX * 0.58;
+      this.vz = this.vz * 0.42 + wishZ * 0.58;
+      if (Math.abs(this.vx) < 0.0005) this.vx = 0.0;
+      if (Math.abs(this.vz) < 0.0005) this.vz = 0.0;
 
-      byte inBlock = getBlockFast((int)Math.floor(this.px), (int)Math.floor(this.py + 0.4), (int)Math.floor(this.pz));
-      boolean inWater = (inBlock == B_WATER);
+      int bx = (int)Math.floor(this.px);
+      int byFoot = (int)Math.floor(this.py + 0.2);
+      int byBody = (int)Math.floor(this.py + 0.9);
+      int bz = (int)Math.floor(this.pz);
+      byte inFoot = getBlockFast(bx, byFoot, bz);
+      byte inBody = getBlockFast(bx, byBody, bz);
+      boolean inWater = (inFoot == B_WATER || inBody == B_WATER);
+      boolean onLadder = (inFoot == B_LADDER || inBody == B_LADDER);
 
       if (this.flying) {
          this.vy = wantJump ? 0.25 : (wantDescend ? -0.25 : 0.0);
+      } else if (onLadder) {
+         if (wantJump || moveFwd > 0.25) {
+            this.vy = 0.17;
+         } else if (wantDescend) {
+            this.vy = 0.0;
+         } else {
+            this.vy = -0.12;
+         }
       } else if (inWater) {
-         this.vy = wantJump ? 0.14 : Math.max(-0.18, this.vy - 0.025);
+         this.vy = wantJump ? 0.15 : Math.max(-0.16, this.vy - 0.025);
       } else {
          if (wantJump && this.onGround) {
             this.vy = 0.42;
@@ -1444,12 +1987,13 @@ public final class PeWorld {
 
       // Void Respawn Protection
       if (this.py < 2.0) {
-         this.px = 0.5;
-         this.py = topSolidY(0, 0) + 1.5;
-         this.pz = 0.5;
+         this.px = this.spawnX;
+         this.py = Math.max(this.spawnY, topSolidY((int)Math.floor(this.spawnX), (int)Math.floor(this.spawnZ)) + 1.0);
+         this.pz = this.spawnZ;
          this.vx = this.vy = this.vz = 0.0;
          this.health = 20;
-         showBanner("Respawned at World Spawn!");
+         syncInterpolationState();
+         showBanner("Respawned at Spawn Point!");
       }
 
       // 2. Hold-to-Mine Block Progression (ONLY when miningHeld is explicitly active!)
@@ -1460,15 +2004,20 @@ public final class PeWorld {
                int held = this.hotbarId[this.selectedSlot];
                float toolMult = (held == I_PICK_DIAMOND || held == I_SHOVEL_DIAMOND) ? 2.4F
                   : ((held == I_PICK_IRON || held == I_AXE_IRON) ? 1.8F : (held == I_PICK_WOOD ? 1.35F : 1.0F));
-               float rate = (this.mode == MODE_CREATIVE) ? 0.55F : (0.068F * toolMult);
+               float rate = (this.mode == MODE_CREATIVE) ? 0.55F : (0.072F * toolMult);
                this.mineProgress += rate;
                this.swingAnim = (this.tickCount % 6) / 6.0F;
                if (this.mineProgress >= 1.0F) {
                   byte broken = getBlock(this.mineX, this.mineY, this.mineZ);
                   setBlock(this.mineX, this.mineY, this.mineZ, B_AIR);
+                  if (isLog(broken)) {
+                     fellTreeIfNatural(this.mineX, this.mineY, this.mineZ, broken);
+                  }
                   if (this.mode == MODE_SURVIVAL && broken != B_AIR) {
-                     byte drop = (broken == B_STONE) ? B_COBBLE : ((broken == B_GRASS) ? B_DIRT : broken);
-                     if (drop != B_LEAVES_OAK && drop != B_LEAVES_SPRUCE && drop != B_TALL_GRASS) {
+                     int drop = (broken == B_STONE) ? B_COBBLE
+                        : ((broken == B_GRASS || broken == B_FARMLAND) ? B_DIRT
+                        : (broken == B_WHEAT ? I_BREAD : (broken & 0xFF)));
+                     if (!isLeaves(broken) && broken != B_TALL_GRASS) {
                         giveItem(drop, 1);
                      }
                   }
@@ -1491,46 +2040,142 @@ public final class PeWorld {
       }
    }
 
+   /**
+    * Checks whether the player AABB [x - 0.28, x + 0.28] x [y, y + 1.76] x [z - 0.28, z + 0.28]
+    * intersects any solid block (accounting for 0.5-height slabs and beds).
+    */
+   private boolean collidesAABB(double x, double y, double z) {
+      double r = 0.28;
+      int minX = (int)Math.floor(x - r);
+      int maxX = (int)Math.floor(x + r);
+      int minY = (int)Math.floor(y + 0.001);
+      int maxY = (int)Math.floor(y + 1.76);
+      int minZ = (int)Math.floor(z - r);
+      int maxZ = (int)Math.floor(z + r);
+
+      for (int by = minY; by <= maxY; by++) {
+         for (int bz = minZ; bz <= maxZ; bz++) {
+            for (int bx = minX; bx <= maxX; bx++) {
+               byte id = getBlockFast(bx, by, bz);
+               double bh = getBlockHeight(id);
+               if (bh > 0.0 && y < by + bh && y + 1.76 > by) {
+                  return true;
+               }
+            }
+         }
+      }
+      return false;
+   }
+
+   private double findSupportingFloorY(double x, double y, double z) {
+      double r = 0.28;
+      int minX = (int)Math.floor(x - r);
+      int maxX = (int)Math.floor(x + r);
+      int minZ = (int)Math.floor(z - r);
+      int maxZ = (int)Math.floor(z + r);
+      int baseBy = (int)Math.floor(y);
+      double bestTop = -1.0;
+
+      for (int by = baseBy - 1; by <= baseBy + 1; by++) {
+         for (int bz = minZ; bz <= maxZ; bz++) {
+            for (int bx = minX; bx <= maxX; bx++) {
+               byte id = getBlockFast(bx, by, bz);
+               double bh = getBlockHeight(id);
+               if (bh > 0.0) {
+                  double top = by + bh;
+                  if (top <= y + 0.58 && top > bestTop) {
+                     bestTop = top;
+                  }
+               }
+            }
+         }
+      }
+      return bestTop;
+   }
+
+   /**
+    * Smooth Independent-Axis AABB Box Collision with:
+    * - Automatic 0.5625-block step-up onto Slabs & Beds (zero vertical bounce!)
+    * - Optional 1.0-block Pocket Edition Auto-Jump onto full blocks
+    * - Smooth wall sliding along X and Z independently
+    */
    private void movePlayerWithCollision() {
       double x = this.px;
       double y = this.py;
       double z = this.pz;
 
-      // Y collision
-      double ny = y + this.vy;
-      int bx = (int)Math.floor(x);
-      int bz = (int)Math.floor(z);
-      boolean grounded = false;
-      if (this.vy <= 0.0 && isSolid(getBlockFast(bx, (int)Math.floor(ny), bz))) {
-         ny = Math.floor(ny) + 1.0;
-         this.vy = 0.0;
-         grounded = true;
-      } else if (this.vy > 0.0 && isSolid(getBlockFast(bx, (int)Math.floor(ny + 1.75), bz))) {
-         this.vy = 0.0;
-      }
-
-      // X & Z collision + Optional Auto Step-Jump (Pocket Edition auto-jump)
+      // 1. Resolve X-axis movement independently
       double nx = x + this.vx;
-      double nz = z + this.vz;
-      int nbx = (int)Math.floor(nx);
-      int nbz = (int)Math.floor(nz);
-      int footY = (int)Math.floor(ny + 0.1);
-      if (isSolid(getBlockFast(nbx, footY, nbz)) || isSolid(getBlockFast(nbx, footY + 1, nbz))) {
-         boolean allowAutoJump = this.autoJump && !this.sneaking && !this.flying;
-         if (grounded && allowAutoJump
-            && isSolid(getBlockFast(nbx, footY, nbz))
-            && !isSolid(getBlockFast(nbx, footY + 1, nbz))
-            && !isSolid(getBlockFast(nbx, footY + 2, nbz))) {
+      if (this.vx != 0.0 && collidesAABB(nx, y, z)) {
+         if (this.onGround && !collidesAABB(nx, y + 0.5625, z)) {
+            double floorTop = findSupportingFloorY(nx, y + 0.5625, z);
+            if (floorTop > y && floorTop - y <= 0.58) {
+               y = floorTop;
+            }
+         } else if (this.onGround && this.autoJump && !this.sneaking && !this.flying && !collidesAABB(nx, y + 1.05, z)) {
             this.vy = 0.42;
-            grounded = false;
+            this.onGround = false;
+            nx = x;
          } else {
-            if (isSolid(getBlockFast(nbx, footY, bz)) || isSolid(getBlockFast(nbx, footY + 1, bz))) nx = x;
-            if (isSolid(getBlockFast(bx, footY, nbz)) || isSolid(getBlockFast(bx, footY + 1, nbz))) nz = z;
+            nx = x;
+            this.vx = 0.0;
          }
       }
 
-      if (Math.hypot(nx - this.px, nz - this.pz) > 0.001 && grounded) {
-         this.walkDist += (float)Math.hypot(nx - this.px, nz - this.pz);
+      // 2. Resolve Z-axis movement independently
+      double nz = z + this.vz;
+      if (this.vz != 0.0 && collidesAABB(nx, y, nz)) {
+         if (this.onGround && !collidesAABB(nx, y + 0.5625, nz)) {
+            double floorTop = findSupportingFloorY(nx, y + 0.5625, nz);
+            if (floorTop > y && floorTop - y <= 0.58) {
+               y = floorTop;
+            }
+         } else if (this.onGround && this.autoJump && !this.sneaking && !this.flying && !collidesAABB(nx, y + 1.05, nz)) {
+            this.vy = 0.42;
+            this.onGround = false;
+            nz = z;
+         } else {
+            nz = z;
+            this.vz = 0.0;
+         }
+      }
+
+      // 3. Sneak edge protection (prevent walking off ledges while sneaking on ground)
+      if (this.sneaking && this.onGround && !this.flying) {
+         if (!collidesAABB(nx, y - 0.58, z)) {
+            nx = x;
+            this.vx = 0.0;
+         }
+         if (!collidesAABB(nx, y - 0.58, nz)) {
+            nz = z;
+            this.vz = 0.0;
+         }
+      }
+
+      // 4. Resolve Y-axis movement
+      double ny = y + this.vy;
+      boolean grounded = false;
+      if (this.vy <= 0.0) {
+         if (collidesAABB(nx, ny, nz)) {
+            double floorTop = findSupportingFloorY(nx, y, nz);
+            if (floorTop > 0.0) {
+               ny = floorTop;
+            } else {
+               ny = Math.floor(ny + 0.05) + 1.0;
+            }
+            this.vy = 0.0;
+            grounded = true;
+         }
+      } else {
+         if (collidesAABB(nx, ny, nz)) {
+            ny = y;
+            this.vy = 0.0;
+         }
+      }
+
+      double movedHoriz = Math.hypot(nx - this.px, nz - this.pz);
+      if (movedHoriz > 0.0005 && grounded) {
+         this.walkDist += (float)movedHoriz;
       }
       this.px = nx;
       this.py = ny;

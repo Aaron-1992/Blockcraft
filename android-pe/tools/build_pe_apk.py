@@ -161,7 +161,7 @@ HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
 
 
 def build_release_notes(version, apk_name, bundle_name):
-    return f"""## Blockcraft PE (Pocket Edition) v{version} — Infinite Worlds, Pixel-Art Textures & Mobile UI Overhaul (Samsung Galaxy A55 5G)
+    return f"""## Blockcraft PE (Pocket Edition) v{version} — 120Hz Smooth Walking & PC Update 3.5+ Visual/Gameplay Overhaul (Samsung Galaxy A55 5G)
 
 > **Separate Pocket Edition Release**: This release contains **only** the Android Pocket Edition (`com.blockcraft.pe`) and does **not** include any PC files. PC (`v*`) and PE (`pe-v*`) releases are kept strictly separated.
 
@@ -170,26 +170,26 @@ def build_release_notes(version, apk_name, bundle_name):
 2. Open **`{apk_name}`** from your browser downloads or Samsung **My Files** and tap **Install / Update**.
 
 ### What's New in Blockcraft PE `pe-v{version}`
-* **Infinite Worlds (`PeWorld` & `PeChunkMesher`)**:
-  * **Seamless Infinite Chunk Streaming**: Replaced the fixed world boundary with a deterministic infinite chunk engine (`16x128x16` chunks at any `(cx, cz)` coordinate) backed by an $O(1)$ `16x16` active spatial chunk ring buffer.
-  * **Persistent Infinite World Saves (`.bcpe` v2)**: Player-built and mined blocks in any chunk across the infinite world are persisted in `savedChunks` and saved to `world_0..2.bcpe` across 3 save slots.
-  * **Richer Biomes & Flora**: Added **Emerald Forests**, **Flower Meadows** (Red Poppies, Yellow Dandelions, Tall Grass), **Golden Deserts** (Sand, Sandstone, Cacti), **Snowy Taiga** (Spruce Pines, Snow, Ice Lakes), **Mountain Peaks**, 3D caves, ore veins, and procedural **Explorer Cabins**.
-* **New Hand-Crafted Pixel-Art Textures (`PeTextures` ported from `TexPaint` & `TexPaint319`)**:
-  * **Leaves Overhaul**: Overlapping `4x3` / `3x4` pixel-art leaf blade clusters (`paintLeaflet`) with cast shadows, 4-tone sunlit leaf blades, and crisp organic sky holes for both Oak Leaves and Spruce Leaves.
-  * **Terrain & Building Blocks**: Multi-tone Grass Top & hanging Grass Side skirt with drop shadows over pebble-strewn Dirt, Voronoi Cobblestone & Mossy Cobble, cracked FBM Stone, 3D-shaded mineral Ore veins, bark-grooved Logs with wood rings, 4-board Planks, Stone Bricks, Crafting Table, Furnace, Chest, Bookshelf, and bevelled Tool/Item sprites.
-* **Major Performance Upgrades**:
-  * **$O(1)$ Empty Section Skipping**: Tracks `sectionNonAir[0..7]` per `16x16x16` section so empty sky sections skip VBO meshing instantaneously.
-  * **Fast Direct Column Indexing & Pre-Fetched Neighbors**: Uses bit-shift indexing `((lz << 11) | (lx << 7) | wy)` and pre-fetches cardinal neighbor chunks once per section.
-  * **Interior Leaf Face Culling**: Culls hidden leaf-to-leaf faces inside tree canopies to eliminate mobile GPU alpha overdraw, plus configurable **Infinite Render Distance (`9x9`, `11x11`, `13x13` Chunks)** in Settings.
-* **AI Players / Mobs Removed Completely**:
-  * Removed all AI bots and mobs from world generation, ticking, and 3D rendering.
-* **Redesigned Mobile-Friendly UI (`PeGLSurfaceView` & `PeTouchController`)**:
-  * **Circular Virtual Joystick & Ergonomic Action Pads**: Smooth circular thumbstick ring + glowing puck (or 5-button D-Pad), circular right-thumb `[MINE]`, `[PLACE]`, and `[JUMP]` pads with item icons, top quick-action pills (`[|| PAUSE]`, `[BAG / CRAFT]`, and 1-tap `[FLY: ON/OFF]`), target block tooltip pill below the crosshair, and recessed 9-slot hotbar & inventory cards.
+* **Fixed Jittery Walking — True 120Hz Sub-Tick Camera & Smooth AABB Box Physics (`PeWorld` & `PeGLSurfaceView`)**:
+  * **120Hz Sub-Tick Camera & View-Bobbing Interpolation**: Fixed the 20Hz simulation stepping on 120Hz displays by snapshotting `prevPx, prevPy, prevPz, prevWalkDist, prevEyeHeight` before each 20Hz tick and interpolating camera position, eye height (when sneaking), and view bobbing with `partial = this.tickAccum` on every single 120Hz frame.
+  * **Smooth Independent-Axis AABB Box Collision**: Replaced single-point floor/corner checks with a `0.56 x 1.76` AABB bounding box that resolves X, Z, and Y independently, slides smoothly along walls, steps onto `0.5`-tall Slabs and Beds without vertical bouncing, auto-jumps `1.0`-tall blocks smoothly, and climbs Ladders.
+  * **Zero-Stutter Perlin Noise Streaming**: Ported PC Update 3.5's integer/polynomial `PerlinNoise` (`Noise.java`) to eliminate `Math.sin`/`Math.cos` calls during chunk generation and capped streaming while walking to 1 new chunk per tick.
+* **PC Update 3.5+ Visuals — 3D Sky, Sun/Moon/Stars, Clouds, Smooth AO & 3D Bushy Leaves (`PeChunkMesher` & `PeTextures`)**:
+  * **3D Sky Dome & Volumetric Clouds**: Added orbiting 3D **Sun (`T_SUN`)** and **Moon (`T_MOON`)**, twinkling **Night Starfield**, warm golden-orange **Sunrise/Sunset Twilight Horizon Glow**, and a drifting **3D Volumetric Cloud Layer (`Y = 104`)**.
+  * **Smooth Corner Ambient Occlusion (AO) & Natural Tone Variation**: Added per-vertex corner AO shading (`aoNW, aoSW, aoSE, aoNE`) on top and side faces plus Update 3.19 natural block-to-block tone variation (`blockVariation`).
+  * **3D Bushy Leaf Fronds & Birch Trees**: Added `T_BUSHY_FROND_OAK`, `T_BUSHY_FROND_SPRUCE`, and `T_BUSHY_FROND_BIRCH` crossed 3D foliage fronds protruding from exposed tree canopy leaves, plus white-bark **Birch Logs (`T_LOG_BIRCH_SIDE`)** and golden-olive **Birch Leaves (`T_LEAVES_BIRCH`)**.
+  * **Animated Water & Lava**: Smoothly animates `T_WATER` and `T_LAVA` on the GPU texture atlas via `glTexSubImage2D`.
+* **PC Update 3.5+ Blocks, Crops, Structures, Tree Felling & Categorized Inventory**:
+  * **Custom 3D Block Shapes**: Added half-height **Oak, Cobblestone & Stone Brick Slabs**, connecting **Oak Fences** (post + auto-connecting rails), 2-block **Oak Doors** with window lattice, climbable **Wall Ladders**, recessed **Wet Farmland**, inset **Storage Chests & Cacti**, and **Beds** (with night-skipping & spawn point setting).
+  * **Farming Crops & Autumn Blocks**: Added **Ripe Wheat**, **Sugar Cane** along water shores, **Pumpkins**, glowing **Jack o'Lanterns**, **Melons**, and banded **Hay Bales**.
+  * **Multi-Building Starter Village, Desert Pyramids & Watchtowers**: Generates a starter village with an **Oak Cottage**, **Fenced Wheat & Pumpkin Farm**, and **Blacksmith Forge**, plus **Desert Pyramids** (with hidden Gold/Chest treasure chamber) and **Stonebrick Watchtowers** across the infinite world.
+  * **Tree Felling (Update 3.10)**: Chopping the base log of a natural tree in Survival mode fells the connected trunk logs above it and awards the harvested wood.
+  * **3-Tab Categorized Inventory & 24 Crafting/Smelting Recipes**: Added **Building Blocks**, **Nature & Decor**, and **Tools & Combat** category tabs in the Inventory & Crafting Workshop (`72` items & `24` survival recipes).
 """
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.1"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.2"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")

@@ -594,11 +594,12 @@ public final class PeTouchController {
          return;
       }
 
-      // Top-Right [ X CLOSE ] button
       float panelW = 1940.0F * scale;
       float panelH = 790.0F * scale;
       float px = (this.screenW - panelW) * 0.5F;
       float py = 90.0F * scale;
+
+      // Top-Right [ X CLOSE ] button
       if (inRect(x, y, px + panelW - 230.0F * scale, py + 18.0F * scale, 210.0F * scale, 74.0F * scale)
          || !inRect(x, y, px, py, panelW, panelH)) {
          world.screen = PeWorld.SCREEN_PLAY;
@@ -606,21 +607,37 @@ public final class PeTouchController {
          return;
       }
 
-      // Left Half (Creative/Block Palette): 7 cols x 4 rows
-      int cols = 7;
-      float cell = 132.0F * scale;
-      float startX = px + 36.0F * scale;
-      float startY = py + 120.0F * scale;
-      for (int i = 0; i < PALETTE_ITEMS.length; i++) {
+      // 3 Category Tabs in Header Bar: [ BUILDING BLOCKS ]  [ NATURE & DECOR ]  [ TOOLS & COMBAT ]
+      float tabY = py + 18.0F * scale;
+      float tabH = 74.0F * scale;
+      float tabW = 360.0F * scale;
+      for (int t = 0; t < 3; t++) {
+         float tx = px + 520.0F * scale + t * (tabW + 16.0F * scale);
+         if (inRect(x, y, tx, tabY, tabW, tabH)) {
+            world.invCategory = t;
+            if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
+            return;
+         }
+      }
+
+      int cat = Math.max(0, Math.min(2, world.invCategory));
+      int[] catItems = PeWorld.CREATIVE_TABS[cat];
+
+      // Left Half (24 Category Blocks/Items): 6 cols x 4 rows
+      int cols = 6;
+      float cell = 148.0F * scale;
+      float startX = px + 38.0F * scale;
+      float startY = py + 150.0F * scale;
+      for (int i = 0; i < catItems.length; i++) {
          int c = i % cols;
          int r = i / cols;
          float bx = startX + c * cell;
          float by = startY + r * cell;
          if (inRect(x, y, bx, by, cell, cell)) {
-            int item = PALETTE_ITEMS[i];
+            int item = catItems[i];
             if (world.mode == PeWorld.MODE_CREATIVE) {
                world.hotbarId[world.selectedSlot] = item;
-               world.hotbarCount[world.selectedSlot] = (item <= 68) ? 64 : 1;
+               world.hotbarCount[world.selectedSlot] = (item <= PeWorld.MAX_BLOCK_ID) ? 64 : 1;
                world.showBanner("Equipped " + PeWorld.getItemName(item));
                if (audio != null) audio.playSfx("pop", 0.85F, 1.1F);
             } else {
@@ -631,17 +648,20 @@ public final class PeTouchController {
          }
       }
 
-      // Right Half (Single-Player Crafting Recipes): 2 cols x 6 rows
-      float craftStartX = px + 1010.0F * scale;
-      float craftColW = 436.0F * scale;
-      float craftRowH = 98.0F * scale;
-      for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
+      // Right Half (8 Category Crafting/Smelting Recipes): 2 cols x 4 rows
+      float craftStartX = px + 980.0F * scale;
+      float craftColW = 448.0F * scale;
+      float craftRowH = 132.0F * scale;
+      int baseRecipe = cat * 8;
+      for (int i = 0; i < 8; i++) {
+         int recipeIdx = baseRecipe + i;
+         if (recipeIdx >= PeWorld.RECIPES.length) break;
          int c = i & 1;
          int r = i >> 1;
          float bx = craftStartX + c * (craftColW + 18.0F * scale);
-         float by = startY + r * (craftRowH + 10.0F * scale);
+         float by = startY + r * (craftRowH + 16.0F * scale);
          if (inRect(x, y, bx, by, craftColW, craftRowH)) {
-            world.tryCraftRecipe(i, audio);
+            world.tryCraftRecipe(recipeIdx, audio);
             return;
          }
       }

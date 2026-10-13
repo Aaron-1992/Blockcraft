@@ -65,10 +65,15 @@ public final class PeTextures {
    public static final int T_MOSSY_COBBLE = 36;
    public static final int T_OBSIDIAN = 37;
    public static final int T_TALL_GRASS = 38;
+   public static final int T_LOG_BIRCH_SIDE = 39;
+   public static final int T_LEAVES_BIRCH = 40;
+   public static final int T_BUSHY_FROND_OAK = 41;
+   public static final int T_SUGAR_CANE = 42;
    public static final int T_CRAFT_TOP = 43;
    public static final int T_FURNACE_FRONT = 44;
    public static final int T_FURNACE_SIDE = 45;
    public static final int T_CRAFT_SIDE = 46;
+   public static final int T_WHEAT = 47;
 
    public static final int T_SPONGE = 48;
    public static final int T_GLASS = 49;
@@ -79,6 +84,13 @@ public final class PeTextures {
    public static final int T_STONEBRICK = 54;
    public static final int T_CRACKED_STONEBRICK = 55;
    public static final int T_MOSSY_STONEBRICK = 56;
+   public static final int T_PUMPKIN_SIDE = 57;
+   public static final int T_PUMPKIN_TOP = 58;
+   public static final int T_PUMPKIN_FACE = 59;
+   public static final int T_JACK_O_LANTERN = 60;
+   public static final int T_MELON_SIDE = 61;
+   public static final int T_MELON_TOP = 62;
+   public static final int T_HAY_SIDE = 63;
 
    public static final int T_WOOL_WHITE = 64;
    public static final int T_WOOL_RED = 65;
@@ -92,6 +104,10 @@ public final class PeTextures {
    public static final int T_CACTUS_SIDE = 73;
    public static final int T_SANDSTONE_TOP = 74;
    public static final int T_SANDSTONE_SIDE = 75;
+   public static final int T_HAY_TOP = 76;
+   public static final int T_DOOR_TOP = 77;
+   public static final int T_DOOR_BOTTOM = 78;
+   public static final int T_FARM_WET = 79;
    public static final int T_TORCH = 80;
    public static final int T_GLOWSTONE = 81;
    public static final int T_NETHERRACK = 82;
@@ -119,6 +135,11 @@ public final class PeTextures {
    public static final int T_PURPUR = 103;
    public static final int T_LADDER = 104;
    public static final int T_BARS = 105;
+   public static final int T_SUN = 106;
+   public static final int T_MOON = 107;
+   public static final int T_BUSHY_FROND_SPRUCE = 108;
+   public static final int T_BUSHY_FROND_BIRCH = 109;
+   public static final int T_FURNACE_LIT = 110;
 
    // Crack animation stages (112..121)
    public static final int T_CRACK_0 = 112;
@@ -152,6 +173,11 @@ public final class PeTextures {
    public static final int T_HEART_EMPTY = 153;
    public static final int T_HUNGER_FULL = 154;
    public static final int T_HUNGER_EMPTY = 155;
+   public static final int T_ITEM_IRON_INGOT = 156;
+   public static final int T_ITEM_GOLD_INGOT = 157;
+   public static final int T_ITEM_DIAMOND = 158;
+   public static final int T_ITEM_COAL = 159;
+   public static final int T_ITEM_BREAD = 160;
 
    public static final int FONT_COLS = 16;
    public static final int FONT_CELL_W = 8;
@@ -328,9 +354,13 @@ public final class PeTextures {
       blitTile(px, T_SNOW_SIDE, paintGrassSide(true));
       blitTile(px, T_TALL_GRASS, paintTallGrass());
 
-      // 2. Crisp Pixel-Art Leaves (Update 3.19 overlapping leaflet blades with cast shadows & sky gaps)
+      // 2. Crisp Pixel-Art Leaves & 3D Bushy Fronds (Update 3.19 overlapping leaflet blades with cast shadows & sky gaps)
       blitTile(px, T_LEAVES_OAK, paintLeaves(0, 0.34F, 0.78F, 0.24F));
       blitTile(px, T_LEAVES_SPRUCE, paintLeaves(1, 0.26F, 0.58F, 0.30F));
+      blitTile(px, T_LEAVES_BIRCH, paintLeaves(2, 0.48F, 0.76F, 0.32F));
+      blitTile(px, T_BUSHY_FROND_OAK, paintBushyFrond(0.34F, 0.78F, 0.24F));
+      blitTile(px, T_BUSHY_FROND_SPRUCE, paintBushyFrond(0.26F, 0.58F, 0.30F));
+      blitTile(px, T_BUSHY_FROND_BIRCH, paintBushyFrond(0.48F, 0.76F, 0.32F));
 
       // 3. Stone, Cobble, Mossy Cobble, Bedrock, Sand, Gravel, Sandstone
       blitTile(px, T_STONE, paintStone(101));
@@ -349,6 +379,7 @@ public final class PeTextures {
       blitTile(px, T_LOG_OAK_SIDE, paintLogSide(c(0x47361F), c(0x634C2D), c(0x785D38), c(0x8B6E44), 601));
       blitTile(px, T_LOG_OAK_TOP, paintLogTop(c(0x523E24), c(0x6B5231), c(0xAA8954), c(0x947344), c(0xBFA067), 602));
       blitTile(px, T_LOG_SPRUCE, paintLogSide(c(0x281B0E), c(0x3B2814), c(0x4A331B), c(0x5A3F22), 603));
+      blitTile(px, T_LOG_BIRCH_SIDE, paintBirchSide());
       blitTile(px, T_PLANKS_OAK, paintPlanks(c(0xA6834E), 701));
       blitTile(px, T_PLANKS_SPRUCE, paintPlanks(c(0x725432), 702));
       blitTile(px, T_PLANKS_BIRCH, paintPlanks(c(0xD4C388), 703));
@@ -369,10 +400,11 @@ public final class PeTextures {
       blitTile(px, T_OBSIDIAN, paintObsidian());
       blitTile(px, T_GLOWSTONE, paintGlowstone());
 
-      // 7. Utility Blocks (Crafting Table, Furnace, Chest, Bookshelf, TNT, Torch, Ladder, Bed, Bars)
+      // 7. Utility Blocks, Crops & Decor (Crafting Table, Furnace, Chest, Bookshelf, TNT, Torch, Ladder, Bed, Bars, Doors, Crops, Pumpkins, Melons, Hay)
       blitTile(px, T_CRAFT_TOP, paintCraftTop());
       blitTile(px, T_CRAFT_SIDE, paintCraftSide());
       blitTile(px, T_FURNACE_FRONT, paintFurnaceFront(false));
+      blitTile(px, T_FURNACE_LIT, paintFurnaceFront(true));
       blitTile(px, T_FURNACE_SIDE, paintStoneBrick(false, false));
       blitTile(px, T_CHEST_TOP, paintChestTop());
       blitTile(px, T_CHEST_SIDE, paintChestSide(false));
@@ -385,6 +417,21 @@ public final class PeTextures {
       blitTile(px, T_LADDER, paintLadder());
       blitTile(px, T_BED_RED, paintBedTop());
       blitTile(px, T_BARS, paintBars());
+      blitTile(px, T_DOOR_TOP, paintDoor(true));
+      blitTile(px, T_DOOR_BOTTOM, paintDoor(false));
+      blitTile(px, T_FARM_WET, paintFarmland(true));
+      blitTile(px, T_WHEAT, paintWheat(7));
+      blitTile(px, T_SUGAR_CANE, paintSugarCane());
+      blitTile(px, T_PUMPKIN_SIDE, paintPumpkinSide());
+      blitTile(px, T_PUMPKIN_TOP, paintPumpkinTop());
+      blitTile(px, T_PUMPKIN_FACE, paintPumpkinFace(false));
+      blitTile(px, T_JACK_O_LANTERN, paintPumpkinFace(true));
+      blitTile(px, T_MELON_SIDE, paintMelonSide());
+      blitTile(px, T_MELON_TOP, paintMelonTop());
+      blitTile(px, T_HAY_SIDE, paintHaySide());
+      blitTile(px, T_HAY_TOP, paintHayTop());
+      blitTile(px, T_SUN, paintSunTile());
+      blitTile(px, T_MOON, paintMoonTile());
 
       // 8. Fluids, Snow, Ice, Plants, Flowers, Cactus
       blitTile(px, T_WATER, paintWaterFrame(0));
@@ -455,7 +502,49 @@ public final class PeTextures {
       blitTile(px, T_HUNGER_FULL, paintHungerTile(0xFFD47A2A, 0xFFFFB868, 0xFF341808));
       blitTile(px, T_HUNGER_EMPTY, paintHungerTile(0xFF322216, 0xFF4C3624, 0xFF160C06));
 
+      blitTile(px, T_ITEM_IRON_INGOT, bevelSprite(paintIngotSprite(0xD8DCE2, 0xF4F8FF, 0x8E949E), T_ITEM_IRON_INGOT));
+      blitTile(px, T_ITEM_GOLD_INGOT, bevelSprite(paintIngotSprite(0xF6CE28, 0xFFF28E, 0xAA7E12), T_ITEM_GOLD_INGOT));
+      blitTile(px, T_ITEM_DIAMOND, bevelSprite(paintGemSprite(0x4CF2E8, 0xC8FFFF, 0x1E9690), T_ITEM_DIAMOND));
+      blitTile(px, T_ITEM_COAL, bevelSprite(paintCoalSprite(), T_ITEM_COAL));
+      blitTile(px, T_ITEM_BREAD, bevelSprite(paintBreadSprite(), T_ITEM_BREAD));
+
       return px;
+   }
+
+   private int lastAnimFrame = -1;
+   private ByteBuffer fluidSubBuf;
+
+   /** Smoothly animates Water (tile 14) and Lava (tile 15) on the GPU atlas every 3 ticks (Update 3.9 Tex.animate). */
+   public void updateFluidAnimations(int worldTick) {
+      if (this.atlasTexId == 0) return;
+      int frame = (worldTick / 3) & 31;
+      if (frame == this.lastAnimFrame) return;
+      this.lastAnimFrame = frame;
+      if (this.fluidSubBuf == null) {
+         this.fluidSubBuf = ByteBuffer.allocateDirect(16 * 16 * 4).order(ByteOrder.nativeOrder());
+      }
+      GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, this.atlasTexId);
+      uploadSubTile(T_WATER, paintWaterFrame(frame));
+      uploadSubTile(T_LAVA, paintLavaFrame(frame / 2));
+   }
+
+   private void uploadSubTile(int tile, int[] argb) {
+      this.fluidSubBuf.clear();
+      for (int i = 0; i < 256; i++) {
+         int p = argb[i];
+         int a = (p >>> 24) & 0xFF;
+         int r = (p >>> 16) & 0xFF;
+         int g = (p >>> 8) & 0xFF;
+         int b = p & 0xFF;
+         this.fluidSubBuf.put((byte)r);
+         this.fluidSubBuf.put((byte)g);
+         this.fluidSubBuf.put((byte)b);
+         this.fluidSubBuf.put((byte)a);
+      }
+      this.fluidSubBuf.flip();
+      int tx0 = (tile & 15) * 16;
+      int ty0 = (tile >> 4) * 16;
+      GLES20.glTexSubImage2D(GLES20.GL_TEXTURE_2D, 0, tx0, ty0, 16, 16, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, this.fluidSubBuf);
    }
 
    // ====================================================================
@@ -1821,6 +1910,325 @@ public final class PeTextures {
       cv.ell(6.2, 6.6, 2.0, 2.0, hiHex);
       cv.shade();
       return cv.p;
+   }
+
+   private static int[] paintIngotSprite(int bodyHex, int hiHex, int darkHex) {
+      Cv cv = new Cv();
+      for (int y = 5; y <= 11; y++) {
+         int shift = (11 - y) / 2;
+         for (int x = 3 + shift; x <= 11 + shift; x++) {
+            int col = (y <= 6 || x == 3 + shift) ? hiHex : ((y >= 10 || x == 11 + shift) ? darkHex : bodyHex);
+            cv.set(x, y, col);
+         }
+      }
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] paintGemSprite(int bodyHex, int hiHex, int darkHex) {
+      Cv cv = new Cv();
+      cv.ell(7.5, 8.0, 4.4, 5.2, bodyHex);
+      cv.ell(6.4, 6.6, 2.0, 2.4, hiHex);
+      cv.line(5, 11, 10, 11, darkHex);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] paintCoalSprite() {
+      Cv cv = new Cv();
+      cv.ell(7.5, 8.5, 4.6, 4.2, 0x2C2C32);
+      cv.ell(6.2, 7.2, 2.2, 1.8, 0x4C4C56);
+      cv.set(9, 10, 0x1A1A1E);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] paintBreadSprite() {
+      Cv cv = new Cv();
+      cv.ell(7.5, 8.5, 5.6, 3.8, 0xC89038);
+      cv.ell(7.0, 7.5, 4.2, 2.2, 0xE6B452);
+      cv.line(5, 7, 6, 8, 0x9C6820);
+      cv.line(8, 7, 9, 8, 0x9C6820);
+      cv.shade();
+      return cv.p;
+   }
+
+   private static int[] paintBirchSide() {
+      int[] pal = {c(0xCFCCB8), c(0xD8D5C2), c(0xE0DDCC), c(0xE8E6D8)};
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float v = vn(x + 0.5F, (y + 0.5F) * 0.4F, 8, 31) * 0.6F + hash(x, y, 32) * 0.4F;
+            p[y * N + x] = step(pal, contrast(v, 1.8F));
+         }
+      }
+      Random r = new Random(31 * 341873128712L + 0xB10C4C2AF7L);
+      for (int i = 0; i < 9; i++) {
+         int x = r.nextInt(N);
+         int y = r.nextInt(N);
+         int len = 2 + r.nextInt(4);
+         for (int k = 0; k < len; k++) {
+            p[(y & 15) * N + ((x + k) & 15)] = c(0x3C3834);
+            if (k == 0 || r.nextInt(3) == 0) {
+               p[((y - 1) & 15) * N + ((x + k) & 15)] = c(0xB8B4A2);
+            }
+            if (r.nextInt(3) != 0) {
+               p[((y + 1) & 15) * N + ((x + k) & 15)] = c(0xBDB9A6);
+            }
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintBushyFrond(float kr, float kg, float kb) {
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float dx = (x + 0.5F - 8.0F) / 8.0F;
+            float dy = (y + 0.5F - 8.0F) / 8.0F;
+            double ang = Math.atan2(dy, dx);
+            float r = (float)Math.hypot(dx, dy);
+            float lobe = 0.94F + 0.14F * (float)Math.cos(ang * 5.0 + 0.4) + 0.10F * (float)Math.sin(ang * 7.0);
+            if (r <= lobe) {
+               if (r > 0.35F && hash(x, y, 6425) < 0.22F) {
+                  continue;
+               }
+               int base = (int)(136.0F - dy * 16.0F + (hash(x, y, 6420) - 0.5F) * 18.0F);
+               p[y * N + x] = tintRgb(rgb(base, base, base), kr, kg, kb);
+            }
+         }
+      }
+      int[][] sprays = {
+         {2, 2, 0}, {6, 1, 1}, {10, 1, 0}, {12, 3, 1},
+         {1, 6, 1}, {5, 5, 0}, {9, 4, 1}, {12, 7, 0},
+         {1, 10, 0}, {4, 9, 1}, {8, 8, 0}, {11, 10, 1},
+         {3, 12, 0}, {7, 12, 1}, {10, 12, 0}, {6, 6, 1}
+      };
+      for (int i = 0; i < sprays.length; i++) {
+         paintLeaflet(p, sprays[i][0], sprays[i][1], sprays[i][2], 6430 + i * 17, kr, kg, kb);
+      }
+      return p;
+   }
+
+   private static int[] paintDoor(boolean upper) {
+      int[] p = paintPlanks(c(0xA6834E), 701);
+      int frame = c(0x6E502A);
+      int bevL = c(0xBA9458);
+      int bevD = c(0x4E361A);
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            if (x < 2 || x >= 14 || (upper ? y < 2 || y >= 13 : y < 2 || y >= 14 || y == 7 || y == 8)) {
+               p[y * N + x] = (x == 0 || y == 0) ? bevL : ((x == 15 || y == 15) ? bevD : frame);
+            }
+         }
+      }
+      if (upper) {
+         for (int y = 3; y < 12; y++) {
+            for (int x = 3; x < 13; x++) {
+               boolean bar = x == 7 || x == 8 || y == 7;
+               p[y * N + x] = bar ? frame : 0;
+            }
+         }
+      } else {
+         for (int y = 3; y < 13; y++) {
+            if (y == 7 || y == 8) continue;
+            for (int x = 3; x < 13; x++) {
+               p[y * N + x] = mul(p[y * N + x], (x == 3 || y == 3 || y == 9) ? 0.80F : 0.92F);
+            }
+         }
+         p[1 * N + 12] = c(0xD8DCDF);
+         p[1 * N + 13] = c(0x787C82);
+         p[2 * N + 12] = c(0x989CA2);
+      }
+      return p;
+   }
+
+   private static int[] paintFarmland(boolean wet) {
+      int[] p = new int[N * N];
+      int[] pal = wet
+         ? new int[]{c(0x28170A), c(0x362010), c(0x442A16), c(0x52341C)}
+         : new int[]{c(0x583C22), c(0x6C4B2C), c(0x7E5A36), c(0x906840)};
+      for (int y = 0; y < N; y++) {
+         int fy = y & 3;
+         float ridge = fy == 0 ? 0.15F : (fy == 1 ? 0.55F : (fy == 2 ? 0.88F : 0.45F));
+         for (int x = 0; x < N; x++) {
+            float v = ridge * 0.72F + hash(x, y, wet ? 203 : 170) * 0.28F;
+            p[y * N + x] = step(pal, v);
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintWheat(int stage) {
+      int[] p = new int[N * N];
+      int h = Math.min(15, 3 + stage * 2);
+      int[] xs = {1, 3, 6, 8, 11, 14};
+      for (int i = 0; i < xs.length; i++) {
+         int x0 = xs[i];
+         int sh = Math.max(2, h - (i & 1));
+         for (int k = 0; k < sh; k++) {
+            int y = 15 - k;
+            float frac = k / (float)Math.max(1, sh - 1);
+            int col = frac > 0.5F ? (k % 2 == 0 ? c(0xF0CA4E) : c(0xD4A632)) : c(0x9E8228);
+            p[y * N + x0] = col;
+            if (frac > 0.55F && x0 + 1 < N) {
+               p[y * N + x0 + 1] = mul(col, 0.88F);
+            }
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintSugarCane() {
+      int[] p = new int[N * N];
+      int[] cols = {2, 6, 10, 13};
+      for (int i = 0; i < cols.length; i++) {
+         int x = cols[i];
+         for (int y = 0; y < N; y++) {
+            boolean node = (y + i * 2) % 5 == 0;
+            int cL = node ? c(0xA8D870) : c(0x78B848);
+            int cR = node ? c(0x82B250) : c(0x56902E);
+            p[y * N + x] = cL;
+            p[y * N + x + 1] = cR;
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintPumpkinSide() {
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            int rib = x & 3;
+            int base = rib == 0 ? c(0xAC5612) : (rib == 1 ? c(0xE47E1E) : (rib == 2 ? c(0xD46E18) : c(0xC05E14)));
+            float v = (fbm(x, y, 222) - 0.5F) * 0.16F;
+            if (y == 0 || y == 15) v -= 0.08F;
+            p[y * N + x] = mul(base, 1.0F + v);
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintPumpkinTop() {
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float dx = x - 7.5F;
+            float dy = y - 7.5F;
+            float r = (float)Math.hypot(dx, dy);
+            if (r < 2.2F) {
+               p[y * N + x] = r < 1.2F ? c(0x6E582C) : c(0x4E3E1E);
+            } else {
+               boolean groove = Math.abs(dx) < 0.8F || Math.abs(dy) < 0.8F || Math.abs(Math.abs(dx) - Math.abs(dy)) < 0.9F;
+               int base = groove ? c(0xB45C14) : c(0xDC761C);
+               p[y * N + x] = mul(base, 0.94F + 0.12F * fbm(x, y, 223));
+            }
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintPumpkinFace(boolean lit) {
+      int[] p = paintPumpkinSide();
+      String[] mask = {
+         "................",
+         "................",
+         "................",
+         "..###......###..",
+         "..####....####..",
+         "...###....###...",
+         ".......##.......",
+         "......####......",
+         "................",
+         "..##..####..##..",
+         ".##############.",
+         "..###..##..###..",
+         "...##......##...",
+         "................",
+         "................",
+         "................"
+      };
+      for (int y = 0; y < N; y++) {
+         String row = mask[y];
+         for (int x = 0; x < N; x++) {
+            if (row.charAt(x) == '#') {
+               p[y * N + x] = lit ? ((y == 4 || y == 10) ? c(0xFFF498) : c(0xF8B828)) : c(0x321808);
+            } else if (y > 0 && mask[y - 1].charAt(x) == '#') {
+               p[y * N + x] = lit ? c(0xF08818) : c(0x7A380C);
+            }
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintMelonSide() {
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            int rib = x & 3;
+            int base = rib == 0 ? c(0x3E681A) : (rib == 1 ? c(0x74A22C) : (rib == 2 ? c(0x88B436) : c(0x588422)));
+            float v = (hash(x, y, 226) - 0.5F) * 0.14F;
+            p[y * N + x] = mul(base, 1.0F + v);
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintMelonTop() {
+      int[] p = paintMelonSide();
+      p[7 * N + 7] = p[7 * N + 8] = p[8 * N + 7] = p[8 * N + 8] = c(0x9EB850);
+      return p;
+   }
+
+   private static int[] paintHayTop() {
+      int[] pal = {c(0xA68420), c(0xC29E2A), c(0xD8B436), c(0xECC844)};
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float v = vn(x * 2.0F + 0.5F, y + 0.5F, 8, 212) * 0.65F + hash(x, y, 213) * 0.35F;
+            p[y * N + x] = step(pal, contrast(v, 2.0F));
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintHaySide() {
+      int[] p = paintHayTop();
+      for (int y : new int[]{3, 4, 11, 12}) {
+         for (int x = 0; x < N; x++) {
+            p[y * N + x] = (y == 3 || y == 11) ? c(0xB83224) : c(0x862218);
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintSunTile() {
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            int d = Math.max(Math.abs(x - 7) - (x >= 8 ? 1 : 0), Math.abs(y - 7) - (y >= 8 ? 1 : 0));
+            if (d <= 4) {
+               p[y * N + x] = d <= 2 ? c(0xFFFFE8) : c(0xFFE878);
+            } else if (d <= 6) {
+               p[y * N + x] = (180 << 24) | 0xFFCE42;
+            } else if (d == 7) {
+               p[y * N + x] = (72 << 24) | 0xFFA824;
+            }
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintMoonTile() {
+      int[] p = new int[N * N];
+      for (int y = 2; y <= 13; y++) {
+         for (int x = 2; x <= 13; x++) {
+            boolean rim = x == 2 || x == 13 || y == 2 || y == 13;
+            boolean crater = (x >= 5 && x <= 7 && y >= 5 && y <= 6) || (x >= 9 && x <= 11 && y >= 8 && y <= 10) || (x == 6 && y == 10);
+            p[y * N + x] = rim ? c(0xB8C6DC) : (crater ? c(0x98A8C2) : c(0xE8F0FF));
+         }
+      }
+      return p;
    }
 
    private static int[] paintHeartTile(int fillArgb, int hiArgb, int borderArgb) {

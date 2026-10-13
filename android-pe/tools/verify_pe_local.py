@@ -225,6 +225,7 @@ public class GLES20 {
    public static void glActiveTexture(int tex) {}
    public static void glTexParameteri(int t, int p, int v) {}
    public static void glTexImage2D(int t, int l, int inf, int w, int h, int b, int f, int ty, Buffer px) {}
+   public static void glTexSubImage2D(int t, int l, int x, int y, int w, int h, int f, int ty, Buffer px) {}
    public static void glGenBuffers(int n, int[] bufs, int off) { for (int i=0;i<n;i++) bufs[off+i] = nextId++; }
    public static void glBindBuffer(int target, int buf) {}
    public static void glBufferData(int target, int size, Buffer data, int usage) {}
@@ -407,6 +408,22 @@ public class PeCoreTest {
       touch.moveForward = 1.0F; // Walk FORWARD
       moveWorld.tick(touch, null);
       check(moveWorld.pz < startZ, "Walking FORWARD at yaw=0 must decrease Z (move toward -Z)");
+      check(moveWorld.prevPz == startZ && moveWorld.pz < moveWorld.prevPz,
+         "120Hz sub-tick interpolation must snapshot prevPz before tick so partialTick interpolates smoothly");
+
+      // Verify smooth 0.5-block Slab step-up on solid ground without vertical bounce
+      moveWorld.flying = false;
+      moveWorld.px = 5.5;
+      moveWorld.py = 64.0;
+      moveWorld.pz = 5.5;
+      moveWorld.onGround = true;
+      moveWorld.setBlock(5, 64, 4, PeWorld.B_SLAB_OAK);
+      touch.moveForward = 1.0F;
+      for (int t = 0; t < 6; t++) {
+         moveWorld.tick(touch, null);
+      }
+      check(Math.abs(moveWorld.py - 64.5) < 0.05,
+         "Walking onto a 0.5-height Oak Slab must step up smoothly to Y=64.5 without vertical bounce, got Y=" + moveWorld.py);
 
       // 4. Verify Camera Look Isolation (Dragging camera NEVER triggers mining, attack, or block place!)
       touch.resetPointers(moveWorld);

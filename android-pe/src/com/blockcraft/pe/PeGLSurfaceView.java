@@ -135,35 +135,55 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.panoramaYaw = (this.panoramaYaw + dt * 9.0F) % 360.0F;
       }
 
-      // Rebuild dirty chunk sections with a smooth frame budget
-      this.mesher.updateDirtySections(this.world, this.world.screen == PeWorld.SCREEN_PLAY ? 6 : 12);
+      // Animate Water & Lava tiles on the GPU atlas
+      this.textures.updateFluidAnimations((int)this.world.tickCount);
 
-      // Day/Night Sky & Horizon Fog color
+      // Rebuild dirty chunk sections with a smooth frame budget
+      this.mesher.updateDirtySections(this.world, this.world.screen == PeWorld.SCREEN_PLAY ? 4 : 12);
+
+      // PC Update 3.5+ Day/Night Sky & Sunrise/Sunset Twilight Horizon Glow
       float sun = (float)Math.sin(this.world.dayTime * Math.PI * 2.0);
-      float dayBright = Math.max(0.20F, Math.min(1.0F, 0.64F + sun * 0.44F));
-      float skyR = 0.42F * dayBright;
-      float skyG = 0.69F * dayBright;
-      float skyB = 0.98F * dayBright;
+      float dayBright = Math.max(0.22F, Math.min(1.0F, 0.64F + sun * 0.44F));
+      float twilight = Math.max(0.0F, 1.0F - Math.abs(sun) * 3.2F);
+      float skyR = 0.40F * dayBright + twilight * 0.36F;
+      float skyG = 0.68F * dayBright + twilight * 0.12F;
+      float skyB = 0.98F * dayBright - twilight * 0.14F;
 
       GLES20.glClearColor(skyR, skyG, skyB, 1.0F);
       GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-      // Build Right-Handed 3D Camera View & MVP Matrix
+      // 120Hz Sub-Tick Camera & View-Bobbing Interpolation (eliminates 20Hz walking jitter!)
       boolean isMenuPanorama = (this.world.screen == PeWorld.SCREEN_TITLE
          || this.world.screen == PeWorld.SCREEN_WORLD_SELECT
          || this.world.screen == PeWorld.SCREEN_CREATE_WORLD);
-      float camX = isMenuPanorama ? 0.5F : (float)this.world.px;
-      float camY = isMenuPanorama ? 74.0F : (float)(this.world.py + (this.touch.sneakHeld && !this.world.flying ? 1.46 : 1.62));
-      float camZ = isMenuPanorama ? 0.5F : (float)this.world.pz;
+      float partial = (this.world.screen == PeWorld.SCREEN_PLAY)
+         ? Math.max(0.0F, Math.min(1.0F, this.tickAccum)) : 1.0F;
+      float interpX = (float)(this.world.prevPx + (this.world.px - this.world.prevPx) * partial);
+      float interpY = (float)(this.world.prevPy + (this.world.py - this.world.prevPy) * partial);
+      float interpZ = (float)(this.world.prevPz + (this.world.pz - this.world.prevPz) * partial);
+      float interpEye = this.world.prevEyeHeight + (this.world.eyeHeight - this.world.prevEyeHeight) * partial;
+      float interpWalk = this.world.prevWalkDist + (this.world.walkDist - this.world.prevWalkDist) * partial;
+
       float useYaw = isMenuPanorama ? this.panoramaYaw : this.world.yaw;
       float usePitch = isMenuPanorama ? 11.0F : this.world.pitch;
-
       float yawRad = (float)Math.toRadians(useYaw);
       float pitchRad = (float)Math.toRadians(usePitch);
       float cosP = (float)Math.cos(pitchRad);
       float lookX = (float)(Math.sin(yawRad) * cosP);
       float lookY = (float)(-Math.sin(pitchRad));
       float lookZ = (float)(-Math.cos(yawRad) * cosP);
+      float rightX = (float)Math.cos(yawRad);
+      float rightZ = (float)Math.sin(yawRad);
+
+      // Smooth 120Hz View Bobbing while walking on solid ground
+      float walkBobY = (!isMenuPanorama && this.world.onGround && !this.world.flying)
+         ? (float)(Math.sin(interpWalk * 3.0F) * 0.028F) : 0.0F;
+      float walkBobSide = (!isMenuPanorama && this.world.onGround && !this.world.flying)
+         ? (float)(Math.cos(interpWalk * 1.5F) * 0.020F) : 0.0F;
+
+      float camX = isMenuPanorama ? 0.5F : (interpX + rightX * walkBobSide);
+      float camY = isMenuPanorama ? 74.0F : (interpY + interpEye + walkBobY);
+      float camZ = isMenuPanorama ? 0.5F : (interpZ + rightZ * walkBobSide);
 
       Matrix.setLookAtM(this.viewMatrix, 0,
          camX, camY, camZ,
@@ -181,35 +201,38 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       GLES20.glUniform3f(this.shaders.uFogColor, skyR, skyG, skyB);
       float fogEnd = (this.world.viewRadiusChunks + 0.5F) * 16.0F;
       GLES20.glUniform2f(this.shaders.uFogRange, fogEnd * 0.52F, fogEnd);
+      GLES20.glUniform4f(this.shaders.uTint, dayBright, dayBright, dayBright, 1.0F);
 
       this.mesher.drawWorldChunks(this.shaders, this.world, this.mvpMatrix, camX, camY, camZ,
          (float)Math.sin(yawRad), (float)(-Math.cos(yawRad)));
 
-      // 2. Render Target Block Selection Box, Crack Overlay & 1st-Person Hand/Tool
+      // 2. Render 3D Sky (Orbiting Sun, Moon, Stars & Drifting 3D Clouds) + Block Selection Box + 1st-Person Hand
+      GLES20.glDisable(GLES20.GL_CULL_FACE);
+      GLES20.glUniform4f(this.shaders.uTint, 1.0F, 1.0F, 1.0F, 1.0F);
+      GLES20.glUniform2f(this.shaders.uFogRange, fogEnd * 0.90F, fogEnd * 1.45F);
+      this.mesher.beginDynamic3D();
+      this.mesher.addSkyAndClouds3D(this.world, camX, camY, camZ, dayBright);
+
       int[] rayHit = null;
       if (!isMenuPanorama) {
-         GLES20.glDisable(GLES20.GL_CULL_FACE);
-         this.mesher.beginDynamic3D();
-
          rayHit = this.world.raycastBlock(5.0);
          if (rayHit != null) {
             float bx = rayHit[0];
             float by = rayHit[1];
             float bz = rayHit[2];
+            float bh = Math.max(0.5F, (float)PeWorld.getBlockHeight((byte)rayHit[6]));
             int crackStage = Math.min(9, (int)(this.world.mineProgress * 10.0F));
             if (this.world.mineProgress > 0.02F) {
-               this.mesher.addBox3D(bx - 0.006F, by - 0.006F, bz - 0.006F, bx + 1.006F, by + 1.006F, bz + 1.006F,
+               this.mesher.addBox3D(bx - 0.006F, by - 0.006F, bz - 0.006F, bx + 1.006F, by + bh + 0.006F, bz + 1.006F,
                   PeTextures.T_CRACK_0 + crackStage, 1.0F, 1.0F, 1.0F, 0.88F);
             } else {
-               this.mesher.addBox3D(bx - 0.005F, by - 0.005F, bz - 0.005F, bx + 1.005F, by + 1.005F, bz + 1.005F,
+               this.mesher.addBox3D(bx - 0.005F, by - 0.005F, bz - 0.005F, bx + 1.005F, by + bh + 0.005F, bz + 1.005F,
                   PeTextures.T_GLASS, 1.0F, 1.0F, 1.0F, 0.22F);
             }
          }
 
-         // First-Person Held Block / Tool with walk bobbing & swing animation
-         float rightX = (float)Math.cos(yawRad);
-         float rightZ = (float)Math.sin(yawRad);
-         float bob = (float)Math.sin(this.world.walkDist * 2.2F) * 0.018F;
+         // First-Person Held Block / Tool with smooth 120Hz walk bobbing & swing animation
+         float bob = (float)Math.sin(interpWalk * 2.4F) * 0.018F;
          float sw = this.world.swingAnim >= 0.0F ? (float)Math.sin(this.world.swingAnim * Math.PI) * 0.22F : 0.0F;
          float hx = camX + lookX * (0.58F - sw * 0.4F) + rightX * 0.36F;
          float hy = camY + lookY * 0.58F - 0.28F + sw * 0.15F + bob;
@@ -218,8 +241,8 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          int heldTile = PeWorld.getItemTile(heldId);
          this.mesher.addBox3D(hx - 0.10F, hy - 0.10F, hz - 0.10F, hx + 0.10F, hy + 0.10F, hz + 0.10F,
             heldTile, dayBright, dayBright, dayBright, 1.0F);
-         this.mesher.flushDynamic3D(this.shaders);
       }
+      this.mesher.flushDynamic3D(this.shaders);
 
       // 3. Render 2D Mobile UI / HUD
       GLES20.glDisable(GLES20.GL_DEPTH_TEST);
@@ -347,10 +370,10 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.mesher.begin2D();
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
          this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 142.0F * scale, 6.4F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "v1.1  -  INFINITE WORLDS  |  PIXEL-ART TEXTURE OVERHAUL", cx, 304.0F * scale, 2.8F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "v1.2  -  PC 3.5+ OVERHAUL  |  120Hz SMOOTH WALKING & 3D SKY", cx, 304.0F * scale, 2.75F * scale, 0xFF98FFB8);
          this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 538.0F * scale, 4.1F * scale, 0xFFFFFFFF);
          this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 690.0F * scale, 3.8F * scale, 0xFFE4F2FF);
-         this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz OpenGL ES Infinite Chunk Engine", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
+         this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz Sub-Tick Physics & Infinite Chunks", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
       } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
          float pw = 1540.0F * scale;
          float px = cx - pw * 0.5F;
@@ -395,51 +418,69 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
    }
 
    // ====================================================================
-   //  Single-Player Inventory & Crafting Screen
+   //  Single-Player Categorized Inventory & 24-Recipe Crafting Screen
    // ====================================================================
    private void renderInventoryAndCraftingScreen(float scale) {
       float panelW = 1940.0F * scale;
       float panelH = 790.0F * scale;
       float px = (this.width - panelW) * 0.5F;
       float py = 90.0F * scale;
+      int cat = Math.max(0, Math.min(2, this.world.invCategory));
+      int[] catItems = PeWorld.CREATIVE_TABS[cat];
+      int baseRecipe = cat * 8;
 
       this.mesher.begin2D();
       this.mesher.addRect2D(0, 0, this.width, this.height, 0x88080C14);
       this.mesher.drawCard2D(px, py, panelW, panelH, 0xF2121620, 0xFF3A5270);
-      this.mesher.addRect2D(px + 18.0F * scale, py + 16.0F * scale, panelW - 36.0F * scale, 78.0F * scale, 0xD81A2230);
+      this.mesher.addRect2D(px + 18.0F * scale, py + 16.0F * scale, panelW - 36.0F * scale, 80.0F * scale, 0xD81A2230);
+
+      // 3 Category Tab Buttons in Header Bar
+      float tabY = py + 18.0F * scale;
+      float tabH = 74.0F * scale;
+      float tabW = 360.0F * scale;
+      for (int t = 0; t < 3; t++) {
+         float tx = px + 520.0F * scale + t * (tabW + 16.0F * scale);
+         boolean activeTab = (t == cat);
+         this.mesher.drawButton2D(tx, tabY, tabW, tabH,
+            activeTab ? 0xFF285842 : 0xFF202A3A,
+            activeTab ? 0xFF54E882 : 0xFF4A6688, activeTab);
+      }
+
+      // Close Button
       this.mesher.drawButton2D(px + panelW - 230.0F * scale, py + 18.0F * scale, 210.0F * scale, 74.0F * scale, 0xFF682626, 0xFFFF6868, false);
 
-      // Left Half: 7x4 Recessed Block/Item Slot Grid
-      int[] pal = PeTouchController.getPaletteItems();
-      int cols = 7;
-      float cell = 132.0F * scale;
-      float startX = px + 36.0F * scale;
-      float startY = py + 120.0F * scale;
+      // Left Half: 6x4 Recessed Block/Item Slot Grid (24 Items per Category Tab)
+      int cols = 6;
+      float cell = 148.0F * scale;
+      float startX = px + 38.0F * scale;
+      float startY = py + 150.0F * scale;
       int curHeld = this.world.hotbarId[this.world.selectedSlot];
-      for (int i = 0; i < pal.length; i++) {
+      for (int i = 0; i < catItems.length; i++) {
          int c = i % cols;
          int r = i / cols;
-         boolean isEquipped = (pal[i] == curHeld);
+         boolean isEquipped = (catItems[i] == curHeld);
          this.mesher.drawSlot2D(startX + c * cell + 6.0F * scale, startY + r * cell + 6.0F * scale,
             cell - 12.0F * scale, isEquipped, 0);
       }
 
-      // Right Half: 2x6 Crafting Workshop Cards
-      float craftStartX = px + 1010.0F * scale;
-      float craftColW = 436.0F * scale;
-      float craftRowH = 98.0F * scale;
-      for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
+      // Right Half: 2x4 Large Crafting/Smelting Cards (8 Recipes per Category Tab)
+      float craftStartX = px + 980.0F * scale;
+      float craftColW = 448.0F * scale;
+      float craftRowH = 132.0F * scale;
+      for (int i = 0; i < 8; i++) {
+         int recipeIdx = baseRecipe + i;
+         if (recipeIdx >= PeWorld.RECIPES.length) break;
          int c = i & 1;
          int r = i >> 1;
-         PeWorld.CraftRecipe rec = PeWorld.RECIPES[i];
+         PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
          boolean canCraft = (this.world.mode == PeWorld.MODE_CREATIVE)
             || (this.world.countItemInHotbar(rec.costId) >= rec.costCount);
          int bg = canCraft ? 0xFF224C34 : 0xFF202632;
          int acc = canCraft ? 0xFF54E882 : 0xFF425066;
          float rx = craftStartX + c * (craftColW + 18.0F * scale);
-         float ry = startY + r * (craftRowH + 10.0F * scale);
+         float ry = startY + r * (craftRowH + 16.0F * scale);
          this.mesher.drawButton2D(rx, ry, craftColW, craftRowH, bg, acc, canCraft);
-         this.mesher.drawSlot2D(rx + 12.0F * scale, ry + 11.0F * scale, 76.0F * scale, false, 0xD8161C24);
+         this.mesher.drawSlot2D(rx + 14.0F * scale, ry + 18.0F * scale, 96.0F * scale, false, 0xD8161C24);
       }
 
       // Bottom 9-Slot Hotbar + [CLOSE] Slot
@@ -457,20 +498,22 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
 
       // Pass B: Crisp Pixel-Art Block & Item Icons
       this.mesher.begin2D();
-      for (int i = 0; i < pal.length; i++) {
+      for (int i = 0; i < catItems.length; i++) {
          int c = i % cols;
          int r = i / cols;
-         int tile = PeWorld.getItemTile(pal[i]);
-         this.mesher.addTile2D(startX + c * cell + 24.0F * scale, startY + r * cell + 24.0F * scale,
-            cell - 48.0F * scale, cell - 48.0F * scale, tile, 0xFFFFFFFF);
+         int tile = PeWorld.getItemTile(catItems[i]);
+         this.mesher.addTile2D(startX + c * cell + 26.0F * scale, startY + r * cell + 26.0F * scale,
+            cell - 52.0F * scale, cell - 52.0F * scale, tile, 0xFFFFFFFF);
       }
-      for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
+      for (int i = 0; i < 8; i++) {
+         int recipeIdx = baseRecipe + i;
+         if (recipeIdx >= PeWorld.RECIPES.length) break;
          int c = i & 1;
          int r = i >> 1;
-         PeWorld.CraftRecipe rec = PeWorld.RECIPES[i];
-         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 22.0F * scale;
-         float by = startY + r * (craftRowH + 10.0F * scale) + 21.0F * scale;
-         this.mesher.addTile2D(bx, by, 56.0F * scale, 56.0F * scale, PeWorld.getItemTile(rec.outId), 0xFFFFFFFF);
+         PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
+         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 28.0F * scale;
+         float by = startY + r * (craftRowH + 16.0F * scale) + 32.0F * scale;
+         this.mesher.addTile2D(bx, by, 68.0F * scale, 68.0F * scale, PeWorld.getItemTile(rec.outId), 0xFFFFFFFF);
       }
       for (int s = 0; s < 9; s++) {
          int id = this.world.hotbarId[s];
@@ -485,19 +528,40 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       // Pass C: Labels
       this.mesher.begin2D();
       String leftHdr = (this.world.mode == PeWorld.MODE_CREATIVE)
-         ? "CREATIVE PALETTE (TAP TO EQUIP)"
-         : "BLOCKS & ITEMS CATALOG";
-      this.mesher.addText2D(this.textures, leftHdr, startX, py + 36.0F * scale, 3.1F * scale, 0xFFFFEA68);
-      this.mesher.addText2D(this.textures, "CRAFTING WORKSHOP (TAP TO CRAFT)", craftStartX, py + 36.0F * scale, 3.1F * scale, 0xFF98FFB8);
+         ? "CREATIVE PALETTE"
+         : "CATALOG & CRAFTING";
+      this.mesher.addText2D(this.textures, leftHdr, startX, py + 36.0F * scale, 3.2F * scale, 0xFFFFEA68);
+
+      for (int t = 0; t < 3; t++) {
+         float tx = px + 520.0F * scale + t * (tabW + 16.0F * scale);
+         this.mesher.addTextCentered2D(this.textures, PeWorld.INV_TAB_NAMES[t],
+            tx + tabW * 0.5F, tabY + 23.0F * scale, 2.55F * scale,
+            t == cat ? 0xFFFFFFFF : 0xFFB8D4F0);
+      }
+
+      this.mesher.addText2D(this.textures, "TAP A RECIPE CARD TO CRAFT OR SMELT:", craftStartX, py + 114.0F * scale, 2.45F * scale, 0xFF98FFB8);
+      this.mesher.addText2D(this.textures,
+         this.world.mode == PeWorld.MODE_CREATIVE ? "TAP ANY BLOCK TO EQUIP IN HOTBAR:" : "TAP CATEGORY TABS ABOVE FOR MORE BLOCKS:",
+         startX, py + 114.0F * scale, 2.45F * scale, 0xFFB8E2FF);
       this.mesher.addTextCentered2D(this.textures, "CLOSE", px + panelW - 125.0F * scale, py + 38.0F * scale, 3.1F * scale, 0xFFFFFFFF);
 
-      for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
+      for (int i = 0; i < 8; i++) {
+         int recipeIdx = baseRecipe + i;
+         if (recipeIdx >= PeWorld.RECIPES.length) break;
          int c = i & 1;
          int r = i >> 1;
-         PeWorld.CraftRecipe rec = PeWorld.RECIPES[i];
-         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 96.0F * scale;
-         float by = startY + r * (craftRowH + 10.0F * scale) + 34.0F * scale;
-         this.mesher.addText2D(this.textures, rec.label, bx, by, 2.25F * scale, 0xFFFFFFFF);
+         PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
+         int have = this.world.countItemInHotbar(rec.costId);
+         boolean ok = (this.world.mode == PeWorld.MODE_CREATIVE) || (have >= rec.costCount);
+         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 122.0F * scale;
+         float by = startY + r * (craftRowH + 16.0F * scale);
+         this.mesher.addText2D(this.textures, rec.label, bx, by + 30.0F * scale, 2.25F * scale, 0xFFFFFFFF);
+         String status = (this.world.mode == PeWorld.MODE_CREATIVE)
+            ? "TAP TO EQUIP (" + rec.outCount + "x)"
+            : (ok ? "READY TO CRAFT! (" + have + "/" + rec.costCount + ")"
+                  : "Need " + rec.costCount + "x " + PeWorld.getItemName(rec.costId) + " (" + have + ")");
+         this.mesher.addText2D(this.textures, status, bx, by + 76.0F * scale, 2.05F * scale,
+            ok ? 0xFF88FFB0 : 0xFFFFB880);
       }
       for (int s = 0; s < 9; s++) {
          if (this.world.hotbarId[s] != PeWorld.B_AIR && this.world.hotbarCount[s] > 1) {
