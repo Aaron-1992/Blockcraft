@@ -727,6 +727,24 @@ SCENES["pixel-resources"] = (_P32_INV + ["-Dbc.tab=6", "-Dbc.page=0"], True)
 SCENES["pixel-workshop"] = ([a for a in SCENES["pixel-materials-plain"][0] if not a.startswith("-Dbc.cam=")] + ["-Dbc.cam=-14,67,4,0,13"], True)
 SCENES["pixel-nether"] = (SCENES["nether-vista-sh"][0], True)
 SCENES["pixel-plants"] = ([a for a in SCENES["pixel-materials-plain"][0] if not a.startswith("-Dbc.cam=")] + ["-Dbc.cam=8,67,22,0,8"], True)
+# Cohesion fixture: ordinary building blocks touch; identical camera/lighting with shaders off/on.
+# Deliberately away from the gallery displays so the comparison has no floating sample ceiling.
+_COH = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=2", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=4",
+        "-Dbc.win=1280x720", "-Dbc.cam=7,68,0,0,12", "-Dbc.shot=150", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.emptyhand=1"]
+_COH_ROWS = [
+    [4,27,1949,1947,67,5,66,69,160,1027,1953,1955],
+    [4,27,1948,1,68,5,66,69,1998,1027,1952,1956],
+]
+_COH_SET = []
+for _r, _row in enumerate(_COH_ROWS):
+    for _x, _id in enumerate(_row):
+        _COH_SET.append("%d,%d,8,%d" % (_x + 1, 68 - _r, _id))
+for _x in range(1,13):
+    for _z in range(1,9):
+        _COH_SET.append("%d,66,%d,%d" % (_x, _z, [4,27,5,17,1029,1941][_x % 6]))
+_COH += ["-Dbc.fill=0,65,0,14,65,9,1;0,66,0,14,74,9,0", "-Dbc.set=" + ";".join(_COH_SET)]
+SCENES["pixel-cohesion-plain"] = (_COH + ["-Dbc.shaders=false"], True)
+SCENES["pixel-cohesion-lit"] = (_COH, True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

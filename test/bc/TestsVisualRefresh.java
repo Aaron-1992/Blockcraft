@@ -103,6 +103,43 @@ final class TestsVisualRefresh {
             check((c>>16&255)==(c>>8&255)&&(c>>8&255)==(c&255),"biome/dye tint masks stay neutral " + t);
          }
       });
+      test("cohesive materials: shared timber, masonry grid and restrained cracks", () -> {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);
+         Tex.initPixels();
+         int[] base=TexPixel32.tile(Tex.STONEBRICK,TexOverhaulV57.readTile(Tex.STONEBRICK),false);
+         int[] cracked=TexMaterials32.paint(657);
+         int changes=0;
+         for(int y=0;y<32;y++)for(int x=0;x<32;x++) {
+            if(base[y*32+x]!=cracked[y*32+x])changes++;
+            if(y%8==0||(x+(y/8%2)*8)%16==0)
+               check(base[y*32+x]==cracked[y*32+x],"cracks preserve the approved mortar");
+         }
+         check(changes>15&&changes<70,"sparse local fractures, not stripes across the tile");
+         int total=0;
+         for(int c:TexMaterials32.paint(259)) {
+            total+=(c>>16&255)+(c>>8&255)+(c&255);
+            check((c>>>24)==255,"Nether brick opaque");
+         }
+         check(total/(1024*3)<55,"dark charcoal-burgundy rather than pale mauve");
+         for(int t=0;t<1024;t++) if(TexMaterials32.handles(t)) {
+            int[] art=TexMaterials32.paint(t);
+            check(art.length==1024,"native 32px material "+t);
+            check(Arrays.equals(art,TexRemaining32.paint(t)),"preview is actual game painter output "+t);
+            check(Arrays.equals(art,TexMaterials32.paint(t)),"deterministic material "+t);
+            for(int c:art)check(c==0||(c>>>24)==255,"hard, unblurred alpha "+t);
+         }
+         for(int species=0;species<6;species++) {
+            int t=species==0?Tex.PLANKS:TexArt313.PLANKS0+species-1;
+            check(Arrays.equals(TexMaterials32.timber(species),TexPixel32.tile(t,TexOverhaulV57.readTile(t),false)),"same approved timber on furniture, species "+species);
+         }
+         int[] oak=TexMaterials32.timber(0), chest=TexMaterials32.paint(42), top=TexMaterials32.paint(37);
+         check(chest[22*32+8]==oak[22*32+8],"chest boards are the approved oak, not a separate paint style");
+         check(top[22*32+8]==oak[22*32+8],"crafting surface uses the same timber");
+         int[] copy=TexMaterials32.timber(0);copy[0]=0;
+         check(TexMaterials32.timber(0)[0]==oak[0],"shared reference pixels cannot be mutated by another painter");
+         check(TexMaterials32.paint(Tex.STONEBRICK)==null&&TexMaterials32.paint(Tex.PLANKS)==null
+            &&TexMaterials32.paint(Tex.COBBLE)==null,"approved references are not overridden");
+      });
       test("native items: extrusion follows the new 32px silhouette, not the legacy mask", () -> {
          ResourcePacks.select(ResourcePacks.ID_DEFAULT, null);
          Tex.initPixels();

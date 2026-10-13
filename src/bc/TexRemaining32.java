@@ -40,6 +40,13 @@ final class TexRemaining32 {
       return shade(base, xx == 0 || yy == 0 ? -31 : xx == 1 || yy == 1 ? 11 : tone(x,y,base,4));
    }
    static int[] paint(int t) {
+      int[] proof = TexMaterials32.paint(t);
+      if (proof != null) return proof;
+      return previous(t);
+   }
+
+   /** 6.4 reference painters, retained while the replacement art direction is reviewed. */
+   static int[] previous(int t) {
       if (animated(t)) return frame(t,0);
       if (item(t)) return icon(t);
       if (t == 2 || t == 9 || t >= 550 && t <= 552 || t == 642) return foliage(t);

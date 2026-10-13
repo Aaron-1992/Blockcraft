@@ -1,3 +1,3 @@
-pixel-items,pixel-food,pixel-resources
+pixel-cohesion-plain,pixel-cohesion-lit
 jar=build
-# Review actual Tools/Food/Materials tabs rather than the Building Blocks tab.
+# Cohesive construction pass: blocks touching in the same wall/floor, plain and shader lighting.
