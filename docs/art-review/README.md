@@ -52,3 +52,11 @@ Includes shared-timber identity, reference cache immutability, masonry joint
 preservation, sparse cracks, native dimensions/alpha, determinism, extrusion UVs,
 existing approved golden hashes and the previous gameplay regressions. Numerical
 tests protect implementation constraints; visual/style review remains necessary.
+
+Remote verification completed: CI 38485782392 passed (4,004,055 assertions, zero
+failures; strict equivalence and GLSL checks also passed). Visual 38485782467
+rendered the plain/shader-on adjacent wall/floor scenes, both exit 0. Reviewed
+`ci-results/shots/pixel-cohesion-{plain,lit}-new.png`: common timber grain and
+masonry proportions are visible at matching world scale. Shader grading/emission
+changes apparent brightness, so the plain scene is the primary art comparison.
+These are actual in-game captures, not the offline contact sheet.
