@@ -1,6 +1,2 @@
 GL: 4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4 / llvmpipe (LLVM 20.1.2, 256 bits)
-java.lang.ArrayIndexOutOfBoundsException: Index 1903 out of bounds for length 1024
-	at bc.Game.startWorld(Game.java:1240)
-	at bc.Game.init(Game.java:428)
-	at bc.Game.run(Game.java:329)
-	at bc.Main.main(Main.java:26)
+AUTO screenshot; chunks=80 fps=9
