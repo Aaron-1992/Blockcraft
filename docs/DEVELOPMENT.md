@@ -450,3 +450,9 @@ aware `Items.maxStack(id)` accessor in both new and loaded galleries, with a reg
 Gallery chunks also now initialize grass/foliage tint arrays (previously zero, making
 tinted surfaces black). The torch screenshot fixture has a solid support so normal
 block ticks cannot break it before capture. Native PNGs are retained for pixel inspection.
+
+6.3 verification completed: GitHub CI run 38478173684 passed 3,831,102 checks plus
+strict equivalence; visual runs 38476990532 / 38477711093 / 38478173788 produced
+native PNGs reviewed in `ci-results/shots/pixel-*.png` (flat bow idle/full/third person,
+held sword daylight/night/supported torch, gallery shader on/off). The final torch
+shot visibly illuminates the sword and gallery grass/foliage no longer renders black.
