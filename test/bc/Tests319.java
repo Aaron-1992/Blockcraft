@@ -2277,6 +2277,28 @@ final class Tests319 {
             }
             check(opaque >= 12, "Overhauled item sprite id=" + id + " (" + Items.name(id) + ") has crisp outlined pixel art (" + opaque + " px)");
          }
+
+         // Verify fixed Recurve Bow (268) has connected diagonal string & curved yew limb
+         int bowTile = Items.tile(Items.BOW);
+         int bTx = (bowTile & 31) * 16;
+         int bTy = (bowTile >> 5) * 16;
+         check((Tex.atlasPixels[(bTy + 2) * 512 + (bTx + 12)] >>> 24) >= 128, "Bow upper nock string pixel (12, 2) is opaque");
+         check((Tex.atlasPixels[(bTy + 7) * 512 + (bTx + 7)] >>> 24) >= 128, "Bow diagonal string midpoint (7, 7) is opaque");
+         check((Tex.atlasPixels[(bTy + 12) * 512 + (bTx + 2)] >>> 24) >= 128, "Bow lower nock string pixel (2, 12) is opaque");
+         check((Tex.atlasPixels[(bTy + 5) * 512 + (bTx + 4)] >>> 24) >= 128, "Bow wrapped leather grip (4, 5) is opaque");
+
+         // Verify all separate texture version Resource Packs can be switched cleanly
+         String[] packIds = {
+            ResourcePacks.ID_V58_FUSION,
+            ResourcePacks.ID_V57_PIXEL,
+            ResourcePacks.ID_V56_PAINTED,
+            ResourcePacks.ID_CLASSIC,
+            ResourcePacks.ID_DEFAULT
+         };
+         for (String pid : packIds) {
+            ResourcePacks.select(pid, null);
+            eq(pid, ResourcePacks.activeId(), "Resource pack " + pid + " activated");
+         }
       });
    }
 }

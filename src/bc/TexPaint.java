@@ -513,12 +513,24 @@ final class TexPaint {
    }
 
    static int[] oakSide() {
+      int mode = ResourcePacks.textureVersionMode();
+      if (mode == 2) {
+         return logSide(c(0x3B2814), c(0x5E4324), c(0x785832), c(0x926E42), 18);
+      }
       int[] v56 = logSide(c(0x45341D), c(0x66502F), c(0x78613A), c(0x8A7045), 8);
+      if (mode == 3) {
+         return v56;
+      }
       int[] mcCols = {c(0x48361E), c(0x6D5532), c(0x7E633B), c(0x584327)};
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
             int mc = mcCols[(x + (y >> 2)) & 3];
-            v56[y * N + x] = mix(v56[y * N + x], mc, 0.44F);
+            int col = mix(v56[y * N + x], mc, 0.44F);
+            if (mode == 0) {
+               float ridge = (hash(x, y >> 1, 808) - 0.5F) * 0.14F + (((x & 3) == 1) ? 0.08F : (((x & 3) == 3) ? -0.09F : 0.0F));
+               col = mul(col, 1.0F + ridge);
+            }
+            v56[y * N + x] = col;
          }
       }
       return v56;
@@ -529,12 +541,24 @@ final class TexPaint {
    }
 
    static int[] spruceSide() {
+      int mode = ResourcePacks.textureVersionMode();
+      if (mode == 2) {
+         return logSide(c(0x22160A), c(0x382614), c(0x4A341C), c(0x5E4326), 42);
+      }
       int[] v56 = logSide(c(0x2B1F10), c(0x40301B), c(0x4E3B22), c(0x5C4729), 32);
+      if (mode == 3) {
+         return v56;
+      }
       int[] mcCols = {c(0x281B0E), c(0x3B2814), c(0x4A331B), c(0x332211)};
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
             int mc = mcCols[(x + (y >> 2)) & 3];
-            v56[y * N + x] = mix(v56[y * N + x], mc, 0.44F);
+            int col = mix(v56[y * N + x], mc, 0.44F);
+            if (mode == 0) {
+               float ridge = (hash(x, y >> 1, 832) - 0.5F) * 0.14F + (((x & 3) == 1) ? 0.08F : (((x & 3) == 3) ? -0.09F : 0.0F));
+               col = mul(col, 1.0F + ridge);
+            }
+            v56[y * N + x] = col;
          }
       }
       return v56;
@@ -546,12 +570,17 @@ final class TexPaint {
 
    /** Birch: 5.6 soft streaks fused with Minecraft's creamy birch bark & dark horizontal lenticel dashes. */
    static int[] birchSide() {
+      int mode = ResourcePacks.textureVersionMode();
       int[] pal = {c(0xCFCCB8), c(0xD8D5C2), c(0xE0DDCC), c(0xE8E6D8)};
       int[] p = new int[N * N];
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
             float v = vn(x + 0.5F, (y + 0.5F) * 0.4F, 8, 31) * 0.6F + hash(x, y, 32) * 0.4F;
-            p[y * N + x] = mix(step(pal, contrast(v, 1.8F)), c(0xDFDCD0), 0.35F);
+            int col = step(pal, contrast(v, 1.8F));
+            if (mode != 3) {
+               col = mix(col, c(0xDFDCD0), 0.35F);
+            }
+            p[y * N + x] = col;
          }
       }
 

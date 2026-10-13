@@ -1,4 +1,4 @@
-BLOCKCRAFT V5.8  -  an original Minecraft-style voxel sandbox   (EDITION V5.8)
+BLOCKCRAFT V5.9  -  an original Minecraft-style voxel sandbox   (EDITION V5.9)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,11 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V5.9  (Realistic 5.6 x Minecraft HD-Feel Texture Engine, Fixed Recurve Bow, Complete Texture Coverage & All Texture Versions in Separate Resource Packs)
+  * FIXED RECURVE BOW (2D SPRITE & 3D FIRST-PERSON DRAW ANIMATION). Fixed the backwards/disconnected Bow texture (id 268) with an authentic diagonal Recurve Bow featuring curved yew wood limbs, a wrapped dark-leather riser grip with gold bands, carved horn nock tips, and a taut braided bowstring directly connecting the upper nock (12, 2) to the lower nock (2, 12). Upgraded first-person Bow rendering in Renderer.renderHand so the wooden belly faces forward, the string faces the archer, and pulling the bow smoothly animates a nocked 3D arrow.
+  * EVERY PREVIOUSLY UNTOUCHED BLOCK & ITEM TEXTURE UPDATED + REALISTIC 3D MICRO-RELIEF. Upgraded all previously untouched blocks and items across Updates 3.5–3.19 (Water & Lava animation frames, Monster Spawner, Wool, Concrete & Powder, Terracotta & Glazed Terracotta, Stained Glass, Granite/Diorite/Andesite, Podzol, Mycelium, Coarse Dirt, Jungle/Acacia/Dark Oak barks, Flowers, Double Plants, Lily Pad, Vines, Mushrooms, Iron Bars, Trapdoors, Beds, Banners, Redstone, Prismarine, Purpur, Stick, Coal, Ingots, Gems, Apple, Golden Apple, Bread, Buckets, Flint & Steel, Shears, Ender Pearl, Eye of Ender, Dyes, and all Food/Crop sprites) with PBR-inspired directional micro-normal relief shading and crevice ambient occlusion.
+  * ALL TEXTURE VERSIONS IN SEPARATE RESOURCE PACKS (ResourcePacks). Added separate built-in Resource Packs for every texture era in the Resource Packs menu: Blockcraft V5.9 Realistic (Default), Blockcraft V5.8 (5.6 x MC Fusion), Blockcraft V5.7 (Bold Pixel Art), Blockcraft V5.6 / V4.0 (Painted), OG Classic 3.5, Vibrant Sunlit, and Retro 8-Bit.
 
 WHAT'S NEW IN V5.8  (5.6 x Minecraft Fused Texture Engine for All Blocks, Tools, Weapons, Armor & Items)
   * 5.6 x MINECRAFT FUSED BLOCK TEXTURES (TexOverhaulV57). Fuses Blockcraft 5.6's organic FBM/Voronoi procedural block textures (TexPaint + TexPaint319) directly with classic 16x16 Minecraft pixel-art patterns and palettes: smooth FBM stone fused with soft horizontal Minecraft strata, 5.6 ore shading fused with Minecraft's iconic staggered ore vein layouts (Coal, Iron, Gold, Diamond, Redstone, Lapis, Emerald, Nether Quartz), 5.6 grass/dirt/leaves fused with Minecraft's grass dither, warm earthy pebble dirt, and jagged grass fringe, plus fused Oak/Spruce/Birch/Jungle/Acacia/Dark Oak planks & logs, Ashlar Stone Bricks, Clay Bricks, Crafting Tables, Furnaces, Chests, Bookshelves, Obsidian, Glowstone, Nether, and End blocks.

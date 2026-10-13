@@ -29,6 +29,9 @@ import javax.imageio.ImageIO;
  */
 public final class ResourcePacks {
    public static final String ID_DEFAULT = "Default";
+   public static final String ID_V58_FUSION = "V58Fusion";
+   public static final String ID_V57_PIXEL = "V57PixelArt";
+   public static final String ID_V56_PAINTED = "V56Painted";
    public static final String ID_CLASSIC = "Classic";
    public static final String ID_VIBRANT = "Vibrant";
    public static final String ID_RETRO = "Retro8Bit";
@@ -46,10 +49,15 @@ public final class ResourcePacks {
       public final boolean classicBase;
       public final Path path;
       public final int badgeColor;
+      public final String badgeText;
       final Properties props = new Properties();
       final Map<Integer, int[]> tileOverrides = new HashMap<>();
 
       public Pack(String id, String title, String subtitle, boolean builtIn, boolean classicBase, Path path, int badgeColor) {
+         this(id, title, subtitle, builtIn, classicBase, path, badgeColor, classicBase ? "3.5" : "5.9");
+      }
+
+      public Pack(String id, String title, String subtitle, boolean builtIn, boolean classicBase, Path path, int badgeColor, String badgeText) {
          this.id = id;
          this.title = title;
          this.subtitle = subtitle;
@@ -57,6 +65,7 @@ public final class ResourcePacks {
          this.classicBase = classicBase;
          this.path = path;
          this.badgeColor = badgeColor;
+         this.badgeText = badgeText;
       }
    }
 
@@ -109,12 +118,43 @@ public final class ResourcePacks {
       packs.clear();
       packs.add(new Pack(
          ID_DEFAULT,
-         "Blockcraft V4.0 (Default)",
-         "Hand-painted 16x16 textures with rich foliage & relief",
+         "Blockcraft V5.9 Realistic (Default)",
+         "Realistic 3D micro-relief 5.6 x Minecraft textures for all blocks & items",
          true,
          false,
          null,
-         0xFF4CAF50
+         0xFF2E7D32,
+         "5.9"
+      ));
+      packs.add(new Pack(
+         ID_V58_FUSION,
+         "Blockcraft V5.8 (5.6 x MC Fusion)",
+         "5.6 procedural painted textures blended with classic Minecraft pixel art",
+         true,
+         false,
+         null,
+         0xFF00897B,
+         "5.8"
+      ));
+      packs.add(new Pack(
+         ID_V57_PIXEL,
+         "Blockcraft V5.7 (Bold Pixel Art)",
+         "High-contrast 5-tone pixel-art overhaul with bold dark item outlines",
+         true,
+         false,
+         null,
+         0xFF1E88E5,
+         "5.7"
+      ));
+      packs.add(new Pack(
+         ID_V56_PAINTED,
+         "Blockcraft V5.6 / V4.0 (Painted)",
+         "Original Update 3.18-5.6 smooth FBM/Voronoi procedural painted art",
+         true,
+         false,
+         null,
+         0xFF4CAF50,
+         "5.6"
       ));
       packs.add(new Pack(
          ID_CLASSIC,
@@ -123,7 +163,8 @@ public final class ResourcePacks {
          true,
          true,
          null,
-         0xFF8D6E63
+         0xFF8D6E63,
+         "3.5"
       ));
       packs.add(new Pack(
          ID_VIBRANT,
@@ -132,7 +173,8 @@ public final class ResourcePacks {
          true,
          false,
          null,
-         0xFFFFB300
+         0xFFFFB300,
+         "SUN"
       ));
       packs.add(new Pack(
          ID_RETRO,
@@ -141,7 +183,8 @@ public final class ResourcePacks {
          true,
          true,
          null,
-         0xFF5C6BC0
+         0xFF5C6BC0,
+         "8BT"
       ));
 
       Path d = dir();
@@ -203,6 +246,35 @@ public final class ResourcePacks {
          return true;
       }
       return active().classicBase;
+   }
+
+   /**
+    * Returns the active texture version mode:
+    * 0 = V5.9 Realistic (Default / Vibrant),
+    * 1 = V5.8 5.6 x Minecraft Classic Fusion,
+    * 2 = V5.7 Bold 5-Tone Pixel Art,
+    * 3 = V5.6 / V4.0 Procedural Painted,
+    * 4 = OG Classic 3.5.
+    */
+   public static synchronized int textureVersionMode() {
+      if (isClassicBase()) {
+         return 4;
+      }
+      if (ID_V56_PAINTED.equalsIgnoreCase(activeId)) {
+         return 3;
+      }
+      if (ID_V57_PIXEL.equalsIgnoreCase(activeId)) {
+         return 2;
+      }
+      if (ID_V58_FUSION.equalsIgnoreCase(activeId)) {
+         return 1;
+      }
+      Pack p = active();
+      String ver = p.props.getProperty("version", "").trim();
+      if ("5.6".equals(ver) || "4.0".equals(ver)) return 3;
+      if ("5.7".equals(ver)) return 2;
+      if ("5.8".equals(ver)) return 1;
+      return 0;
    }
 
    /** Sets the active pack ID without rebuilding GL/world state (used during Options.load before Tex.init). */

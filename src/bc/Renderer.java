@@ -2659,7 +2659,24 @@ public final class Renderer {
                GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
             }
 
-            if (Items.isItem(id) || flatBlock(id)) {
+            if (id == Items.BOW) {
+               float pull = (this.g != null && this.g.bowCharge > 0)
+                  ? Math.min(1.0F, (this.g.bowCharge + partial) / 20.0F) : 0.0F;
+               float tremor = pull > 0.85F ? (float)Math.sin(idleT * 42.0F) * 0.004F * (pull - 0.85F) : 0.0F;
+               GL11.glTranslatef(1.13F / 16.0F - 0.16F * pull, 3.2F / 16.0F + 0.07F * pull + tremor, 1.13F / 16.0F + 0.09F * pull);
+               GL11.glRotatef(-90.0F - 6.0F * pull, 0.0F, 1.0F, 0.0F);
+               GL11.glRotatef(-35.0F, 0.0F, 0.0F, 1.0F);
+               GL11.glScalef(0.72F, 0.72F + 0.05F * pull, 0.72F);
+               drawItemModel(id, bright);
+               if (pull > 0.02F) {
+                  GL11.glPushMatrix();
+                  GL11.glRotatef(80.0F, 0.0F, 0.0F, 1.0F);
+                  GL11.glTranslatef(-0.08F - 0.18F * pull, 0.02F + 0.18F * pull, 0.015F);
+                  GL11.glScalef(0.85F, 0.85F, 0.85F);
+                  drawItemModel(Items.ARROW, bright);
+                  GL11.glPopMatrix();
+               }
+            } else if (Items.isItem(id) || flatBlock(id)) {
                // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
                GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
                GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);

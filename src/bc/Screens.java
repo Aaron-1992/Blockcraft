@@ -823,7 +823,7 @@ final class Screens {
          gui.rect(rx, ry, rw, rh, isAct ? 0xFF4CAF50 : 0xFF3A3C48);
          gui.rect(rx + 1, ry + 1, rw - 2, rh - 2, isAct ? 0xFF1E2D24 : 0xFF161820);
          gui.rect(rx + 4, ry + 4, 20, rh - 8.0F, p.badgeColor);
-         gui.centered(p.classicBase ? "OG" : "V4", rx + 14.0F, ry + rh / 2.0F - 4.0F, 0xFFFFFFFF, true, 1.0F);
+         gui.centered(p.badgeText != null ? p.badgeText : (p.classicBase ? "3.5" : "5.9"), rx + 14.0F, ry + rh / 2.0F - 4.0F, 0xFFFFFFFF, true, 1.0F);
 
          float btnW = 54.0F;
          float tx = rx + 28.0F;
