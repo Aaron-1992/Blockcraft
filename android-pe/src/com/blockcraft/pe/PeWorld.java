@@ -8,6 +8,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -320,8 +321,53 @@ public final class PeWorld {
       }
    }
 
+   /**
+    * PC Update 3.10 Animated 3D Falling Tree:
+    * Topples smoothly from 0..90 degrees around the cut log pivot (pivotX, pivotY, pivotZ)
+    * at 120Hz (via getAngleDegrees(partial)) before crashing onto the ground and placing its
+    * fallen trunk logs and canopy leaves!
+    */
+   public static final class FallingTree {
+      public final int pivotX;
+      public final int pivotY;
+      public final int pivotZ;
+      public final int dx;
+      public final int dz;
+      public final int nLogs;
+      public final int nTotal;
+      public final int[] offX;
+      public final int[] offY;
+      public final int[] offZ;
+      public final byte[] blockId;
+      public final int rotTicks;
+      public int age = 0;
+      public boolean done = false;
+
+      public FallingTree(int pivotX, int pivotY, int pivotZ, int dx, int dz,
+                         int nLogs, int nTotal, int[] offX, int[] offY, int[] offZ, byte[] blockId) {
+         this.pivotX = pivotX;
+         this.pivotY = pivotY;
+         this.pivotZ = pivotZ;
+         this.dx = dx;
+         this.dz = dz;
+         this.nLogs = nLogs;
+         this.nTotal = nTotal;
+         this.offX = offX;
+         this.offY = offY;
+         this.offZ = offZ;
+         this.blockId = blockId;
+         this.rotTicks = 22;
+      }
+
+      public float getAngleDegrees(float partial) {
+         float t = Math.max(0.0F, Math.min(1.0F, (this.age + partial) / (float)this.rotTicks));
+         return 90.0F * t * t;
+      }
+   }
+
    public final PeChunk[] chunkGrid = new PeChunk[ACTIVE_SLOTS];
    private final HashMap<Long, byte[]> savedChunks = new HashMap<Long, byte[]>();
+   public final ArrayList<FallingTree> fallingTrees = new ArrayList<FallingTree>();
 
    public int viewRadiusChunks = 5;
    public boolean bushyLeaves = true;
@@ -334,7 +380,8 @@ public final class PeWorld {
    public int createMode = MODE_SURVIVAL;
    public int createWorldType = WTYPE_LARGE_BIOMES;
    public int createSeedIdx = 0;
-   public int invCategory = 0; // 0 = Building, 1 = Nature & Utility, 2 = Tools & Smelting
+   public int invCategory = 0; // 0 = Backpack & Craft, 1 = Building, 2 = Nature & Decor, 3 = Tools & Combat
+   public int selectedInvSlot = -1;
 
    // Saved World Metadata Cache for Slots 0..2
    public final boolean[] slotExists = new boolean[3];
@@ -388,6 +435,8 @@ public final class PeWorld {
    public int selectedSlot = 0;
    public final int[] hotbarId = new int[9];
    public final int[] hotbarCount = new int[9];
+   public final int[] invId = new int[27];
+   public final int[] invCount = new int[27];
 
    // Mining state
    public int mineX = 0, mineY = -1, mineZ = 0;
@@ -397,8 +446,9 @@ public final class PeWorld {
    public String bannerMessage = "";
    public int bannerTicks = 0;
 
-   // Categorized Creative Palette (3 Tabs x 24 Items = 72 Blocks/Items)
+   // 4-Tab Inventory & Creative Palette (Tab 0 = 27-Slot Player Backpack, Tabs 1..3 = 72 Categorized Blocks/Items)
    public static final String[] INV_TAB_NAMES = new String[]{
+      "Backpack & Craft",
       "Building Blocks",
       "Nature & Decor",
       "Tools & Combat"
@@ -581,6 +631,7 @@ public final class PeWorld {
       if (this.screen == SCREEN_TITLE || this.screen == SCREEN_WORLD_SELECT || this.screen == SCREEN_CREATE_WORLD) {
          return false;
       }
+      finishAllFallingTrees();
       flushModifiedActiveChunksToMap();
 
       int slot = Math.max(0, Math.min(2, this.currentSlot));
@@ -620,6 +671,12 @@ public final class PeWorld {
             out.writeInt(cx);
             out.writeInt(cz);
             out.write(entry.getValue(), 0, CHUNK_BYTES);
+         }
+         // Save 27-slot player backpack after chunks (backwards-compatible trailer)
+         out.writeInt(0x42414731); // "BAG1"
+         for (int i = 0; i < 27; i++) {
+            out.writeInt(this.invId[i]);
+            out.writeInt(this.invCount[i]);
          }
          out.flush();
          out.close();
@@ -678,6 +735,9 @@ public final class PeWorld {
             this.hotbarCount[i] = in.readInt();
          }
 
+         Arrays.fill(this.invId, 0);
+         Arrays.fill(this.invCount, 0);
+         this.fallingTrees.clear();
          resetActiveChunks();
          this.savedChunks.clear();
 
@@ -689,6 +749,16 @@ public final class PeWorld {
                byte[] data = new byte[CHUNK_BYTES];
                in.readFully(data);
                this.savedChunks.put(chunkKey(cx, cz), data);
+            }
+            try {
+               int bagMagic = in.readInt();
+               if (bagMagic == 0x42414731) {
+                  for (int i = 0; i < 27; i++) {
+                     this.invId[i] = in.readInt();
+                     this.invCount[i] = in.readInt();
+                  }
+               }
+            } catch (Exception ignored) {
             }
          }
          in.close();
@@ -724,6 +794,7 @@ public final class PeWorld {
       this.seed = (customSeed != 0L) ? customSeed : (System.currentTimeMillis() ^ 0x5DEECE66DL);
       ensureNoiseInitialized();
 
+      this.fallingTrees.clear();
       resetActiveChunks();
       this.savedChunks.clear();
       this.health = 20;
@@ -777,25 +848,44 @@ public final class PeWorld {
    private void equipDefaultLoadout() {
       Arrays.fill(this.hotbarId, 0);
       Arrays.fill(this.hotbarCount, 0);
+      Arrays.fill(this.invId, 0);
+      Arrays.fill(this.invCount, 0);
       this.selectedSlot = 0;
+      this.selectedInvSlot = -1;
       if (this.mode == MODE_CREATIVE) {
-         setSlot(0, B_GRASS, 64);
-         setSlot(1, B_STONEBRICK, 64);
-         setSlot(2, B_PLANKS_OAK, 64);
-         setSlot(3, B_LOG_OAK, 64);
-         setSlot(4, B_LEAVES_OAK, 64);
-         setSlot(5, B_SLAB_OAK, 64);
-         setSlot(6, B_FENCE_OAK, 64);
+         setSlot(0, I_PICK_DIAMOND, 1);
+         setSlot(1, I_SWORD_DIAMOND, 1);
+         setSlot(2, B_GRASS, 64);
+         setSlot(3, B_STONEBRICK, 64);
+         setSlot(4, B_PLANKS_OAK, 64);
+         setSlot(5, B_LOG_OAK, 64);
+         setSlot(6, B_STAIR_OAK, 64);
          setSlot(7, B_TORCH, 64);
-         setSlot(8, B_JACK_O_LANTERN, 64);
+         setSlot(8, B_TNT, 64);
+         this.invId[0] = B_SLAB_OAK;        this.invCount[0] = 64;
+         this.invId[1] = B_FENCE_OAK;       this.invCount[1] = 64;
+         this.invId[2] = B_DOOR_OAK;        this.invCount[2] = 64;
+         this.invId[3] = B_GLASS;           this.invCount[3] = 64;
+         this.invId[4] = B_JACK_O_LANTERN;  this.invCount[4] = 64;
+         this.invId[5] = B_BED_RED;         this.invCount[5] = 64;
+         this.invId[6] = I_AXE_IRON;        this.invCount[6] = 1;
+         this.invId[7] = I_SHOVEL_DIAMOND;  this.invCount[7] = 1;
+         this.invId[8] = I_ENDER_PEARL;     this.invCount[8] = 16;
       } else {
          setSlot(0, I_PICK_WOOD, 1);
          setSlot(1, I_SWORD_WOOD, 1);
-         setSlot(2, B_TORCH, 16);
-         setSlot(3, B_PLANKS_OAK, 16);
-         setSlot(4, B_COBBLE, 16);
-         setSlot(5, B_CRAFTING_TABLE, 1);
-         setSlot(6, I_STEAK, 6);
+         setSlot(2, I_AXE_IRON, 1);
+         setSlot(3, B_TORCH, 16);
+         setSlot(4, B_PLANKS_OAK, 16);
+         setSlot(5, B_COBBLE, 16);
+         setSlot(6, B_CRAFTING_TABLE, 1);
+         setSlot(7, I_STEAK, 6);
+         this.invId[0] = B_LOG_OAK;         this.invCount[0] = 8;
+         this.invId[1] = B_SAND;            this.invCount[1] = 12;
+         this.invId[2] = B_DOOR_OAK;        this.invCount[2] = 2;
+         this.invId[3] = B_BED_RED;         this.invCount[3] = 1;
+         this.invId[4] = I_BREAD;           this.invCount[4] = 4;
+         this.invId[5] = I_ENDER_PEARL;     this.invCount[5] = 2;
       }
    }
 
@@ -826,11 +916,26 @@ public final class PeWorld {
       return true;
    }
 
+   private static boolean matchesCraftCost(int slotItem, int costId) {
+      if (slotItem == costId) return true;
+      if (costId == B_COAL_ORE && slotItem == I_COAL) return true;
+      if (costId == B_IRON_ORE && slotItem == I_IRON_INGOT) return true;
+      if (costId == B_GOLD_ORE && slotItem == I_GOLD_INGOT) return true;
+      if (costId == B_DIAMOND_ORE && slotItem == I_DIAMOND) return true;
+      if (costId == B_PLANKS_OAK && (slotItem == B_PLANKS_SPRUCE || slotItem == B_PLANKS_BIRCH)) return true;
+      return false;
+   }
+
    public int countItemInHotbar(int id) {
       int total = 0;
       for (int i = 0; i < 9; i++) {
-         if (this.hotbarId[i] == id && this.hotbarCount[i] > 0) {
+         if (matchesCraftCost(this.hotbarId[i], id) && this.hotbarCount[i] > 0) {
             total += this.hotbarCount[i];
+         }
+      }
+      for (int i = 0; i < 27; i++) {
+         if (matchesCraftCost(this.invId[i], id) && this.invCount[i] > 0) {
+            total += this.invCount[i];
          }
       }
       return total;
@@ -839,7 +944,7 @@ public final class PeWorld {
    private void consumeItemFromHotbar(int id, int count) {
       int rem = count;
       for (int i = 0; i < 9 && rem > 0; i++) {
-         if (this.hotbarId[i] == id && this.hotbarCount[i] > 0) {
+         if (matchesCraftCost(this.hotbarId[i], id) && this.hotbarCount[i] > 0) {
             int take = Math.min(rem, this.hotbarCount[i]);
             this.hotbarCount[i] -= take;
             rem -= take;
@@ -849,24 +954,76 @@ public final class PeWorld {
             }
          }
       }
+      for (int i = 0; i < 27 && rem > 0; i++) {
+         if (matchesCraftCost(this.invId[i], id) && this.invCount[i] > 0) {
+            int take = Math.min(rem, this.invCount[i]);
+            this.invCount[i] -= take;
+            rem -= take;
+            if (this.invCount[i] <= 0) {
+               this.invId[i] = 0;
+               this.invCount[i] = 0;
+            }
+         }
+      }
+   }
+
+   public static boolean isToolOrWeapon(int id) {
+      return id >= I_SWORD_WOOD && id <= I_BOW;
    }
 
    public void giveItem(int id, int count) {
-      for (int i = 0; i < 9; i++) {
-         if (this.hotbarId[i] == id && this.hotbarCount[i] < 64) {
-            this.hotbarCount[i] = Math.min(64, this.hotbarCount[i] + count);
-            return;
+      if (id <= 0 || count <= 0) return;
+      int maxStack = isToolOrWeapon(id) ? 1 : 64;
+      int rem = count;
+
+      // 1. Stack into matching Hotbar slots
+      if (maxStack > 1) {
+         for (int i = 0; i < 9 && rem > 0; i++) {
+            if (this.hotbarId[i] == id && this.hotbarCount[i] > 0 && this.hotbarCount[i] < maxStack) {
+               int add = Math.min(rem, maxStack - this.hotbarCount[i]);
+               this.hotbarCount[i] += add;
+               rem -= add;
+            }
+         }
+         // 2. Stack into matching Backpack slots
+         for (int i = 0; i < 27 && rem > 0; i++) {
+            if (this.invId[i] == id && this.invCount[i] > 0 && this.invCount[i] < maxStack) {
+               int add = Math.min(rem, maxStack - this.invCount[i]);
+               this.invCount[i] += add;
+               rem -= add;
+            }
          }
       }
-      for (int i = 0; i < 9; i++) {
+
+      // 3. Place into empty Hotbar slots
+      for (int i = 0; i < 9 && rem > 0; i++) {
          if (this.hotbarId[i] == 0 || this.hotbarCount[i] <= 0) {
+            int put = Math.min(rem, maxStack);
             this.hotbarId[i] = id;
-            this.hotbarCount[i] = count;
-            return;
+            this.hotbarCount[i] = put;
+            rem -= put;
          }
       }
-      this.hotbarId[this.selectedSlot] = id;
-      this.hotbarCount[this.selectedSlot] = count;
+
+      // 4. Place into empty 27-slot Backpack slots (never overwriting held tools!)
+      for (int i = 0; i < 27 && rem > 0; i++) {
+         if (this.invId[i] == 0 || this.invCount[i] <= 0) {
+            int put = Math.min(rem, maxStack);
+            this.invId[i] = id;
+            this.invCount[i] = put;
+            rem -= put;
+         }
+      }
+   }
+
+   public void swapBackpackAndHotbar(int invSlot, int hotbarSlot) {
+      if (invSlot < 0 || invSlot >= 27 || hotbarSlot < 0 || hotbarSlot >= 9) return;
+      int tmpId = this.hotbarId[hotbarSlot];
+      int tmpCnt = this.hotbarCount[hotbarSlot];
+      this.hotbarId[hotbarSlot] = this.invId[invSlot];
+      this.hotbarCount[hotbarSlot] = this.invCount[invSlot];
+      this.invId[invSlot] = tmpId;
+      this.invCount[invSlot] = tmpCnt;
    }
 
    // ====================================================================
@@ -1501,12 +1658,13 @@ public final class PeWorld {
       if (isSlab(id) || isStair(id)) return 0.5;
       if (id == B_BED_RED) return 0.5625;
       if (id == B_FARMLAND) return 0.9375;
+      if (id == B_DOOR_OAK) return 2.0;
       return 1.0;
    }
 
    public static boolean isOpaque(byte id) {
       return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_GLASS
-         && !isLeaves(id) && !isSlab(id) && !isStair(id)
+         && !isLeaves(id) && !isSlab(id) && !isStair(id) && id != B_FARMLAND
          && id != B_ICE && id != B_SLIME_BLOCK && !isCrossPlant(id)
          && id != B_BARS && id != B_BED_RED && id != B_FENCE_OAK
          && id != B_DOOR_OAK && id != B_DOOR_OAK_OPEN && id != B_LADDER && id != B_CHEST && id != B_CACTUS;
@@ -1764,6 +1922,13 @@ public final class PeWorld {
          if (b != B_AIR && b != B_WATER && b != B_LAVA) {
             return new int[]{bx, by, bz, prevX, prevY, prevZ, b & 0xFF};
          }
+         // 2-block tall Door hit check on upper half (by - 1)
+         if (by > 1) {
+            byte below = getBlockFast(bx, by - 1, bz);
+            if (below == B_DOOR_OAK || below == B_DOOR_OAK_OPEN) {
+               return new int[]{bx, by - 1, bz, prevX, prevY, prevZ, below & 0xFF};
+            }
+         }
          prevX = bx;
          prevY = by;
          prevZ = bz;
@@ -1771,11 +1936,31 @@ public final class PeWorld {
       return null;
    }
 
+   public void settleGravityColumnAbove(int wx, int wy, int wz) {
+      for (int checkY = wy + 1; checkY < WORLD_H - 1; checkY++) {
+         byte above = getBlockFast(wx, checkY, wz);
+         if (above == B_SAND || above == B_GRAVEL) {
+            int destY = checkY;
+            while (destY > 1 && getBlockFast(wx, destY - 1, wz) == B_AIR) {
+               destY--;
+            }
+            if (destY != checkY) {
+               setBlock(wx, checkY, wz, B_AIR);
+               setBlock(wx, destY, wz, above);
+            }
+         } else {
+            break;
+         }
+      }
+   }
+
    /**
-    * Update 3.10 Tree Felling: when chopping the base log of a natural tree in Survival mode,
-    * fells the connected trunk logs above it and awards the harvested logs!
+    * PC Update 3.10 Animated 3D Tree Felling:
+    * When chopping the base/trunk log of a natural tree, collects the trunk logs and canopy leaves,
+    * removes them from the static chunk grid, and launches an animated 3D FallingTree that topples
+    * smoothly from 0..90 degrees at 120Hz before crashing onto the ground and placing the fallen trunk!
     */
-   private void fellTreeIfNatural(int x, int y, int z, byte logType) {
+   public boolean fellTreeIfNatural(int x, int y, int z, byte logType) {
       int leavesAround = 0;
       for (int dy = 1; dy <= 7; dy++) {
          for (int dz = -2; dz <= 2; dz++) {
@@ -1786,34 +1971,180 @@ public final class PeWorld {
             }
          }
       }
-      if (leavesAround < 4) return;
+      if (leavesAround < 4) return false;
 
-      int felledLogs = 0;
+      int[] tmpOx = new int[192];
+      int[] tmpOy = new int[192];
+      int[] tmpOz = new int[192];
+      byte[] tmpId = new byte[192];
+      int count = 0;
+
+      // 1. Collect vertical trunk logs above the cut
+      int trunkTop = 0;
       for (int dy = 1; dy <= 7; dy++) {
          byte above = getBlockFast(x, y + dy, z);
-         if (above == logType) {
-            setBlock(x, y + dy, z, B_AIR);
-            felledLogs++;
+         if (isLog(above)) {
+            tmpOx[count] = 0;
+            tmpOy[count] = dy;
+            tmpOz[count] = 0;
+            tmpId[count] = above;
+            count++;
+            trunkTop = dy;
          } else {
             break;
          }
       }
-      if (felledLogs > 0) {
-         // Clear inner leaves directly above the trunk so canopy crumbles naturally
-         for (int dy = 2; dy <= felledLogs + 3; dy++) {
-            for (int dz = -1; dz <= 1; dz++) {
-               for (int dx = -1; dx <= 1; dx++) {
-                  if (isLeaves(getBlockFast(x + dx, y + dy, z + dz))) {
-                     setBlock(x + dx, y + dy, z + dz, B_AIR);
-                  }
+      if (count == 0) return false;
+      int nLogs = count;
+
+      // 2. Collect canopy leaves attached to the trunk
+      for (int dy = 1; dy <= trunkTop + 2; dy++) {
+         for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+               if (count >= tmpId.length) break;
+               byte b = getBlockFast(x + dx, y + dy, z + dz);
+               if (isLeaves(b)) {
+                  tmpOx[count] = dx;
+                  tmpOy[count] = dy;
+                  tmpOz[count] = dz;
+                  tmpId[count] = b;
+                  count++;
                }
             }
          }
-         if (this.mode == MODE_SURVIVAL) {
-            giveItem(logType, felledLogs);
-         }
-         showBanner("Felled Tree! (+" + (felledLogs + 1) + " " + getItemName(logType) + ")");
       }
+
+      // 3. Remove the collected logs & leaves from the static chunk grid while the tree is falling in 3D
+      for (int i = count - 1; i >= 0; i--) {
+         setBlock(x + tmpOx[i], y + tmpOy[i], z + tmpOz[i], B_AIR);
+      }
+
+      // 4. Choose fall direction pointing away from the player
+      double awayX = (x + 0.5) - this.px;
+      double awayZ = (z + 0.5) - this.pz;
+      int fallDx = 1;
+      int fallDz = 0;
+      if (Math.abs(awayX) >= Math.abs(awayZ)) {
+         fallDx = (awayX >= 0.0) ? 1 : -1;
+         fallDz = 0;
+      } else {
+         fallDx = 0;
+         fallDz = (awayZ >= 0.0) ? 1 : -1;
+      }
+
+      int[] ox = Arrays.copyOf(tmpOx, count);
+      int[] oy = Arrays.copyOf(tmpOy, count);
+      int[] oz = Arrays.copyOf(tmpOz, count);
+      byte[] ids = Arrays.copyOf(tmpId, count);
+
+      FallingTree tree = new FallingTree(x, y, z, fallDx, fallDz, nLogs, count, ox, oy, oz, ids);
+      this.fallingTrees.add(tree);
+      showBanner("TIMBER! Tree Falling!");
+      return true;
+   }
+
+   public void tickFallingTrees(PeAudio audio) {
+      if (this.fallingTrees.isEmpty()) return;
+      for (int i = 0; i < this.fallingTrees.size(); i++) {
+         FallingTree f = this.fallingTrees.get(i);
+         if (f.done) continue;
+         f.age++;
+         if (f.age >= f.rotTicks) {
+            landFallingTree(f, audio);
+         }
+      }
+      for (int i = this.fallingTrees.size() - 1; i >= 0; i--) {
+         if (this.fallingTrees.get(i).done) {
+            this.fallingTrees.remove(i);
+         }
+      }
+   }
+
+   public void finishAllFallingTrees() {
+      if (this.fallingTrees.isEmpty()) return;
+      for (int i = 0; i < this.fallingTrees.size(); i++) {
+         FallingTree f = this.fallingTrees.get(i);
+         if (!f.done) {
+            landFallingTree(f, null);
+         }
+      }
+      this.fallingTrees.clear();
+   }
+
+   private boolean isReplaceableByFallingTree(byte b) {
+      return b == B_AIR || isLeaves(b) || isCrossPlant(b) || b == B_SNOW;
+   }
+
+   private void landFallingTree(FallingTree f, PeAudio audio) {
+      if (f.done) return;
+      f.done = true;
+
+      // 1. Place the fallen horizontal trunk logs on the ground along (f.dx, f.dz)
+      for (int i = 0; i < f.nLogs; i++) {
+         int along = f.offX[i] * f.dx + f.offZ[i] * f.dz;
+         int side = -f.offX[i] * f.dz + f.offZ[i] * f.dx;
+         int rx = f.pivotX + f.offY[i] * f.dx - side * f.dz;
+         int ry = f.pivotY - along;
+         int rz = f.pivotZ + f.offY[i] * f.dz + side * f.dx;
+
+         // Drop down until resting on solid terrain
+         while (ry > 2 && isReplaceableByFallingTree(getBlockFast(rx, ry - 1, rz))) {
+            ry--;
+         }
+         // Step up at most 2 blocks if the terrain rises along the fall direction
+         for (int up = 0; up <= 2; up++) {
+            if (isReplaceableByFallingTree(getBlockFast(rx, ry + up, rz))) {
+               setBlock(rx, ry + up, rz, f.blockId[i]);
+               break;
+            }
+         }
+      }
+
+      // 2. Place canopy leaves around the fallen trunk where there is air
+      for (int i = f.nLogs; i < f.nTotal; i++) {
+         int along = f.offX[i] * f.dx + f.offZ[i] * f.dz;
+         int side = -f.offX[i] * f.dz + f.offZ[i] * f.dx;
+         int rx = f.pivotX + f.offY[i] * f.dx - side * f.dz;
+         int ry = f.pivotY - along;
+         int rz = f.pivotZ + f.offY[i] * f.dz + side * f.dx;
+
+         int groundY = topSolidY(rx, rz);
+         int targetY = Math.max(groundY + 1, Math.min(groundY + 3, ry));
+         if (targetY > 1 && targetY < WORLD_H - 1 && getBlockFast(rx, targetY, rz) == B_AIR) {
+            setBlock(rx, targetY, rz, f.blockId[i]);
+         }
+      }
+
+      if (this.mode == MODE_SURVIVAL && f.nLogs > 0) {
+         giveItem(f.blockId[0] & 0xFF, Math.min(2, f.nLogs));
+      }
+      if (audio != null) {
+         audio.playSound("explode", 0.65F, 1.35F);
+      }
+   }
+
+   private void awardSurvivalBlockDrop(byte broken) {
+      if (this.mode != MODE_SURVIVAL || broken == B_AIR) return;
+      if (broken == B_TALL_GRASS) return;
+      if (isLeaves(broken)) {
+         if ((this.tickCount & 3L) == 0L) {
+            giveItem(B_PLANKS_OAK, 1);
+         } else if ((this.tickCount & 7L) == 1L) {
+            giveItem(I_GOLDEN_APPLE, 1);
+            showBanner("Found a Golden Apple in the leaves!");
+         }
+         return;
+      }
+      int drop;
+      if (broken == B_STONE) drop = B_COBBLE;
+      else if (broken == B_GRASS || broken == B_FARMLAND) drop = B_DIRT;
+      else if (broken == B_COAL_ORE) drop = I_COAL;
+      else if (broken == B_DIAMOND_ORE) drop = I_DIAMOND;
+      else if (broken == B_WHEAT) drop = I_BREAD;
+      else if (broken == B_MELON) drop = I_STEAK;
+      else if (broken == B_DOOR_OAK_OPEN) drop = B_DOOR_OAK;
+      else drop = broken & 0xFF;
+      giveItem(drop, 1);
    }
 
    // Dedicated Break / Mine tap action
@@ -1824,14 +2155,11 @@ public final class PeWorld {
          byte target = (byte)hit[6];
          if (this.mode == MODE_CREATIVE || isCrossPlant(target)) {
             setBlock(hit[0], hit[1], hit[2], B_AIR);
+            settleGravityColumnAbove(hit[0], hit[1], hit[2]);
             if (isLog(target)) {
                fellTreeIfNatural(hit[0], hit[1], hit[2], target);
             }
-            if (this.mode == MODE_SURVIVAL) {
-               if (target == B_TORCH) giveItem(B_TORCH, 1);
-               else if (target == B_WHEAT) giveItem(I_BREAD, 1);
-               else if (target == B_SUGAR_CANE) giveItem(B_SUGAR_CANE, 1);
-            }
+            awardSurvivalBlockDrop(target);
             if (audio != null) audio.playSound("dig_stone", 0.8F, 1.0F);
             return;
          }
@@ -1846,12 +2174,13 @@ public final class PeWorld {
       this.swingAnim = 0.0F;
       int held = this.hotbarId[this.selectedSlot];
 
-      // 1. Check if tapping a Crafting Table, Furnace, Chest, or Bed in the world
+      // 1. Check if tapping a Crafting Table, Furnace, Chest, Door, TNT, or Bed in the world
       int[] hit = raycastBlock(5.0);
       if (hit != null && !this.sneaking) {
          byte targetBlock = (byte)hit[6];
          if (targetBlock == B_CRAFTING_TABLE || targetBlock == B_FURNACE || targetBlock == B_CHEST) {
             this.previousScreen = SCREEN_PLAY;
+            this.invCategory = (targetBlock == B_CHEST) ? 0 : 1;
             this.screen = SCREEN_INVENTORY;
             if (audio != null) audio.playSound("click", 0.85F, 1.1F);
             return;
@@ -1886,11 +2215,45 @@ public final class PeWorld {
             consumeSelectedSlot(1);
             showBanner("Ate " + getItemName(held) + " (+" + (heal / 2) + " Hearts)");
             if (audio != null) audio.playSound("eat_bite", 0.85F, 1.0F);
+         } else {
+            showBanner("Health & Hunger are already full!");
          }
          return;
       }
 
-      // 3. Place Block at targeted block face
+      // 3. Throw Ender Pearl to Teleport!
+      if (held == I_ENDER_PEARL) {
+         int[] farHit = raycastBlock(18.0);
+         if (farHit != null) {
+            this.px = farHit[3] + 0.5;
+            this.py = Math.max(farHit[4], topSolidY(farHit[3], farHit[5]) + 1.0);
+            this.pz = farHit[5] + 0.5;
+            this.vx = this.vy = this.vz = 0.0;
+            syncInterpolationState();
+            consumeSelectedSlot(1);
+            showBanner("Teleported with Ender Pearl!");
+            if (audio != null) audio.playSound("levelup", 0.9F, 1.25F);
+         }
+         return;
+      }
+
+      // 4. Fire Bow!
+      if (held == I_BOW) {
+         int[] bowHit = raycastBlock(24.0);
+         if (bowHit != null) {
+            byte hitBlock = (byte)bowHit[6];
+            if (hitBlock == B_TNT) {
+               detonateTnt(bowHit[0], bowHit[1], bowHit[2], audio);
+            } else if (hitBlock == B_GLASS || isLeaves(hitBlock) || isCrossPlant(hitBlock)) {
+               setBlock(bowHit[0], bowHit[1], bowHit[2], B_AIR);
+               awardSurvivalBlockDrop(hitBlock);
+            }
+         }
+         if (audio != null) audio.playSound("swing_1", 0.85F, 1.35F);
+         return;
+      }
+
+      // 5. Place Block at targeted block face
       if (hit != null && held > 0 && held <= MAX_BLOCK_ID) {
          int pxPlace = hit[3], pyPlace = hit[4], pzPlace = hit[5];
          byte heldByte = (byte)held;
@@ -1974,6 +2337,9 @@ public final class PeWorld {
          if (this.swingAnim >= 1.0F) this.swingAnim = -1.0F;
       }
       this.dayTime = (this.dayTime + 0.00008F) % 1.0F;
+
+      // Advance animated 3D falling trees (0..90 degrees topple + landing on ground)
+      tickFallingTrees(audio);
 
       // Smoothly interpolate eye height when sneaking vs standing
       float targetEye = (this.sneaking && !this.flying) ? 1.46F : 1.62F;
@@ -2060,17 +2426,11 @@ public final class PeWorld {
                if (this.mineProgress >= 1.0F) {
                   byte broken = getBlock(this.mineX, this.mineY, this.mineZ);
                   setBlock(this.mineX, this.mineY, this.mineZ, B_AIR);
+                  settleGravityColumnAbove(this.mineX, this.mineY, this.mineZ);
                   if (isLog(broken)) {
                      fellTreeIfNatural(this.mineX, this.mineY, this.mineZ, broken);
                   }
-                  if (this.mode == MODE_SURVIVAL && broken != B_AIR) {
-                     int drop = (broken == B_STONE) ? B_COBBLE
-                        : ((broken == B_GRASS || broken == B_FARMLAND) ? B_DIRT
-                        : (broken == B_WHEAT ? I_BREAD : (broken & 0xFF)));
-                     if (!isLeaves(broken) && broken != B_TALL_GRASS) {
-                        giveItem(drop, 1);
-                     }
-                  }
+                  awardSurvivalBlockDrop(broken);
                   if (audio != null) audio.playSound("dig_stone", 0.85F, 1.0F);
                   this.mineProgress = 0.0F;
                }

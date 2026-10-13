@@ -161,7 +161,7 @@ HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
 
 
 def build_release_notes(version, apk_name, bundle_name):
-    return f"""## Blockcraft PE (Pocket Edition) v{version} — 120Hz Smooth Walking & PC Update 3.5+ Visual/Gameplay Overhaul (Samsung Galaxy A55 5G)
+    return f"""## Blockcraft PE (Pocket Edition) v{version} — Fixed Face Culling & Orientation, Real Animated Falling Trees, 3D Tools, 36-Slot Backpack & Polish Overhaul (Samsung Galaxy A55 5G)
 
 > **Separate Pocket Edition Release**: This release contains **only** the Android Pocket Edition (`com.blockcraft.pe`) and does **not** include any PC files. PC (`v*`) and PE (`pe-v*`) releases are kept strictly separated.
 
@@ -170,27 +170,31 @@ def build_release_notes(version, apk_name, bundle_name):
 2. Open **`{apk_name}`** from your browser downloads or Samsung **My Files** and tap **Install / Update**.
 
 ### What's New in Blockcraft PE `pe-v{version}`
-* **Fixed Jittery Walking — True 120Hz Sub-Tick Camera & Smooth AABB Box Physics (`PeWorld` & `PeGLSurfaceView`)**:
-  * **120Hz Sub-Tick Camera & View-Bobbing Interpolation**: Fixed the 20Hz simulation stepping on 120Hz displays by snapshotting `prevPx, prevPy, prevPz, prevWalkDist, prevEyeHeight` before each 20Hz tick and interpolating camera position, eye height (when sneaking), and view bobbing with `partial = this.tickAccum` on every single 120Hz frame.
-  * **Smooth Independent-Axis AABB Box Collision**: Replaced single-point floor/corner checks with a `0.56 x 1.76` AABB bounding box that resolves X, Z, and Y independently, slides smoothly along walls, steps onto `0.5`-tall Slabs and Beds without vertical bouncing, auto-jumps `1.0`-tall blocks smoothly, and climbs Ladders.
-  * **Zero-Stutter Perlin Noise Streaming**: Ported PC Update 3.5's integer/polynomial `PerlinNoise` (`Noise.java`) to eliminate `Math.sin`/`Math.cos` calls during chunk generation and capped streaming while walking to 1 new chunk per tick.
-* **PC Update 3.5+ Visuals — 3D Sky, Sun/Moon/Stars, Clouds, Smooth AO & 3D Bushy Leaves (`PeChunkMesher` & `PeTextures`)**:
-  * **3D Sky Dome & Volumetric Clouds**: Added orbiting 3D **Sun (`T_SUN`)** and **Moon (`T_MOON`)**, twinkling **Night Starfield**, warm golden-orange **Sunrise/Sunset Twilight Horizon Glow**, and a drifting **3D Volumetric Cloud Layer (`Y = 104`)**.
-  * **Smooth Corner Ambient Occlusion (AO) & Natural Tone Variation**: Added per-vertex corner AO shading (`aoNW, aoSW, aoSE, aoNE`) on top and side faces plus Update 3.19 natural block-to-block tone variation (`blockVariation`).
-  * **3D Bushy Leaf Fronds & Birch Trees**: Added `T_BUSHY_FROND_OAK`, `T_BUSHY_FROND_SPRUCE`, and `T_BUSHY_FROND_BIRCH` crossed 3D foliage fronds protruding from exposed tree canopy leaves, plus white-bark **Birch Logs (`T_LOG_BIRCH_SIDE`)** and golden-olive **Birch Leaves (`T_LEAVES_BIRCH`)**.
-  * **Animated Water & Lava**: Smoothly animates `T_WATER` and `T_LAVA` on the GPU texture atlas via `glTexSubImage2D`.
-* **PC Update 3.5+ Blocks, Crops, Structures, Tree Felling & Categorized Inventory**:
-      * **Custom 3D Block Shapes**: Added 3D **Oak, Cobblestone & Stone Brick Stairs** (`B_STAIR_*`), half-height **Oak, Cobblestone & Stone Brick Slabs**, connecting **Oak Fences** (post + auto-connecting rails), interactive 2-block **Oak Doors** (`B_DOOR_OAK` / `B_DOOR_OAK_OPEN` swinging 90 degrees open on tap), climbable **Wall Ladders**, recessed **Wet Farmland**, inset **Storage Chests & Cacti**, and **Beds** (with night-skipping & spawn point setting).
-  * **Interactive TNT Explosions, Gravity Sand/Gravel & Neighbor Torchlight**: Tapping `[PLACE]` on `B_TNT` detonates a 3-block radius blast crater, placing `B_SAND` or `B_GRAVEL` over air drops it to the floor below, and Torches/Glowstone/Jack o'Lanterns/Lava cast warm neighbor illumination onto adjacent blocks.
-  * **Farming Crops & Autumn Blocks**: Added **Ripe Wheat**, **Sugar Cane** along water shores, **Pumpkins**, glowing **Jack o'Lanterns**, **Melons**, and banded **Hay Bales**.
-  * **Multi-Building Starter Village, Desert Pyramids & Watchtowers**: Generates a starter village with a pitched-stair-roof **Oak Cottage**, **Fenced Wheat & Pumpkin Farm**, and **Blacksmith Forge**, plus **Desert Pyramids** (with hidden Gold/Chest treasure chamber) and **Stonebrick Watchtowers** across the infinite world.
-  * **Tree Felling (Update 3.10)**: Chopping the base log of a natural tree in Survival mode fells the connected trunk logs above it and awards the harvested wood.
-  * **3-Tab Categorized Inventory & 24 Crafting/Smelting Recipes**: Added **Building Blocks**, **Nature & Decor**, and **Tools & Combat** category tabs in the Inventory & Crafting Workshop (`72` items & `24` survival recipes).
+* **Fixed Face Culling & Side-Face Texture Orientation (`PeChunkMesher` & `PeWorld`)**:
+  * **Fixed Counter-Clockwise (`GL_CCW`) Winding & Upright UV Mapping on All 6 Faces**: Re-engineered the North (`-Z`), South (`+Z`), East (`+X`), and West (`-X`) quad vertex order across `meshSection`, `emitCustomBox`, and `addDynamicBox` to `(Top-Left, Bottom-Left, Bottom-Right, Top-Right)` when viewed from outside each face. Every outer face of terrain blocks, slabs, stairs, fences, doors, torches, and chests now winds strictly `GL_CCW` (zero missing/inside-out faces under `glCullFace(GL_BACK)`) AND renders every side texture (`Grass Side`, `Furnace Front`, `Crafting Table Side`, `Chest Front`, `Oak/Spruce/Birch Bark`, `Pumpkin/Jack o'Lantern Face`, `Bookshelf`) right-side-up (`+Y` at top, `-Y` at bottom) without any 90° rotation or mirroring!
+  * **Fixed `shouldRenderFace` & `isOpaque` Culling Rules**:
+    * Fixed `B_FARMLAND` (`0.9375` height) being marked `isOpaque`, which previously caused adjacent dirt/grass blocks to cull their lower face strip and leave a visible seam.
+    * Fixed leaf-to-leaf internal face culling (`face == 1, 3, 5`) making tree canopies look hollow when viewed from `-Y`, `+Z`, or `-X` with `GL_CULL_FACE` enabled.
+    * Fixed `shouldRenderFace` so top faces of `0.5`-high Slabs, Beds, `0.9375`-high Farmland, and `0.75`-high Enchanting Tables are never culled by solid blocks above them, and subsurface water/lava uses `topY = 1.0F` when covered by water/lava above so underwater pockets never show air gaps.
+    * Widened horizontal chunk frustum culling (`distSq > 1024.0F`, `dot < -0.68F`) so tall trees, watchtowers, and hills at the top/bottom edges of wide-FOV screens never pop out when pitching the camera up or down.
+* **Trees Actually Fall Over in 3D (`PeWorld.FallingTree` & `PeChunkMesher.addFallingTrees3D`)**:
+  * Ported PC Update 3.10's (`src/bc/Trees.java`) animated 3D tree-felling system! Chopping a natural tree trunk (`B_LOG_OAK`, `B_LOG_SPRUCE`, `B_LOG_BIRCH`, `B_LOG_JUNGLE`) detaches the connected trunk and leaf canopy (`up to 160 blocks`), hinges on the cut base block, and smoothly tips over **0° → 90°** (`cubic ease-in` gravity acceleration at 120Hz) away from the player before crashing onto the ground, placing fallen trunk logs & leaves along the terrain and dropping harvested wood!
+* **Real 3D First-Person Tools, Weapons, Torches & Isometric 3D Inventory Block Icons (`PeChunkMesher.addFirstPersonHeld3D` & `addItemOrBlockIcon2D`)**:
+  * **First-Person 3D Tools & Weapons**: Replaced the flat cube placeholder in the bottom-right hand with multi-part 3D voxel-extruded models for **Pickaxes** (3D diagonal oak handle + metallic collar + curved twin-tip pick head), **Swords** (pommel + grip + wide crossguard + stepped 3D blade), **Axes** (handle + bearded 3D axe bit + poll), **Shovels** (handle + wide 3D scoop blade), **Bows** (curved limbs + taut bowstring), **Torches** (3D stick + glowing ember head), **6-Face 3D Blocks / Slabs / Stairs**, and a **3D First-Person Player Arm** when empty-handed, complete with 120Hz walk bobbing and forward-and-down mining/chopping swing arcs!
+  * **3-Face Isometric 3D Block Icons in Hotbar & Inventory**: All 3D blocks in the Hotbar and Inventory now render as 3-face isometric 3D cubes/slabs (`Top + Front-Left + Right` shaded faces with true slab heights), while tools, weapons, food, ingots, doors, ladders, and plants render as crisp pixel-art sprites.
+* **Upgraded 4-Tab Inventory, 27-Slot Player Backpack (`36` Total Slots) & Fixed Gameplay Interactions (`PeWorld`, `PeGLSurfaceView` & `PeTouchController`)**:
+  * **36-Slot Player Inventory (`9` Hotbar + `27` Backpack Slots, persisted in `world_0..2.bcpe` `"BAG1"`)**: Fixed `giveItem` overwriting the player's currently held tool when all 9 hotbar slots were occupied! Picked-up blocks and crafted items now stack across all 36 slots and overflow cleanly into the **27-slot Player Backpack** (`Tab 0: Backpack & Craft`).
+  * **Interactive Slot Swapping & Item Management**: Tap any slot in your `9x3` Backpack grid and tap any Hotbar slot (or tap `[TO HOTBAR]` / double-tap the slot) to swap or stack items between your Backpack and Hotbar, or tap `[DROP / CLEAR]` to discard unwanted items. In Survival mode, tapping any owned item in the Building/Nature/Tools tabs automatically equips it from your Backpack into your active Hotbar slot!
+  * **Fixed All Wood Types in Crafting & Fixed World Interactions**:
+    * Crafting recipes requiring Wood Logs (`Oak Planks x4`, `Charcoal x2`) now accept **Oak, Spruce, Birch, or Jungle Logs**, and recipes requiring Planks (`Crafting Table`, `Sticks`, `Chest`, `Door`, `Bed`, `Fences`, `Slabs`, `Stairs`, `Wooden Tools`) accept **any Plank type** across all 36 Hotbar + Backpack slots.
+    * Breaking a block underneath a **Sand** or **Gravel** column now immediately settles the entire column above it downward.
+    * Tapping the upper or lower half of an **Oak Door** toggles or mines the door cleanly.
+    * Tapping `[PLACE]` on a placed **Crafting Table**, **Furnace**, or **Chest** opens the Inventory & Crafting screen; tapping `[PLACE]` with an **Ender Pearl** teleports you forward along your look ray; and tapping `[PLACE]` with a **Bow** fires a ranged arrow strike!
 """
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.3"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.4"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")

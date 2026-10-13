@@ -580,14 +580,22 @@ public final class PeTouchController {
    private void handleInventoryAndCraftingTap(float x, float y, PeWorld world, PeAudio audio) {
       float scale = this.screenH / 1080.0F;
 
-      // Bottom Hotbar selection
+      // Bottom Hotbar selection (or instant Backpack <-> Hotbar Swap when a Backpack slot is selected!)
       if (y >= this.hotbarY && y <= this.hotbarY + this.hotbarSlotSize
          && x >= this.hotbarX && x <= this.hotbarX + this.hotbarSlotSize * 10.0F) {
          int slot = (int)((x - this.hotbarX) / this.hotbarSlotSize);
          if (slot >= 0 && slot < 9) {
-            world.selectedSlot = slot;
-            if (audio != null) audio.playSfx("click", 0.75F, 1.0F);
+            if (world.invCategory == 0 && world.selectedInvSlot >= 0) {
+               world.swapBackpackAndHotbar(world.selectedInvSlot, slot);
+               world.selectedSlot = slot;
+               world.selectedInvSlot = -1;
+               if (audio != null) audio.playSfx("pop", 0.85F, 1.15F);
+            } else {
+               world.selectedSlot = slot;
+               if (audio != null) audio.playSfx("click", 0.75F, 1.0F);
+            }
          } else {
+            world.selectedInvSlot = -1;
             world.screen = PeWorld.SCREEN_PLAY;
             if (audio != null) audio.playSfx("click", 0.85F, 1.0F);
          }
@@ -599,62 +607,140 @@ public final class PeTouchController {
       float px = (this.screenW - panelW) * 0.5F;
       float py = 90.0F * scale;
 
-      // Top-Right [ X CLOSE ] button
-      if (inRect(x, y, px + panelW - 230.0F * scale, py + 18.0F * scale, 210.0F * scale, 74.0F * scale)
+      // Top-Right [ CLOSE ] button
+      if (inRect(x, y, px + panelW - 216.0F * scale, py + 18.0F * scale, 196.0F * scale, 74.0F * scale)
          || !inRect(x, y, px, py, panelW, panelH)) {
+         world.selectedInvSlot = -1;
          world.screen = PeWorld.SCREEN_PLAY;
          if (audio != null) audio.playSfx("click", 0.85F, 0.95F);
          return;
       }
 
-      // 3 Category Tabs in Header Bar: [ BUILDING BLOCKS ]  [ NATURE & DECOR ]  [ TOOLS & COMBAT ]
+      // 4 Category Tabs in Header Bar: [ BACKPACK & CRAFT ] [ BUILDING ] [ NATURE ] [ TOOLS ]
       float tabY = py + 18.0F * scale;
       float tabH = 74.0F * scale;
-      float tabW = 360.0F * scale;
-      for (int t = 0; t < 3; t++) {
-         float tx = px + 520.0F * scale + t * (tabW + 16.0F * scale);
+      float tabW = 310.0F * scale;
+      for (int t = 0; t < 4; t++) {
+         float tx = px + 390.0F * scale + t * (tabW + 14.0F * scale);
          if (inRect(x, y, tx, tabY, tabW, tabH)) {
             world.invCategory = t;
+            world.selectedInvSlot = -1;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
       }
 
-      int cat = Math.max(0, Math.min(2, world.invCategory));
-      int[] catItems = PeWorld.CREATIVE_TABS[cat];
-
-      // Left Half (24 Category Blocks/Items): 6 cols x 4 rows
-      int cols = 6;
-      float cell = 148.0F * scale;
+      int cat = Math.max(0, Math.min(3, world.invCategory));
       float startX = px + 38.0F * scale;
       float startY = py + 150.0F * scale;
-      for (int i = 0; i < catItems.length; i++) {
-         int c = i % cols;
-         int r = i / cols;
-         float bx = startX + c * cell;
-         float by = startY + r * cell;
-         if (inRect(x, y, bx, by, cell, cell)) {
-            int item = catItems[i];
-            if (world.mode == PeWorld.MODE_CREATIVE) {
-               world.hotbarId[world.selectedSlot] = item;
-               world.hotbarCount[world.selectedSlot] = (item <= PeWorld.MAX_BLOCK_ID) ? 64 : 1;
-               world.showBanner("Equipped " + PeWorld.getItemName(item));
-               if (audio != null) audio.playSfx("pop", 0.85F, 1.1F);
+
+      if (cat == 0) {
+         // Tab 0 Left Half: 9x3 Player Backpack Grid (27 Slots)
+         float bagCell = 98.0F * scale;
+         for (int i = 0; i < 27; i++) {
+            int c = i % 9;
+            int r = i / 9;
+            float bx = startX + c * bagCell;
+            float by = startY + r * bagCell;
+            if (inRect(x, y, bx, by, bagCell, bagCell)) {
+               if (world.selectedInvSlot == i) {
+                  // Double-tap a backpack slot to swap it straight into the active hotbar slot!
+                  world.swapBackpackAndHotbar(i, world.selectedSlot);
+                  world.selectedInvSlot = -1;
+                  if (audio != null) audio.playSfx("pop", 0.85F, 1.15F);
+               } else {
+                  world.selectedInvSlot = i;
+                  if (audio != null) audio.playSfx("click", 0.8F, 1.05F);
+               }
+               return;
+            }
+         }
+
+         // Action Buttons below 9x3 Backpack Grid: [TO HOTBAR] and [DROP / CLEAR]
+         float barY = startY + 3.0F * bagCell + 20.0F * scale;
+         if (inRect(x, y, startX + 430.0F * scale, barY + 26.0F * scale, 220.0F * scale, 96.0F * scale)) {
+            if (world.selectedInvSlot >= 0) {
+               world.swapBackpackAndHotbar(world.selectedInvSlot, world.selectedSlot);
+               world.selectedInvSlot = -1;
+               world.showBanner("Swapped with Hotbar Slot #" + (world.selectedSlot + 1));
+               if (audio != null) audio.playSfx("pop", 0.85F, 1.15F);
             } else {
-               world.showBanner(PeWorld.getItemName(item) + " - Mine in world or Craft on the right!");
-               if (audio != null) audio.playSfx("click", 0.75F, 1.0F);
+               // Move active hotbar item into first empty backpack slot
+               for (int i = 0; i < 27; i++) {
+                  if (world.invId[i] == PeWorld.B_AIR || world.invCount[i] <= 0) {
+                     world.swapBackpackAndHotbar(i, world.selectedSlot);
+                     world.showBanner("Stored in Backpack Slot #" + (i + 1));
+                     if (audio != null) audio.playSfx("pop", 0.85F, 1.0F);
+                     break;
+                  }
+               }
             }
             return;
          }
+         if (inRect(x, y, startX + 666.0F * scale, barY + 26.0F * scale, 196.0F * scale, 96.0F * scale)) {
+            if (world.selectedInvSlot >= 0 && world.invId[world.selectedInvSlot] != PeWorld.B_AIR) {
+               String dropped = PeWorld.getItemName(world.invId[world.selectedInvSlot]);
+               world.invId[world.selectedInvSlot] = PeWorld.B_AIR;
+               world.invCount[world.selectedInvSlot] = 0;
+               world.selectedInvSlot = -1;
+               world.showBanner("Cleared " + dropped);
+               if (audio != null) audio.playSfx("break", 0.75F, 0.95F);
+            } else if (world.hotbarId[world.selectedSlot] != PeWorld.B_AIR) {
+               String dropped = PeWorld.getItemName(world.hotbarId[world.selectedSlot]);
+               world.hotbarId[world.selectedSlot] = PeWorld.B_AIR;
+               world.hotbarCount[world.selectedSlot] = 0;
+               world.showBanner("Cleared " + dropped);
+               if (audio != null) audio.playSfx("break", 0.75F, 0.95F);
+            }
+            return;
+         }
+      } else {
+         // Tabs 1..3 Left Half (24 Category Blocks/Items): 6 cols x 4 rows
+         int[] catItems = PeWorld.CREATIVE_TABS[cat - 1];
+         int cols = 6;
+         float cell = 148.0F * scale;
+         for (int i = 0; i < catItems.length; i++) {
+            int c = i % cols;
+            int r = i / cols;
+            float bx = startX + c * cell;
+            float by = startY + r * cell;
+            if (inRect(x, y, bx, by, cell, cell)) {
+               int item = catItems[i];
+               if (world.mode == PeWorld.MODE_CREATIVE) {
+                  world.hotbarId[world.selectedSlot] = item;
+                  world.hotbarCount[world.selectedSlot] = (item <= PeWorld.MAX_BLOCK_ID) ? 64 : 1;
+                  world.showBanner("Equipped " + PeWorld.getItemName(item));
+                  if (audio != null) audio.playSfx("pop", 0.85F, 1.1F);
+               } else {
+                  // In Survival, if the player owns this item in their 27-slot backpack, equip it straight into the active hotbar slot!
+                  int foundBag = -1;
+                  for (int b = 0; b < 27; b++) {
+                     if (world.invId[b] == item && world.invCount[b] > 0) {
+                        foundBag = b;
+                        break;
+                     }
+                  }
+                  if (foundBag >= 0) {
+                     world.swapBackpackAndHotbar(foundBag, world.selectedSlot);
+                     world.showBanner("Equipped " + PeWorld.getItemName(item) + " from Backpack!");
+                     if (audio != null) audio.playSfx("pop", 0.85F, 1.15F);
+                  } else {
+                     world.showBanner(PeWorld.getItemName(item) + " - Mine in world or Craft on the right!");
+                     if (audio != null) audio.playSfx("click", 0.75F, 1.0F);
+                  }
+               }
+               return;
+            }
+         }
       }
 
-      // Right Half (8 Category Crafting/Smelting Recipes): 2 cols x 4 rows
+      // Right Half (8 Crafting/Smelting Recipes): 2 cols x 4 rows
       float craftStartX = px + 980.0F * scale;
       float craftColW = 448.0F * scale;
       float craftRowH = 132.0F * scale;
-      int baseRecipe = cat * 8;
+      int baseRecipe = (cat == 0) ? 0 : ((cat - 1) * 8);
       for (int i = 0; i < 8; i++) {
-         int recipeIdx = baseRecipe + i;
+         int recipeIdx = PeGLSurfaceView.getDisplayRecipeIndex(cat, baseRecipe, i);
          if (recipeIdx >= PeWorld.RECIPES.length) break;
          int c = i & 1;
          int r = i >> 1;

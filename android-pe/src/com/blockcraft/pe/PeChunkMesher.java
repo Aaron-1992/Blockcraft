@@ -148,9 +148,9 @@ public final class PeChunkMesher {
             float distSq = dX * dX + dZ * dZ;
             if (distSq > maxDistSq) continue;
 
-            if (distSq > 576.0F) {
+            if (distSq > 1024.0F) {
                float dot = (dX * fwdX + dZ * fwdZ) / (float)Math.sqrt(distSq);
-               if (dot < -0.45F) continue;
+               if (dot < -0.68F) continue;
             }
 
             int slot = PeWorld.slotIndex(cx, cz);
@@ -178,19 +178,23 @@ public final class PeChunkMesher {
    // ====================================================================
    private static boolean shouldRenderFace(byte self, byte neighbor, int face) {
       if (neighbor == PeWorld.B_AIR) return true;
+      // Cutout foliage blocks (Oak, Spruce, Birch Leaves) have sky cutouts so all 6 faces
+      // not against a solid opaque block must be rendered to prevent one-way invisible faces!
+      if (PeWorld.isLeaves(self)) {
+         return !PeWorld.isOpaque(neighbor);
+      }
       if (self == neighbor) {
-         if (PeWorld.isLeaves(self)) {
-            return face == 0 || face == 2 || face == 4;
-         }
          if (PeWorld.isSlab(self) && (face == 0 || face == 1)) {
             return true;
          }
-         if (self == PeWorld.B_FENCE_OAK || self == PeWorld.B_CHEST || self == PeWorld.B_CACTUS) {
+         if (PeWorld.isStair(self) || self == PeWorld.B_FENCE_OAK || self == PeWorld.B_CHEST || self == PeWorld.B_CACTUS) {
             return true;
          }
          return false;
       }
-      if (PeWorld.isSlab(self) && face == 0) return true;
+      if ((PeWorld.isSlab(self) || PeWorld.isStair(self) || self == PeWorld.B_FARMLAND || self == PeWorld.B_BED_RED) && face == 0) {
+         return true;
+      }
       return !PeWorld.isOpaque(neighbor);
    }
 
@@ -298,16 +302,18 @@ public final class PeChunkMesher {
                   continue;
                }
 
-               // 7. Standard Cube with Smooth Corner Ambient Occlusion (AO) + Optional 3D Bushy Leaf Fronds
-               float topY = (b == PeWorld.B_WATER || b == PeWorld.B_LAVA) ? 0.88F : 1.0F;
+               // 8. Standard Cube with Smooth Corner Ambient Occlusion (AO) + Optional 3D Bushy Leaf Fronds
                byte nUp = (y < PeWorld.WORLD_H - 1) ? cBlocks[colBase | (y + 1)] : PeWorld.B_AIR;
                byte nDn = (y > 0) ? cBlocks[colBase | (y - 1)] : PeWorld.B_BEDROCK;
                byte nN = (lz > 0) ? cBlocks[((lz - 1) << 11) | (lx << 7) | y] : world.getBlockFast(x, y, z - 1);
                byte nS = (lz < 15) ? cBlocks[((lz + 1) << 11) | (lx << 7) | y] : world.getBlockFast(x, y, z + 1);
                byte nE = (lx < 15) ? cBlocks[zBase | ((lx + 1) << 7) | y] : world.getBlockFast(x + 1, y, z);
                byte nW = (lx > 0) ? cBlocks[zBase | ((lx - 1) << 7) | y] : world.getBlockFast(x - 1, y, z);
+               float topY = ((b == PeWorld.B_WATER || b == PeWorld.B_LAVA) && nUp != b) ? 0.88F : 1.0F;
 
-               // Face 0: +Y (Top) with Corner Ambient Occlusion
+               // All 6 faces use (Top-Left, Bottom-Left, Bottom-Right, Top-Right) so normals point OUTWARD (CCW)
+               // and side UVs have v=v0 at top (Y1) and v=v1 at bottom (Y0)!
+               // Face 0: +Y (Top, outward normal = (0, +1, 0))
                if (shouldRenderFace(b, nUp, 0)) {
                   int tile = PeWorld.getFaceTile(b, 0);
                   float sBase = 1.0F * varJit;
@@ -325,7 +331,7 @@ public final class PeChunkMesher {
                      x + 1, y + topY, z + 1, aoSE,
                      x + 1, y + topY, z,     aoNE);
                }
-               // Face 1: -Y (Bottom)
+               // Face 1: -Y (Bottom, outward normal = (0, -1, 0))
                if (y > 0 && shouldRenderFace(b, nDn, 1)) {
                   int tile = PeWorld.getFaceTile(b, 1);
                   float s = 0.54F * varJit;
@@ -335,49 +341,49 @@ public final class PeChunkMesher {
                      x + 1, y, z,     s,
                      x + 1, y, z + 1, s);
                }
-               // Face 2: -Z (North) with Bottom/Top Edge AO
+               // Face 2: -Z (North, outward normal = (0, 0, -1), upright UVs: top at y+topY, bottom at y)
                if (shouldRenderFace(b, nN, 2)) {
                   int tile = PeWorld.getFaceTile(b, 2);
                   float sTop = 0.84F * varJit * (PeWorld.isOpaque(world.getBlockFast(x, y + 1, z - 1)) ? 0.84F : 1.0F);
                   float sBot = 0.84F * varJit * (PeWorld.isOpaque(world.getBlockFast(x, y - 1, z - 1)) ? 0.82F : 1.0F);
                   ptr = emitFaceAO(out, ptr, tile, boost,
                      x + 1, y + topY, z, sTop,
-                     x,     y + topY, z, sTop,
+                     x + 1, y,        z, sBot,
                      x,     y,        z, sBot,
-                     x + 1, y,        z, sBot);
+                     x,     y + topY, z, sTop);
                }
-               // Face 3: +Z (South) with Bottom/Top Edge AO
+               // Face 3: +Z (South, outward normal = (0, 0, +1), upright UVs: top at y+topY, bottom at y)
                if (shouldRenderFace(b, nS, 3)) {
                   int tile = PeWorld.getFaceTile(b, 3);
                   float sTop = 0.88F * varJit * (PeWorld.isOpaque(world.getBlockFast(x, y + 1, z + 1)) ? 0.84F : 1.0F);
                   float sBot = 0.88F * varJit * (PeWorld.isOpaque(world.getBlockFast(x, y - 1, z + 1)) ? 0.82F : 1.0F);
                   ptr = emitFaceAO(out, ptr, tile, boost,
                      x,     y + topY, z + 1, sTop,
-                     x + 1, y + topY, z + 1, sTop,
+                     x,     y,        z + 1, sBot,
                      x + 1, y,        z + 1, sBot,
-                     x,     y,        z + 1, sBot);
+                     x + 1, y + topY, z + 1, sTop);
                }
-               // Face 4: +X (East) with Bottom/Top Edge AO
+               // Face 4: +X (East, outward normal = (+1, 0, 0), upright UVs: top at y+topY, bottom at y)
                if (shouldRenderFace(b, nE, 4)) {
                   int tile = PeWorld.getFaceTile(b, 4);
                   float sTop = 0.73F * varJit * (PeWorld.isOpaque(world.getBlockFast(x + 1, y + 1, z)) ? 0.84F : 1.0F);
                   float sBot = 0.73F * varJit * (PeWorld.isOpaque(world.getBlockFast(x + 1, y - 1, z)) ? 0.82F : 1.0F);
                   ptr = emitFaceAO(out, ptr, tile, boost,
                      x + 1, y + topY, z + 1, sTop,
-                     x + 1, y + topY, z,     sTop,
+                     x + 1, y,        z + 1, sBot,
                      x + 1, y,        z,     sBot,
-                     x + 1, y,        z + 1, sBot);
+                     x + 1, y + topY, z,     sTop);
                }
-               // Face 5: -X (West) with Bottom/Top Edge AO
+               // Face 5: -X (West, outward normal = (-1, 0, 0), upright UVs: top at y+topY, bottom at y)
                if (shouldRenderFace(b, nW, 5)) {
                   int tile = PeWorld.getFaceTile(b, 5);
                   float sTop = 0.71F * varJit * (PeWorld.isOpaque(world.getBlockFast(x - 1, y + 1, z)) ? 0.84F : 1.0F);
                   float sBot = 0.71F * varJit * (PeWorld.isOpaque(world.getBlockFast(x - 1, y - 1, z)) ? 0.82F : 1.0F);
                   ptr = emitFaceAO(out, ptr, tile, boost,
                      x, y + topY, z,     sTop,
-                     x, y + topY, z + 1, sTop,
+                     x, y,        z,     sBot,
                      x, y,        z + 1, sBot,
-                     x, y,        z,     sBot);
+                     x, y + topY, z + 1, sTop);
                }
 
                // Update 3.19 Bushy Leaves: emit protruding diagonal 3D foliage fronds on exposed outer canopy leaves
@@ -436,30 +442,30 @@ public final class PeChunkMesher {
          X0, Y0, Z0, 0.55F * jit,
          X1, Y0, Z0, 0.55F * jit,
          X1, Y0, Z1, 0.55F * jit);
-      // North (-Z)
+      // North (-Z, outward normal = (0, 0, -1), upright UVs)
       ptr = emitFaceAO(out, ptr, PeWorld.getFaceTile(b, 2), boost,
          X1, Y1, Z0, 0.84F * jit,
-         X0, Y1, Z0, 0.84F * jit,
+         X1, Y0, Z0, 0.78F * jit,
          X0, Y0, Z0, 0.78F * jit,
-         X1, Y0, Z0, 0.78F * jit);
-      // South (+Z)
+         X0, Y1, Z0, 0.84F * jit);
+      // South (+Z, outward normal = (0, 0, +1), upright UVs)
       ptr = emitFaceAO(out, ptr, PeWorld.getFaceTile(b, 3), boost,
          X0, Y1, Z1, 0.88F * jit,
-         X1, Y1, Z1, 0.88F * jit,
+         X0, Y0, Z1, 0.80F * jit,
          X1, Y0, Z1, 0.80F * jit,
-         X0, Y0, Z1, 0.80F * jit);
-      // East (+X)
+         X1, Y1, Z1, 0.88F * jit);
+      // East (+X, outward normal = (+1, 0, 0), upright UVs)
       ptr = emitFaceAO(out, ptr, PeWorld.getFaceTile(b, 4), boost,
          X1, Y1, Z1, 0.74F * jit,
-         X1, Y1, Z0, 0.74F * jit,
+         X1, Y0, Z1, 0.68F * jit,
          X1, Y0, Z0, 0.68F * jit,
-         X1, Y0, Z1, 0.68F * jit);
-      // West (-X)
+         X1, Y1, Z0, 0.74F * jit);
+      // West (-X, outward normal = (-1, 0, 0), upright UVs)
       ptr = emitFaceAO(out, ptr, PeWorld.getFaceTile(b, 5), boost,
          X0, Y1, Z0, 0.72F * jit,
-         X0, Y1, Z1, 0.72F * jit,
+         X0, Y0, Z0, 0.66F * jit,
          X0, Y0, Z1, 0.66F * jit,
-         X0, Y0, Z0, 0.66F * jit);
+         X0, Y1, Z1, 0.72F * jit);
       return ptr;
    }
 
@@ -756,20 +762,376 @@ public final class PeChunkMesher {
       float u1 = ((tile & 15) * 16.0F + 15.85F) / 256.0F;
       float v1 = ((tile >> 4) * 16.0F + 15.85F) / 256.0F;
 
+      // Top (+Y)
       p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, r, g, b, a,
          x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0);
+      // Bottom (-Y)
       p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, r * 0.6F, g * 0.6F, b * 0.6F, a,
          x0, y0, z1, x0, y0, z0, x1, y0, z0, x1, y0, z1);
+      // North (-Z, outward normal = (0, 0, -1), upright UVs)
       p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, r * 0.85F, g * 0.85F, b * 0.85F, a,
-         x1, y1, z0, x0, y1, z0, x0, y0, z0, x1, y0, z0);
+         x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0);
+      // South (+Z, outward normal = (0, 0, +1), upright UVs)
       p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, r * 0.9F, g * 0.9F, b * 0.9F, a,
-         x0, y1, z1, x1, y1, z1, x1, y0, z1, x0, y0, z1);
+         x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1);
+      // East (+X, outward normal = (+1, 0, 0), upright UVs)
       p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, r * 0.75F, g * 0.75F, b * 0.75F, a,
-         x1, y1, z1, x1, y1, z0, x1, y0, z0, x1, y0, z1);
+         x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0);
+      // West (-X, outward normal = (-1, 0, 0), upright UVs)
       p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, r * 0.72F, g * 0.72F, b * 0.72F, a,
-         x0, y1, z0, x0, y1, z1, x0, y0, z1, x0, y0, z0);
+         x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1);
 
       this.dyn3DVerts = p / FLOATS_PER_VERT_3D;
+   }
+
+   /**
+    * PC Update 3.10 Animated 3D Falling Trees Renderer:
+    * Smoothly rotates every trunk log and canopy leaf block of each active FallingTree
+    * around its cut hinge pivot (pivotX + 0.5, pivotY, pivotZ + 0.5) by getAngleDegrees(partial)
+    * from 0..90 degrees at 120Hz!
+    */
+   public void addFallingTrees3D(PeWorld world, float partial, float dayBright) {
+      if (world.fallingTrees.isEmpty()) return;
+      for (int tIdx = 0; tIdx < world.fallingTrees.size(); tIdx++) {
+         PeWorld.FallingTree tree = world.fallingTrees.get(tIdx);
+         if (tree.done) continue;
+         float deg = tree.getAngleDegrees(partial);
+         double rad = Math.toRadians(deg);
+         float cosA = (float)Math.cos(rad);
+         float sinA = (float)Math.sin(rad);
+         float pvx = tree.pivotX + 0.5F;
+         float pvy = tree.pivotY;
+         float pvz = tree.pivotZ + 0.5F;
+         int dx = tree.dx;
+         int dz = tree.dz;
+
+         for (int i = 0; i < tree.nTotal; i++) {
+            int p = this.dyn3DVerts * FLOATS_PER_VERT_3D;
+            if (p + 36 * FLOATS_PER_VERT_3D >= this.dyn3DData.length) break;
+            byte b = tree.blockId[i];
+            float ox0 = tree.offX[i] - 0.5F;
+            float ox1 = ox0 + 1.0F;
+            float oy0 = tree.offY[i];
+            float oy1 = oy0 + 1.0F;
+            float oz0 = tree.offZ[i] - 0.5F;
+            float oz1 = oz0 + 1.0F;
+
+            // Compute rotated 8 corners around hinge (pvx, pvy, pvz) along (dx, dz)
+            float[] cx = new float[8];
+            float[] cy = new float[8];
+            float[] cz = new float[8];
+            for (int c = 0; c < 8; c++) {
+               float lx = ((c & 1) != 0) ? ox1 : ox0;
+               float ly = ((c & 2) != 0) ? oy1 : oy0;
+               float lz = ((c & 4) != 0) ? oz1 : oz0;
+               float along = lx * dx + lz * dz;
+               float side = -lx * dz + lz * dx;
+               float rotAlong = along * cosA + ly * sinA;
+               float rotUp = ly * cosA - along * sinA;
+               cx[c] = pvx + rotAlong * dx - side * dz;
+               cy[c] = pvy + rotUp;
+               cz[c] = pvz + rotAlong * dz + side * dx;
+            }
+            p = emitOrientedBlockFaces(this.dyn3DData, p, cx, cy, cz, b, dayBright);
+            this.dyn3DVerts = p / FLOATS_PER_VERT_3D;
+         }
+      }
+   }
+
+   /**
+    * Renders True 3D First-Person Held Tools, Weapons, Torches & 6-Face 3D Blocks
+    * in the camera's local coordinate frame (right, up, fwd) with 120Hz walk bobbing & swing arc!
+    */
+   public void addFirstPersonHeld3D(int heldId, float camX, float camY, float camZ,
+                                    float yawDeg, float pitchDeg, float swingProgress,
+                                    float walkBob, float dayBright) {
+      float yawRad = (float)Math.toRadians(yawDeg);
+      float pitchRad = (float)Math.toRadians(pitchDeg);
+      float cosP = (float)Math.cos(pitchRad);
+      float sinP = (float)Math.sin(pitchRad);
+      float sinY = (float)Math.sin(yawRad);
+      float cosY = (float)Math.cos(yawRad);
+
+      // Right-handed camera basis vectors: Right (+X_cam), Up (+Y_cam), Forward (+Z_cam into scene)
+      float rx = cosY,           ry = 0.0F,  rz = sinY;
+      float fx = sinY * cosP,    fy = -sinP, fz = -cosY * cosP;
+      float ux = sinY * sinP,    uy = cosP,  uz = -cosY * sinP;
+
+      float swSin = (swingProgress >= 0.0F) ? (float)Math.sin(swingProgress * Math.PI) : 0.0F;
+      float swArc = (swingProgress >= 0.0F) ? (float)Math.sin(swingProgress * Math.PI * 0.85F) : 0.0F;
+
+      // Hand anchor in front-right of camera
+      float hx = camX + fx * (0.56F - swSin * 0.14F) + rx * (0.36F - swSin * 0.12F) + ux * (-0.26F - swArc * 0.14F + walkBob);
+      float hy = camY + fy * (0.56F - swSin * 0.14F) + ry * (0.36F - swSin * 0.12F) + uy * (-0.26F - swArc * 0.14F + walkBob);
+      float hz = camZ + fz * (0.56F - swSin * 0.14F) + rz * (0.36F - swSin * 0.12F) + uz * (-0.26F - swArc * 0.14F + walkBob);
+
+      // Pitch the tool forward during swing
+      float tilt = 0.35F + swSin * 0.85F;
+      float cosT = (float)Math.cos(tilt);
+      float sinT = (float)Math.sin(tilt);
+      float tUx = ux * cosT + fx * sinT;
+      float tUy = uy * cosT + fy * sinT;
+      float tUz = uz * cosT + fz * sinT;
+      float tFx = fx * cosT - ux * sinT;
+      float tFy = fy * cosT - uy * sinT;
+      float tFz = fz * cosT - uz * sinT;
+
+      float lit = Math.max(0.45F, dayBright);
+
+      // 1. Empty Hand: 3D Angled First-Person Player Arm
+      if (heldId == 0) {
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.045F, -0.05F, -0.14F, 0.045F, 0.05F, 0.14F,
+            PeTextures.T_SANDSTONE_TOP, lit * 0.94F, lit * 0.74F, lit * 0.58F);
+         return;
+      }
+
+      // 2. 3D Pickaxe (Wood, Iron, Diamond) — 3D Handle Shaft + Cross-Head Bar + Left/Right Curved Pick Tips + Top Cap
+      if (heldId == PeWorld.I_PICK_WOOD || heldId == PeWorld.I_PICK_IRON || heldId == PeWorld.I_PICK_DIAMOND) {
+         int headTile = (heldId == PeWorld.I_PICK_DIAMOND) ? PeTextures.T_DIAMOND_BLOCK
+            : ((heldId == PeWorld.I_PICK_IRON) ? PeTextures.T_IRON_BLOCK : PeTextures.T_PLANKS_BIRCH);
+         // 3D Oak Handle Shaft
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.018F, -0.15F, -0.018F, 0.018F, 0.17F, 0.018F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         // 3D Pickaxe Cross-Head Bar
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.024F, 0.11F, -0.13F, 0.024F, 0.155F, 0.13F,
+            headTile, lit, lit, lit);
+         // Curved Front & Back Pick Tips
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.020F, 0.075F, 0.10F, 0.020F, 0.125F, 0.165F,
+            headTile, lit * 0.94F, lit * 0.94F, lit * 0.94F);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.020F, 0.075F, -0.165F, 0.020F, 0.125F, -0.10F,
+            headTile, lit * 0.94F, lit * 0.94F, lit * 0.94F);
+         // Top Cap Lug
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.020F, 0.155F, -0.024F, 0.020F, 0.185F, 0.024F,
+            PeTextures.T_PLANKS_OAK, lit * 0.9F, lit * 0.9F, lit * 0.9F);
+         return;
+      }
+
+      // 3. 3D Sword (Wood, Iron, Diamond) — 3D Pommel + Grip + Wide Crossguard + Long Tapered 3D Blade
+      if (heldId == PeWorld.I_SWORD_WOOD || heldId == PeWorld.I_SWORD_IRON || heldId == PeWorld.I_SWORD_DIAMOND) {
+         int bladeTile = (heldId == PeWorld.I_SWORD_DIAMOND) ? PeTextures.T_DIAMOND_BLOCK
+            : ((heldId == PeWorld.I_SWORD_IRON) ? PeTextures.T_IRON_BLOCK : PeTextures.T_PLANKS_OAK);
+         int guardTile = (heldId == PeWorld.I_SWORD_DIAMOND) ? PeTextures.T_GOLD_BLOCK : PeTextures.T_IRON_BLOCK;
+         // Pommel
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.025F, -0.165F, -0.025F, 0.025F, -0.125F, 0.025F,
+            guardTile, lit, lit, lit);
+         // Grip
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.017F, -0.125F, -0.020F, 0.017F, -0.025F, 0.020F,
+            PeTextures.T_LOG_OAK_SIDE, lit, lit, lit);
+         // Wide 3D Crossguard
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.024F, -0.025F, -0.095F, 0.024F, 0.012F, 0.095F,
+            guardTile, lit, lit, lit);
+         // Main 3D Double-Edged Blade
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.014F, 0.012F, -0.042F, 0.014F, 0.255F, 0.042F,
+            bladeTile, lit, lit, lit);
+         // Pointed Blade Tip
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.011F, 0.255F, -0.024F, 0.011F, 0.305F, 0.024F,
+            bladeTile, lit * 1.05F, lit * 1.05F, lit * 1.05F);
+         return;
+      }
+
+      // 4. 3D Axe (I_AXE_IRON) — 3D Handle Shaft + Sweeping Iron Axe Bit + Back Poll
+      if (heldId == PeWorld.I_AXE_IRON) {
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.018F, -0.15F, -0.018F, 0.018F, 0.175F, 0.018F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.024F, 0.085F, -0.045F, 0.024F, 0.165F, 0.095F,
+            PeTextures.T_IRON_BLOCK, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.018F, 0.055F, 0.055F, 0.018F, 0.175F, 0.135F,
+            PeTextures.T_IRON_BLOCK, lit * 1.04F, lit * 1.04F, lit * 1.04F);
+         return;
+      }
+
+      // 5. 3D Shovel (I_SHOVEL_DIAMOND) — 3D Handle Shaft + Beveled Diamond Spade Scoop
+      if (heldId == PeWorld.I_SHOVEL_DIAMOND) {
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.017F, -0.15F, -0.017F, 0.017F, 0.12F, 0.017F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.055F, 0.115F, -0.016F, 0.055F, 0.235F, 0.016F,
+            PeTextures.T_DIAMOND_BLOCK, lit, lit, lit);
+         return;
+      }
+
+      // 6. 3D Bow (I_BOW) — Curved 3D Wooden Bow Limbs + Bowstring
+      if (heldId == PeWorld.I_BOW) {
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.018F, -0.09F, 0.02F, 0.018F, 0.09F, 0.055F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.016F, 0.08F, -0.03F, 0.016F, 0.19F, 0.025F,
+            PeTextures.T_LOG_OAK_SIDE, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.016F, -0.19F, -0.03F, 0.016F, -0.08F, 0.025F,
+            PeTextures.T_LOG_OAK_SIDE, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.006F, -0.18F, -0.035F, 0.006F, 0.18F, -0.025F,
+            PeTextures.T_WOOL_WHITE, lit, lit, lit);
+         return;
+      }
+
+      // 7. 3D Held Torch — Wooden Post + Bright Glowing Flame Head
+      if (heldId == PeWorld.B_TORCH) {
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.022F, -0.11F, -0.022F, 0.022F, 0.09F, 0.022F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.028F, 0.09F, -0.028F, 0.028F, 0.155F, 0.028F,
+            PeTextures.T_LAVA, 1.0F, 0.95F, 0.65F);
+         return;
+      }
+
+      // 8. Non-Block Held Items (Food, Ingots, Gems, Ender Pearl): 3D Extruded Item Tablet
+      if (heldId > PeWorld.MAX_BLOCK_ID) {
+         int itemTile = PeWorld.getItemTile(heldId);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.095F, -0.095F, -0.022F, 0.095F, 0.095F, 0.022F,
+            itemTile, lit, lit, lit);
+         return;
+      }
+
+      // 9. True 6-Face 3D Held Block (using getFaceTile(b, 0..5) and Slab/Stair geometry!)
+      byte b = (byte)heldId;
+      // Rotate block slightly by 35 degrees in hand so Top, Front, and Side faces are all clearly visible
+      float cR = 0.82F, sR = 0.57F;
+      float bRx = rx * cR + fx * sR;
+      float bRy = ry * cR + fy * sR;
+      float bRz = rz * cR + fz * sR;
+      float bFx = fx * cR - rx * sR;
+      float bFy = fy * cR - ry * sR;
+      float bFz = fz * cR - rz * sR;
+
+      if (PeWorld.isSlab(b)) {
+         addLocalBlockBox6Face(hx, hy, hz, bRx, bRy, bRz, ux, uy, uz, bFx, bFy, bFz,
+            -0.105F, -0.09F, -0.105F, 0.105F, 0.015F, 0.105F, b, lit);
+      } else if (PeWorld.isStair(b)) {
+         addLocalBlockBox6Face(hx, hy, hz, bRx, bRy, bRz, ux, uy, uz, bFx, bFy, bFz,
+            -0.105F, -0.09F, -0.105F, 0.105F, 0.015F, 0.105F, b, lit);
+         addLocalBlockBox6Face(hx, hy, hz, bRx, bRy, bRz, ux, uy, uz, bFx, bFy, bFz,
+            -0.105F, 0.015F, -0.105F, 0.105F, 0.12F, 0.0F, b, lit);
+      } else {
+         addLocalBlockBox6Face(hx, hy, hz, bRx, bRy, bRz, ux, uy, uz, bFx, bFy, bFz,
+            -0.105F, -0.105F, -0.105F, 0.105F, 0.105F, 0.105F, b, lit);
+      }
+   }
+
+   private void addLocalBox3D(float ox, float oy, float oz,
+                              float rx, float ry, float rz,
+                              float ux, float uy, float uz,
+                              float fx, float fy, float fz,
+                              float x0, float y0, float z0, float x1, float y1, float z1,
+                              int tile, float cr, float cg, float cb) {
+      int p = this.dyn3DVerts * FLOATS_PER_VERT_3D;
+      if (p + 36 * FLOATS_PER_VERT_3D >= this.dyn3DData.length) return;
+      float[] cx = new float[8];
+      float[] cy = new float[8];
+      float[] cz = new float[8];
+      for (int c = 0; c < 8; c++) {
+         float lx = ((c & 1) != 0) ? x1 : x0;
+         float ly = ((c & 2) != 0) ? y1 : y0;
+         float lz = ((c & 4) != 0) ? z1 : z0;
+         cx[c] = ox + rx * lx + ux * ly + fx * lz;
+         cy[c] = oy + ry * lx + uy * ly + fy * lz;
+         cz[c] = oz + rz * lx + uz * ly + fz * lz;
+      }
+      float u0 = ((tile & 15) * 16.0F + 0.15F) / 256.0F;
+      float v0 = ((tile >> 4) * 16.0F + 0.15F) / 256.0F;
+      float u1 = ((tile & 15) * 16.0F + 15.85F) / 256.0F;
+      float v1 = ((tile >> 4) * 16.0F + 15.85F) / 256.0F;
+      // Top (+Y: 2, 6, 7, 3)
+      p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, cr, cg, cb, 1.0F,
+         cx[2], cy[2], cz[2], cx[6], cy[6], cz[6], cx[7], cy[7], cz[7], cx[3], cy[3], cz[3]);
+      // Bottom (-Y: 4, 0, 1, 5)
+      p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, cr * 0.6F, cg * 0.6F, cb * 0.6F, 1.0F,
+         cx[4], cy[4], cz[4], cx[0], cy[0], cz[0], cx[1], cy[1], cz[1], cx[5], cy[5], cz[5]);
+      // North (-Z: 3, 1, 0, 2)
+      p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, cr * 0.85F, cg * 0.85F, cb * 0.85F, 1.0F,
+         cx[3], cy[3], cz[3], cx[1], cy[1], cz[1], cx[0], cy[0], cz[0], cx[2], cy[2], cz[2]);
+      // South (+Z: 6, 4, 5, 7)
+      p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, cr * 0.90F, cg * 0.90F, cb * 0.90F, 1.0F,
+         cx[6], cy[6], cz[6], cx[4], cy[4], cz[4], cx[5], cy[5], cz[5], cx[7], cy[7], cz[7]);
+      // East (+X: 7, 5, 1, 3)
+      p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, cr * 0.76F, cg * 0.76F, cb * 0.76F, 1.0F,
+         cx[7], cy[7], cz[7], cx[5], cy[5], cz[5], cx[1], cy[1], cz[1], cx[3], cy[3], cz[3]);
+      // West (-X: 2, 0, 4, 6)
+      p = emitDynamicQuad(this.dyn3DData, p, u0, v0, u1, v1, cr * 0.72F, cg * 0.72F, cb * 0.72F, 1.0F,
+         cx[2], cy[2], cz[2], cx[0], cy[0], cz[0], cx[4], cy[4], cz[4], cx[6], cy[6], cz[6]);
+      this.dyn3DVerts = p / FLOATS_PER_VERT_3D;
+   }
+
+   private void addLocalBlockBox6Face(float ox, float oy, float oz,
+                                      float rx, float ry, float rz,
+                                      float ux, float uy, float uz,
+                                      float fx, float fy, float fz,
+                                      float x0, float y0, float z0, float x1, float y1, float z1,
+                                      byte b, float shade) {
+      int p = this.dyn3DVerts * FLOATS_PER_VERT_3D;
+      if (p + 36 * FLOATS_PER_VERT_3D >= this.dyn3DData.length) return;
+      float[] cx = new float[8];
+      float[] cy = new float[8];
+      float[] cz = new float[8];
+      for (int c = 0; c < 8; c++) {
+         float lx = ((c & 1) != 0) ? x1 : x0;
+         float ly = ((c & 2) != 0) ? y1 : y0;
+         float lz = ((c & 4) != 0) ? z1 : z0;
+         cx[c] = ox + rx * lx + ux * ly + fx * lz;
+         cy[c] = oy + ry * lx + uy * ly + fy * lz;
+         cz[c] = oz + rz * lx + uz * ly + fz * lz;
+      }
+      p = emitOrientedBlockFaces(this.dyn3DData, p, cx, cy, cz, b, shade);
+      this.dyn3DVerts = p / FLOATS_PER_VERT_3D;
+   }
+
+   private static int emitOrientedBlockFaces(float[] out, int p, float[] cx, float[] cy, float[] cz, byte b, float shade) {
+      // Face 0: Top (+Y: 2, 6, 7, 3)
+      p = emitFaceAO(out, p, PeWorld.getFaceTile(b, 0), 0.0F,
+         cx[2], cy[2], cz[2], shade,
+         cx[6], cy[6], cz[6], shade,
+         cx[7], cy[7], cz[7], shade,
+         cx[3], cy[3], cz[3], shade);
+      // Face 1: Bottom (-Y: 4, 0, 1, 5)
+      p = emitFaceAO(out, p, PeWorld.getFaceTile(b, 1), 0.0F,
+         cx[4], cy[4], cz[4], shade * 0.56F,
+         cx[0], cy[0], cz[0], shade * 0.56F,
+         cx[1], cy[1], cz[1], shade * 0.56F,
+         cx[5], cy[5], cz[5], shade * 0.56F);
+      // Face 2: North (-Z: 3, 1, 0, 2)
+      p = emitFaceAO(out, p, PeWorld.getFaceTile(b, 2), 0.0F,
+         cx[3], cy[3], cz[3], shade * 0.85F,
+         cx[1], cy[1], cz[1], shade * 0.80F,
+         cx[0], cy[0], cz[0], shade * 0.80F,
+         cx[2], cy[2], cz[2], shade * 0.85F);
+      // Face 3: South (+Z: 6, 4, 5, 7)
+      p = emitFaceAO(out, p, PeWorld.getFaceTile(b, 3), 0.0F,
+         cx[6], cy[6], cz[6], shade * 0.90F,
+         cx[4], cy[4], cz[4], shade * 0.84F,
+         cx[5], cy[5], cz[5], shade * 0.84F,
+         cx[7], cy[7], cz[7], shade * 0.90F);
+      // Face 4: East (+X: 7, 5, 1, 3)
+      p = emitFaceAO(out, p, PeWorld.getFaceTile(b, 4), 0.0F,
+         cx[7], cy[7], cz[7], shade * 0.76F,
+         cx[5], cy[5], cz[5], shade * 0.70F,
+         cx[1], cy[1], cz[1], shade * 0.70F,
+         cx[3], cy[3], cz[3], shade * 0.76F);
+      // Face 5: West (-X: 2, 0, 4, 6)
+      p = emitFaceAO(out, p, PeWorld.getFaceTile(b, 5), 0.0F,
+         cx[2], cy[2], cz[2], shade * 0.72F,
+         cx[0], cy[0], cz[0], shade * 0.66F,
+         cx[4], cy[4], cz[4], shade * 0.66F,
+         cx[6], cy[6], cz[6], shade * 0.72F);
+      return p;
    }
 
    private static int emitDynamicQuad(float[] out, int p,
@@ -873,6 +1235,71 @@ public final class PeChunkMesher {
       float u1 = ((tile & 15) * 16.0F + 15.85F) / 256.0F;
       float v1 = ((tile >> 4) * 16.0F + 15.85F) / 256.0F;
       addTexturedQuad2D(x, y, w, h, u0, v0, u1, v1, argb);
+   }
+
+   /**
+    * Renders an Item or Block inside an Inventory or Hotbar Slot:
+    * - Tools, Weapons, Food, Ores/Ingots, Cross-Plants, Doors & Ladders render as crisp 2D pixel-art sprites.
+    * - 3D Blocks, Slabs & Stairs render as 3-face Isometric 3D Block Previews (Top + Left + Right faces with shading)!
+    */
+   public void addItemOrBlockIcon2D(float x, float y, float s, int id) {
+      if (id <= 0) return;
+      if (id > PeWorld.MAX_BLOCK_ID
+         || PeWorld.isCrossPlant((byte)id)
+         || id == PeWorld.B_DOOR_OAK || id == PeWorld.B_DOOR_OAK_OPEN
+         || id == PeWorld.B_LADDER || id == PeWorld.B_BED_RED) {
+         addTile2D(x, y, s, s, PeWorld.getItemTile(id), 0xFFFFFFFF);
+         return;
+      }
+
+      byte b = (byte)id;
+      int topTile = PeWorld.getFaceTile(b, 0);
+      int leftTile = PeWorld.getFaceTile(b, 3);
+      int rightTile = PeWorld.getFaceTile(b, 4);
+
+      float cx = x + s * 0.50F;
+      float rx = s * 0.44F;
+      float ry = s * 0.22F;
+      float hFull = s * 0.48F;
+      float hUsed = PeWorld.isSlab(b) ? (hFull * 0.52F) : hFull;
+      float topY = y + s * 0.28F + (hFull - hUsed) * 0.65F;
+
+      // Top diamond face: N=(cx, topY - ry), W=(cx - rx, topY), S=(cx, topY + ry), E=(cx + rx, topY)
+      addTileFreeQuad2D(topTile, 1.0F,
+         cx,      topY - ry,
+         cx - rx, topY,
+         cx,      topY + ry,
+         cx + rx, topY);
+      // Left-Front face (South): TL=(cx - rx, topY), BL=(cx - rx, topY + hUsed), BR=(cx, topY + ry + hUsed), TR=(cx, topY + ry)
+      addTileFreeQuad2D(leftTile, 0.86F,
+         cx - rx, topY,
+         cx - rx, topY + hUsed,
+         cx,      topY + ry + hUsed,
+         cx,      topY + ry);
+      // Right-Side face (East): TL=(cx, topY + ry), BL=(cx, topY + ry + hUsed), BR=(cx + rx, topY + hUsed), TR=(cx + rx, topY)
+      addTileFreeQuad2D(rightTile, 0.68F,
+         cx,      topY + ry,
+         cx,      topY + ry + hUsed,
+         cx + rx, topY + hUsed,
+         cx + rx, topY);
+   }
+
+   private void addTileFreeQuad2D(int tile, float shade,
+                                  float x0, float y0, float x1, float y1,
+                                  float x2, float y2, float x3, float y3) {
+      int p = this.dyn2DVerts * FLOATS_PER_VERT_2D;
+      if (p + 6 * FLOATS_PER_VERT_2D >= this.dyn2DData.length) return;
+      float u0 = ((tile & 15) * 16.0F + 0.15F) / 256.0F;
+      float v0 = ((tile >> 4) * 16.0F + 0.15F) / 256.0F;
+      float u1 = ((tile & 15) * 16.0F + 15.85F) / 256.0F;
+      float v1 = ((tile >> 4) * 16.0F + 15.85F) / 256.0F;
+      p = putV2D(this.dyn2DData, p, x0, y0, u0, v0, shade, shade, shade, 1.0F);
+      p = putV2D(this.dyn2DData, p, x1, y1, u0, v1, shade, shade, shade, 1.0F);
+      p = putV2D(this.dyn2DData, p, x2, y2, u1, v1, shade, shade, shade, 1.0F);
+      p = putV2D(this.dyn2DData, p, x0, y0, u0, v0, shade, shade, shade, 1.0F);
+      p = putV2D(this.dyn2DData, p, x2, y2, u1, v1, shade, shade, shade, 1.0F);
+      p = putV2D(this.dyn2DData, p, x3, y3, u1, v0, shade, shade, shade, 1.0F);
+      this.dyn2DVerts = p / FLOATS_PER_VERT_2D;
    }
 
    public void addText2D(PeTextures tex, String text, float x, float y, float scale, int argb) {

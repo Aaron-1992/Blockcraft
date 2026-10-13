@@ -437,9 +437,46 @@ public class PeCoreTest {
       check(!touch.miningHeld && !touch.attackTapped && !touch.placeTapped,
          "Releasing finger after camera look must NEVER trigger attack or block placement!");
 
-      // 5. Verify Single-Player Crafting, O(1) Empty Sky Section Skipping & VBO Mesher + GL Draw
-      moveWorld.giveItem(PeWorld.B_LOG_OAK, 2);
-      check(moveWorld.tryCraftRecipe(0, null), "Crafting Oak Planks x4 from 1 Oak Log must succeed");
+      // 5. Verify Single-Player Crafting, 36-Slot Backpack, Animated 3D Falling Trees, 3D Tools & VBO Mesher
+      moveWorld.giveItem(PeWorld.B_LOG_BIRCH, 2);
+      check(moveWorld.tryCraftRecipe(0, null), "Crafting Planks x4 from Birch Log must succeed via flexible wood matching");
+
+      // Verify 27-slot backpack overflow never overwrites held tool in selectedSlot
+      int heldBefore = moveWorld.hotbarId[moveWorld.selectedSlot];
+      for (int s = 0; s < 9; s++) {
+         if (moveWorld.hotbarId[s] == 0) {
+            moveWorld.hotbarId[s] = PeWorld.B_COBBLE + s;
+            moveWorld.hotbarCount[s] = 1;
+         }
+      }
+      moveWorld.giveItem(PeWorld.B_DIAMOND_BLOCK, 12);
+      check(moveWorld.hotbarId[moveWorld.selectedSlot] == heldBefore,
+         "giveItem must NEVER overwrite held tool in selectedSlot when hotbar is full!");
+      check(moveWorld.countItemInHotbar(PeWorld.B_DIAMOND_BLOCK) == 12,
+         "Overflow items must be stored in the 27-slot backpack and counted by countItemInHotbar!");
+
+      // Verify Animated 3D Tree Felling (PC Update 3.10 port)
+      int tx = 14, tz = 14;
+      int ty = 90;
+      moveWorld.setBlock(tx, ty - 1, tz, PeWorld.B_DIRT);
+      for (int h = 0; h < 5; h++) {
+         moveWorld.setBlock(tx, ty + h, tz, PeWorld.B_LOG_OAK);
+      }
+      for (int ldx = -1; ldx <= 1; ldx++) {
+         for (int ldz = -1; ldz <= 1; ldz++) {
+            moveWorld.setBlock(tx + ldx, ty + 5, tz + ldz, PeWorld.B_LEAVES_OAK);
+         }
+      }
+      moveWorld.setBlock(tx, ty, tz, PeWorld.B_AIR);
+      boolean startedFall = moveWorld.fellTreeIfNatural(tx, ty, tz, PeWorld.B_LOG_OAK);
+      check(startedFall && moveWorld.fallingTrees.size() == 1,
+         "Breaking base log of natural tree must spawn an animated 3D FallingTree");
+      PeWorld.FallingTree ft = moveWorld.fallingTrees.get(0);
+      check(ft.getAngleDegrees(0.5F) > 0.0F && ft.getAngleDegrees(0.5F) < 90.0F,
+         "FallingTree must smoothly interpolate angle between 0 and 90 degrees");
+      moveWorld.finishAllFallingTrees();
+      check(moveWorld.fallingTrees.isEmpty(), "finishAllFallingTrees must land all active falling trees");
+
       float[] scratch = new float[54000 * 9];
       PeChunkMesher mesher = new PeChunkMesher();
       check(mesher.buildSectionGeometry(moveWorld, 0, 7, 0, scratch) == 0,
@@ -450,14 +487,25 @@ public class PeCoreTest {
       }
       check(totalVerts > 100, "Spawn chunk VBO mesher must emit > 100 vertices, got " + totalVerts);
 
+      // Verify 3D Held Tool & 3D Block Meshing + Isometric 3D Slot Icons
+      mesher.beginDynamic3D();
+      mesher.addFirstPersonHeld3D(PeWorld.I_PICK_IRON, 0.0F, 70.0F, 0.0F, 0.0F, 0.0F, 0.35F, 0.0F, 1.0F);
+      mesher.addFirstPersonHeld3D(PeWorld.I_SWORD_DIAMOND, 0.0F, 70.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
+      mesher.addFirstPersonHeld3D(PeWorld.B_GRASS, 0.0F, 70.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
+
       PeGLSurfaceView glView = new PeGLSurfaceView(ctx);
       glView.onSurfaceCreated(null, null);
       glView.onSurfaceChanged(null, 2340, 1080);
       glView.onDrawFrame(null); // Draw Title Screen
       glView.world.screen = PeWorld.SCREEN_PLAY;
-      glView.onDrawFrame(null); // Draw Play Screen
+      glView.onDrawFrame(null); // Draw Play Screen with 3D Tool & Isometric Hotbar Icons
+      glView.world.screen = PeWorld.SCREEN_INVENTORY;
+      glView.world.invCategory = 0;
+      glView.onDrawFrame(null); // Draw Backpack & Craft Tab
+      glView.world.invCategory = 1;
+      glView.onDrawFrame(null); // Draw Building Blocks Tab
 
-      System.out.println("PeCoreTest PASSED: Infinite Worlds, TexPaint319 Leaves & Terrain Textures, O(1) Section Meshing, Mobile UI, and Controls verified!");
+      System.out.println("PeCoreTest PASSED: CCW Face Winding, Upright Side UVs, Animated 3D Falling Trees, 3D Tools, 36-Slot Backpack, and Controls verified!");
    }
 }
 """
