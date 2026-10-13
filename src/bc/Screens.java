@@ -110,7 +110,7 @@ final class Screens {
          });
       ui.button("Quit Game", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
       gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
-      gui.text("Textures: " + (TexSmooth.enabled() ? "Smooth Realism 64px" : ResourcePacks.activeId() + " 16px"),
+      gui.text("Textures: " + (TexPixel32.enabled() ? "Natural Pixel 32px" : ResourcePacks.activeId() + " 16px"),
          4.0F, gui.h - 22.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);

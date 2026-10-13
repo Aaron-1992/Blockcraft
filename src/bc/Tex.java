@@ -881,14 +881,14 @@ public final class Tex {
       }
    }
 
-   /** Reallocate on pack switches as default is 64px, classic/custom packs remain 16px. */
+   /** Reallocate on pack switches as default is 32px, classic/custom packs remain 16px. */
    private static void uploadAtlas() {
-      renderTileSize = TexSmooth.enabled() ? TexSmooth.SIZE : 16;
-      renderMaxLevel = renderTileSize == 64 ? 5 : 3;
-      int[] pixels = renderTileSize == 64 ? TexSmooth.atlas(atlasPixels) : atlasPixels;
+      renderTileSize = TexPixel32.enabled() ? TexPixel32.SIZE : 16;
+      renderMaxLevel = renderTileSize == TexPixel32.SIZE ? 4 : 3;
+      int[] pixels = renderTileSize == TexPixel32.SIZE ? TexPixel32.atlas(atlasPixels) : atlasPixels;
       int width = COLS * renderTileSize;
       GL11.glBindTexture(3553, atlas);
-      // Gradients are baked at 64px. Nearest in each mip avoids sampling neighbouring atlas tiles.
+      // Nearest sampling preserves the 32px palette and never blurs adjacent atlas cells.
       GL11.glTexParameteri(3553, 10240, 9728);
       GL11.glTexParameteri(3553, 10241, 9986);
       GL11.glTexParameteri(3553, 10242, 33071);
@@ -1066,7 +1066,7 @@ public final class Tex {
 
    private static void upload(int x, int y, int[] pixels, boolean mips) {
       int tile = (y / 16) * COLS + x / 16;
-      int[] cur = renderTileSize == 64 ? TexSmooth.tile(tile, pixels, true) : pixels;
+      int[] cur = renderTileSize == TexPixel32.SIZE ? TexPixel32.tile(tile, pixels, true) : pixels;
       int scale = renderTileSize / 16;
       x *= scale;
       y *= scale;

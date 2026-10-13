@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.2  -  an original Minecraft-style voxel sandbox   (EDITION V6.2)
+BLOCKCRAFT V6.3  -  an original Minecraft-style voxel sandbox   (EDITION V6.3)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,17 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.3 - Natural Pixel 32, sprite bow and held-item lighting
+  * Default textures are now 32x32, with crisp pixel clusters and natural stepped
+    palettes. No bilinear reconstruction or blur. New stone, soil, grass, sand,
+    timber, cobble, masonry and ore patterns; other authored pixels remain sharp.
+  * The held bow is flat pixel art again, with idle/three pulling stages and a
+    nocked arrow painted into the frame. No 3D rods or curved limb mesh.
+  * Held items use the player's gamma-correct lightmap once, preserving torch
+    colour without a second world-space sun/shadow/dynamic-light pass.
+  * Choose Natural Pixel 32 (Default) in Options > Resource Packs. Older packs
+    and custom packs are still available and your saves/options are preserved.
 
 WHAT'S NEW IN V6.2 - Smooth Realism & held weapons (included in this download)
   * Default block/item atlas now renders at 64x64 per tile (2048x2048 total), with
@@ -21,8 +32,8 @@ WHAT'S NEW IN V6.2 - Smooth Realism & held weapons (included in this download)
 
 HOW TO CONFIRM THIS UPDATE
   * Extract into a NEW folder and run that folder's Blockcraft.exe, not an old shortcut.
-  * The title screen must say Blockcraft V6.2 and Textures: Smooth Realism 64px.
-  * If a different pack is active, select Smooth Realism 6.2 (Default) under
+  * The title screen must say Blockcraft V6.3 and Textures: Natural Pixel 32px.
+  * If a different pack is active, select Natural Pixel 32 (Default) under
     Options > Resource Packs. Do not delete your saves or options.
   * Check-build.bat reports the version and source fingerprint from inside the EXE.
   * The All Blocks buttons and the bed/turned-log fixes from V6.1 are retained.

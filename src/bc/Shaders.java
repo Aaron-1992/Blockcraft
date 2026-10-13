@@ -891,6 +891,7 @@ public final class Shaders {
     */
    public void useEntity(float[] mv, double camX, double camY, double camZ, float fogNear, float fogFar, float[] fogCol, boolean shadowOn, float sky, float blk) {
       GL20.glUseProgram(this.pEntity);
+      this.u1f(this.pEntity, "handPass", 0.0F); // never leak viewmodel lighting into world entities
       this.calcView(mv);
       GL20.glUniformMatrix4fv(this.loc(this.pEntity, "invView"), false, this.invViewM);
       float[] sm = new float[16];
@@ -918,6 +919,15 @@ public final class Shaders {
       GL11.glBindTexture(3553, this.shadowTex);
       GL13.glActiveTexture(33984);
       this.entityOn = true;
+   }
+
+   /** Viewmodels already have face shading. Sample the player's lightmap once, not a second sun/dynamic pass. */
+   public void useHand(float[] mv, double x, double y, double z, float sky, float block) {
+      useEntity(mv, x, y, z, 80, 160, new float[]{0, 0, 0}, false, sky, block);
+      int light = HandLighting.sample(Tex.lmBuf, sky, block);
+      this.u1f(this.pEntity, "handPass", 1.0F);
+      GL20.glUniform3f(this.loc(this.pEntity, "handLight"), (light >> 16 & 255) / 255.0F,
+         (light >> 8 & 255) / 255.0F, (light & 255) / 255.0F);
    }
 
    /** The light level (0..1 each) of the entity that is drawn next. */

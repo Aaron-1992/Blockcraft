@@ -1,2 +1,2 @@
-gfx-glow-night,gfx-glow-night-low,mobs-torch-sh,nether-vista-sh,gfx-nether-low,gfx-cloudshadow,gfx-cloudshadow-low,gfx-cloudshadow-fair,gfx-rain,gfx-rain-low,gfx-ao,gfx-look-vivid
+pixel-bow-idle,pixel-bow-full,pixel-bow-third,pixel-hand-day,pixel-hand-night,pixel-hand-torch,pixel-materials
 jar=build

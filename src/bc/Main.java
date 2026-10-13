@@ -17,9 +17,10 @@ public final class Main {
             }
             System.out.println("version=" + Game.VERSION_STR);
             System.out.println("source.sha256=" + receipt.getProperty("source.sha256"));
-            System.out.println("default.texture.tileSize=" + TexSmooth.SIZE);
+            System.out.println("default.texture.tileSize=" + TexPixel32.SIZE);
             System.out.println("gun.firstPersonYaw=" + WeaponPose.FIRST_PERSON_YAW);
-            System.out.println("bow.model=articulated-3d");
+            System.out.println("bow.model=pixel-sprite");
+            System.out.println("hand.lighting=single-lightmap");
             return; // No window, GPU, native libraries, options or saved-world writes.
          }
          new Game().run();

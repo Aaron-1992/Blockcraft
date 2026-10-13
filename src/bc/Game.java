@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.2";
+   public static final String VERSION_STR = "6.3";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -6178,7 +6178,7 @@ public final class Game {
          Perf.mark(Perf.HAND);
          if (this.screenIsPlay() && !this.hideGui && this.screen != Game.S.DEAD && !this.player.spectator && this.view == 0) {
             float var4 = this.swingPrev + (this.swing - this.swingPrev) * this.partial;
-            float var5 = this.rend.brightnessAt(this.world, this.player.x, this.player.y + 1.0, this.player.z);
+            float var5 = this.rend.brightnessAt(this.world, this.player.x, this.player.y + this.player.eye, this.player.z);
             this.rend
                .renderHand(
                   this.partial,

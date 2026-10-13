@@ -15,7 +15,12 @@ import zipfile
 
 import build as B
 
-REQUIRED = ("Game", "Renderer", "PlayerModel", "Tex", "TexSmooth", "WeaponPose", "BowModel")
+REQUIRED = ("Game", "Renderer", "PlayerModel", "Tex", "TexPixel32", "WeaponPose", "BowSprite", "HandLighting", "ShaderSrc", "Shaders")
+
+def required(version):
+    if tuple(map(int, version.split("."))) < (6, 3):
+        return ("Game", "Renderer", "PlayerModel", "Tex", "TexSmooth", "WeaponPose", "BowModel")
+    return REQUIRED
 
 
 def properties(raw):
@@ -38,7 +43,7 @@ def inspect_payload(exe, jar, version, source_hash):
             raise ValueError("Packaged version does not match requested release " + version)
         if receipt.get("source.sha256") != source_hash:
             raise ValueError("Update pack is stale: source fingerprint differs; rebuild with tools/build.py --patch")
-        for cls in REQUIRED:
+        for cls in required(version):
             actual = hashlib.sha256(j.read("bc/" + cls + ".class")).hexdigest()
             if actual != receipt.get("class." + cls + ".sha256"):
                 raise ValueError("Missing/modified visual update class: " + cls)
@@ -58,11 +63,14 @@ def verify(archive, version):
                                     capture_output=True, text=True, timeout=30)
             info = properties(result.stdout.encode("utf-8"))
             expected = {"version": version, "source.sha256": receipt["source.sha256"],
-                        "default.texture.tileSize": "64", "gun.firstPersonYaw": "96.0",
-                        "bow.model": "articulated-3d"}
+                        "default.texture.tileSize": "32" if tuple(map(int, version.split("."))) >= (6, 3) else "64",
+                        "gun.firstPersonYaw": "96.0",
+                        "bow.model": "pixel-sprite" if tuple(map(int, version.split("."))) >= (6, 3) else "articulated-3d"}
+            if tuple(map(int, version.split("."))) >= (6, 3):
+                expected["hand.lighting"] = "single-lightmap"
             if result.returncode or any(info.get(k) != v for k, v in expected.items()):
                 raise ValueError("Packaged %s failed runtime check:\n%s\n%s" % (name, result.stdout, result.stderr))
-            print("[verify] %s: version=%s, 64px atlas, corrected gun pose, articulated bow" % (name, version))
+            print("[verify] %s: version=%s, %spx atlas, %s bow" % (name, version, expected["default.texture.tileSize"], expected["bow.model"]))
     print("[verify] source.sha256=" + receipt["source.sha256"])
     return receipt
 

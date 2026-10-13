@@ -452,7 +452,8 @@ final class PlayerModel {
          float size = id == Items.BOW ? 14.4F : (id == Redstone319.PISTOL ? 12.48F : 13.76F);
          GL11.glScalef(size, size, size);
          if (id == Items.BOW) {
-            BowModel.draw(draw, nocked, bright);
+            GL11.glRotatef(180, 0, 1, 0); // sprite arrow points -X; the forearm convention points +X forward
+            BowSprite.draw(draw, nocked, bright);
          } else {
             GL11.glTranslatef(-WeaponPose.gripX(id), -WeaponPose.gripY(id), 0);
             Renderer.drawGunModel3D(id, bright);

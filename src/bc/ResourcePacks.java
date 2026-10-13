@@ -119,13 +119,13 @@ public final class ResourcePacks {
       packs.clear();
       packs.add(new Pack(
          ID_DEFAULT,
-         "Smooth Realism 6.2 (Default)",
-         "64x64 materials, smooth colour gradients & fine surface detail",
+         "Natural Pixel 32 (Default)",
+         "32x32 crisp pixel art, natural materials, no texture blur",
          true,
          false,
          null,
          0xFF2E7D32,
-         "64px"
+         "32px"
       ));
       packs.add(new Pack(
          ID_V59_RELIEF,

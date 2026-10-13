@@ -43,18 +43,4 @@ final class WeaponPose {
       float t = clamp((ticks - partial) / 4.0F);
       return clamp(draw) * t * t * t;
    }
-   static float tipX(float draw) { return -0.12F - 0.08F * clamp(draw); }
-   static float tipY(float draw) {
-      float d = clamp(draw);
-      return 0.60F - 0.12F * d * d;
-   }
-   /** String length remains 1.2 units, including while drawing. The arrow tail uses this same point. */
-   static float nockZ(float draw) { return 0.036F * clamp(draw); }
-   static float nockX(float draw) {
-      float y = tipY(draw), z = nockZ(draw);
-      return tipX(draw) - (float)Math.sqrt(Math.max(0, 0.36F - y * y - z * z));
-   }
-   static float limbX(float t, float draw) {
-      return tipX(draw) * t * t + 0.065F * (float)Math.sin(Math.PI * t);
-   }
 }

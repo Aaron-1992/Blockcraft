@@ -2157,6 +2157,13 @@ public final class Renderer {
    }
 
    public static void drawItemModel(int var0, float var1) {
+      if (var0 == Items.BOW) {
+         GL11.glPushMatrix();
+         GL11.glTranslatef(-0.25F, 0, 0);
+         BowSprite.draw(0, false, var1);
+         GL11.glPopMatrix();
+         return;
+      }
       if (isGun(var0)) {
          drawGunModel3D(var0, var1);
          return;
@@ -2604,7 +2611,10 @@ public final class Renderer {
       GL11.glRotatef(-clYaw * 0.32F + breathRoll, 0.0F, 0.0F, 1.0F);
       boolean entShader = this.shadersOn() && this.sh.entityOk;
       if (entShader) {
-         this.sh.useEntity(this.mv, this.camX, this.camY, this.camZ, 80.0F, 160.0F, this.entFogCol, false, this.lastSky, this.lastBlk);
+         this.sh.useHand(this.mv, this.camX, this.camY, this.camZ, this.lastSky, this.lastBlk);
+         bright = 1.0F; // The hand shader applies the lightmap once; vertex colours only shade model faces.
+      } else {
+         bright = HandLighting.fallback(bright, this.g.opt.gamma);
       }
 
       float s1 = (float)Math.sqrt(swing);
@@ -2642,12 +2652,12 @@ public final class Renderer {
                try { pull = WeaponPose.clamp(Float.parseFloat(preview)); nocked = pull > 0; }
                catch (NumberFormatException ignored) { }
             }
-            // A dedicated pose, not the sword swing/item-sprite transform. +X points down the sightline.
+            // A flat pixel-art bow. Drawing changes the sprite, not a tube/limb mesh.
             GL11.glTranslatef(0.33F - 0.08F * pull, -0.24F - p * 0.5F + 0.035F * pull, -0.92F);
-            GL11.glRotatef(100.0F, 0, 1, 0);
-            GL11.glRotatef(-8.0F + 5.0F * pull, 1, 0, 0);
+            GL11.glRotatef(-18.0F + 6.0F * pull, 0, 0, 1);
+            GL11.glRotatef(-20.0F, 0, 1, 0); // keep the flat sprite visible, not edge-on like a gun barrel
             GL11.glScalef(0.82F, 0.82F, 0.82F);
-            BowModel.draw(pull, nocked, bright);
+            BowSprite.draw(pull, nocked, bright);
          } else {
             if (use >= 0.0F) {
                float f = 32.0F * (1.0F - use) + 1.0F; // ticks left

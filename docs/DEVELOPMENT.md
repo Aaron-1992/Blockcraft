@@ -412,3 +412,30 @@ release included these changes. V6.2 packages the visual refresh and retains the
   release workflow uses `pipefail`, so a verification failure cannot be hidden by tee.
 - `python3 -m unittest discover -s tools -p 'test_verify_release.py'` checks valid,
   old-EXE/new-JAR, mislabeled-version, stale-source and changed-class payloads.
+
+### 6.3: replace the rejected soft 64px style
+
+`TexPixel32` replaces `TexSmooth`: native 32px stepped material palettes, hard pixel
+clusters/veins/mortar edges, and exact nearest expansion for remaining authored
+cells. There is no spatial colour interpolation. Default GPU atlas = 1024x1024,
+mips = 32/16/8/4/2px per tile; classic/custom packs still use 16px. Temporal blending
+of fluid/fire frames remains, but does not spatially blur their pixels.
+
+`BowSprite` replaces `BowModel`: one alpha-tested two-sided flat quad, nearest-filtered
+32px idle + 3 draw stages, grip fixed at pixel (8,16), string and arrow painted in the
+same frame. Release reuses the stages without an arrow. Inventory/default-atlas and
+dropped bows share the idle artwork. `WeaponPose` retains gun/recoil and draw timing,
+not the removed 3D limb geometry.
+
+The entity shader has an explicit `handPass`. It uses the eye-position lightmap RGB
+(which already contains sky/block light, torch tint, dimension ambient and gamma)
+with face-shading colours at brightness 1. It bypasses world-space derivative normals,
+sun/shadows/fog/dynamic-light additions. `useEntity` resets the hand flag each time.
+Shader-off hands now honour gamma as well. The existing post-process/GUI ordering is
+unchanged. Tests cover exact non-interpolated colour edges, 32px alpha/mips, sprite
+stages/nock/tips, lightmap samples and hand-pass isolation.
+
+Visual scenes: `pixel-bow-idle`, `pixel-bow-full`, `pixel-bow-third`, `pixel-hand-day`,
+`pixel-hand-night`, `pixel-hand-torch`, `pixel-materials`. CPU atlas export:
+`bc.TexSheet build/pixel32-atlas.png pixel32`. Pack verification checks the 32px
+renderer, sprite bow and single-lightmap flag in the actual EXE and JAR.

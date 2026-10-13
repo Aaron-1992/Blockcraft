@@ -707,6 +707,17 @@ SCENES["gfx-cloudshadow-fair"] = (_VF_NOMOB + ["-Dbc.cam=182.5,100,83.5,128,28",
 SCENES["gfx-rain"] = (_VF + ["-Dbc.weather=rain", "-Dbc.lightning=off", "-Dbc.look=1"], True)
 SCENES["gfx-rain-low"] = ([a for a in SCENES["gfx-rain"][0] if not a.startswith("-Dbc.look=")] + ["-Dbc.fx=0", "-Dbc.look=0"], True)
 SCENES["gfx-ao"] = (SCENES["gfx-look-vivid"][0] + ["-Dbc.fx=2"], True)
+# 6.3: inspect the actual viewmodel shader and native 32px art before release.
+_P32 = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=8", "-Dbc.win=960x540",
+        "-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.shot=110", "-Dbc.weather=calm"]
+SCENES["pixel-bow-idle"] = (_P32 + ["-Dbc.hold=268", "-Dbc.bowdraw=0", "-Dbc.time=6000"], True)
+SCENES["pixel-bow-full"] = (_P32 + ["-Dbc.hold=268", "-Dbc.bowdraw=1", "-Dbc.time=6000"], True)
+SCENES["pixel-bow-third"] = (_P32 + ["-Dbc.hold=268", "-Dbc.posestate=bow=1", "-Dbc.view=2", "-Dbc.bodyyaw=-40", "-Dbc.time=6000"], True)
+SCENES["pixel-hand-day"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=6000"], True)
+SCENES["pixel-hand-night"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000"], True)
+SCENES["pixel-hand-torch"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000", "-Dbc.set=141,68,75,32"], True)
+SCENES["pixel-materials"] = ([a for a in _P32 if not a.startswith("-Dbc.cam=")] + ["-Dbc.gen=12", "-Dbc.cam=-24,67.5,0,0,14", "-Dbc.time=6000", "-Dbc.emptyhand=1"], True)
+
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

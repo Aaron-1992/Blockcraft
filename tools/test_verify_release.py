@@ -3,13 +3,13 @@ import hashlib
 import io
 import unittest
 import zipfile
-from verify_release import REQUIRED, inspect_payload
+from verify_release import required, inspect_payload
 
 
-def payload(version="6.2", source="expected", tamper=False):
-    data = {"bc/" + c + ".class": c.encode() for c in REQUIRED}
+def payload(version="6.3", source="expected", tamper=False):
+    data = {"bc/" + c + ".class": c.encode() for c in required(version)}
     text = "version=%s\nsource.sha256=%s\n" % (version, source)
-    for c in REQUIRED:
+    for c in required(version):
         text += "class.%s.sha256=%s\n" % (c, hashlib.sha256(data["bc/" + c + ".class"]).hexdigest())
     data["bc-build.properties"] = text.encode()
     if tamper:
@@ -24,27 +24,27 @@ def payload(version="6.2", source="expected", tamper=False):
 class ReleaseTests(unittest.TestCase):
     def test_current_embedded_game(self):
         jar = payload()
-        receipt = inspect_payload(b"launcher-stub" + jar, jar, "6.2", "expected")
-        self.assertEqual(receipt["version"], "6.2")
+        receipt = inspect_payload(b"launcher-stub" + jar, jar, "6.3", "expected")
+        self.assertEqual(receipt["version"], "6.3")
 
     def test_old_exe_next_to_new_jar_rejected(self):
-        with self.assertRaisesRegex(ValueError, "disagree"):
-            inspect_payload(payload("6.1"), payload(), "6.2", "expected")
+        with self.assertRaisesRegex(ValueError, "disagree|different game"):
+            inspect_payload(payload("6.1"), payload(), "6.3", "expected")
 
     def test_renamed_old_release_rejected(self):
         jar = payload("6.1")
         with self.assertRaisesRegex(ValueError, "version"):
-            inspect_payload(jar, jar, "6.2", "expected")
+            inspect_payload(jar, jar, "6.3", "expected")
 
     def test_same_version_stale_sources_rejected(self):
         jar = payload(source="older-sources")
         with self.assertRaisesRegex(ValueError, "stale"):
-            inspect_payload(jar, jar, "6.2", "expected")
+            inspect_payload(jar, jar, "6.3", "expected")
 
     def test_old_renderer_with_new_receipt_rejected(self):
         jar = payload(tamper=True)
         with self.assertRaisesRegex(ValueError, "visual update class"):
-            inspect_payload(jar, jar, "6.2", "expected")
+            inspect_payload(jar, jar, "6.3", "expected")
 
 
 if __name__ == "__main__":
