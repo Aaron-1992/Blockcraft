@@ -965,20 +965,37 @@ public final class PeChunkMesher {
          return;
       }
 
-      // 6. 3D Bow (I_BOW) — Curved 3D Wooden Bow Limbs + Bowstring
+      // 6. 3D Bow (I_BOW) — Curved 6-Segment 3D Wooden Recurve Bow + Bowstring + Nocked Arrow
       if (heldId == PeWorld.I_BOW) {
+         // Central wrapped leather riser grip curving forward (+Z)
          addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
-            -0.018F, -0.09F, 0.02F, 0.018F, 0.09F, 0.055F,
+            -0.018F, -0.065F, 0.045F, 0.018F, 0.065F, 0.082F,
+            PeTextures.T_LOG_SPRUCE, lit, lit, lit);
+         // Upper & lower mid-limbs curving back toward string
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.016F, 0.055F, 0.012F, 0.016F, 0.135F, 0.052F,
             PeTextures.T_PLANKS_OAK, lit, lit, lit);
          addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
-            -0.016F, 0.08F, -0.03F, 0.016F, 0.19F, 0.025F,
+            -0.016F, -0.135F, 0.012F, 0.016F, -0.055F, 0.052F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         // Upper & lower nock tips meeting the bowstring at z = -0.028
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.014F, 0.125F, -0.030F, 0.014F, 0.195F, 0.018F,
             PeTextures.T_LOG_OAK_SIDE, lit, lit, lit);
          addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
-            -0.016F, -0.19F, -0.03F, 0.016F, -0.08F, 0.025F,
+            -0.014F, -0.195F, -0.030F, 0.014F, -0.125F, 0.018F,
             PeTextures.T_LOG_OAK_SIDE, lit, lit, lit);
+         // Taut vertical braided bowstring connecting upper & lower nock tips
          addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
-            -0.006F, -0.18F, -0.035F, 0.006F, 0.18F, -0.025F,
+            -0.005F, -0.188F, -0.032F, 0.005F, 0.188F, -0.022F,
             PeTextures.T_WOOL_WHITE, lit, lit, lit);
+         // Nocked 3D arrow resting across the riser
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.007F, -0.007F, -0.028F, 0.007F, 0.007F, 0.135F,
+            PeTextures.T_PLANKS_OAK, lit, lit, lit);
+         addLocalBox3D(hx, hy, hz, rx, ry, rz, tUx, tUy, tUz, tFx, tFy, tFz,
+            -0.015F, -0.015F, 0.130F, 0.015F, 0.015F, 0.165F,
+            PeTextures.T_IRON_BLOCK, lit, lit, lit);
          return;
       }
 

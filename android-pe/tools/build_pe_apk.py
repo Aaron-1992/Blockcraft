@@ -161,7 +161,7 @@ HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
 
 
 def build_release_notes(version, apk_name, bundle_name):
-    return f"""## Blockcraft PE (Pocket Edition) v{version} — 5.6 x Minecraft Fused Texture Engine (Samsung Galaxy A55 5G)
+    return f"""## Blockcraft PE (Pocket Edition) v{version} — Realistic 5.6 x MC Texture Engine, Fixed Recurve Bow & Multi-Version Resource Pack Switcher (Samsung Galaxy A55 5G)
 
 > **Separate Pocket Edition Release**: This release contains **only** the Android Pocket Edition (`com.blockcraft.pe`) and does **not** include any PC files. PC (`v*`) and PE (`pe-v*`) releases are kept strictly separated.
 

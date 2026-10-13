@@ -337,11 +337,16 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          float bw = 1020.0F * scale;
          float bx = cx - bw * 0.5F;
          float bh = 104.0F * scale;
-         for (int i = 0; i < 5; i++) {
-            int acc = (i == 1 || i == 4) ? 0xFF54E882 : 0xFF5CA8FF;
-            this.mesher.drawButton2D(bx, (206.0F + i * 124.0F) * scale, bw, bh, 0xFF202C3C, acc, false);
+      } else if (this.world.screen == PeWorld.SCREEN_SETTINGS) {
+         float bw = 1040.0F * scale;
+         float bx = cx - bw * 0.5F;
+         float bh = 90.0F * scale;
+         this.mesher.drawCard2D(bx - 56.0F * scale, 96.0F * scale, bw + 112.0F * scale, 888.0F * scale, 0xEC10141C, 0xFF3A5270);
+         for (int i = 0; i < 6; i++) {
+            int acc = (i == 1 || i == 4 || i == 5) ? 0xFF54E882 : 0xFF5CA8FF;
+            this.mesher.drawButton2D(bx, (194.0F + i * 106.0F) * scale, bw, bh, 0xFF202C3C, acc, false);
          }
-         this.mesher.drawButton2D(cx - 320.0F * scale, 840.0F * scale, 640.0F * scale, 102.0F * scale, 0xFF286C3E, 0xFF54E882, true);
+         this.mesher.drawButton2D(cx - 320.0F * scale, 846.0F * scale, 640.0F * scale, 98.0F * scale, 0xFF286C3E, 0xFF54E882, true);
       }
 
       this.mesher.flush2D(this.shaders, this.textures.whiteTexId, this.orthoMatrix);
@@ -366,7 +371,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.mesher.begin2D();
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
          this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 142.0F * scale, 6.4F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "v1.6  -  5.6 x MINECRAFT FUSED TEXTURES FOR ALL BLOCKS & ITEMS", cx, 304.0F * scale, 2.55F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "v1.7  -  REALISTIC 5.6 x MC TEXTURES, FIXED BOW & RESOURCE PACKS", cx, 304.0F * scale, 2.50F * scale, 0xFF98FFB8);
          this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 538.0F * scale, 4.1F * scale, 0xFFFFFFFF);
          this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 690.0F * scale, 3.8F * scale, 0xFFE4F2FF);
          this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz Sub-Tick Physics & Infinite Chunks", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
@@ -400,15 +405,16 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.mesher.addTextCentered2D(this.textures, "SAVE WORLD NOW", cx, 642.0F * scale, 3.6F * scale, 0xFF98FFB8);
          this.mesher.addTextCentered2D(this.textures, "SAVE & QUIT TO TITLE", cx, 772.0F * scale, 3.6F * scale, 0xFFFFC4C4);
       } else if (this.world.screen == PeWorld.SCREEN_SETTINGS) {
-         this.mesher.addTextCentered2D(this.textures, "CONTROLS, UI & PERFORMANCE SETTINGS", cx, 122.0F * scale, 4.0F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "LEFT MOVEMENT:  " + (this.touch.useAnalogStick ? "CIRCULAR ANALOG JOYSTICK" : "CLASSIC 5-BUTTON D-PAD"), cx, 240.0F * scale, 3.2F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "ACTION CONTROLS:  " + (this.touch.touchTapToInteract ? "BUTTONS + STATIONARY TAP" : "DEDICATED BUTTONS ONLY (NO ACCIDENTAL MINE)"), cx, 366.0F * scale, 2.7F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "CONTROLS, TEXTURE PACKS & PERFORMANCE SETTINGS", cx, 120.0F * scale, 3.8F * scale, 0xFFFFEA68);
+         this.mesher.addTextCentered2D(this.textures, "LEFT MOVEMENT:  " + (this.touch.useAnalogStick ? "CIRCULAR ANALOG JOYSTICK" : "CLASSIC 5-BUTTON D-PAD"), cx, 224.0F * scale, 3.0F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "ACTION CONTROLS:  " + (this.touch.touchTapToInteract ? "BUTTONS + STATIONARY TAP" : "DEDICATED BUTTONS ONLY (NO ACCIDENTAL MINE)"), cx, 332.0F * scale, 2.6F * scale, 0xFF98FFB8);
          String sensStr = this.touch.sensitivityLevel == 0 ? "LOW" : (this.touch.sensitivityLevel == 2 ? "HIGH" : "MEDIUM");
-         this.mesher.addTextCentered2D(this.textures, "CAMERA LOOK SENSITIVITY:  " + sensStr, cx, 488.0F * scale, 3.2F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "AUTO-JUMP:  " + (this.world.autoJump ? "ON (POCKET EDITION)" : "OFF"), cx, 612.0F * scale, 3.2F * scale, 0xFFFFE282);
+         this.mesher.addTextCentered2D(this.textures, "CAMERA LOOK SENSITIVITY:  " + sensStr, cx, 436.0F * scale, 3.0F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "AUTO-JUMP:  " + (this.world.autoJump ? "ON (POCKET EDITION)" : "OFF"), cx, 542.0F * scale, 3.0F * scale, 0xFFFFE282);
          int gridW = this.world.viewRadiusChunks * 2 + 1;
-         this.mesher.addTextCentered2D(this.textures, "INFINITE RENDER DISTANCE:  " + gridW + "x" + gridW + " CHUNKS (" + (gridW * 16) + " BLOCKS)", cx, 736.0F * scale, 3.1F * scale, 0xFF98E8FF);
-         this.mesher.addTextCentered2D(this.textures, "DONE", cx, 874.0F * scale, 3.8F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "INFINITE RENDER DISTANCE:  " + gridW + "x" + gridW + " CHUNKS (" + (gridW * 16) + " BLOCKS)", cx, 648.0F * scale, 2.9F * scale, 0xFF98E8FF);
+         this.mesher.addTextCentered2D(this.textures, "RESOURCE PACK:  " + PeTextures.PACK_NAMES[PeTextures.activePackMode], cx, 754.0F * scale, 3.0F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "DONE", cx, 878.0F * scale, 3.8F * scale, 0xFFFFFFFF);
       }
       this.mesher.flush2D(this.shaders, this.textures.fontTexId, this.orthoMatrix);
    }

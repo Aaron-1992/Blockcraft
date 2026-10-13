@@ -183,10 +183,24 @@ public final class PeTextures {
    public static final int FONT_CELL_W = 8;
    public static final int FONT_CELL_H = 11;
 
+   public static int activePackMode = 0;
+   public static final String[] PACK_NAMES = {
+      "Realistic 5.6 x MC (V1.7)",
+      "V1.6 (5.6 x MC Fusion)",
+      "V1.5 (Bold Pixel Art)",
+      "V1.4 (5.6 Painted)"
+   };
+
    public int atlasTexId = 0;
    public int fontTexId = 0;
    public int whiteTexId = 0;
+   public static boolean dirtyAtlas = false;
    public final int[] fontWidths = new int[128];
+
+   public static void cycleTexturePack() {
+      activePackMode = (activePackMode + 1) % PACK_NAMES.length;
+      dirtyAtlas = true;
+   }
 
    public void initGL(Context context) {
       int[] tex = new int[3];
@@ -334,11 +348,70 @@ public final class PeTextures {
    }
 
    private static void blitTile(int[] atlas, int tile, int[] tilePixels) {
+      int[] src = tilePixels;
+      if (activePackMode == 0 && tile != T_HEART_FULL && tile != T_HEART_EMPTY && tile != T_HUNGER_FULL && tile != T_HUNGER_EMPTY) {
+         boolean wrap = tile < 120 && tile != T_LEAVES_OAK && tile != T_LEAVES_SPRUCE && tile != T_LEAVES_BIRCH
+            && tile != T_BUSHY_FROND_OAK && tile != T_BUSHY_FROND_SPRUCE && tile != T_BUSHY_FROND_BIRCH
+            && tile != T_TALL_GRASS && tile != T_FLOWER_RED && tile != T_FLOWER_YELLOW && tile != T_TORCH;
+         src = applyRealisticRelief(tilePixels, 0.72F, wrap);
+      } else if (activePackMode == 2 && tile < 128) {
+         src = applyRealisticRelief(tilePixels, 1.15F, false);
+      }
       int tx0 = (tile & 15) * 16;
       int ty0 = (tile >> 4) * 16;
       for (int y = 0; y < 16; y++) {
-         System.arraycopy(tilePixels, y * 16, atlas, (ty0 + y) * ATLAS_W + tx0, 16);
+         System.arraycopy(src, y * 16, atlas, (ty0 + y) * ATLAS_W + tx0, 16);
       }
+   }
+
+   private static int[] applyRealisticRelief(int[] src, float reliefStrength, boolean wrapSeamless) {
+      int[] out = new int[N * N];
+      float[] h = new float[N * N];
+      for (int i = 0; i < N * N; i++) {
+         int c = src[i];
+         if ((c >>> 24) < 32) {
+            h[i] = -1.0F;
+         } else {
+            int r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
+            h[i] = ((r * 77 + g * 150 + b * 29) >> 8) / 255.0F;
+         }
+      }
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            int col = src[y * N + x];
+            int alpha = col >>> 24;
+            if (alpha < 32) {
+               out[y * N + x] = col;
+               continue;
+            }
+            int xl = wrapSeamless ? ((x - 1) & 15) : Math.max(0, x - 1);
+            int xr = wrapSeamless ? ((x + 1) & 15) : Math.min(15, x + 1);
+            int yt = wrapSeamless ? ((y - 1) & 15) : Math.max(0, y - 1);
+            int yb = wrapSeamless ? ((y + 1) & 15) : Math.min(15, y + 1);
+            float hc = h[y * N + x];
+            float hl = h[y * N + xl] < 0 ? hc : h[y * N + xl];
+            float hr = h[y * N + xr] < 0 ? hc : h[y * N + xr];
+            float ht = h[yt * N + x] < 0 ? hc : h[yt * N + x];
+            float hb = h[yb * N + x] < 0 ? hc : h[yb * N + x];
+            float slope = ((hc - hl) * 0.65F + (hc - ht) * 0.85F - (hc - hr) * 0.25F - (hc - hb) * 0.35F);
+            float cavity = (hc - 0.25F * (hl + hr + ht + hb)) * 0.55F;
+            float delta = (slope * 0.72F + cavity * 0.48F) * reliefStrength;
+            if (delta > 0.22F) delta = 0.22F;
+            if (delta < -0.22F) delta = -0.22F;
+            int r = (col >> 16) & 255, g = (col >> 8) & 255, b = col & 255;
+            if (delta >= 0.0F) {
+               r = clamp(Math.round(r * (1.0F + delta * 1.06F) + delta * 14.0F));
+               g = clamp(Math.round(g * (1.0F + delta * 1.02F) + delta * 10.0F));
+               b = clamp(Math.round(b * (1.0F + delta * 0.94F) + delta * 5.0F));
+            } else {
+               r = clamp(Math.round(r * (1.0F + delta * 1.08F)));
+               g = clamp(Math.round(g * (1.0F + delta * 1.02F)));
+               b = clamp(Math.round(b * (1.0F + delta * 0.92F)));
+            }
+            out[y * N + x] = (alpha << 24) | (r << 16) | (g << 8) | b;
+         }
+      }
+      return out;
    }
 
    // ====================================================================
@@ -517,6 +590,11 @@ public final class PeTextures {
    /** Smoothly animates Water (tile 14) and Lava (tile 15) on the GPU atlas every 3 ticks (Update 3.9 Tex.animate). */
    public void updateFluidAnimations(int worldTick) {
       if (this.atlasTexId == 0) return;
+      if (dirtyAtlas) {
+         dirtyAtlas = false;
+         uploadTexture(this.atlasTexId, ATLAS_W, ATLAS_H, generateAtlasPixels());
+         this.lastAnimFrame = -1;
+      }
       int frame = (worldTick / 3) & 31;
       if (frame == this.lastAnimFrame) return;
       this.lastAnimFrame = frame;
@@ -1858,13 +1936,33 @@ public final class PeTextures {
 
    private static int[] paintBowSprite() {
       Cv cv = new Cv();
-      for (int y = 1; y < 15; y++) {
-         double ny = (y - 7.5) / 7.5;
-         int x = (int)Math.round(11.0 - 6.0 * ny * ny);
-         cv.set(x, y, 0x8F6B38);
-         cv.set(x + 1, y, 0x5E4526);
+      int wHi = 0xBA8E54, wMid = 0x8F6836, wDark = 0x5E4220;
+      int gripLt = 0x6E4826, gripDk = 0x462C16, bandGold = 0xDFB438;
+      int strHi = 0xEEECE4, strSh = 0xC2BEB2;
+      // 1. Taut diagonal bowstring connecting upper nock (12, 2) to lower nock (2, 12)
+      for (int i = 0; i <= 10; i++) {
+         cv.set(12 - i, 2 + i, (i & 1) == 0 ? strHi : strSh);
       }
-      cv.line(12, 2, 12, 13, 0xE8E8EC);
+      // 2. Curved wooden recurve limbs & wrapped leather riser grip
+      int[][] limb = {
+         {12, 1, 2}, {13, 1, 0}, {13, 2, 0},
+         {10, 1, 2}, {11, 1, 1}, {11, 2, 0},
+         {8, 1, 2}, {9, 1, 1}, {9, 2, 0}, {10, 2, 0},
+         {6, 2, 2}, {7, 2, 1}, {8, 2, 1}, {7, 3, 0},
+         {5, 3, 4}, {6, 3, 1}, {6, 4, 0},
+         {4, 4, 3}, {5, 4, 3}, {5, 5, 4},
+         {3, 5, 3}, {4, 5, 3}, {4, 6, 0},
+         {3, 6, 4},
+         {2, 6, 2}, {2, 7, 1}, {3, 7, 1}, {4, 7, 0},
+         {2, 8, 2}, {2, 9, 1}, {3, 8, 0}, {3, 9, 0},
+         {1, 9, 2}, {1, 10, 1}, {2, 10, 0}, {2, 11, 0},
+         {1, 11, 2}, {1, 12, 1}, {1, 13, 0}, {2, 13, 0}
+      };
+      for (int[] pt : limb) {
+         int col = pt[2] == 4 ? bandGold : (pt[2] == 3 ? (((pt[0] + pt[1]) & 1) == 0 ? gripLt : gripDk)
+            : (pt[2] == 2 ? wHi : (pt[2] == 1 ? wMid : wDark)));
+         cv.set(pt[0], pt[1], col);
+      }
       cv.shade();
       return cv.p;
    }

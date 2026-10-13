@@ -516,42 +516,49 @@ public final class PeTouchController {
       }
 
       if (world.screen == PeWorld.SCREEN_SETTINGS) {
-         float bw = 1020.0F * scale;
+         float bw = 1040.0F * scale;
          float bx = cx - bw * 0.5F;
-         float bh = 104.0F * scale;
+         float bh = 90.0F * scale;
          // 1. Movement Pad: Joystick vs D-Pad
-         if (inRect(x, y, bx, 206.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 194.0F * scale, bw, bh)) {
             this.useAnalogStick = !this.useAnalogStick;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 2. Look / Interact Mode: Dedicated Buttons Only vs Buttons + Stationary Tap
-         if (inRect(x, y, bx, 330.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 300.0F * scale, bw, bh)) {
             this.touchTapToInteract = !this.touchTapToInteract;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 3. Look Sensitivity
-         if (inRect(x, y, bx, 454.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 406.0F * scale, bw, bh)) {
             this.sensitivityLevel = (this.sensitivityLevel + 1) % 3;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 4. Auto-Jump ON / OFF
-         if (inRect(x, y, bx, 578.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 512.0F * scale, bw, bh)) {
             world.autoJump = !world.autoJump;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 5. Render Distance (9x9 / 11x11 / 13x13 Chunks)
-         if (inRect(x, y, bx, 702.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 618.0F * scale, bw, bh)) {
             world.viewRadiusChunks = (world.viewRadiusChunks >= 6) ? 4 : (world.viewRadiusChunks + 1);
             world.ensureChunksAroundPlayer(64);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
-         // 6. [ DONE ]
-         if (inRect(x, y, cx - 320.0F * scale, 840.0F * scale, 640.0F * scale, 102.0F * scale)) {
+         // 6. Resource Pack Version Switcher (V1.7 Realistic / V1.6 Fusion / V1.5 Pixel Art / V1.4 Painted)
+         if (inRect(x, y, bx, 724.0F * scale, bw, bh)) {
+            PeTextures.cycleTexturePack();
+            world.showBanner("Resource Pack: " + PeTextures.PACK_NAMES[PeTextures.activePackMode]);
+            if (audio != null) audio.playSfx("levelup", 0.9F, 1.1F);
+            return;
+         }
+         // 7. [ DONE ]
+         if (inRect(x, y, cx - 320.0F * scale, 846.0F * scale, 640.0F * scale, 98.0F * scale)) {
             world.screen = world.previousScreen;
             if (audio != null) audio.playSfx("click", 0.85F, 1.0F);
          }
