@@ -513,7 +513,7 @@ final class TexPaint {
    }
 
    static int[] oakSide() {
-      return logSide(c(0x45341D), c(0x66502F), c(0x78613A), c(0x8A7045), 8);
+      return logSide(c(0x3B2814), c(0x5E4324), c(0x785832), c(0x926E42), 18);
    }
 
    static int[] oakTop() {
@@ -521,38 +521,35 @@ final class TexPaint {
    }
 
    static int[] spruceSide() {
-      return logSide(c(0x2B1F10), c(0x40301B), c(0x4E3B22), c(0x5C4729), 32);
+      return logSide(c(0x22160A), c(0x382614), c(0x4A341C), c(0x5E4326), 42);
    }
 
    static int[] spruceTop() {
       return logTop(c(0x3A2B17), c(0x47361E), c(0x7E6038), c(0x93724A), c(0x6D5230), 33);
    }
 
-   /** Birch: pale, soft streaks, dark dashes. */
+   /** Birch: creamy-white paper bark with dark horizontal lenticel knots and subtle silver shadows. */
    static int[] birchSide() {
-      int[] pal = {c(0xCFCCB8), c(0xD8D5C2), c(0xE0DDCC), c(0xE8E6D8)};
+      int[] pal = {c(0xD2CFC0), c(0xDDDAD0), c(0xE8E6DC), c(0xF4F2EA)};
       int[] p = new int[N * N];
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
-            float v = vn(x + 0.5F, (y + 0.5F) * 0.4F, 8, 31) * 0.6F + hash(x, y, 32) * 0.4F;
-            p[y * N + x] = step(pal, contrast(v, 1.8F));
+            float v = vn(x + 0.5F, (y + 0.5F) * 0.45F, 8, 131) * 0.62F + hash(x, y, 132) * 0.38F;
+            p[y * N + x] = step(pal, contrast(v, 1.9F));
          }
       }
 
-      java.util.Random r = rnd(31);
-      for (int i = 0; i < 9; i++) {
-         int x = r.nextInt(N);
-         int y = r.nextInt(N);
-         int len = 2 + r.nextInt(4);
+      int[][] knots = {
+         {1, 2, 4}, {10, 4, 3}, {4, 7, 5}, {12, 9, 3},
+         {2, 12, 4}, {8, 14, 4}, {6, 1, 2}, {0, 9, 3}
+      };
+      for (int[] kn : knots) {
+         int x = kn[0];
+         int y = kn[1];
+         int len = kn[2];
          for (int k = 0; k < len; k++) {
-            setw(p, x + k, y, c(0x3C3834));
-            if (k == 0 || r.nextInt(3) == 0) {
-               setw(p, x + k, y - 1, c(0xB8B4A2));
-            }
-
-            if (r.nextInt(3) != 0) {
-               setw(p, x + k, y + 1, c(0xBDB9A6));
-            }
+            setw(p, x + k, y, k == 0 || k == len - 1 ? c(0x4E4A44) : c(0x2A2622));
+            setw(p, x + k, y + 1, c(0xB8B4A4));
          }
       }
 

@@ -173,6 +173,7 @@ final class TexPaint319 {
       Tex.blit(BUSHY_FROND, bushyFrond());
       Tex.blit(BackroomsStalkerMod.T_ALMOND_WATER, BackroomsStalkerMod.almondWaterSprite());
       Redstone319.paint();
+      TexOverhaulV57.applyAll();
       bevelItemSprites();
    }
 

@@ -2226,5 +2226,57 @@ final class Tests319 {
          check(bwGame.player.health < 20,
             "Brawl AI bot dynamically targets and attacks the human player in combat range even when other rival bots exist");
       });
+
+      test("5.7 Master Texture Overhaul: every block tile and item/tool/armor/weapon sprite has brand-new crisp pixel art", () -> {
+         TexExtra.blocks();
+         int[] checkTiles = {
+            Tex.GRASS_TOP, Tex.DIRT, Tex.GRASS_SIDE_OVL, Tex.STONE, Tex.COBBLE, Tex.SAND, Tex.GRAVEL,
+            Tex.LOG_SIDE, Tex.LOG_TOP, Tex.LEAVES, Tex.PLANKS, Tex.BEDROCK,
+            Tex.COAL, Tex.IRON, Tex.GOLD, Tex.DIAMOND, Tex.REDSTONE, Tex.LAPIS,
+            Tex.SNOW, Tex.GLASS, Tex.BRICKS, Tex.SANDSTONE_SIDE, Tex.SANDSTONE_TOP,
+            Tex.TALLGRASS, Tex.FLOWER_RED, Tex.FLOWER_YELLOW, Tex.CACTUS_SIDE, Tex.CACTUS_TOP,
+            Tex.GLOWSTONE, Tex.SPRUCE_SIDE, Tex.SPRUCE_TOP, Tex.BIRCH_SIDE, Tex.OBSIDIAN,
+            Tex.STONEBRICK, Tex.TORCH, Tex.CRAFT_TOP, Tex.CRAFT_SIDE, Tex.FURNACE_FRONT, Tex.FURNACE_ON,
+            Tex.CHEST_TOP, Tex.CHEST_SIDE, Tex.SPAWNER, Tex.MOSSY,
+            Tex.DOOR_LO, Tex.DOOR_HI, Tex.FARM_TOP, Tex.WHEAT0, Tex.LADDER,
+            Tex.TNT_SIDE, Tex.TNT_TOP, Tex.TNT_BOTTOM,
+            203, 208, 212, 213, 219, 220, 221, 222, 223, 224, 225, 226,
+            Color312.T_IRON, Color312.T_GOLD, Color312.T_DIAMOND, Color312.T_EMERALD, Color312.T_COAL, Color312.T_LAPIS,
+            TexArt312.NETHERRACK, TexArt312.SOUL_SAND, TexArt312.QUARTZ_ORE, TexArt312.NETHER_BRICKS,
+            TexArt312.MAGMA, TexArt312.QUARTZ_SIDE, TexArt312.QUARTZ_TOP, TexArt312.END_STONE, TexArt312.DRAGON_EGG,
+            TexArt313.RED_SAND, TexArt313.GRANITE, TexArt313.DIORITE, TexArt313.ANDESITE,
+            TexArt313.COARSE_DIRT, TexArt313.PODZOL_TOP, TexArt313.MYCELIUM_TOP, TexArt313.ICE, TexArt313.PACKED_ICE,
+            642
+         };
+         for (int tile : checkTiles) {
+            int tx0 = (tile & 31) * 16;
+            int ty0 = (tile >> 5) * 16;
+            int nonZero = 0;
+            for (int y = 0; y < 16; y++) {
+               for (int x = 0; x < 16; x++) {
+                  if (Tex.atlasPixels[(ty0 + y) * 512 + (tx0 + x)] != 0) {
+                     nonZero++;
+                  }
+               }
+            }
+            check(nonZero >= 12, "Overhauled block tile " + tile + " has crisp pixel art (" + nonZero + " non-zero pixels)");
+         }
+
+         for (int id = 256; id < Blocks.EXT0; id++) {
+            if (Items.name[id] == null || Items.tile(id) <= 0) continue;
+            int tile = Items.tile(id);
+            int tx0 = (tile & 31) * 16;
+            int ty0 = (tile >> 5) * 16;
+            int opaque = 0;
+            for (int y = 0; y < 16; y++) {
+               for (int x = 0; x < 16; x++) {
+                  if ((Tex.atlasPixels[(ty0 + y) * 512 + (tx0 + x)] >>> 24) >= 128) {
+                     opaque++;
+                  }
+               }
+            }
+            check(opaque >= 12, "Overhauled item sprite id=" + id + " (" + Items.name(id) + ") has crisp outlined pixel art (" + opaque + " px)");
+         }
+      });
    }
 }
