@@ -19,7 +19,7 @@ WHAT'S NEW IN V6.3 - Natural Pixel 32, sprite bow and held-item lighting
     colour without a second world-space sun/shadow pass. Nearby torch lights are
     sampled at the player, not from viewmodel face normals.
   * Fixed the All Blocks gallery startup crash caused by an extended block ID
-    in the starter inventory.
+    in the starter inventory, and missing biome tints that made gallery grass black.
   * Choose Natural Pixel 32 (Default) in Options > Resource Packs. Older packs
     and custom packs are still available and your saves/options are preserved.
 

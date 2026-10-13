@@ -715,9 +715,10 @@ SCENES["pixel-bow-full"] = (_P32 + ["-Dbc.hold=268", "-Dbc.bowdraw=1", "-Dbc.tim
 SCENES["pixel-bow-third"] = (_P32 + ["-Dbc.hold=268", "-Dbc.posestate=bow=1", "-Dbc.view=2", "-Dbc.bodyyaw=-40", "-Dbc.time=6000"], True)
 SCENES["pixel-hand-day"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=6000"], True)
 SCENES["pixel-hand-night"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000"], True)
-SCENES["pixel-hand-torch"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000", "-Dbc.set=141,68,75,32"], True)
+SCENES["pixel-hand-torch"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000", "-Dbc.set=141,67,75,3;141,68,75,32"], True)
 SCENES["pixel-materials"] = ([a for a in _P32 if not a.startswith("-Dbc.cam=")] + ["-Dbc.gen=12", "-Dbc.cam=-24,67,1,0,14", "-Dbc.time=6000", "-Dbc.emptyhand=1"], True)
 
+SCENES["pixel-materials-plain"] = (SCENES["pixel-materials"][0] + ["-Dbc.shaders=false"], True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

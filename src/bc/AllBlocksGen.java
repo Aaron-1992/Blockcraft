@@ -150,6 +150,9 @@ public final class AllBlocksGen extends Gen {
    @Override
    public Chunk generate(int cx, int cz) {
       Chunk c = new Chunk(cx, cz);
+      // Like FlatGen: tinted textures need populated biome colours, otherwise grass/leaves render black.
+      java.util.Arrays.fill(c.grassColor, grassColorFor(0.8, 0.4));
+      java.util.Arrays.fill(c.foliageColor, foliageColorFor(0.8, 0.4));
       for (int z = 0; z < 16; z++) {
          int wz = cz * 16 + z;
          for (int x = 0; x < 16; x++) {

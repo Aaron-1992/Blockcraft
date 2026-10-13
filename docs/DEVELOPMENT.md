@@ -446,3 +446,7 @@ renderer, sprite bow and single-lightmap flag in the actual EXE and JAR.
 The gallery screenshot caught an existing 6.1 startup crash: redstone torch ID 1903
 indexed the 1024-entry item stack table. `giveShowcaseStarter` now uses the extended-ID
 aware `Items.maxStack(id)` accessor in both new and loaded galleries, with a regression test.
+
+Gallery chunks also now initialize grass/foliage tint arrays (previously zero, making
+tinted surfaces black). The torch screenshot fixture has a solid support so normal
+block ticks cannot break it before capture. Native PNGs are retained for pixel inspection.

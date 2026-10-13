@@ -133,6 +133,13 @@ final class TestsVisualRefresh {
          g.giveShowcaseStarter();
          check(g.inv[0].id == Items.BOW && g.inv[0].n == 1, "bow stack");
          check(g.inv[8].id == Redstone319.REDSTONE_TORCH && g.inv[8].n == 64, "extended-ID redstone torch stack");
+         WorldSettings settings = new WorldSettings();
+         settings.type = WorldSettings.ALL_BLOCKS;
+         Chunk c = new AllBlocksGen(1L, settings).generate(0, 0);
+         for (int i = 0; i < 256; i++) {
+            check(c.grassColor[i] == Gen.grassColorFor(0.8, 0.4), "gallery grass is biome-tinted, not black");
+            check(c.foliageColor[i] == Gen.foliageColorFor(0.8, 0.4), "gallery foliage has a nonzero tint");
+         }
       });
       test("bow: actual draw/release consumes one arrow, menus cancel without firing", () -> {
          Game g = GameTests.newGame(0);
