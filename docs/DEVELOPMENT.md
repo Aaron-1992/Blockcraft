@@ -495,3 +495,9 @@ workstations/glass/colored blocks, joined tall plants, the torch-lit native swor
 Nether lava and unchanged drawing bow. The first inventory fixture opened Building
 Blocks instead of Tools; corrected the fixture and added Food/Materials tab shots
 for a final GUI-art check. Native geometry uses the existing pack-switch cache reset.
+
+Final 6.4 verification: CI 38482191706 passed 3,850,839 checks with zero failures,
+GLSL validation, equivalence and the standalone coverage audit. Visual 38482191628
+rendered the actual Tools/Food/Materials inventory tabs successfully; their native
+PNGs were reviewed along with the earlier world scenes. The packaged source SHA
+is b47b97dd199a3c7fecdc7be8a78483a11246a4931db30b75685cf48ca8823494.
