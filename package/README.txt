@@ -16,7 +16,10 @@ WHAT'S NEW IN V6.3 - Natural Pixel 32, sprite bow and held-item lighting
   * The held bow is flat pixel art again, with idle/three pulling stages and a
     nocked arrow painted into the frame. No 3D rods or curved limb mesh.
   * Held items use the player's gamma-correct lightmap once, preserving torch
-    colour without a second world-space sun/shadow/dynamic-light pass.
+    colour without a second world-space sun/shadow pass. Nearby torch lights are
+    sampled at the player, not from viewmodel face normals.
+  * Fixed the All Blocks gallery startup crash caused by an extended block ID
+    in the starter inventory.
   * Choose Natural Pixel 32 (Default) in Options > Resource Packs. Older packs
     and custom packs are still available and your saves/options are preserved.
 

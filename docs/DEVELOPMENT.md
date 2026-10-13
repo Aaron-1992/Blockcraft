@@ -430,7 +430,10 @@ not the removed 3D limb geometry.
 The entity shader has an explicit `handPass`. It uses the eye-position lightmap RGB
 (which already contains sky/block light, torch tint, dimension ambient and gamma)
 with face-shading colours at brightness 1. It bypasses world-space derivative normals,
-sun/shadows/fog/dynamic-light additions. `useEntity` resets the hand flag each time.
+sun/shadows/fog and derivative-based dynamic shading. Nearby camera-relative lights
+are sampled by distance on the CPU and max-combined with the lightmap (not added
+a second time), so a newly placed torch still illuminates the hand before chunk
+light propagation catches up. `useEntity` resets the hand flag each time.
 Shader-off hands now honour gamma as well. The existing post-process/GUI ordering is
 unchanged. Tests cover exact non-interpolated colour edges, 32px alpha/mips, sprite
 stages/nock/tips, lightmap samples and hand-pass isolation.
@@ -439,3 +442,7 @@ Visual scenes: `pixel-bow-idle`, `pixel-bow-full`, `pixel-bow-third`, `pixel-han
 `pixel-hand-night`, `pixel-hand-torch`, `pixel-materials`. CPU atlas export:
 `bc.TexSheet build/pixel32-atlas.png pixel32`. Pack verification checks the 32px
 renderer, sprite bow and single-lightmap flag in the actual EXE and JAR.
+
+The gallery screenshot caught an existing 6.1 startup crash: redstone torch ID 1903
+indexed the 1024-entry item stack table. `giveShowcaseStarter` now uses the extended-ID
+aware `Items.maxStack(id)` accessor in both new and loaded galleries, with a regression test.

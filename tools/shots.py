@@ -716,7 +716,7 @@ SCENES["pixel-bow-third"] = (_P32 + ["-Dbc.hold=268", "-Dbc.posestate=bow=1", "-
 SCENES["pixel-hand-day"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=6000"], True)
 SCENES["pixel-hand-night"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000"], True)
 SCENES["pixel-hand-torch"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000", "-Dbc.set=141,68,75,32"], True)
-SCENES["pixel-materials"] = ([a for a in _P32 if not a.startswith("-Dbc.cam=")] + ["-Dbc.gen=12", "-Dbc.cam=-24,67.5,0,0,14", "-Dbc.time=6000", "-Dbc.emptyhand=1"], True)
+SCENES["pixel-materials"] = ([a for a in _P32 if not a.startswith("-Dbc.cam=")] + ["-Dbc.gen=12", "-Dbc.cam=-24,67,1,0,14", "-Dbc.time=6000", "-Dbc.emptyhand=1"], True)
 
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
@@ -820,7 +820,7 @@ def main():
         jars = {"ref": T.reference_jar(), "new": release_jar() or os.path.join(ROOT, "build", "blockcraft.jar")}
     java = shutil.which("java") or "java"
     names = DEFAULT_SCENES if a.scenes == "all" else [x.strip() for x in a.scenes.split(",") if x.strip()]
-    shutil.rmtree(OUT, ignore_errors=True)
+    # Keep earlier verified scenes when rerunning a targeted subset.
     os.makedirs(OUT, exist_ok=True)
     rows = []
     for name in names:

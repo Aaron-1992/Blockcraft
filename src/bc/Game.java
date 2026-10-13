@@ -1031,6 +1031,14 @@ public final class Game {
       }
    }
 
+   void giveShowcaseStarter() {
+      int[] starter = {268, 267, 316, 317, 318, 319, 451, 283, Redstone319.REDSTONE_TORCH};
+      for (int i = 0; i < starter.length; i++) {
+         // Extended block IDs (e.g. redstone torch 1903) are not indices into the 1024-item table.
+         this.inv[i] = new Stack(starter[i], Math.min(64, Items.maxStack(starter[i])));
+      }
+   }
+
    void ensureAllBlocksShowcaseWorld() {
       try {
          File dir = new File(this.root, "saves/All_Blocks_Showcase");
@@ -1234,11 +1242,7 @@ public final class Game {
          this.player.setPos(var16[0] + 0.5, startY, var16[2] + 0.5);
          this.needSpawn = true;
          if (ws.type == WorldSettings.ALL_BLOCKS) {
-            int[] starter = new int[]{268, 267, 316, 317, 318, 319, 451, 283, Redstone319.REDSTONE_TORCH};
-            for (int i = 0; i < starter.length && i < 9; i++) {
-               int id = starter[i];
-               this.inv[i] = new Stack(id, Items.maxStack[id] > 1 ? Math.min(64, Items.maxStack[id]) : 1);
-            }
+            this.giveShowcaseStarter();
             this.player.yaw = 0.0F;
             this.player.pitch = 8.0F;
          } else if (var3 == 1) {
@@ -1287,11 +1291,7 @@ public final class Game {
          parseStacks(var4.getProperty("inv", ""), this.inv);
          parseStacks(var4.getProperty("armor", ""), this.armor);
          if (ws.type == WorldSettings.ALL_BLOCKS && this.inv[0] == null) {
-            int[] starter = new int[]{268, 267, 316, 317, 318, 319, 451, 283, Redstone319.REDSTONE_TORCH};
-            for (int i = 0; i < starter.length && i < 9; i++) {
-               int id = starter[i];
-               this.inv[i] = new Stack(id, Items.maxStack[id] > 1 ? Math.min(64, Items.maxStack[id]) : 1);
-            }
+            this.giveShowcaseStarter();
          }
          this.mobs.load(this.world.dir);
          this.needSpawn = false;

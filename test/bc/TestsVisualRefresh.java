@@ -119,9 +119,20 @@ final class TestsVisualRefresh {
          check(HandLighting.sample(lm, 0.5F / 16, 15.5F / 16) == lm[240], "warm block light, not a second grey brightness multiplier");
          check(HandLighting.sample(lm, -1, -1) == lm[0], "clamped dark sample");
          check(HandLighting.fallback(0.2F, 1) > HandLighting.fallback(0.2F, 0), "brightness option also affects shader-off hands");
+         float[] lights = {2, 0, 0, 8}, colors = {1, 0.65F, 0.25F, 1};
+         int warm = HandLighting.withNearby(lm[0], lights, colors);
+         check((warm >> 16 & 255) > (warm >> 8 & 255) && (warm >> 8 & 255) > (warm & 255), "nearby torch warms held item even before block-light propagation");
+         check(warm == HandLighting.withNearby(lm[0], new float[]{0, 0, 2, 8}, colors), "turning camera does not flip nearby light");
+         check(HandLighting.withNearby(0xFFFFFFFF, lights, colors) == 0xFFFFFFFF, "no double-lighting in daylight");
          String fs = ShaderSrc.ENTITY_FS;
          check(fs.indexOf("if (handPass > 0.5)") < fs.indexOf("cross(dFdx(vRel)"), "viewmodel bypasses derivative-based world normal lighting");
          check(fs.contains("t.rgb * vCol.rgb * handLight"), "single sampled lighting factor");
+      });
+      test("showcase: extended block IDs in starter kit do not index the item-only stack table", () -> {
+         Game g = GameTests.newGame(0);
+         g.giveShowcaseStarter();
+         check(g.inv[0].id == Items.BOW && g.inv[0].n == 1, "bow stack");
+         check(g.inv[8].id == Redstone319.REDSTONE_TORCH && g.inv[8].n == 64, "extended-ID redstone torch stack");
       });
       test("bow: actual draw/release consumes one arrow, menus cancel without firing", () -> {
          Game g = GameTests.newGame(0);

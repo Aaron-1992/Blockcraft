@@ -924,7 +924,7 @@ public final class Shaders {
    /** Viewmodels already have face shading. Sample the player's lightmap once, not a second sun/dynamic pass. */
    public void useHand(float[] mv, double x, double y, double z, float sky, float block) {
       useEntity(mv, x, y, z, 80, 160, new float[]{0, 0, 0}, false, sky, block);
-      int light = HandLighting.sample(Tex.lmBuf, sky, block);
+      int light = HandLighting.withNearby(HandLighting.sample(Tex.lmBuf, sky, block), this.dynL, this.dynC);
       this.u1f(this.pEntity, "handPass", 1.0F);
       GL20.glUniform3f(this.loc(this.pEntity, "handLight"), (light >> 16 & 255) / 255.0F,
          (light >> 8 & 255) / 255.0F, (light & 255) / 255.0F);
