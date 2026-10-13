@@ -1,4 +1,4 @@
-BLOCKCRAFT V5.7  -  an original Minecraft-style voxel sandbox   (EDITION V5.7)
+BLOCKCRAFT V5.8  -  an original Minecraft-style voxel sandbox   (EDITION V5.8)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,10 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V5.8  (5.6 x Minecraft Fused Texture Engine for All Blocks, Tools, Weapons, Armor & Items)
+  * 5.6 x MINECRAFT FUSED BLOCK TEXTURES (TexOverhaulV57). Fuses Blockcraft 5.6's organic FBM/Voronoi procedural block textures (TexPaint + TexPaint319) directly with classic 16x16 Minecraft pixel-art patterns and palettes: smooth FBM stone fused with soft horizontal Minecraft strata, 5.6 ore shading fused with Minecraft's iconic staggered ore vein layouts (Coal, Iron, Gold, Diamond, Redstone, Lapis, Emerald, Nether Quartz), 5.6 grass/dirt/leaves fused with Minecraft's grass dither, warm earthy pebble dirt, and jagged grass fringe, plus fused Oak/Spruce/Birch/Jungle/Acacia/Dark Oak planks & logs, Ashlar Stone Bricks, Clay Bricks, Crafting Tables, Furnaces, Chests, Bookshelves, Obsidian, Glowstone, Nether, and End blocks.
+  * 5.6 x MINECRAFT FUSED TOOLS, WEAPONS, ARMOR & ITEMS (SELF-SHADED SILHOUETTES). Fuses Blockcraft 5.6's TexExtra + TexPaint319 item sprites with Minecraft's 16x16 stepped diagonal tool/weapon/armor silhouettes using self-colored material edge shading (top-left highlight and bottom-right darkened material edge, with zero heavy black border halos).
 
 WHAT'S NEW IN V5.7  (Master Pixel-Art Texture Overhaul for Every Single Block, Tool, Weapon, Armor Piece & Item)
   * BRAND-NEW PIXEL-ART TEXTURES FOR EVERY BLOCK (TexOverhaulV57). Hand-crafted 5-tone pixel-art overhaul across every terrain block, wood species, leaf canopy, ore vein, mineral block, crop, work block, Nether/End block, and Redstone component: lush multi-blade grass tops & deep hanging grass skirts, stratified FBM stone & 9-cell Voronoi cobblestone, 5-tone faceted mineral ore clusters in recessed stone sockets, deep bark-fissured logs & 4-board wood planks with nail joints, and redesigned Crafting Tables, Furnaces, Chests, Bookshelves, TNT, Obsidian, Glowstone, Sea Lanterns, Pistons, Observers, and Daylight Sensors.
