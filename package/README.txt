@@ -1,4 +1,4 @@
-BLOCKCRAFT V5.1  -  an original Minecraft-style voxel sandbox   (EDITION V5.1)
+BLOCKCRAFT V5.7  -  an original Minecraft-style voxel sandbox   (EDITION V5.7)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,10 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V5.7  (Master Pixel-Art Texture Overhaul for Every Single Block, Tool, Weapon, Armor Piece & Item)
+  * BRAND-NEW PIXEL-ART TEXTURES FOR EVERY BLOCK (TexOverhaulV57). Hand-crafted 5-tone pixel-art overhaul across every terrain block, wood species, leaf canopy, ore vein, mineral block, crop, work block, Nether/End block, and Redstone component: lush multi-blade grass tops & deep hanging grass skirts, stratified FBM stone & 9-cell Voronoi cobblestone, 5-tone faceted mineral ore clusters in recessed stone sockets, deep bark-fissured logs & 4-board wood planks with nail joints, and redesigned Crafting Tables, Furnaces, Chests, Bookshelves, TNT, Obsidian, Glowstone, Sea Lanterns, Pistons, Observers, and Daylight Sensors.
+  * BRAND-NEW PIXEL-ART SPRITES FOR EVERY TOOL, WEAPON, ARMOR PIECE & ITEM. All 25 tools and weapons (Swords, Pickaxes, Axes, Shovels, and Hoes across Wood, Stone, Iron, Gold, and Diamond tiers), all 16 armor pieces (Leather, Iron, Gold, and Diamond Helmets, Chestplates, Leggings, and Boots), and every food, ingot, gem, bucket, bow, arrow, tactical CS2 weapon, Murder Mystery knife, C4 bomb, and Siege Cannon/Mortar sprite now feature custom 5-tone pixel art with crisp dark 1px outlines and top-left specular bevels.
 
 WHAT'S NEW IN V5.1  (Clean Self-Contained Multi-Level Maps Without Cutoffs/Fusion, 3D Vertical AI Stair/Jump-Pad/Drop Pathfinding & Anti-Block-Spam, Multiplayer Player 2 Map Synchronization)
   * CLEAN, SELF-CONTAINED MULTI-LEVEL MAPS WITHOUT CUTOFFS OR FUSION. Rebuilt all 5 minigame map generators (Battle, Tumble, Bedwars, CS2 Strike, and Murder Mystery) across all 8 maps (Cove, Crucible, Cavern, Temple, Lair, Castle, Frontier, and Shrunk) so they no longer fuse old floating islands/walls with cut-off .mca perimeter rings. Every arena now features clean enclosing perimeter architecture, wide 2-to-3-block staircases with solid under-supports and open overhead stairwell cutouts (4+ blocks of headroom on every step), and Slime Block Jump Pads.

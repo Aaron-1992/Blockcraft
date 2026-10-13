@@ -41,6 +41,13 @@ def find_patch(version=None):
     if version:
         zips = [z for z in zips if z.endswith("UPDATE%s-patch.zip" % version)]
     if not zips:
+        print("Building update pack for version %s via tools/build.py --patch ..." % (version or "latest"))
+        import subprocess
+        subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build.py"), "--patch"], check=True)
+        zips = glob.glob(os.path.join(ROOT, "releases", "Blockcraft-UPDATE*-patch.zip"))
+        if version:
+            zips = [z for z in zips if z.endswith("UPDATE%s-patch.zip" % version)]
+    if not zips:
         sys.exit("no update pack found in releases/ (version %s) - run: python3 tools/build.py --patch" % (version or "latest"))
     return sorted(zips, key=version_key)[-1]
 
