@@ -1,2 +1,3 @@
 pixel-bow-idle,pixel-bow-full,pixel-bow-third,pixel-hand-day,pixel-hand-night,pixel-hand-torch,pixel-materials
 jar=build
+# Keep native-resolution PNGs to inspect pixel edges; tolerate rebuilt mod JARs when committing results.

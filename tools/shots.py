@@ -841,7 +841,7 @@ def main():
         write_report(rows)
         # keep the repo small: only the side-by-side JPEG is kept, full PNGs are deleted
         for l in got:
-            if got[l] and os.path.exists(got[l]):
+            if got[l] and os.path.exists(got[l]) and not name.startswith("pixel-"):
                 os.remove(got[l])
     write_report(rows)
     print(open(os.path.join(OUT, "report.md")).read())
