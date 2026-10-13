@@ -1,13 +1,11 @@
-# Visual run 2026-10-13 23:08:29 UTC
+# Visual run 2026-10-13 23:43:33 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| pixel-items | new | n/a |
-| pixel-food | new | n/a |
-| pixel-resources | new | n/a |
+| pixel-cohesion-plain | new | n/a |
+| pixel-cohesion-lit | new | n/a |
 
 ## timings
 
-- pixel-items/new: exit 0 in 27s
-- pixel-food/new: exit 0 in 16s
-- pixel-resources/new: exit 0 in 16s
+- pixel-cohesion-plain/new: exit 0 in 18s
+- pixel-cohesion-lit/new: exit 0 in 37s
