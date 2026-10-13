@@ -72,7 +72,7 @@ def notes(version, full_name, patch_name):
         "Your worlds and options live in `%%USERPROFILE%%\\.blockcraft112`, so they are **kept** when you use a new folder.\n"
         "If Windows SmartScreen warns about an unknown publisher: *More info -> Run anyway* (the game is not code-signed).\n"
         "If it doesn't start, run `Blockcraft-debug.bat` and read the messages (or open `%%USERPROFILE%%\\.blockcraft112\\crash.log`).\n\n"
-        "*Small download instead?* `%(patch)s` (about 6 MB) only contains the changed files - extract it and copy the "
+        "*Small download instead?* `%(patch)s` only contains the changed files - extract it and copy the "
         "`Blockcraft` folder over an existing Blockcraft install of V3.5 or newer (\"Replace files\").\n\n"
         "### What's new\n\n```\n%(new)s\n```\n"
     ) % {"v": version, "full": full_name, "patch": patch_name, "new": whats_new(version)}
