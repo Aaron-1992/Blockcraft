@@ -677,11 +677,12 @@ public final class PeTextures {
 
    private static int[] paintGrassSide(boolean snowy) {
       int[] p = paintDirt();
+      int[] mcLip = {3, 2, 4, 4, 2, 3, 5, 3, 2, 2, 4, 5, 3, 2, 3, 4};
       for (int x = 0; x < N; x++) {
-         int lip = 2 + (int)(vn(x * 0.5F, 0.5F, 8, 510) * 3.8F) + ((h32(x, 0, 511) & 1));
-         // Drop shadow on dirt directly under the hanging grass fringe
+         int v56Lip = 2 + (int)(vn(x * 0.5F, 0.5F, 8, 510) * 3.8F) + ((h32(x, 0, 511) & 1));
+         int lip = (v56Lip + mcLip[x]) >> 1;
          if (lip < N) {
-            p[lip * N + x] = mul(p[lip * N + x], 0.74F);
+            p[lip * N + x] = mul(p[lip * N + x], 0.78F);
          }
          for (int y = 0; y < lip && y < N; y++) {
             if (snowy) {
@@ -689,9 +690,9 @@ public final class PeTextures {
                p[y * N + x] = w;
             } else {
                float v = fbm(x, y, 512) * 0.65F + hash(x, y, 513) * 0.35F;
-               int g = 162 + (int)(v * 48.0F);
+               int g = 164 + (int)(v * 44.0F);
                if (y == 0) g += 14;
-               else if (y == lip - 1) g -= 20;
+               else if (y == lip - 1) g -= 16;
                p[y * N + x] = tintRgb(rgb(g, g, g), 0.45F, 0.84F, 0.30F);
             }
          }
@@ -700,24 +701,15 @@ public final class PeTextures {
    }
 
    private static int[] paintStone(int seed) {
-      int[] pal = {c(0x66666A), c(0x747478), c(0x808084), c(0x8C8C90), c(0x98989C)};
+      int[] pal = {c(0x68686A), c(0x747476), c(0x808082), c(0x8C8C8E), c(0x969698)};
       int[] p = new int[N * N];
       for (int y = 0; y < N; y++) {
          for (int x = 0; x < N; x++) {
-            float v = fbm(x * 2, y, seed) * 0.78F + hash(x, y, seed + 3) * 0.22F;
-            p[y * N + x] = step(pal, contrast(v, 2.2F));
-         }
-      }
-      Random r = new Random(seed + 9);
-      for (int c = 0; c < 4; c++) {
-         int cx = r.nextInt(N);
-         int cy = r.nextInt(N);
-         int len = 3 + r.nextInt(3);
-         for (int i = 0; i < len; i++) {
-            p[(cy & 15) * N + (cx & 15)] = pal[0];
-            p[((cy - 1) & 15) * N + (cx & 15)] = pal[4];
-            cx += r.nextBoolean() ? 1 : -1;
-            if (r.nextInt(3) == 0) cy++;
+            float v56 = fbm(x * 2, y, seed) * 0.78F + hash(x, y, seed + 3) * 0.22F;
+            float mcStrata = vn((x + (y & 1) * 2) * 0.5F, y * 1.2F, 4, seed + 17) * 0.68F + hash(x, y, seed + 23) * 0.32F;
+            int col56 = step(pal, contrast(v56, 2.0F));
+            int colMc = step(pal, contrast(mcStrata, 1.9F));
+            p[y * N + x] = mix(col56, colMc, 0.46F);
          }
       }
       return p;
@@ -970,22 +962,25 @@ public final class PeTextures {
 
    private static int[] paintOre(int main, int shade, int high, int seed, int n, boolean small) {
       int[] p = paintStone(101);
-      Random r = new Random(seed);
-      int[][] shapeBig = {{0, 0}, {1, 0}, {0, 1}, {1, 1}, {2, 1}};
-      int[][] shapeSmall = {{0, 0}, {1, 0}, {0, 1}};
-      int[][] shape = small ? shapeSmall : shapeBig;
-      for (int i = 0; i < n; i++) {
-         int bx = 2 + r.nextInt(11);
-         int by = 2 + r.nextInt(11);
-         for (int k = 0; k < shape.length; k++) {
-            int x = (bx + shape[k][0]) & 15;
-            int y = (by + shape[k][1]) & 15;
-            int col = k == 0 ? high : (k == shape.length - 1 ? shade : main);
-            p[y * N + x] = col;
+      int[][][] mcVeins = {
+         {{3, 2, 2}, {4, 2, 1}, {2, 3, 2}, {3, 3, 1}, {4, 3, 1}, {5, 3, 0}},
+         {{10, 3, 2}, {11, 3, 1}, {12, 3, 0}, {9, 4, 1}, {10, 4, 1}, {11, 4, 0}},
+         {{5, 6, 2}, {6, 6, 1}, {7, 6, 1}, {8, 6, 0}, {4, 7, 1}, {5, 7, 1}, {6, 7, 0}},
+         {{11, 8, 2}, {12, 8, 1}, {13, 8, 0}, {11, 9, 1}, {12, 9, 0}},
+         {{2, 10, 2}, {3, 10, 1}, {4, 10, 0}, {3, 11, 1}, {4, 11, 0}},
+         {{8, 12, 2}, {9, 12, 1}, {10, 12, 1}, {11, 12, 0}, {7, 13, 1}, {8, 13, 1}, {9, 13, 0}}
+      };
+      int shiftX = seed & 1;
+      for (int[][] v : mcVeins) {
+         for (int[] pt : v) {
+            int x = (pt[0] + shiftX) & 15;
+            int y = pt[1] & 15;
+            int col = pt[2] == 2 ? high : (pt[2] == 1 ? main : shade);
+            p[y * N + x] = mix(p[y * N + x], col, 0.85F);
             int sx = (x + 1) & 15;
             int sy = (y + 1) & 15;
-            if (p[sy * N + sx] != main && p[sy * N + sx] != high && p[sy * N + sx] != shade) {
-               p[sy * N + sx] = c(0x525256);
+            if (p[sy * N + sx] == paintStone(101)[sy * N + sx]) {
+               p[sy * N + sx] = mul(p[sy * N + sx], 0.82F);
             }
          }
       }
@@ -1794,34 +1789,31 @@ public final class PeTextures {
       return out;
    }
 
-   // toolClass: 1=Pickaxe, 2=Axe, 3=Shovel, 4=Sword
+   // toolClass: 1=Pickaxe, 2=Axe, 3=Shovel, 4=Sword (5.6 x Minecraft Fused Self-Shaded Tool Sprites)
    private static int[] paintToolSprite(int toolClass, int tierHex) {
       Cv cv = new Cv();
       int base = c(tierHex);
-      int dark = mul(base, 0.70F);
-      int hi = mul(base, 1.25F);
+      int dark = mul(base, 0.72F);
+      int hi = mul(base, 1.22F);
       switch (toolClass) {
-         case 1: { // Pickaxe
-            cv.line(2, 14, 11, 5, 0x96733F);
-            cv.line(3, 14, 12, 5, 0x5E4526);
-            for (int i = -6; i <= 6; i++) {
-               double a = i / 6.0 * 1.15;
-               double cx = 11.5 - 6.5 * Math.cos(Math.PI / 4);
-               double cy = 4.5 + 6.5 * Math.sin(Math.PI / 4);
-               double ux = Math.cos(Math.PI / 4), uy = -Math.sin(Math.PI / 4);
-               double vx = Math.sin(Math.PI / 4), vy = Math.cos(Math.PI / 4);
-               for (double dr = 0.0; dr <= 1.6; dr += 0.5) {
-                  double rad = 6.5 - dr;
-                  int px = (int)Math.round(cx + rad * (Math.cos(a) * ux + Math.sin(a) * vx));
-                  int py = (int)Math.round(cy + rad * (Math.cos(a) * uy + Math.sin(a) * vy));
-                  cv.set(px, py, dr < 0.6 ? hi : (dr < 1.2 ? base : dark));
-               }
+         case 1: { // Pickaxe (5.6 arc fused with Minecraft stepped pickaxe head)
+            cv.line(2, 14, 11, 5, 0x987440);
+            cv.line(3, 14, 12, 5, 0x644824);
+            int[][] head = {
+               {8, 1, 2}, {9, 1, 2}, {10, 1, 2}, {11, 1, 1},
+               {7, 2, 2}, {8, 2, 1}, {9, 2, 1}, {10, 2, 1}, {11, 2, 1}, {12, 2, 0},
+               {6, 3, 1}, {7, 3, 0}, {11, 3, 1}, {12, 3, 1}, {13, 3, 0},
+               {12, 4, 1}, {13, 4, 1}, {14, 4, 0},
+               {13, 5, 1}, {14, 5, 0}, {13, 6, 0}
+            };
+            for (int[] q : head) {
+               cv.set(q[0], q[1], q[2] == 2 ? hi : (q[2] == 1 ? base : dark));
             }
             break;
          }
          case 2: { // Axe
-            cv.line(2, 14, 11, 5, 0x96733F);
-            cv.line(3, 14, 12, 5, 0x5E4526);
+            cv.line(2, 14, 11, 5, 0x987440);
+            cv.line(3, 14, 12, 5, 0x644824);
             String[] mask = {"..HHH.", ".HHHHH", "HHHHHD", "HHHHDD", ".HHDD.", "..DD.."};
             for (int r = 0; r < mask.length; r++) {
                for (int col = 0; col < 6; col++) {
@@ -1833,25 +1825,30 @@ public final class PeTextures {
             break;
          }
          case 3: { // Shovel
-            cv.line(2, 14, 10, 6, 0x96733F);
-            cv.line(3, 14, 11, 6, 0x5E4526);
-            cv.ell(11.5, 4.5, 3.0, 3.6, base);
-            cv.ell(10.8, 3.8, 1.4, 1.6, hi);
-            cv.set(13, 6, dark);
-            cv.set(12, 7, dark);
+            cv.line(2, 14, 10, 6, 0x987440);
+            cv.line(3, 14, 11, 6, 0x644824);
+            cv.ell(11.5, 4.2, 2.8, 3.2, base);
+            cv.ell(10.8, 3.5, 1.4, 1.6, hi);
+            cv.set(13, 5, dark);
+            cv.set(12, 6, dark);
             break;
          }
          case 4:
-         default: { // Sword
-            cv.line(3, 12, 1, 14, 0x96733F);
-            cv.line(4, 12, 2, 14, 0x5E4526);
-            cv.line(2, 9, 6, 13, 0x6B5430);
-            cv.line(3, 9, 7, 13, 0x4A3A22);
-            cv.line(5, 10, 13, 2, base);
-            cv.line(6, 10, 14, 2, base);
-            cv.line(5, 9, 13, 1, hi);
-            cv.line(7, 10, 14, 3, dark);
+         default: { // Sword (5.6 diagonal blade + Minecraft stepped fuller & crossguard)
+            cv.set(1, 14, dark); cv.set(2, 14, hi); cv.set(1, 13, hi);
+            cv.line(2, 13, 4, 11, 0x96733F);
+            cv.line(3, 13, 5, 11, 0x5E4526);
+            for (int i = 0; i < 9; i++) {
+               int bx = 5 + i;
+               int by = 10 - i;
+               cv.set(bx, by, base);
+               cv.set(bx, by - 1, hi);
+               cv.set(bx + 1, by, dark);
+            }
             cv.set(14, 1, hi);
+            cv.line(2, 9, 6, 13, base);
+            cv.line(3, 9, 7, 13, dark);
+            cv.set(4, 10, hi);
             break;
          }
       }

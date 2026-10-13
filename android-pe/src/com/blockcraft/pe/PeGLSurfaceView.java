@@ -366,7 +366,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.mesher.begin2D();
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
          this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 142.0F * scale, 6.4F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "v1.5  -  BRAND-NEW TEXTURES FOR EVERY BLOCK, TOOL & ITEM", cx, 304.0F * scale, 2.55F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "v1.6  -  5.6 x MINECRAFT FUSED TEXTURES FOR ALL BLOCKS & ITEMS", cx, 304.0F * scale, 2.55F * scale, 0xFF98FFB8);
          this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 538.0F * scale, 4.1F * scale, 0xFFFFFFFF);
          this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 690.0F * scale, 3.8F * scale, 0xFFE4F2FF);
          this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz Sub-Tick Physics & Infinite Chunks", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
