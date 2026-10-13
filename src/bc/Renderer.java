@@ -2028,6 +2028,7 @@ public final class Renderer {
    /** Renders a multi-box 3D firearm model for PISTOL (459), MACHINE_GUN (460), and SNIPER_RIFLE (461). */
    public static void drawGunModel3D(int id, float bright) {
       boolean prevCull = GL11.glIsEnabled(2884);
+      boolean prevAlpha = GL11.glIsEnabled(3008);
       GL11.glDisable(2884);
       GL11.glEnable(3553);
       GL11.glBindTexture(3553, SkyGen.whiteTex());
@@ -2152,6 +2153,7 @@ public final class Renderer {
       if (prevCull) {
          GL11.glEnable(2884);
       }
+      if (prevAlpha) GL11.glEnable(3008);
    }
 
    public static void drawItemModel(int var0, float var1) {
@@ -2611,19 +2613,18 @@ public final class Renderer {
       } else {
          int id = item.id;
          if (isGun(id)) {
-            int maxCd = id == Redstone319.SNIPER_RIFLE ? 22 : (id == Redstone319.PISTOL ? 7 : 3);
-            float cd = Math.max(0.0F, SkyGen.playerGunCooldown - partial);
-            float recoil = cd > maxCd - 3.5F ? Math.min(1.0F, (cd - (maxCd - 3.5F)) / 3.0F) : 0.0F;
-            boolean flash = SkyGen.playerGunCooldown >= maxCd - 1;
-            GL11.glTranslatef(0.46F, -0.36F + p * -0.45F + recoil * 0.045F, -0.68F + recoil * 0.11F);
-            GL11.glRotatef(-84.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(4.0F + recoil * 12.0F, 0.0F, 0.0F, 1.0F);
+            float recoil = WeaponPose.recoil(id, SkyGen.playerGunCooldown, partial);
+            boolean flash = SkyGen.playerGunCooldown > 0
+               && WeaponPose.cooldown(id) - SkyGen.playerGunCooldown + partial < 1.0F;
+            GL11.glTranslatef(0.36F, -0.32F + p * -0.45F + recoil * 0.025F, -0.70F + recoil * 0.08F);
+            GL11.glRotatef(WeaponPose.FIRST_PERSON_YAW, 0.0F, 1.0F, 0.0F);
+            GL11.glRotatef(2.0F + recoil * 7.0F, 0.0F, 0.0F, 1.0F);
             float gunScale = id == Redstone319.SNIPER_RIFLE ? 0.78F : (id == Redstone319.MACHINE_GUN ? 0.74F : 0.68F);
             GL11.glScalef(gunScale, gunScale, gunScale);
             drawGunModel3D(id, bright);
             if (flash) {
-               float mx = id == Redstone319.SNIPER_RIFLE ? 0.78F : (id == Redstone319.MACHINE_GUN ? 0.60F : 0.46F);
-               float my = id == Redstone319.SNIPER_RIFLE ? 0.08F : (id == Redstone319.MACHINE_GUN ? 0.055F : 0.10F);
+               float mx = WeaponPose.muzzleX(id);
+               float my = WeaponPose.muzzleY(id);
                GL11.glEnable(3553);
                GL11.glBindTexture(3553, SkyGen.whiteTex());
                GL11.glBegin(7);
@@ -2633,6 +2634,20 @@ public final class Renderer {
                GL11.glEnd();
                GL11.glBindTexture(3553, Tex.atlas);
             }
+         } else if (id == Items.BOW) {
+            float pull = this.g.bowVisualDraw(partial);
+            boolean nocked = this.g.bowCharge > 0;
+            String preview = System.getProperty("bc.bowdraw");
+            if (preview != null && System.getProperty("bc.auto") != null) {
+               try { pull = WeaponPose.clamp(Float.parseFloat(preview)); nocked = pull > 0; }
+               catch (NumberFormatException ignored) { }
+            }
+            // A dedicated pose, not the sword swing/item-sprite transform. +X points down the sightline.
+            GL11.glTranslatef(0.33F - 0.08F * pull, -0.24F - p * 0.5F + 0.035F * pull, -0.92F);
+            GL11.glRotatef(100.0F, 0, 1, 0);
+            GL11.glRotatef(-8.0F + 5.0F * pull, 1, 0, 0);
+            GL11.glScalef(0.82F, 0.82F, 0.82F);
+            BowModel.draw(pull, nocked, bright);
          } else {
             if (use >= 0.0F) {
                float f = 32.0F * (1.0F - use) + 1.0F; // ticks left
@@ -2659,24 +2674,7 @@ public final class Renderer {
                GL11.glRotatef(-45.0F, 0.0F, 1.0F, 0.0F);
             }
 
-            if (id == Items.BOW) {
-               float pull = (this.g != null && this.g.bowCharge > 0)
-                  ? Math.min(1.0F, (this.g.bowCharge + partial) / 20.0F) : 0.0F;
-               float tremor = pull > 0.85F ? (float)Math.sin(idleT * 42.0F) * 0.004F * (pull - 0.85F) : 0.0F;
-               GL11.glTranslatef(1.13F / 16.0F - 0.16F * pull, 3.2F / 16.0F + 0.07F * pull + tremor, 1.13F / 16.0F + 0.09F * pull);
-               GL11.glRotatef(-90.0F - 6.0F * pull, 0.0F, 1.0F, 0.0F);
-               GL11.glRotatef(-35.0F, 0.0F, 0.0F, 1.0F);
-               GL11.glScalef(0.72F, 0.72F + 0.05F * pull, 0.72F);
-               drawItemModel(id, bright);
-               if (pull > 0.02F) {
-                  GL11.glPushMatrix();
-                  GL11.glRotatef(80.0F, 0.0F, 0.0F, 1.0F);
-                  GL11.glTranslatef(-0.08F - 0.18F * pull, 0.02F + 0.18F * pull, 0.015F);
-                  GL11.glScalef(0.85F, 0.85F, 0.85F);
-                  drawItemModel(Items.ARROW, bright);
-                  GL11.glPopMatrix();
-               }
-            } else if (Items.isItem(id) || flatBlock(id)) {
+            if (Items.isItem(id) || flatBlock(id)) {
                // item/generated and item/handheld, "firstperson_righthand": rotation [0, -90, 25], translation [1.13, 3.2, 1.13], scale 0.68
                GL11.glTranslatef(1.13F / 16.0F, 3.2F / 16.0F, 1.13F / 16.0F);
                GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);

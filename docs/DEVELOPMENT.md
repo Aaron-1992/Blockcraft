@@ -349,3 +349,66 @@ so old lines still load).
 Reachable: github.com, api.github.com, npm, PyPI. Not reachable: Maven Central, Adoptium, apt mirrors, GitHub Releases
 asset hosts, file-sharing sites. No JDK, no display, no GPU, no Wine – so the game itself cannot be started in the
 sandbox; GitHub Actions (see `.github/workflows`) is used for real-JDK builds and headless OpenGL screenshot runs.
+
+## Smooth Realism / held-weapon refresh (2026-10-13)
+
+The **Default** pack uses `TexSmooth` to build a 2048x2048 GPU atlas (64px per tile).
+Natural earth, six plank species, bark (including turned logs), cobble, gravel,
+masonry and the six base ores have new continuous material painters. Other cells
+reconstruct the authored colour layout with alpha-weighted filtering and restrained
+microdetail. Sprite silhouettes are deliberately retained: `Renderer.spriteGeometry`
+still extrudes the 16px alpha mask. This is a diffuse-art upgrade, not a PBR shader.
+Skins, fonts and external pack assets are not upscaled or repainted.
+
+`Tex.atlasPixels`, `Tex.PX`, tile UVs, mod/pack IO and CPU masks retain their 16px
+layout. Only GPU upload dimensions change. `Tex.uploadAtlas` reallocates the atlas
+on pack switches; mip levels are generated tile-by-tile down to 2px. Animated
+water/lava/fire/portal updates use the same resolution and mip coordinates as the
+static atlas. Intra-mip nearest sampling is intentional: the smooth colour ramps
+are baked at 64px and this prevents sampling adjacent atlas cells. Older and custom
+packs still upload at 16px. The HD atlas costs approximately 22 MB including mips.
+
+`WeaponPose` defines a common +X muzzle / +Y up coordinate convention, grip offsets,
+recoil timing, bow tip positions and constant-length string/nock geometry.
+`BowModel` is used by both `Renderer.renderHand` and `PlayerModel.drawHeld`.
+Gun and bow transforms bypass generic sprite transforms; gun arm aim compensates
+for the elbow bend and does not inherit the melee swing. Bow release hides the arrow
+immediately and relaxes the limbs over four ticks; leaving play cancels a draw.
+
+Verification:
+- `python3 tools/runtests.py` covers existing logic/equivalence plus
+  `TestsVisualRefresh` (all atlas cells and alpha masks, mip sizes, pack switching,
+  firearm directions/aim/recoil, continuous draw, string attachment/length and release).
+- `bc.TexSheet build/smooth-atlas.png smooth` exports the actual default GPU atlas
+  without OpenGL (use the test/classes/LWJGL classpath from `tools/runtests.py`).
+- Added real-game visual scenes to `tools/shots.py`: `smooth-pistol`, `smooth-rifle`,
+  `smooth-sniper`, `smooth-gun-third`, `smooth-bow-rest`, `smooth-bow-half`,
+  `smooth-bow-full`; existing `pl-bow` exercises the third-person draw.
+  `-Dbc.bowdraw=0..1` freezes the first-person bow only when `bc.auto` is enabled.
+- In-game visual scenes still need a display/OpenGL machine or the Visual workflow;
+  they cannot run in the assistant sandbox. Test shader on/off, F5, slim/default
+  skins, long charge/release/cancel, inventory pack switching and transparent blocks.
+
+### 6.2 delivery correction
+
+The published `v6.1` revision (`7422af91dde8c9cc58437c121a0a733a83f4f83d`)
+did not contain `TexSmooth`, `WeaponPose` or `BowModel`; its first-person gun still
+used -84 degrees. A successful local compile was not evidence that the downloadable
+release included these changes. V6.2 packages the visual refresh and retains the
+6.1 showcase buttons, starter inventory and bed/turned-log fixes.
+
+- The title screen reports the version **and active texture resolution**. Selecting
+  `Smooth Realism 6.2 (Default)` enables the new atlas; deliberate older/custom pack
+  selections are not overwritten and worlds/options need not be deleted.
+- `tools/build.py` embeds `bc-build.properties` (version, SHA-256 of all Java source
+  paths/bytes, SHA-256 of the visual implementation classes) into both JAR and EXE.
+- `java -jar Blockcraft.exe --build-info` (or `Check-build.bat` in the Windows folder)
+  prints the receipt and compiled renderer constants without opening GL or changing saves.
+- `python3 tools/verify_release.py <zip> 6.2` compares every embedded EXE/JAR entry,
+  validates receipt/class hashes against current sources, and runs the headless
+  build-info entry point from both actual packaged binaries.
+- `make_release.py` now defaults to the current source version, not whichever older
+  patch happens to be present. For 6.2+ it verifies the patch before assembly; the
+  release workflow uses `pipefail`, so a verification failure cannot be hidden by tee.
+- `python3 -m unittest discover -s tools -p 'test_verify_release.py'` checks valid,
+  old-EXE/new-JAR, mislabeled-version, stale-source and changed-class payloads.

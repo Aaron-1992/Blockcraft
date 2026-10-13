@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.0  -  an original Minecraft-style voxel sandbox   (EDITION V6.0)
+BLOCKCRAFT V6.2  -  an original Minecraft-style voxel sandbox   (EDITION V6.2)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,24 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.2 - Smooth Realism & held weapons (included in this download)
+  * Default block/item atlas now renders at 64x64 per tile (2048x2048 total), with
+    new natural stone, soil, sand, timber, bark, cobble, masonry and ore materials;
+    remaining block/item art has smooth colour reconstruction and fine detail.
+    Removed heavy per-pixel embossing. Classic, older packs and custom packs stay selectable.
+  * Guns point away from the camera, attach at the grip in third person, and use
+    elbow-compensated aim instead of the generic melee swing. Recoil settles smoothly.
+  * Held bows now use bending 3D limbs, an attached string and nocked arrow in both
+    views, interpolated drawing, and a short spring-back after release.
+
+HOW TO CONFIRM THIS UPDATE
+  * Extract into a NEW folder and run that folder's Blockcraft.exe, not an old shortcut.
+  * The title screen must say Blockcraft V6.2 and Textures: Smooth Realism 64px.
+  * If a different pack is active, select Smooth Realism 6.2 (Default) under
+    Options > Resource Packs. Do not delete your saves or options.
+  * Check-build.bat reports the version and source fingerprint from inside the EXE.
+  * The All Blocks buttons and the bed/turned-log fixes from V6.1 are retained.
 
 WHAT'S NEW IN V6.0  (100% Brand-New Textures From Scratch for Every Single Block & Item + "All Blocks & Items Showcase" Gallery World)
   * 100% BRAND-NEW TEXTURES PAINTED FROM SCRATCH FOR EVERY SINGLE BLOCK & ITEM (TexBrandNewV60). Every single block tile, crop stage, flower, sapling, door, trapdoor, bed, banner, wool, concrete, terracotta, glazed terracotta, stained glass, prismarine, purpur, redstone mechanism, liquid/fire/portal animation frame, tool, weapon, armor piece, dye, food, and item sprite in the 512x512 atlas is now painted 100% new from scratch (no untouched legacy tiles anywhere). Previous texture versions (V5.9 Relief, V5.8 Fusion, V5.7 Pixel Art, V5.6 Painted, and OG Classic 3.5) remain selectable in the Resource Packs menu.

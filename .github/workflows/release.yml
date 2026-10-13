@@ -41,6 +41,7 @@ jobs:
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
+          set -euo pipefail
           VER="$INPUT_VERSION"
           if [ -z "$VER" ]; then VER="$(head -n1 ci/release-trigger.txt | tr -d '[:space:]')"; fi
           case "$VER" in *[!0-9.]*) VER="";; esac

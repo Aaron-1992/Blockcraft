@@ -6,6 +6,22 @@ import java.io.PrintWriter;
 public final class Main {
    public static void main(String[] var0) {
       try {
+         if (var0.length == 1 && "--build-info".equals(var0[0])) {
+            java.util.Properties receipt = new java.util.Properties();
+            try (java.io.InputStream in = Main.class.getResourceAsStream("/bc-build.properties")) {
+               if (in == null) throw new IllegalStateException("Build receipt missing: rebuild this executable.");
+               receipt.load(in);
+            }
+            if (!Game.VERSION_STR.equals(receipt.getProperty("version"))) {
+               throw new IllegalStateException("Build receipt and compiled game versions disagree.");
+            }
+            System.out.println("version=" + Game.VERSION_STR);
+            System.out.println("source.sha256=" + receipt.getProperty("source.sha256"));
+            System.out.println("default.texture.tileSize=" + TexSmooth.SIZE);
+            System.out.println("gun.firstPersonYaw=" + WeaponPose.FIRST_PERSON_YAW);
+            System.out.println("bow.model=articulated-3d");
+            return; // No window, GPU, native libraries, options or saved-world writes.
+         }
          new Game().run();
          // everything is saved and closed; do not let a lingering AWT thread (the skin file dialog) keep the process alive
          System.exit(0);

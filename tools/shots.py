@@ -683,6 +683,15 @@ SCENES = {
     "gfx-glow-night":     (COMMON + ["-Dbc.cam=143.5,68.4,72.6,0,20", "-Dbc.time=18000", "-Dbc.weather=calm", sets(glow_blocks()), "-Dbc.shot=150"], True),
     "gfx-glow-night-low": (COMMON + ["-Dbc.cam=143.5,68.4,72.6,0,20", "-Dbc.time=18000", "-Dbc.weather=calm", sets(glow_blocks()), "-Dbc.fx=0", "-Dbc.look=0", "-Dbc.shot=150"], True),
     "day-shaders":    (["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.mode=1", "-Dbc.rd=2", "-Dbc.lod=16", CAM, "-Dbc.time=6000", "-Dbc.shot=20"], True),
+    # Smooth materials and shared 3D weapon poses. bc.bowdraw freezes just the hand model for inspection.
+    "smooth-pistol": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.hold=459", "-Dbc.time=6000", "-Dbc.shot=110"] + PLAIN, True),
+    "smooth-rifle": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.hold=460", "-Dbc.time=6000", "-Dbc.shot=110"], True),
+    "smooth-sniper": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.hold=461", "-Dbc.time=6000", "-Dbc.shot=110"] + PLAIN, True),
+    "smooth-gun-third": (COMMON + ["-Dbc.cam=140.5,67,74.5,0,8", "-Dbc.view=2", "-Dbc.bodyyaw=-40", "-Dbc.skin=demo", "-Dbc.hold=460", "-Dbc.time=6000", "-Dbc.shot=110"] + PLAIN, True),
+    "smooth-bow-rest": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.hold=268", "-Dbc.bowdraw=0", "-Dbc.time=6000", "-Dbc.shot=110"] + PLAIN, True),
+    "smooth-bow-half": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.hold=268", "-Dbc.bowdraw=0.5", "-Dbc.time=6000", "-Dbc.shot=110"] + PLAIN, True),
+    "smooth-bow-full": (COMMON + ["-Dbc.cam=140.5,67,74.5,20,10", "-Dbc.hold=268", "-Dbc.bowdraw=1", "-Dbc.time=6000", "-Dbc.shot=110"], True),
+
 }
 # Update 3.19: variants of existing scenes (same camera, other look / effects level)
 for _n, _look in (("classic", 0), ("vivid", 1), ("cinematic", 2), ("dreamy", 3)):

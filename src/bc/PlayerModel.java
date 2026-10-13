@@ -48,6 +48,7 @@ final class PlayerModel {
       /** Progress 0..1 of eating, or < 0 for none; how far the bow is drawn (1 = full), or < 0 for none. */
       float eat = -1.0F;
       float bow = -1.0F;
+      float bowVisual = -1.0F;
       /** 1 right after a hard landing (the knees give way), fading to 0; 1 right after a hit, fading to 0. */
       float land;
       float hurt;
@@ -70,6 +71,10 @@ final class PlayerModel {
 
       /** The item in the right hand, in the frame of the arm with its origin at the shoulder. */
       void held(int id, boolean slim, float bright);
+
+      default void held(int id, boolean slim, float bright, float draw, boolean nocked) {
+         held(id, slim, bright);
+      }
    }
 
    // ------------------------------------------------------------------ geometry
@@ -249,7 +254,12 @@ final class PlayerModel {
 
       @Override
       public void held(int id, boolean slim, float bright) {
-         drawHeld(id, slim, bright);
+         held(id, slim, bright, 0, false);
+      }
+
+      @Override
+      public void held(int id, boolean slim, float bright, float draw, boolean nocked) {
+         drawHeld(id, slim, bright, draw, nocked);
          GL11.glBindTexture(3553, texture(this.px)); // the item drew with the block atlas
          GL11.glEnable(3008);
          GL11.glAlphaFunc(516, 0.1F);
@@ -306,7 +316,7 @@ final class PlayerModel {
             final int held = p.held;
             limb(s, slim ? -2.0F : -3.0F, -2.0F, aw, 4, 40, 16, 40, 32, bright, -j.el[side], held > 0 ? () -> {
                s.translate(0.0F, 4.0F, 0.0F); // the item is placed relative to the shoulder
-               s.held(held, slim, bright);
+               s.held(held, slim, bright, Math.max(0, p.bowVisual >= 0 ? p.bowVisual : p.bow), p.bow >= 0);
             } : null);
          } else {
             limb(s, -1.0F, -2.0F, aw, 4, 32, 48, 48, 48, bright, -j.el[side], null);
@@ -428,7 +438,28 @@ final class PlayerModel {
     * blocks: rotation [75, 45, 0] translation [0, 2.5, 0] scale 0.375; the bow has its own).
     */
    static void drawHeld(int id, boolean slim, float bright) {
+      drawHeld(id, slim, bright, 0, false);
+   }
+
+   static void drawHeld(int id, boolean slim, float bright, float draw, boolean nocked) {
       GL11.glPushMatrix();
+      if (Renderer.isGun(id) || id == Items.BOW) {
+         // In the lower arm's virtual shoulder frame the palm is at y=-10. Anchor the GRIP,
+         // not the receiver/texture centre. +X barrel -> -Y forearm; +Y sights -> +Z wrist.
+         GL11.glTranslatef(slim ? -0.5F : -1.0F, -10.0F, 0.0F);
+         GL11.glRotatef(-90, 0, 0, 1);
+         GL11.glRotatef(90, 1, 0, 0);
+         float size = id == Items.BOW ? 14.4F : (id == Redstone319.PISTOL ? 12.48F : 13.76F);
+         GL11.glScalef(size, size, size);
+         if (id == Items.BOW) {
+            BowModel.draw(draw, nocked, bright);
+         } else {
+            GL11.glTranslatef(-WeaponPose.gripX(id), -WeaponPose.gripY(id), 0);
+            Renderer.drawGunModel3D(id, bright);
+         }
+         GL11.glPopMatrix();
+         return;
+      }
       GL11.glRotatef(180.0F, 1.0F, 0.0F, 0.0F); // our model hangs along -y and faces +z, Minecraft's raw model space is y down
       if (slim) {
          GL11.glTranslatef(0.5F, 0.0F, 0.0F); // (ModelPlayer.postRenderArm moves the pivot half a pixel for slim arms)
@@ -438,22 +469,9 @@ final class PlayerModel {
       GL11.glRotatef(180.0F, 0.0F, 1.0F, 0.0F);
       GL11.glTranslatef(1.0F, 2.0F, -10.0F); // 1/16, 0.125, -0.625 blocks
       if (id >= 256 || Renderer.flatBlock(id)) {
-         boolean isGun = Renderer.isGun(id);
          boolean handheld = id >= 256
-            && (Items.isTool(id) || id == 256 || isGun || id == Redstone319.MURDER_KNIFE);
-         if (id == 268) { // the bow
-            GL11.glTranslatef(-1.0F, -2.0F, 2.5F);
-            GL11.glRotatef(-80.0F, 1.0F, 0.0F, 0.0F);
-            GL11.glRotatef(260.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(-40.0F, 0.0F, 0.0F, 1.0F);
-            GL11.glScalef(0.9F * 16.0F, 0.9F * 16.0F, 0.9F * 16.0F);
-         } else if (isGun) {
-            GL11.glTranslatef(0.0F, 3.4F, 1.4F);
-            GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
-            GL11.glRotatef(8.0F, 0.0F, 0.0F, 1.0F);
-            float gunScale = id == Redstone319.SNIPER_RIFLE ? 0.92F : (id == Redstone319.MACHINE_GUN ? 0.86F : 0.78F);
-            GL11.glScalef(gunScale * 16.0F, gunScale * 16.0F, gunScale * 16.0F);
-         } else if (handheld) {
+            && (Items.isTool(id) || id == 256 || id == Redstone319.MURDER_KNIFE);
+         if (handheld) {
             GL11.glTranslatef(0.0F, 4.0F, 0.5F);
             GL11.glRotatef(-90.0F, 0.0F, 1.0F, 0.0F);
             GL11.glRotatef(55.0F, 0.0F, 0.0F, 1.0F);

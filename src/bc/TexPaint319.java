@@ -174,7 +174,7 @@ final class TexPaint319 {
       Tex.blit(BackroomsStalkerMod.T_ALMOND_WATER, BackroomsStalkerMod.almondWaterSprite());
       Redstone319.paint();
       TexOverhaulV57.applyAll();
-      bevelItemSprites();
+      if (!TexSmooth.enabled()) bevelItemSprites(); // default already has a restrained rim, not double embossing
    }
 
    /** Gives all item sprites (256..1023) a directional top-left specular bevel and bottom-right shadow rim while preserving their silhouette. */

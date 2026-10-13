@@ -816,21 +816,26 @@ public final class Tex {
       return dst;
    }
 
-   /** Builds mip levels 1..3 (8x8, 4x4, 2x2 per tile) on the CPU per 16x16 tile so adjacent transparent/cutout tiles never bleed into solid blocks. */
-   static void uploadAtlasMips() {
+   /** GPU layout only; the CPU mask/pack atlas remains 16px per tile. */
+   static int renderTileSize = 16;
+   static int renderMaxLevel = 3;
+
+   /** Builds each mip down to 2px per tile, never averaging across neighbouring cells. */
+   static void uploadAtlasMips(int[] renderPixels) {
       int totalTiles = COLS * COLS;
-      int[][] curTiles = new int[totalTiles][256];
+      int[][] curTiles = new int[totalTiles][renderTileSize * renderTileSize];
+      int width = COLS * renderTileSize;
       for (int t = 0; t < totalTiles; t++) {
-         int tx0 = tx(t);
-         int ty0 = ty(t);
+         int tx0 = (t % COLS) * renderTileSize;
+         int ty0 = (t / COLS) * renderTileSize;
          int[] tile = curTiles[t];
-         for (int r = 0; r < 16; r++) {
-            System.arraycopy(atlasPixels, (ty0 + r) * PX + tx0, tile, r * 16, 16);
+         for (int r = 0; r < renderTileSize; r++) {
+            System.arraycopy(renderPixels, (ty0 + r) * width + tx0, tile, r * renderTileSize, renderTileSize);
          }
       }
 
-      int tileSize = 16;
-      for (int level = 1; level <= 3; level++) {
+      int tileSize = renderTileSize;
+      for (int level = 1; level <= renderMaxLevel; level++) {
          int nextSize = tileSize >> 1;
          int mipPx = COLS * nextSize;
          int[] mipAtlas = new int[mipPx * mipPx];
@@ -853,11 +858,8 @@ public final class Tex {
 
    public static void init() {
       initPixels();
-      atlas = upload(PX, PX, atlasPixels, false, false);
-      GL11.glBindTexture(3553, atlas);
-      GL11.glTexParameteri(3553, 10241, 9986);
-      GL11.glTexParameteri(3553, 33085, 3);
-      uploadAtlasMips();
+      atlas = GL11.glGenTextures();
+      uploadAtlas();
 
       crack = upload(160, 16, crackPixels(), false, false);
       clouds = upload(256, 256, cloudPixels(), false, true);
@@ -873,14 +875,31 @@ public final class Tex {
       if (atlas != 0) {
          try {
             GL11.glBindTexture(3553, atlas);
-            ByteBuffer buf = toBuffer(atlasPixels);
-            GL11.glPixelStorei(3317, 1);
-            GL11.glTexSubImage2D(3553, 0, 0, 0, PX, PX, 6408, 5121, buf);
-            MemoryUtil.memFree(buf);
-            uploadAtlasMips();
+            uploadAtlas();
          } catch (Throwable ignored) {
          }
       }
+   }
+
+   /** Reallocate on pack switches as default is 64px, classic/custom packs remain 16px. */
+   private static void uploadAtlas() {
+      renderTileSize = TexSmooth.enabled() ? TexSmooth.SIZE : 16;
+      renderMaxLevel = renderTileSize == 64 ? 5 : 3;
+      int[] pixels = renderTileSize == 64 ? TexSmooth.atlas(atlasPixels) : atlasPixels;
+      int width = COLS * renderTileSize;
+      GL11.glBindTexture(3553, atlas);
+      // Gradients are baked at 64px. Nearest in each mip avoids sampling neighbouring atlas tiles.
+      GL11.glTexParameteri(3553, 10240, 9728);
+      GL11.glTexParameteri(3553, 10241, 9986);
+      GL11.glTexParameteri(3553, 10242, 33071);
+      GL11.glTexParameteri(3553, 10243, 33071);
+      GL11.glTexParameteri(3553, 33085, renderMaxLevel);
+      GL11.glPixelStorei(3317, 1);
+      ByteBuffer buf = toBuffer(pixels);
+      GL11.glTexImage2D(3553, 0, 32856, width, width, 0, 6408, 5121, buf);
+      MemoryUtil.memFree(buf);
+      uploadAtlasMips(pixels);
+      lastBlendKey = -1;
    }
 
    /** Update 3.11: paints every tile into {@link #atlasPixels} without touching OpenGL (the LOD colours and the tests read them). */
@@ -1046,9 +1065,13 @@ public final class Tex {
    }
 
    private static void upload(int x, int y, int[] pixels, boolean mips) {
-      int[] cur = pixels;
-      int size = 16;
-      int maxLevel = mips ? 3 : 0;
+      int tile = (y / 16) * COLS + x / 16;
+      int[] cur = renderTileSize == 64 ? TexSmooth.tile(tile, pixels, true) : pixels;
+      int scale = renderTileSize / 16;
+      x *= scale;
+      y *= scale;
+      int size = renderTileSize;
+      int maxLevel = mips ? renderMaxLevel : 0;
       for (int level = 0; level <= maxLevel; level++) {
          ByteBuffer buf = toBuffer(cur);
          GL11.glTexSubImage2D(3553, level, x >> level, y >> level, size, size, 6408, 5121, buf);

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.0";
+   public static final String VERSION_STR = "6.2";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -71,6 +71,8 @@ public final class Game {
    boolean leftPressed;
    boolean rightPressed;
    int bowCharge;
+   int bowReleaseTicks;
+   float bowReleaseDraw;
    boolean deathHandled;
    int sel = 0;
    float nameTimer;
@@ -933,6 +935,9 @@ public final class Game {
 
    void scanWorlds() {
       this.worldList.clear();
+      if (this.window != 0L && System.getProperty("bc.fakeworlds") == null && System.getProperty("bc.auto") == null) {
+         this.ensureAllBlocksShowcaseWorld();
+      }
       File[] var1 = new File(this.root, "saves").listFiles();
       if (var1 != null) {
          for (File var5 : var1) {
@@ -984,7 +989,12 @@ public final class Game {
             }
          }
 
-         this.worldList.sort((var0, var1x) -> Long.compare(var1x.mod, var0.mod));
+         this.worldList.sort((var0, var1x) -> {
+            boolean aShow = "All_Blocks_Showcase".equals(var0.dir);
+            boolean bShow = "All_Blocks_Showcase".equals(var1x.dir);
+            if (aShow != bShow) return aShow ? -1 : 1;
+            return Long.compare(var1x.mod, var0.mod);
+         });
          boolean var15 = false;
 
          for (Game.WInfo var17 : this.worldList) {
@@ -1207,6 +1217,7 @@ public final class Game {
       this.menu = null;
       this.eatTicks = 0;
       this.bowCharge = 0;
+      this.bowReleaseTicks = 0;
       this.deathHandled = false;
       this.particles.clear();
       this.chatLog.clear();
@@ -1275,6 +1286,13 @@ public final class Game {
          this.sel = (int)d(var4, "sel", 0.0);
          parseStacks(var4.getProperty("inv", ""), this.inv);
          parseStacks(var4.getProperty("armor", ""), this.armor);
+         if (ws.type == WorldSettings.ALL_BLOCKS && this.inv[0] == null) {
+            int[] starter = new int[]{268, 267, 316, 317, 318, 319, 451, 283, Redstone319.REDSTONE_TORCH};
+            for (int i = 0; i < starter.length && i < 9; i++) {
+               int id = starter[i];
+               this.inv[i] = new Stack(id, Items.maxStack[id] > 1 ? Math.min(64, Items.maxStack[id]) : 1);
+            }
+         }
          this.mobs.load(this.world.dir);
          this.needSpawn = false;
       }
@@ -1370,6 +1388,7 @@ public final class Game {
          this.menu = null;
          this.eatTicks = 0;
          this.bowCharge = 0;
+         this.bowReleaseTicks = 0;
          this.deathHandled = false;
          this.particles.clear();
       } else if (this.world.settings != null && this.world.settings.mapId != targetMapId) {
@@ -1872,6 +1891,10 @@ public final class Game {
    void setScreen(Game.S var1) {
       Game.S var2 = this.screen;
       this.screen = var1;
+      if (var1 != Game.S.PLAY) {
+         this.bowCharge = 0;
+         this.bowReleaseTicks = 0;
+      }
       if (var1 == Game.S.LOADING && var2 != Game.S.LOADING) {
          this.loadFrac = 0.0F;
       }
@@ -4020,12 +4043,13 @@ public final class Game {
       p.hurt = this.animK(K_HURT, partial);
       p.vy = (float)pl.vy;
       p.eat = this.eatTicks > 0 ? Math.min(1.0F, (this.eatTicks + partial) / 32.0F) : -1.0F;
-      p.bow = this.bowCharge > 0 ? this.bowCharge / 20.0F : -1.0F;
+      p.bow = this.bowCharge > 0 ? WeaponPose.bowDraw(this.bowCharge, partial) : -1.0F;
+      p.bowVisual = this.bowVisualDraw(partial);
       if (POSE_STATE != null) {
          // the state is exactly what the property names: everything else is switched off (a creative player in a test scene is flying)
          p.sneakK = p.sprintK = p.airK = p.swim = p.tread = p.climb = p.fly = p.land = p.hurt = p.vy = 0.0F;
          p.sneak = p.sprint = p.air = false;
-         p.eat = p.bow = -1.0F;
+         p.eat = p.bow = p.bowVisual = -1.0F;
          for (String kv : POSE_STATE.split(",")) {
             String[] e = kv.trim().split("=");
             float v = e.length > 1 ? Float.parseFloat(e[1]) : 1.0F;
@@ -4120,8 +4144,19 @@ public final class Game {
       }
    }
 
+   float bowVisualDraw(float partial) {
+      if (heldId() != Items.BOW) return 0;
+      return this.bowCharge > 0 ? WeaponPose.bowDraw(this.bowCharge, partial)
+         : WeaponPose.releaseDraw(this.bowReleaseDraw, this.bowReleaseTicks, partial);
+   }
+
    void tick() {
       this.tickCount++;
+      if (this.bowReleaseTicks > 0) this.bowReleaseTicks--;
+      if (this.heldId() != Items.BOW) {
+         this.bowCharge = 0;
+         this.bowReleaseTicks = 0;
+      }
       this.pshake = this.shake;
       this.shake = this.shake < 0.004F ? 0.0F : this.shake * 0.9F;
       this.tickEquip();
@@ -4548,6 +4583,7 @@ public final class Game {
             } else {
                boolean var21 = this.player.creative || this.countItem(267) > 0;
                if (this.rightDown && var21) {
+                  this.bowReleaseTicks = 0;
                   this.bowCharge = Math.min(this.bowCharge + 1, 60);
                } else {
                   if (this.bowCharge > 0) {
@@ -4557,6 +4593,8 @@ public final class Game {
                         var8 = 1.0F;
                      }
 
+                     this.bowReleaseDraw = WeaponPose.bowDraw(this.bowCharge, 0);
+                     this.bowReleaseTicks = 4;
                      this.bowCharge = 0;
                      if (var8 >= 0.1F) {
                         double var9 = Math.toRadians(this.player.yaw);

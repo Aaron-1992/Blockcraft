@@ -119,13 +119,13 @@ public final class ResourcePacks {
       packs.clear();
       packs.add(new Pack(
          ID_DEFAULT,
-         "Blockcraft V6.0 Brand-New (Default)",
-         "100% brand-new handcrafted realistic textures for EVERY block & item",
+         "Smooth Realism 6.2 (Default)",
+         "64x64 materials, smooth colour gradients & fine surface detail",
          true,
          false,
          null,
          0xFF2E7D32,
-         "6.0"
+         "64px"
       ));
       packs.add(new Pack(
          ID_V59_RELIEF,

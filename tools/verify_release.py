@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Reject mislabeled/stale releases and EXEs with an old embedded game.
+
+python3 tools/verify_release.py releases/Blockcraft-UPDATE6.2-patch.zip 6.2
+Checks source fingerprint, class hashes, matching EXE/JAR contents and executes
+--build-info from BOTH packaged launchers without starting OpenGL.
+"""
+import hashlib
+import io
+import os
+import subprocess
+import sys
+import tempfile
+import zipfile
+
+import build as B
+
+REQUIRED = ("Game", "Renderer", "PlayerModel", "Tex", "TexSmooth", "WeaponPose", "BowModel")
+
+
+def properties(raw):
+    return dict(line.split("=", 1) for line in raw.decode("utf-8").splitlines() if "=" in line)
+
+
+def inspect_payload(exe, jar, version, source_hash):
+    with zipfile.ZipFile(io.BytesIO(jar)) as j, zipfile.ZipFile(io.BytesIO(exe)) as e:
+        if e.testzip() or j.testzip():
+            raise ValueError("Corrupt executable/JAR")
+        if set(j.namelist()) != set(e.namelist()):
+            raise ValueError("Executable contains a different game from the JAR")
+        for name in j.namelist():
+            if j.read(name) != e.read(name):
+                raise ValueError("Executable/JAR disagree: " + name)
+        if "bc-build.properties" not in j.namelist():
+            raise ValueError("Missing build receipt (old executable)")
+        receipt = properties(j.read("bc-build.properties"))
+        if receipt.get("version") != version:
+            raise ValueError("Packaged version does not match requested release " + version)
+        if receipt.get("source.sha256") != source_hash:
+            raise ValueError("Update pack is stale: source fingerprint differs; rebuild with tools/build.py --patch")
+        for cls in REQUIRED:
+            actual = hashlib.sha256(j.read("bc/" + cls + ".class")).hexdigest()
+            if actual != receipt.get("class." + cls + ".sha256"):
+                raise ValueError("Missing/modified visual update class: " + cls)
+        return receipt
+
+
+def verify(archive, version):
+    with zipfile.ZipFile(archive) as z:
+        exe, jar = (z.read("Blockcraft/" + n) for n in ("Blockcraft.exe", "blockcraft.jar"))
+        receipt = inspect_payload(exe, jar, version, B.source_fingerprint())
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, data in (("Blockcraft.exe", exe), ("blockcraft.jar", jar)):
+            path = os.path.join(tmp, name)
+            with open(path, "wb") as f:
+                f.write(data)
+            result = subprocess.run([B.java_exe(), "-Djava.awt.headless=true", "-jar", path, "--build-info"],
+                                    capture_output=True, text=True, timeout=30)
+            info = properties(result.stdout.encode("utf-8"))
+            expected = {"version": version, "source.sha256": receipt["source.sha256"],
+                        "default.texture.tileSize": "64", "gun.firstPersonYaw": "96.0",
+                        "bow.model": "articulated-3d"}
+            if result.returncode or any(info.get(k) != v for k, v in expected.items()):
+                raise ValueError("Packaged %s failed runtime check:\n%s\n%s" % (name, result.stdout, result.stderr))
+            print("[verify] %s: version=%s, 64px atlas, corrected gun pose, articulated bow" % (name, version))
+    print("[verify] source.sha256=" + receipt["source.sha256"])
+    return receipt
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        sys.exit("Usage: verify_release.py <patch-or-full.zip> <version>")
+    verify(sys.argv[1], sys.argv[2])

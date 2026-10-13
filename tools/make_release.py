@@ -79,9 +79,13 @@ def notes(version, full_name, patch_name):
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else None
+    version = sys.argv[1] if len(sys.argv) > 1 else B.game_version()
     patch = find_patch(version)
     version = re.search(r"UPDATE([0-9.]+)-patch\.zip$", patch).group(1)
+    if tuple(map(int, version.split("."))) >= (6, 2):
+        from verify_release import verify
+        verify(patch, version) # fail BEFORE assembling/publishing any stale or mislabeled bytes
+
     shutil.rmtree(OUT, ignore_errors=True)
     os.makedirs(OUT)
 

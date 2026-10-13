@@ -18,6 +18,7 @@ The compiler is `javac` if a JDK is on PATH, otherwise the ECJ compiler set up b
 Either way the code is checked against the Java 21 API (the JRE bundled with the game).
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -100,6 +101,17 @@ def game_version():
     return m.group(1)
 
 
+def source_fingerprint():
+    """Hash source paths and bytes, not git HEAD: uncommitted fixes must be identified too."""
+    digest = hashlib.sha256()
+    for path in find_sources(os.path.join(ROOT, "src")):
+        digest.update(os.path.relpath(path, ROOT).replace(os.sep, "/").encode("utf-8") + b"\0")
+        with open(path, "rb") as f:
+            digest.update(f.read())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def build_jar(classes_dir, jar_path):
     """LWJGL bundle + compiled classes + resources -> jar with Main-Class bc.Main."""
     entries = {}  # name -> (bytes, compress_type)
@@ -116,6 +128,10 @@ def build_jar(classes_dir, jar_path):
                 if rel == "sounds/soundbank.bin":
                     continue
                 entries[rel] = open(p, "rb").read()
+    receipt = "version=%s\nsource.sha256=%s\n" % (game_version(), source_fingerprint())
+    for name in ("Game", "Renderer", "PlayerModel", "Tex", "TexSmooth", "WeaponPose", "BowModel"):
+        receipt += "class.%s.sha256=%s\n" % (name, hashlib.sha256(entries["bc/%s.class" % name]).hexdigest())
+    entries["bc-build.properties"] = receipt.encode("utf-8")
     os.makedirs(os.path.dirname(jar_path), exist_ok=True)
     with zipfile.ZipFile(jar_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         zi = zipfile.ZipInfo("META-INF/MANIFEST.MF", FIXED_TIME)

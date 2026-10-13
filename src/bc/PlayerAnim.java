@@ -268,7 +268,7 @@ final class PlayerAnim {
       float k = smooth(0.0F, 0.08F, draw + 0.01F) * weight;
       float d = clamp(draw, 0.0F, 1.0F);
       float aim = 90.0F - lookPitch;
-      j.sh[0] = lerp(j.sh[0], aim, k);
+      j.sh[0] = lerp(j.sh[0], aim - 4.0F, k);
       j.el[0] = lerp(j.el[0], 4.0F, k);
       j.abd[0] = lerp(j.abd[0], -4.0F, k);
       j.sh[1] = lerp(j.sh[1], aim - 4.0F, k);
@@ -317,16 +317,20 @@ final class PlayerAnim {
       } else if (p.eat >= 0.0F) {
          eat(j, p.eat);
       } else if (Renderer.isGun(p.held)) {
-         float aim = 80.0F - clamp(lookPitch, -75.0F, 75.0F);
-         j.sh[0] = lerp(j.sh[0], aim, 0.92F);
-         j.el[0] = lerp(j.el[0], p.held == Redstone319.PISTOL ? 12.0F : 22.0F, 0.92F);
-         j.abd[0] = lerp(j.abd[0], -8.0F, 0.92F);
-         j.sh[1] = lerp(j.sh[1], aim - 6.0F, 0.88F);
-         j.el[1] = lerp(j.el[1], p.held == Redstone319.PISTOL ? 28.0F : 42.0F, 0.88F);
-         j.abd[1] = lerp(j.abd[1], -22.0F, 0.88F);
+         float aim = 90.0F - clamp(lookPitch, -75.0F, 75.0F);
+         // The lower arm rotates by shoulder + elbow, so compensate at the shoulder.
+         // Otherwise the weapon pitches upward by the elbow bend even while looking level.
+         j.el[0] = p.held == Redstone319.PISTOL ? 12.0F : 22.0F;
+         j.sh[0] = aim - j.el[0];
+         j.abd[0] = 0;
+         j.el[1] = p.held == Redstone319.PISTOL ? 28.0F : 42.0F;
+         j.sh[1] = aim - j.el[1];
+         j.abd[1] = -22.0F;
+         j.tYaw = 0;
+
       }
 
-      if (p.swing >= 0.0F && p.bow < 0.0F) {
+      if (p.swing >= 0.0F && p.bow < 0.0F && !Renderer.isGun(p.held)) {
          swing(j, p.swing, p.eat >= 0.0F ? 0.0F : 1.0F);
       }
 

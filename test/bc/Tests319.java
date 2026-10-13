@@ -1438,7 +1438,7 @@ final class Tests319 {
          PlayerModel.Pose gunPose = new PlayerModel.Pose();
          gunPose.held = Redstone319.MACHINE_GUN;
          PlayerAnim.Joints gunJoints = PlayerAnim.solve(gunPose);
-         check(gunJoints.sh[0] > 65.0F && gunJoints.sh[1] > 60.0F, "Holding a 3D gun raises both right and left arms into a two-handed tactical aiming stance");
+         check(Math.abs(gunJoints.sh[0] + gunJoints.el[0] - 90.0F) < 0.01F && Math.abs(gunJoints.sh[1] + gunJoints.el[1] - 90.0F) < 0.01F, "Holding a 3D gun raises both right and left arms into a two-handed tactical aiming stance");
 
          // Verify stuck arrows preserve non-zero flight heading vector so MobRender.drawArrows keeps incoming orientation
          bwGame.world.setBlock(0, SkyGen.Y_DECK + 2, 2, Blocks.STONE);

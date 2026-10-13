@@ -14,6 +14,17 @@ public final class TexSheet {
    static final int S = 10; // zoom
 
    public static void main(String[] args) throws Exception {
+      if (args.length > 1 && args[1].equals("smooth")) {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT, null);
+         Tex.initPixels();
+         int[] atlas = TexSmooth.atlas(Tex.atlasPixels);
+         int width = Tex.COLS * TexSmooth.SIZE;
+         BufferedImage image = new BufferedImage(width, width, BufferedImage.TYPE_INT_ARGB);
+         image.setRGB(0, 0, width, width, atlas, 0, width);
+         ImageIO.write(image, "png", new File(args[0]));
+         System.out.println("wrote default 64px atlas to " + args[0]);
+         return;
+      }
       List<int[]> tiles = new ArrayList<>();
       List<String> names = new ArrayList<>();
       add(tiles, names, "dry farm", TexExtra.farmTop());

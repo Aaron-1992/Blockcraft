@@ -250,10 +250,10 @@ final class TestsPlayerAnim {
          b.bow = 1.5F;
          b.headPitch = 0.0F;
          PlayerAnim.Joints j = PlayerAnim.solve(b);
-         check(near(j.sh[0], 90.0F, 1.0F) && j.el[0] < 10.0F, "the right arm points where the player looks: " + j.sh[0]);
+         check(near(j.sh[0] + j.el[0], 90.0F, 1.0F) && j.el[0] < 10.0F, "the right arm points where the player looks: " + j.sh[0]);
          check(j.el[1] > 100.0F, "the left hand is at the cheek with the bow fully drawn: " + j.el[1]);
          b.headPitch = 40.0F;
-         check(near(PlayerAnim.solve(b).sh[0], 50.0F, 1.5F), "looking down 40 degrees lowers the aiming arm: " + PlayerAnim.solve(b).sh[0]);
+         check(near(PlayerAnim.solve(b).sh[0] + PlayerAnim.solve(b).el[0], 50.0F, 1.5F), "looking down 40 degrees lowers the aiming arm: " + PlayerAnim.solve(b).sh[0]);
          b.bow = 0.2F;
          check(PlayerAnim.solve(b).el[1] < j.el[1] - 40.0F, "a half drawn bow bends the elbow less");
       });
