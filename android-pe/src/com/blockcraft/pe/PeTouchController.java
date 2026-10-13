@@ -378,17 +378,23 @@ public final class PeTouchController {
 
       if (world.screen == PeWorld.SCREEN_TITLE) {
          float bw = 820.0F * scale;
-         float bh = 122.0F * scale;
+         float bh = 114.0F * scale;
          float bx = cx - bw * 0.5F;
          // [ PLAY SINGLEPLAYER ]
-         if (inRect(x, y, bx, 500.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 470.0F * scale, bw, bh)) {
             world.refreshSaveSlots(context);
             world.screen = PeWorld.SCREEN_WORLD_SELECT;
             if (audio != null) audio.playSfx("click", 0.9F, 1.0F);
             return;
          }
+         // [ ALL BLOCKS & ITEMS GALLERY ]
+         if (inRect(x, y, bx, 610.0F * scale, bw, bh)) {
+            world.createNewSinglePlayerWorld(context, 2, PeWorld.MODE_CREATIVE, PeWorld.WTYPE_ALL_BLOCKS, 2026L);
+            if (audio != null) audio.playSfx("levelup", 0.95F, 1.0F);
+            return;
+         }
          // [ CONTROLS & SETTINGS ]
-         if (inRect(x, y, bx, 650.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 750.0F * scale, bw, bh)) {
             world.previousScreen = PeWorld.SCREEN_TITLE;
             world.screen = PeWorld.SCREEN_SETTINGS;
             if (audio != null) audio.playSfx("click", 0.9F, 1.05F);

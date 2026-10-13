@@ -272,10 +272,11 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.mesher.addRect2D(cx - 420.0F * scale, 292.0F * scale, 840.0F * scale, 54.0F * scale, 0xD81E3428);
 
          float bw = 820.0F * scale;
-         float bh = 122.0F * scale;
+         float bh = 114.0F * scale;
          float bx = cx - bw * 0.5F;
-         this.mesher.drawButton2D(bx, 500.0F * scale, bw, bh, 0xFF286C3E, 0xFF54E882, true);
-         this.mesher.drawButton2D(bx, 650.0F * scale, bw, bh, 0xFF243448, 0xFF5CA8FF, false);
+         this.mesher.drawButton2D(bx, 470.0F * scale, bw, bh, 0xFF286C3E, 0xFF54E882, true);
+         this.mesher.drawButton2D(bx, 610.0F * scale, bw, bh, 0xFF285848, 0xFF54E882, true);
+         this.mesher.drawButton2D(bx, 750.0F * scale, bw, bh, 0xFF243448, 0xFF5CA8FF, false);
 
          // Bottom Footer Pill
          this.mesher.drawCard2D(cx - 520.0F * scale, 932.0F * scale, 1040.0F * scale, 72.0F * scale, 0xCC121620, 0xFF2A3648);
@@ -371,9 +372,10 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.mesher.begin2D();
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
          this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 142.0F * scale, 6.4F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "v1.8  -  BRAND-NEW TEXTURES & ALL BLOCKS GALLERY", cx, 304.0F * scale, 2.50F * scale, 0xFF98FFB8);
-         this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 538.0F * scale, 4.1F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 690.0F * scale, 3.8F * scale, 0xFFE4F2FF);
+         this.mesher.addTextCentered2D(this.textures, "v1.9  -  BRAND-NEW TEXTURES & ALL BLOCKS GALLERY", cx, 304.0F * scale, 2.50F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 506.0F * scale, 4.0F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "ALL BLOCKS & ITEMS GALLERY", cx, 646.0F * scale, 3.8F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 786.0F * scale, 3.8F * scale, 0xFFE4F2FF);
          this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz Sub-Tick Physics & Infinite Chunks", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
       } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
          float pw = 1540.0F * scale;
