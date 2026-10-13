@@ -416,6 +416,8 @@ final class Screens {
          ws.type = WorldSettings.TYPE_ORDER[(ws.typeIndex() + 1) % WorldSettings.TYPE_ORDER.length];
          if (ws.isVoidMode()) {
             g.newMode = 0; // Skyblock, Skywars, and Bedwars default to Survival
+         } else if (ws.type == WorldSettings.ALL_BLOCKS) {
+            g.newMode = 1; // All Blocks Gallery defaults to Creative Mode
          }
       });
       float iy = ty + 24.0F;

@@ -2289,6 +2289,7 @@ final class Tests319 {
 
          // Verify all separate texture version Resource Packs can be switched cleanly
          String[] packIds = {
+            ResourcePacks.ID_V59_RELIEF,
             ResourcePacks.ID_V58_FUSION,
             ResourcePacks.ID_V57_PIXEL,
             ResourcePacks.ID_V56_PAINTED,
@@ -2298,6 +2299,38 @@ final class Tests319 {
          for (String pid : packIds) {
             ResourcePacks.select(pid, null);
             eq(pid, ResourcePacks.activeId(), "Resource pack " + pid + " activated");
+         }
+
+         // Verify V6.0 All Blocks & Items Showcase Gallery World (WorldSettings.ALL_BLOCKS = 12)
+         int[] galleryBlocks = AllBlocksGen.getShowcaseBlocks();
+         int[] galleryItems = AllBlocksGen.getShowcaseItems();
+         check(galleryBlocks.length >= 340, "AllBlocksGen includes all blocks & block states: " + galleryBlocks.length);
+         check(galleryItems.length >= 130, "AllBlocksGen includes all items, tools, weapons, armor & dyes: " + galleryItems.length);
+
+         WorldSettings galleryWs = new WorldSettings();
+         galleryWs.type = WorldSettings.ALL_BLOCKS;
+         World galleryWorld = new World(2026L, null, Dim.OVERWORLD, galleryWs);
+         galleryWorld.saveEnabled = false;
+         try {
+            int placedCount = 0;
+            for (int cz = -1; cz <= 3; cz++) {
+               for (int cx = -2; cx <= 2; cx++) {
+                  Chunk c = galleryWorld.gen.generate(cx, cz);
+                  for (int z = 0; z < 16; z++) {
+                     for (int x = 0; x < 16; x++) {
+                        if (c.get(x, AllBlocksGen.FLOOR_Y + 1, z) != Blocks.AIR) {
+                           placedCount++;
+                        }
+                     }
+                  }
+               }
+            }
+            check(placedCount >= 250, "AllBlocksGen places exhibit blocks across the museum floor: " + placedCount);
+            AllBlocksGen.populateShowcaseChestsAndInventory(null, galleryWorld);
+            eq(Blocks.CHEST, galleryWorld.getBlock(0, AllBlocksGen.FLOOR_Y + 1, -1) == Blocks.CHEST ? Blocks.CHEST : galleryWorld.getBlock(-1, AllBlocksGen.FLOOR_Y + 1, -1),
+               "AllBlocksGen populates showcase item chests at entrance");
+         } finally {
+            galleryWorld.shutdown();
          }
       });
    }

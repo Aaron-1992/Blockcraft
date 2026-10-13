@@ -115,6 +115,8 @@ public final class Dim {
       Gen g;
       if (st == null || st.type == WorldSettings.CLASSIC) {
          g = new Gen(seed);
+      } else if (st.type == WorldSettings.ALL_BLOCKS) {
+         g = new AllBlocksGen(seed, st);
       } else if (st.type == WorldSettings.FLAT) {
          g = new FlatGen(seed, st);
       } else if (st.isVoidMode()) {

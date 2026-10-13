@@ -248,6 +248,14 @@ final class TexOverhaulV57 {
    // ====================================================================
    static void applyAll() {
       int mode = ResourcePacks.textureVersionMode();
+      if (mode == 0) {
+         // Default V6.0: 100% Brand-New Textures From Scratch for EVERY Block & Item!
+         TexBrandNewV60.applyAll();
+         return;
+      }
+      if (mode == 5) {
+         mode = 0; // V5.9 Relief mode
+      }
       // Always fix the Bow (268) in every non-3.5 pack so it is never backwards!
       Tex.blit(Items.tile[Items.BOW], shadeAndFuseSprite(null, paintRealisticBow(), 1.0F, 968, mode == 3 ? 1 : mode));
       if (mode == 3) {

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "5.9";
+   public static final String VERSION_STR = "6.0";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -252,6 +252,9 @@ public final class Game {
    public void run() throws Exception {
       this.root = new File(System.getProperty("user.home"), ".blockcraft112");
       this.root.mkdirs();
+      if (System.getProperty("bc.fakeworlds") == null && System.getProperty("bc.auto") == null) {
+         this.ensureAllBlocksShowcaseWorld();
+      }
 
       try {
          PrintStream var1 = new PrintStream(new FileOutputStream(new File(this.root, "latest.log")), true);
@@ -1018,6 +1021,43 @@ public final class Game {
       }
    }
 
+   void ensureAllBlocksShowcaseWorld() {
+      try {
+         File dir = new File(this.root, "saves/All_Blocks_Showcase");
+         File propFile = new File(dir, "level.properties");
+         if (!propFile.exists()) {
+            dir.mkdirs();
+            Properties p = new Properties();
+            p.setProperty("name", "All Blocks & Items Showcase");
+            p.setProperty("seed", "2026");
+            p.setProperty("mode", "1");
+            p.setProperty("creative", "true");
+            p.setProperty("flying", "true");
+            p.setProperty("gentype", Integer.toString(WorldSettings.ALL_BLOCKS));
+            p.setProperty("structures", "false");
+            p.setProperty("bonus", "false");
+            p.setProperty("flat", "0");
+            p.setProperty("structver", "2");
+            p.setProperty("mapid", "0");
+            p.setProperty("x", "0.5");
+            p.setProperty("y", "66.0");
+            p.setProperty("z", "-4.5");
+            p.setProperty("yaw", "0.0");
+            p.setProperty("pitch", "8.0");
+            p.setProperty("spawnx", "0");
+            p.setProperty("spawnz", "-4");
+            p.setProperty("time", "1000");
+            p.setProperty("health", "20");
+            p.setProperty("food", "20");
+            p.setProperty("sat", "5.0");
+            try (FileOutputStream out = new FileOutputStream(propFile)) {
+               p.store(out, "Blockcraft All Blocks & Items Texture Showcase");
+            }
+         }
+      } catch (Exception ignored) {
+      }
+   }
+
    String uniqueDir(String var1) {
       String var2 = var1.trim().replaceAll("[^A-Za-z0-9 _-]", "").trim();
       if (var2.isEmpty()) {
@@ -1182,7 +1222,15 @@ public final class Game {
          double startY = (this.world.gen instanceof BackroomsGen) ? (BackroomsGen.FLOOR_Y + 1.0) : 200.0;
          this.player.setPos(var16[0] + 0.5, startY, var16[2] + 0.5);
          this.needSpawn = true;
-         if (var3 == 1) {
+         if (ws.type == WorldSettings.ALL_BLOCKS) {
+            int[] starter = new int[]{268, 267, 316, 317, 318, 319, 451, 283, Redstone319.REDSTONE_TORCH};
+            for (int i = 0; i < starter.length && i < 9; i++) {
+               int id = starter[i];
+               this.inv[i] = new Stack(id, Items.maxStack[id] > 1 ? Math.min(64, Items.maxStack[id]) : 1);
+            }
+            this.player.yaw = 0.0F;
+            this.player.pitch = 8.0F;
+         } else if (var3 == 1) {
             int[] var10 = new int[]{1, 4, 5, 3, 15, 32, 9, 25, 7};
 
             for (int var11 = 0; var11 < var10.length; var11++) {
@@ -2690,6 +2738,20 @@ public final class Game {
                      }
                   }
                   break;
+               case "gallery":
+               case "allblocks":
+               case "showcase":
+                  if (this.world != null) {
+                     int ox = (int)Math.floor(this.player.x);
+                     int oy = Math.max(4, Math.min(200, (int)Math.floor(this.player.y)));
+                     int oz = (int)Math.floor(this.player.z);
+                     AllBlocksGen.buildGalleryAt(this, this.world, ox, oy, oz);
+                     this.player.setMode(1);
+                     this.player.yaw = 0.0F;
+                     this.player.pitch = 8.0F;
+                     this.say("§aBuilt All Blocks & Items Texture Showcase Gallery! (" + AllBlocksGen.getShowcaseBlocks().length + " blocks + " + AllBlocksGen.getShowcaseItems().length + " items in chests)");
+                  }
+                  break;
                case "kill":
                   if (var2.length > 1 && (var2[1].equalsIgnoreCase("mobs") || var2[1].equalsIgnoreCase("all") || var2[1].equalsIgnoreCase("@e"))) {
                      int removed = this.mobs.list.size();
@@ -3811,6 +3873,9 @@ public final class Game {
                }
 
                if (!this.needSpawn) {
+                  if (this.world.settings != null && this.world.settings.type == WorldSettings.ALL_BLOCKS) {
+                     AllBlocksGen.populateShowcaseChestsAndInventory(this, this.world);
+                  }
                   if (Phys.collides(this.world, this.player.bb)) {
                      this.player.setPos(this.player.x, this.player.y + 1.0, this.player.z);
                   }

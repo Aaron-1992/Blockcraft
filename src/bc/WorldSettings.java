@@ -32,15 +32,17 @@ public final class WorldSettings {
    public static final int END_FIGHT = 10;
    /** Castle Siege / Conquest with Cannons Mini Game (Attackers vs Defenders fortress breach & control zone capture with cannons, mortars & TNT). */
    public static final int CASTLE_SIEGE = 11;
-   public static final int TYPES = 12;
+   /** All Blocks & Items Texture Showcase Gallery (walkable museum with every block, plant, crop, door, bed, banner, redstone part & item chests). */
+   public static final int ALL_BLOCKS = 12;
+   public static final int TYPES = 13;
 
    /** Standard world types cycled by the "Type:" button on Create New World (keeps Mini Games in their own dedicated menu). */
-   public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, CLASSIC};
+   public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, ALL_BLOCKS, CLASSIC};
    /** Console Edition & Tactical Mini Game modes shown on the dedicated Mini Games menu. */
    public static final int[] MINIGAME_ORDER = new int[]{BATTLE, TUMBLE, BEDWARS, CS2, MURDER, END_FIGHT, CASTLE_SIEGE};
 
    public static final String[] TYPE_NAME = new String[]{
-      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Tumble", "Battle", "Bedwars", "CS2 Strike", "Murder Mystery", "End Fight", "Castle Siege"
+      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Tumble", "Battle", "Bedwars", "CS2 Strike", "Murder Mystery", "End Fight", "Castle Siege", "All Blocks Gallery"
    };
    public static final String[] TYPE_INFO = new String[]{
       "The terrain of Update 3.5 - 3.12",
@@ -54,7 +56,8 @@ public final class WorldSettings {
       "CS2 Tactical Strike: CT vs T combat with Machine Guns, Pistols, Snipers, TNT Grenades, Map Bomb Sites & No-Bombs Mode!",
       "Murder Mystery: 1 Murderer with a concealed Knife, 1 Sheriff with a Pistol, and Innocents scavenging 5 Gold Ingots to arm themselves!",
       "Bed-Spam End Fight: rapidly place and detonate beds in the End! Zero self-damage/knockback from your own beds; blast foes into the void!",
-      "Castle Siege Conquest: Attackers vs Defenders! Fire Siege Cannons, Mortars & TNT to breach castle walls and capture the inner Control Zones!"
+      "Castle Siege Conquest: Attackers vs Defenders! Fire Siege Cannons, Mortars & TNT to breach castle walls and capture the inner Control Zones!",
+      "All Blocks & Items Gallery: every single block, plant, crop, door, bed, banner, redstone part & chest of all items laid out to inspect!"
    };
 
    // Console Edition Mini Game Maps ("like the real deal") — all 8 ported Console Edition maps
@@ -389,6 +392,11 @@ public final class WorldSettings {
          case "siege":
          case "conquest":
             return CASTLE_SIEGE;
+         case "all_blocks":
+         case "allblocks":
+         case "gallery":
+         case "showcase":
+            return ALL_BLOCKS;
          default:
             return DEFAULT;
       }

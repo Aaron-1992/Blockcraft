@@ -29,6 +29,7 @@ import javax.imageio.ImageIO;
  */
 public final class ResourcePacks {
    public static final String ID_DEFAULT = "Default";
+   public static final String ID_V59_RELIEF = "V59Relief";
    public static final String ID_V58_FUSION = "V58Fusion";
    public static final String ID_V57_PIXEL = "V57PixelArt";
    public static final String ID_V56_PAINTED = "V56Painted";
@@ -118,12 +119,22 @@ public final class ResourcePacks {
       packs.clear();
       packs.add(new Pack(
          ID_DEFAULT,
-         "Blockcraft V5.9 Realistic (Default)",
-         "Realistic 3D micro-relief 5.6 x Minecraft textures for all blocks & items",
+         "Blockcraft V6.0 Brand-New (Default)",
+         "100% brand-new handcrafted realistic textures for EVERY block & item",
          true,
          false,
          null,
          0xFF2E7D32,
+         "6.0"
+      ));
+      packs.add(new Pack(
+         ID_V59_RELIEF,
+         "Blockcraft V5.9 (5.6 x MC Relief)",
+         "3D micro-relief 5.6 x Minecraft fusion textures",
+         true,
+         false,
+         null,
+         0xFF388E3C,
          "5.9"
       ));
       packs.add(new Pack(
@@ -269,11 +280,15 @@ public final class ResourcePacks {
       if (ID_V58_FUSION.equalsIgnoreCase(activeId)) {
          return 1;
       }
+      if (ID_V59_RELIEF.equalsIgnoreCase(activeId)) {
+         return 5;
+      }
       Pack p = active();
       String ver = p.props.getProperty("version", "").trim();
       if ("5.6".equals(ver) || "4.0".equals(ver)) return 3;
       if ("5.7".equals(ver)) return 2;
       if ("5.8".equals(ver)) return 1;
+      if ("5.9".equals(ver)) return 5;
       return 0;
    }
 
