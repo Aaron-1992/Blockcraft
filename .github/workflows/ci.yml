@@ -33,6 +33,9 @@ jobs:
           set -o pipefail
           python3 tools/runtests.py 2>&1 | tee build/runtests.log
 
+      - name: Native texture coverage (no silently inherited atlas cells)
+        run: java -Djava.awt.headless=true -cp build/classes:build/test-classes:libs/lwjgl-bundle.jar bc.TextureAudit build/texture-coverage.tsv
+
       - name: Test output (readable through the check-run API)
         if: always()
         run: |

@@ -1751,25 +1751,28 @@ public final class Renderer {
          return var1;
       }
 
-      int var3 = Tex.tx(var2);
-      int var4 = Tex.ty(var2);
+      int[] pixels = TexOverhaulV57.readTile(var2);
+      int size = 16;
+      if (TexPixel32.enabled()) { pixels = TexPixel32.tile(var2, pixels, false); size = 32; }
+      float pixelUV = Tex.TS / size;
+      float baseU = Tex.tu(var2), baseV = Tex.tv(var2);
       ArrayList var5 = new ArrayList();
       float var6 = 0.03125F;
 
-      for (int var7 = 0; var7 < 16; var7++) {
-         for (int var8 = 0; var8 < 16; var8++) {
-            int var9 = Tex.atlasPixels[(var4 + var7) * Tex.PX + var3 + var8];
+      for (int var7 = 0; var7 < size; var7++) {
+         for (int var8 = 0; var8 < size; var8++) {
+            int var9 = pixels[var7 * size + var8];
             if (var9 >>> 24 != 0) {
-               float var10 = var8 / 16.0F - 0.5F;
-               float var11 = (var8 + 1) / 16.0F - 0.5F;
-               float var12 = 0.5F - var7 / 16.0F;
-               float var13 = 0.5F - (var7 + 1) / 16.0F;
-               float var14 = (var3 + var8 + 0.5F) / Tex.PX;
-               float var15 = (var4 + var7 + 0.5F) / Tex.PX;
-               float var16 = (var3 + var8) / (float)Tex.PX;
-               float var17 = (var3 + var8 + 1) / (float)Tex.PX;
-               float var18 = (var4 + var7) / (float)Tex.PX;
-               float var19 = (var4 + var7 + 1) / (float)Tex.PX;
+               float var10 = var8 / (float)size - 0.5F;
+               float var11 = (var8 + 1) / (float)size - 0.5F;
+               float var12 = 0.5F - var7 / (float)size;
+               float var13 = 0.5F - (var7 + 1) / (float)size;
+               float var14 = baseU + (var8 + 0.5F) * pixelUV;
+               float var15 = baseV + (var7 + 0.5F) * pixelUV;
+               float var16 = baseU + var8 * pixelUV;
+               float var17 = baseU + (var8 + 1) * pixelUV;
+               float var18 = baseV + var7 * pixelUV;
+               float var19 = baseV + (var7 + 1) * pixelUV;
                var5.add(
                   new float[]{
                      var10,
@@ -1826,7 +1829,7 @@ public final class Renderer {
                      0.8F
                   }
                );
-               if (var8 == 0 || Tex.atlasPixels[(var4 + var7) * Tex.PX + var3 + var8 - 1] >>> 24 == 0) {
+               if (var8 == 0 || pixels[var7 * size + var8 - 1] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var10,
@@ -1857,7 +1860,7 @@ public final class Renderer {
                   );
                }
 
-               if (var8 == 15 || Tex.atlasPixels[(var4 + var7) * Tex.PX + var3 + var8 + 1] >>> 24 == 0) {
+               if (var8 == size - 1 || pixels[var7 * size + var8 + 1] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var11,
@@ -1888,7 +1891,7 @@ public final class Renderer {
                   );
                }
 
-               if (var7 == 0 || Tex.atlasPixels[(var4 + var7 - 1) * Tex.PX + var3 + var8] >>> 24 == 0) {
+               if (var7 == 0 || pixels[(var7 - 1) * size + var8] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var10,
@@ -1919,7 +1922,7 @@ public final class Renderer {
                   );
                }
 
-               if (var7 == 15 || Tex.atlasPixels[(var4 + var7 + 1) * Tex.PX + var3 + var8] >>> 24 == 0) {
+               if (var7 == size - 1 || pixels[(var7 + 1) * size + var8] >>> 24 == 0) {
                   var5.add(
                      new float[]{
                         var10,

@@ -21,7 +21,7 @@ final class TestsVisualRefresh {
                int[] result = tile == Items.tile[Items.BOW] ? BowSprite.pixels(0, false) : TexPixel32.tile(tile, src, tile == Tex.WATER || tile == Tex.LAVA || tile == 235 || tile == TexArt312.PORTAL);
                for (int y = 0; y < 32; y++) for (int x = 0; x < 32; x++) {
                   int c = result[y * 32 + x];
-                  if (tile != Items.tile[Items.BOW]) check((c >>> 24) == (src[y / 2 * 16 + x / 2] >>> 24), "same silhouette/opacity " + tile);
+                  if (tile != Items.tile[Items.BOW] && !TexRemaining32.handles(tile)) check((c >>> 24) == (src[y / 2 * 16 + x / 2] >>> 24), "same silhouette/opacity " + tile);
                   check(c == hd[((tile / Tex.COLS) * 32 + y) * width + (tile % Tex.COLS) * 32 + x], "tile isolation " + tile);
                }
             }
@@ -50,14 +50,81 @@ final class TestsVisualRefresh {
       test("pixel materials: transparent neighbours cannot add black fringes or change white utility texel", () -> {
          int[] src = new int[256];
          src[8 * 16 + 8] = 0xFFCCAA88;
-         int[] hd = TexPixel32.tile(700, src, true);
+         int[] hd = TexPixel32.tile(999, src, true);
          for (int y = 16; y < 18; y++) for (int x = 16; x < 18; x++) {
             check(hd[y * 32 + x] == src[136], "alpha-normalised colour at silhouette");
          }
          Arrays.fill(src, -1);
          for (int c : TexPixel32.tile(Tex.WHITE, src, false)) check(c == -1, "white stays white");
          for (int i = 0; i < 256; i++) src[i] = (i & 1) == 0 ? 0xFFFF0000 : 0xFF0000FF;
-         for (int c : TexPixel32.tile(700, src, false)) check(c == 0xFFFF0000 || c == 0xFF0000FF, "no purple interpolated texels at red/blue boundary");
+         for (int c : TexPixel32.tile(999, src, false)) check(c == 0xFFFF0000 || c == 0xFF0000FF, "no purple interpolated texels at red/blue boundary");
+      });
+      test("complete pixel pack: approved 6.3 artwork is unchanged; every remaining cell has native art", () -> {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT, null);
+         Tex.initPixels();
+         java.util.Properties approved = new java.util.Properties();
+         try (java.io.InputStream in = new java.io.FileInputStream("test/pixel32-approved.properties")) {
+            approved.load(in);
+         } catch (java.io.IOException e) { throw new RuntimeException(e); }
+         int protectedCount=0, redrawnCount=0;
+         for(int t=0;t<1024;t++) {
+            int[] src=TexOverhaulV57.readTile(t);
+            boolean populated=false;
+            for(int c:src) if((c>>>24)!=0) populated=true;
+            if(!populated) continue;
+            int[] art=t==Items.tile[Items.BOW]?BowSprite.pixels(0,false):TexPixel32.tile(t,src,TexRemaining32.animated(t));
+            String golden=approved.getProperty(Integer.toString(t));
+            if(golden!=null) {
+               check(Arrays.hashCode(art)==Integer.parseInt(golden), "approved pixels unchanged " + t);
+               protectedCount++;
+            } else if(t!=Tex.WHITE) {
+               check(TexRemaining32.handles(t), "no silent legacy fallback for populated tile " + t);
+               check(Arrays.equals(art,TexRemaining32.paint(t)), "native dispatch " + t);
+               boolean changed=false, nativeDetail=false;
+               for(int y=0;y<32;y++) for(int x=0;x<32;x++) {
+                  int c=art[y*32+x];
+                  changed |= c!=src[(y/2)*16+x/2];
+                  nativeDetail |= c!=art[(y&~1)*32+(x&~1)];
+                  check((c>>>24)!=0 || c==0,"no invisible coloured fringe " + t);
+               }
+               check(changed,"not the old 16px art enlarged " + t);
+               check(nativeDetail,"uses native 32px detail " + t);
+               redrawnCount++;
+            }
+         }
+         check(protectedCount==approved.size(), "all approved fixtures exercised");
+         check(redrawnCount>300, "coverage includes items, model-only faces and mod bottle");
+         for(int t:new int[]{23,24,235,263}) {
+            check(!Arrays.equals(TexRemaining32.frame(t,0),TexRemaining32.frame(t,3)),"animation moves " + t);
+            check(Arrays.equals(TexRemaining32.frame(t,0),TexRemaining32.frame(t,16)),"animation loops exactly " + t);
+         }
+         check(!Arrays.equals(TexRemaining32.paint(196),TexRemaining32.paint(218)),"flint and steel is not shears");
+         for(int t:new int[]{2,9,550,551,552,642,630,634,639,640,641}) for(int c:TexRemaining32.paint(t)) {
+            check((c>>16&255)==(c>>8&255)&&(c>>8&255)==(c&255),"biome/dye tint masks stay neutral " + t);
+         }
+      });
+      test("native items: extrusion follows the new 32px silhouette, not the legacy mask", () -> {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT, null);
+         Tex.initPixels();
+         Renderer.itemGeo.clear();
+         int tile=Items.tile[Items.toolId(4,4)];
+         int[] pixels=TexPixel32.tile(tile,TexOverhaulV57.readTile(tile),false);
+         int quads=0;
+         for(int y=0;y<32;y++)for(int x=0;x<32;x++)if((pixels[y*32+x]>>>24)!=0){
+            quads+=2;
+            if(x==0||(pixels[y*32+x-1]>>>24)==0)quads++;
+            if(x==31||(pixels[y*32+x+1]>>>24)==0)quads++;
+            if(y==0||(pixels[(y-1)*32+x]>>>24)==0)quads++;
+            if(y==31||(pixels[(y+1)*32+x]>>>24)==0)quads++;
+         }
+         float[] geo=Renderer.spriteGeometry(tile,-6400);
+         check(geo.length==quads*24,"every visible texel and exposed edge has a face");
+         for(int i=0;i<geo.length;i+=6){
+            check(geo[i]>=-.5F&&geo[i]<=.5F&&geo[i+1]>=-.5F&&geo[i+1]<=.5F,"unchanged item scale");
+            check(geo[i+3]>=Tex.tu(tile)&&geo[i+3]<=Tex.tu(tile)+Tex.TS,"u stays in tile");
+            check(geo[i+4]>=Tex.tv(tile)&&geo[i+4]<=Tex.tv(tile)+Tex.TS,"v stays in tile");
+         }
+         Renderer.itemGeo.clear();
       });
       test("weapons: barrels face forward, forearm aim compensates elbow, recoil returns to rest", () -> {
          double yaw = Math.toRadians(WeaponPose.FIRST_PERSON_YAW);

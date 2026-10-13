@@ -2,7 +2,8 @@ package bc;
 
 /** Default 32px pixel-art materials. No spatial interpolation, blur, emboss pass or generated normals.
  * A small stepped palette and coherent pixel clusters keep materials readable at Minecraft scale.
- * The 16px CPU atlas remains the pack interchange format and item extrusion mask.
+ * The 16px CPU atlas remains the pack interchange format. Default item extrusion
+ * uses the native 32px silhouette; legacy/custom packs retain their 16px masks.
  */
 final class TexPixel32 {
    static final int SIZE = 32;
@@ -148,8 +149,13 @@ final class TexPixel32 {
       return earth(Tex.STONE, x, y);
    }
 
-   /** Keep every authored pixel and alpha edge intact. No averaging neighbouring colours at all. */
+   /** Native art, preserving the approved 6.3 families. Unknown extension tiles keep nearest sampling. */
    static int[] tile(int tile, int[] src, boolean animated) {
+      // 6.3 painters below stay byte-for-byte stable. Every other populated family
+      // is now painted natively, not silently enlarged from the old CPU atlas.
+      boolean populated = false;
+      for (int c : src) if ((c >>> 24) != 0) { populated = true; break; }
+      if (populated && TexRemaining32.handles(tile)) return TexRemaining32.paint(tile);
       int[] out = new int[SIZE * SIZE];
       boolean opaque = true;
       for (int c : src) if ((c >>> 24) != 255) { opaque = false; break; }

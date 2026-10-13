@@ -1066,7 +1066,9 @@ public final class Tex {
 
    private static void upload(int x, int y, int[] pixels, boolean mips) {
       int tile = (y / 16) * COLS + x / 16;
-      int[] cur = renderTileSize == TexPixel32.SIZE ? TexPixel32.tile(tile, pixels, true) : pixels;
+      int[] cur = renderTileSize == TexPixel32.SIZE
+         ? (TexRemaining32.animated(tile) ? TexRemaining32.frame(tile, Math.max(0, lastBlendKey) / 16.0F) : TexPixel32.tile(tile, pixels, true))
+         : pixels;
       int scale = renderTileSize / 16;
       x *= scale;
       y *= scale;

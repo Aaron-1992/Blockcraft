@@ -456,3 +456,36 @@ strict equivalence; visual runs 38476990532 / 38477711093 / 38478173788 produced
 native PNGs reviewed in `ci-results/shots/pixel-*.png` (flat bow idle/full/third person,
 held sword daylight/night/supported torch, gallery shader on/off). The final torch
 shot visibly illuminates the sword and gallery grass/foliage no longer renders black.
+
+## 6.4 — finish the Natural Pixel 32 atlas
+
+`TexRemaining32` paints the 456 populated atlas cells that previously used a
+nearest-enlarged 16px source. It uses a native 32px aliased canvas, explicit material
+palettes, plant/crop silhouettes, work-block face layouts, mechanism details,
+color-family patterns and item shapes. Water/lava/fire/portal are native animated
+painters driven by the same looping animation phase. There is no image-wide
+recolour/blur/relief filter. This scope is the default block/item atlas, not player
+skins, fonts or UI artwork; legacy/custom resource packs remain separate.
+
+The 60 terrain/material tiles and bow already approved in 6.3 are protected by
+`test/pixel32-approved.properties` (exact ARGB array hashes). White utility tile 64
+stays white. Unknown extension tiles retain nearest sampling. All **518 populated
+cells** are accounted for: 61 unchanged approved tiles, 456 new native tiles, and
+one utility white. `docs/texture-coverage.tsv` records each cell, artist, changed
+texels and palette size. Regenerate with:
+
+```
+java -Djava.awt.headless=true -cp build/classes:build/test-classes:libs/lwjgl-bundle.jar bc.TextureAudit docs/texture-coverage.tsv
+```
+
+The renderer now extrudes the actual native 32px item alpha mask with matching UVs
+and the same physical item scale. Legacy/custom packs still extrude 16px masks.
+This prevents new silhouettes being clipped by old mesh outlines. Bow and gun
+poses, recoil and the 6.3 hand-lighting logic were not altered.
+
+Tests cover coverage (no silent legacy fallback), native rather than doubled pixel
+detail, deterministic output, approved-art hashes, clear texels, neutral tint
+masks, animation loops and matching extrusion faces/UVs. Also fixed the old tile
+1000 test fixture cleanup: it previously restored just one row and contaminated
+later atlas audits. Local full equivalence: 397 identical / 64 intentional / 145
+new. Latest unit suite: 3,849,815 passed, zero failed; release-verifier tests: 5/5.

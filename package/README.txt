@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.3  -  an original Minecraft-style voxel sandbox   (EDITION V6.3)
+BLOCKCRAFT V6.4  -  an original Minecraft-style voxel sandbox   (EDITION V6.4)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,20 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.4 - Complete Natural Pixel 32 pack
+  * Finished the remaining default block and item atlas artwork at native 32x32:
+    plants, leaves, crops, workstations, containers, glass, colored materials,
+    Nether/End blocks, redstone, decorations, tools, armor, food and item icons.
+  * Water, lava, fire and portal animations now also use native 32px painters.
+    Stepped palettes and hard pixel edges; no blur or generic smoothing filter.
+  * Preserved the approved 6.3 terrain, wood, masonry, wool, ores and sprite bow
+    exactly. Gun poses/recoil and the corrected held-item lighting are unchanged.
+  * Held/dropped item extrusion follows the new native sprite silhouettes,
+    avoiding old 16px outlines clipping the new artwork.
+  * Default pack coverage is audited per atlas cell, including model-only faces
+    and the almond-water icon. Older/custom resource packs remain separate.
+  * Select Natural Pixel 32 (Default) in Options > Resource Packs.
 
 WHAT'S NEW IN V6.3 - Natural Pixel 32, sprite bow and held-item lighting
   * Default textures are now 32x32, with crisp pixel clusters and natural stepped

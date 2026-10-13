@@ -719,6 +719,11 @@ SCENES["pixel-hand-torch"] = (_P32 + ["-Dbc.hold=316", "-Dbc.time=18000", "-Dbc.
 SCENES["pixel-materials"] = ([a for a in _P32 if not a.startswith("-Dbc.cam=")] + ["-Dbc.gen=12", "-Dbc.cam=-24,67,1,0,14", "-Dbc.time=6000", "-Dbc.emptyhand=1"], True)
 
 SCENES["pixel-materials-plain"] = (SCENES["pixel-materials"][0] + ["-Dbc.shaders=false"], True)
+# 6.4: native remaining families, items and alpha/animation integration.
+SCENES["pixel-items"] = (SCENES["inv-creative-2"][0], True)
+SCENES["pixel-workshop"] = ([a for a in SCENES["pixel-materials-plain"][0] if not a.startswith("-Dbc.cam=")] + ["-Dbc.cam=-14,67,4,0,13"], True)
+SCENES["pixel-nether"] = (SCENES["nether-vista-sh"][0], True)
+SCENES["pixel-plants"] = ([a for a in SCENES["pixel-materials-plain"][0] if not a.startswith("-Dbc.cam=")] + ["-Dbc.cam=8,67,22,0,8"], True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

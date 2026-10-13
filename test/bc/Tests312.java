@@ -198,7 +198,7 @@ final class Tests312 {
          Tex.blit(1000, px);
          eq(0xFF123456, Tex.atlasPixels[Tex.ty(1000) * Tex.PX + Tex.tx(1000)], "first pixel of tile 1000");
          eq(0xFF123456, Tex.atlasPixels[(Tex.ty(1000) + 15) * Tex.PX + Tex.tx(1000) + 15], "last pixel of tile 1000");
-         java.util.Arrays.fill(Tex.atlasPixels, Tex.ty(1000) * Tex.PX + Tex.tx(1000), Tex.ty(1000) * Tex.PX + Tex.tx(1000) + 16, 0);
+         Tex.blit(1000, new int[256]); // restore the whole fixture, not just its first row
       });
 
       test("meshing: a block with an id above 1023 is drawn, lit and walked on like any other (a probe block defined by the test)", () -> {

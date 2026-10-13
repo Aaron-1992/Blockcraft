@@ -1,0 +1,519 @@
+tile	label	artist	changed_texels_vs_6.3	unique_colors
+0	Grass Block	approved-6.3	0	10
+1	Grass Block	approved-6.3	0	7
+2	GRASS_SIDE_OVL	native-6.4	340	6
+3	Stone	approved-6.3	0	10
+4	Cobblestone	approved-6.3	0	23
+5	Sand	approved-6.3	0	5
+6	Gravel	approved-6.3	0	24
+7	Oak Log	approved-6.3	0	6
+8	Oak Log	approved-6.3	0	12
+9	Oak Leaves	native-6.4	1024	9
+10	Oak Planks	approved-6.3	0	16
+11	Bedrock	native-6.4	1024	10
+12	Coal Ore	approved-6.3	0	13
+13	Iron Ore	approved-6.3	0	13
+14	Gold Ore	approved-6.3	0	13
+15	Diamond Ore	approved-6.3	0	13
+16	Redstone Ore	approved-6.3	0	13
+17	Lapis Ore	approved-6.3	0	12
+18	Snow Block	approved-6.3	0	5
+19	Glass	native-6.4	286	3
+20	Bricks	approved-6.3	0	40
+21	Sandstone	native-6.4	1024	7
+22	Sandstone	native-6.4	1024	5
+23	Water	native-6.4	1024	5
+24	Lava	native-6.4	1024	5
+25	Grass	native-6.4	351	3
+26	Poppy	native-6.4	235	6
+27	Dandelion	native-6.4	235	6
+28	Cactus	native-6.4	1024	8
+29	Cactus	native-6.4	1024	7
+30	Glowstone	native-6.4	1024	22
+31	Spruce Log	approved-6.3	0	6
+32	Spruce Log	approved-6.3	0	13
+33	Birch Log	approved-6.3	0	10
+34	Obsidian	native-6.4	1024	6
+35	Stone Bricks	approved-6.3	0	40
+36	Torch	native-6.4	152	5
+37	Crafting Table	native-6.4	1024	9
+38	Crafting Table	native-6.4	1024	12
+39	Furnace	native-6.4	1024	9
+40	Furnace	native-6.4	1024	11
+41	Chest	native-6.4	1024	8
+42	Chest	native-6.4	1024	11
+43	Monster Spawner	native-6.4	856	7
+44	Mossy Cobblestone	approved-6.3	0	44
+48	White Wool	approved-6.3	0	2
+49	Orange Wool	approved-6.3	0	2
+50	Magenta Wool	approved-6.3	0	2
+51	Light Blue Wool	approved-6.3	0	2
+52	Yellow Wool	approved-6.3	0	2
+53	Lime Wool	approved-6.3	0	2
+54	Pink Wool	approved-6.3	0	2
+55	Gray Wool	approved-6.3	0	2
+56	Light Gray Wool	approved-6.3	0	2
+57	Cyan Wool	approved-6.3	0	2
+58	Purple Wool	approved-6.3	0	2
+59	Blue Wool	approved-6.3	0	2
+60	Brown Wool	approved-6.3	0	2
+61	Green Wool	approved-6.3	0	2
+62	Red Wool	approved-6.3	0	2
+63	Black Wool	approved-6.3	0	2
+64	WHITE	utility-white	0	1
+65	Stick	native-6.4	199	3
+66	Coal	native-6.4	351	4
+67	Iron Ingot	native-6.4	307	4
+68	Gold Ingot	native-6.4	307	4
+69	Diamond	native-6.4	343	5
+70	Leather	native-6.4	461	4
+71	Feather	native-6.4	301	4
+72	String	native-6.4	194	3
+73	Bone	native-6.4	231	3
+74	Gunpowder	native-6.4	296	4
+75	Flint	native-6.4	352	4
+76	Arrow	native-6.4	166	4
+77	Bow	approved-6.3	0	8
+78	Apple	native-6.4	427	5
+79	Raw Porkchop	native-6.4	402	4
+80	Cooked Porkchop	native-6.4	402	4
+81	Raw Beef	native-6.4	402	4
+82	Steak	native-6.4	402	4
+83	Raw Chicken	native-6.4	456	5
+84	Cooked Chicken	native-6.4	456	5
+85	Raw Mutton	native-6.4	402	4
+86	Cooked Mutton	native-6.4	402	4
+87	Rotten Flesh	native-6.4	402	4
+88	Oak Door	native-6.4	486	4
+105	Wooden Sword	native-6.4	260	8
+106	Wooden Pickaxe	native-6.4	296	5
+107	Wooden Axe	native-6.4	297	5
+108	Wooden Shovel	native-6.4	231	5
+109	Stone Sword	native-6.4	260	8
+110	Stone Pickaxe	native-6.4	296	5
+111	Stone Axe	native-6.4	297	5
+112	Stone Shovel	native-6.4	231	5
+113	Iron Sword	native-6.4	260	8
+114	Iron Pickaxe	native-6.4	296	5
+115	Iron Axe	native-6.4	297	5
+116	Iron Shovel	native-6.4	231	5
+117	Golden Sword	native-6.4	260	8
+118	Golden Pickaxe	native-6.4	296	5
+119	Golden Axe	native-6.4	297	5
+120	Golden Shovel	native-6.4	231	5
+121	Diamond Sword	native-6.4	260	8
+122	Diamond Pickaxe	native-6.4	296	5
+123	Diamond Axe	native-6.4	297	5
+124	Diamond Shovel	native-6.4	231	5
+135	Leather Cap	native-6.4	390	3
+136	Leather Tunic	native-6.4	516	4
+137	Leather Pants	native-6.4	428	4
+138	Leather Boots	native-6.4	420	3
+139	Iron Helmet	native-6.4	390	3
+140	Iron Chestplate	native-6.4	516	4
+141	Iron Leggings	native-6.4	428	4
+142	Iron Boots	native-6.4	420	3
+143	Golden Helmet	native-6.4	390	3
+144	Golden Chestplate	native-6.4	516	4
+145	Golden Leggings	native-6.4	428	4
+146	Golden Boots	native-6.4	420	3
+147	Diamond Helmet	native-6.4	390	3
+148	Diamond Chestplate	native-6.4	516	4
+149	Diamond Leggings	native-6.4	428	4
+150	Diamond Boots	native-6.4	420	3
+160	Oak Door	native-6.4	1024	10
+161	Oak Door	native-6.4	848	10
+170	Farmland	native-6.4	1024	14
+171	Wheat	native-6.4	91	2
+172	Wheat	native-6.4	152	2
+173	Wheat	native-6.4	204	2
+174	Wheat	native-6.4	256	2
+175	Wheat	native-6.4	352	4
+176	Wheat	native-6.4	404	4
+177	Wheat	native-6.4	456	4
+178	Wheat	native-6.4	468	4
+179	Ladder	native-6.4	576	4
+180	TNT	native-6.4	1024	9
+181	TNT	native-6.4	1024	9
+182	TNT	native-6.4	1024	7
+183	BED_TOP_HEAD	native-6.4	1024	8
+184	BED_TOP_FOOT	native-6.4	1024	2
+185	BED_SIDE	native-6.4	576	3
+190	Bucket	native-6.4	475	6
+191	Water Bucket	native-6.4	475	6
+192	Lava Bucket	native-6.4	475	6
+193	Wheat Seeds	native-6.4	251	2
+194	Wheat	native-6.4	346	4
+195	Bread	native-6.4	414	4
+196	Flint and Steel	native-6.4	361	4
+198	Wooden Hoe	native-6.4	253	5
+199	Stone Hoe	native-6.4	253	5
+200	Iron Hoe	native-6.4	253	5
+201	Golden Hoe	native-6.4	253	5
+202	Diamond Hoe	native-6.4	253	5
+203	Farmland	native-6.4	1024	14
+204	Carrots	native-6.4	131	2
+205	Carrots	native-6.4	204	2
+206	Carrots	native-6.4	268	2
+207	Carrots	native-6.4	412	3
+208	Potatoes	native-6.4	131	2
+209	Potatoes	native-6.4	204	2
+210	Potatoes	native-6.4	268	2
+211	Potatoes	native-6.4	412	3
+212	Hay Bale	native-6.4	1024	3
+213	Hay Bale	native-6.4	1024	2
+214	Carrot	native-6.4	257	4
+215	Potato	native-6.4	425	4
+216	Baked Potato	native-6.4	425	4
+217	Bone Meal	native-6.4	297	4
+218	Shears	native-6.4	378	4
+219	Sugar Cane	native-6.4	487	5
+220	Bookshelf	native-6.4	1024	14
+221	Pumpkin	native-6.4	1024	7
+222	Pumpkin	native-6.4	1024	7
+223	Carved Pumpkin	native-6.4	1024	8
+224	Jack o'Lantern	native-6.4	1024	8
+225	Melon	native-6.4	1024	7
+226	Melon	native-6.4	1024	7
+227	Pumpkin Stem	native-6.4	58	2
+228	Pumpkin Stem	native-6.4	77	2
+229	Pumpkin Stem	native-6.4	97	2
+230	Pumpkin Stem	native-6.4	111	2
+231	Cake	native-6.4	1024	6
+232	Cake	native-6.4	1024	10
+233	Cake	native-6.4	1024	5
+234	Cake	native-6.4	1024	10
+235	Fire	native-6.4	797	5
+236	Sugar	native-6.4	297	4
+237	Paper	native-6.4	491	4
+238	Book	native-6.4	494	6
+239	Milk Bucket	native-6.4	475	6
+240	Egg	native-6.4	352	3
+241	Pumpkin Seeds	native-6.4	251	2
+242	Melon Seeds	native-6.4	251	2
+243	Melon Slice	native-6.4	338	4
+244	Pumpkin Pie	native-6.4	417	5
+245	Cake	native-6.4	404	4
+246	Oak Log	approved-6.3	0	6
+247	Birch Log	approved-6.3	0	10
+248	Spruce Log	approved-6.3	0	6
+256	Netherrack	native-6.4	1024	10
+257	Soul Sand	native-6.4	1024	6
+258	Nether Quartz Ore	native-6.4	1024	7
+259	Nether Bricks	native-6.4	1024	7
+260	Magma Block	native-6.4	1024	22
+261	Block of Quartz	native-6.4	1024	7
+262	Block of Quartz	native-6.4	1024	6
+263	Nether Portal	native-6.4	1024	5
+264	End Stone	native-6.4	1024	6
+265	End Portal Frame	native-6.4	1024	10
+266	End Portal Frame with Eye	native-6.4	1024	12
+267	End Portal Frame	native-6.4	1024	7
+268	End Portal	native-6.4	1024	2
+269	Dragon Egg	native-6.4	1024	6
+272	Nether Quartz	native-6.4	352	4
+273	Nether Brick	native-6.4	307	4
+274	Blaze Rod	native-6.4	199	3
+275	Blaze Powder	native-6.4	299	4
+276	Ghast Tear	native-6.4	339	3
+277	Gold Nugget	native-6.4	339	3
+278	Ender Pearl	native-6.4	489	4
+279	Eye of Ender	native-6.4	489	6
+280	Emerald	native-6.4	343	5
+281	Orange Dye	native-6.4	294	4
+282	Magenta Dye	native-6.4	297	4
+283	Light Blue Dye	native-6.4	297	4
+284	Yellow Dye	native-6.4	301	4
+285	Lime Dye	native-6.4	299	4
+286	Pink Dye	native-6.4	300	4
+287	Gray Dye	native-6.4	295	4
+288	Light Gray Dye	native-6.4	301	4
+289	Cyan Dye	native-6.4	297	4
+290	Purple Dye	native-6.4	300	4
+291	Blue Dye	native-6.4	306	4
+292	Brown Dye	native-6.4	304	4
+293	Green Dye	native-6.4	301	4
+294	Red Dye	native-6.4	298	4
+295	Black Dye	native-6.4	301	4
+400	White Concrete	native-6.4	1024	5
+401	Orange Concrete	native-6.4	1024	5
+402	Magenta Concrete	native-6.4	1024	5
+403	Light Blue Concrete	native-6.4	1024	5
+404	Yellow Concrete	native-6.4	1024	5
+405	Lime Concrete	native-6.4	1024	5
+406	Pink Concrete	native-6.4	1024	5
+407	Gray Concrete	native-6.4	1024	5
+408	Light Gray Concrete	native-6.4	1024	5
+409	Cyan Concrete	native-6.4	1024	5
+410	Purple Concrete	native-6.4	1024	5
+411	Blue Concrete	native-6.4	1024	5
+412	Brown Concrete	native-6.4	1024	5
+413	Green Concrete	native-6.4	1024	5
+414	Red Concrete	native-6.4	1024	5
+415	Black Concrete	native-6.4	1024	5
+416	White Concrete Powder	native-6.4	1024	10
+417	Orange Concrete Powder	native-6.4	1024	10
+418	Magenta Concrete Powder	native-6.4	1024	10
+419	Light Blue Concrete Powder	native-6.4	1024	10
+420	Yellow Concrete Powder	native-6.4	1024	10
+421	Lime Concrete Powder	native-6.4	1024	10
+422	Pink Concrete Powder	native-6.4	1024	10
+423	Gray Concrete Powder	native-6.4	1023	10
+424	Light Gray Concrete Powder	native-6.4	1024	10
+425	Cyan Concrete Powder	native-6.4	1024	10
+426	Purple Concrete Powder	native-6.4	1024	10
+427	Blue Concrete Powder	native-6.4	1024	10
+428	Brown Concrete Powder	native-6.4	1024	10
+429	Green Concrete Powder	native-6.4	1024	10
+430	Red Concrete Powder	native-6.4	1024	10
+431	Black Concrete Powder	native-6.4	1024	10
+432	Terracotta	native-6.4	1024	5
+433	White Terracotta	native-6.4	1024	5
+434	Orange Terracotta	native-6.4	1024	5
+435	Magenta Terracotta	native-6.4	1024	5
+436	Light Blue Terracotta	native-6.4	1024	5
+437	Yellow Terracotta	native-6.4	1024	5
+438	Lime Terracotta	native-6.4	1024	5
+439	Pink Terracotta	native-6.4	1024	5
+440	Gray Terracotta	native-6.4	1024	5
+441	Light Gray Terracotta	native-6.4	1024	5
+442	Cyan Terracotta	native-6.4	1024	5
+443	Purple Terracotta	native-6.4	1024	5
+444	Blue Terracotta	native-6.4	1024	5
+445	Brown Terracotta	native-6.4	1024	5
+446	Green Terracotta	native-6.4	1024	5
+447	Red Terracotta	native-6.4	1024	5
+448	Black Terracotta	native-6.4	1024	5
+449	White Glazed Terracotta	native-6.4	1024	4
+450	Orange Glazed Terracotta	native-6.4	1024	4
+451	Magenta Glazed Terracotta	native-6.4	1024	4
+452	Light Blue Glazed Terracotta	native-6.4	1024	4
+453	Yellow Glazed Terracotta	native-6.4	1024	4
+454	Lime Glazed Terracotta	native-6.4	1024	4
+455	Pink Glazed Terracotta	native-6.4	1024	4
+456	Gray Glazed Terracotta	native-6.4	1024	4
+457	Light Gray Glazed Terracotta	native-6.4	1024	4
+458	Cyan Glazed Terracotta	native-6.4	1024	4
+459	Purple Glazed Terracotta	native-6.4	1024	4
+460	Blue Glazed Terracotta	native-6.4	1024	4
+461	Brown Glazed Terracotta	native-6.4	1024	4
+462	Green Glazed Terracotta	native-6.4	1024	4
+463	Red Glazed Terracotta	native-6.4	1024	4
+464	Black Glazed Terracotta	native-6.4	1024	4
+465	Clay	approved-6.3	0	5
+466	White Stained Glass	native-6.4	1024	3
+467	Orange Stained Glass	native-6.4	1024	3
+468	Magenta Stained Glass	native-6.4	1024	3
+469	Light Blue Stained Glass	native-6.4	1024	3
+470	Yellow Stained Glass	native-6.4	1024	3
+471	Lime Stained Glass	native-6.4	1024	3
+472	Pink Stained Glass	native-6.4	1024	3
+473	Gray Stained Glass	native-6.4	1024	3
+474	Light Gray Stained Glass	native-6.4	1024	3
+475	Cyan Stained Glass	native-6.4	1024	3
+476	Purple Stained Glass	native-6.4	1024	3
+477	Blue Stained Glass	native-6.4	1024	3
+478	Brown Stained Glass	native-6.4	1024	3
+479	Green Stained Glass	native-6.4	1024	3
+480	Red Stained Glass	native-6.4	1024	3
+481	Black Stained Glass	native-6.4	1024	3
+482	Block of Iron	native-6.4	1024	5
+483	Block of Gold	native-6.4	1024	5
+484	Block of Diamond	native-6.4	1024	5
+485	Block of Emerald	native-6.4	1024	5
+486	Block of Coal	native-6.4	1024	7
+487	Lapis Lazuli Block	native-6.4	1024	6
+488	Emerald Ore	native-6.4	1024	7
+520	Granite	approved-6.3	0	5
+521	Diorite	approved-6.3	0	5
+522	Andesite	approved-6.3	0	9
+523	Red Sand	approved-6.3	0	5
+524	Podzol	native-6.4	1024	10
+525	Podzol	native-6.4	1024	10
+526	Mycelium	native-6.4	1024	5
+527	Mycelium	native-6.4	1024	10
+528	Coarse Dirt	native-6.4	1024	5
+529	Ice	native-6.4	1024	7
+530	Packed Ice	native-6.4	1024	7
+531	Red Sandstone	native-6.4	1024	5
+532	Red Sandstone	native-6.4	1024	7
+534	Spruce Planks	approved-6.3	0	16
+535	Birch Planks	approved-6.3	0	16
+536	Jungle Planks	approved-6.3	0	16
+537	Acacia Planks	approved-6.3	0	16
+538	Dark Oak Planks	approved-6.3	0	16
+540	Jungle Log	approved-6.3	0	6
+541	Acacia Log	approved-6.3	0	6
+542	Dark Oak Log	approved-6.3	0	6
+543	Jungle Log	approved-6.3	0	12
+544	Acacia Log	approved-6.3	0	12
+545	Dark Oak Log	approved-6.3	0	12
+546	Jungle Log	approved-6.3	0	6
+547	Acacia Log	approved-6.3	0	6
+548	Dark Oak Log	approved-6.3	0	6
+550	Jungle Leaves	native-6.4	1020	9
+551	Acacia Leaves	native-6.4	1022	9
+552	Dark Oak Leaves	native-6.4	1018	9
+553	Fern	native-6.4	457	4
+554	Dead Bush	native-6.4	192	3
+556	Blue Orchid	native-6.4	235	6
+557	Allium	native-6.4	235	6
+558	Azure Bluet	native-6.4	235	6
+559	Red Tulip	native-6.4	233	4
+560	Orange Tulip	native-6.4	233	4
+561	White Tulip	native-6.4	233	4
+562	Pink Tulip	native-6.4	233	4
+563	Oxeye Daisy	native-6.4	235	6
+564	Cornflower	native-6.4	235	6
+565	Lily of the Valley	native-6.4	235	6
+566	Brown Mushroom	native-6.4	337	4
+567	Red Mushroom	native-6.4	337	5
+570	Tall Grass	native-6.4	409	2
+571	Tall Grass	native-6.4	331	3
+572	Large Fern	native-6.4	537	2
+573	Large Fern	native-6.4	500	4
+574	Sunflower	native-6.4	409	2
+575	Sunflower	native-6.4	475	6
+576	Lilac	native-6.4	504	2
+577	Lilac	native-6.4	550	6
+578	Rose Bush	native-6.4	504	2
+579	Rose Bush	native-6.4	550	6
+580	Peony	native-6.4	504	2
+581	Peony	native-6.4	550	6
+582	Lily Pad	native-6.4	491	4
+583	Vines	native-6.4	570	4
+584	Red Mushroom Block	native-6.4	1024	10
+585	Brown Mushroom Block	native-6.4	1024	5
+586	Mushroom Stem	native-6.4	1024	6
+587	Snow	native-6.4	1024	10
+590	ITEM0	native-6.4	486	4
+591	Model-only face / icon	native-6.4	486	4
+592	Model-only face / icon	native-6.4	486	4
+593	Model-only face / icon	native-6.4	486	4
+594	Model-only face / icon	native-6.4	486	4
+595	Model-only face / icon	native-6.4	486	4
+600	Iron Bars	native-6.4	610	5
+601	EDGE0	native-6.4	352	3
+602	Model-only face / icon	native-6.4	352	3
+603	Model-only face / icon	native-6.4	352	3
+604	Model-only face / icon	native-6.4	352	3
+605	Model-only face / icon	native-6.4	352	3
+606	Model-only face / icon	native-6.4	352	3
+607	Model-only face / icon	native-6.4	352	3
+608	Model-only face / icon	native-6.4	352	3
+609	Model-only face / icon	native-6.4	352	3
+610	Model-only face / icon	native-6.4	352	3
+611	Model-only face / icon	native-6.4	352	3
+612	Model-only face / icon	native-6.4	352	3
+613	Model-only face / icon	native-6.4	352	3
+614	Model-only face / icon	native-6.4	352	3
+615	Model-only face / icon	native-6.4	352	3
+616	Model-only face / icon	native-6.4	352	3
+617	Model-only face / icon	native-6.4	352	3
+618	BARS_EDGE	native-6.4	352	3
+620	Oak Trapdoor	native-6.4	896	10
+621	Birch Trapdoor	native-6.4	896	10
+622	Spruce Trapdoor	native-6.4	896	10
+623	Jungle Trapdoor	native-6.4	896	10
+624	Acacia Trapdoor	native-6.4	896	10
+625	Dark Oak Trapdoor	native-6.4	896	10
+626	Iron Trapdoor	native-6.4	896	10
+630	BED_FOOT0	native-6.4	1024	3
+631	Model-only face / icon	native-6.4	1024	3
+632	Model-only face / icon	native-6.4	1024	3
+633	Model-only face / icon	native-6.4	1024	3
+634	BED_HEAD0	native-6.4	1024	2
+635	Model-only face / icon	native-6.4	1024	2
+636	Model-only face / icon	native-6.4	1024	2
+637	Model-only face / icon	native-6.4	1024	2
+638	BED_SIDE	native-6.4	576	3
+639	PILLOW_TOP	native-6.4	1024	6
+640	PILLOW_SIDE	native-6.4	1024	6
+641	CLOTH	native-6.4	1024	2
+642	BUSHY_FROND	native-6.4	1006	9
+643	Block of Redstone	native-6.4	1024	5
+644	Redstone Lamp	native-6.4	1024	8
+645	Redstone Lamp	native-6.4	1024	8
+646	Redstone Torch	native-6.4	144	5
+647	Redstone Wire	native-6.4	256	3
+648	Polished Granite	native-6.4	1024	7
+649	Polished Diorite	native-6.4	1024	7
+650	Polished Andesite	native-6.4	1024	7
+651	Chiseled Sandstone	native-6.4	1024	6
+652	Smooth Sandstone	native-6.4	1024	5
+653	Chiseled Red Sandstone	native-6.4	1024	6
+654	Smooth Red Sandstone	native-6.4	1024	5
+655	Chiseled Stone Bricks	native-6.4	1024	6
+656	Mossy Stone Bricks	native-6.4	1024	14
+657	Cracked Stone Bricks	native-6.4	1024	8
+658	Slime Block	native-6.4	1024	6
+659	Sea Lantern	native-6.4	1024	11
+660	Redstone Dust	native-6.4	299	4
+661	Redstone Wire	native-6.4	256	3
+662	Redstone Torch	native-6.4	136	5
+663	Redstone Repeater	native-6.4	1024	9
+664	Redstone Repeater	native-6.4	1024	9
+665	Piston	native-6.4	1024	9
+666	Piston	native-6.4	1024	9
+667	Sticky Piston	native-6.4	1024	10
+668	Piston	native-6.4	1024	8
+669	Daylight Sensor	native-6.4	1024	8
+670	Note Block	native-6.4	1024	8
+671	Observer	native-6.4	1024	7
+672	Golden Apple	native-6.4	427	5
+673	Golden Carrot	native-6.4	257	4
+674	Cookie	native-6.4	489	3
+675	Mushroom Stew	native-6.4	406	6
+676	Bowl	native-6.4	406	4
+677	Compass	native-6.4	577	6
+678	Clock	native-6.4	577	6
+679	Fire Charge	native-6.4	489	4
+680	Prismarine	native-6.4	1024	5
+681	Prismarine Bricks	native-6.4	1024	7
+682	Dark Prismarine	native-6.4	1024	7
+683	Purpur Block	native-6.4	1024	7
+684	Purpur Pillar	native-6.4	1024	6
+685	Purpur Pillar	native-6.4	1024	4
+686	Bone Block	native-6.4	1024	6
+687	Bone Block	native-6.4	1024	7
+688	Tactical Pistol	native-6.4	240	5
+689	Assault SMG	native-6.4	317	7
+690	Heavy Sniper	native-6.4	385	9
+691	TNT Frag Grenade	native-6.4	411	5
+692	Murderer's Knife	native-6.4	205	4
+693	C4 Explosive	native-6.4	504	6
+694	Siege Cannon	native-6.4	438	5
+695	Mortar Launcher	native-6.4	435	4
+700	White Bed	native-6.4	468	5
+701	Orange Bed	native-6.4	468	5
+702	Magenta Bed	native-6.4	468	5
+703	Light Blue Bed	native-6.4	468	5
+704	Yellow Bed	native-6.4	468	5
+705	Lime Bed	native-6.4	468	5
+706	Pink Bed	native-6.4	468	5
+707	Gray Bed	native-6.4	468	5
+708	Light Gray Bed	native-6.4	468	5
+709	Cyan Bed	native-6.4	468	5
+710	Purple Bed	native-6.4	468	5
+711	Blue Bed	native-6.4	468	5
+712	Brown Bed	native-6.4	468	5
+713	Green Bed	native-6.4	468	5
+714	Red Bed	native-6.4	468	5
+715	Black Bed	native-6.4	468	5
+716	White Banner	native-6.4	490	4
+717	Orange Banner	native-6.4	490	4
+718	Magenta Banner	native-6.4	490	4
+719	Light Blue Banner	native-6.4	490	4
+720	Yellow Banner	native-6.4	490	4
+721	Lime Banner	native-6.4	490	4
+722	Pink Banner	native-6.4	490	4
+723	Gray Banner	native-6.4	490	4
+724	Light Gray Banner	native-6.4	490	4
+725	Cyan Banner	native-6.4	490	4
+726	Purple Banner	native-6.4	490	4
+727	Blue Banner	native-6.4	490	4
+728	Brown Banner	native-6.4	490	4
+729	Green Banner	native-6.4	490	4
+730	Red Banner	native-6.4	490	4
+731	Black Banner	native-6.4	490	4
+742	Model-only face / icon	native-6.4	434	7
