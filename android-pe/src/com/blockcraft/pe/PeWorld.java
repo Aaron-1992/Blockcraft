@@ -8,19 +8,20 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Random;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Blockcraft PE (Pocket Edition) Single-Player World Engine:
+ * Blockcraft PE (Pocket Edition) v1.1 — Infinite World Single-Player Engine:
+ * - True Infinite Streaming World: 16x128x16 chunks generated deterministically at ANY (cx, cz) coordinate
+ *   around the player using a lock-free O(1) 16x16 active spatial ring buffer + persistent modified chunk storage
  * - Multi-Biome Overworld Generation (Large Biomes Recommended, Default Biomes, Superflat)
- *   with Caves, Ore Veins, Trees, Desert Cacti, Snowy Peaks, Water Lakes & Village Cabins
- * - Persistent GZIP World Saving & Loading across 3 Save Slots (world_0..2.bcpe)
- * - Right-Handed Camera, Raycasting & AABB Physics Collision (with optional Auto-Jump)
- * - Survival Mining, Item Collection, Crafting & Creative Building
+ *   with Caves, Ore Veins, Oak/Spruce/Birch Forests, Flower Meadows, Desert Cacti, Snowy Peaks & Explorer Cabins
+ * - Per-section non-air tracking (sectionNonAir[0..7]) so empty sky sections skip VBO meshing in O(1)
+ * - Zero AI bots / mobs for pure, lag-free 120Hz single-player exploration, mining, crafting & building
  */
 public final class PeWorld {
    // Screen States
@@ -129,7 +130,14 @@ public final class PeWorld {
    public static final byte B_PURPUR = 62;
    public static final byte B_BARS = 63;
 
-   // Item IDs (100+)
+   // Plant & Foliage Sub-Blocks
+   public static final byte B_LEAVES_SPRUCE = 64;
+   public static final byte B_CACTUS = 65;
+   public static final byte B_TALL_GRASS = 66;
+   public static final byte B_FLOWER_RED = 67;
+   public static final byte B_FLOWER_YELLOW = 68;
+
+   // Item IDs (98+)
    public static final int I_SWORD_WOOD = 98;
    public static final int I_PICK_WOOD = 99;
    public static final int I_SWORD_IRON = 100;
@@ -144,21 +152,69 @@ public final class PeWorld {
    public static final int I_STEAK = 109;
    public static final int I_ENDER_PEARL = 110;
 
-   // World Dimensions: 10x10 chunks (160x160 horizontal: wx, wz in -80..+79), Y in 0..127
-   public static final int CHUNK_GRID = 10;
-   public static final int HALF_CHUNKS = 5;
-   public static final int WORLD_W = CHUNK_GRID * 16; // 160
-   public static final int HALF_W = WORLD_W / 2;      // 80
+   // Infinite Streaming Chunk Ring-Buffer Constants
+   // 16x16 active chunk ring buffer (256 chunk slots covering up to 256x256 blocks around the player at any (cx, cz))
+   public static final int ACTIVE_GRID = 16;
+   public static final int ACTIVE_MASK = 15;
+   public static final int ACTIVE_SLOTS = ACTIVE_GRID * ACTIVE_GRID; // 256
+   public static final int CHUNK_BYTES = 16 * 16 * 128;              // 32,768 bytes per chunk
    public static final int WORLD_H = 128;
-   public static final int SECTIONS_Y = WORLD_H / 16; // 8
+   public static final int SECTIONS_Y = WORLD_H / 16;                // 8 sections of 16x16x16
    public static final int Y_SEA = 60;
    public static final int Y_DECK = 64;
 
    private static final int SAVE_MAGIC = 0x42435045; // "BCPE"
-   private static final int SAVE_VERSION = 1;
+   private static final int SAVE_VERSION_INFINITE = 2;
 
-   public final byte[] blocks = new byte[WORLD_W * WORLD_W * WORLD_H];
-   public final boolean[][] sectionDirty = new boolean[CHUNK_GRID * CHUNK_GRID][SECTIONS_Y];
+   /**
+    * Represents one 16x128x16 chunk column in the active 16x16 spatial ring buffer.
+    * Block index = ((lz << 11) | (lx << 7) | wy), requiring zero multiplications.
+    */
+   public static final class PeChunk {
+      public int cx = Integer.MIN_VALUE;
+      public int cz = Integer.MIN_VALUE;
+      public boolean loaded = false;
+      public boolean modified = false;
+      public int maxY = 64;
+      public final byte[] blocks = new byte[CHUNK_BYTES];
+      public final int[] sectionNonAir = new int[SECTIONS_Y];
+      public final boolean[] sectionDirty = new boolean[SECTIONS_Y];
+
+      public void clear() {
+         Arrays.fill(this.blocks, B_AIR);
+         Arrays.fill(this.sectionNonAir, 0);
+         Arrays.fill(this.sectionDirty, true);
+         this.maxY = 0;
+         this.modified = false;
+      }
+
+      public void recomputeSectionCounts() {
+         Arrays.fill(this.sectionNonAir, 0);
+         int highest = 0;
+         for (int lz = 0; lz < 16; lz++) {
+            int zBase = lz << 11;
+            for (int lx = 0; lx < 16; lx++) {
+               int colBase = zBase | (lx << 7);
+               for (int y = 0; y < WORLD_H; y++) {
+                  if (this.blocks[colBase | y] != B_AIR) {
+                     this.sectionNonAir[y >> 4]++;
+                     if (y > highest) highest = y;
+                  }
+               }
+            }
+         }
+         this.maxY = highest;
+      }
+   }
+
+   public final PeChunk[] chunkGrid = new PeChunk[ACTIVE_SLOTS];
+   // Stores player-modified chunks at ANY (cx, cz) across the infinite world
+   private final HashMap<Long, byte[]> savedChunks = new HashMap<Long, byte[]>();
+
+   //Configurable active chunk streaming radius around the player (4=9x9, 5=11x11, 6=13x13 chunks)
+   public int viewRadiusChunks = 5;
+   private int lastStreamCenterCx = Integer.MIN_VALUE;
+   private int lastStreamCenterCz = Integer.MIN_VALUE;
 
    // Current Screen & World Slot
    public int screen = SCREEN_TITLE;
@@ -177,9 +233,9 @@ public final class PeWorld {
    public int worldType = WTYPE_LARGE_BIOMES;
    public long seed = 884219551L;
    public long tickCount = 0L;
-   public float dayTime = 0.22F; // 0..1 day/night cycle
+   public float dayTime = 0.22F;
 
-   // Player State
+   // Player State (Supports arbitrary infinite coordinates!)
    public double px = 0.5;
    public double py = 72.0;
    public double pz = 0.5;
@@ -207,10 +263,7 @@ public final class PeWorld {
    public int mineX = 0, mineY = -1, mineZ = 0;
    public float mineProgress = 0.0F;
 
-   // Feedback & HUD State
-   public int hitmarkerTicks = 0;
-   public boolean hitmarkerCrit = false;
-   public int kills = 0;
+   // HUD Banner State
    public String bannerMessage = "";
    public int bannerTicks = 0;
 
@@ -237,7 +290,7 @@ public final class PeWorld {
       new CraftRecipe("Crafting Table (4 Planks)", B_CRAFTING_TABLE, 1, B_PLANKS_OAK, 4),
       new CraftRecipe("Furnace (8 Cobble)", B_FURNACE, 1, B_COBBLE, 8),
       new CraftRecipe("Storage Chest (8 Planks)", B_CHEST, 1, B_PLANKS_OAK, 8),
-      new CraftRecipe("Torches x4 (1 Coal + 1 Plank)", B_TORCH, 4, B_COAL_ORE, 1),
+      new CraftRecipe("Torches x4 (1 Coal)", B_TORCH, 4, B_COAL_ORE, 1),
       new CraftRecipe("Stone Bricks x4 (4 Stone)", B_STONEBRICK, 4, B_STONE, 4),
       new CraftRecipe("Glass x4 (4 Sand)", B_GLASS, 4, B_SAND, 4),
       new CraftRecipe("Sandstone x2 (2 Sand)", B_SANDSTONE, 2, B_SAND, 2),
@@ -252,41 +305,22 @@ public final class PeWorld {
       new CraftRecipe("Bed (3 Planks)", B_BED_RED, 1, B_PLANKS_OAK, 3)
    };
 
-   // Entities: Overworld Mobs & Projectiles
-   public static final class PeMob {
-      public int id;
-      public int type; // 1=Zombie, 2=Skeleton, 3=Creeper, 4=Villager/Guard
-      public int team = -1;
-      public String name;
-      public double x, y, z;
-      public double vx, vy, vz;
-      public float yaw, pitch;
-      public float walkPhase;
-      public int health = 20;
-      public int maxHealth = 20;
-      public int hurtTime = 0;
-      public int attackCd = 0;
-      public int heldItem = I_SWORD_IRON;
-      public boolean onGround = false;
-      public boolean dead = false;
+   public PeWorld() {
+      for (int i = 0; i < ACTIVE_SLOTS; i++) {
+         this.chunkGrid[i] = new PeChunk();
+      }
    }
 
-   public static final class PeProjectile {
-      public int type; // 0=Arrow
-      public int sourceTeam; // -2=Player, -1=Mob
-      public double x, y, z;
-      public double vx, vy, vz;
-      public int fuse = 60;
-      public int damage = 6;
-      public boolean dead = false;
+   public static int slotIndex(int cx, int cz) {
+      return (cx & ACTIVE_MASK) | ((cz & ACTIVE_MASK) << 4);
    }
 
-   public final ArrayList<PeMob> mobs = new ArrayList<PeMob>();
-   public final ArrayList<PeProjectile> projectiles = new ArrayList<PeProjectile>();
-   private final Random rng = new Random(1337L);
+   public static long chunkKey(int cx, int cz) {
+      return (((long)cx) << 32) ^ (cz & 0xFFFFFFFFL);
+   }
 
    // ====================================================================
-   //  Persistent Save Directory & World Save/Load (GZIP .bcpe files)
+   //  Persistent Save Directory & Infinite World Save/Load (.bcpe files)
    // ====================================================================
    public static File getSavesDir(Context context) {
       File base = null;
@@ -311,7 +345,7 @@ public final class PeWorld {
       for (int s = 0; s < 3; s++) {
          File f = new File(dir, "world_" + s + ".bcpe");
          File meta = new File(dir, "world_" + s + ".meta");
-         this.slotExists[s] = f.exists() && f.length() > 64;
+         this.slotExists[s] = f.exists() && f.length() > 32;
          if (this.slotExists[s] && meta.exists()) {
             try {
                DataInputStream in = new DataInputStream(new FileInputStream(meta));
@@ -319,12 +353,12 @@ public final class PeWorld {
                in.close();
                this.slotSummary[s] = summary;
             } catch (Exception e) {
-               this.slotSummary[s] = "Saved World (Tap to Load)";
+               this.slotSummary[s] = "Saved Infinite World (Tap to Play)";
             }
          } else if (this.slotExists[s]) {
-            this.slotSummary[s] = "Saved World (Tap to Load)";
+            this.slotSummary[s] = "Saved Infinite World (Tap to Play)";
          } else {
-            this.slotSummary[s] = "Empty Slot - Tap to Create New World";
+            this.slotSummary[s] = "Empty Slot  -  Tap to Create Infinite World";
          }
       }
    }
@@ -337,10 +371,23 @@ public final class PeWorld {
       refreshSaveSlots(context);
    }
 
+   private void flushModifiedActiveChunksToMap() {
+      for (int i = 0; i < ACTIVE_SLOTS; i++) {
+         PeChunk c = this.chunkGrid[i];
+         if (c.loaded && c.modified) {
+            byte[] copy = new byte[CHUNK_BYTES];
+            System.arraycopy(c.blocks, 0, copy, 0, CHUNK_BYTES);
+            this.savedChunks.put(chunkKey(c.cx, c.cz), copy);
+         }
+      }
+   }
+
    public boolean saveWorld(Context context) {
       if (this.screen == SCREEN_TITLE || this.screen == SCREEN_WORLD_SELECT || this.screen == SCREEN_CREATE_WORLD) {
          return false;
       }
+      flushModifiedActiveChunksToMap();
+
       int slot = Math.max(0, Math.min(2, this.currentSlot));
       File dir = getSavesDir(context);
       File tmpFile = new File(dir, "world_" + slot + ".bcpe.tmp");
@@ -351,7 +398,7 @@ public final class PeWorld {
             new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(tmpFile)))
          );
          out.writeInt(SAVE_MAGIC);
-         out.writeInt(SAVE_VERSION);
+         out.writeInt(SAVE_VERSION_INFINITE);
          out.writeInt(this.mode);
          out.writeInt(this.worldType);
          out.writeLong(this.seed);
@@ -370,7 +417,15 @@ public final class PeWorld {
             out.writeInt(this.hotbarId[i]);
             out.writeInt(this.hotbarCount[i]);
          }
-         out.write(this.blocks, 0, this.blocks.length);
+         out.writeInt(this.savedChunks.size());
+         for (Map.Entry<Long, byte[]> entry : this.savedChunks.entrySet()) {
+            long key = entry.getKey();
+            int cx = (int)(key >> 32);
+            int cz = (int)key;
+            out.writeInt(cx);
+            out.writeInt(cz);
+            out.write(entry.getValue(), 0, CHUNK_BYTES);
+         }
          out.flush();
          out.close();
 
@@ -379,13 +434,13 @@ public final class PeWorld {
 
          int dayNum = (int)(this.tickCount / 24000L) + 1;
          String wTypeShort = this.worldType == WTYPE_LARGE_BIOMES ? "Large Biomes" : (this.worldType == WTYPE_SUPERFLAT ? "Superflat" : "Default");
-         String summary = MODE_NAMES[this.mode] + " | " + wTypeShort + " | Day " + dayNum;
+         String summary = MODE_NAMES[this.mode] + "  |  " + wTypeShort + "  |  Day " + dayNum;
          DataOutputStream mOut = new DataOutputStream(new FileOutputStream(metaFile));
          mOut.writeUTF(summary);
          mOut.close();
 
          refreshSaveSlots(context);
-         showBanner("World Saved (" + "World " + (slot + 1) + ")");
+         showBanner("World Saved (World " + (slot + 1) + ")");
          return true;
       } catch (Exception e) {
          return false;
@@ -403,7 +458,7 @@ public final class PeWorld {
          );
          int magic = in.readInt();
          int ver = in.readInt();
-         if (magic != SAVE_MAGIC || ver != SAVE_VERSION) {
+         if (magic != SAVE_MAGIC || (ver != SAVE_VERSION_INFINITE && ver != 1)) {
             in.close();
             return false;
          }
@@ -426,16 +481,26 @@ public final class PeWorld {
             this.hotbarId[i] = in.readInt();
             this.hotbarCount[i] = in.readInt();
          }
-         in.readFully(this.blocks);
+
+         resetActiveChunks();
+         this.savedChunks.clear();
+
+         if (ver == SAVE_VERSION_INFINITE) {
+            int count = in.readInt();
+            for (int i = 0; i < count; i++) {
+               int cx = in.readInt();
+               int cz = in.readInt();
+               byte[] data = new byte[CHUNK_BYTES];
+               in.readFully(data);
+               this.savedChunks.put(chunkKey(cx, cz), data);
+            }
+         }
          in.close();
 
          this.vx = this.vy = this.vz = 0.0;
          this.mineY = -1;
          this.mineProgress = 0.0F;
-         this.mobs.clear();
-         this.projectiles.clear();
-         spawnOverworldMobs();
-         markAllDirty();
+         ensureChunksAroundPlayer(256);
          this.screen = SCREEN_PLAY;
          showBanner("Loaded World " + (slot + 1) + " (" + MODE_NAMES[this.mode] + ")");
          return true;
@@ -444,40 +509,55 @@ public final class PeWorld {
       }
    }
 
+   private void resetActiveChunks() {
+      for (int i = 0; i < ACTIVE_SLOTS; i++) {
+         PeChunk c = this.chunkGrid[i];
+         c.loaded = false;
+         c.modified = false;
+         c.cx = Integer.MIN_VALUE;
+         c.cz = Integer.MIN_VALUE;
+      }
+      this.lastStreamCenterCx = Integer.MIN_VALUE;
+      this.lastStreamCenterCz = Integer.MIN_VALUE;
+   }
+
    public void createNewSinglePlayerWorld(Context context, int slot, int newMode, int newWorldType, long customSeed) {
       this.currentSlot = Math.max(0, Math.min(2, slot));
       this.mode = newMode;
       this.worldType = newWorldType;
       this.seed = (customSeed != 0L) ? customSeed : (System.currentTimeMillis() ^ 0x5DEECE66DL);
-      this.rng.setSeed(this.seed);
 
-      Arrays.fill(this.blocks, B_AIR);
-      this.mobs.clear();
-      this.projectiles.clear();
-      this.kills = 0;
+      resetActiveChunks();
+      this.savedChunks.clear();
       this.health = 20;
       this.hunger = 20;
       this.hurtTime = 0;
       this.invulnTicks = 40;
       this.flying = false;
       this.tickCount = 0L;
-      this.dayTime = 0.20F;
+      this.dayTime = 0.22F;
 
-      if (this.worldType == WTYPE_SUPERFLAT) {
-         generateSuperflatWorld();
-      } else {
-         generateOverworldBiomes();
-      }
+      this.px = 0.5;
+      this.pz = 0.5;
+      ensureChunksAroundPlayer(256);
+
+      int spawnY = topSolidY(0, 0) + 1;
+      this.px = 0.5;
+      this.py = spawnY + 0.05;
+      this.pz = 0.5;
+      this.vx = this.vy = this.vz = 0.0;
+      this.yaw = 0.0F;
+      this.pitch = 6.0F;
+
       equipDefaultLoadout();
-      markAllDirty();
       this.screen = SCREEN_PLAY;
       saveWorld(context);
-      showBanner("Created World " + (this.currentSlot + 1) + " - " + WTYPE_NAMES[this.worldType]);
+      showBanner("Created Infinite World " + (this.currentSlot + 1) + " - " + WTYPE_NAMES[this.worldType]);
    }
 
-   // Backwards-compatible helper for tests/preview
    public void generateWorld(Context context, int newMode, int worldTypeOrMap) {
-      createNewSinglePlayerWorld(context, this.currentSlot, newMode <= 1 ? newMode : MODE_SURVIVAL, worldTypeOrMap % 3, 884219551L + worldTypeOrMap * 997L);
+      createNewSinglePlayerWorld(context, this.currentSlot, newMode <= 1 ? newMode : MODE_SURVIVAL,
+         worldTypeOrMap % 3, 884219551L + worldTypeOrMap * 997L);
    }
 
    public String currentWorldSummary() {
@@ -486,7 +566,7 @@ public final class PeWorld {
 
    public void showBanner(String msg) {
       this.bannerMessage = msg;
-      this.bannerTicks = 100;
+      this.bannerTicks = 90;
    }
 
    private void equipDefaultLoadout() {
@@ -497,14 +577,13 @@ public final class PeWorld {
          setSlot(0, B_GRASS, 64);
          setSlot(1, B_STONEBRICK, 64);
          setSlot(2, B_PLANKS_OAK, 64);
-         setSlot(3, B_BRICKS, 64);
-         setSlot(4, B_GLASS, 64);
-         setSlot(5, B_TORCH, 64);
-         setSlot(6, B_GLOWSTONE, 64);
-         setSlot(7, B_GOLD_BLOCK, 64);
-         setSlot(8, I_SWORD_DIAMOND, 1);
+         setSlot(3, B_LOG_OAK, 64);
+         setSlot(4, B_LEAVES_OAK, 64);
+         setSlot(5, B_BRICKS, 64);
+         setSlot(6, B_GLASS, 64);
+         setSlot(7, B_TORCH, 64);
+         setSlot(8, B_GLOWSTONE, 64);
       } else {
-         // Survival starter tools & blocks
          setSlot(0, I_PICK_WOOD, 1);
          setSlot(1, I_SWORD_WOOD, 1);
          setSlot(2, B_TORCH, 16);
@@ -568,14 +647,12 @@ public final class PeWorld {
    }
 
    public void giveItem(int id, int count) {
-      // Stack into existing matching slot first
       for (int i = 0; i < 9; i++) {
          if (this.hotbarId[i] == id && this.hotbarCount[i] < 64) {
             this.hotbarCount[i] = Math.min(64, this.hotbarCount[i] + count);
             return;
          }
       }
-      // Empty slot
       for (int i = 0; i < 9; i++) {
          if (this.hotbarId[i] == 0 || this.hotbarCount[i] <= 0) {
             this.hotbarId[i] = id;
@@ -583,70 +660,202 @@ public final class PeWorld {
             return;
          }
       }
-      // Replace currently selected slot if full
       this.hotbarId[this.selectedSlot] = id;
       this.hotbarCount[this.selectedSlot] = count;
    }
 
    // ====================================================================
-   //  Single-Player Overworld Terrain & Biome Generator
+   //  Infinite World Streaming & Deterministic Chunk Generation
    // ====================================================================
-   private void generateSuperflatWorld() {
-      for (int wz = -HALF_W; wz < HALF_W; wz++) {
-         for (int wx = -HALF_W; wx < HALF_W; wx++) {
-            setFast(wx, 0, wz, B_BEDROCK);
-            for (int y = 1; y <= 59; y++) {
-               setFast(wx, y, wz, B_STONE);
+   public void ensureChunksAroundPlayer(int maxNewChunks) {
+      int pCx = ((int)Math.floor(this.px)) >> 4;
+      int pCz = ((int)Math.floor(this.pz)) >> 4;
+      int rad = Math.max(3, Math.min(7, this.viewRadiusChunks));
+      int generated = 0;
+
+      for (int ring = 0; ring <= rad && generated < maxNewChunks; ring++) {
+         for (int dz = -ring; dz <= ring && generated < maxNewChunks; dz++) {
+            for (int dx = -ring; dx <= ring && generated < maxNewChunks; dx++) {
+               if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
+               int cx = pCx + dx;
+               int cz = pCz + dz;
+               PeChunk slot = this.chunkGrid[slotIndex(cx, cz)];
+               if (!slot.loaded || slot.cx != cx || slot.cz != cz) {
+                  loadOrGenerateChunkIntoSlot(slot, cx, cz);
+                  generated++;
+               }
             }
-            for (int y = 60; y <= 62; y++) {
-               setFast(wx, y, wz, B_DIRT);
-            }
-            setFast(wx, 63, wz, B_GRASS);
          }
       }
-      buildVillageHouse(12, 63, -12);
-      this.px = 0.5;
-      this.py = 64.1;
-      this.pz = 0.5;
-      this.yaw = 0.0F;
-      this.pitch = 8.0F;
-      spawnOverworldMobs();
+      this.lastStreamCenterCx = pCx;
+      this.lastStreamCenterCz = pCz;
    }
 
-   private void generateOverworldBiomes() {
-      double biomeFreq = (this.worldType == WTYPE_LARGE_BIOMES) ? 0.018 : 0.036;
+   private PeChunk getOrLoadChunk(int cx, int cz) {
+      PeChunk c = this.chunkGrid[slotIndex(cx, cz)];
+      if (!c.loaded || c.cx != cx || c.cz != cz) {
+         loadOrGenerateChunkIntoSlot(c, cx, cz);
+      }
+      return c;
+   }
+
+   private void loadOrGenerateChunkIntoSlot(PeChunk slot, int cx, int cz) {
+      // Save old modified chunk before evicting
+      if (slot.loaded && slot.modified && (slot.cx != cx || slot.cz != cz)) {
+         byte[] copy = new byte[CHUNK_BYTES];
+         System.arraycopy(slot.blocks, 0, copy, 0, CHUNK_BYTES);
+         this.savedChunks.put(chunkKey(slot.cx, slot.cz), copy);
+      }
+
+      slot.cx = cx;
+      slot.cz = cz;
+      slot.loaded = true;
+
+      byte[] saved = this.savedChunks.get(chunkKey(cx, cz));
+      if (saved != null) {
+         System.arraycopy(saved, 0, slot.blocks, 0, CHUNK_BYTES);
+         slot.modified = true;
+         slot.recomputeSectionCounts();
+         Arrays.fill(slot.sectionDirty, true);
+      } else {
+         slot.clear();
+         if (this.worldType == WTYPE_SUPERFLAT) {
+            generateSuperflatChunk(slot, cx, cz);
+         } else {
+            generateOverworldChunk(slot, cx, cz);
+         }
+         Arrays.fill(slot.sectionDirty, true);
+      }
+
+      // Mark adjacent neighbor chunks dirty so cross-chunk faces remesh cleanly
+      markChunkDirtyIfLoaded(cx - 1, cz);
+      markChunkDirtyIfLoaded(cx + 1, cz);
+      markChunkDirtyIfLoaded(cx, cz - 1);
+      markChunkDirtyIfLoaded(cx, cz + 1);
+   }
+
+   private void markChunkDirtyIfLoaded(int cx, int cz) {
+      PeChunk n = this.chunkGrid[slotIndex(cx, cz)];
+      if (n.loaded && n.cx == cx && n.cz == cz) {
+         Arrays.fill(n.sectionDirty, true);
+      }
+   }
+
+   public void markAllDirty() {
+      for (int i = 0; i < ACTIVE_SLOTS; i++) {
+         Arrays.fill(this.chunkGrid[i].sectionDirty, true);
+      }
+   }
+
+   private static void setChunkLocal(PeChunk c, int lx, int wy, int lz, byte id) {
+      if ((lx & ~15) != 0 || (lz & ~15) != 0 || (wy & ~127) != 0) return;
+      int idx = (lz << 11) | (lx << 7) | wy;
+      byte prev = c.blocks[idx];
+      if (prev == id) return;
+      c.blocks[idx] = id;
+      int sy = wy >> 4;
+      if (prev == B_AIR && id != B_AIR) {
+         c.sectionNonAir[sy]++;
+         if (wy > c.maxY) c.maxY = wy;
+      } else if (prev != B_AIR && id == B_AIR) {
+         if (c.sectionNonAir[sy] > 0) c.sectionNonAir[sy]--;
+      }
+   }
+
+   private static int topSolidLocal(PeChunk c, int lx, int lz) {
+      int colBase = (lz << 11) | (lx << 7);
+      for (int y = WORLD_H - 2; y >= 1; y--) {
+         byte b = c.blocks[colBase | y];
+         if (isSolid(b) && b != B_LEAVES_OAK && b != B_LEAVES_SPRUCE) {
+            return y;
+         }
+      }
+      return Y_DECK;
+   }
+
+   private static int chunkHash(int x, int z, long seed) {
+      int h = x * 374761393 + z * 668265263 + (int)(seed ^ (seed >>> 32)) * 1442695041;
+      h = (h ^ (h >>> 13)) * 1274126177;
+      return (h ^ (h >>> 16)) & 0x7FFFFFFF;
+   }
+
+   public int getBiomeAt(int wx, int wz) {
+      if (this.worldType == WTYPE_SUPERFLAT) return 0;
+      double biomeFreq = (this.worldType == WTYPE_LARGE_BIOMES) ? 0.015 : 0.032;
       double sOffX = ((this.seed & 0xFFFFL) - 32768.0) * 0.01;
       double sOffZ = (((this.seed >>> 16) & 0xFFFFL) - 32768.0) * 0.01;
+      double bx = (wx + sOffX) * biomeFreq;
+      double bz = (wz + sOffZ) * biomeFreq;
+      double temp = Math.sin(bx + 0.5) * Math.cos(bz - 0.3);
+      double humid = Math.cos(bx * 0.8 - 1.1) * Math.sin(bz * 0.8 + 0.7);
+      if (temp > 0.38 && humid < 0.12) return 1; // Golden Desert
+      if (temp < -0.36) return 2;                // Snowy Taiga
+      if (humid > 0.42) return 3;                // Mountain Peaks
+      if (temp > 0.12 && humid > 0.15) return 4; // Flower Meadow
+      return 0;                                  // Emerald Forest
+   }
 
-      for (int wz = -HALF_W; wz < HALF_W; wz++) {
-         for (int wx = -HALF_W; wx < HALF_W; wx++) {
-            double bx = (wx + sOffX) * biomeFreq;
-            double bz = (wz + sOffZ) * biomeFreq;
-            double temp = Math.sin(bx + 0.5) * Math.cos(bz - 0.3);
-            double humid = Math.cos(bx * 0.8 - 1.1) * Math.sin(bz * 0.8 + 0.7);
+   public String getBiomeName(int wx, int wz) {
+      switch (getBiomeAt(wx, wz)) {
+         case 1: return "Golden Desert";
+         case 2: return "Snowy Taiga";
+         case 3: return "Mountain Peaks";
+         case 4: return "Flower Meadow";
+         default: return this.worldType == WTYPE_SUPERFLAT ? "Superflat Plains" : "Emerald Forest";
+      }
+   }
 
-            // Biomes: 0=Plains/Forest, 1=Desert, 2=Snowy Taiga, 3=Mountain Hills
-            int biome = 0;
-            if (temp > 0.38 && humid < 0.1) biome = 1;      // Desert
-            else if (temp < -0.36) biome = 2;               // Snowy Taiga
-            else if (humid > 0.42) biome = 3;               // Extreme Hills
+   private void generateSuperflatChunk(PeChunk c, int cx, int cz) {
+      for (int lz = 0; lz < 16; lz++) {
+         for (int lx = 0; lx < 16; lx++) {
+            setChunkLocal(c, lx, 0, lz, B_BEDROCK);
+            for (int y = 1; y <= 59; y++) {
+               setChunkLocal(c, lx, y, lz, B_STONE);
+            }
+            for (int y = 60; y <= 62; y++) {
+               setChunkLocal(c, lx, y, lz, B_DIRT);
+            }
+            setChunkLocal(c, lx, 63, lz, B_GRASS);
+         }
+      }
+      if (cx == 0 && cz == -1) {
+         buildCabinInChunk(c, 8, 63, 6);
+      }
+   }
 
-            double n1 = Math.sin((wx + sOffX) * 0.045) * Math.cos((wz + sOffZ) * 0.045);
-            double n2 = Math.sin((wx + wz) * 0.09) * 0.5 + Math.cos((wx - wz) * 0.11) * 0.5;
-            double mtn = Math.max(0.0, Math.sin((wx - sOffX) * 0.028) * Math.sin((wz - sOffZ) * 0.028));
-            double hillScale = (biome == 3) ? 18.0 : 10.0;
+   private void generateOverworldChunk(PeChunk c, int cx, int cz) {
+      double sOffX = ((this.seed & 0xFFFFL) - 32768.0) * 0.01;
+      double sOffZ = (((this.seed >>> 16) & 0xFFFFL) - 32768.0) * 0.01;
+      int wx0 = cx << 4;
+      int wz0 = cz << 4;
+
+      int[][] surfaceY = new int[16][16];
+      int[][] biomeMap = new int[16][16];
+
+      for (int lz = 0; lz < 16; lz++) {
+         int wz = wz0 + lz;
+         for (int lx = 0; lx < 16; lx++) {
+            int wx = wx0 + lx;
+            int biome = getBiomeAt(wx, wz);
+            biomeMap[lz][lx] = biome;
+
+            double n1 = Math.sin((wx + sOffX) * 0.042) * Math.cos((wz + sOffZ) * 0.042);
+            double n2 = Math.sin((wx + wz) * 0.085) * 0.5 + Math.cos((wx - wz) * 0.105) * 0.5;
+            double mtn = Math.max(0.0, Math.sin((wx - sOffX) * 0.025) * Math.sin((wz - sOffZ) * 0.025));
+            double hillScale = (biome == 3) ? 20.0 : 10.0;
             int h = (int)Math.round(62.0 + n1 * 5.5 + n2 * 2.5 + mtn * hillScale);
 
-            // Keep spawn area (r < 10) flat and welcoming
+            // Keep spawn area around (0, 0) flat and welcoming
             double spawnDist = Math.hypot(wx, wz);
             if (spawnDist < 12.0) {
                double blend = spawnDist / 12.0;
                h = (int)Math.round(64.0 * (1.0 - blend) + h * blend);
             }
+            surfaceY[lz][lx] = h;
 
-            setFast(wx, 0, wz, B_BEDROCK);
+            setChunkLocal(c, lx, 0, lz, B_BEDROCK);
             for (int y = 1; y <= h; y++) {
-               // Underground 3D Cave tunnels (below Y=50)
+               // Underground 3D Cave tunnels
                if (y > 4 && y < h - 4 && spawnDist > 10.0) {
                   double cave = Math.sin(wx * 0.14 + y * 0.18) * Math.cos(wz * 0.14 - y * 0.15)
                      + Math.cos((wx - wz) * 0.11 + y * 0.22) * 0.5;
@@ -659,7 +868,7 @@ public final class PeWorld {
                if (y == h) {
                   if (h <= Y_SEA) b = B_SAND;
                   else if (biome == 1) b = B_SAND;
-                  else if (biome == 2 || h >= 76) b = B_SNOW;
+                  else if (biome == 2 || h >= 77) b = B_SNOW;
                   else b = B_GRASS;
                } else if (y >= h - 3) {
                   b = (biome == 1) ? B_SANDSTONE : B_DIRT;
@@ -673,91 +882,101 @@ public final class PeWorld {
                   else if (hash == 20) b = B_GRAVEL;
                   else b = B_STONE;
                }
-               setFast(wx, y, wz, b);
+               setChunkLocal(c, lx, y, lz, b);
             }
             for (int y = h + 1; y <= Y_SEA; y++) {
-               setFast(wx, y, wz, (biome == 2 && y == Y_SEA) ? B_ICE : B_WATER);
+               setChunkLocal(c, lx, y, lz, (biome == 2 && y == Y_SEA) ? B_ICE : B_WATER);
             }
          }
       }
 
-      // Trees & Desert Cacti across the Overworld
-      for (int wz = -68; wz <= 68; wz += 8) {
-         for (int wx = -68; wx <= 68; wx += 8) {
-            if (Math.hypot(wx, wz) < 11.0 || Math.hypot(wx - 14, wz + 14) < 9.0) continue;
-            int tx = wx + ((wz * 3) & 3);
-            int tz = wz + ((wx * 5) & 3);
-            int ty = topSolidY(tx, tz);
-            byte top = getBlock(tx, ty, tz);
-            if (ty > Y_SEA + 1 && ty < 76 && (top == B_GRASS || top == B_SNOW)) {
-               byte log = (top == B_SNOW || ((tx + tz) & 3) == 0) ? B_LOG_SPRUCE : B_LOG_OAK;
-               placeTree(tx, ty + 1, tz, log);
-            } else if (ty > Y_SEA + 1 && top == B_SAND && ((tx ^ tz) & 3) == 0) {
+      // Starter Cabin at chunk (0, -1), or rare Explorer Cabins across the infinite world
+      boolean hasCabin = (cx == 0 && cz == -1) || ((cx != 0 || cz != 0) && (chunkHash(cx, cz, this.seed + 77L) % 44 == 0));
+      if (hasCabin) {
+         int hy = surfaceY[8][8];
+         if (hy > Y_SEA + 1 && hy < 76) {
+            buildCabinInChunk(c, 8, hy, 8);
+            return;
+         }
+      }
+
+      // Deterministic Trees, Cacti, Flowers & Tall Grass inside chunk bounds (lx, lz in 2..13)
+      for (int gz = 0; gz < 2; gz++) {
+         for (int gx = 0; gx < 2; gx++) {
+            int cellH = chunkHash(cx * 2 + gx, cz * 2 + gz, this.seed);
+            int lx = 3 + gx * 6 + (cellH & 3);
+            int lz = 3 + gz * 6 + ((cellH >>> 2) & 3);
+            int wx = wx0 + lx;
+            int wz = wz0 + lz;
+            if (Math.hypot(wx, wz) < 8.5) continue;
+
+            int ty = surfaceY[lz][lx];
+            int biome = biomeMap[lz][lx];
+            byte top = c.blocks[(lz << 11) | (lx << 7) | ty];
+            if (ty <= Y_SEA + 1 || ty >= 76) continue;
+
+            if ((top == B_GRASS || top == B_SNOW) && (cellH % 3 != 0)) {
+               boolean spruce = (top == B_SNOW) || (biome == 2) || ((cellH & 7) == 0);
+               placeTreeInChunk(c, lx, ty + 1, lz, spruce ? B_LOG_SPRUCE : B_LOG_OAK, spruce ? B_LEAVES_SPRUCE : B_LEAVES_OAK);
+            } else if (top == B_SAND && (cellH & 3) == 0) {
                for (int ch = 1; ch <= 3; ch++) {
-                  setFast(tx, ty + ch, tz, B_WOOL_GREEN);
+                  setChunkLocal(c, lx, ty + ch, lz, B_CACTUS);
                }
             }
          }
       }
 
-      // Build a furnished Starter Village Cabin near spawn at (14, -14)
-      int houseY = topSolidY(14, -14);
-      if (houseY < Y_SEA + 1) houseY = Y_SEA + 1;
-      buildVillageHouse(14, houseY, -14);
-
-      int spawnY = topSolidY(0, 0) + 1;
-      this.px = 0.5;
-      this.py = spawnY + 0.05;
-      this.pz = 0.5;
-      this.yaw = 0.0F; // Looking toward -Z (where the Village Cabin at z=-14 is visible!)
-      this.pitch = 6.0F;
-
-      spawnOverworldMobs();
-   }
-
-   private void spawnOverworldMobs() {
-      this.mobs.clear();
-      String[] mobNames = new String[]{"Zombie", "Skeleton", "Creeper", "Zombie", "Skeleton", "Creeper"};
-      for (int i = 0; i < 6; i++) {
-         double ang = i * (Math.PI / 3.0) + 0.4;
-         int mx = (int)Math.round(Math.cos(ang) * 24.0);
-         int mz = (int)Math.round(Math.sin(ang) * 24.0);
-         int my = topSolidY(mx, mz) + 1;
-         PeMob m = new PeMob();
-         m.id = i + 1;
-         m.type = 1 + (i % 3);
-         m.team = -1;
-         m.name = mobNames[i];
-         m.x = mx + 0.5;
-         m.y = my;
-         m.z = mz + 0.5;
-         m.health = 20;
-         m.maxHealth = 20;
-         this.mobs.add(m);
-      }
-   }
-
-   private void placeTree(int x, int y, int z, byte logId) {
-      for (int dy = 0; dy < 5; dy++) {
-         setFast(x, y + dy, z, logId);
-      }
-      for (int dy = 3; dy <= 6; dy++) {
-         int r = (dy >= 5) ? 1 : 2;
-         for (int dz = -r; dz <= r; dz++) {
-            for (int dx = -r; dx <= r; dx++) {
-               if (dx == 0 && dz == 0 && dy < 5) continue;
-               if (Math.abs(dx) == 2 && Math.abs(dz) == 2 && dy == 4) continue;
-               setFast(x + dx, y + dy, z + dz, B_LEAVES_OAK);
+      // Surface Flowers & Tall Grass tufts on open grass blocks
+      for (int lz = 1; lz < 15; lz++) {
+         for (int lx = 1; lx < 15; lx++) {
+            int ty = surfaceY[lz][lx];
+            if (ty <= Y_SEA + 1 || ty >= 75) continue;
+            int colBase = (lz << 11) | (lx << 7);
+            if (c.blocks[colBase | ty] == B_GRASS && c.blocks[colBase | (ty + 1)] == B_AIR) {
+               int fh = chunkHash(wx0 + lx, wz0 + lz, this.seed + 313L) & 63;
+               int biome = biomeMap[lz][lx];
+               if (fh == 0 || (biome == 4 && fh <= 3)) {
+                  setChunkLocal(c, lx, ty + 1, lz, B_FLOWER_RED);
+               } else if (fh == 1 || (biome == 4 && fh <= 7)) {
+                  setChunkLocal(c, lx, ty + 1, lz, B_FLOWER_YELLOW);
+               } else if (fh <= 6) {
+                  setChunkLocal(c, lx, ty + 1, lz, B_TALL_GRASS);
+               }
             }
          }
       }
    }
 
-   private void buildVillageHouse(int ox, int oy, int oz) {
+   private static void placeTreeInChunk(PeChunk c, int lx, int y, int lz, byte logId, byte leafId) {
+      for (int dy = 3; dy <= 6; dy++) {
+         int r = (dy >= 5) ? 1 : 2;
+         for (int dz = -r; dz <= r; dz++) {
+            for (int dx = -r; dx <= r; dx++) {
+               if (Math.abs(dx) == 2 && Math.abs(dz) == 2 && (dy == 3 || dy == 4)) continue;
+               int nx = lx + dx;
+               int nz = lz + dz;
+               if ((nx & ~15) == 0 && (nz & ~15) == 0 && (y + dy) < WORLD_H - 1) {
+                  int idx = (nz << 11) | (nx << 7) | (y + dy);
+                  if (c.blocks[idx] == B_AIR) {
+                     setChunkLocal(c, nx, y + dy, nz, leafId);
+                  }
+               }
+            }
+         }
+      }
+      for (int dy = 0; dy < 5; dy++) {
+         setChunkLocal(c, lx, y + dy, lz, logId);
+      }
+   }
+
+   private static void buildCabinInChunk(PeChunk c, int ox, int oy, int oz) {
       for (int dz = -3; dz <= 3; dz++) {
          for (int dx = -3; dx <= 3; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
             for (int y = oy - 3; y <= oy; y++) {
-               setFast(ox + dx, y, oz + dz, B_COBBLE);
+               setChunkLocal(c, lx, y, lz, B_COBBLE);
             }
             boolean wall = Math.abs(dx) == 3 || Math.abs(dz) == 3;
             boolean door = (dz == 3 && dx == 0);
@@ -765,84 +984,109 @@ public final class PeWorld {
                if (wall && !(door && dy <= 2)) {
                   boolean corner = Math.abs(dx) == 3 && Math.abs(dz) == 3;
                   boolean win = dy == 2 && (dx == 0 || dz == 0) && !door;
-                  setFast(ox + dx, oy + dy, oz + dz, corner ? B_LOG_OAK : (win ? B_GLASS : B_PLANKS_OAK));
+                  setChunkLocal(c, lx, oy + dy, lz, corner ? B_LOG_OAK : (win ? B_GLASS : B_PLANKS_OAK));
                } else {
-                  setFast(ox + dx, oy + dy, oz + dz, B_AIR);
+                  setChunkLocal(c, lx, oy + dy, lz, B_AIR);
                }
             }
-            setFast(ox + dx, oy + 5, oz + dz, B_PLANKS_SPRUCE);
+            setChunkLocal(c, lx, oy + 5, lz, B_PLANKS_SPRUCE);
          }
       }
-      setFast(ox - 2, oy + 1, oz - 2, B_CRAFTING_TABLE);
-      setFast(ox, oy + 1, oz - 2, B_FURNACE);
-      setFast(ox + 2, oy + 1, oz - 2, B_CHEST);
-      setFast(ox - 2, oy + 1, oz + 1, B_BED_RED);
-      setFast(ox, oy + 3, oz, B_TORCH);
+      setChunkLocal(c, ox - 2, oy + 1, oz - 2, B_CRAFTING_TABLE);
+      setChunkLocal(c, ox, oy + 1, oz - 2, B_FURNACE);
+      setChunkLocal(c, ox + 2, oy + 1, oz - 2, B_CHEST);
+      setChunkLocal(c, ox - 2, oy + 1, oz + 1, B_BED_RED);
+      setChunkLocal(c, ox, oy + 3, oz, B_TORCH);
    }
 
-   private void setFast(int wx, int wy, int wz, byte id) {
-      int ix = wx + HALF_W;
-      int iz = wz + HALF_W;
-      if (ix >= 0 && ix < WORLD_W && iz >= 0 && iz < WORLD_W && wy >= 0 && wy < WORLD_H) {
-         this.blocks[(iz * WORLD_W + ix) * WORLD_H + wy] = id;
-      }
-   }
-
+   // ====================================================================
+   //  Fast O(1) Block Access Across Infinite Coordinates
+   // ====================================================================
    public int topSolidY(int wx, int wz) {
-      for (int y = WORLD_H - 2; y >= 1; y--) {
-         byte b = getBlock(wx, y, wz);
-         if (isSolid(b) && b != B_LEAVES_OAK) {
-            return y;
-         }
-      }
-      return Y_DECK;
+      int cx = wx >> 4;
+      int cz = wz >> 4;
+      PeChunk c = getOrLoadChunk(cx, cz);
+      return topSolidLocal(c, wx & 15, wz & 15);
    }
 
-   public void markAllDirty() {
-      for (int i = 0; i < sectionDirty.length; i++) {
-         Arrays.fill(sectionDirty[i], true);
-      }
-   }
-
-   public byte getBlock(int wx, int wy, int wz) {
-      int ix = wx + HALF_W;
-      int iz = wz + HALF_W;
-      if (ix < 0 || ix >= WORLD_W || iz < 0 || iz >= WORLD_W || wy < 0 || wy >= WORLD_H) {
+   /** Fast O(1) lookup in the active 16x16 chunk ring buffer (returns B_AIR if chunk is outside active ring). */
+   public byte getBlockFast(int wx, int wy, int wz) {
+      if ((wy & ~127) != 0) return B_AIR;
+      int cx = wx >> 4;
+      int cz = wz >> 4;
+      PeChunk c = this.chunkGrid[(cx & ACTIVE_MASK) | ((cz & ACTIVE_MASK) << 4)];
+      if (!c.loaded || c.cx != cx || c.cz != cz) {
          return B_AIR;
       }
-      return this.blocks[(iz * WORLD_W + ix) * WORLD_H + wy];
+      return c.blocks[((wz & 15) << 11) | ((wx & 15) << 7) | wy];
+   }
+
+   /** Full infinite-world block getter: automatically loads/generates chunk (cx, cz) if not yet in the active ring. */
+   public byte getBlock(int wx, int wy, int wz) {
+      if ((wy & ~127) != 0) return B_AIR;
+      int cx = wx >> 4;
+      int cz = wz >> 4;
+      PeChunk c = this.chunkGrid[(cx & ACTIVE_MASK) | ((cz & ACTIVE_MASK) << 4)];
+      if (!c.loaded || c.cx != cx || c.cz != cz) {
+         c = getOrLoadChunk(cx, cz);
+      }
+      return c.blocks[((wz & 15) << 11) | ((wx & 15) << 7) | wy];
    }
 
    public void setBlock(int wx, int wy, int wz, byte id) {
-      int ix = wx + HALF_W;
-      int iz = wz + HALF_W;
-      if (ix < 0 || ix >= WORLD_W || iz < 0 || iz >= WORLD_W || wy < 0 || wy >= WORLD_H) {
-         return;
-      }
-      int idx = (iz * WORLD_W + ix) * WORLD_H + wy;
-      if (this.blocks[idx] == id) {
-         return;
-      }
-      this.blocks[idx] = id;
-      int cx = ix >> 4;
-      int cz = iz >> 4;
+      if ((wy & ~127) != 0) return;
+      int cx = wx >> 4;
+      int cz = wz >> 4;
+      int lx = wx & 15;
+      int lz = wz & 15;
+      PeChunk c = getOrLoadChunk(cx, cz);
+      int idx = (lz << 11) | (lx << 7) | wy;
+      byte prev = c.blocks[idx];
+      if (prev == id) return;
+
+      c.blocks[idx] = id;
+      c.modified = true;
       int sy = wy >> 4;
-      this.sectionDirty[cz * CHUNK_GRID + cx][sy] = true;
-      if ((ix & 15) == 0 && cx > 0) this.sectionDirty[cz * CHUNK_GRID + (cx - 1)][sy] = true;
-      if ((ix & 15) == 15 && cx + 1 < CHUNK_GRID) this.sectionDirty[cz * CHUNK_GRID + (cx + 1)][sy] = true;
-      if ((iz & 15) == 0 && cz > 0) this.sectionDirty[(cz - 1) * CHUNK_GRID + cx][sy] = true;
-      if ((iz & 15) == 15 && cz + 1 < CHUNK_GRID) this.sectionDirty[(cz + 1) * CHUNK_GRID + cx][sy] = true;
-      if ((wy & 15) == 0 && sy > 0) this.sectionDirty[cz * CHUNK_GRID + cx][sy - 1] = true;
-      if ((wy & 15) == 15 && sy + 1 < SECTIONS_Y) this.sectionDirty[cz * CHUNK_GRID + cx][sy + 1] = true;
+      if (prev == B_AIR && id != B_AIR) {
+         c.sectionNonAir[sy]++;
+         if (wy > c.maxY) c.maxY = wy;
+      } else if (prev != B_AIR && id == B_AIR) {
+         if (c.sectionNonAir[sy] > 0) c.sectionNonAir[sy]--;
+      }
+
+      c.sectionDirty[sy] = true;
+      if ((wy & 15) == 0 && sy > 0) c.sectionDirty[sy - 1] = true;
+      if ((wy & 15) == 15 && sy + 1 < SECTIONS_Y) c.sectionDirty[sy + 1] = true;
+
+      if (lx == 0) {
+         PeChunk w = this.chunkGrid[slotIndex(cx - 1, cz)];
+         if (w.loaded && w.cx == cx - 1 && w.cz == cz) w.sectionDirty[sy] = true;
+      } else if (lx == 15) {
+         PeChunk e = this.chunkGrid[slotIndex(cx + 1, cz)];
+         if (e.loaded && e.cx == cx + 1 && e.cz == cz) e.sectionDirty[sy] = true;
+      }
+      if (lz == 0) {
+         PeChunk n = this.chunkGrid[slotIndex(cx, cz - 1)];
+         if (n.loaded && n.cx == cx && n.cz == cz - 1) n.sectionDirty[sy] = true;
+      } else if (lz == 15) {
+         PeChunk s = this.chunkGrid[slotIndex(cx, cz + 1)];
+         if (s.loaded && s.cx == cx && s.cz == cz + 1) s.sectionDirty[sy] = true;
+      }
+   }
+
+   public static boolean isCrossPlant(byte id) {
+      return id == B_TORCH || id == B_TALL_GRASS || id == B_FLOWER_RED || id == B_FLOWER_YELLOW;
    }
 
    public static boolean isSolid(byte id) {
-      return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_TORCH;
+      return id != B_AIR && id != B_WATER && id != B_LAVA && !isCrossPlant(id);
    }
 
    public static boolean isOpaque(byte id) {
-      return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_GLASS && id != B_LEAVES_OAK
-         && id != B_ICE && id != B_SLIME_BLOCK && id != B_TORCH && id != B_BARS && id != B_BED_RED;
+      return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_GLASS
+         && id != B_LEAVES_OAK && id != B_LEAVES_SPRUCE
+         && id != B_ICE && id != B_SLIME_BLOCK && !isCrossPlant(id)
+         && id != B_BARS && id != B_BED_RED;
    }
 
    public static boolean isLightEmitter(byte id) {
@@ -866,6 +1110,7 @@ public final class PeWorld {
          case B_COAL_ORE: return PeTextures.T_COAL_ORE;
          case B_LOG_OAK: return (face <= 1) ? PeTextures.T_LOG_OAK_TOP : PeTextures.T_LOG_OAK_SIDE;
          case B_LEAVES_OAK: return PeTextures.T_LEAVES_OAK;
+         case B_LEAVES_SPRUCE: return PeTextures.T_LEAVES_SPRUCE;
          case B_GLASS: return PeTextures.T_GLASS;
          case B_SANDSTONE: return (face <= 1) ? PeTextures.T_SANDSTONE_TOP : PeTextures.T_SANDSTONE_SIDE;
          case B_WOOL_WHITE: return PeTextures.T_WOOL_WHITE;
@@ -887,7 +1132,7 @@ public final class PeWorld {
          case B_CRAFTING_TABLE: return face == 0 ? PeTextures.T_CRAFT_TOP : (face == 1 ? PeTextures.T_PLANKS_OAK : PeTextures.T_CRAFT_SIDE);
          case B_FURNACE: return face == 3 ? PeTextures.T_FURNACE_FRONT : PeTextures.T_FURNACE_SIDE;
          case B_REDSTONE_ORE: return PeTextures.T_REDSTONE_ORE;
-         case B_SNOW: return PeTextures.T_SNOW;
+         case B_SNOW: return face == 0 ? PeTextures.T_SNOW : (face == 1 ? PeTextures.T_DIRT : PeTextures.T_SNOW_SIDE);
          case B_ICE: return PeTextures.T_ICE;
          case B_NETHERRACK: return PeTextures.T_NETHERRACK;
          case B_SOUL_SAND: return PeTextures.T_SOUL_SAND;
@@ -914,12 +1159,18 @@ public final class PeWorld {
          case B_CRACKED_STONEBRICK: return PeTextures.T_CRACKED_STONEBRICK;
          case B_PURPUR: return PeTextures.T_PURPUR;
          case B_BARS: return PeTextures.T_BARS;
+         case B_CACTUS: return (face <= 1) ? PeTextures.T_CACTUS_TOP : PeTextures.T_CACTUS_SIDE;
+         case B_TALL_GRASS: return PeTextures.T_TALL_GRASS;
+         case B_FLOWER_RED: return PeTextures.T_FLOWER_RED;
+         case B_FLOWER_YELLOW: return PeTextures.T_FLOWER_YELLOW;
          default: return PeTextures.T_STONE;
       }
    }
 
    public static int getItemTile(int id) {
-      if (id > 0 && id < 64) {
+      if (id == B_GRASS) return PeTextures.T_GRASS_SIDE;
+      if (id == B_SNOW) return PeTextures.T_SNOW_SIDE;
+      if (id > 0 && id <= 68) {
          return getFaceTile((byte)id, 3);
       }
       switch (id) {
@@ -959,6 +1210,7 @@ public final class PeWorld {
          case B_LOG_OAK: return "Oak Log";
          case B_LOG_SPRUCE: return "Spruce Log";
          case B_LEAVES_OAK: return "Oak Leaves";
+         case B_LEAVES_SPRUCE: return "Spruce Leaves";
          case B_WOOL_WHITE: return "White Wool";
          case B_WOOL_RED: return "Red Wool";
          case B_WOOL_BLUE: return "Blue Wool";
@@ -966,8 +1218,8 @@ public final class PeWorld {
          case B_WOOL_YELLOW: return "Yellow Wool";
          case B_GOLD_ORE: return "Gold Ore";
          case B_IRON_ORE: return "Iron Ore";
-         case B_COAL_ORE: return "Coal";
-         case B_DIAMOND_ORE: return "Diamond";
+         case B_COAL_ORE: return "Coal Ore";
+         case B_DIAMOND_ORE: return "Diamond Ore";
          case B_REDSTONE_ORE: return "Redstone Ore";
          case B_GOLD_BLOCK: return "Gold Block";
          case B_DIAMOND_BLOCK: return "Diamond Block";
@@ -988,6 +1240,10 @@ public final class PeWorld {
          case B_BOOKSHELF: return "Bookshelf";
          case B_SNOW: return "Snow Block";
          case B_ICE: return "Ice";
+         case B_CACTUS: return "Cactus";
+         case B_TALL_GRASS: return "Tall Grass";
+         case B_FLOWER_RED: return "Red Poppy";
+         case B_FLOWER_YELLOW: return "Dandelion";
          case I_SWORD_WOOD: return "Wooden Sword";
          case I_PICK_WOOD: return "Wooden Pickaxe";
          case I_SWORD_IRON: return "Iron Sword";
@@ -1028,7 +1284,7 @@ public final class PeWorld {
          int bx = (int)Math.floor(ex + dx * t);
          int by = (int)Math.floor(ey + dy * t);
          int bz = (int)Math.floor(ez + dz * t);
-         byte b = getBlock(bx, by, bz);
+         byte b = getBlockFast(bx, by, bz);
          if (b != B_AIR && b != B_WATER && b != B_LAVA) {
             return new int[]{bx, by, bz, prevX, prevY, prevZ, b & 0xFF};
          }
@@ -1039,60 +1295,22 @@ public final class PeWorld {
       return null;
    }
 
-   public PeMob raycastMob(double maxReach) {
-      double ex = this.px;
-      double ey = this.py + 1.62;
-      double ez = this.pz;
-      double yawRad = Math.toRadians(this.yaw);
-      double pitchRad = Math.toRadians(this.pitch);
-      double cosP = Math.cos(pitchRad);
-      double dx = Math.sin(yawRad) * cosP;
-      double dy = -Math.sin(pitchRad);
-      double dz = -Math.cos(yawRad) * cosP;
-
-      PeMob best = null;
-      double bestD = maxReach;
-      for (PeMob m : this.mobs) {
-         if (m == null || m.dead) continue;
-         double mx = m.x - ex;
-         double my = (m.y + 0.9) - ey;
-         double mz = m.z - ez;
-         double proj = mx * dx + my * dy + mz * dz;
-         if (proj > 0.0 && proj < bestD) {
-            double perpSq = (mx * mx + my * my + mz * mz) - proj * proj;
-            if (perpSq <= 0.85) {
-               bestD = proj;
-               best = m;
-            }
-         }
-      }
-      return best;
-   }
-
-   // Dedicated Attack / Break tap action
+   // Dedicated Break / Mine tap action
    public void triggerAttackAction(PeAudio audio) {
       this.swingAnim = 0.0F;
-      int held = this.hotbarId[this.selectedSlot];
-
-      // Melee Attack on Targeted Mob
-      PeMob hitMob = raycastMob(3.8);
-      if (hitMob != null) {
-         boolean isCrit = !this.onGround && this.vy < -0.05;
-         int dmg = (held == I_SWORD_DIAMOND ? 8 : (held == I_SWORD_IRON || held == I_AXE_IRON ? 6 : (held == I_SWORD_WOOD ? 5 : 3))) + (isCrit ? 2 : 0);
-         damageMob(hitMob, dmg, this.px, this.pz, true, audio);
-         return;
-      }
-
-      // In Creative Mode, tapping MINE/HIT breaks the targeted block immediately
-      if (this.mode == MODE_CREATIVE) {
-         int[] hit = raycastBlock(5.5);
-         if (hit != null && hit[6] != B_BEDROCK) {
+      // In Creative Mode (or on instant-break plants/torches), tapping MINE breaks immediately
+      int[] hit = raycastBlock(5.5);
+      if (hit != null && hit[6] != B_BEDROCK) {
+         byte target = (byte)hit[6];
+         if (this.mode == MODE_CREATIVE || isCrossPlant(target)) {
             setBlock(hit[0], hit[1], hit[2], B_AIR);
+            if (this.mode == MODE_SURVIVAL && target == B_TORCH) {
+               giveItem(B_TORCH, 1);
+            }
             if (audio != null) audio.playSound("dig_stone", 0.8F, 1.0F);
             return;
          }
       }
-
       if (audio != null) {
          audio.playSound("swing_1", 0.6F, 1.0F);
       }
@@ -1103,7 +1321,7 @@ public final class PeWorld {
       this.swingAnim = 0.0F;
       int held = this.hotbarId[this.selectedSlot];
 
-      // 1. Check if tapping a Crafting Table, Chest, or Bed in the world
+      // 1. Check if tapping a Crafting Table, Furnace, Chest, or Bed in the world
       int[] hit = raycastBlock(5.0);
       if (hit != null && !this.sneaking) {
          byte targetBlock = (byte)hit[6];
@@ -1114,7 +1332,7 @@ public final class PeWorld {
             return;
          }
          if (targetBlock == B_BED_RED) {
-            this.dayTime = 0.22F; // Morning!
+            this.dayTime = 0.22F;
             this.health = 20;
             showBanner("You slept through the night! Spawn point set.");
             if (audio != null) audio.playSound("levelup", 0.85F, 1.0F);
@@ -1134,20 +1352,15 @@ public final class PeWorld {
          return;
       }
 
-      // 3. Shoot Bow if holding Bow
-      if (held == I_BOW) {
-         firePlayerProjectile(0, 2.1, 7, 60);
-         if (audio != null) audio.playSound("bow_shoot", 0.85F, 1.1F);
-         return;
-      }
-
-      // 4. Place Block at targeted block face
-      if (hit != null && held > 0 && held < 64) {
+      // 3. Place Block at targeted block face
+      if (hit != null && held > 0 && held <= 68) {
          int pxPlace = hit[3], pyPlace = hit[4], pzPlace = hit[5];
-         boolean overlapsPlayer = Math.abs((pxPlace + 0.5) - this.px) < 0.75
+         boolean overlapsPlayer = isSolid((byte)held)
+            && Math.abs((pxPlace + 0.5) - this.px) < 0.75
             && Math.abs((pzPlace + 0.5) - this.pz) < 0.75
             && pyPlace >= Math.floor(this.py) && pyPlace <= Math.floor(this.py + 1.7);
-         if (!overlapsPlayer && getBlock(pxPlace, pyPlace, pzPlace) == B_AIR) {
+         byte existing = getBlock(pxPlace, pyPlace, pzPlace);
+         if (!overlapsPlayer && (existing == B_AIR || existing == B_WATER || existing == B_TALL_GRASS)) {
             setBlock(pxPlace, pyPlace, pzPlace, (byte)held);
             if (this.mode != MODE_CREATIVE) {
                consumeSelectedSlot(1);
@@ -1160,7 +1373,7 @@ public final class PeWorld {
    // Legacy alias for tests
    public void triggerPrimaryAction(PeAudio audio) {
       int held = this.hotbarId[this.selectedSlot];
-      if (held > 0 && held < 64) {
+      if (held > 0 && held <= 68) {
          triggerPlaceOrUseAction(audio);
       } else {
          triggerAttackAction(audio);
@@ -1176,53 +1389,6 @@ public final class PeWorld {
       }
    }
 
-   private void firePlayerProjectile(int type, double speed, int dmg, int fuse) {
-      double yawRad = Math.toRadians(this.yaw);
-      double pitchRad = Math.toRadians(this.pitch);
-      double cosP = Math.cos(pitchRad);
-      double dx = Math.sin(yawRad) * cosP;
-      double dy = -Math.sin(pitchRad);
-      double dz = -Math.cos(yawRad) * cosP;
-      PeProjectile p = new PeProjectile();
-      p.type = type;
-      p.sourceTeam = -2;
-      p.x = this.px + dx * 0.6;
-      p.y = this.py + 1.52 + dy * 0.4;
-      p.z = this.pz + dz * 0.6;
-      p.vx = dx * speed;
-      p.vy = dy * speed + 0.04;
-      p.vz = dz * speed;
-      p.damage = dmg;
-      p.fuse = fuse;
-      this.projectiles.add(p);
-   }
-
-   public void damageMob(PeMob m, int dmg, double srcX, double srcZ, boolean fromPlayer, PeAudio audio) {
-      if (m == null || m.dead || m.hurtTime > 0) return;
-      m.health -= dmg;
-      m.hurtTime = 8;
-      double dx = m.x - srcX;
-      double dz = m.z - srcZ;
-      double d = Math.max(0.1, Math.hypot(dx, dz));
-      m.vx += (dx / d) * 0.42;
-      m.vy = 0.34;
-      m.vz += (dz / d) * 0.42;
-      m.onGround = false;
-      if (fromPlayer) {
-         this.hitmarkerTicks = 10;
-         this.hitmarkerCrit = m.health <= 0 || (!this.onGround && this.vy < -0.05);
-      }
-      if (audio != null) audio.playSound("hit_1", 0.85F, 1.0F);
-      if (m.health <= 0) {
-         m.dead = true;
-         if (fromPlayer) {
-            this.kills++;
-            giveItem(I_STEAK, 1);
-            showBanner("Defeated " + m.name + "! (+1 Steak)");
-         }
-      }
-   }
-
    public void tick(PeTouchController touch, PeAudio audio) {
       if (this.screen != SCREEN_PLAY) {
          return;
@@ -1230,13 +1396,15 @@ public final class PeWorld {
       this.tickCount++;
       if (this.hurtTime > 0) this.hurtTime--;
       if (this.invulnTicks > 0) this.invulnTicks--;
-      if (this.hitmarkerTicks > 0) this.hitmarkerTicks--;
       if (this.bannerTicks > 0) this.bannerTicks--;
       if (this.swingAnim >= 0.0F) {
          this.swingAnim += 0.16F;
          if (this.swingAnim >= 1.0F) this.swingAnim = -1.0F;
       }
       this.dayTime = (this.dayTime + 0.00008F) % 1.0F;
+
+      // Stream infinite chunks around player (up to 2 new chunks per tick for zero stutter!)
+      ensureChunksAroundPlayer(2);
 
       // 1. Player Movement & Right-Handed Camera Basis:
       //    Forward = ( +sin(yaw), -cos(yaw) )
@@ -1246,7 +1414,8 @@ public final class PeWorld {
       boolean wantJump = touch != null && touch.jumpHeld;
       boolean wantDescend = touch != null && touch.sneakHeld;
 
-      double speed = this.flying ? 0.34 : (this.sneaking ? 0.10 : (this.sprinting ? 0.24 : 0.185));
+      this.sprinting = (moveFwd > 0.72 && !this.sneaking);
+      double speed = this.flying ? 0.36 : (this.sneaking ? 0.10 : (this.sprinting ? 0.235 : 0.185));
       double yawRad = Math.toRadians(this.yaw);
       double sinY = Math.sin(yawRad);
       double cosY = Math.cos(yawRad);
@@ -1256,11 +1425,11 @@ public final class PeWorld {
       this.vx = this.vx * 0.50 + wishX * 0.50;
       this.vz = this.vz * 0.50 + wishZ * 0.50;
 
-      byte inBlock = getBlock((int)Math.floor(this.px), (int)Math.floor(this.py + 0.4), (int)Math.floor(this.pz));
+      byte inBlock = getBlockFast((int)Math.floor(this.px), (int)Math.floor(this.py + 0.4), (int)Math.floor(this.pz));
       boolean inWater = (inBlock == B_WATER);
 
       if (this.flying) {
-         this.vy = wantJump ? 0.24 : (wantDescend ? -0.24 : 0.0);
+         this.vy = wantJump ? 0.25 : (wantDescend ? -0.25 : 0.0);
       } else if (inWater) {
          this.vy = wantJump ? 0.14 : Math.max(-0.18, this.vy - 0.025);
       } else {
@@ -1271,7 +1440,7 @@ public final class PeWorld {
          this.vy = Math.max(-0.78, this.vy - 0.08);
       }
 
-      moveEntityWithCollision(true, null);
+      movePlayerWithCollision();
 
       // Void Respawn Protection
       if (this.py < 2.0) {
@@ -1291,7 +1460,7 @@ public final class PeWorld {
                int held = this.hotbarId[this.selectedSlot];
                float toolMult = (held == I_PICK_DIAMOND || held == I_SHOVEL_DIAMOND) ? 2.4F
                   : ((held == I_PICK_IRON || held == I_AXE_IRON) ? 1.8F : (held == I_PICK_WOOD ? 1.35F : 1.0F));
-               float rate = (this.mode == MODE_CREATIVE) ? 0.55F : (0.065F * toolMult);
+               float rate = (this.mode == MODE_CREATIVE) ? 0.55F : (0.068F * toolMult);
                this.mineProgress += rate;
                this.swingAnim = (this.tickCount % 6) / 6.0F;
                if (this.mineProgress >= 1.0F) {
@@ -1299,7 +1468,9 @@ public final class PeWorld {
                   setBlock(this.mineX, this.mineY, this.mineZ, B_AIR);
                   if (this.mode == MODE_SURVIVAL && broken != B_AIR) {
                      byte drop = (broken == B_STONE) ? B_COBBLE : ((broken == B_GRASS) ? B_DIRT : broken);
-                     giveItem(drop, 1);
+                     if (drop != B_LEAVES_OAK && drop != B_LEAVES_SPRUCE && drop != B_TALL_GRASS) {
+                        giveItem(drop, 1);
+                     }
                   }
                   if (audio != null) audio.playSound("dig_stone", 0.85F, 1.0F);
                   this.mineProgress = 0.0F;
@@ -1318,137 +1489,52 @@ public final class PeWorld {
          this.mineY = -1;
          this.mineProgress = 0.0F;
       }
-
-      // 3. Tick Projectiles
-      for (int i = this.projectiles.size() - 1; i >= 0; i--) {
-         PeProjectile p = this.projectiles.get(i);
-         p.x += p.vx;
-         p.y += p.vy;
-         p.z += p.vz;
-         p.vy -= 0.012;
-         p.fuse--;
-         int bx = (int)Math.floor(p.x);
-         int by = (int)Math.floor(p.y);
-         int bz = (int)Math.floor(p.z);
-         byte hitB = getBlock(bx, by, bz);
-
-         for (PeMob m : this.mobs) {
-            if (m == null || m.dead) continue;
-            if (Math.hypot(m.x - p.x, m.z - p.z) <= 0.85 && p.y >= m.y && p.y <= m.y + 1.9) {
-               damageMob(m, p.damage, p.x - p.vx, p.z - p.vz, p.sourceTeam == -2, audio);
-               p.dead = true;
-               break;
-            }
-         }
-         if (!p.dead && (isSolid(hitB) || p.fuse <= 0)) {
-            p.dead = true;
-         }
-         if (p.dead) {
-            this.projectiles.remove(i);
-         }
-      }
-
-      // 4. Tick Overworld Mobs
-      tickOverworldMobs(audio);
    }
 
-   private void tickOverworldMobs(PeAudio audio) {
-      for (PeMob m : this.mobs) {
-         if (m == null || m.dead) continue;
-         if (m.hurtTime > 0) m.hurtTime--;
-         if (m.attackCd > 0) m.attackCd--;
-
-         double dx = this.px - m.x;
-         double dz = this.pz - m.z;
-         double dist = Math.hypot(dx, dz);
-
-         if (this.mode == MODE_SURVIVAL && dist < 16.0 && dist > 0.7) {
-            m.yaw = (float)Math.toDegrees(Math.atan2(dx, -dz));
-            double spd = 0.095;
-            m.vx = (dx / dist) * spd;
-            m.vz = (dz / dist) * spd;
-            m.walkPhase += 0.25F;
-         } else {
-            // Peaceful wander
-            if (((this.tickCount + m.id * 19) % 80) == 0) {
-               m.yaw += (this.rng.nextFloat() - 0.5F) * 90.0F;
-            }
-            double rad = Math.toRadians(m.yaw);
-            m.vx = Math.sin(rad) * 0.04;
-            m.vz = -Math.cos(rad) * 0.04;
-            m.walkPhase += 0.12F;
-         }
-         m.vy = Math.max(-0.75, m.vy - 0.08);
-         moveEntityWithCollision(false, m);
-
-         if (this.mode == MODE_SURVIVAL && dist <= 1.85 && Math.abs(this.py - m.y) <= 2.0 && m.attackCd <= 0) {
-            m.attackCd = 24;
-            if (this.invulnTicks <= 0) {
-               this.health = Math.max(1, this.health - 2);
-               this.hurtTime = 8;
-               this.invulnTicks = 16;
-               if (audio != null) audio.playSound("player_hurt", 0.8F, 1.0F);
-            }
-         }
-      }
-   }
-
-   private void moveEntityWithCollision(boolean isPlayer, PeMob mob) {
-      double x = isPlayer ? this.px : mob.x;
-      double y = isPlayer ? this.py : mob.y;
-      double z = isPlayer ? this.pz : mob.z;
-      double vx = isPlayer ? this.vx : mob.vx;
-      double vy = isPlayer ? this.vy : mob.vy;
-      double vz = isPlayer ? this.vz : mob.vz;
+   private void movePlayerWithCollision() {
+      double x = this.px;
+      double y = this.py;
+      double z = this.pz;
 
       // Y collision
-      double ny = y + vy;
+      double ny = y + this.vy;
       int bx = (int)Math.floor(x);
       int bz = (int)Math.floor(z);
       boolean grounded = false;
-      if (vy <= 0.0 && isSolid(getBlock(bx, (int)Math.floor(ny), bz))) {
+      if (this.vy <= 0.0 && isSolid(getBlockFast(bx, (int)Math.floor(ny), bz))) {
          ny = Math.floor(ny) + 1.0;
-         vy = 0.0;
+         this.vy = 0.0;
          grounded = true;
-      } else if (vy > 0.0 && isSolid(getBlock(bx, (int)Math.floor(ny + 1.75), bz))) {
-         vy = 0.0;
+      } else if (this.vy > 0.0 && isSolid(getBlockFast(bx, (int)Math.floor(ny + 1.75), bz))) {
+         this.vy = 0.0;
       }
 
       // X & Z collision + Optional Auto Step-Jump (Pocket Edition auto-jump)
-      double nx = x + vx;
-      double nz = z + vz;
+      double nx = x + this.vx;
+      double nz = z + this.vz;
       int nbx = (int)Math.floor(nx);
       int nbz = (int)Math.floor(nz);
       int footY = (int)Math.floor(ny + 0.1);
-      if (isSolid(getBlock(nbx, footY, nbz)) || isSolid(getBlock(nbx, footY + 1, nbz))) {
-         boolean allowAutoJump = !isPlayer || (this.autoJump && !this.sneaking && !this.flying);
+      if (isSolid(getBlockFast(nbx, footY, nbz)) || isSolid(getBlockFast(nbx, footY + 1, nbz))) {
+         boolean allowAutoJump = this.autoJump && !this.sneaking && !this.flying;
          if (grounded && allowAutoJump
-            && isSolid(getBlock(nbx, footY, nbz))
-            && !isSolid(getBlock(nbx, footY + 1, nbz))
-            && !isSolid(getBlock(nbx, footY + 2, nbz))) {
-            vy = 0.42;
+            && isSolid(getBlockFast(nbx, footY, nbz))
+            && !isSolid(getBlockFast(nbx, footY + 1, nbz))
+            && !isSolid(getBlockFast(nbx, footY + 2, nbz))) {
+            this.vy = 0.42;
             grounded = false;
          } else {
-            if (isSolid(getBlock(nbx, footY, bz)) || isSolid(getBlock(nbx, footY + 1, bz))) nx = x;
-            if (isSolid(getBlock(bx, footY, nbz)) || isSolid(getBlock(bx, footY + 1, nbz))) nz = z;
+            if (isSolid(getBlockFast(nbx, footY, bz)) || isSolid(getBlockFast(nbx, footY + 1, bz))) nx = x;
+            if (isSolid(getBlockFast(bx, footY, nbz)) || isSolid(getBlockFast(bx, footY + 1, nbz))) nz = z;
          }
       }
 
-      if (isPlayer) {
-         if (Math.hypot(nx - this.px, nz - this.pz) > 0.001 && grounded) {
-            this.walkDist += (float)Math.hypot(nx - this.px, nz - this.pz);
-         }
-         this.px = nx;
-         this.py = ny;
-         this.pz = nz;
-         this.vy = vy;
-         this.onGround = grounded;
-      } else {
-         mob.x = nx;
-         mob.y = ny;
-         mob.z = nz;
-         mob.vy = vy;
-         mob.onGround = grounded;
+      if (Math.hypot(nx - this.px, nz - this.pz) > 0.001 && grounded) {
+         this.walkDist += (float)Math.hypot(nx - this.px, nz - this.pz);
       }
+      this.px = nx;
+      this.py = ny;
+      this.pz = nz;
+      this.onGround = grounded;
    }
 }

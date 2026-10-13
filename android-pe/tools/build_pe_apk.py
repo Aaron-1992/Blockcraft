@@ -114,34 +114,42 @@ Note: This is the standalone Android Pocket Edition release of Blockcraft.
 PC and PE releases are strictly separated — this release contains ONLY the
 Android Pocket Edition build and no PC files.
 
-WHAT'S IN THIS SINGLE-PLAYER POCKET EDITION BUILD
--------------------------------------------------
-* Single-Player World Generation & Persistent Saving:
-  - Title Screen -> World Select (3 persistent Save Slots: World 1, 2, 3) ->
-    Create New World (Survival / Creative, Large Biomes Recommended / Default /
-    Superflat, Seed Presets).
-  - Multi-Biome Overworld with Mountains, Forests, Deserts, Snowy Taiga,
-    Underground 3D Caves, Ore Veins (Coal, Iron, Gold, Redstone, Diamond),
-    Water Lakes, Trees, and a furnished Starter Village Cabin.
-  - Automatic & Manual World Saving (`world_0..2.bcpe` in app storage): saves
-    every placed/mined block, player position, inventory, mode, and day time.
-* Redesigned Mobile Controls (Samsung Galaxy A55 5G 2340x1080 @ 120Hz):
-  - Fixed Right-Handed Camera & Movement Math: walking Left (-X) and Right (+X)
-    and turning the camera match your thumb direction 100% accurately.
-  - Pure Camera Look (No Accidental Mining or Placing): dragging your finger to
-    look around ONLY rotates the camera and never triggers unwanted mining,
-    attacks, or block placements.
-  - Dedicated Right-Thumb Action Buttons:
-    * [MINE / HIT]: Hold to mine blocks (you can also drag your thumb while
-      holding [MINE / HIT] to aim the crosshair while mining!) or tap to attack.
-    * [PLACE / USE]: Tap to place your selected block, open a Crafting Table /
-      Chest, eat food, or sleep in a Bed.
-    * [JUMP / FLY]: Hold to jump/swim up, double-tap in Creative to fly.
-  - Left Movement Pad: Smooth Analog Joystick (default) OR Classic 5-Button
-    Minecraft PE D-Pad (toggleable in Settings), plus a [SNEAK] toggle button.
-* Crisp, High-Contrast Readable Text:
-  - Decodes the authentic 16x6 (8x11 cell) `font.bin` bitmap font with large
-    1080p scaling and drop shadows.
+WHAT'S NEW IN BLOCKCRAFT PE v{version}
+--------------------------------------
+* True Infinite Worlds (`PeWorld` & `PeChunkMesher`):
+  - Explore endlessly in every direction! Deterministic 16x128x16 chunks stream
+    seamlessly around the player at any coordinate using a lock-free O(1) 16x16
+    active chunk ring buffer (`256` active chunk slots).
+  - Persistent Infinite Chunk Saving (`world_0..2.bcpe` v2): every modified
+    chunk across the infinite world is saved and restored at any coordinate.
+  - Multi-Biome Overworld: Emerald Forests, Flower Meadows (Poppies, Dandelions,
+    Tall Grass), Golden Deserts with Cacti, Snowy Taiga with Spruce Pines & Ice
+    Lakes, Mountain Peaks, 3D Caves, Ore Veins & Explorer Cabins.
+* Hand-Crafted Pixel-Art Texture Overhaul (`PeTextures`):
+  - Ported the PC game's Update 3.18 / 3.19 `TexPaint` & `TexPaint319` painters:
+    * Crisp pixel-art Oak & Spruce Leaves with 16 overlapping 4x3 / 3x4 leaf
+      blade clusters, cast shadows, 4-tone sunlit leaf tips, and organic sky
+      cutouts (plus interior leaf-to-leaf face culling!).
+    * Multi-tone Grass Top & hanging Grass Side skirt with drop shadow over
+      pebble-strewn Dirt.
+    * Voronoi Cobblestone & Mossy Cobble, cracked FBM Stone, 3D-shaded Ore
+      veins, grooved Bark Logs with concentric growth rings, 4-board Planks,
+      Stone Bricks, Crafting Table, Furnace, Chest, Bookshelf, and bevelled
+      Tool/Item sprites.
+* High-Performance 120Hz VBO Engine (`PeChunkMesher`):
+  - O(1) empty sky section skipping via per-section non-air block counters.
+  - Direct column bit-shift indexing `((lz << 11) | (lx << 7) | wy)` with
+    pre-fetched cardinal neighbor chunks.
+  - Interior leaf-to-leaf face culling and configurable Render Distance
+    (`9x9`, `11x11`, or `13x13` Chunks) in Settings.
+  - Complete removal of AI bots and mobs for lag-free single-player performance.
+* Redesigned Mobile-Friendly UI (`PeGLSurfaceView` & `PeTouchController`):
+  - Dark-glass cards with double borders, top specular highlights & recessed
+    item slots.
+  - Circular Virtual Analog Joystick ring + glowing thumb puck (or Classic
+    5-Button D-Pad), circular right-thumb action arc (`[MINE]`, `[PLACE]`,
+    `[JUMP]`) with mini item icons, top quick-action pills (`[|| PAUSE]`,
+    `[BAG / CRAFT]`, `[FLY]`), and target block tooltip pill under the crosshair.
 
 HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
 ---------------------------------------
@@ -153,7 +161,7 @@ HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
 
 
 def build_release_notes(version, apk_name, bundle_name):
-    return f"""## Blockcraft PE (Pocket Edition) v{version} — Singleplayer Edition (Samsung Galaxy A55 5G)
+    return f"""## Blockcraft PE (Pocket Edition) v{version} — Infinite Worlds, Pixel-Art Textures & Mobile UI Overhaul (Samsung Galaxy A55 5G)
 
 > **Separate Pocket Edition Release**: This release contains **only** the Android Pocket Edition (`com.blockcraft.pe`) and does **not** include any PC files. PC (`v*`) and PE (`pe-v*`) releases are kept strictly separated.
 
@@ -161,25 +169,27 @@ def build_release_notes(version, apk_name, bundle_name):
 1. Download **`{apk_name}`** below under **Assets** directly on your phone (or download `{bundle_name}`).
 2. Open **`{apk_name}`** from your browser downloads or Samsung **My Files** and tap **Install / Update**.
 
-### What's New & Fixed in Singleplayer Pocket Edition
-* **Single-Player World Generation & Persistent World Saving (`PeWorld`)**:
-  * **Title Screen & 3 Persistent World Save Slots (`World 1..3`)**: Create, load, and delete single-player worlds saved automatically in GZIP format (`world_0..2.bcpe`) across app restarts.
-  * **Create World Options**: Choose **Survival** or **Creative**, **Large Biomes (Recommended)**, **Default Biomes**, or **Superflat**, and custom **Seed Presets** (*Random, Mountain Peaks, Village Valley, Desert Oasis*).
-  * **Rich Overworld Terrain & Survival Crafting**: Multi-biome terrain, underground 3D caves, Coal/Iron/Gold/Redstone/Diamond ore veins, trees, starter Village Cabin with Crafting Table/Furnace/Chest/Bed, and an in-game **Crafting & Inventory screen (`[CRAFT / INV]`)**.
-* **Completely Reworked Touch Controls (`PeTouchController`)**:
-  * **Fixed Left / Right Walking Direction**: Corrected the right-handed camera and movement basis (`Forward = (+sin(yaw), -cos(yaw))`, `Right = (+cos(yaw), +sin(yaw))`) so walking Left and Right and rotating the camera match your thumb direction at every angle.
-  * **Pure Camera Look (Zero Unwanted Actions While Moving Camera)**: Dragging your finger on the screen **only rotates the camera** — it never triggers accidental block breaking, block placement, or attacks while panning.
-  * **Dedicated Ergonomic Action Buttons**:
-    * **`[MINE / HIT]`**: Hold to mine blocks (supports dragging your thumb while holding `[MINE / HIT]` to aim while mining!) or tap to attack.
-    * **`[PLACE / USE]`**: Tap to place blocks, use Crafting Tables/Chests/Beds, or eat food.
-    * **`[JUMP / FLY]`** & **`[SNEAK]`**: Dedicated jump/fly and crouch toggle buttons, plus choice of **Smooth Analog Joystick** or **Classic 5-Button D-Pad** in **Controls & Settings**.
-* **Crisp, Readable Bitmap Font (`PeTextures` & `PeChunkMesher`)**:
-  * Properly decodes the `16x6` (`8x11` cell) `font.bin` alpha bitmap font with large `1080x2340` UI scaling so all menus, buttons, and HUD labels are sharp and easy to read.
+### What's New in Blockcraft PE `pe-v{version}`
+* **Infinite Worlds (`PeWorld` & `PeChunkMesher`)**:
+  * **Seamless Infinite Chunk Streaming**: Replaced the fixed world boundary with a deterministic infinite chunk engine (`16x128x16` chunks at any `(cx, cz)` coordinate) backed by an $O(1)$ `16x16` active spatial chunk ring buffer.
+  * **Persistent Infinite World Saves (`.bcpe` v2)**: Player-built and mined blocks in any chunk across the infinite world are persisted in `savedChunks` and saved to `world_0..2.bcpe` across 3 save slots.
+  * **Richer Biomes & Flora**: Added **Emerald Forests**, **Flower Meadows** (Red Poppies, Yellow Dandelions, Tall Grass), **Golden Deserts** (Sand, Sandstone, Cacti), **Snowy Taiga** (Spruce Pines, Snow, Ice Lakes), **Mountain Peaks**, 3D caves, ore veins, and procedural **Explorer Cabins**.
+* **New Hand-Crafted Pixel-Art Textures (`PeTextures` ported from `TexPaint` & `TexPaint319`)**:
+  * **Leaves Overhaul**: Overlapping `4x3` / `3x4` pixel-art leaf blade clusters (`paintLeaflet`) with cast shadows, 4-tone sunlit leaf blades, and crisp organic sky holes for both Oak Leaves and Spruce Leaves.
+  * **Terrain & Building Blocks**: Multi-tone Grass Top & hanging Grass Side skirt with drop shadows over pebble-strewn Dirt, Voronoi Cobblestone & Mossy Cobble, cracked FBM Stone, 3D-shaded mineral Ore veins, bark-grooved Logs with wood rings, 4-board Planks, Stone Bricks, Crafting Table, Furnace, Chest, Bookshelf, and bevelled Tool/Item sprites.
+* **Major Performance Upgrades**:
+  * **$O(1)$ Empty Section Skipping**: Tracks `sectionNonAir[0..7]` per `16x16x16` section so empty sky sections skip VBO meshing instantaneously.
+  * **Fast Direct Column Indexing & Pre-Fetched Neighbors**: Uses bit-shift indexing `((lz << 11) | (lx << 7) | wy)` and pre-fetches cardinal neighbor chunks once per section.
+  * **Interior Leaf Face Culling**: Culls hidden leaf-to-leaf faces inside tree canopies to eliminate mobile GPU alpha overdraw, plus configurable **Infinite Render Distance (`9x9`, `11x11`, `13x13` Chunks)** in Settings.
+* **AI Players / Mobs Removed Completely**:
+  * Removed all AI bots and mobs from world generation, ticking, and 3D rendering.
+* **Redesigned Mobile-Friendly UI (`PeGLSurfaceView` & `PeTouchController`)**:
+  * **Circular Virtual Joystick & Ergonomic Action Pads**: Smooth circular thumbstick ring + glowing puck (or 5-button D-Pad), circular right-thumb `[MINE]`, `[PLACE]`, and `[JUMP]` pads with item icons, top quick-action pills (`[|| PAUSE]`, `[BAG / CRAFT]`, and 1-tap `[FLY: ON/OFF]`), target block tooltip pill below the crosshair, and recessed 9-slot hotbar & inventory cards.
 """
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.0"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.1"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")
@@ -211,6 +221,8 @@ def main():
         unaligned_apk = os.path.join(work, "unaligned.apk")
         gen_r_dir = os.path.join(work, "gen")
         os.makedirs(gen_r_dir, exist_ok=True)
+        ver_parts = [int(p) for p in version.split(".") if p.isdigit()]
+        ver_code = str((ver_parts[0] * 100 + (ver_parts[1] * 10 if len(ver_parts) > 1 else 0)) if ver_parts else 110)
         run_cmd([
             aapt2, "link",
             "-I", android_jar,
@@ -218,7 +230,7 @@ def main():
             "--java", gen_r_dir,
             "--min-sdk-version", "26",
             "--target-sdk-version", "34",
-            "--version-code", "100",
+            "--version-code", ver_code,
             "--version-name", version,
             "-o", unaligned_apk,
             compiled_res_zip,

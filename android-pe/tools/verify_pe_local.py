@@ -332,39 +332,55 @@ public class PeCoreTest {
    public static void main(String[] args) {
       Context ctx = new Context();
 
-      // 1. Verify Texture Atlas & Authentic 16x6 (8x11 cell) font.bin decoding
+      // 1. Verify Pixel-Art Texture Atlas (TexPaint / TexPaint319) & Authentic 16x6 (8x11 cell) font.bin decoding
       int[] atlas = PeTextures.generateAtlasPixels();
       check(atlas.length == 256 * 256, "Atlas pixel count must be 65536");
+      int leafTx0 = (PeTextures.T_LEAVES_OAK & 15) * 16;
+      int leafTy0 = (PeTextures.T_LEAVES_OAK >> 4) * 16;
+      int leafTransparent = 0;
+      int leafOpaque = 0;
+      for (int y = 0; y < 16; y++) {
+         for (int x = 0; x < 16; x++) {
+            int p = atlas[(leafTy0 + y) * 256 + (leafTx0 + x)];
+            if ((p >>> 24) == 0) leafTransparent++;
+            else leafOpaque++;
+         }
+      }
+      check(leafTransparent >= 12 && leafOpaque >= 180,
+         "TexPaint319 Oak Leaves must have organic sky cutouts and lush leaflet clusters, got trans=" + leafTransparent + " opaque=" + leafOpaque);
+
       PeTextures tex = new PeTextures();
       int[] font = tex.generateFontPixels(ctx);
       check(font.length == 128 * 128, "Font pixel count must be 16384");
       check(tex.measureText("BLOCKCRAFT PE") > 50, "Font measureText must return positive pixel width");
-      // Verify glyph 'A' (idx=33, gx=8, gy=22) has opaque pixels at row gy+2=24, col gx+1=9
       int glyphAPixel = font[24 * 128 + 9];
       check((glyphAPixel >>> 24) > 128, "Glyph 'A' from font.bin must have opaque pixels at (9, 24)");
 
-      // 2. Verify Single-Player World Gen, Persistent Save & Load (world_0.bcpe)
+      // 2. Verify Infinite World Streaming, Distant Coordinates & Persistent Save/Load (world_0.bcpe)
       PeWorld world = new PeWorld();
       world.deleteWorldSlot(ctx, 0);
       world.createNewSinglePlayerWorld(ctx, 0, PeWorld.MODE_SURVIVAL, PeWorld.WTYPE_LARGE_BIOMES, 884219551L);
       check(world.screen == PeWorld.SCREEN_PLAY, "New world must enter SCREEN_PLAY");
       check(world.slotExists[0], "World slot 0 must exist on disk after creation");
 
-      // Place custom blocks & move player, then save
+      // Place block near spawn AND travel 4,000 blocks away in the infinite world!
       world.setBlock(3, 72, -3, PeWorld.B_GOLD_BLOCK);
-      world.setBlock(4, 72, -3, PeWorld.B_CRAFTING_TABLE);
-      world.px = 12.5;
-      world.py = 71.0;
-      world.pz = -8.5;
+      world.px = 2405.5;
+      world.pz = -3208.5;
+      world.ensureChunksAroundPlayer(64);
+      int farSurfaceY = world.topSolidY(2405, -3208);
+      check(farSurfaceY >= 54 && farSurfaceY <= 95, "Infinite world must generate terrain at (2405, -3208), got Y=" + farSurfaceY);
+      world.setBlock(2405, 82, -3208, PeWorld.B_DIAMOND_BLOCK);
+      world.py = farSurfaceY + 1.0;
       world.yaw = 45.0F;
       check(world.saveWorld(ctx), "saveWorld must succeed");
 
       // Wipe in-memory state and reload from disk
       PeWorld loaded = new PeWorld();
       check(loaded.loadWorld(ctx, 0), "loadWorld(0) must succeed");
-      check(loaded.getBlock(3, 72, -3) == PeWorld.B_GOLD_BLOCK, "Saved Gold Block must be restored from disk");
-      check(loaded.getBlock(4, 72, -3) == PeWorld.B_CRAFTING_TABLE, "Saved Crafting Table must be restored from disk");
-      check(Math.abs(loaded.px - 12.5) < 0.01 && Math.abs(loaded.pz - (-8.5)) < 0.01, "Saved player position must be restored");
+      check(loaded.getBlock(2405, 82, -3208) == PeWorld.B_DIAMOND_BLOCK, "Saved distant Diamond Block at (2405, 82, -3208) must be restored");
+      check(loaded.getBlock(3, 72, -3) == PeWorld.B_GOLD_BLOCK, "Saved spawn Gold Block at (3, 72, -3) must also be restored");
+      check(Math.abs(loaded.px - 2405.5) < 0.01 && Math.abs(loaded.pz - (-3208.5)) < 0.01, "Saved distant player position must be restored");
 
       // 3. Verify Right-Handed Walking Left (-X) and Right (+X) at yaw = 0 (facing -Z)
       PeWorld moveWorld = new PeWorld();
@@ -404,16 +420,18 @@ public class PeCoreTest {
       check(!touch.miningHeld && !touch.attackTapped && !touch.placeTapped,
          "Releasing finger after camera look must NEVER trigger attack or block placement!");
 
-      // 5. Verify Single-Player Crafting & VBO Mesher + GL Draw
-      world.giveItem(PeWorld.B_LOG_OAK, 2);
-      check(world.tryCraftRecipe(0, null), "Crafting Oak Planks x4 from 1 Oak Log must succeed");
-      float[] scratch = new float[72000 * 9];
+      // 5. Verify Single-Player Crafting, O(1) Empty Sky Section Skipping & VBO Mesher + GL Draw
+      moveWorld.giveItem(PeWorld.B_LOG_OAK, 2);
+      check(moveWorld.tryCraftRecipe(0, null), "Crafting Oak Planks x4 from 1 Oak Log must succeed");
+      float[] scratch = new float[54000 * 9];
       PeChunkMesher mesher = new PeChunkMesher();
+      check(mesher.buildSectionGeometry(moveWorld, 0, 7, 0, scratch) == 0,
+         "Empty sky section (sy=7) must skip meshing in O(1) and emit 0 vertices");
       int totalVerts = 0;
       for (int sy = 0; sy < PeWorld.SECTIONS_Y; sy++) {
-         totalVerts += mesher.buildSectionGeometry(world, 5, sy, 5, scratch);
+         totalVerts += mesher.buildSectionGeometry(moveWorld, 0, sy, 0, scratch);
       }
-      check(totalVerts > 100, "Center chunk VBO mesher must emit > 100 vertices, got " + totalVerts);
+      check(totalVerts > 100, "Spawn chunk VBO mesher must emit > 100 vertices, got " + totalVerts);
 
       PeGLSurfaceView glView = new PeGLSurfaceView(ctx);
       glView.onSurfaceCreated(null, null);
@@ -422,7 +440,7 @@ public class PeCoreTest {
       glView.world.screen = PeWorld.SCREEN_PLAY;
       glView.onDrawFrame(null); // Draw Play Screen
 
-      System.out.println("PeCoreTest PASSED: Font readability, Single-Player World Gen & Save/Load, Left/Right movement math, and Pure Camera Look verified!");
+      System.out.println("PeCoreTest PASSED: Infinite Worlds, TexPaint319 Leaves & Terrain Textures, O(1) Section Meshing, Mobile UI, and Controls verified!");
    }
 }
 """

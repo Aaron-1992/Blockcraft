@@ -9,7 +9,7 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 /**
- * OpenGL ES 3.0 / 2.0 SurfaceView & Renderer for Blockcraft PE Single-Player
+ * OpenGL ES 3.0 / 2.0 SurfaceView & Renderer for Blockcraft PE v1.1 (Infinite Worlds)
  * on Samsung Galaxy A55 5G (120Hz Super AMOLED 2340x1080).
  */
 public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceView.Renderer {
@@ -86,7 +86,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.touch.updateLayout(this.width, this.height);
 
       float aspect = (float)this.width / (float)this.height;
-      Matrix.perspectiveM(this.projMatrix, 0, 72.0F, aspect, 0.12F, 185.0F);
+      Matrix.perspectiveM(this.projMatrix, 0, 72.0F, aspect, 0.12F, 210.0F);
       Matrix.orthoM(this.orthoMatrix, 0, 0.0F, this.width, this.height, 0.0F, -1.0F, 1.0F);
    }
 
@@ -111,7 +111,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.world.yaw += this.touch.consumeYawDelta();
          this.world.pitch = Math.max(-89.0F, Math.min(89.0F, this.world.pitch + this.touch.consumePitchDelta()));
 
-         // Handle dedicated button taps (MINE/HIT vs PLACE/USE)
+         // Handle dedicated button taps (MINE vs PLACE/USE)
          if (this.touch.attackTapped) {
             this.touch.attackTapped = false;
             this.world.triggerAttackAction(this.audio);
@@ -132,25 +132,23 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       } else {
          this.touch.consumeYawDelta();
          this.touch.consumePitchDelta();
-         this.panoramaYaw = (this.panoramaYaw + dt * 10.0F) % 360.0F;
+         this.panoramaYaw = (this.panoramaYaw + dt * 9.0F) % 360.0F;
       }
 
-      // Rebuild up to 8 dirty chunk sections per frame
-      this.mesher.updateDirtySections(this.world, 8);
+      // Rebuild dirty chunk sections with a smooth frame budget
+      this.mesher.updateDirtySections(this.world, this.world.screen == PeWorld.SCREEN_PLAY ? 6 : 12);
 
-      // Day/Night Sky & Fog color
+      // Day/Night Sky & Horizon Fog color
       float sun = (float)Math.sin(this.world.dayTime * Math.PI * 2.0);
-      float dayBright = Math.max(0.18F, Math.min(1.0F, 0.62F + sun * 0.45F));
-      float skyR = 0.44F * dayBright;
-      float skyG = 0.68F * dayBright;
+      float dayBright = Math.max(0.20F, Math.min(1.0F, 0.64F + sun * 0.44F));
+      float skyR = 0.42F * dayBright;
+      float skyG = 0.69F * dayBright;
       float skyB = 0.98F * dayBright;
 
       GLES20.glClearColor(skyR, skyG, skyB, 1.0F);
       GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-      // Build Right-Handed 3D Camera View & MVP Matrix:
-      // Forward = ( +sin(yaw)*cos(pitch), -sin(pitch), -cos(yaw)*cos(pitch) )
-      // Right   = ( +cos(yaw),             0,          +sin(yaw)            )
+      // Build Right-Handed 3D Camera View & MVP Matrix
       boolean isMenuPanorama = (this.world.screen == PeWorld.SCREEN_TITLE
          || this.world.screen == PeWorld.SCREEN_WORLD_SELECT
          || this.world.screen == PeWorld.SCREEN_CREATE_WORLD);
@@ -158,7 +156,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       float camY = isMenuPanorama ? 74.0F : (float)(this.world.py + (this.touch.sneakHeld && !this.world.flying ? 1.46 : 1.62));
       float camZ = isMenuPanorama ? 0.5F : (float)this.world.pz;
       float useYaw = isMenuPanorama ? this.panoramaYaw : this.world.yaw;
-      float usePitch = isMenuPanorama ? 12.0F : this.world.pitch;
+      float usePitch = isMenuPanorama ? 11.0F : this.world.pitch;
 
       float yawRad = (float)Math.toRadians(useYaw);
       float pitchRad = (float)Math.toRadians(usePitch);
@@ -173,7 +171,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          0.0F, 1.0F, 0.0F);
       Matrix.multiplyMM(this.mvpMatrix, 0, this.projMatrix, 0, this.viewMatrix, 0);
 
-      // 1. Render 3D World Chunks using Hardware VBOs
+      // 1. Render Infinite 3D World Chunks using Hardware VBOs
       GLES20.glEnable(GLES20.GL_DEPTH_TEST);
       GLES20.glEnable(GLES20.GL_CULL_FACE);
       GLES20.glUseProgram(this.shaders.prog3D);
@@ -181,33 +179,19 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, this.textures.atlasTexId);
       GLES20.glUniform1i(this.shaders.uTex3D, 0);
       GLES20.glUniform3f(this.shaders.uFogColor, skyR, skyG, skyB);
-      GLES20.glUniform2f(this.shaders.uFogRange, 52.0F, 118.0F);
+      float fogEnd = (this.world.viewRadiusChunks + 0.5F) * 16.0F;
+      GLES20.glUniform2f(this.shaders.uFogRange, fogEnd * 0.52F, fogEnd);
 
       this.mesher.drawWorldChunks(this.shaders, this.world, this.mvpMatrix, camX, camY, camZ,
          (float)Math.sin(yawRad), (float)(-Math.cos(yawRad)));
 
-      // 2. Render 3D Dynamic Entities (Mobs, Projectiles, Target Block Highlight & Crack Overlay, 1st-Person Hand)
+      // 2. Render Target Block Selection Box, Crack Overlay & 1st-Person Hand/Tool
+      int[] rayHit = null;
       if (!isMenuPanorama) {
          GLES20.glDisable(GLES20.GL_CULL_FACE);
          this.mesher.beginDynamic3D();
-         for (int i = 0; i < this.world.mobs.size(); i++) {
-            PeWorld.PeMob m = this.world.mobs.get(i);
-            if (m != null && !m.dead) {
-               this.mesher.addMobModel(m);
-            }
-         }
-         for (int i = 0; i < this.world.projectiles.size(); i++) {
-            PeWorld.PeProjectile pr = this.world.projectiles.get(i);
-            if (pr == null || pr.dead) continue;
-            float px = (float)pr.x;
-            float py = (float)pr.y;
-            float pz = (float)pr.z;
-            this.mesher.addBox3D(px - 0.12F, py - 0.12F, pz - 0.12F, px + 0.12F, py + 0.12F, pz + 0.12F,
-               PeTextures.T_PLANKS_OAK, 1.0F, 0.9F, 0.6F, 1.0F);
-         }
 
-         // Target Block Selection Box & Mining Crack Stage
-         int[] rayHit = this.world.raycastBlock(5.0);
+         rayHit = this.world.raycastBlock(5.0);
          if (rayHit != null) {
             float bx = rayHit[0];
             float by = rayHit[1];
@@ -218,16 +202,17 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
                   PeTextures.T_CRACK_0 + crackStage, 1.0F, 1.0F, 1.0F, 0.88F);
             } else {
                this.mesher.addBox3D(bx - 0.005F, by - 0.005F, bz - 0.005F, bx + 1.005F, by + 1.005F, bz + 1.005F,
-                  PeTextures.T_GLASS, 1.0F, 1.0F, 1.0F, 0.25F);
+                  PeTextures.T_GLASS, 1.0F, 1.0F, 1.0F, 0.22F);
             }
          }
 
-         // First-Person Held Item / Block in bottom-right of camera view
+         // First-Person Held Block / Tool with walk bobbing & swing animation
          float rightX = (float)Math.cos(yawRad);
          float rightZ = (float)Math.sin(yawRad);
+         float bob = (float)Math.sin(this.world.walkDist * 2.2F) * 0.018F;
          float sw = this.world.swingAnim >= 0.0F ? (float)Math.sin(this.world.swingAnim * Math.PI) * 0.22F : 0.0F;
          float hx = camX + lookX * (0.58F - sw * 0.4F) + rightX * 0.36F;
-         float hy = camY + lookY * 0.58F - 0.28F + sw * 0.15F;
+         float hy = camY + lookY * 0.58F - 0.28F + sw * 0.15F + bob;
          float hz = camZ + lookZ * (0.58F - sw * 0.4F) + rightZ * 0.36F;
          int heldId = this.world.hotbarId[this.world.selectedSlot];
          int heldTile = PeWorld.getItemTile(heldId);
@@ -236,10 +221,10 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.mesher.flushDynamic3D(this.shaders);
       }
 
-      // 3. Render 2D UI / HUD
+      // 3. Render 2D Mobile UI / HUD
       GLES20.glDisable(GLES20.GL_DEPTH_TEST);
       if (this.world.screen == PeWorld.SCREEN_PLAY) {
-         renderPlayHud();
+         renderPlayHud(rayHit);
       } else {
          renderMenuScreen();
       }
@@ -257,113 +242,154 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          return;
       }
 
-      // Pass A: Colored Panels & Buttons
+      // Pass A: Dark-Glass Cards, Frames & Tactile Buttons
       this.mesher.begin2D();
-      this.mesher.addRect2D(0, 0, this.width, this.height, 0x9010141C);
+      this.mesher.addRect2D(0, 0, this.width, this.height, 0x800A0E16);
 
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
-         drawBevelButton(cx - 560.0F * scale, 120.0F * scale, 1120.0F * scale, 240.0F * scale, 0xD81E242E);
-         float bw = 760.0F * scale;
-         float bh = 116.0F * scale;
-         float bx = cx - bw * 0.5F;
-         drawBevelButton(bx, 500.0F * scale, bw, bh, 0xFF347844);
-         drawBevelButton(bx, 650.0F * scale, bw, bh, 0xFF2E3C4E);
-      } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
-         float pw = 1480.0F * scale;
-         float px = cx - pw * 0.5F;
-         drawBevelButton(px, 90.0F * scale, pw, 860.0F * scale, 0xEE181C24);
-         for (int s = 0; s < 3; s++) {
-            float rowY = (240.0F + s * 185.0F) * scale;
-            float rowH = 155.0F * scale;
-            int slotCol = this.world.slotExists[s] ? 0xFF285838 : 0xFF2A323E;
-            drawBevelButton(px + 40.0F * scale, rowY, pw - 360.0F * scale, rowH, slotCol);
-            int actCol = this.world.slotExists[s] ? 0xFF7A2E2E : 0xFF346844;
-            drawBevelButton(px + pw - 300.0F * scale, rowY, 260.0F * scale, rowH, actCol);
-         }
-         drawBevelButton(cx - 320.0F * scale, 825.0F * scale, 640.0F * scale, 100.0F * scale, 0xFF384252);
-      } else if (this.world.screen == PeWorld.SCREEN_CREATE_WORLD) {
-         float pw = 1140.0F * scale;
-         float px = cx - pw * 0.5F;
-         drawBevelButton(px, 110.0F * scale, pw, 780.0F * scale, 0xEE181C24);
-         float bw = 960.0F * scale;
-         float bx = cx - bw * 0.5F;
-         float bh = 112.0F * scale;
-         drawBevelButton(bx, 260.0F * scale, bw, bh, 0xFF2C3A4C);
-         drawBevelButton(bx, 400.0F * scale, bw, bh, 0xFF2C4A3E);
-         drawBevelButton(bx, 540.0F * scale, bw, bh, 0xFF2C3A4C);
-         drawBevelButton(bx, 720.0F * scale, 580.0F * scale, 120.0F * scale, 0xFF347844);
-         drawBevelButton(bx + 610.0F * scale, 720.0F * scale, 350.0F * scale, 120.0F * scale, 0xFF5A3232);
-      } else if (this.world.screen == PeWorld.SCREEN_PAUSE) {
-         float pw = 960.0F * scale;
-         drawBevelButton(cx - pw * 0.5F, 100.0F * scale, pw, 790.0F * scale, 0xEE181C24);
+         // Hero Title Card
+         this.mesher.drawCard2D(cx - 600.0F * scale, 105.0F * scale, 1200.0F * scale, 275.0F * scale, 0xE6141A24, 0xFF3E5674);
+         // Subtitle Pill inside Hero Card
+         this.mesher.addRect2D(cx - 420.0F * scale, 292.0F * scale, 840.0F * scale, 54.0F * scale, 0xD81E3428);
+
          float bw = 820.0F * scale;
+         float bh = 122.0F * scale;
          float bx = cx - bw * 0.5F;
-         float bh = 104.0F * scale;
-         drawBevelButton(bx, 220.0F * scale, bw, bh, 0xFF347844);
-         drawBevelButton(bx, 350.0F * scale, bw, bh, 0xFF2E3E52);
-         drawBevelButton(bx, 480.0F * scale, bw, bh, 0xFF2E3E52);
-         drawBevelButton(bx, 610.0F * scale, bw, bh, 0xFF2E5A44);
-         drawBevelButton(bx, 740.0F * scale, bw, bh, 0xFF683232);
+         this.mesher.drawButton2D(bx, 500.0F * scale, bw, bh, 0xFF286C3E, 0xFF54E882, true);
+         this.mesher.drawButton2D(bx, 650.0F * scale, bw, bh, 0xFF243448, 0xFF5CA8FF, false);
+
+         // Bottom Footer Pill
+         this.mesher.drawCard2D(cx - 520.0F * scale, 932.0F * scale, 1040.0F * scale, 72.0F * scale, 0xCC121620, 0xFF2A3648);
+      } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
+         float pw = 1540.0F * scale;
+         float px = cx - pw * 0.5F;
+         this.mesher.drawCard2D(px, 82.0F * scale, pw, 880.0F * scale, 0xF0121620, 0xFF384C68);
+         this.mesher.addRect2D(px + 20.0F * scale, 98.0F * scale, pw - 40.0F * scale, 92.0F * scale, 0xD01A2230);
+
+         for (int s = 0; s < 3; s++) {
+            float rowY = (232.0F + s * 186.0F) * scale;
+            float rowH = 158.0F * scale;
+            boolean exists = this.world.slotExists[s];
+            int cardBg = exists ? 0xFF1E3E2C : 0xFF1E2634;
+            int cardAccent = exists ? 0xFF4CE07A : 0xFF5288C8;
+            this.mesher.drawButton2D(px + 40.0F * scale, rowY, pw - 360.0F * scale, rowH, cardBg, cardAccent, exists);
+            // Slot icon frame on the left of each world card
+            this.mesher.drawSlot2D(px + 66.0F * scale, rowY + 21.0F * scale, 116.0F * scale, exists, 0);
+
+            int actBg = exists ? 0xFF682626 : 0xFF28683C;
+            int actAccent = exists ? 0xFFFF6464 : 0xFF54E882;
+            this.mesher.drawButton2D(px + pw - 300.0F * scale, rowY, 260.0F * scale, rowH, actBg, actAccent, false);
+         }
+         this.mesher.drawButton2D(cx - 340.0F * scale, 822.0F * scale, 680.0F * scale, 102.0F * scale, 0xFF283446, 0xFF70A8FF, false);
+      } else if (this.world.screen == PeWorld.SCREEN_CREATE_WORLD) {
+         float pw = 1180.0F * scale;
+         float px = cx - pw * 0.5F;
+         this.mesher.drawCard2D(px, 96.0F * scale, pw, 800.0F * scale, 0xF0121620, 0xFF3A5270);
+         this.mesher.addRect2D(px + 20.0F * scale, 112.0F * scale, pw - 40.0F * scale, 90.0F * scale, 0xD01A2230);
+
+         float bw = 1020.0F * scale;
+         float bx = cx - bw * 0.5F;
+         float bh = 114.0F * scale;
+         this.mesher.drawButton2D(bx, 255.0F * scale, bw, bh, 0xFF223246, 0xFF5CA8FF, false);
+         this.mesher.drawButton2D(bx, 395.0F * scale, bw, bh, 0xFF1E3E2E, 0xFF52E882, true);
+         this.mesher.drawButton2D(bx, 535.0F * scale, bw, bh, 0xFF2C3224, 0xFFFFD858, false);
+         this.mesher.drawButton2D(bx, 720.0F * scale, 640.0F * scale, 120.0F * scale, 0xFF286C3E, 0xFF54E882, true);
+         this.mesher.drawButton2D(bx + 664.0F * scale, 720.0F * scale, 356.0F * scale, 120.0F * scale, 0xFF5A2828, 0xFFFF6868, false);
+      } else if (this.world.screen == PeWorld.SCREEN_PAUSE) {
+         float pw = 980.0F * scale;
+         float px = cx - pw * 0.5F;
+         this.mesher.drawCard2D(px, 92.0F * scale, pw, 806.0F * scale, 0xF0121620, 0xFF3A5270);
+         this.mesher.addRect2D(px + 20.0F * scale, 108.0F * scale, pw - 40.0F * scale, 84.0F * scale, 0xD01A2230);
+
+         float bw = 860.0F * scale;
+         float bx = cx - bw * 0.5F;
+         float bh = 106.0F * scale;
+         this.mesher.drawButton2D(bx, 218.0F * scale, bw, bh, 0xFF286C3E, 0xFF54E882, true);
+         this.mesher.drawButton2D(bx, 348.0F * scale, bw, bh, 0xFF223448, 0xFF5CA8FF, false);
+         this.mesher.drawButton2D(bx, 478.0F * scale, bw, bh, 0xFF223448, 0xFF5CA8FF, false);
+         this.mesher.drawButton2D(bx, 608.0F * scale, bw, bh, 0xFF224C38, 0xFF54E882, false);
+         this.mesher.drawButton2D(bx, 738.0F * scale, bw, bh, 0xFF622626, 0xFFFF6868, false);
       } else if (this.world.screen == PeWorld.SCREEN_SETTINGS) {
-         float pw = 1120.0F * scale;
-         drawBevelButton(cx - pw * 0.5F, 90.0F * scale, pw, 880.0F * scale, 0xEE181C24);
-         float bw = 980.0F * scale;
+         float pw = 1160.0F * scale;
+         float px = cx - pw * 0.5F;
+         this.mesher.drawCard2D(px, 82.0F * scale, pw, 892.0F * scale, 0xF0121620, 0xFF3A5270);
+         this.mesher.addRect2D(px + 20.0F * scale, 98.0F * scale, pw - 40.0F * scale, 84.0F * scale, 0xD01A2230);
+
+         float bw = 1020.0F * scale;
          float bx = cx - bw * 0.5F;
          float bh = 104.0F * scale;
          for (int i = 0; i < 5; i++) {
-            drawBevelButton(bx, (210.0F + i * 125.0F) * scale, bw, bh, 0xFF2C3A4C);
+            int acc = (i == 1 || i == 4) ? 0xFF54E882 : 0xFF5CA8FF;
+            this.mesher.drawButton2D(bx, (206.0F + i * 124.0F) * scale, bw, bh, 0xFF202C3C, acc, false);
          }
-         drawBevelButton(cx - 300.0F * scale, 845.0F * scale, 600.0F * scale, 100.0F * scale, 0xFF347844);
+         this.mesher.drawButton2D(cx - 320.0F * scale, 840.0F * scale, 640.0F * scale, 102.0F * scale, 0xFF286C3E, 0xFF54E882, true);
       }
 
       this.mesher.flush2D(this.shaders, this.textures.whiteTexId, this.orthoMatrix);
 
-      // Pass B: Crisp Bitmap Font Text
+      // Pass B: Atlas Icons on Menu Cards (Title Block Badges & World Slot Icons)
       this.mesher.begin2D();
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
-         this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 155.0F * scale, 6.2F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "Pocket Edition - Singleplayer World Gen & Saving", cx, 265.0F * scale, 3.2F * scale, 0xFFD8F0FF);
-         this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 536.0F * scale, 4.0F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 686.0F * scale, 3.8F * scale, 0xFFE0F0FF);
-         this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G | 120Hz OpenGL ES VBO Engine", cx, 960.0F * scale, 2.8F * scale, 0xFFB8D0E8);
+         this.mesher.addTile2D(cx - 540.0F * scale, 148.0F * scale, 116.0F * scale, 116.0F * scale, PeTextures.T_GRASS_SIDE, 0xFFFFFFFF);
+         this.mesher.addTile2D(cx + 424.0F * scale, 148.0F * scale, 116.0F * scale, 116.0F * scale, PeTextures.T_CRAFT_SIDE, 0xFFFFFFFF);
       } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
-         float pw = 1480.0F * scale;
+         float pw = 1540.0F * scale;
          float px = cx - pw * 0.5F;
-         this.mesher.addTextCentered2D(this.textures, "SELECT OR CREATE SINGLEPLAYER WORLD", cx, 135.0F * scale, 4.2F * scale, 0xFFFFEA68);
+         int[] slotIcons = {PeTextures.T_GRASS_SIDE, PeTextures.T_LEAVES_OAK, PeTextures.T_CRAFT_SIDE};
          for (int s = 0; s < 3; s++) {
-            float rowY = (240.0F + s * 185.0F) * scale;
-            String title = "WORLD SLOT " + (s + 1) + (this.world.slotExists[s] ? "  [SAVED]" : "  [EMPTY]");
-            this.mesher.addText2D(this.textures, title, px + 76.0F * scale, rowY + 28.0F * scale, 3.6F * scale, 0xFFFFFFFF);
-            this.mesher.addText2D(this.textures, this.world.slotSummary[s], px + 76.0F * scale, rowY + 88.0F * scale, 3.0F * scale, 0xFF98E8B0);
-            String rightLabel = this.world.slotExists[s] ? "DELETE" : "CREATE";
-            this.mesher.addTextCentered2D(this.textures, rightLabel, px + pw - 170.0F * scale, rowY + 58.0F * scale, 3.4F * scale, 0xFFFFFFFF);
+            float rowY = (232.0F + s * 186.0F) * scale;
+            this.mesher.addTile2D(px + 84.0F * scale, rowY + 39.0F * scale, 80.0F * scale, 80.0F * scale, slotIcons[s], 0xFFFFFFFF);
          }
-         this.mesher.addTextCentered2D(this.textures, "BACK TO TITLE", cx, 855.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+      }
+      this.mesher.flush2D(this.shaders, this.textures.atlasTexId, this.orthoMatrix);
+
+      // Pass C: Crisp Bitmap Font Text
+      this.mesher.begin2D();
+      if (this.world.screen == PeWorld.SCREEN_TITLE) {
+         this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 142.0F * scale, 6.4F * scale, 0xFFFFEA68);
+         this.mesher.addTextCentered2D(this.textures, "v1.1  -  INFINITE WORLDS  |  PIXEL-ART TEXTURE OVERHAUL", cx, 304.0F * scale, 2.8F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 538.0F * scale, 4.1F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 690.0F * scale, 3.8F * scale, 0xFFE4F2FF);
+         this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz OpenGL ES Infinite Chunk Engine", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
+      } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
+         float pw = 1540.0F * scale;
+         float px = cx - pw * 0.5F;
+         this.mesher.addTextCentered2D(this.textures, "SELECT OR CREATE INFINITE SINGLEPLAYER WORLD", cx, 124.0F * scale, 4.0F * scale, 0xFFFFEA68);
+         for (int s = 0; s < 3; s++) {
+            float rowY = (232.0F + s * 186.0F) * scale;
+            String title = "WORLD SLOT " + (s + 1) + (this.world.slotExists[s] ? "   [SAVED]" : "   [NEW WORLD]");
+            this.mesher.addText2D(this.textures, title, px + 210.0F * scale, rowY + 30.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+            this.mesher.addText2D(this.textures, this.world.slotSummary[s], px + 210.0F * scale, rowY + 92.0F * scale, 2.9F * scale, 0xFF98F4B4);
+            String rightLabel = this.world.slotExists[s] ? "DELETE" : "CREATE";
+            this.mesher.addTextCentered2D(this.textures, rightLabel, px + pw - 170.0F * scale, rowY + 60.0F * scale, 3.4F * scale, 0xFFFFFFFF);
+         }
+         this.mesher.addTextCentered2D(this.textures, "BACK TO TITLE", cx, 854.0F * scale, 3.6F * scale, 0xFFFFFFFF);
       } else if (this.world.screen == PeWorld.SCREEN_CREATE_WORLD) {
-         this.mesher.addTextCentered2D(this.textures, "CREATE NEW WORLD (SLOT " + (this.world.createSlot + 1) + ")", cx, 150.0F * scale, 4.2F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "GAME MODE: " + PeWorld.MODE_NAMES[this.world.createMode], cx, 296.0F * scale, 3.6F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "WORLD TYPE: " + PeWorld.WTYPE_NAMES[this.world.createWorldType], cx, 436.0F * scale, 3.4F * scale, 0xFF90FFB0);
-         this.mesher.addTextCentered2D(this.textures, "SEED: " + PeWorld.SEED_NAMES[this.world.createSeedIdx], cx, 576.0F * scale, 3.6F * scale, 0xFFFFE088);
-         this.mesher.addTextCentered2D(this.textures, "Tip: Large Biomes recommended for best exploration!", cx, 668.0F * scale, 2.8F * scale, 0xFFB8E0FF);
-         float bx = cx - 480.0F * scale;
-         this.mesher.addTextCentered2D(this.textures, "CREATE WORLD", bx + 290.0F * scale, 760.0F * scale, 3.8F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "CANCEL", bx + 785.0F * scale, 760.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "CREATE INFINITE WORLD (SLOT " + (this.world.createSlot + 1) + ")", cx, 138.0F * scale, 4.1F * scale, 0xFFFFEA68);
+         this.mesher.addTextCentered2D(this.textures, "GAME MODE:  " + PeWorld.MODE_NAMES[this.world.createMode], cx, 292.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "WORLD TYPE:  " + PeWorld.WTYPE_NAMES[this.world.createWorldType], cx, 432.0F * scale, 3.4F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "BIOME SEED:  " + PeWorld.SEED_NAMES[this.world.createSeedIdx], cx, 572.0F * scale, 3.6F * scale, 0xFFFFE282);
+         this.mesher.addTextCentered2D(this.textures, "Large Biomes recommended  -  Infinite chunks stream seamlessly as you explore!", cx, 668.0F * scale, 2.6F * scale, 0xFFB8E2FF);
+         float bx = cx - 510.0F * scale;
+         this.mesher.addTextCentered2D(this.textures, "CREATE INFINITE WORLD", bx + 320.0F * scale, 760.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "CANCEL", bx + 842.0F * scale, 760.0F * scale, 3.5F * scale, 0xFFFFFFFF);
       } else if (this.world.screen == PeWorld.SCREEN_PAUSE) {
-         this.mesher.addTextCentered2D(this.textures, "GAME PAUSED - " + this.world.currentWorldSummary(), cx, 140.0F * scale, 3.8F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "RESUME GAME", cx, 254.0F * scale, 3.6F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "GAME MODE: " + PeWorld.MODE_NAMES[this.world.mode], cx, 384.0F * scale, 3.6F * scale, 0xFF98E8FF);
-         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 514.0F * scale, 3.6F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "SAVE WORLD NOW", cx, 644.0F * scale, 3.6F * scale, 0xFF98FFB0);
-         this.mesher.addTextCentered2D(this.textures, "SAVE & QUIT TO TITLE", cx, 774.0F * scale, 3.6F * scale, 0xFFFFC0C0);
+         this.mesher.addTextCentered2D(this.textures, "GAME PAUSED  -  " + this.world.currentWorldSummary(), cx, 132.0F * scale, 3.8F * scale, 0xFFFFEA68);
+         this.mesher.addTextCentered2D(this.textures, "RESUME GAME", cx, 252.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "GAME MODE:  " + PeWorld.MODE_NAMES[this.world.mode], cx, 382.0F * scale, 3.6F * scale, 0xFF98E8FF);
+         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 512.0F * scale, 3.6F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "SAVE WORLD NOW", cx, 642.0F * scale, 3.6F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "SAVE & QUIT TO TITLE", cx, 772.0F * scale, 3.6F * scale, 0xFFFFC4C4);
       } else if (this.world.screen == PeWorld.SCREEN_SETTINGS) {
-         this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 130.0F * scale, 4.2F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "LEFT MOVEMENT: " + (this.touch.useAnalogStick ? "ANALOG JOYSTICK" : "CLASSIC 5-BUTTON D-PAD"), cx, 244.0F * scale, 3.3F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "CAMERA / ACTIONS: " + (this.touch.touchTapToInteract ? "BUTTONS + STATIONARY TAP" : "DEDICATED BUTTONS ONLY (NO ACCIDENTAL MINE)"), cx, 369.0F * scale, 2.8F * scale, 0xFF98FFB0);
+         this.mesher.addTextCentered2D(this.textures, "CONTROLS, UI & PERFORMANCE SETTINGS", cx, 122.0F * scale, 4.0F * scale, 0xFFFFEA68);
+         this.mesher.addTextCentered2D(this.textures, "LEFT MOVEMENT:  " + (this.touch.useAnalogStick ? "CIRCULAR ANALOG JOYSTICK" : "CLASSIC 5-BUTTON D-PAD"), cx, 240.0F * scale, 3.2F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "ACTION CONTROLS:  " + (this.touch.touchTapToInteract ? "BUTTONS + STATIONARY TAP" : "DEDICATED BUTTONS ONLY (NO ACCIDENTAL MINE)"), cx, 366.0F * scale, 2.7F * scale, 0xFF98FFB8);
          String sensStr = this.touch.sensitivityLevel == 0 ? "LOW" : (this.touch.sensitivityLevel == 2 ? "HIGH" : "MEDIUM");
-         this.mesher.addTextCentered2D(this.textures, "CAMERA LOOK SENSITIVITY: " + sensStr, cx, 494.0F * scale, 3.3F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "AUTO-JUMP: " + (this.world.autoJump ? "ON" : "OFF"), cx, 619.0F * scale, 3.3F * scale, 0xFFFFE088);
-         this.mesher.addTextCentered2D(this.textures, "INVERT Y-AXIS: " + (this.touch.invertY ? "ON" : "OFF"), cx, 744.0F * scale, 3.3F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "DONE", cx, 878.0F * scale, 3.8F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "CAMERA LOOK SENSITIVITY:  " + sensStr, cx, 488.0F * scale, 3.2F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "AUTO-JUMP:  " + (this.world.autoJump ? "ON (POCKET EDITION)" : "OFF"), cx, 612.0F * scale, 3.2F * scale, 0xFFFFE282);
+         int gridW = this.world.viewRadiusChunks * 2 + 1;
+         this.mesher.addTextCentered2D(this.textures, "INFINITE RENDER DISTANCE:  " + gridW + "x" + gridW + " CHUNKS (" + (gridW * 16) + " BLOCKS)", cx, 736.0F * scale, 3.1F * scale, 0xFF98E8FF);
+         this.mesher.addTextCentered2D(this.textures, "DONE", cx, 874.0F * scale, 3.8F * scale, 0xFFFFFFFF);
       }
       this.mesher.flush2D(this.shaders, this.textures.fontTexId, this.orthoMatrix);
    }
@@ -372,32 +398,35 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
    //  Single-Player Inventory & Crafting Screen
    // ====================================================================
    private void renderInventoryAndCraftingScreen(float scale) {
-      float panelW = 1920.0F * scale;
-      float panelH = 780.0F * scale;
+      float panelW = 1940.0F * scale;
+      float panelH = 790.0F * scale;
       float px = (this.width - panelW) * 0.5F;
-      float py = 95.0F * scale;
+      float py = 90.0F * scale;
 
       this.mesher.begin2D();
-      this.mesher.addRect2D(0, 0, this.width, this.height, 0x9010141C);
-      drawBevelButton(px, py, panelW, panelH, 0xF0181C24);
-      drawBevelButton(px + panelW - 220.0F * scale, py + 16.0F * scale, 200.0F * scale, 72.0F * scale, 0xFF7A2E2E);
+      this.mesher.addRect2D(0, 0, this.width, this.height, 0x88080C14);
+      this.mesher.drawCard2D(px, py, panelW, panelH, 0xF2121620, 0xFF3A5270);
+      this.mesher.addRect2D(px + 18.0F * scale, py + 16.0F * scale, panelW - 36.0F * scale, 78.0F * scale, 0xD81A2230);
+      this.mesher.drawButton2D(px + panelW - 230.0F * scale, py + 18.0F * scale, 210.0F * scale, 74.0F * scale, 0xFF682626, 0xFFFF6868, false);
 
-      // Left Half: 7x4 Block/Item Grid
+      // Left Half: 7x4 Recessed Block/Item Slot Grid
       int[] pal = PeTouchController.getPaletteItems();
       int cols = 7;
       float cell = 132.0F * scale;
       float startX = px + 36.0F * scale;
       float startY = py + 120.0F * scale;
+      int curHeld = this.world.hotbarId[this.world.selectedSlot];
       for (int i = 0; i < pal.length; i++) {
          int c = i % cols;
          int r = i / cols;
-         drawBevelButton(startX + c * cell + 6.0F * scale, startY + r * cell + 6.0F * scale,
-            cell - 12.0F * scale, cell - 12.0F * scale, 0xFF2A3442);
+         boolean isEquipped = (pal[i] == curHeld);
+         this.mesher.drawSlot2D(startX + c * cell + 6.0F * scale, startY + r * cell + 6.0F * scale,
+            cell - 12.0F * scale, isEquipped, 0);
       }
 
-      // Right Half: 2x6 Crafting Recipe Buttons
+      // Right Half: 2x6 Crafting Workshop Cards
       float craftStartX = px + 1010.0F * scale;
-      float craftColW = 430.0F * scale;
+      float craftColW = 436.0F * scale;
       float craftRowH = 98.0F * scale;
       for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
          int c = i & 1;
@@ -405,25 +434,28 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          PeWorld.CraftRecipe rec = PeWorld.RECIPES[i];
          boolean canCraft = (this.world.mode == PeWorld.MODE_CREATIVE)
             || (this.world.countItemInHotbar(rec.costId) >= rec.costCount);
-         int bg = canCraft ? 0xFF2E5C3E : 0xFF2C2E38;
-         drawBevelButton(craftStartX + c * (craftColW + 18.0F * scale), startY + r * (craftRowH + 10.0F * scale),
-            craftColW, craftRowH, bg);
+         int bg = canCraft ? 0xFF224C34 : 0xFF202632;
+         int acc = canCraft ? 0xFF54E882 : 0xFF425066;
+         float rx = craftStartX + c * (craftColW + 18.0F * scale);
+         float ry = startY + r * (craftRowH + 10.0F * scale);
+         this.mesher.drawButton2D(rx, ry, craftColW, craftRowH, bg, acc, canCraft);
+         this.mesher.drawSlot2D(rx + 12.0F * scale, ry + 11.0F * scale, 76.0F * scale, false, 0xD8161C24);
       }
 
-      // Bottom Hotbar
+      // Bottom 9-Slot Hotbar + [CLOSE] Slot
       float hs = this.touch.hotbarSlotSize;
       float hx = this.touch.hotbarX;
       float hy = this.touch.hotbarY;
-      this.mesher.addRect2D(hx - 6.0F * scale, hy - 6.0F * scale, hs * 10.0F + 12.0F * scale, hs + 12.0F * scale, 0xD8181A20);
+      this.mesher.drawCard2D(hx - 8.0F * scale, hy - 8.0F * scale, hs * 10.0F + 16.0F * scale, hs + 16.0F * scale, 0xE812161E, 0xFF3A4E68);
       for (int s = 0; s < 10; s++) {
          float sx = hx + s * hs;
          boolean sel = (s == this.world.selectedSlot);
-         int bg = (s == 9) ? 0xC0683232 : (sel ? 0xE04E8A3E : 0xB02C3038);
-         drawBevelButton(sx + 3.0F * scale, hy + 3.0F * scale, hs - 6.0F * scale, hs - 6.0F * scale, bg);
+         int special = (s == 9) ? 0xD8682828 : 0;
+         this.mesher.drawSlot2D(sx + 3.0F * scale, hy + 3.0F * scale, hs - 6.0F * scale, sel, special);
       }
       this.mesher.flush2D(this.shaders, this.textures.whiteTexId, this.orthoMatrix);
 
-      // Pass B: Item Icons
+      // Pass B: Crisp Pixel-Art Block & Item Icons
       this.mesher.begin2D();
       for (int i = 0; i < pal.length; i++) {
          int c = i % cols;
@@ -436,16 +468,16 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          int c = i & 1;
          int r = i >> 1;
          PeWorld.CraftRecipe rec = PeWorld.RECIPES[i];
-         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 12.0F * scale;
-         float by = startY + r * (craftRowH + 10.0F * scale) + 14.0F * scale;
-         this.mesher.addTile2D(bx, by, 68.0F * scale, 68.0F * scale, PeWorld.getItemTile(rec.outId), 0xFFFFFFFF);
+         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 22.0F * scale;
+         float by = startY + r * (craftRowH + 10.0F * scale) + 21.0F * scale;
+         this.mesher.addTile2D(bx, by, 56.0F * scale, 56.0F * scale, PeWorld.getItemTile(rec.outId), 0xFFFFFFFF);
       }
       for (int s = 0; s < 9; s++) {
          int id = this.world.hotbarId[s];
          if (id != PeWorld.B_AIR) {
             int tile = PeWorld.getItemTile(id);
-            this.mesher.addTile2D(hx + s * hs + 14.0F * scale, hy + 14.0F * scale,
-               hs - 28.0F * scale, hs - 28.0F * scale, tile, 0xFFFFFFFF);
+            this.mesher.addTile2D(hx + s * hs + 15.0F * scale, hy + 15.0F * scale,
+               hs - 30.0F * scale, hs - 30.0F * scale, tile, 0xFFFFFFFF);
          }
       }
       this.mesher.flush2D(this.shaders, this.textures.atlasTexId, this.orthoMatrix);
@@ -453,24 +485,24 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       // Pass C: Labels
       this.mesher.begin2D();
       String leftHdr = (this.world.mode == PeWorld.MODE_CREATIVE)
-         ? "CREATIVE BLOCKS & TOOLS (TAP TO EQUIP)"
-         : "BLOCKS & ITEMS";
-      this.mesher.addText2D(this.textures, leftHdr, startX, py + 38.0F * scale, 3.2F * scale, 0xFFFFEA68);
-      this.mesher.addText2D(this.textures, "CRAFTING RECIPES (TAP TO CRAFT)", craftStartX, py + 38.0F * scale, 3.2F * scale, 0xFF98FFB0);
-      this.mesher.addTextCentered2D(this.textures, "CLOSE", px + panelW - 120.0F * scale, py + 36.0F * scale, 3.2F * scale, 0xFFFFFFFF);
+         ? "CREATIVE PALETTE (TAP TO EQUIP)"
+         : "BLOCKS & ITEMS CATALOG";
+      this.mesher.addText2D(this.textures, leftHdr, startX, py + 36.0F * scale, 3.1F * scale, 0xFFFFEA68);
+      this.mesher.addText2D(this.textures, "CRAFTING WORKSHOP (TAP TO CRAFT)", craftStartX, py + 36.0F * scale, 3.1F * scale, 0xFF98FFB8);
+      this.mesher.addTextCentered2D(this.textures, "CLOSE", px + panelW - 125.0F * scale, py + 38.0F * scale, 3.1F * scale, 0xFFFFFFFF);
 
       for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
          int c = i & 1;
          int r = i >> 1;
          PeWorld.CraftRecipe rec = PeWorld.RECIPES[i];
-         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 92.0F * scale;
+         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 96.0F * scale;
          float by = startY + r * (craftRowH + 10.0F * scale) + 34.0F * scale;
-         this.mesher.addText2D(this.textures, rec.label, bx, by, 2.3F * scale, 0xFFFFFFFF);
+         this.mesher.addText2D(this.textures, rec.label, bx, by, 2.25F * scale, 0xFFFFFFFF);
       }
       for (int s = 0; s < 9; s++) {
          if (this.world.hotbarId[s] != PeWorld.B_AIR && this.world.hotbarCount[s] > 1) {
             this.mesher.addText2D(this.textures, String.valueOf(this.world.hotbarCount[s]),
-               hx + s * hs + hs - 38.0F * scale, hy + hs - 30.0F * scale, 2.4F * scale, 0xFFFFFFFF);
+               hx + s * hs + hs - 38.0F * scale, hy + hs - 30.0F * scale, 2.3F * scale, 0xFFFFFFFF);
          }
       }
       this.mesher.addTextCentered2D(this.textures, "X", hx + 9.5F * hs, hy + 28.0F * scale, 3.2F * scale, 0xFFFFFFFF);
@@ -478,12 +510,14 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
    }
 
    // ====================================================================
-   //  In-Game Single-Player HUD
+   //  Redesigned Mobile-Friendly In-Game HUD
    // ====================================================================
-   private void renderPlayHud() {
+   private void renderPlayHud(int[] rayHit) {
       float scale = this.height / 1080.0F;
+      float cx = this.width * 0.5F;
+      float cy = this.height * 0.5F;
 
-      // Pass A: Colored Panels, Buttons, Crosshair & Movement Pad
+      // Pass A: Dark-Glass Pills, Circular Joystick, Ergonomic Action Pads & Recessed Hotbar
       this.mesher.begin2D();
 
       // Hurt red vignette flash
@@ -492,77 +526,109 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.mesher.addRect2D(0, 0, this.width, this.height, (alpha << 24) | 0xFF2010);
       }
 
-      // Top-Center Compact [|| PAUSE] and [CRAFT / INV] buttons
-      drawBevelButton(this.touch.topPauseX, this.touch.topPauseY, this.touch.topPauseW, this.touch.topPauseH, 0xC8222832);
-      drawBevelButton(this.touch.topInvX, this.touch.topInvY, this.touch.topInvW, this.touch.topInvH, 0xC8284834);
+      // 1. Top-Left Status Card (Hearts & Hunger in Survival, or Creative Badge)
+      this.mesher.drawCard2D(this.touch.safeMarginX - 8.0F * scale, 14.0F * scale,
+         412.0F * scale, 88.0F * scale, 0xBF121620, 0xC0364A64);
 
-      // Crosshair + Mining Progress Bar at screen center
-      float cx = this.width * 0.5F;
-      float cy = this.height * 0.5F;
-      float chLen = 18.0F * scale;
-      float chThick = 3.0F * scale;
-      this.mesher.addRect2D(cx - chLen, cy - chThick * 0.5F, chLen * 2.0F, chThick, 0xE8FFFFFF);
-      this.mesher.addRect2D(cx - chThick * 0.5F, cy - chLen, chThick, chLen * 2.0F, 0xE8FFFFFF);
-
-      if (this.world.mineProgress > 0.02F) {
-         float barW = 140.0F * scale;
-         float barH = 14.0F * scale;
-         this.mesher.addRect2D(cx - barW * 0.5F, cy + 32.0F * scale, barW, barH, 0xB0101418);
-         this.mesher.addRect2D(cx - barW * 0.5F, cy + 32.0F * scale, barW * this.world.mineProgress, barH, 0xFF48FF68);
+      // 2. Top-Center Quick-Action Pill Buttons ([|| PAUSE], [BAG / CRAFT], and optional [FLY])
+      this.mesher.drawButton2D(this.touch.topPauseX, this.touch.topPauseY, this.touch.topPauseW, this.touch.topPauseH,
+         0xD41C2432, 0xFF70A8FF, false);
+      this.mesher.drawButton2D(this.touch.topInvX, this.touch.topInvY, this.touch.topInvW, this.touch.topInvH,
+         0xD41E3C2C, 0xFF54E882, false);
+      if (this.world.mode == PeWorld.MODE_CREATIVE || this.world.flying) {
+         this.mesher.drawButton2D(this.touch.topFlyX, this.touch.topFlyY, this.touch.topFlyW, this.touch.topFlyH,
+            this.world.flying ? 0xD8285878 : 0xCC1E2634, 0xFF68D8FF, this.world.flying);
       }
 
-      // Dedicated Sneak / Crouch Toggle Button
-      drawBevelButton(this.touch.sneakBtnX, this.touch.sneakBtnY, this.touch.sneakBtnW, this.touch.sneakBtnH,
-         this.touch.sneakHeld ? 0xD0E89828 : 0x88242A34);
+      // 3. Top-Right Coordinates, Biome & FPS Pill
+      float infoW = 545.0F * scale;
+      float infoX = this.width - this.touch.safeMarginX - infoW;
+      this.mesher.drawCard2D(infoX, 14.0F * scale, infoW, 84.0F * scale, 0xBF121620, 0xC0364A64);
 
-      // Left Movement Pad (Joystick or Classic 5-Button D-Pad)
+      // 4. Crisp Outlined Crosshair + Target Block Tooltip / Mining Progress Bar
+      float chLen = 17.0F * scale;
+      float chThick = 3.0F * scale;
+      // Dark shadow outline behind crosshair so it's readable on snow/sky
+      this.mesher.addRect2D(cx - chLen - 1.5F, cy - chThick * 0.5F - 1.5F, chLen * 2.0F + 3.0F, chThick + 3.0F, 0x90000000);
+      this.mesher.addRect2D(cx - chThick * 0.5F - 1.5F, cy - chLen - 1.5F, chThick + 3.0F, chLen * 2.0F + 3.0F, 0x90000000);
+      this.mesher.addRect2D(cx - chLen, cy - chThick * 0.5F, chLen * 2.0F, chThick, 0xF0FFFFFF);
+      this.mesher.addRect2D(cx - chThick * 0.5F, cy - chLen, chThick, chLen * 2.0F, 0xF0FFFFFF);
+
+      if (this.world.mineProgress > 0.02F) {
+         float barW = 160.0F * scale;
+         float barH = 16.0F * scale;
+         this.mesher.drawCard2D(cx - barW * 0.5F, cy + 30.0F * scale, barW, barH, 0xD810141C, 0xFF384A60);
+         this.mesher.addRect2D(cx - barW * 0.5F + 3.0F, cy + 30.0F * scale + 3.0F,
+            (barW - 6.0F) * Math.min(1.0F, this.world.mineProgress), barH - 6.0F, 0xFF54F884);
+      } else if (rayHit != null) {
+         // Subtle target block pill under crosshair
+         this.mesher.addRect2D(cx - 115.0F * scale, cy + 28.0F * scale, 230.0F * scale, 34.0F * scale, 0x8810141E);
+      }
+
+      // 5. Left Thumb Zone: Sneak Pill + Circular Analog Joystick (or 5-Button D-Pad)
+      this.mesher.drawButton2D(this.touch.sneakBtnX, this.touch.sneakBtnY, this.touch.sneakBtnW, this.touch.sneakBtnH,
+         this.touch.sneakHeld ? 0xD8784C18 : 0xAC1A222E,
+         this.touch.sneakHeld ? 0xFFFFB848 : 0xFF527090, this.touch.sneakHeld);
+
       float dcx = this.touch.dpadCenterX;
       float dcy = this.touch.dpadCenterY;
       float dr = this.touch.dpadRadius;
       if (!this.touch.useAnalogStick) {
          float btnS = dr * 0.58F;
-         drawBevelButton(dcx - btnS * 0.5F, dcy - dr, btnS, btnS, this.touch.moveForward > 0.1F ? 0xC070A8FF : 0x8028303A);
-         drawBevelButton(dcx - btnS * 0.5F, dcy + dr - btnS, btnS, btnS, this.touch.moveForward < -0.1F ? 0xC070A8FF : 0x8028303A);
-         drawBevelButton(dcx - dr, dcy - btnS * 0.5F, btnS, btnS, this.touch.moveStrafe < -0.1F ? 0xC070A8FF : 0x8028303A);
-         drawBevelButton(dcx + dr - btnS, dcy - btnS * 0.5F, btnS, btnS, this.touch.moveStrafe > 0.1F ? 0xC070A8FF : 0x8028303A);
-         drawBevelButton(dcx - btnS * 0.44F, dcy - btnS * 0.44F, btnS * 0.88F, btnS * 0.88F, this.touch.sneakHeld ? 0xC0FFB040 : 0x7020242C);
+         this.mesher.drawButton2D(dcx - btnS * 0.5F, dcy - dr, btnS, btnS,
+            this.touch.moveForward > 0.1F ? 0xD03868A8 : 0x981C2430, 0xFF68B0FF, this.touch.moveForward > 0.1F);
+         this.mesher.drawButton2D(dcx - btnS * 0.5F, dcy + dr - btnS, btnS, btnS,
+            this.touch.moveForward < -0.1F ? 0xD03868A8 : 0x981C2430, 0xFF68B0FF, this.touch.moveForward < -0.1F);
+         this.mesher.drawButton2D(dcx - dr, dcy - btnS * 0.5F, btnS, btnS,
+            this.touch.moveStrafe < -0.1F ? 0xD03868A8 : 0x981C2430, 0xFF68B0FF, this.touch.moveStrafe < -0.1F);
+         this.mesher.drawButton2D(dcx + dr - btnS, dcy - btnS * 0.5F, btnS, btnS,
+            this.touch.moveStrafe > 0.1F ? 0xD03868A8 : 0x981C2430, 0xFF68B0FF, this.touch.moveStrafe > 0.1F);
+         this.mesher.drawButton2D(dcx - btnS * 0.44F, dcy - btnS * 0.44F, btnS * 0.88F, btnS * 0.88F,
+            this.touch.sneakHeld ? 0xD0885818 : 0x88161C24, 0xFFFFB848, this.touch.sneakHeld);
       } else {
-         drawBevelButton(dcx - dr * 0.85F, dcy - dr * 0.85F, dr * 1.7F, dr * 1.7F, 0x60202630);
-         float knobX = dcx + this.touch.moveStrafe * dr * 0.55F;
-         float knobY = dcy - this.touch.moveForward * dr * 0.55F;
-         float kr = 52.0F * scale;
-         drawBevelButton(knobX - kr, knobY - kr, kr * 2.0F, kr * 2.0F, 0xD070A8FF);
+         // Outer Circular Virtual Joystick Ring + Cardinal Guides + Glowing Thumb Puck
+         this.mesher.drawCirclePad2D(dcx, dcy, dr * 0.90F, 0x9048688E, 0x58121822);
+         this.mesher.drawCirclePad2D(dcx, dcy, dr * 0.24F, 0x506890B8, 0x401A2230);
+         float knobX = dcx + this.touch.moveStrafe * dr * 0.54F;
+         float knobY = dcy - this.touch.moveForward * dr * 0.54F;
+         boolean moving = (Math.abs(this.touch.moveForward) > 0.05F || Math.abs(this.touch.moveStrafe) > 0.05F);
+         this.mesher.drawCirclePad2D(knobX, knobY, 54.0F * scale,
+            moving ? 0xFF78C8FF : 0xC85888B8,
+            moving ? 0xE83268A8 : 0xC0243852);
       }
 
-      // Right Dedicated Ergonomic Action Buttons: [JUMP/FLY], [MINE/HIT], [PLACE/USE]
-      float jr = this.touch.jumpBtnR;
-      drawBevelButton(this.touch.jumpBtnX - jr, this.touch.jumpBtnY - jr, jr * 2.0F, jr * 2.0F,
-         this.touch.jumpHeld ? 0xD050C878 : 0x98283848);
-      float ar = this.touch.atkBtnR;
-      drawBevelButton(this.touch.atkBtnX - ar, this.touch.atkBtnY - ar, ar * 2.0F, ar * 2.0F,
-         this.touch.miningHeld ? 0xD8FF5252 : 0xA0542828);
-      float ur = this.touch.useBtnR;
-      drawBevelButton(this.touch.useBtnX - ur, this.touch.useBtnY - ur, ur * 2.0F, ur * 2.0F, 0xA0285238);
+      // 6. Right Thumb Zone: Circular Ergonomic Action Pads ([JUMP], [MINE], [PLACE])
+      this.mesher.drawCirclePad2D(this.touch.jumpBtnX, this.touch.jumpBtnY, this.touch.jumpBtnR,
+         this.touch.jumpHeld ? 0xFF78E8FF : 0xC84A88B8,
+         this.touch.jumpHeld ? 0xE02A6C98 : 0xB41C3248);
 
-      // Bottom 9-Slot Touch Hotbar + [INV] Button
+      this.mesher.drawCirclePad2D(this.touch.atkBtnX, this.touch.atkBtnY, this.touch.atkBtnR,
+         this.touch.miningHeld ? 0xFFFF8868 : 0xD8B84A42,
+         this.touch.miningHeld ? 0xE8982822 : 0xBC4E1E1E);
+
+      this.mesher.drawCirclePad2D(this.touch.useBtnX, this.touch.useBtnY, this.touch.useBtnR,
+         0xD84CE07A, 0xBC1E4E30);
+
+      // 7. Bottom 9-Slot Recessed Hotbar + Floating Item Name Pill + [BAG] Button
       float hs = this.touch.hotbarSlotSize;
       float hx = this.touch.hotbarX;
       float hy = this.touch.hotbarY;
-      this.mesher.addRect2D(hx - 6.0F * scale, hy - 6.0F * scale, hs * 10.0F + 12.0F * scale, hs + 12.0F * scale, 0xC8181A20);
+      this.mesher.addRect2D(cx - 210.0F * scale, hy - 48.0F * scale, 420.0F * scale, 36.0F * scale, 0xA810141E);
+      this.mesher.drawCard2D(hx - 8.0F * scale, hy - 8.0F * scale, hs * 10.0F + 16.0F * scale, hs + 16.0F * scale, 0xDF12161E, 0xFF384C66);
       for (int s = 0; s < 10; s++) {
          float sx = hx + s * hs;
          boolean sel = (s == this.world.selectedSlot);
-         int bg = (s == 9) ? 0xD0324860 : (sel ? 0xE84E8A3E : 0xA82C3038);
-         drawBevelButton(sx + 3.0F * scale, hy + 3.0F * scale, hs - 6.0F * scale, hs - 6.0F * scale, bg);
+         int special = (s == 9) ? 0xD8284868 : 0;
+         this.mesher.drawSlot2D(sx + 3.0F * scale, hy + 3.0F * scale, hs - 6.0F * scale, sel, special);
       }
 
       this.mesher.flush2D(this.shaders, this.textures.whiteTexId, this.orthoMatrix);
 
-      // Pass B: Atlas Icons (Hearts, Hunger, Hotbar Item Icons)
+      // Pass B: Atlas Icons (Hearts, Hunger, Hotbar Item Icons, Action Pad Mini-Icons)
       this.mesher.begin2D();
       if (this.world.mode == PeWorld.MODE_SURVIVAL) {
          float heartY = 22.0F * scale;
-         float heartX = this.touch.safeMarginX;
+         float heartX = this.touch.safeMarginX + 6.0F * scale;
          float heartS = 34.0F * scale;
          int hearts = (this.world.health + 1) / 2;
          for (int i = 0; i < 10; i++) {
@@ -572,69 +638,94 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          int food = (this.world.hunger + 1) / 2;
          for (int i = 0; i < 10; i++) {
             int tile = (i < food) ? PeTextures.T_HUNGER_FULL : PeTextures.T_HUNGER_EMPTY;
-            this.mesher.addTile2D(heartX + i * (heartS + 4.0F * scale), heartY + 40.0F * scale, heartS, heartS, tile, 0xFFFFFFFF);
+            this.mesher.addTile2D(heartX + i * (heartS + 4.0F * scale), heartY + 38.0F * scale, heartS, heartS, tile, 0xFFFFFFFF);
          }
+      } else {
+         this.mesher.addTile2D(this.touch.safeMarginX + 12.0F * scale, 28.0F * scale, 56.0F * scale, 56.0F * scale, PeTextures.T_GRASS_SIDE, 0xFFFFFFFF);
       }
+
+      // Mini Pickaxe Icon inside [MINE] button & Block Icon inside [PLACE] button
+      this.mesher.addTile2D(this.touch.atkBtnX - 24.0F * scale, this.touch.atkBtnY - 52.0F * scale,
+         48.0F * scale, 48.0F * scale, PeTextures.T_ITEM_PICK_IRON, 0xFFFFFFFF);
+      int selItem = this.world.hotbarId[this.world.selectedSlot];
+      int placeTile = selItem != 0 ? PeWorld.getItemTile(selItem) : PeTextures.T_CRAFT_TOP;
+      this.mesher.addTile2D(this.touch.useBtnX - 22.0F * scale, this.touch.useBtnY - 48.0F * scale,
+         44.0F * scale, 44.0F * scale, placeTile, 0xFFFFFFFF);
 
       for (int s = 0; s < 9; s++) {
          int id = this.world.hotbarId[s];
          if (id != PeWorld.B_AIR) {
             int tile = PeWorld.getItemTile(id);
-            this.mesher.addTile2D(hx + s * hs + 14.0F * scale, hy + 14.0F * scale,
-               hs - 28.0F * scale, hs - 28.0F * scale, tile, 0xFFFFFFFF);
+            this.mesher.addTile2D(hx + s * hs + 15.0F * scale, hy + 15.0F * scale,
+               hs - 30.0F * scale, hs - 30.0F * scale, tile, 0xFFFFFFFF);
          }
       }
       this.mesher.flush2D(this.shaders, this.textures.atlasTexId, this.orthoMatrix);
 
       // Pass C: Crisp Bitmap Font Text Labels
       this.mesher.begin2D();
-      this.mesher.addTextCentered2D(this.textures, "PAUSE",
-         this.touch.topPauseX + this.touch.topPauseW * 0.5F, this.touch.topPauseY + 18.0F * scale, 2.8F * scale, 0xFFFFFFFF);
-      this.mesher.addTextCentered2D(this.textures, "CRAFT / INV",
-         this.touch.topInvX + this.touch.topInvW * 0.5F, this.touch.topInvY + 18.0F * scale, 2.7F * scale, 0xFF98FFB0);
 
-      // Top-Right Coordinates, Mode & FPS Readout
-      String posLine = String.format("XYZ: %d, %d, %d | %d FPS",
-         (int)Math.floor(this.world.px), (int)Math.floor(this.world.py), (int)Math.floor(this.world.pz), this.currentFps);
-      this.mesher.addText2D(this.textures, posLine, this.width - this.touch.safeMarginX - 540.0F * scale, 22.0F * scale, 2.6F * scale, 0xFFE8F4FF);
+      if (this.world.mode == PeWorld.MODE_CREATIVE) {
+         this.mesher.addText2D(this.textures, "CREATIVE MODE", this.touch.safeMarginX + 82.0F * scale, 28.0F * scale, 2.7F * scale, 0xFFFFEA68);
+         this.mesher.addText2D(this.textures, this.world.flying ? "Flight Active" : "Tap FLY to Soar", this.touch.safeMarginX + 82.0F * scale, 60.0F * scale, 2.3F * scale, 0xFF98F4B8);
+      }
 
-      String banner = (this.world.bannerTicks > 0 && this.world.bannerMessage != null && !this.world.bannerMessage.isEmpty())
+      this.mesher.addTextCentered2D(this.textures, "|| PAUSE",
+         this.touch.topPauseX + this.touch.topPauseW * 0.5F, this.touch.topPauseY + 18.0F * scale, 2.6F * scale, 0xFFFFFFFF);
+      this.mesher.addTextCentered2D(this.textures, "BAG / CRAFT",
+         this.touch.topInvX + this.touch.topInvW * 0.5F, this.touch.topInvY + 18.0F * scale, 2.5F * scale, 0xFF98FFB8);
+      if (this.world.mode == PeWorld.MODE_CREATIVE || this.world.flying) {
+         this.mesher.addTextCentered2D(this.textures, this.world.flying ? "FLY: ON" : "FLY: OFF",
+            this.touch.topFlyX + this.touch.topFlyW * 0.5F, this.touch.topFlyY + 18.0F * scale, 2.5F * scale, 0xFFD8F4FF);
+      }
+
+      // Top-Right Coordinates, Biome & FPS Readout
+      int bpx = (int)Math.floor(this.world.px);
+      int bpy = (int)Math.floor(this.world.py);
+      int bpz = (int)Math.floor(this.world.pz);
+      String posLine = String.format("XYZ: %d, %d, %d  |  %d FPS", bpx, bpy, bpz, this.currentFps);
+      this.mesher.addText2D(this.textures, posLine, infoX + 18.0F * scale, 24.0F * scale, 2.45F * scale, 0xFFEAF6FF);
+
+      String subLine = (this.world.bannerTicks > 0 && this.world.bannerMessage != null && !this.world.bannerMessage.isEmpty())
          ? this.world.bannerMessage
-         : this.world.currentWorldSummary();
-      this.mesher.addText2D(this.textures, banner, this.width - this.touch.safeMarginX - 540.0F * scale, 58.0F * scale, 2.5F * scale, 0xFFFFE070);
+         : (this.world.getBiomeName(bpx, bpz) + "  |  " + this.world.currentWorldSummary());
+      this.mesher.addText2D(this.textures, subLine, infoX + 18.0F * scale, 58.0F * scale, 2.3F * scale, 0xFFFFE278);
 
-      // Sneak & Right Action Button Labels
+      // Target Block Tooltip under crosshair
+      if (rayHit != null && this.world.mineProgress <= 0.02F) {
+         String targetName = PeWorld.getItemName(rayHit[6]);
+         this.mesher.addTextCentered2D(this.textures, targetName, cx, cy + 34.0F * scale, 2.2F * scale, 0xFFD8F0FF);
+      }
+
+      // D-Pad directional labels when in Classic D-Pad mode
+      if (!this.touch.useAnalogStick) {
+         this.mesher.addTextCentered2D(this.textures, "^", dcx, dcy - dr * 0.72F, 3.2F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "v", dcx, dcy + dr * 0.55F, 3.0F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "<", dcx - dr * 0.72F, dcy - 12.0F * scale, 3.0F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, ">", dcx + dr * 0.72F, dcy - 12.0F * scale, 3.0F * scale, 0xFFFFFFFF);
+      }
+
+      // Sneak & Right Circular Action Pad Labels
       this.mesher.addTextCentered2D(this.textures, this.touch.sneakHeld ? "SNEAK: ON" : "SNEAK",
-         this.touch.sneakBtnX + this.touch.sneakBtnW * 0.5F, this.touch.sneakBtnY + 18.0F * scale, 2.5F * scale, 0xFFFFFFFF);
-      this.mesher.addTextCentered2D(this.textures, this.world.flying ? "FLY UP" : "JUMP",
-         this.touch.jumpBtnX, this.touch.jumpBtnY - 14.0F * scale, 2.8F * scale, 0xFFFFFFFF);
+         this.touch.sneakBtnX + this.touch.sneakBtnW * 0.5F, this.touch.sneakBtnY + 18.0F * scale, 2.4F * scale, 0xFFFFFFFF);
+      this.mesher.addTextCentered2D(this.textures, this.world.flying ? "ASCEND" : "JUMP",
+         this.touch.jumpBtnX, this.touch.jumpBtnY - 12.0F * scale, 2.6F * scale, 0xFFFFFFFF);
       this.mesher.addTextCentered2D(this.textures, "MINE",
-         this.touch.atkBtnX, this.touch.atkBtnY - 28.0F * scale, 2.8F * scale, 0xFFFFD8D8);
-      this.mesher.addTextCentered2D(this.textures, "/ HIT",
-         this.touch.atkBtnX, this.touch.atkBtnY + 4.0F * scale, 2.5F * scale, 0xFFFFD8D8);
+         this.touch.atkBtnX, this.touch.atkBtnY + 6.0F * scale, 2.6F * scale, 0xFFFFE4E0);
       this.mesher.addTextCentered2D(this.textures, "PLACE",
-         this.touch.useBtnX, this.touch.useBtnY - 28.0F * scale, 2.7F * scale, 0xFFD0FFD8);
-      this.mesher.addTextCentered2D(this.textures, "/ USE",
-         this.touch.useBtnX, this.touch.useBtnY + 4.0F * scale, 2.5F * scale, 0xFFD0FFD8);
+         this.touch.useBtnX, this.touch.useBtnY + 6.0F * scale, 2.5F * scale, 0xFFD8FFE4);
 
       // Selected Hotbar Item Name Banner + Stack Counts
-      int selItem = this.world.hotbarId[this.world.selectedSlot];
       this.mesher.addTextCentered2D(this.textures, PeWorld.getItemName(selItem),
-         this.width * 0.5F, this.touch.hotbarY - 42.0F * scale, 3.0F * scale, 0xFFFFFFFF);
+         cx, hy - 42.0F * scale, 2.6F * scale, 0xFFFFF4B8);
       for (int s = 0; s < 9; s++) {
          if (this.world.hotbarId[s] != PeWorld.B_AIR && this.world.hotbarCount[s] > 1) {
             this.mesher.addText2D(this.textures, String.valueOf(this.world.hotbarCount[s]),
                hx + s * hs + hs - 38.0F * scale, hy + hs - 30.0F * scale, 2.3F * scale, 0xFFFFFFFF);
          }
       }
-      this.mesher.addTextCentered2D(this.textures, "INV", hx + 9.5F * hs, hy + 28.0F * scale, 2.8F * scale, 0xFFFFFFFF);
+      this.mesher.addTextCentered2D(this.textures, "BAG", hx + 9.5F * hs, hy + 30.0F * scale, 2.6F * scale, 0xFFFFFFFF);
 
       this.mesher.flush2D(this.shaders, this.textures.fontTexId, this.orthoMatrix);
-   }
-
-   private void drawBevelButton(float x, float y, float w, float h, int bgArgb) {
-      this.mesher.addRect2D(x, y, w, h, bgArgb);
-      this.mesher.addRect2D(x, y, w, 4.0F, 0x58FFFFFF);
-      this.mesher.addRect2D(x, y + h - 4.0F, w, 4.0F, 0x80000000);
    }
 }

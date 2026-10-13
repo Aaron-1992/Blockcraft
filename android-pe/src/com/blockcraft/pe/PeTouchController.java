@@ -6,11 +6,13 @@ import android.view.MotionEvent;
 /**
  * Multi-Touch Pocket Edition Controller tailored for the Samsung Galaxy A55 5G (2340x1080).
  *
- * Key design improvements:
+ * Key design features:
  * 1. Camera look dragging NEVER triggers mining, block placement, or attacks by accident.
- * 2. Holding the [MINE / HIT] button also allows dragging your thumb to aim while mining!
- * 3. Correct right-handed movement mapping: pushing Left strafes Left (-1), pushing Right strafes Right (+1).
- * 4. Full UI navigation for Title, World Select (3 save slots), Create World, Inventory/Crafting, Pause & Settings.
+ * 2. Holding the circular [MINE] pad also allows dragging your thumb to aim while mining!
+ * 3. Right-handed movement mapping: pushing Left strafes Left (-1), pushing Right strafes Right (+1).
+ * 4. Ergonomic mobile layout with top quick-action pills ([PAUSE], [BAG / CRAFT], [FLY]),
+ *    circular virtual joystick / 5-button D-Pad, right-thumb action arc ([MINE], [PLACE], [JUMP]),
+ *    and full UI navigation across Title, World Select, Create World, Inventory/Crafting, Pause & Settings.
  */
 public final class PeTouchController {
    public int screenW = 2340;
@@ -30,7 +32,7 @@ public final class PeTouchController {
    public boolean attackTapped = false;
 
    // User customizable control settings
-   public boolean useAnalogStick = true;        // Smooth thumbstick by default; toggleable to Classic 5-Button D-Pad
+   public boolean useAnalogStick = true;        // Smooth circular thumbstick by default; toggleable to Classic 5-Button D-Pad
    public boolean touchTapToInteract = false;   // False = pure camera look (actions only via buttons, 0 accidental actions!)
    public int sensitivityLevel = 1;             // 0=Low, 1=Medium, 2=High
    public boolean invertY = false;
@@ -67,6 +69,7 @@ public final class PeTouchController {
    public float hotbarX, hotbarY, hotbarSlotSize;
    public float topPauseX, topPauseY, topPauseW, topPauseH;
    public float topInvX, topInvY, topInvW, topInvH;
+   public float topFlyX, topFlyY, topFlyW, topFlyH;
 
    public PeTouchController() {
       updateLayout(2340, 1080);
@@ -78,41 +81,50 @@ public final class PeTouchController {
       float scale = this.screenH / 1080.0F;
       this.safeMarginX = 72.0F * scale;
 
-      this.dpadRadius = 175.0F * scale;
-      this.dpadCenterX = this.safeMarginX + this.dpadRadius + 24.0F * scale;
+      // Left Thumb Zone: Circular Virtual Joystick / 5-Button D-Pad
+      this.dpadRadius = 176.0F * scale;
+      this.dpadCenterX = this.safeMarginX + this.dpadRadius + 26.0F * scale;
       this.dpadCenterY = this.screenH - this.dpadRadius - 48.0F * scale;
 
-      this.sneakBtnW = 150.0F * scale;
-      this.sneakBtnH = 64.0F * scale;
+      this.sneakBtnW = 164.0F * scale;
+      this.sneakBtnH = 62.0F * scale;
       this.sneakBtnX = this.dpadCenterX - this.sneakBtnW * 0.5F;
-      this.sneakBtnY = this.dpadCenterY - this.dpadRadius - 84.0F * scale;
+      this.sneakBtnY = this.dpadCenterY - this.dpadRadius - 82.0F * scale;
 
-      this.jumpBtnR = 76.0F * scale;
-      this.jumpBtnX = this.screenW - this.safeMarginX - this.jumpBtnR - 28.0F * scale;
-      this.jumpBtnY = this.screenH - this.jumpBtnR - 58.0F * scale;
+      // Right Thumb Zone: Natural Ergonomic Arc of Circular Pads ([MINE], [PLACE], [JUMP])
+      this.jumpBtnR = 78.0F * scale;
+      this.jumpBtnX = this.screenW - this.safeMarginX - this.jumpBtnR - 26.0F * scale;
+      this.jumpBtnY = this.screenH - this.jumpBtnR - 56.0F * scale;
 
-      this.atkBtnR = 82.0F * scale;
-      this.atkBtnX = this.jumpBtnX - 186.0F * scale;
-      this.atkBtnY = this.jumpBtnY - 12.0F * scale;
+      this.atkBtnR = 86.0F * scale;
+      this.atkBtnX = this.jumpBtnX - 196.0F * scale;
+      this.atkBtnY = this.jumpBtnY - 14.0F * scale;
 
-      this.useBtnR = 76.0F * scale;
-      this.useBtnX = this.jumpBtnX - 42.0F * scale;
-      this.useBtnY = this.jumpBtnY - 178.0F * scale;
+      this.useBtnR = 78.0F * scale;
+      this.useBtnX = this.jumpBtnX - 48.0F * scale;
+      this.useBtnY = this.jumpBtnY - 186.0F * scale;
 
-      this.hotbarSlotSize = 86.0F * scale;
-      float totalHotbarW = this.hotbarSlotSize * 10.0F; // 9 slots + 1 [INV] button
+      // Bottom Center: 9-Slot Recessed Hotbar + [BAG] Button
+      this.hotbarSlotSize = 88.0F * scale;
+      float totalHotbarW = this.hotbarSlotSize * 10.0F;
       this.hotbarX = (this.screenW - totalHotbarW) * 0.5F;
       this.hotbarY = this.screenH - this.hotbarSlotSize - 16.0F * scale;
 
-      this.topPauseW = 180.0F * scale;
-      this.topPauseH = 66.0F * scale;
-      this.topPauseX = this.screenW * 0.5F - this.topPauseW - 12.0F * scale;
+      // Top Center / Top Right Quick-Action Pill Bar
+      this.topPauseW = 176.0F * scale;
+      this.topPauseH = 62.0F * scale;
+      this.topPauseX = this.screenW * 0.5F - this.topPauseW - 10.0F * scale;
       this.topPauseY = 16.0F * scale;
 
-      this.topInvW = 210.0F * scale;
-      this.topInvH = 66.0F * scale;
-      this.topInvX = this.screenW * 0.5F + 12.0F * scale;
+      this.topInvW = 216.0F * scale;
+      this.topInvH = 62.0F * scale;
+      this.topInvX = this.screenW * 0.5F + 10.0F * scale;
       this.topInvY = 16.0F * scale;
+
+      this.topFlyW = 162.0F * scale;
+      this.topFlyH = 62.0F * scale;
+      this.topFlyX = this.topInvX + this.topInvW + 14.0F * scale;
+      this.topFlyY = 16.0F * scale;
    }
 
    public synchronized float consumeYawDelta() {
@@ -152,7 +164,7 @@ public final class PeTouchController {
       switch (action) {
          case MotionEvent.ACTION_DOWN:
          case MotionEvent.ACTION_POINTER_DOWN: {
-            // 1. Top-Center [|| PAUSE] and [CRAFT / INV] buttons
+            // 1. Top Pill Buttons: [|| PAUSE], [BAG / CRAFT], and [FLY]
             if (inRect(x, y, this.topPauseX, this.topPauseY, this.topPauseW, this.topPauseH)) {
                resetPointers(world);
                world.saveWorld(context);
@@ -167,8 +179,15 @@ public final class PeTouchController {
                if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
                return;
             }
+            if ((world.mode == PeWorld.MODE_CREATIVE || world.flying)
+               && inRect(x, y, this.topFlyX, this.topFlyY, this.topFlyW, this.topFlyH)) {
+               world.flying = !world.flying;
+               world.showBanner(world.flying ? "Creative Flight: ON" : "Creative Flight: OFF");
+               if (audio != null) audio.playSfx("click", 0.8F, 1.15F);
+               return;
+            }
 
-            // 2. Bottom 9-Slot Hotbar + [INV] button
+            // 2. Bottom 9-Slot Hotbar + [BAG] button
             if (y >= this.hotbarY && y <= this.hotbarY + this.hotbarSlotSize
                && x >= this.hotbarX && x <= this.hotbarX + this.hotbarSlotSize * 10.0F) {
                int slot = (int)((x - this.hotbarX) / this.hotbarSlotSize);
@@ -184,7 +203,7 @@ public final class PeTouchController {
                return;
             }
 
-            // 3. Dedicated Sneak / Crouch Toggle Button (above D-Pad/Stick)
+            // 3. Dedicated Sneak / Crouch Toggle Pill (above Joystick/D-Pad)
             if (inRect(x, y, this.sneakBtnX, this.sneakBtnY, this.sneakBtnW, this.sneakBtnH)) {
                this.sneakHeld = !this.sneakHeld;
                world.sneaking = this.sneakHeld;
@@ -192,7 +211,7 @@ public final class PeTouchController {
                return;
             }
 
-            // 4. Right-Side Dedicated Action Buttons: [JUMP/FLY], [MINE/HIT], [PLACE/USE]
+            // 4. Right-Side Dedicated Circular Action Buttons: [JUMP], [MINE], [PLACE]
             if (dist(x, y, this.jumpBtnX, this.jumpBtnY) <= this.jumpBtnR * 1.18F) {
                this.jumpPointerId = pid;
                this.jumpHeld = true;
@@ -251,7 +270,7 @@ public final class PeTouchController {
                   this.moveCurY = py;
                   updateMoveVector(px, py, world);
                } else if (id == this.attackBtnPointerId) {
-                  // Allow aiming the camera while holding down the [MINE / HIT] button!
+                  // Allow aiming the camera while holding down the [MINE] button!
                   float dx = px - this.attackBtnLastX;
                   float dy = py - this.attackBtnLastY;
                   this.attackBtnLastX = px;
@@ -358,8 +377,8 @@ public final class PeTouchController {
       float cx = this.screenW * 0.5F;
 
       if (world.screen == PeWorld.SCREEN_TITLE) {
-         float bw = 760.0F * scale;
-         float bh = 116.0F * scale;
+         float bw = 820.0F * scale;
+         float bh = 122.0F * scale;
          float bx = cx - bw * 0.5F;
          // [ PLAY SINGLEPLAYER ]
          if (inRect(x, y, bx, 500.0F * scale, bw, bh)) {
@@ -378,12 +397,12 @@ public final class PeTouchController {
       }
 
       if (world.screen == PeWorld.SCREEN_WORLD_SELECT) {
-         float pw = 1480.0F * scale;
+         float pw = 1540.0F * scale;
          float px = cx - pw * 0.5F;
          for (int s = 0; s < 3; s++) {
-            float rowY = (240.0F + s * 185.0F) * scale;
-            float rowH = 155.0F * scale;
-            // Main Slot Button [ PLAY / CREATE ]
+            float rowY = (232.0F + s * 186.0F) * scale;
+            float rowH = 158.0F * scale;
+            // Main Slot Card [ PLAY / CREATE ]
             if (inRect(x, y, px + 40.0F * scale, rowY, pw - 360.0F * scale, rowH)) {
                if (world.slotExists[s]) {
                   world.loadWorld(context, s);
@@ -398,7 +417,7 @@ public final class PeTouchController {
                }
                return;
             }
-            // Right Slot Button [ NEW / DELETE ]
+            // Right Slot Action Button [ CREATE / DELETE ]
             if (inRect(x, y, px + pw - 300.0F * scale, rowY, 260.0F * scale, rowH)) {
                if (world.slotExists[s]) {
                   world.deleteWorldSlot(context, s);
@@ -412,7 +431,7 @@ public final class PeTouchController {
             }
          }
          // [ BACK TO TITLE ]
-         if (inRect(x, y, cx - 320.0F * scale, 825.0F * scale, 640.0F * scale, 100.0F * scale)) {
+         if (inRect(x, y, cx - 340.0F * scale, 822.0F * scale, 680.0F * scale, 102.0F * scale)) {
             world.screen = PeWorld.SCREEN_TITLE;
             if (audio != null) audio.playSfx("click", 0.85F, 0.95F);
          }
@@ -420,35 +439,35 @@ public final class PeTouchController {
       }
 
       if (world.screen == PeWorld.SCREEN_CREATE_WORLD) {
-         float bw = 960.0F * scale;
+         float bw = 1020.0F * scale;
          float bx = cx - bw * 0.5F;
-         float bh = 112.0F * scale;
+         float bh = 114.0F * scale;
          // Row 1: Game Mode toggle
-         if (inRect(x, y, bx, 260.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 255.0F * scale, bw, bh)) {
             world.createMode = (world.createMode + 1) % PeWorld.MODE_NAMES.length;
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }
          // Row 2: World Type toggle (Large Biomes Recommended / Default / Superflat)
-         if (inRect(x, y, bx, 400.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 395.0F * scale, bw, bh)) {
             world.createWorldType = (world.createWorldType + 1) % PeWorld.WTYPE_NAMES.length;
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }
          // Row 3: Seed Preset toggle
-         if (inRect(x, y, bx, 540.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 535.0F * scale, bw, bh)) {
             world.createSeedIdx = (world.createSeedIdx + 1) % PeWorld.SEED_NAMES.length;
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }
-         // Row 4: [ CREATE & GENERATE WORLD ] and [ CANCEL ]
-         if (inRect(x, y, bx, 720.0F * scale, 580.0F * scale, 120.0F * scale)) {
+         // Row 4: [ CREATE INFINITE WORLD ] and [ CANCEL ]
+         if (inRect(x, y, bx, 720.0F * scale, 640.0F * scale, 120.0F * scale)) {
             long seed = PeWorld.SEED_PRESETS[world.createSeedIdx];
             world.createNewSinglePlayerWorld(context, world.createSlot, world.createMode, world.createWorldType, seed);
             if (audio != null) audio.playSfx("levelup", 0.95F, 1.0F);
             return;
          }
-         if (inRect(x, y, bx + 610.0F * scale, 720.0F * scale, 350.0F * scale, 120.0F * scale)) {
+         if (inRect(x, y, bx + 664.0F * scale, 720.0F * scale, 356.0F * scale, 120.0F * scale)) {
             world.screen = PeWorld.SCREEN_WORLD_SELECT;
             if (audio != null) audio.playSfx("click", 0.85F, 0.95F);
          }
@@ -456,17 +475,17 @@ public final class PeTouchController {
       }
 
       if (world.screen == PeWorld.SCREEN_PAUSE) {
-         float bw = 820.0F * scale;
+         float bw = 860.0F * scale;
          float bx = cx - bw * 0.5F;
-         float bh = 104.0F * scale;
+         float bh = 106.0F * scale;
          // 1. [ RESUME GAME ]
-         if (inRect(x, y, bx, 220.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 218.0F * scale, bw, bh)) {
             world.screen = PeWorld.SCREEN_PLAY;
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }
          // 2. [ GAME MODE: SURVIVAL / CREATIVE ]
-         if (inRect(x, y, bx, 350.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 348.0F * scale, bw, bh)) {
             world.mode = (world.mode == PeWorld.MODE_SURVIVAL) ? PeWorld.MODE_CREATIVE : PeWorld.MODE_SURVIVAL;
             if (world.mode == PeWorld.MODE_SURVIVAL) world.flying = false;
             world.showBanner("Switched to " + PeWorld.MODE_NAMES[world.mode] + " Mode");
@@ -474,20 +493,20 @@ public final class PeTouchController {
             return;
          }
          // 3. [ CONTROLS & SETTINGS ]
-         if (inRect(x, y, bx, 480.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 478.0F * scale, bw, bh)) {
             world.previousScreen = PeWorld.SCREEN_PAUSE;
             world.screen = PeWorld.SCREEN_SETTINGS;
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }
          // 4. [ SAVE WORLD NOW ]
-         if (inRect(x, y, bx, 610.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 608.0F * scale, bw, bh)) {
             world.saveWorld(context);
             if (audio != null) audio.playSfx("levelup", 0.9F, 1.0F);
             return;
          }
          // 5. [ SAVE & QUIT TO TITLE ]
-         if (inRect(x, y, bx, 740.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 738.0F * scale, bw, bh)) {
             world.saveWorld(context);
             world.refreshSaveSlots(context);
             world.screen = PeWorld.SCREEN_TITLE;
@@ -497,41 +516,42 @@ public final class PeTouchController {
       }
 
       if (world.screen == PeWorld.SCREEN_SETTINGS) {
-         float bw = 980.0F * scale;
+         float bw = 1020.0F * scale;
          float bx = cx - bw * 0.5F;
          float bh = 104.0F * scale;
          // 1. Movement Pad: Joystick vs D-Pad
-         if (inRect(x, y, bx, 210.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 206.0F * scale, bw, bh)) {
             this.useAnalogStick = !this.useAnalogStick;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
-         // 2. Look / Interact Mode: Dedicated Buttons Only vs Split + Tap
-         if (inRect(x, y, bx, 335.0F * scale, bw, bh)) {
+         // 2. Look / Interact Mode: Dedicated Buttons Only vs Buttons + Stationary Tap
+         if (inRect(x, y, bx, 330.0F * scale, bw, bh)) {
             this.touchTapToInteract = !this.touchTapToInteract;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 3. Look Sensitivity
-         if (inRect(x, y, bx, 460.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 454.0F * scale, bw, bh)) {
             this.sensitivityLevel = (this.sensitivityLevel + 1) % 3;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 4. Auto-Jump ON / OFF
-         if (inRect(x, y, bx, 585.0F * scale, bw, bh)) {
+         if (inRect(x, y, bx, 578.0F * scale, bw, bh)) {
             world.autoJump = !world.autoJump;
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
-         // 5. Invert Y-Axis OFF / ON
-         if (inRect(x, y, bx, 710.0F * scale, bw, bh)) {
-            this.invertY = !this.invertY;
+         // 5. Render Distance (9x9 / 11x11 / 13x13 Chunks)
+         if (inRect(x, y, bx, 702.0F * scale, bw, bh)) {
+            world.viewRadiusChunks = (world.viewRadiusChunks >= 6) ? 4 : (world.viewRadiusChunks + 1);
+            world.ensureChunksAroundPlayer(64);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
-         // 6. [ DONE / BACK ]
-         if (inRect(x, y, cx - 300.0F * scale, 845.0F * scale, 600.0F * scale, 100.0F * scale)) {
+         // 6. [ DONE ]
+         if (inRect(x, y, cx - 320.0F * scale, 840.0F * scale, 640.0F * scale, 102.0F * scale)) {
             world.screen = world.previousScreen;
             if (audio != null) audio.playSfx("click", 0.85F, 1.0F);
          }
@@ -546,11 +566,11 @@ public final class PeTouchController {
    private static final int[] PALETTE_ITEMS = new int[]{
       PeWorld.B_GRASS, PeWorld.B_DIRT, PeWorld.B_STONE, PeWorld.B_COBBLE,
       PeWorld.B_PLANKS_OAK, PeWorld.B_PLANKS_SPRUCE, PeWorld.B_LOG_OAK, PeWorld.B_LOG_SPRUCE,
-      PeWorld.B_BRICKS, PeWorld.B_STONEBRICK, PeWorld.B_SAND, PeWorld.B_SANDSTONE,
-      PeWorld.B_GLASS, PeWorld.B_TORCH, PeWorld.B_GLOWSTONE, PeWorld.B_CRAFTING_TABLE,
-      PeWorld.B_FURNACE, PeWorld.B_CHEST, PeWorld.B_BED_RED, PeWorld.B_BOOKSHELF,
-      PeWorld.B_WOOL_RED, PeWorld.B_WOOL_BLUE, PeWorld.B_GOLD_BLOCK, PeWorld.B_DIAMOND_BLOCK,
-      PeWorld.I_PICK_DIAMOND, PeWorld.I_SWORD_DIAMOND, PeWorld.I_AXE_IRON, PeWorld.I_BOW
+      PeWorld.B_LEAVES_OAK, PeWorld.B_LEAVES_SPRUCE, PeWorld.B_BRICKS, PeWorld.B_STONEBRICK,
+      PeWorld.B_SAND, PeWorld.B_SANDSTONE, PeWorld.B_GLASS, PeWorld.B_TORCH,
+      PeWorld.B_GLOWSTONE, PeWorld.B_CRAFTING_TABLE, PeWorld.B_FURNACE, PeWorld.B_CHEST,
+      PeWorld.B_BED_RED, PeWorld.B_BOOKSHELF, PeWorld.B_FLOWER_RED, PeWorld.B_FLOWER_YELLOW,
+      PeWorld.I_PICK_DIAMOND, PeWorld.I_SWORD_DIAMOND, PeWorld.I_AXE_IRON, PeWorld.I_GOLDEN_APPLE
    };
 
    public static int[] getPaletteItems() {
@@ -575,11 +595,11 @@ public final class PeTouchController {
       }
 
       // Top-Right [ X CLOSE ] button
-      float panelW = 1920.0F * scale;
-      float panelH = 780.0F * scale;
+      float panelW = 1940.0F * scale;
+      float panelH = 790.0F * scale;
       float px = (this.screenW - panelW) * 0.5F;
-      float py = 95.0F * scale;
-      if (inRect(x, y, px + panelW - 220.0F * scale, py + 16.0F * scale, 200.0F * scale, 72.0F * scale)
+      float py = 90.0F * scale;
+      if (inRect(x, y, px + panelW - 230.0F * scale, py + 18.0F * scale, 210.0F * scale, 74.0F * scale)
          || !inRect(x, y, px, py, panelW, panelH)) {
          world.screen = PeWorld.SCREEN_PLAY;
          if (audio != null) audio.playSfx("click", 0.85F, 0.95F);
@@ -600,7 +620,8 @@ public final class PeTouchController {
             int item = PALETTE_ITEMS[i];
             if (world.mode == PeWorld.MODE_CREATIVE) {
                world.hotbarId[world.selectedSlot] = item;
-               world.hotbarCount[world.selectedSlot] = (item < 64) ? 64 : 1;
+               world.hotbarCount[world.selectedSlot] = (item <= 68) ? 64 : 1;
+               world.showBanner("Equipped " + PeWorld.getItemName(item));
                if (audio != null) audio.playSfx("pop", 0.85F, 1.1F);
             } else {
                world.showBanner(PeWorld.getItemName(item) + " - Mine in world or Craft on the right!");
@@ -612,7 +633,7 @@ public final class PeTouchController {
 
       // Right Half (Single-Player Crafting Recipes): 2 cols x 6 rows
       float craftStartX = px + 1010.0F * scale;
-      float craftColW = 430.0F * scale;
+      float craftColW = 436.0F * scale;
       float craftRowH = 98.0F * scale;
       for (int i = 0; i < 12 && i < PeWorld.RECIPES.length; i++) {
          int c = i & 1;
