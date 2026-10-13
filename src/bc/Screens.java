@@ -102,7 +102,13 @@ final class Screens {
          g.optionsReturn = Game.S.TITLE;
          g.setScreen(Game.S.OPTIONS);
       });
-      ui.button("Quit Game", bx, by + row * 3, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
+      ui.button("All Blocks", bx, by + row * 3, half, 20.0F, true,
+         "Open the All Blocks & Items Showcase Gallery with every block & item laid out!", () -> {
+            g.ensureAllBlocksShowcaseWorld();
+            g.worldName = "All_Blocks_Showcase";
+            g.startWorld(false, null, 1);
+         });
+      ui.button("Quit Game", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
       gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
@@ -259,8 +265,14 @@ final class Screens {
       float by = gui.h - footer + 6.0F;
       float third = (pw - 8.0F) / 3.0F;
       boolean any = n > 0;
-      ui.button("Play Selected World", px, by, pw - third - 4.0F, 20.0F, any, "Opens the world you picked (double-click a world to open it faster).", () -> g.startWorld(false, null, 1));
-      ui.button("Mini Games", px + pw - third, by, third, 20.0F, true, "Play Minecraft Console Edition Battle, Tumble, and Bedwars Mini Games across 4 arenas!", () -> openMinigames(g, Game.S.WORLDS));
+      ui.button("Play World", px, by, third, 20.0F, any, "Opens the world you picked (double-click a world to open it faster).", () -> g.startWorld(false, null, 1));
+      ui.button("All Blocks", px + third + 4.0F, by, third, 20.0F, true,
+         "Open the All Blocks & Items Showcase Gallery with every single block, plant, crop, bed, banner & item chest laid out!", () -> {
+            g.ensureAllBlocksShowcaseWorld();
+            g.worldName = "All_Blocks_Showcase";
+            g.startWorld(false, null, 1);
+         });
+      ui.button("Mini Games", px + 2 * (third + 4.0F), by, third, 20.0F, true, "Play Minecraft Console Edition Battle, Tumble, and Bedwars Mini Games across 4 arenas!", () -> openMinigames(g, Game.S.WORLDS));
       ui.button("New World", px, by + 24.0F, third, 20.0F, true, "Make a new world: choose its seed, type and game mode.", () -> openNewWorld(g));
       ui.button(g.confirmDelete ? "\u00a7cReally delete?" : "Delete", px + third + 4.0F, by + 24.0F, third, 20.0F, any,
          "Deletes the picked world from your disk. Click twice to confirm. This cannot be undone.", () -> {

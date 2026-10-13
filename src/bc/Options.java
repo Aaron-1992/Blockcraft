@@ -90,6 +90,9 @@ public final class Options {
                this.fx = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("fx", "1"))));
                this.bushyLeaves = Boolean.parseBoolean(var2.getProperty("bushyLeaves", "true"));
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
+               if (!"6.1".equals(var2.getProperty("texEpoch", ""))) {
+                  this.resourcePack = ResourcePacks.ID_DEFAULT;
+               }
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
                this.realAcoustics = Boolean.parseBoolean(var2.getProperty("realAcoustics", "true"));
@@ -139,6 +142,7 @@ public final class Options {
       var1.setProperty("fx", this.fx + "");
       var1.setProperty("bushyLeaves", this.bushyLeaves + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
+      var1.setProperty("texEpoch", "6.1");
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");
       var1.setProperty("realAcoustics", this.realAcoustics + "");

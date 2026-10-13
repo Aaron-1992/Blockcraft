@@ -17,6 +17,11 @@ final class TexArt310 {
       if (ResourcePacks.isClassicBase()) {
          return type == 0 ? Tex.tLogSide(6L, 102, 81, 50) : (type == 1 ? Tex.tBirchSide() : Tex.tLogSide(15L, 58, 39, 19));
       }
+      int tile = type == 0 ? Tex.LOG_SIDE : (type == 1 ? Tex.BIRCH_SIDE : Tex.SPRUCE_SIDE);
+      int[] cur = TexOverhaulV57.readTile(tile);
+      if (cur != null && cur[0] != 0) {
+         return cur;
+      }
       return type == 0 ? TexPaint.oakSide() : (type == 1 ? TexPaint.birchSide() : TexPaint.spruceSide());
    }
 

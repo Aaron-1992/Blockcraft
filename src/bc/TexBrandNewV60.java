@@ -376,7 +376,7 @@ final class TexBrandNewV60 {
       putBlock(Tex.LOG_SIDE, paintBark(c(0x6E5230), c(0x523C20), c(0x382812), c(0x886840), false, 6110), true);
       putBlock(Tex.SPRUCE_SIDE, paintBark(c(0x422C18), c(0x301E0E), c(0x201208), c(0x583C22), false, 6111), true);
       putBlock(Tex.BIRCH_SIDE, paintBirchBark(), true);
-      TexArt310.blocks(); // Syncs turned logs 246..248 from 7, 33, 31!
+      TexArt310.blocks();
 
       putBlock(Tex.LOG_TOP, paintLogRings(c(0x5E4628), c(0xBC9862), c(0x9E7C48)), false);
       putBlock(Tex.SPRUCE_TOP, paintLogRings(c(0x382412), c(0x927042), c(0x765830)), false);
@@ -1446,13 +1446,17 @@ final class TexBrandNewV60 {
          putSprite(TexArt315.TRAP0 + k, paintTrapdoor(c(trapCols[k]), k == 6));
       }
 
-      putBlock(183, paintBedTop(c(0xCC2420)), false);
-      putBlock(184, paintBedSide(c(0xCC2420)), false);
-      putBlock(185, paintBedEnd(c(0xCC2420)), false);
+      putBlock(183, paintBedHeadTop(c(0xCC2420)), false);
+      putBlock(184, paintBedTop(c(0xCC2420)), false);
+      putBlock(185, paintBedSide(c(0xCC2420)), false);
       putBlock(TexArt315.BED_SIDE, paintBedSide(c(0xDADCE0)), false);
+      putBlock(TexArt315.PILLOW_TOP, paintWool(c(0xF6F4EC), 82), false);
+      putBlock(TexArt315.PILLOW_SIDE, paintWool(c(0xEAE8E0), 83), false);
+      int[] footBase = paintBedTop(c(0xDADCE0));
+      int[] headBase = paintBedHeadTop(c(0xDADCE0));
       for (int f = 0; f < 4; f++) {
-         putBlock(TexArt315.BED_FOOT0 + f, paintBedTop(c(0xDADCE0)), false);
-         putBlock(TexArt315.BED_HEAD0 + f, paintBedHeadTop(c(0xDADCE0)), false);
+         putBlock(TexArt315.BED_FOOT0 + f, TexArt315.turnedFor(footBase, f), false);
+         putBlock(TexArt315.BED_HEAD0 + f, TexArt315.turnedFor(headBase, f), false);
       }
       putBlock(TexArt315.CLOTH, paintWool(c(0xE4E6EA), 70), true);
 

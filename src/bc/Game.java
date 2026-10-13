@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.0";
+   public static final String VERSION_STR = "6.1";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -933,6 +933,9 @@ public final class Game {
 
    void scanWorlds() {
       this.worldList.clear();
+      if (this.window != 0L && System.getProperty("bc.fakeworlds") == null && System.getProperty("bc.auto") == null) {
+         this.ensureAllBlocksShowcaseWorld();
+      }
       File[] var1 = new File(this.root, "saves").listFiles();
       if (var1 != null) {
          for (File var5 : var1) {
@@ -984,7 +987,12 @@ public final class Game {
             }
          }
 
-         this.worldList.sort((var0, var1x) -> Long.compare(var1x.mod, var0.mod));
+         this.worldList.sort((var0, var1x) -> {
+            boolean aShow = "All_Blocks_Showcase".equals(var0.dir);
+            boolean bShow = "All_Blocks_Showcase".equals(var1x.dir);
+            if (aShow != bShow) return aShow ? -1 : 1;
+            return Long.compare(var1x.mod, var0.mod);
+         });
          boolean var15 = false;
 
          for (Game.WInfo var17 : this.worldList) {
@@ -1275,6 +1283,13 @@ public final class Game {
          this.sel = (int)d(var4, "sel", 0.0);
          parseStacks(var4.getProperty("inv", ""), this.inv);
          parseStacks(var4.getProperty("armor", ""), this.armor);
+         if (ws.type == WorldSettings.ALL_BLOCKS && this.inv[0] == null) {
+            int[] starter = new int[]{268, 267, 316, 317, 318, 319, 451, 283, Redstone319.REDSTONE_TORCH};
+            for (int i = 0; i < starter.length && i < 9; i++) {
+               int id = starter[i];
+               this.inv[i] = new Stack(id, Items.maxStack[id] > 1 ? Math.min(64, Items.maxStack[id]) : 1);
+            }
+         }
          this.mobs.load(this.world.dir);
          this.needSpawn = false;
       }
