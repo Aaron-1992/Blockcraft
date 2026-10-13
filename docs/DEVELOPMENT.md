@@ -489,3 +489,9 @@ masks, animation loops and matching extrusion faces/UVs. Also fixed the old tile
 1000 test fixture cleanup: it previously restored just one row and contaminated
 later atlas audits. Local full equivalence: 397 identical / 64 intentional / 145
 new. Latest unit suite: 3,849,815 passed, zero failed; release-verifier tests: 5/5.
+
+Remote CI 38481652563 and Visual 38481652312 passed. Reviewed the native PNGs of
+workstations/glass/colored blocks, joined tall plants, the torch-lit native sword,
+Nether lava and unchanged drawing bow. The first inventory fixture opened Building
+Blocks instead of Tools; corrected the fixture and added Food/Materials tab shots
+for a final GUI-art check. Native geometry uses the existing pack-switch cache reset.
