@@ -47,10 +47,12 @@ public final class PeWorld {
    public static final int WTYPE_LARGE_BIOMES = 0; // Default & Recommended!
    public static final int WTYPE_DEFAULT = 1;
    public static final int WTYPE_SUPERFLAT = 2;
+   public static final int WTYPE_ALL_BLOCKS = 3;
    public static final String[] WTYPE_NAMES = new String[]{
       "Large Biomes (Recommended)",
       "Default Biomes",
-      "Superflat World"
+      "Superflat World",
+      "All Blocks Gallery"
    };
 
    public static final long[] SEED_PRESETS = new long[]{
@@ -602,6 +604,8 @@ public final class PeWorld {
             }
          } else if (this.slotExists[s]) {
             this.slotSummary[s] = "Saved Infinite World (Tap to Play)";
+         } else if (s == 2) {
+            this.slotSummary[s] = "All Blocks & Items Gallery  -  Tap to Open Showcase!";
          } else {
             this.slotSummary[s] = "Empty Slot  -  Tap to Create Infinite World";
          }
@@ -685,7 +689,8 @@ public final class PeWorld {
          tmpFile.renameTo(dstFile);
 
          int dayNum = (int)(this.tickCount / 24000L) + 1;
-         String wTypeShort = this.worldType == WTYPE_LARGE_BIOMES ? "Large Biomes" : (this.worldType == WTYPE_SUPERFLAT ? "Superflat" : "Default");
+         String wTypeShort = this.worldType == WTYPE_ALL_BLOCKS ? "All Blocks Gallery"
+            : (this.worldType == WTYPE_LARGE_BIOMES ? "Large Biomes" : (this.worldType == WTYPE_SUPERFLAT ? "Superflat" : "Default"));
          String summary = MODE_NAMES[this.mode] + "  |  " + wTypeShort + "  |  Day " + dayNum;
          DataOutputStream mOut = new DataOutputStream(new FileOutputStream(metaFile));
          mOut.writeUTF(summary);
@@ -852,6 +857,30 @@ public final class PeWorld {
       Arrays.fill(this.invCount, 0);
       this.selectedSlot = 0;
       this.selectedInvSlot = -1;
+      if (this.worldType == WTYPE_ALL_BLOCKS) {
+         setSlot(0, I_BOW, 1);
+         setSlot(1, I_PICK_DIAMOND, 1);
+         setSlot(2, I_SWORD_DIAMOND, 1);
+         setSlot(3, I_AXE_IRON, 1);
+         setSlot(4, I_SHOVEL_DIAMOND, 1);
+         setSlot(5, I_GOLDEN_APPLE, 16);
+         setSlot(6, I_STEAK, 16);
+         setSlot(7, I_DIAMOND, 64);
+         setSlot(8, I_ENDER_PEARL, 16);
+         int[] allItemsAndBlocks = {
+            I_SWORD_WOOD, I_SWORD_IRON, I_PICK_WOOD, I_PICK_IRON,
+            I_ARROW, I_IRON_INGOT, I_GOLD_INGOT, I_COAL, I_BREAD,
+            B_GRASS, B_STONE, B_COBBLE, B_PLANKS_OAK, B_LOG_OAK, B_LEAVES_OAK,
+            B_CRAFTING_TABLE, B_FURNACE, B_CHEST, B_TORCH, B_TNT, B_BED_RED,
+            B_DOOR_OAK, B_JACK_O_LANTERN, B_DIAMOND_BLOCK, B_EMERALD_BLOCK, B_GOLD_BLOCK, B_OBSIDIAN
+         };
+         for (int i = 0; i < 27 && i < allItemsAndBlocks.length; i++) {
+            int id = allItemsAndBlocks[i];
+            this.invId[i] = id;
+            this.invCount[i] = (id >= I_SWORD_WOOD && id <= I_BOW) ? 1 : 64;
+         }
+         return;
+      }
       if (this.mode == MODE_CREATIVE) {
          setSlot(0, I_PICK_DIAMOND, 1);
          setSlot(1, I_SWORD_DIAMOND, 1);
@@ -1080,7 +1109,9 @@ public final class PeWorld {
          Arrays.fill(slot.sectionDirty, true);
       } else {
          slot.clear();
-         if (this.worldType == WTYPE_SUPERFLAT) {
+         if (this.worldType == WTYPE_ALL_BLOCKS) {
+            generateAllBlocksGalleryChunk(slot, cx, cz);
+         } else if (this.worldType == WTYPE_SUPERFLAT) {
             generateSuperflatChunk(slot, cx, cz);
          } else {
             generateOverworldChunk(slot, cx, cz);
@@ -1154,12 +1185,61 @@ public final class PeWorld {
    }
 
    public String getBiomeName(int wx, int wz) {
+      if (this.worldType == WTYPE_ALL_BLOCKS) return "All Blocks Gallery";
       switch (getBiomeAt(wx, wz)) {
          case 1: return "Golden Desert";
          case 2: return "Snowy Taiga";
          case 3: return "Mountain Peaks";
          case 4: return "Birch Flower Meadow";
          default: return this.worldType == WTYPE_SUPERFLAT ? "Superflat Plains" : "Emerald Forest";
+      }
+   }
+
+   private void generateAllBlocksGalleryChunk(PeChunk c, int cx, int cz) {
+      int wx0 = cx << 4;
+      int wz0 = cz << 4;
+      for (int lz = 0; lz < 16; lz++) {
+         int wz = wz0 + lz;
+         for (int lx = 0; lx < 16; lx++) {
+            int wx = wx0 + lx;
+            setChunkLocal(c, lx, 0, lz, B_BEDROCK);
+            for (int y = 1; y <= 61; y++) {
+               setChunkLocal(c, lx, y, lz, B_STONE);
+            }
+            setChunkLocal(c, lx, 62, lz, B_STONEBRICK);
+            if (wx >= -18 && wx <= 18 && wz >= -30 && wz <= 10) {
+               boolean light = Math.floorMod(wx, 4) == 0 && Math.floorMod(wz, 3) == 0;
+               boolean aisle = ((wx + wz) & 1) == 0;
+               setChunkLocal(c, lx, 63, lz, light ? B_GLOWSTONE : (aisle ? B_QUARTZ_BLOCK : B_STONEBRICK));
+            } else {
+               setChunkLocal(c, lx, 63, lz, B_GRASS);
+            }
+         }
+      }
+
+      // Lay out ALL 88 PE blocks (B_STONE = 1 .. MAX_BLOCK_ID = 88) in 15 columns x 6 rows in front of spawn (wz = -4..-19)
+      for (int id = 1; id <= MAX_BLOCK_ID; id++) {
+         int idx = id - 1;
+         int col = idx % 15;
+         int row = idx / 15;
+         int bx = -14 + col * 2;
+         int bz = -4 - row * 3;
+         if ((bx >> 4) == cx && (bz >> 4) == cz) {
+            int lx = bx & 15;
+            int lz = bz & 15;
+            byte b = (byte)id;
+            if (b == B_TALL_GRASS || b == B_FLOWER_RED || b == B_FLOWER_YELLOW || b == B_SUGAR_CANE) {
+               setChunkLocal(c, lx, 63, lz, B_GRASS);
+            } else if (b == B_WHEAT) {
+               setChunkLocal(c, lx, 63, lz, B_FARMLAND);
+            } else if (b == B_CACTUS) {
+               setChunkLocal(c, lx, 63, lz, B_SAND);
+            }
+            setChunkLocal(c, lx, 64, lz, b);
+            if (isOpaque(b)) {
+               setChunkLocal(c, lx, 67, lz, b);
+            }
+         }
       }
    }
 

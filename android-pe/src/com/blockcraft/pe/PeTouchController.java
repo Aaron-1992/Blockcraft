@@ -407,6 +407,9 @@ public final class PeTouchController {
                if (world.slotExists[s]) {
                   world.loadWorld(context, s);
                   if (audio != null) audio.playSfx("levelup", 0.9F, 1.0F);
+               } else if (s == 2) {
+                  world.createNewSinglePlayerWorld(context, 2, PeWorld.MODE_CREATIVE, PeWorld.WTYPE_ALL_BLOCKS, 2026L);
+                  if (audio != null) audio.playSfx("levelup", 0.95F, 1.0F);
                } else {
                   world.createSlot = s;
                   world.createMode = PeWorld.MODE_SURVIVAL;
@@ -448,9 +451,12 @@ public final class PeTouchController {
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }
-         // Row 2: World Type toggle (Large Biomes Recommended / Default / Superflat)
+         // Row 2: World Type toggle (Large Biomes Recommended / Default / Superflat / All Blocks Gallery)
          if (inRect(x, y, bx, 395.0F * scale, bw, bh)) {
             world.createWorldType = (world.createWorldType + 1) % PeWorld.WTYPE_NAMES.length;
+            if (world.createWorldType == PeWorld.WTYPE_ALL_BLOCKS) {
+               world.createMode = PeWorld.MODE_CREATIVE;
+            }
             if (audio != null) audio.playSfx("click", 0.85F, 1.05F);
             return;
          }

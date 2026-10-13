@@ -185,6 +185,7 @@ public final class PeTextures {
 
    public static int activePackMode = 0;
    public static final String[] PACK_NAMES = {
+      "Brand-New Overhaul (V1.8)",
       "Realistic 5.6 x MC (V1.7)",
       "V1.6 (5.6 x MC Fusion)",
       "V1.5 (Bold Pixel Art)",
@@ -349,12 +350,13 @@ public final class PeTextures {
 
    private static void blitTile(int[] atlas, int tile, int[] tilePixels) {
       int[] src = tilePixels;
-      if (activePackMode == 0 && tile != T_HEART_FULL && tile != T_HEART_EMPTY && tile != T_HUNGER_FULL && tile != T_HUNGER_EMPTY) {
+      if ((activePackMode == 0 || activePackMode == 1)
+         && tile != T_HEART_FULL && tile != T_HEART_EMPTY && tile != T_HUNGER_FULL && tile != T_HUNGER_EMPTY) {
          boolean wrap = tile < 120 && tile != T_LEAVES_OAK && tile != T_LEAVES_SPRUCE && tile != T_LEAVES_BIRCH
             && tile != T_BUSHY_FROND_OAK && tile != T_BUSHY_FROND_SPRUCE && tile != T_BUSHY_FROND_BIRCH
             && tile != T_TALL_GRASS && tile != T_FLOWER_RED && tile != T_FLOWER_YELLOW && tile != T_TORCH;
-         src = applyRealisticRelief(tilePixels, 0.72F, wrap);
-      } else if (activePackMode == 2 && tile < 128) {
+         src = applyRealisticRelief(tilePixels, activePackMode == 0 ? 0.85F : 0.72F, wrap);
+      } else if (activePackMode == 3 && tile < 128) {
          src = applyRealisticRelief(tilePixels, 1.15F, false);
       }
       int tx0 = (tile & 15) * 16;
