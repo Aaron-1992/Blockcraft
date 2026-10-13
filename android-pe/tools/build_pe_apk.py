@@ -194,7 +194,7 @@ def build_release_notes(version, apk_name, bundle_name):
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.4"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.5"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")

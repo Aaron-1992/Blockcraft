@@ -505,7 +505,35 @@ public class PeCoreTest {
       glView.world.invCategory = 1;
       glView.onDrawFrame(null); // Draw Building Blocks Tab
 
-      System.out.println("PeCoreTest PASSED: CCW Face Winding, Upright Side UVs, Animated 3D Falling Trees, 3D Tools, 36-Slot Backpack, and Controls verified!");
+      // 11. Verify Every Block Face Tile & Every Tool/Item Sprite in PeTextures Has Crisp Pixel Art
+      for (int id = 1; id <= PeWorld.MAX_BLOCK_ID; id++) {
+         for (int face = 0; face < 6; face++) {
+            int tile = PeWorld.getFaceTile((byte)id, face);
+            int tx0 = (tile & 15) * 16;
+            int ty0 = (tile >> 4) * 16;
+            int nonZero = 0;
+            for (int y = 0; y < 16; y++) {
+               for (int x = 0; x < 16; x++) {
+                  if ((atlas[(ty0 + y) * 256 + (tx0 + x)] >>> 24) >= 64) nonZero++;
+               }
+            }
+            check(nonZero >= 12, "Block id=" + id + " face=" + face + " tile=" + tile + " has crisp pixel art (" + nonZero + " px)");
+         }
+      }
+      for (int itemId = PeWorld.I_SWORD_WOOD; itemId <= PeWorld.I_BREAD; itemId++) {
+         int tile = PeWorld.getItemTile(itemId);
+         int tx0 = (tile & 15) * 16;
+         int ty0 = (tile >> 4) * 16;
+         int nonZero = 0;
+         for (int y = 0; y < 16; y++) {
+            for (int x = 0; x < 16; x++) {
+               if ((atlas[(ty0 + y) * 256 + (tx0 + x)] >>> 24) >= 128) nonZero++;
+            }
+         }
+         check(nonZero >= 16, "Item id=" + itemId + " (" + PeWorld.getItemName(itemId) + ") tile=" + tile + " has crisp outlined pixel art (" + nonZero + " px)");
+      }
+
+      System.out.println("PeCoreTest PASSED: Master Pixel-Art Texture Overhaul, CCW Face Winding, Upright Side UVs, Animated 3D Falling Trees, 3D Tools, 36-Slot Backpack, and Controls verified!");
    }
 }
 """
