@@ -28,9 +28,10 @@ carved-pumpkin and jack-o-lantern faces (223/224).
   fragment masks restrict furnace/jack-o-lantern/torch/observer emission. Wood,
   casings, unpowered parts and daylight sensors are not emissive materials.
 - 56 slimmer item canvases: 25 tools, 16 armour pieces, arrow, four buckets,
-  compass, clock, fire charge, the flat bow, and six combat/mod icons. Shears and flint-and-steel
-  are pixel-exact. The bow has slimmer two-pixel limbs while retaining its flat draw animation. Held lighting,
-  gun poses and cannon/mortar artwork are unchanged.
+  compass, clock, fire charge, the flat bow, and six combat/mod icons. Shears and
+  flint-and-steel are pixel-exact. The bow has slimmer two-pixel limbs while
+  retaining its flat draw animation. Held lighting, gun poses and cannon/mortar
+  artwork are unchanged.
 - Paper, book and Eye of Ender are redrawn. Cake icing is authored at its actual
   half-height side UV range, rather than disappearing above the placed model.
 
@@ -69,17 +70,36 @@ The icons sheet uses the real GUI model path with a native32 software atlas.
 - [Tools/combat canvases](utility-review-tools.png)
 - [GUI models and banner items](utility-review-icons.png)
 
-Actual-game fixtures have been added for plain/lit utility models, night emission,
-menu-open/menu-closed chest views, both Tools/Combat inventory pages, standing/wall
-banners and wall-torch caps, plus idle/full-draw flat bows. The initial remote
-Mesa runs (38618694527, source 1f4e33d) and image inspection completed successfully.
-Inspection exposed floor occlusion beneath the egg/cage and repeated latch artwork
-inside the open chest; those are now corrected and covered by new mesh tests.
-The corrective follow-up (38619902783, source 66755d5) also passed. The 11-scene final run (38620690785, source a6e14de) passed; idle/full flat bows,
-cloth, wall-torch caps, both inventory pages and corrected models were inspected.
-The cloth inspection revealed tiny inter-fold light slits: fold depths now overlap,
-a regression guards the joins, and a focused two-scene cloth recheck is running. Chest
-motion smoothness/performance and resource-pack appearance still need visual
-checks. Test totals and coverage establish scope/correctness, not art approval.
+## Actual-game verification
 
-No published archive has been rebuilt or replaced for this review.
+All **11 real-game scenes** passed and were inspected (Mesa llvmpipe, source
+`a6e14de`, [Visual run 38620690785](https://github.com/Aaron-1992/Blockcraft/actions/runs/38620690785)).
+The final cloth-join correction at `2c1cea9` also passed its focused plain/lit
+recheck: [Visual run 38622022895](https://github.com/Aaron-1992/Blockcraft/actions/runs/38622022895).
+Final [CI run 38622022970](https://github.com/Aaron-1992/Blockcraft/actions/runs/38622022970)
+confirms **4,422,166 passed / 0 failed**, strict equivalence, GLSL syntax and coverage.
+
+| Actual-game view | Captures |
+|---|---|
+| Utility models | [Plain](../../ci-results/shots/pixel-utility-review-plain-new.png) · [Shaders](../../ci-results/shots/pixel-utility-review-lit-new.png) |
+| Selective emission | [Night lights and unlit control](../../ci-results/shots/pixel-utility-review-night-new.png) |
+| Real chest menu/lid path | [Open](../../ci-results/shots/pixel-utility-chest-open-new.png) · [Closed](../../ci-results/shots/pixel-utility-chest-closed-new.png) |
+| Tools/Combat inventory | [Page 1](../../ci-results/shots/pixel-utility-tools-new.png) · [Page 2](../../ci-results/shots/pixel-utility-tools-page2-new.png) |
+| Standing/wall cloth and torch caps | [Plain](../../ci-results/shots/pixel-utility-banners-plain-new.png) · [Shaders](../../ci-results/shots/pixel-utility-banners-lit-new.png) |
+| Flat bow preserved | [Idle](../../ci-results/shots/pixel-bow-idle-new.png) · [Full draw](../../ci-results/shots/pixel-bow-full-new.png) |
+
+Image inspection caught and led to fixes for the egg/cage hiding their supporting
+floor, duplicated latch art inside the open chest, and light leaking between thin
+banner folds. These now have mesh/model regressions, not just screenshot evidence.
+
+### Remaining before a public release
+
+- User art review: this batch and the earlier two batches are still unapproved.
+- Windows/manual play checks, especially lid smoothness/performance and custom-pack
+  appearance. Current lid animation is driven by the local chest menu, not a new
+  multiplayer open-container broadcast.
+- Fresh versioned packaging and release receipts after the review is settled.
+
+Test totals and coverage establish scope/correctness, not artistic acceptance.
+No published archive has been rebuilt or replaced for this review. V6.5 still
+points to `23a29db449ae465235d23ab36ff97b921627607e` (published 2026-10-14 00:20:44Z).
