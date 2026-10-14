@@ -823,6 +823,12 @@ SCENES["pixel-utility-chest-closed"] = (_UR+["-Dbc.time=6000","-Dbc.shaders=fals
 SCENES["pixel-utility-tools"] = ([a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.shot="))]
     +["-Dbc.inv=creative","-Dbc.tab=4","-Dbc.mouse=2,2","-Dbc.shaders=false","-Dbc.shot=140"],True)
 SCENES["pixel-utility-tools-page2"] = (SCENES["pixel-utility-tools"][0]+["-Dbc.page=1"],True)
+_UB=[a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.cam=","-Dbc.shot="))]
+_UB += ["-Dbc.fill=0,66,0,12,66,8,1;0,67,0,12,74,8,0;1,67,6,4,71,6,27",
+        "-Dbc.set=2,68,5,90;4,68,5,90;3,70,5,2444;6,67,3,2386;8,67,3,2330;10,67,3,2374",
+        "-Dbc.cam=6,69.5,-1,0,12","-Dbc.shot=200","-Dbc.worldonly=true"]
+SCENES["pixel-utility-banners-plain"] = (_UB+["-Dbc.shaders=false"],True)
+SCENES["pixel-utility-banners-lit"] = (_UB,True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

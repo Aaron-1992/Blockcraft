@@ -124,7 +124,7 @@ final class TestsVisualRefresh {
                if(alphaChanges>0)newSilhouettes++;
             }
          }
-         check(changed==521,"500 earlier redrawn cells plus 21 dedicated utility components");
+         check(changed==522,"500 earlier redrawn cells, the explicitly reopened bow and 21 new utility components");
          check(newSilhouettes==items,"every rejected item receives a new silhouette");
          for(int t:new int[]{23,24,235,263})for(float phase:new float[]{0,1,7,15.5F}) {
             int[] frame=TexRemaining32.frame(t,phase);

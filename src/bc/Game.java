@@ -578,6 +578,7 @@ public final class Game {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
          if (this.autoFrames == 1) {
+            if(Boolean.getBoolean("bc.worldonly"))this.hideGui=true;
             if (var2 != null) {
                String[] var3 = var2.split(",");
                this.player.setPos(Double.parseDouble(var3[0]), Double.parseDouble(var3[1]), Double.parseDouble(var3[2]));

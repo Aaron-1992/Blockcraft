@@ -27,9 +27,9 @@ carved-pumpkin and jack-o-lantern faces (223/224).
 - Explicit emissive-material list replaces inference from shared block textures;
   fragment masks restrict furnace/jack-o-lantern/torch/observer emission. Wood,
   casings, unpowered parts and daylight sensors are not emissive materials.
-- 55 slimmer item canvases: 25 tools, 16 armour pieces, arrow, four buckets,
-  compass, clock, fire charge, and six combat/mod icons. Shears and flint-and-steel
-  are pixel-exact. The existing flat bow sprites/draw animation, held lighting,
+- 56 slimmer item canvases: 25 tools, 16 armour pieces, arrow, four buckets,
+  compass, clock, fire charge, the flat bow, and six combat/mod icons. Shears and flint-and-steel
+  are pixel-exact. The bow has slimmer two-pixel limbs while retaining its flat draw animation. Held lighting,
   gun poses and cannon/mortar artwork are unchanged.
 - Paper, book and Eye of Ender are redrawn. Cake icing is authored at its actual
   half-height side UV range, rather than disappearing above the placed model.
@@ -37,19 +37,19 @@ carved-pumpkin and jack-o-lantern faces (223/224).
 ## Scope and local verification
 
 The immutable `test/pixel32-color-nature.properties` baseline was exported from
-**dfee07f**, before this batch. An independent allowlist verifies exactly **128
-changed cells**: 107 existing canvases and 21 new component cells (760–780).
+**dfee07f**, before this batch. An independent allowlist verifies exactly **129
+changed cells**: 108 existing canvases and 21 new component cells (760–780).
 Every other atlas cell, including the 16 Building revisions and 100 retained
 Colors/Nature revisions, is unchanged. Previous review scope checks remain in
 place; only the two explicitly reopened pumpkin faces are delegated to this guard.
 
-Local full run: **4,420,111 assertions passed, 0 failed**. Strict terrain/world/tick
+Local full run: **4,422,163 assertions passed, 0 failed**. Strict terrain/world/tick
 comparison still matches the 3.5 reference with legacy features selected:
 397 equal fingerprints, 64 intentionally changed, 145 new. The old mesh flag
 retains historical torch/chest geometry rather than weakening that comparison.
 GLSL syntax checks pass; these are not a substitute for a GPU/driver run.
 
-Coverage: **539 populated cells = 521 redrawn + 17 protected + 1 white utility**.
+Coverage: **539 populated cells = 522 redrawn + 16 protected + 1 white utility**.
 New components have CPU16 fallbacks before resource-pack overrides; default
 native32 dispatch owns their full-resolution art. The furnace animation upload
 is limited to the default native32 pack.
@@ -70,11 +70,13 @@ The icons sheet uses the real GUI model path with a native32 software atlas.
 - [GUI models and banner items](utility-review-icons.png)
 
 Actual-game fixtures have been added for plain/lit utility models, night emission,
-menu-open/menu-closed chest views, and the Tools/Combat inventory. The initial remote
+menu-open/menu-closed chest views, both Tools/Combat inventory pages, standing/wall
+banners and wall-torch caps, plus idle/full-draw flat bows. The initial remote
 Mesa runs (38618694527, source 1f4e33d) and image inspection completed successfully.
 Inspection exposed floor occlusion beneath the egg/cage and repeated latch artwork
 inside the open chest; those are now corrected and covered by new mesh tests.
-A follow-up actual-game capture is pending at this checkpoint. Chest
+The corrective follow-up (38619902783, source 66755d5) also passed. The final
+bow/cloth/wall-torch capture is pending at this checkpoint. Chest
 motion smoothness/performance and resource-pack appearance still need visual
 checks. Test totals and coverage establish scope/correctness, not art approval.
 

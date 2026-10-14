@@ -1,12 +1,13 @@
 package bc;
 
 /** Utility-review item silhouettes. Native 32px; deliberately leaves the accepted
- * flat animated bow, shears and flint-and-steel alone. Gun poses are not touched. */
+ * flat bow mechanics intact; shears, flint-and-steel and gun poses are untouched. */
 final class TexTools32 {
    private TexTools32(){}
-   static boolean handles(int t){return t>=105&&t<=124||t>=198&&t<=202||t>=135&&t<=150
+   static boolean handles(int t){return t==77||t>=105&&t<=124||t>=198&&t<=202||t>=135&&t<=150
       ||t==76||t>=190&&t<=192||t==239||t==677||t==678||t==679||t>=688&&t<=693;}
    static int[] paint(int t){
+      if(t==77)return BowSprite.pixels(0,false);
       if(t>=105&&t<=124||t>=198&&t<=202)return tool(t);
       if(t>=135&&t<=150)return armor(t);
       PixelArt32 a=new PixelArt32();

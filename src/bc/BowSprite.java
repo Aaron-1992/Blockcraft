@@ -18,7 +18,9 @@ final class BowSprite {
    static int tipY(int stage) { return 2 + stage; }
    static int nockX(int stage) { return 19 + stage * 3; }
 
-   static int[] pixels(int stage, boolean arrow) {
+   static int[] pixels(int stage, boolean arrow) {return pixels(stage,arrow,true);}
+   static int[] previousPixels(int stage,boolean arrow){return pixels(stage,arrow,false);}
+   private static int[] pixels(int stage, boolean arrow,boolean review) {
       stage = Math.max(0, Math.min(3, stage));
       int[] p = new int[SIZE * SIZE];
       int tx = tipX(stage), ty = tipY(stage), nx = nockX(stage);
@@ -30,12 +32,12 @@ final class BowSprite {
          for (int i = 0; i < top.length - 1; i++) {
             int ax = top[i][0], ay = side == 0 ? top[i][1] : 31 - top[i][1];
             int bx = top[i + 1][0], by = side == 0 ? top[i + 1][1] : 31 - top[i + 1][1];
-            line(p, ax - 1, ay, bx - 1, by, 0xFF624527);
-            line(p, ax, ay, bx, by, 0xFFAF8750);
-            line(p, ax + 1, ay, bx + 1, by, 0xFF896135);
+            line(p, ax - 1, ay, bx - 1, by, review?0xFF765536:0xFF624527);
+            line(p, ax, ay, bx, by, review?0xFFB99A63:0xFFAF8750);
+            if(!review)line(p, ax + 1, ay, bx + 1, by, 0xFF896135);
          }
       }
-      for (int y = 13; y <= 18; y++) for (int x = 7; x <= 9; x++) {
+      for (int y = 13; y <= 18; y++) for (int x = 7; x <= (review?8:9); x++) {
          set(p, x, y, (y & 1) == 0 ? 0xFF6C4931 : 0xFF4D3627);
       }
       set(p, tx, ty, 0xFFD4C3A0);

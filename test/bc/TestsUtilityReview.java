@@ -11,11 +11,11 @@ final class TestsUtilityReview {
       return t>=760&&t<=780||t>=39&&t<=43||t>=180&&t<=182||t>=231&&t<=234
          ||t>=265&&t<=267||t>=716&&t<=731||t>=105&&t<=124||t>=135&&t<=150
          ||t>=198&&t<=202||t>=190&&t<=192||t>=688&&t<=693
-         ||Arrays.binarySearch(new int[]{30,36,76,212,213,220,223,224,237,238,239,269,279,641,
+         ||Arrays.binarySearch(new int[]{30,36,76,77,212,213,220,223,224,237,238,239,269,279,641,
             644,645,646,659,662,663,664,669,671,677,678,679},t)>=0;
    }
    static void run() {
-      test("utility review: exact 128-cell scope preserves earlier reviews and explicit item exceptions",()->{
+      test("utility review: exact 129-cell scope preserves earlier reviews and explicit item exceptions",()->{
          ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);Tex.initPixels();
          Properties before=new Properties();
          try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-color-nature.properties")){before.load(in);}
@@ -26,12 +26,13 @@ final class TestsUtilityReview {
             check(differs==reopened(t),"exact requested review scope "+t);
             if(differs){changed++;check(Arrays.equals(art,TexRemaining32.paint(t)),"native reviewed dispatch "+t);}
          }
-         eq(128,changed,"107 existing cells and 21 new components");
-         for(int t:new int[]{77,196,218,4,10,35,534,535,536,537,538})
-            check(Arrays.hashCode(BuildingBlockReviewPreview.pixels(t))==Integer.parseInt(before.getProperty(""+t)),"protected bow, exceptions and approved references "+t);
+         eq(129,changed,"108 existing cells and 21 new components");
+         for(int t:new int[]{196,218,4,10,35,534,535,536,537,538})
+            check(Arrays.hashCode(BuildingBlockReviewPreview.pixels(t))==Integer.parseInt(before.getProperty(""+t)),"explicit exceptions and approved references "+t);
+         check(Arrays.hashCode(BowSprite.previousPixels(0,false))==Integer.parseInt(before.getProperty("77")),"honest pre-review bow reference");
          for(int id:Creative.tab(Creative.TOOLS)) {
             int t=Items.tile(id);
-            check(t==77||t==196||t==218||TexTools32.handles(t),"no omitted creative Tools/Combat item "+Items.name(id));
+            check(t==196||t==218||TexTools32.handles(t),"no omitted creative Tools/Combat item "+Items.name(id));
          }
       });
       test("utility review: native tools have lighter silhouettes, readable TNT and visible cake icing",()->{

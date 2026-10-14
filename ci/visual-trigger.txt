@@ -1,3 +1,3 @@
-pixel-utility-review-plain,pixel-utility-review-lit,pixel-utility-review-night,pixel-utility-chest-open,pixel-utility-chest-closed,pixel-utility-tools,pixel-utility-tools-page2
+pixel-utility-review-plain,pixel-utility-review-lit,pixel-utility-review-night,pixel-utility-chest-open,pixel-utility-chest-closed,pixel-utility-tools,pixel-utility-tools-page2,pixel-utility-banners-plain,pixel-utility-banners-lit,pixel-bow-idle,pixel-bow-full
 jar=build
-# Correct partial-model floor occlusion and single chest latch; capture unobscured tools on both pages.
+# Final utility check: folded cloth, wall torch caps, corrected floor/latch, both inventory pages and slimmer flat bow sprites.
