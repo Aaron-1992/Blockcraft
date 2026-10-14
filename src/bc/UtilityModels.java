@@ -103,7 +103,8 @@ final class UtilityModels {
       else {parts.add(part(7.5,0,7,8.5,28,8,ROD));parts.add(part(0,28,6,16,29,7,ROD));}
       double y=wall?-11:4,z=wall?12:6;
       for(int i=0;i<4;i++) {
-         double fold=new double[]{0,.35,.1,.5}[i];
+         // Adjacent folds overlap in depth: thin cloth must not have light-leaking slits.
+         double fold=new double[]{0,.15,.05,.20}[i];
          double[] p=local(Shapes.tint(Shapes.tiles(Shapes.px(.5+i*3.75,y,z+fold,4.25+i*3.75,y+24,z+fold+.25),641,CLOTH_EDGE,CLOTH_EDGE),tint));
          p=java.util.Arrays.copyOf(p,19);p[15]=i/4.;p[16]=0;p[17]=(i+1)/4.;p[18]=1;parts.add(p);
       }

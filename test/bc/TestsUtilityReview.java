@@ -146,6 +146,7 @@ final class TestsUtilityReview {
          double last=0;int strips=0;
          for(double[] b:banner)if(b.length>18){check(b[15]==last&&b[17]-b[15]==.25,"four consecutive UV strips");last=b[17];strips++;Shapes.corner(b,3,0,xyz,uv);check(uv[0]>=b[15]&&uv[0]<=b[17],"strip UV stays in its band");}
          eq(4,strips,"folded fabric, not cube");
+         for(int i=2;i<banner.length-1;i++)check(banner[i][5]>=banner[i+1][2]&&banner[i+1][5]>=banner[i][2],"no light-leaking gap between cloth strips");
          double[][] eye=Shapes.modelBoxes(Blocks.END_FRAME_EYE);
          check(eye.length>=3&&eye[2][1]>=14/16.&&eye[2][4]==1,"eye above socket, not painted flat");
          double[][] egg=Shapes.modelBoxes(Blocks.DRAGON_EGG);

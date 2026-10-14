@@ -43,7 +43,7 @@ Every other atlas cell, including the 16 Building revisions and 100 retained
 Colors/Nature revisions, is unchanged. Previous review scope checks remain in
 place; only the two explicitly reopened pumpkin faces are delegated to this guard.
 
-Local full run: **4,422,163 assertions passed, 0 failed**. Strict terrain/world/tick
+Local full run: **4,422,166 assertions passed, 0 failed**. Strict terrain/world/tick
 comparison still matches the 3.5 reference with legacy features selected:
 397 equal fingerprints, 64 intentionally changed, 145 new. The old mesh flag
 retains historical torch/chest geometry rather than weakening that comparison.
@@ -75,8 +75,10 @@ banners and wall-torch caps, plus idle/full-draw flat bows. The initial remote
 Mesa runs (38618694527, source 1f4e33d) and image inspection completed successfully.
 Inspection exposed floor occlusion beneath the egg/cage and repeated latch artwork
 inside the open chest; those are now corrected and covered by new mesh tests.
-The corrective follow-up (38619902783, source 66755d5) also passed. The final
-bow/cloth/wall-torch capture is pending at this checkpoint. Chest
+The corrective follow-up (38619902783, source 66755d5) also passed. The 11-scene final run (38620690785, source a6e14de) passed; idle/full flat bows,
+cloth, wall-torch caps, both inventory pages and corrected models were inspected.
+The cloth inspection revealed tiny inter-fold light slits: fold depths now overlap,
+a regression guards the joins, and a focused two-scene cloth recheck is running. Chest
 motion smoothness/performance and resource-pack appearance still need visual
 checks. Test totals and coverage establish scope/correctness, not art approval.
 
