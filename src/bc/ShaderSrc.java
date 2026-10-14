@@ -262,6 +262,7 @@ final class ShaderSrc {
          "  float et = tileId(vUv); vec2 ep = fract(vUv * 32.0);",
          "  float materialMask = 1.0;",
          "  if (abs(et-36.0)<0.5) materialMask = (ep.y<0.47 && ep.x>0.36 && ep.x<0.65) ? 1.0 : 0.0;",
+         "  if (abs(et-776.0)<0.5) materialMask = (ep.x>0.375 && ep.x<0.625 && ep.y>0.375 && ep.y<0.625) ? 1.0 : 0.0;",
          "  if (abs(et-40.0)<0.5) materialMask = (ep.y>0.56 && ep.y<0.90 && ep.x>0.17 && ep.x<0.84) ? 1.0 : 0.0;",
          "  if (abs(et-224.0)<0.5) materialMask = (t.g>0.65 && t.b>0.25) ? 1.0 : 0.0;",
          "  if (abs(et-30.0)<0.5 || abs(et-659.0)<0.5) materialMask = smoothstep(0.58,0.76,dot(t.rgb,vec3(0.299,0.587,0.114)));",

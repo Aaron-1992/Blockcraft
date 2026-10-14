@@ -1728,6 +1728,7 @@ public final class GameTests {
       TestsPlayerAnim.run();
       Tests319.run();
       TestsVisualRefresh.run();
+      TestsUtilityReview.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

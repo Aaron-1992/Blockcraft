@@ -1143,7 +1143,7 @@ public final class Mesher {
       }
    }
 
-   static void wallTorch(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+   static void wallTorchLegacy(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
       int var6 = var5 - 89;
       float var7 = var6 == 2 ? -1.0F : (var6 == 3 ? 1.0F : 0.0F);
       float var8 = var6 == 0 ? 1.0F : (var6 == 1 ? -1.0F : 0.0F);
@@ -1176,6 +1176,32 @@ public final class Mesher {
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
          emit(var0, var0.o, Blocks.tiles[var5][var19], false);
+      }
+   }
+
+
+   static void wallTorch(Mesher.Scratch var0, Chunk var1, int var2, int var3, int var4, int var5) {
+      if(legacy){wallTorchLegacy(var0,var1,var2,var3,var4,var5);return;}
+      int var6 = var5 - 89;
+      float var7 = var6 == 2 ? -1.0F : (var6 == 3 ? 1.0F : 0.0F);
+      float var8 = var6 == 0 ? 1.0F : (var6 == 1 ? -1.0F : 0.0F);
+      int var9 = ci(var2 + 1, var3 + 1, var4 + 1);
+      int var10 = var0.L[var9] & 255;
+      float var11 = var10 >> 4 & 15;
+      float var12 = var10 & 15;
+      float[] uv=new float[2],xyz=new float[3];
+      for(double[] part:Shapes.modelBoxes(Blocks.TORCH))for(int face=0;face<6;face++) {
+         for(int i=0;i<4;i++) {
+            Shapes.corner(part,face,i,xyz,uv);float lean=xyz[1]*.55F;
+            var0.qx[i]=var2+xyz[0]-var7*.34F+var7*lean;
+            var0.qy[i]=var3+.2F+xyz[1];
+            var0.qz[i]=var4+xyz[2]-var8*.34F+var8*lean;
+            var0.qu[i]=uv[0];var0.qv[i]=uv[1];
+            var0.qr[i]=var0.qg[i]=var0.qb[i]=var0.qa[i]=var0.ao[i]=1;
+            var0.qm[i]=lu(var11);var0.ql[i]=lu(Math.max(var12,Blocks.emit[var5]));
+         }
+         int tile=(int)(face==0?part[9]:face==1?part[10]:part[8]);
+         emit(var0,var0.o,tile,false);
       }
    }
 

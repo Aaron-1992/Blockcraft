@@ -8,6 +8,7 @@ final class TexItems32 {
    private TexItems32(){}
    static final int[] TIERS={PixelArt32.OAK,PixelArt32.STONE,PixelArt32.IRON,PixelArt32.GOLD,PixelArt32.DIAMOND};
    static int[] paint(int t){
+      if(TexTools32.handles(t))return TexTools32.paint(t);
       PixelArt32 a=new PixelArt32();
       if(t>=105&&t<=124||t>=198&&t<=202)return tool(t);
       if(t>=135&&t<=150)return armor(t);

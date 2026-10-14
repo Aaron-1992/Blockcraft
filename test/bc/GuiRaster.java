@@ -13,6 +13,10 @@ import javax.imageio.ImageIO;
  * real atlas (Tex.initPixels). Rotation is ignored (the splash text of the title is drawn straight).
  */
 public class GuiRaster extends Gui {
+   private int[] nativePixels;
+   void useNativeAtlas(){nativePixels=TexPixel32.atlas(Tex.atlasPixels);}
+   private int atlasWidth(){return nativePixels==null?Tex.PX:Tex.COLS*32;}
+   private int[] atlasPixels(){return nativePixels==null?Tex.atlasPixels:nativePixels;}
    public final int W;
    public final int H;
    public final int[] px;
@@ -196,14 +200,14 @@ public class GuiRaster extends Gui {
       int y0 = Math.round(this.dy(y));
       int x1 = Math.round(this.dx(x + w));
       int y1 = Math.round(this.dy(y + h));
-      float u0 = Tex.tu(tile) * Tex.PX;
-      float v0 = Tex.tv(tile) * Tex.PX;
-      int ts = Math.round(Tex.TS * Tex.PX);
+      float u0 = Tex.tu(tile) * atlasWidth();
+      float v0 = Tex.tv(tile) * atlasWidth();
+      int ts = Math.round(Tex.TS * atlasWidth());
       for (int j = Math.max(0, y0); j < Math.min(this.H, y1); j++) {
          for (int i = Math.max(0, x0); i < Math.min(this.W, x1); i++) {
             int sx = (int)(u0 + (i - x0 + 0.5F) * ts / Math.max(1, x1 - x0));
             int sy = (int)(v0 + (j - y0 + 0.5F) * ts / Math.max(1, y1 - y0));
-            int c = Tex.atlasPixels[sy * Tex.PX + sx];
+            int c = atlasPixels()[sy * atlasWidth() + sx];
             int a = c >>> 24;
             if (a < 26) {
                continue;
@@ -232,8 +236,8 @@ public class GuiRaster extends Gui {
    protected void v(float x, float y, float du, float dv, float r, float g, float b, float a, float tu0, float tv0) {
       this.qx[this.qn] = this.dx(x);
       this.qy[this.qn] = this.dy(y);
-      this.qu[this.qn] = (tu0 + du * Tex.TS) * Tex.PX;
-      this.qv[this.qn] = (tv0 + dv * Tex.TS) * Tex.PX;
+      this.qu[this.qn] = (tu0 + du * Tex.TS) * atlasWidth();
+      this.qv[this.qn] = (tv0 + dv * Tex.TS) * atlasWidth();
       this.qr = r;
       this.qg = g;
       this.qb = b;
@@ -275,7 +279,7 @@ public class GuiRaster extends Gui {
 
             int sx = (int)(this.qu[0] + u * du + v * dvu);
             int sy = (int)(this.qv[0] + u * duv + v * dvv);
-            int c = Tex.atlasPixels[Math.max(0, Math.min(Tex.PX - 1, sy)) * Tex.PX + Math.max(0, Math.min(Tex.PX - 1, sx))];
+            int c = atlasPixels()[Math.max(0, Math.min(atlasWidth() - 1, sy)) * atlasWidth() + Math.max(0, Math.min(atlasWidth() - 1, sx))];
             int a = c >>> 24;
             if (a < 26) {
                continue;

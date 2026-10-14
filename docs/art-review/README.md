@@ -1,7 +1,7 @@
 # V6.5 native-pixel art rework
 
 **Unreleased follow-ups (not yet user-approved):**
-[Building category](building-block-review.md) · [Colors / Nature categories](colors-nature-review.md).
+[Building category](building-block-review.md) · [Colors / Nature categories](colors-nature-review.md) · [Utilities / Tools review](utility-tools-review.md).
 The release record below describes the published V6.5 assets, not those working revisions.
 
 ## Scope and protected references

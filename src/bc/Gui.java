@@ -665,6 +665,23 @@ public class Gui {
       }
    }
 
+   private void componentIcon(int id,float x,float y,float size) {
+      boolean chest=id==Blocks.CHEST||id==Blocks.CHEST_LOOT||id==Blocks.FURNACE||id==Blocks.FURNACE_LIT;
+      int[] faces=chest?new int[]{0,2,5}:new int[]{0,3,4};
+      float[] xyz=new float[3],uv=new float[2];
+      double[][] boxes=iconBoxes(id);if(boxes==null)boxes=new double[][]{Shapes.px(0,0,0,16,16,16)};
+      for(double[] box:boxes)for(int f:faces) {
+         double override=f==0?box[9]:box[8];
+         int tile=override>=0?(int)override:Blocks.tiles[id][f];
+         float shade=f==0?1:f<4?.78F:.58F;
+         for(int i=0;i<4;i++) {
+            Shapes.corner(box,f,i,xyz,uv);
+            if(chest){xyz[0]=1-xyz[0];xyz[2]=1-xyz[2];}
+            v(sx(x,size,xyz[0],xyz[2]),sy(y,size,xyz[0],xyz[2],xyz[1]),uv[0],uv[1],shade,shade,shade,1,Tex.tu(tile),Tex.tv(tile));
+         }
+      }
+   }
+
    public void icon(int var1, float var2, float var3, float var4) {
       if (var1 != 0) {
          if (Items.isItem(var1)) {
@@ -681,6 +698,8 @@ public class Gui {
                float[] var26 = new float[]{var2, var2 + var4, var2 + var4, var2};
                float[] var28 = new float[]{var3, var3, var3 + var4, var3 + var4};
                this.face(Blocks.tiles[var1][0], var26, var28, 1.0F, var24, true);
+            } else if (UtilityModels.componentIcon(var1)) {
+               componentIcon(var1,var2,var3,var4);
             } else if (iconBoxes(var1) != null) {
                int[] var6 = tintFor(var1);
 

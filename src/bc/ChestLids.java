@@ -16,7 +16,7 @@ final class ChestLids {
       if(world!=g.world){angles.clear();world=g.world;accumulator=0;}
       if(world==null)return;
       accumulator+=dt;if(accumulator<.05)return;float elapsed=(float)Math.min(.1,accumulator);accumulator=0;
-      TileEntity tile=g.menu!=null&&g.menu.kind==3?g.menu.tile:null;
+      TileEntity tile=g.menu!=null&&g.menu.kind==Menu.CHEST?g.menu.tile:null;
       String active=tile==null?null:key(tile.x,tile.y,tile.z);
       if(active!=null)angles.putIfAbsent(active,0F);
       for(String k:angles.keySet()) {
@@ -25,7 +25,13 @@ final class ChestLids {
          int id=world.getBlock(x,y,z);
          if(id!=Blocks.CHEST&&id!=Blocks.CHEST_LOOT)value=0;
          if(value==0)angles.remove(k);else angles.put(k,value);
-         if(value!=old&&g.rend!=null)g.meshNow(x,y,z);
+         if(value!=old) {
+            // meshNow only rebuilds dirty sections; changing a client-only angle
+            // does not pass through World.setBlock to invalidate them for us.
+            Chunk chunk=world.chunkAt(x,z);
+            if(chunk!=null&&y>=0&&y<256)chunk.sections[y>>4].dirty=true;
+            if(g.rend!=null)g.meshNow(x,y,z);
+         }
       }
    }
 }

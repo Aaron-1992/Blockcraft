@@ -17,7 +17,7 @@ public final class TextureAudit {
       for (int id = 1; id < Blocks.MAX; id++) if (Blocks.name[id] != null && Blocks.tiles[id] != null)
          for (int t : Blocks.tiles[id]) if (t >= 0 && t < 1024 && names[t] == null) names[t] = Blocks.name[id];
       for (int id = 256; id < Items.name.length; id++) if (Items.name[id] != null) names[Items.tile[id]] = Items.name[id];
-      for(Class<?> cl:new Class<?>[]{Tex.class,TexArt313.class,TexArt315.class,TexPaint319.class})
+      for(Class<?> cl:new Class<?>[]{Tex.class,TexArt313.class,TexArt315.class,TexPaint319.class,UtilityModels.class})
          for(java.lang.reflect.Field f:cl.getDeclaredFields())if(!java.lang.reflect.Modifier.isPrivate(f.getModifiers())&&f.getType()==int.class&&java.lang.reflect.Modifier.isStatic(f.getModifiers())&&java.lang.reflect.Modifier.isFinal(f.getModifiers())) {
             int t=f.getInt(null);if(t>=0&&t<1024&&names[t]==null)names[t]=f.getName();
          }
@@ -36,7 +36,7 @@ public final class TextureAudit {
          int[] before=keep||t==Tex.WHITE?art:TexRemaining32.previous(t);
          int changed=0;Set<Integer> colors=new HashSet<>();
          for(int y=0;y<32;y++)for(int x=0;x<32;x++){int c=art[y*32+x];if(!keep&&c!=before[y*32+x])changed++;colors.add(c);}
-         out.println(t+"\t"+(names[t]==null?"Model-only face / icon":names[t])+"\t"+(keep?"approved-6.3":t==Tex.WHITE?"utility-white":TexColorNature32.handles(t)?"colors-nature-review-unreleased":TexBuildingReview32.handles(t)?"building-review-unreleased":TexMaterials32.handles(t)?"material-6.5":TexRemaining32.item(t)?"item-6.5":"nature-6.5")+"\t"+changed+"\t"+colors.size());
+         out.println(t+"\t"+(names[t]==null?"Model-only face / icon":names[t])+"\t"+(keep?"approved-6.3":t==Tex.WHITE?"utility-white":TexUtility32.handles(t)?"utility-review-unreleased":TexTools32.handles(t)?"tools-review-unreleased":TexColorNature32.handles(t)?"colors-nature-review-unreleased":TexBuildingReview32.handles(t)?"building-review-unreleased":TexMaterials32.handles(t)?"material-6.5":TexRemaining32.item(t)?"item-6.5":"nature-6.5")+"\t"+changed+"\t"+colors.size());
          if(keep)kept++;else if(t!=Tex.WHITE)redrawn++;
       }
       out.flush();if(args.length>0)out.close();

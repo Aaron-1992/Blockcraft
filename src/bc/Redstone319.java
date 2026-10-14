@@ -1581,13 +1581,14 @@ final class Redstone319 {
       World w = g.world;
       // 1. Button & Observer auto-release timers
       if (!buttonTimers.isEmpty()) {
-         Iterator<Map.Entry<Long, Integer>> it = buttonTimers.entrySet().iterator();
-         while (it.hasNext()) {
-            Map.Entry<Long, Integer> e = it.next();
+         // Resetting a watched observer can arm another one. Iterate a snapshot
+         // so a vertical chain cannot mutate the timer iterator or lose a new pulse.
+         for(Map.Entry<Long,Integer> e:new HashMap<>(buttonTimers).entrySet()) {
+            if(!e.getValue().equals(buttonTimers.get(e.getKey())))continue;
             int rem = e.getValue() - 1;
             if (rem <= 0) {
                long k = e.getKey();
-               it.remove();
+               buttonTimers.remove(k);
                int x = unpackX(k);
                int y = unpackY(k);
                int z = unpackZ(k);
@@ -1604,7 +1605,7 @@ final class Redstone319 {
                   g.meshNow(x, y, z);
                }
             } else {
-               e.setValue(rem);
+               buttonTimers.put(e.getKey(),rem);
             }
          }
       }

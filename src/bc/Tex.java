@@ -1005,11 +1005,6 @@ public final class Tex {
       }
 
       TexExtra.blocks();
-      for(int tile=760;tile<=780;tile++) {
-         int[] nativePixels=TexUtility32.paint(tile),low=new int[256];
-         for(int y=0;y<16;y++)for(int x=0;x<16;x++)low[y*16+x]=nativePixels[y*64+x*2];
-         blit(tile,low);
-      }
       ResourcePacks.applyPostProcess(atlasPixels);
    }
 

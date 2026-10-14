@@ -36,6 +36,7 @@ final class TexExtra {
    }
 
    static void blocks() {
+      UtilityModels.initPixels();
       Tex.blit(64, solid(16777215));
       Tex.blit(37, craftTop());
       Tex.blit(38, craftSide());

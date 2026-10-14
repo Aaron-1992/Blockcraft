@@ -146,6 +146,27 @@ final class Tests311 {
                }
 
                float[] cq = centre(q);
+               if(kind==5) {
+                  // A wall torch now has two boxes: the head's underside is
+                  // outward from the head, not from the whole composite model.
+                  int facing=id-Blocks.WALL_TORCH;
+                  float dx=facing==2?-1:facing==3?1:0,dz=facing==0?1:facing==1?-1:0;
+                  boolean found=false;
+                  for(double[] part:Shapes.modelBoxes(Blocks.TORCH)) {
+                     boolean contains=true;
+                     for(float[] v:q) {
+                        float py=v[1]-.2F;
+                        float[] p={v[0]+dx*.34F-dx*py*.55F,py,v[2]+dz*.34F-dz*py*.55F};
+                        for(int axis=0;axis<3;axis++)contains&=p[axis]>=part[axis]-.001&&p[axis]<=part[axis+3]+.001;
+                     }
+                     if(contains){
+                        float py=(float)(part[1]+part[4])/2;
+                        mid=new float[]{(float)(part[0]+part[3])/2-dx*.34F+dx*py*.55F,
+                           py+.2F,(float)(part[2]+part[5])/2-dz*.34F+dz*py*.55F};found=true;break;
+                     }
+                  }
+                  check(found,"wall torch face belongs to a real shaft/head component");
+               }
                float dot = (n[0] * (cq[0] - mid[0]) + n[1] * (cq[1] - mid[1]) + n[2] * (cq[2] - mid[2])) / len;
                check(dot >= -1e-3F, "block " + id + " (" + Blocks.name[id] + "): a face points into the block (dot " + dot + ")");
                checked++;

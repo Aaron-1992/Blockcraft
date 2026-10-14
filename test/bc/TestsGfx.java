@@ -494,9 +494,10 @@ final class TestsGfx {
          }
 
          check(lava > 0.0F && torch > lava, "a torch glows more than lava: " + torch + " vs " + lava);
-         // whatever is listed is used by nothing that gives no light
+         // Powered wire and observer indicators use visual emission without block-light propagation.
          for (int id = 1; id < Blocks.MAX; id++) {
-            if (Blocks.name[id] != null && Blocks.emit[id] < 12) {
+            if (Blocks.name[id] != null && Blocks.emit[id] == 0 && !Redstone319.observerOn(id)
+               && !(Redstone319.isWire(id)&&id>Redstone319.REDSTONE_WIRE0)) {
                for (int f = 0; f < 6; f++) {
                   check(!tiles.contains(Blocks.tiles[id][f]), Blocks.name[id] + " (" + id + ") shares a glowing tile");
                }

@@ -2262,6 +2262,11 @@ public final class Renderer {
                      float var19 = Tex.tv(var30);
 
                      for (int var20 = 0; var20 < 4; var20++) {
+                        if(UtilityModels.componentIcon(var0)) {
+                           float[] xyz=new float[3];Shapes.corner(var27,var29,var20,xyz,var22);
+                           GL11.glTexCoord2f(var18+var22[0]*Tex.TS,var19+var22[1]*Tex.TS);
+                           GL11.glVertex3f(xyz[0]-.5F,xyz[1]-.5F,xyz[2]-.5F);
+                        } else {
                         int[] var21 = Mesher.FC[var29][var20];
                         Mesher.uvFor(var29, var21[0], var21[1], var21[2], var22);
                         GL11.glTexCoord2f(var18 + var22[0] * Tex.TS, var19 + var22[1] * Tex.TS);
@@ -2270,6 +2275,7 @@ public final class Renderer {
                            (float)(var27[1] + var21[1] * (var27[4] - var27[1])) - 0.5F,
                            (float)(var27[2] + var21[2] * (var27[5] - var27[2])) - 0.5F
                         );
+                        }
                      }
                   }
                }

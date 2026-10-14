@@ -535,12 +535,25 @@ final class Shapes {
       }
    }
 
+   /** Shared world/held/GUI vertex contract: UVs precede hinge rotation. */
+   static void corner(double[] b,int face,int corner,float[] xyz,float[] uv) {
+      int[] c=Mesher.FC[face][corner];
+      for(int axis=0;axis<3;axis++)xyz[axis]=(float)b[axis+c[axis]*3];
+      if(b.length>11&&b[11]!=0)Mesher.uvFor(face,c[0],c[1],c[2],uv);
+      else Mesher.uvFor(face,xyz[0],xyz[1],xyz[2],uv);
+      if(b.length>18&&face>=2){uv[0]=(float)(b[15]+uv[0]*(b[17]-b[15]));uv[1]=(float)(b[16]+uv[1]*(b[18]-b[16]));}
+      if(b.length>14&&b[12]!=0){
+         double y=xyz[1]-b[13],z=xyz[2]-b[14],co=Math.cos(b[12]),sn=Math.sin(b[12]);
+         xyz[1]=(float)(b[13]+y*co-z*sn);xyz[2]=(float)(b[14]+y*sn+z*co);
+      }
+   }
+
    /** One box of a shape: the six faces (except the hidden ones) with the texture laid over the whole block, so that the parts line up. */
    static void emitBox(Mesher.Scratch s, int x, int y, int z, int id, double[] b, int hide, Mesher.FB buf, float alpha) {
       s.rot = 0;
       int cell = Mesher.ci(x + 1, y + 1, z + 1);
       int own = s.L[cell] & 255;
-      float[] uv = new float[2];
+      float[] uv = new float[2],xyz=new float[3];
       float tr = 1.0F;
       float tg = 1.0F;
       float tb = 1.0F;
@@ -576,21 +589,8 @@ final class Shapes {
             : Blocks.emit[id];
          float blk = Math.max(light & 15, selfGlow);
          for (int i = 0; i < 4; i++) {
-            int[] corner = Mesher.FC[f][i];
-            float px = (float)(corner[0] == 0 ? b[0] : b[3]);
-            float py = (float)(corner[1] == 0 ? b[1] : b[4]);
-            float pz = (float)(corner[2] == 0 ? b[2] : b[5]);
-            if (b.length > 11 && b[11] != 0) {
-               Mesher.uvFor(f, (px - (float)b[0]) / (float)(b[3] - b[0]), (py - (float)b[1]) / (float)(b[4] - b[1]), (pz - (float)b[2]) / (float)(b[5] - b[2]), uv);
-            } else {
-               Mesher.uvFor(f, px, py, pz, uv);
-            }
-
-            if(b.length>18&&f>=2){uv[0]=(float)(b[15]+uv[0]*(b[17]-b[15]));uv[1]=(float)(b[16]+uv[1]*(b[18]-b[16]));}
-            if(b.length>14&&b[12]!=0){double cy=py-b[13],cz=pz-b[14],c=Math.cos(b[12]),sn=Math.sin(b[12]);py=(float)(b[13]+cy*c-cz*sn);pz=(float)(b[14]+cy*sn+cz*c);}
-            s.qx[i] = x + px;
-            s.qy[i] = y + py;
-            s.qz[i] = z + pz;
+            corner(b,f,i,xyz,uv);
+            s.qx[i] = x + xyz[0];s.qy[i] = y + xyz[1];s.qz[i] = z + xyz[2];
             s.qu[i] = uv[0];
             s.qv[i] = uv[1];
             float shade = Mesher.SHADE[f];

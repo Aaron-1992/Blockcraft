@@ -356,8 +356,8 @@ final class Tests319 {
          check(Shapes.flatItem(Redstone319.REDSTONE_TORCH) && Shapes.flatItem(Redstone319.REDSTONE_TORCH_OFF), "redstone torches render as crisp flat icons in inventory/hand");
          check(Shapes.iconBoxes(Redstone319.LEVER_OFF) != null && Shapes.iconBoxes(Redstone319.REPEATER_OFF) != null && Shapes.iconBoxes(Redstone319.DAYLIGHT_SENSOR) != null, "3D iconBoxes exposed for redstone mechanisms");
          eq(Redstone319.T_OBSERVER_FRONT, Blocks.tiles[Redstone319.OBSERVER][2], "north-facing observer has face only on front (-Z)");
-         eq(Redstone319.T_PISTON_BOTTOM, Blocks.tiles[Redstone319.OBSERVER][3], "north-facing observer has output port on back (+Z)");
-         eq(Redstone319.T_PISTON_SIDE, Blocks.tiles[Redstone319.OBSERVER][4], "north-facing observer has side texture on east (+X)");
+         eq(UtilityModels.OBS_BACK, Blocks.tiles[Redstone319.OBSERVER][3], "north-facing observer has output port on back (+Z)");
+         eq(UtilityModels.FURNACE_SIDE, Blocks.tiles[Redstone319.OBSERVER][4], "north-facing observer has side texture on east (+X)");
          eq(2, Redstone319.faceRot(Redstone319.REPEATER_OFF + 1, 0), "south repeater rotates top arrow 180 deg");
          eq(3, Redstone319.faceRot(Redstone319.REPEATER_OFF + 2, 0), "east repeater rotates top arrow 90 deg");
          eq(2, Redstone319.faceRot(Redstone319.PISTON, 2), "downward piston rotates side texture 180 deg");

@@ -124,7 +124,7 @@ final class TestsVisualRefresh {
                if(alphaChanges>0)newSilhouettes++;
             }
          }
-         check(changed==500,"456 redrawn cells plus 44 explicitly reopened reference cells");
+         check(changed==521,"500 earlier redrawn cells plus 21 dedicated utility components");
          check(newSilhouettes==items,"every rejected item receives a new silhouette");
          for(int t:new int[]{23,24,235,263})for(float phase:new float[]{0,1,7,15.5F}) {
             int[] frame=TexRemaining32.frame(t,phase);
@@ -145,6 +145,7 @@ final class TestsVisualRefresh {
          catch(java.io.IOException e){throw new RuntimeException(e);}
          int changed=0;
          for(int t=0;t<1024;t++) {
+            if(TestsUtilityReview.reopened(t))continue; // protected by the new immutable-baseline guard
             int[] art=t==77?BowSprite.pixels(0,false):TexPixel32.tile(t,TexOverhaulV57.readTile(t),TexRemaining32.animated(t));
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
             check(differs==(TexBuildingReview32.handles(t)||TexColorNature32.handles(t)),"change scope exactly matches requested faces: "+t);
@@ -153,7 +154,7 @@ final class TestsVisualRefresh {
             check(art.length==1024&&Arrays.equals(art,TexColorNature32.handles(t)?TexColorNature32.paint(t):TexBuildingReview32.paint(t)),"native deterministic review painter "+t);
             for(int c:art)check((c>>>24)==255,"building material has no alpha holes "+t);
          }
-         check(changed==118,"16 building faces plus 102 colors/nature faces");
+         check(changed==116,"prior 118 faces except the two explicitly reopened pumpkin faces");
          for(int t:new int[]{44,656}) {
             int[] rock=TexMaterials32.base(t==44?Tex.COBBLE:Tex.STONEBRICK),art=TexBuildingReview32.paint(t);
             int moss=0;
@@ -172,13 +173,14 @@ final class TestsVisualRefresh {
          catch(java.io.IOException e){throw new RuntimeException(e);}
          int changed=0;
          for(int t=0;t<1024;t++) {
+            if(TestsUtilityReview.reopened(t))continue; // latest review has its own exact-scope guard
             int[] art=BuildingBlockReviewPreview.pixels(t);
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
             check(differs==TexColorNature32.handles(t),"only this batch's listed cells change "+t);
             if(differs){changed++;check(Arrays.equals(art,TexColorNature32.paint(t)),"deterministic dispatch "+t);for(int c:art)check(c>>>24==255,"opaque native face "+t);}
             if(TexColorNature32.wasProtected(t))check(Arrays.hashCode(TexPixel32.preReviewReference(t))==Integer.parseInt(release.getProperty(Integer.toString(t))),"honest historical reference "+t);
          }
-         check(changed==102,"all 102 color/nature cells revised; earlier building batch untouched");
+         check(changed==100,"100 retained color/nature faces; carved/lit pumpkins explicitly reopened");
          int[][] logs={{7,246},{33,247},{31,248},{540,546},{541,547},{542,548}};
          for(int[] pair:logs){int[] side=TexColorNature32.paint(pair[0]),turned=TexColorNature32.paint(pair[1]);for(int y=0;y<32;y++)for(int x=0;x<32;x++)check(side[y*32+x]==turned[x*32+y],"horizontal logs rotate the same native artwork");}
          for(int t:new int[]{12,13,14,15,16,17,258,488}) {

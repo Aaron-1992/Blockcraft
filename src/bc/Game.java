@@ -730,6 +730,18 @@ public final class Game {
             }
          }
 
+         // Actual-game review fixtures use the real tile entities/menu/lid path.
+         if(this.autoFrames==72&&System.getProperty("bc.reviewburn")!=null) {
+            String[] p=System.getProperty("bc.reviewburn").split(",");
+            TileEntity furnace=this.world.getOrCreateTile(Integer.parseInt(p[0]),Integer.parseInt(p[1]),Integer.parseInt(p[2]));
+            if(furnace!=null&&furnace.type==TileEntity.FURNACE)furnace.burn=furnace.burnMax=2400;
+         }
+         if(this.autoFrames==80&&System.getProperty("bc.reviewchest")!=null) {
+            String[] p=System.getProperty("bc.reviewchest").split(",");
+            this.openMenu(Menu.CHEST,this.world.getOrCreateTile(Integer.parseInt(p[0]),Integer.parseInt(p[1]),Integer.parseInt(p[2])));
+         }
+         if(this.autoFrames==Integer.getInteger("bc.reviewclose",-1)&&this.menu!=null&&this.menu.kind==Menu.CHEST){this.closeMenu();this.setScreen(Game.S.PLAY);}
+
          if (this.autoFrames == 80 && System.getProperty("bc.toggle") != null) {
             String[] var12 = System.getProperty("bc.toggle").split(",");
             this.toggleDoor(Integer.parseInt(var12[0]), Integer.parseInt(var12[1]), Integer.parseInt(var12[2]));
@@ -6201,6 +6213,8 @@ public final class Game {
          GL11.glClear(16640);
       }
 
+      // Capture the world behind a real open menu, without an inventory overlay.
+      if(System.getProperty("bc.auto")!=null&&Boolean.getBoolean("bc.worldonly"))return;
       Perf.mark(Perf.GUI);
       this.gui.begin(this.fbW, this.fbH, var1);
       switch (this.screen) {

@@ -13,7 +13,21 @@ final class UtilityModels {
    static double[] part(double x,double y,double z,double xx,double yy,double zz,int tile){return Shapes.tiles(Shapes.px(x,y,z,xx,yy,zz),tile,tile,tile);}
    static double[] local(double[] p){return Shapes.local(p);}
    static double[] hinged(double[] p,double angle,double y,double z){double[] q=java.util.Arrays.copyOf(p,15);q[12]=angle;q[13]=y;q[14]=z;return q;}
+   static boolean componentIcon(int id) {
+      return id==Blocks.FURNACE||id==Blocks.FURNACE_LIT||id==Blocks.CHEST||id==Blocks.CHEST_LOOT||id==Blocks.DRAGON_EGG||id==Blocks.END_FRAME_EYE
+         ||id==Redstone319.REDSTONE_TORCH||id==Redstone319.REDSTONE_TORCH_OFF
+         ||id==Redstone319.LEVER_OFF||id==Redstone319.LEVER_ON||Redstone319.isRepeater(id)
+         ||id>=Redstone319.STONE_BUTTON&&id<=Redstone319.WOOD_BUTTON_ON;
+   }
+   static void initPixels() {
+      for(int tile=760;tile<=780;tile++) {
+         int[] nativePixels=TexUtility32.paint(tile),low=new int[256];
+         for(int y=0;y<16;y++)for(int x=0;x<16;x++)low[y*16+x]=nativePixels[y*64+x*2];
+         Tex.blit(tile,low);
+      }
+   }
    static void register() {
+      if(Boolean.getBoolean("bc.legacymesh"))return; // retain the strict 3.5 mesh fixture
       // Upright torch has a real cap, separate wood shaft and luminous head.
       Shapes.model(Blocks.TORCH,new double[][]{part(7,0,7,9,8,9,SHAFT),Shapes.tiles(Shapes.px(6.75,8,6.75,9.25,10,9.25),FLAME,CAP,SHAFT)});
       for(int id=Blocks.WALL_TORCH;id<Blocks.WALL_TORCH+4;id++)Blocks.tiles[id][0]=CAP;
@@ -74,7 +88,7 @@ final class UtilityModels {
          int id=Redstone319.observerId(f,on==1);
          if(f>=4){Blocks.def(id,"Observer",3,true,665);Blocks.mineClass[id]=1;Blocks.needTool[id]=true;Blocks.drop[id]=Redstone319.OBSERVER;}
          int front=f<4?2+f:f==4?1:0;
-         java.util.Arrays.fill(Blocks.tiles[id],665);Blocks.tiles[id][front]=671;Blocks.tiles[id][front^1]=on==1?OBS_BACK_ON:OBS_BACK;
+         java.util.Arrays.fill(Blocks.tiles[id],FURNACE_SIDE);Blocks.tiles[id][front]=671;Blocks.tiles[id][front^1]=on==1?OBS_BACK_ON:OBS_BACK;
          Blocks.emit[id]=0;
       }
    }

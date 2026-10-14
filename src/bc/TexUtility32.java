@@ -62,12 +62,19 @@ final class TexUtility32 {
       }return a.p;
    }
    private static void glowstone(PixelArt32 a){
-      material(a,0x795134,30);
-      for(int row=0;row<5;row++)for(int col=0;col<5;col++){
-         int x=col*7-2+(row%2)*3,y=row*7-2;
-         int c=(row+col)%3==0?0xF7D98F:0xDDB06A;
-         a.poly(c,31+col+row,x,y+2,x+3,y,x+7,y+1,x+8,y+5,x+4,y+7,x,y+5);
-         a.line(x+2,y+2,x+5,y+1,0xFFE9AA);
+      int[] pigments={0xE7BE73,0xF4D68D,0xCF9C51,0xFBE3A5,0xDBAB60};
+      float[] sx=new float[24],sy=new float[24];
+      for(int i=0;i<24;i++){sx[i]=h(i,0,30)*32;sy[i]=h(i,1,30)*32;}
+      for(int y=0;y<32;y++)for(int x=0;x<32;x++){
+         float first=1000,second=1000;int cell=0;
+         for(int i=0;i<24;i++){
+            float dx=Math.abs(x-sx[i]),dy=Math.abs(y-sy[i]);dx=Math.min(dx,32-dx);dy=Math.min(dy,32-dy);
+            float d=Math.max(dx,dy)+.45F*Math.min(dx,dy);
+            if(d<first){second=first;first=d;cell=i;}else if(d<second)second=d;
+         }
+         float edge=second-first;
+         int color=edge<.55F?0x795330:edge<1.1F?0xAC773B:pigments[cell%pigments.length];
+         a.set(x,y,shade(color,PixelArt32.grain(x,y,30,3)));
       }
    }
    private static int[] torch(int t){PixelArt32 a=new PixelArt32();a.material(14,14,4,18,0x815B35,36,3);a.line(14,16,14,30,0xB38B50);a.rect(13,14,6,2,0x4F4030);
@@ -84,7 +91,7 @@ final class TexUtility32 {
    private static void hay(PixelArt32 a,boolean top){material(a,0xB39B46,212);for(int i=0;i<130;i++){int x=(int)(h(i,0,213)*32),y=(int)(h(i,1,213)*32),c=i%3==0?0xE0C66D:i%3==1?0xC6AE55:0x8E7935;if(top){a.line(x,y,x+1,y+1,c);a.set(x+1,y,0xA38D40);}else a.line(x,y,x,y+3+i%7,c);}if(!top)for(int y:new int[]{7,24}){a.rect(0,y,32,2,0x926047);a.line(0,y,31,y,0xB27E51);}}
    private static void books(PixelArt32 a){base(a,Tex.PLANKS);int[] col={0x805046,0x4D7180,0x6D8051,0xAC874E,0x795C7E,0xB8AF8F};for(int row=0;row<2;row++){int y=2+row*15;a.rect(2,y,28,12,0x423C2E);int x=3;for(int i=0;i<7;i++){int w=i%3==0?4:3,hh=9+i%3;a.material(x,y+12-hh,w,hh,col[(i+row)%6],220+i,2);a.line(x,y+12-hh,x,y+11,shade(col[(i+row)%6],13));a.line(x+1,y+4,x+w-1,y+4,0xC5B792);a.set(x+1,y+8,0xD8C4A0);a.line(x+1,y+10,x+w-1,y+10,0x524935);x+=w+1;if(x>28)break;}a.rect(0,y+12,32,2,0xA48756);a.line(0,y+14,31,y+14,0x685234);}}
    private static void pumpkin(PixelArt32 a,boolean lit){System.arraycopy(TexColorNature32.paint(222),0,a.p,0,1024);int c=lit?0xF6D184:0x3B2B1C;a.poly(c,223,4,9,12,6,11,14,6,13);a.poly(c,224,20,6,28,9,26,13,21,14);a.poly(c,225,15,13,18,17,13,17);a.poly(c,226,4,20,9,22,12,19,15,23,18,20,21,23,28,19,26,28,22,27,19,25,16,28,12,25,8,27,5,25);a.rect(9,23,2,3,0x84501E);a.rect(21,22,2,3,0x84501E);}
-   private static void cake(PixelArt32 a,int t){material(a,t==231?0xE5D7BF:0xB08A59,t);if(t==231){for(int[] p:new int[][]{{4,5},{17,3},{25,10},{10,15},{21,23},{5,26}}){a.poly(0xAE4134,231,p[0],p[1],p[0]+3,p[1]-1,p[0]+4,p[1]+2,p[0]+1,p[1]+3);a.set(p[0]+1,p[1],0xDB7760);}a.outline(0,0,32,32,0xCEBEA4);}else if(t!=233){for(int y=0;y<32;y++)for(int x=0;x<32;x++){if(y<7+(int)(h(x/3,0,232)*4))a.set(x,y,0xE4D4B7);else if(y==20||y==21)a.set(x,y,0x8D4B35);else if(y==22)a.set(x,y,0xDDC29B);else if(h(x,y,233)>.91)a.set(x,y,0x8E6840);}}}
+   private static void cake(PixelArt32 a,int t){material(a,t==231?0xE5D7BF:0xB08A59,t);if(t==231){for(int[] p:new int[][]{{4,5},{17,3},{25,10},{10,15},{21,23},{5,26}}){a.poly(0xAE4134,231,p[0],p[1],p[0]+3,p[1]-1,p[0]+4,p[1]+2,p[0]+1,p[1]+3);a.set(p[0]+1,p[1],0xDB7760);}a.outline(0,0,32,32,0xCEBEA4);}else if(t!=233){for(int y=0;y<32;y++)for(int x=0;x<32;x++){if(y<19+(int)(h(x/3,0,232)*3))a.set(x,y,0xE4D4B7);else if(y==26)a.set(x,y,0x8D4B35);else if(y==27)a.set(x,y,0xDDC29B);else if(h(x,y,233)>.91)a.set(x,y,0x8E6840);}}}
    private static void portal(PixelArt32 a,int t){material(a,0x637863,t);for(int y=0;y<32;y+=8)a.line(0,y,31,y,0x425B4B);a.outline(0,0,32,32,0xA9AF87);if(t!=267){a.rect(8,8,16,16,0x243C34);a.outline(6,6,20,20,0xA5B083);for(int x=3;x<30;x+=7){a.line(x,2,x+2,4,0xCDD0A2);a.line(x,28,x+2,26,0xBDD09F);}if(t==266){a.ellipse(9,9,14,14,0x8BAC87,266,false);a.poly(0x203830,267,16,10,19,15,16,22,13,16);}}}
    private static void shell(PixelArt32 a){material(a,0x28232F,773);for(int y=1;y<32;y+=4)for(int x=1+(y/4%2)*3;x<32;x+=6){a.line(x,y,x+3,y,0x423346);a.line(x+3,y,x+4,y+2,0x1B1B27);if(h(x,y,269)>.6)a.set(x+1,y+1,0x65516C);}}
    private static void cloth(PixelArt32 a){for(int y=0;y<32;y++)for(int x=0;x<32;x++){int d=(int)(h(x,y,641)*5)-2+(x%8==2?5:x%8==6?-6:0);a.set(x,y,shade(0xD5D5D5,d));}a.line(1,0,1,31,0xB8B8B8);a.line(30,0,30,31,0xB8B8B8);a.line(0,30,31,30,0xBDBDBD);}

@@ -805,6 +805,23 @@ _RN += ["-Dbc.set="+";".join(_RN_SET)]
 SCENES["pixel-nature-review-plain"] = (_RN+["-Dbc.shaders=false"],True)
 SCENES["pixel-nature-review-lit"] = (_RN,True)
 SCENES["pixel-nature-review-overview"] = ([a for a in _RN if not a.startswith("-Dbc.cam=")]+["-Dbc.cam=9,74,-6,0,28","-Dbc.shaders=false"],True)
+# Unreleased utilities: actual models, lit faces and menu-driven chest lids.
+_UR=[a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.cam=","-Dbc.shot=","-Dbc.time="))]
+_UR_CELLS=[]
+for _z,_row in enumerate([[69,67,68,32,1044,1042],[132,158,160,187,71,1041],
+                         [1903,1904,1960,1905,1906,1908],[2001,2030,2031,1999,2000,1951],[25,1951,1901,1902,166,32]]):
+    for _x,_id in enumerate(_row):_UR_CELLS.append("%d,67,%d,%d"%(2+_x*2,3+_z*3,_id))
+_UR += ["-Dbc.fill=0,66,0,15,66,17,1;0,67,0,15,76,17,0", "-Dbc.set="+";".join(_UR_CELLS)+";8,66,15,1900",
+        "-Dbc.cam=7,73,-5,0,27", "-Dbc.shot=240", "-Dbc.reviewburn=6,67,3", "-Dbc.worldonly=true"]
+SCENES["pixel-utility-review-plain"] = (_UR+["-Dbc.time=6000","-Dbc.shaders=false"],True)
+SCENES["pixel-utility-review-lit"] = (_UR+["-Dbc.time=6000"],True)
+SCENES["pixel-utility-review-night"] = (_UR+["-Dbc.time=18000","-Dbc.cam=7,70,10,0,15"],True)
+SCENES["pixel-utility-chest-open"] = (_UR+["-Dbc.time=6000","-Dbc.shaders=false","-Dbc.reviewchest=2,67,3",
+    "-Dbc.cam=2.8,69,0,0,25"],True)
+SCENES["pixel-utility-chest-closed"] = (_UR+["-Dbc.time=6000","-Dbc.shaders=false","-Dbc.reviewchest=2,67,3",
+    "-Dbc.reviewclose=180","-Dbc.cam=2.8,69,0,0,25"],True)
+SCENES["pixel-utility-tools"] = ([a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.shot="))]
+    +["-Dbc.inv=creative","-Dbc.tab=4","-Dbc.shaders=false","-Dbc.shot=140"],True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

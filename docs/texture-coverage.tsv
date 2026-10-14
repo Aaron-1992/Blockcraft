@@ -29,20 +29,20 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 27	Dandelion	nature-6.5	219	62
 28	Cactus	nature-6.5	1024	13
 29	Cactus	nature-6.5	1024	15
-30	Glowstone	material-6.5	1024	51
+30	Glowstone	utility-review-unreleased	1024	34
 31	Spruce Log	colors-nature-review-unreleased	1024	11
 32	Spruce Log	colors-nature-review-unreleased	1024	30
 33	Birch Log	colors-nature-review-unreleased	1024	18
 34	Obsidian	material-6.5	1024	37
 35	Stone Bricks	approved-6.3	0	40
-36	Torch	nature-6.5	137	26
+36	Torch	utility-review-unreleased	150	39
 37	Crafting Table	material-6.5	1015	58
 38	Crafting Table	material-6.5	993	50
-39	Furnace	material-6.5	1024	71
-40	Furnace	material-6.5	1024	81
-41	Chest	material-6.5	983	31
-42	Chest	material-6.5	994	53
-43	Monster Spawner	material-6.5	468	12
+39	Furnace	utility-review-unreleased	1024	24
+40	Furnace	utility-review-unreleased	1024	27
+41	Chest	utility-review-unreleased	981	20
+42	Chest	utility-review-unreleased	987	27
+43	Monster Spawner	utility-review-unreleased	775	8
 44	Mossy Cobblestone	building-review-unreleased	538	29
 48	White Wool	colors-nature-review-unreleased	1024	9
 49	Orange Wool	colors-nature-review-unreleased	1024	9
@@ -72,7 +72,7 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 73	Bone	item-6.5	255	67
 74	Gunpowder	item-6.5	275	45
 75	Flint	item-6.5	409	43
-76	Arrow	item-6.5	154	32
+76	Arrow	tools-review-unreleased	152	32
 77	Bow	approved-6.3	0	8
 78	Apple	item-6.5	472	44
 79	Raw Porkchop	item-6.5	464	44
@@ -85,42 +85,42 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 86	Cooked Mutton	item-6.5	464	67
 87	Rotten Flesh	item-6.5	464	44
 88	Oak Door	item-6.5	418	18
-105	Wooden Sword	item-6.5	255	51
-106	Wooden Pickaxe	item-6.5	264	56
-107	Wooden Axe	item-6.5	362	53
-108	Wooden Shovel	item-6.5	273	51
-109	Stone Sword	item-6.5	255	51
-110	Stone Pickaxe	item-6.5	264	56
-111	Stone Axe	item-6.5	362	53
-112	Stone Shovel	item-6.5	273	51
-113	Iron Sword	item-6.5	255	51
-114	Iron Pickaxe	item-6.5	264	56
-115	Iron Axe	item-6.5	362	53
-116	Iron Shovel	item-6.5	273	51
-117	Golden Sword	item-6.5	255	51
-118	Golden Pickaxe	item-6.5	264	56
-119	Golden Axe	item-6.5	362	53
-120	Golden Shovel	item-6.5	273	51
-121	Diamond Sword	item-6.5	255	51
-122	Diamond Pickaxe	item-6.5	264	56
-123	Diamond Axe	item-6.5	362	53
-124	Diamond Shovel	item-6.5	273	51
-135	Leather Cap	item-6.5	344	43
-136	Leather Tunic	item-6.5	511	47
-137	Leather Pants	item-6.5	443	42
-138	Leather Boots	item-6.5	433	38
-139	Iron Helmet	item-6.5	342	42
-140	Iron Chestplate	item-6.5	511	46
-141	Iron Leggings	item-6.5	443	39
-142	Iron Boots	item-6.5	433	37
-143	Golden Helmet	item-6.5	342	42
-144	Golden Chestplate	item-6.5	511	46
-145	Golden Leggings	item-6.5	443	39
-146	Golden Boots	item-6.5	433	37
-147	Diamond Helmet	item-6.5	342	42
-148	Diamond Chestplate	item-6.5	511	46
-149	Diamond Leggings	item-6.5	443	39
-150	Diamond Boots	item-6.5	433	37
+105	Wooden Sword	tools-review-unreleased	217	22
+106	Wooden Pickaxe	tools-review-unreleased	235	21
+107	Wooden Axe	tools-review-unreleased	253	24
+108	Wooden Shovel	tools-review-unreleased	218	24
+109	Stone Sword	tools-review-unreleased	217	22
+110	Stone Pickaxe	tools-review-unreleased	235	21
+111	Stone Axe	tools-review-unreleased	253	24
+112	Stone Shovel	tools-review-unreleased	218	24
+113	Iron Sword	tools-review-unreleased	217	22
+114	Iron Pickaxe	tools-review-unreleased	235	21
+115	Iron Axe	tools-review-unreleased	253	24
+116	Iron Shovel	tools-review-unreleased	218	24
+117	Golden Sword	tools-review-unreleased	217	22
+118	Golden Pickaxe	tools-review-unreleased	235	21
+119	Golden Axe	tools-review-unreleased	253	24
+120	Golden Shovel	tools-review-unreleased	218	24
+121	Diamond Sword	tools-review-unreleased	217	22
+122	Diamond Pickaxe	tools-review-unreleased	235	21
+123	Diamond Axe	tools-review-unreleased	253	24
+124	Diamond Shovel	tools-review-unreleased	218	24
+135	Leather Cap	tools-review-unreleased	294	21
+136	Leather Tunic	tools-review-unreleased	443	24
+137	Leather Pants	tools-review-unreleased	390	22
+138	Leather Boots	tools-review-unreleased	371	21
+139	Iron Helmet	tools-review-unreleased	294	20
+140	Iron Chestplate	tools-review-unreleased	443	23
+141	Iron Leggings	tools-review-unreleased	390	22
+142	Iron Boots	tools-review-unreleased	371	21
+143	Golden Helmet	tools-review-unreleased	294	21
+144	Golden Chestplate	tools-review-unreleased	443	22
+145	Golden Leggings	tools-review-unreleased	390	20
+146	Golden Boots	tools-review-unreleased	371	21
+147	Diamond Helmet	tools-review-unreleased	294	21
+148	Diamond Chestplate	tools-review-unreleased	443	22
+149	Diamond Leggings	tools-review-unreleased	390	21
+150	Diamond Boots	tools-review-unreleased	371	23
 160	Oak Door	material-6.5	1000	42
 161	Oak Door	material-6.5	848	42
 170	Farmland	material-6.5	995	15
@@ -133,24 +133,24 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 177	Wheat	nature-6.5	445	23
 178	Wheat	nature-6.5	475	23
 179	Ladder	material-6.5	384	24
-180	TNT	nature-6.5	1024	18
-181	TNT	nature-6.5	1024	38
-182	TNT	nature-6.5	1024	31
+180	TNT	utility-review-unreleased	1024	13
+181	TNT	utility-review-unreleased	1024	31
+182	TNT	utility-review-unreleased	1024	28
 183	BED_TOP_HEAD	nature-6.5	1024	36
 184	BED_TOP_FOOT	nature-6.5	1024	24
 185	BED_SIDE	nature-6.5	192	16
-190	Bucket	item-6.5	512	74
-191	Water Bucket	item-6.5	512	74
-192	Lava Bucket	item-6.5	512	74
+190	Bucket	tools-review-unreleased	478	70
+191	Water Bucket	tools-review-unreleased	478	71
+192	Lava Bucket	tools-review-unreleased	478	63
 193	Wheat Seeds	item-6.5	266	22
 194	Wheat	item-6.5	391	28
 195	Bread	item-6.5	454	54
 196	Flint and Steel	item-6.5	332	52
-198	Wooden Hoe	item-6.5	261	56
-199	Stone Hoe	item-6.5	261	56
-200	Iron Hoe	item-6.5	261	56
-201	Golden Hoe	item-6.5	261	56
-202	Diamond Hoe	item-6.5	261	56
+198	Wooden Hoe	tools-review-unreleased	223	21
+199	Stone Hoe	tools-review-unreleased	223	21
+200	Iron Hoe	tools-review-unreleased	223	21
+201	Golden Hoe	tools-review-unreleased	223	21
+202	Diamond Hoe	tools-review-unreleased	223	21
 203	Farmland	material-6.5	1024	15
 204	Carrots	nature-6.5	120	21
 205	Carrots	nature-6.5	177	20
@@ -160,34 +160,34 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 209	Potatoes	nature-6.5	177	20
 210	Potatoes	nature-6.5	243	21
 211	Potatoes	nature-6.5	349	50
-212	Hay Bale	material-6.5	1024	7
-213	Hay Bale	material-6.5	1024	6
+212	Hay Bale	utility-review-unreleased	1024	10
+213	Hay Bale	utility-review-unreleased	1024	9
 214	Carrot	item-6.5	284	59
 215	Potato	item-6.5	437	47
 216	Baked Potato	item-6.5	437	61
 217	Bone Meal	item-6.5	286	47
 218	Shears	item-6.5	399	56
 219	Sugar Cane	nature-6.5	455	25
-220	Bookshelf	material-6.5	1014	52
+220	Bookshelf	utility-review-unreleased	1023	49
 221	Pumpkin	colors-nature-review-unreleased	1024	52
 222	Pumpkin	colors-nature-review-unreleased	1024	36
-223	Carved Pumpkin	colors-nature-review-unreleased	1024	56
-224	Jack o'Lantern	colors-nature-review-unreleased	1024	56
+223	Carved Pumpkin	utility-review-unreleased	1024	57
+224	Jack o'Lantern	utility-review-unreleased	1024	57
 225	Melon	colors-nature-review-unreleased	1024	56
 226	Melon	colors-nature-review-unreleased	1024	53
 227	Pumpkin Stem	nature-6.5	30	13
 228	Pumpkin Stem	nature-6.5	41	13
 229	Pumpkin Stem	nature-6.5	55	13
 230	Pumpkin Stem	nature-6.5	69	11
-231	Cake	nature-6.5	1024	10
-232	Cake	nature-6.5	1024	13
-233	Cake	nature-6.5	1024	8
-234	Cake	nature-6.5	1024	13
+231	Cake	utility-review-unreleased	1024	25
+232	Cake	utility-review-unreleased	1024	9
+233	Cake	utility-review-unreleased	1024	5
+234	Cake	utility-review-unreleased	1024	9
 235	Fire	nature-6.5	713	6
 236	Sugar	item-6.5	279	47
-237	Paper	item-6.5	506	37
-238	Book	item-6.5	576	68
-239	Milk Bucket	item-6.5	512	74
+237	Paper	utility-review-unreleased	541	39
+238	Book	utility-review-unreleased	553	72
+239	Milk Bucket	tools-review-unreleased	478	72
 240	Egg	item-6.5	424	47
 241	Pumpkin Seeds	item-6.5	266	22
 242	Melon Seeds	item-6.5	266	22
@@ -206,11 +206,11 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 262	Block of Quartz	building-review-unreleased	1024	11
 263	Nether Portal	nature-6.5	1024	5
 264	End Stone	building-review-unreleased	1024	27
-265	End Portal Frame	nature-6.5	1024	46
-266	End Portal Frame with Eye	nature-6.5	1024	88
-267	End Portal Frame	nature-6.5	1024	40
+265	End Portal Frame	utility-review-unreleased	1024	11
+266	Model-only face / icon	utility-review-unreleased	1024	45
+267	End Portal Frame	utility-review-unreleased	1024	7
 268	End Portal	nature-6.5	1024	2
-269	Dragon Egg	material-6.5	1024	37
+269	Model-only face / icon	utility-review-unreleased	1024	8
 272	Nether Quartz	item-6.5	409	43
 273	Nether Brick	item-6.5	359	38
 274	Blaze Rod	item-6.5	194	22
@@ -218,7 +218,7 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 276	Ghast Tear	item-6.5	365	37
 277	Gold Nugget	item-6.5	389	38
 278	Ender Pearl	item-6.5	577	62
-279	Eye of Ender	item-6.5	577	104
+279	Eye of Ender	utility-review-unreleased	500	73
 280	Emerald	item-6.5	426	36
 281	Orange Dye	item-6.5	281	47
 282	Magenta Dye	item-6.5	283	50
@@ -429,12 +429,12 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 638	BED_SIDE	nature-6.5	192	16
 639	PILLOW_TOP	nature-6.5	1015	21
 640	PILLOW_SIDE	nature-6.5	1015	21
-641	CLOTH	nature-6.5	1024	16
+641	CLOTH	utility-review-unreleased	1013	17
 642	BUSHY_FROND	nature-6.5	879	56
 643	Block of Redstone	material-6.5	1024	25
-644	Redstone Lamp	material-6.5	1024	36
-645	Redstone Lamp	material-6.5	1024	36
-646	Redstone Torch	nature-6.5	137	26
+644	Redstone Lamp	utility-review-unreleased	1024	13
+645	Redstone Lamp	utility-review-unreleased	1024	13
+646	Redstone Torch	utility-review-unreleased	150	39
 647	Redstone Wire	nature-6.5	252	8
 648	Polished Granite	material-6.5	977	15
 649	Polished Diorite	material-6.5	970	15
@@ -447,27 +447,27 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 656	Mossy Stone Bricks	building-review-unreleased	1003	50
 657	Cracked Stone Bricks	material-6.5	983	52
 658	Slime Block	nature-6.5	1024	20
-659	Sea Lantern	material-6.5	1024	15
+659	Sea Lantern	utility-review-unreleased	1024	32
 660	Redstone Dust	item-6.5	296	44
 661	Redstone Wire	nature-6.5	252	8
-662	Redstone Torch	nature-6.5	136	14
-663	Redstone Repeater	material-6.5	1024	34
-664	Redstone Repeater	material-6.5	1024	34
+662	Redstone Torch	utility-review-unreleased	136	13
+663	Redstone Repeater	utility-review-unreleased	1024	10
+664	Redstone Repeater	utility-review-unreleased	1024	10
 665	Piston	material-6.5	1024	43
 666	Piston	material-6.5	992	28
 667	Sticky Piston	material-6.5	1017	33
 668	Piston	material-6.5	1024	29
-669	Daylight Sensor	material-6.5	1024	41
+669	Daylight Sensor	utility-review-unreleased	1024	12
 670	Note Block	material-6.5	988	31
-671	Observer	material-6.5	1024	22
+671	Observer	utility-review-unreleased	1024	14
 672	Golden Apple	item-6.5	472	44
 673	Golden Carrot	item-6.5	284	59
 674	Cookie	item-6.5	513	64
 675	Mushroom Stew	item-6.5	433	76
 676	Bowl	item-6.5	433	68
-677	Compass	item-6.5	588	76
-678	Clock	item-6.5	592	78
-679	Fire Charge	item-6.5	577	80
+677	Compass	tools-review-unreleased	577	63
+678	Clock	tools-review-unreleased	577	51
+679	Fire Charge	tools-review-unreleased	490	56
 680	Prismarine	material-6.5	1024	51
 681	Prismarine Bricks	material-6.5	1024	40
 682	Dark Prismarine	material-6.5	1024	40
@@ -476,12 +476,12 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 685	Purpur Pillar	building-review-unreleased	1024	36
 686	Bone Block	material-6.5	1024	9
 687	Bone Block	material-6.5	1024	15
-688	Tactical Pistol	item-6.5	294	43
-689	Assault SMG	item-6.5	365	63
-690	Heavy Sniper	item-6.5	429	69
-691	TNT Frag Grenade	item-6.5	425	51
-692	Murderer's Knife	item-6.5	256	51
-693	C4 Explosive	item-6.5	515	16
+688	Tactical Pistol	tools-review-unreleased	245	34
+689	Assault SMG	tools-review-unreleased	306	36
+690	Heavy Sniper	tools-review-unreleased	367	34
+691	TNT Frag Grenade	tools-review-unreleased	384	22
+692	Murderer's Knife	tools-review-unreleased	197	25
+693	C4 Explosive	tools-review-unreleased	511	12
 694	Siege Cannon	item-6.5	455	76
 695	Mortar Launcher	item-6.5	396	46
 700	White Bed	item-6.5	459	61
@@ -500,20 +500,41 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 713	Green Bed	item-6.5	459	61
 714	Red Bed	item-6.5	459	61
 715	Black Bed	item-6.5	459	61
-716	White Banner	item-6.5	409	28
-717	Orange Banner	item-6.5	409	28
-718	Magenta Banner	item-6.5	409	28
-719	Light Blue Banner	item-6.5	409	28
-720	Yellow Banner	item-6.5	409	28
-721	Lime Banner	item-6.5	409	28
-722	Pink Banner	item-6.5	409	28
-723	Gray Banner	item-6.5	409	28
-724	Light Gray Banner	item-6.5	409	28
-725	Cyan Banner	item-6.5	409	28
-726	Purple Banner	item-6.5	409	28
-727	Blue Banner	item-6.5	409	28
-728	Brown Banner	item-6.5	409	28
-729	Green Banner	item-6.5	409	28
-730	Red Banner	item-6.5	409	28
-731	Black Banner	item-6.5	409	28
+716	White Banner	utility-review-unreleased	459	23
+717	Orange Banner	utility-review-unreleased	459	23
+718	Magenta Banner	utility-review-unreleased	459	23
+719	Light Blue Banner	utility-review-unreleased	459	23
+720	Yellow Banner	utility-review-unreleased	459	23
+721	Lime Banner	utility-review-unreleased	459	23
+722	Pink Banner	utility-review-unreleased	459	23
+723	Gray Banner	utility-review-unreleased	459	23
+724	Light Gray Banner	utility-review-unreleased	459	23
+725	Cyan Banner	utility-review-unreleased	459	23
+726	Purple Banner	utility-review-unreleased	459	23
+727	Blue Banner	utility-review-unreleased	459	23
+728	Brown Banner	utility-review-unreleased	459	23
+729	Green Banner	utility-review-unreleased	459	23
+730	Red Banner	utility-review-unreleased	459	23
+731	Black Banner	utility-review-unreleased	459	23
 742	Model-only face / icon	item-6.5	444	32
+760	Torch	utility-review-unreleased	1024	6
+761	SHAFT	utility-review-unreleased	1024	6
+762	RED_HEAD	utility-review-unreleased	1024	7
+763	DEAD_HEAD	utility-review-unreleased	1024	6
+764	Chest	utility-review-unreleased	1024	19
+765	Furnace	utility-review-unreleased	1024	13
+766	Furnace	utility-review-unreleased	1024	13
+767	Daylight Sensor	utility-review-unreleased	1024	12
+768	EYE_TOP	utility-review-unreleased	1024	27
+769	EYE_SIDE	utility-review-unreleased	1024	6
+770	METAL	utility-review-unreleased	1024	7
+771	Stone Button	utility-review-unreleased	1024	5
+772	Wooden Button	utility-review-unreleased	1024	6
+773	Dragon Egg	utility-review-unreleased	1024	8
+774	FLAME	utility-review-unreleased	1024	40
+775	Observer	utility-review-unreleased	1024	7
+776	Observer	utility-review-unreleased	1024	7
+777	REPEATER_EDGE	utility-review-unreleased	1024	7
+778	ROD	utility-review-unreleased	1024	6
+779	CLOTH_EDGE	utility-review-unreleased	1024	5
+780	LEVER_BASE	utility-review-unreleased	1024	7
