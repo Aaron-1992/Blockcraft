@@ -11,12 +11,12 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 9	Oak Leaves	nature-6.5	1018	62
 10	Oak Planks	approved-6.3	0	16
 11	Bedrock	nature-6.5	1024	13
-12	Coal Ore	colors-nature-review-unreleased	335	18
-13	Iron Ore	colors-nature-review-unreleased	391	19
-14	Gold Ore	colors-nature-review-unreleased	408	18
-15	Diamond Ore	colors-nature-review-unreleased	408	20
-16	Redstone Ore	colors-nature-review-unreleased	346	20
-17	Lapis Ore	colors-nature-review-unreleased	301	21
+12	Coal Ore	colors-nature-review-unreleased	343	18
+13	Iron Ore	colors-nature-review-unreleased	409	20
+14	Gold Ore	colors-nature-review-unreleased	410	19
+15	Diamond Ore	colors-nature-review-unreleased	372	18
+16	Redstone Ore	colors-nature-review-unreleased	334	18
+17	Lapis Ore	colors-nature-review-unreleased	326	19
 18	Snow Block	approved-6.3	0	5
 19	Glass	nature-6.5	157	3
 20	Bricks	approved-6.3	0	40
@@ -199,7 +199,7 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 248	Spruce Log	colors-nature-review-unreleased	1024	11
 256	Netherrack	material-6.5	1024	6
 257	Soul Sand	building-review-unreleased	1024	72
-258	Nether Quartz Ore	colors-nature-review-unreleased	1024	18
+258	Nether Quartz Ore	colors-nature-review-unreleased	1024	20
 259	Nether Bricks	material-6.5	1024	40
 260	Magma Block	material-6.5	1024	57
 261	Block of Quartz	building-review-unreleased	1024	11
@@ -323,7 +323,7 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 485	Block of Emerald	building-review-unreleased	1024	90
 486	Block of Coal	building-review-unreleased	1024	44
 487	Lapis Lazuli Block	building-review-unreleased	1024	43
-488	Emerald Ore	colors-nature-review-unreleased	969	19
+488	Emerald Ore	colors-nature-review-unreleased	967	19
 520	Granite	approved-6.3	0	5
 521	Diorite	approved-6.3	0	5
 522	Andesite	building-review-unreleased	1024	39

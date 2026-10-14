@@ -159,15 +159,38 @@ final class TexColorNature32 {
       PixelArt32 a=new PixelArt32();System.arraycopy(host,0,a.p,0,1024);
       int c=t==12?0x343535:t==13?0xB58D72:t==14?0xCBA64D:t==15?0x5AB9BD:t==16?0xA74332:t==17?0x3F5894:t==488?0x369267:0xD7CCB1;
       boolean[] seam=new boolean[1024];
-      int[][] starts={{3,4},{17,2},{25,10},{10,13},{3,25},{19,24},{27,29}};
-      for(int i=0;i<starts.length;i++) {
-         int x=starts[i][0],y=starts[i][1],dir=(i+t)%2==0?1:-1;
-         for(int k=0;k<7+i%3;k++) {
-            x=Math.floorMod(x+dir,32);y=(y+(h(i,k,t)>.5?1:0))&31;
-            seam[y*32+x]=true;
-            if(k>0&&k<7)seam[((y+1)&31)*32+x]=true;
-            if(k>1&&k<5)seam[((y+2)&31)*32+x]=true;
-            if(k==2||k==4)seam[((y-1)&31)*32+((x+dir)&31)]=true;
+      // Three intersecting fractures, with type-specific topology. The previous
+      // short isolated strokes repeated as little checkmarks in a tiled wall.
+      int[][][] veins={
+         {{3,5,9,7,12,14,20,15,26,23,29,27},{12,14,6,19,4,27},{20,15,24,9,28,8}},
+         {{3,8,9,10,14,6,20,9,23,16,28,19},{9,10,7,18,12,24,11,29},{23,16,19,23,22,28}},
+         {{4,4,7,10,14,13,16,19,25,22,28,28},{14,13,19,7,25,6},{16,19,10,22,6,28}},
+         {{5,4,10,9,8,16,16,20,18,27,25,29},{10,9,18,7,25,10},{16,20,24,17,29,19}},
+         {{2,9,9,6,14,10,16,16,23,19,29,26},{14,10,22,5,28,7},{16,16,9,21,11,29}},
+         {{3,4,5,11,13,14,18,11,24,17,27,25},{13,14,9,20,4,24},{24,17,20,25,22,29}},
+         {{4,5,10,8,12,15,19,18,22,25,28,28},{12,15,7,20,3,27},{19,18,23,10,28,7}},
+         {{5,3,8,9,15,12,16,20,23,23,28,29},{15,12,20,6,28,8},{16,20,9,24,4,22}}
+      };
+      int kind=t==258?6:t==488?7:t-12;
+      PixelArt32 fissures=new PixelArt32();
+      for(int[] path:veins[kind])for(int k=2;k<path.length;k+=2)
+         fissures.line(path[k-2],path[k-1],path[k],path[k+1],1);
+      for(int y=1;y<31;y++)for(int x=1;x<31;x++)if(fissures.p[y*32+x]!=0) {
+         seam[y*32+x]=true;
+         if(h(x,y,t+76)>.25F)seam[(y+1)*32+x]=true;
+         if(h(x,y,t+77)>.63F)seam[y*32+x+1]=true;
+      }
+      // Angular mineral pockets grow from the fractures; they are not isolated
+      // round stickers, nor just hairline colored cracks across empty stone.
+      for(int branch=0;branch<veins[kind].length;branch++) {
+         int[] path=veins[kind][branch];
+         for(int k=2;k<path.length-2;k+=4) {
+            int cx=path[k],cy=path[k+1];
+            for(int dy=-1;dy<=2;dy++)for(int dx=-2;dx<=3;dx++) {
+               int x=cx+dx,y=cy+dy;
+               if(x<1||x>30||y<1||y>30)continue;
+               if((dy==0&&dx>-2&&dx<3)||h(x,y,t+branch+93)>.35F&&dx+dy>-2&&dx-dy<4)seam[y*32+x]=true;
+            }
          }
       }
       for(int y=0;y<32;y++)for(int x=0;x<32;x++) {

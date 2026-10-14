@@ -64,9 +64,19 @@ Reviewed actual nearest-neighbour comparisons (not generated concept art):
 [earth/gourds](colors-nature-earth.png), [logs/ores](colors-nature-logs-ores.png).
 An inspection iteration reduced the pumpkin cap's mechanical spoke appearance,
 strengthened the birch tears, and increased ore seam visibility without adding
-raised outlines around the mineral deposits.
+raised outlines around the mineral deposits. The first in-game tiled wall revealed
+that the short ore strokes repeated as small checkmarks. These were replaced by
+individually laid-out branched fracture networks, widened at angular mineral
+pockets, so the deposits are not isolated glyphs or only hairline cracks.
 
-Pending actual-game validation: `pixel-color-review`, `pixel-glazed-review`,
+Initial remote CI **38495229683** passed with 4,412,628 assertions, zero failures.
+Visual **38495229743** rendered all four scenes (exit 0). Reviewed the colors and
+all 16 glaze designs in the actual game; powder/wool/clay show distinct surface
+structure beside unchanged concrete. The nature shots confirm snow is white on
+top and sides while remaining a shallow layer over dirt. The final ore iteration
+and an elevated log-end/snow view are awaiting the follow-up visual run.
+
+Actual-game fixtures: `pixel-color-review`, `pixel-glazed-review`,
 `pixel-nature-review-plain/lit` use `jar=build`, with unchanged concrete controls,
 all 16 glaze patterns, log/ore walls, visible log ends, soil/rind floors, thin
 snow over dirt and an unchanged snow block alongside it.

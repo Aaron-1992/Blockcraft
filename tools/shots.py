@@ -804,6 +804,7 @@ _RN_SET.append("17,66,4,18") # unchanged full snow block alongside the thin laye
 _RN += ["-Dbc.set="+";".join(_RN_SET)]
 SCENES["pixel-nature-review-plain"] = (_RN+["-Dbc.shaders=false"],True)
 SCENES["pixel-nature-review-lit"] = (_RN,True)
+SCENES["pixel-nature-review-overview"] = ([a for a in _RN if not a.startswith("-Dbc.cam=")]+["-Dbc.cam=9,74,-6,0,28","-Dbc.shaders=false"],True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 
