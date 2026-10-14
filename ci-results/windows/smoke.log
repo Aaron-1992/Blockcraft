@@ -3,26 +3,26 @@ extracted update pack: Blockcraft-UPDATE6.5-patch.zip
 installed to C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft
 Mesa: mesa3d-26.2.4-release-msvc.7z (70 MB)
 copied next to javaw.exe: opengl32.dll, libgallium_wgl.dll
-title: starting via Blockcraft.exe (Launch4j stub)
-title            exit code 0                      1s  screenshot=NO
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=TITLE
+pixel-title: starting via Blockcraft.exe (Launch4j stub)
+pixel-title      exit code 0                     28s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=TITLE -Dbc.pano=on -Dbc.rd=2 -Dbc.lod=8 -Dbc.win=1280x720
 pixel-items: starting via Blockcraft.exe (Launch4j stub)
-pixel-items      exit code 0                     18s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.inv=creative -Dbc.shot=110 -Dbc.tab=4 -Dbc.page=0
+pixel-items      exit code 0                     29s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.inv=creative -Dbc.shot=110 -Dbc.mouse=0,0 -Dbc.tab=4 -Dbc.pa
 pixel-food: starting via Blockcraft.exe (Launch4j stub)
-pixel-food       exit code 0                     17s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.inv=creative -Dbc.shot=110 -Dbc.tab=5 -Dbc.page=0
+pixel-food       exit code 0                     31s  screenshot=yes
+    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=3 -Dbc.lod=32 -Dbc.cam=133,92,71,45,22 -Dbc.shaders=false -Dbc.inv=creative -Dbc.shot=110 -Dbc.mouse=0,0 -Dbc.tab=5 -Dbc.pa
 pixel-garden-plain: starting via java.exe -jar Blockcraft.exe
-pixel-garden-plain exit code 0                      8s  screenshot=yes
+pixel-garden-plain exit code 0                     33s  screenshot=yes
 pixel-cohesion-lit: starting via java.exe -jar Blockcraft.exe
-pixel-cohesion-lit exit code 0                     28s  screenshot=yes
+pixel-cohesion-lit exit code 0                     52s  screenshot=yes
 pixel-bow-full: starting via Blockcraft.exe (Launch4j stub)
-pixel-bow-full   exit code 0                     21s  screenshot=yes
+pixel-bow-full   exit code 0                     40s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=2 -Dbc.lod=8 -Dbc.win=960x540 -Dbc.cam=140.5,67,74.5,20,10 -Dbc.shot=110 -Dbc.weather=calm -Dbc.hold=268 -Dbc.bowdraw=1 -Db
 pixel-hand-torch: starting via Blockcraft.exe (Launch4j stub)
-pixel-hand-torch exit code 0                     21s  screenshot=yes
+pixel-hand-torch exit code 0                     34s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=2 -Dbc.lod=8 -Dbc.win=960x540 -Dbc.cam=140.5,67,74.5,20,10 -Dbc.shot=110 -Dbc.weather=calm -Dbc.hold=316 -Dbc.time=18000 -D
 GPU preference entries in the registry (2):
     | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\javaw.exe    REG_SZ    GpuPreference=2;
     | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\java.exe    REG_SZ    GpuPreference=2;
-RESULT: {"title": false, "pixel-items": true, "pixel-food": true, "pixel-garden-plain": true, "pixel-cohesion-lit": true, "pixel-bow-full": true, "pixel-hand-torch": true, "gpu_pref_in_registry": true}
+RESULT: {"pixel-title": true, "pixel-items": true, "pixel-food": true, "pixel-garden-plain": true, "pixel-cohesion-lit": true, "pixel-bow-full": true, "pixel-hand-torch": true, "gpu_pref_in_registry": true}
