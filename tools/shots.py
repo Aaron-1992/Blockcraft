@@ -832,6 +832,19 @@ SCENES["pixel-utility-banners-lit"] = (_UB,True)
 # V6.6: editor pack round trip and hot reload through the actual renderer, not a mock.
 SCENES["pixel-editor-reload"] = (SCENES["pixel-utility-review-plain"][0] + ["-Dbc.reviewpack=true"], True)
 SCENES["pixel-editor-bow"] = (SCENES["pixel-bow-full"][0] + ["-Dbc.reviewpack=true", "-Dbc.shot=150"], True)
+# V6.7: aquatic generation and raw-state waterlogging in the actual packaged renderer.
+_AQ=["-Dbc.auto=1","-Dbc.seed=12345","-Dbc.gen=1","-Dbc.mode=1","-Dbc.rd=3","-Dbc.lod=4",
+     "-Dbc.shot=360","-Dbc.time=6000","-Dbc.weather=clear","-Dbc.worldonly=true","-Dbc.win=1280x720"]
+SCENES["pixel-aquatic-reef"] = (_AQ+["-Dbc.cam=-2965,58,-3007,0,8","-Dbc.shaders=false"],True)
+SCENES["pixel-aquatic-ice"] = (_AQ+["-Dbc.cam=-216,78,-3022,0,24"],True)
+_RS=[a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.cam=","-Dbc.shot=","-Dbc.time="))]
+_RS += ["-Dbc.fill=0,66,0,20,66,16,1;0,67,0,20,78,16,0", "-Dbc.cam=9,74,-4,0,30",
+        "-Dbc.time=6000","-Dbc.shot=300","-Dbc.worldonly=true","-Dbc.shaders=false"]
+_RS_SET=["2,67,3,1905","3,67,3,1920","4,67,3,1920","5,67,3,1962","6,67,3,1920","7,67,3,1901",
+         "2,67,7,1900","3,67,7,2602","4,67,7,1920","5,67,7,1901",
+         "10,67,3,1900","11,67,3,1972","12,67,3,1",
+         "4,67,11,4209","6,67,11,4311","8,67,11,4214","10,67,11,5613"]
+SCENES["pixel-aquatic-circuits"] = (_RS+["-Dbc.set="+";".join(_RS_SET)],True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

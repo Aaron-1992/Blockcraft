@@ -56,7 +56,7 @@ final class CaveCull {
          for (int z = 1; z <= 16; z++) {
             int row = (y * 18 + z) * 18;
             for (int x = 1; x <= 16; x++) {
-               if (!opaque[b[row + x] & 0xFFFF]) {
+               if (!opaque[b[row + x] & BlockState.ID_MASK]) {
                   open++;
                }
             }
@@ -84,7 +84,7 @@ final class CaveCull {
                }
 
                int v = y << 8 | z << 4 | x;
-               if ((seen[v >> 6] >>> (v & 63) & 1L) != 0L || opaque[b[((y + 1) * 18 + z + 1) * 18 + x + 1] & 0xFFFF]) {
+               if ((seen[v >> 6] >>> (v & 63) & 1L) != 0L || opaque[b[((y + 1) * 18 + z + 1) * 18 + x + 1] & BlockState.ID_MASK]) {
                   continue;
                }
 
@@ -130,7 +130,7 @@ final class CaveCull {
                      }
 
                      int n = ny << 8 | nz << 4 | nx;
-                     if ((seen[n >> 6] >>> (n & 63) & 1L) != 0L || opaque[b[((ny + 1) * 18 + nz + 1) * 18 + nx + 1] & 0xFFFF]) {
+                     if ((seen[n >> 6] >>> (n & 63) & 1L) != 0L || opaque[b[((ny + 1) * 18 + nz + 1) * 18 + nx + 1] & BlockState.ID_MASK]) {
                         continue;
                      }
 

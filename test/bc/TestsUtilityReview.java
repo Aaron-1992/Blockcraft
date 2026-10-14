@@ -21,6 +21,7 @@ final class TestsUtilityReview {
          try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-color-nature.properties")){before.load(in);}
          int changed=0;
          for(int t=0;t<1024;t++) {
+            if(Aquatic.tile(t))continue;
             int[] art=BuildingBlockReviewPreview.pixels(t);
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(""+t));
             check(differs==reopened(t),"exact requested review scope "+t);
@@ -68,12 +69,13 @@ final class TestsUtilityReview {
             w.setBlock(x+sx,y+sy,z,Blocks.STONE);
             eq(off,w.getBlock(x,y,z),"ignore side change "+f);
             w.setBlock(x+dx,y+dy,z+dz,Blocks.STONE);
+            TestsAquaticRedstone.advance(w,2);
             eq(on,w.getBlock(x,y,z),"watch change pulses "+f);
             eq(0,Redstone319.sourcePower(on),"not an omnidirectional source");
             eq(15,Redstone319.powerAt(w,x,y,z),"pulse power 15");
             for(int[] d:Mesher.FN)check(Redstone319.isPowered(w,x+d[0],y+d[1],z+d[2])
                ==(d[0]==-dx&&d[1]==-dy&&d[2]==-dz),"output only, facing "+f+" neighbour "+Arrays.toString(d));
-            for(int i=0;i<4;i++)Redstone319.tick(g);
+            TestsAquaticRedstone.advance(w,2);
             eq(off,w.getBlock(x,y,z),"pulse resets preserving orientation "+f);
             check(!Redstone319.isPowered(w,x-dx,y-dy,z-dz),"output goes low again");
             for(int id:new int[]{off,on}) {
@@ -93,8 +95,10 @@ final class TestsUtilityReview {
          Game g=newGame(1);World w=g.world;
          for(int y=72;y<77;y++)w.setBlock(8,y,8,Redstone319.OBSERVER_VERTICAL);
          w.setBlock(8,71,8,Blocks.STONE);
-         for(int y=72;y<77;y++)eq(Redstone319.OBSERVER_VERTICAL_ON,w.getBlock(8,y,8),"initial upward pulse chain");
-         for(int tick=0;tick<40;tick++)Redstone319.tick(g);
+         eq(Redstone319.OBSERVER_VERTICAL,w.getBlock(8,72,8),"observer chain begins with scheduled delay");
+         TestsAquaticRedstone.advance(w,2);
+         eq(Redstone319.OBSERVER_VERTICAL_ON,w.getBlock(8,72,8),"first observer pulses after delay");
+         TestsAquaticRedstone.advance(w,80);
          for(int y=72;y<77;y++)eq(Redstone319.OBSERVER_VERTICAL,w.getBlock(8,y,8),"finite chain settles off");
       });
       test("utility review: chest motion invalidates meshes, closes smoothly, resets on world change and keeps its inventory",()->{

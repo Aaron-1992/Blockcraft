@@ -34,6 +34,7 @@ public final class World {
    public final File dir;
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
+   final RedstoneLogic.State redstone = new RedstoneLogic.State();
    public long dayTime = 1000L;
    public Consumer<Chunk> unloadHook;
    public boolean saveEnabled = true;
@@ -167,7 +168,7 @@ public final class World {
    public int getBlock(int var1, int var2, int var3) {
       if (var2 >= 0 && var2 <= 255) {
          Chunk var4 = this.chunk(var1 >> 4, var3 >> 4);
-         return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & 0xFFFF;
+         return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & BlockState.ID_MASK;
       } else {
          return 0;
       }
@@ -310,6 +311,7 @@ public final class World {
          if (inArenaBounds || Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
             this.chunks.put(readyKey, var22);
             this.fire.scanChunk(var22);
+            RedstoneLogic.loaded(this, var22);
             this.lightChunk(var22);
 
             for (int var24 = -1; var24 <= 1; var24++) {
@@ -610,7 +612,7 @@ public final class World {
                      if (var13 != null) {
                         int var14 = var10 & 15;
                         int var15 = var12 & 15;
-                        int var16 = Blocks.opacity[var13.blocks[Chunk.idx(var14, var11, var15)] & 0xFFFF];
+                        int var16 = Blocks.opacity[var13.blocks[Chunk.idx(var14, var11, var15)] & BlockState.ID_MASK];
                         if (var16 < 15) {
                            int var17 = var8 - Math.max(1, var16);
                            if (var1 && var9 == 3 && var8 == 15 && var16 == 0) {
@@ -768,7 +770,7 @@ public final class World {
          int baseIdx = sy << 12;
          int endIdx = baseIdx + 4096;
          for (int var17 = baseIdx; var17 < endIdx; var17++) {
-            int var19 = Blocks.emit[var16[var17] & 0xFFFF];
+            int var19 = Blocks.emit[var16[var17] & BlockState.ID_MASK];
             if (var19 > 0) {
                var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
                int var22 = var17 >> 8;
@@ -823,7 +825,7 @@ public final class World {
                for (int var6 = yLo; var6 < colYHi; var6++) {
                   int var10 = this.lightOf(var5, var2, var8, var6, var9);
                   if (var10 > 1) {
-                     if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & 0xFFFF] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
+                     if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & BlockState.ID_MASK] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
                         this.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
                      }
                   }
@@ -833,7 +835,19 @@ public final class World {
       }
    }
 
-   public boolean setBlock(int var1, int var2, int var3, int var4) {
+   /** Raw 16-bit saved state: 12-bit block ID plus block-specific property bits. */
+   public int getState(int x, int y, int z) {
+      Chunk c = y < 0 || y > 255 ? null : chunkAt(x, z);
+      return c == null ? 0 : c.blocks[Chunk.idx(x & 15, y, z & 15)] & 0xFFFF;
+   }
+
+   public boolean setBlock(int x, int y, int z, int id) {
+      return setState(x, y, z, BlockState.transition(getState(x, y, z), id));
+   }
+
+   public boolean setState(int var1, int var2, int var3, int state) {
+      if (state < 0 || state > 65535) return false;
+      int var4 = state & BlockState.ID_MASK;
       if (var2 >= 0 && var2 <= 255) {
          Chunk var5 = this.chunkAt(var1, var3);
          if (var5 == null) {
@@ -843,11 +857,11 @@ public final class World {
          int var6 = var1 & 15;
          int var7 = var3 & 15;
          int var8 = var5.get(var6, var2, var7);
-         if (var8 == var4) {
+         if (getState(var1, var2, var3) == state) {
             return false;
          }
 
-         var5.set(var6, var2, var7, var4);
+         var5.set(var6, var2, var7, state);
          var5.modified = true;
          var5.lodDirty = this.tickCount + 1L;
          if (var4 == Blocks.FIRE) {
@@ -918,21 +932,21 @@ public final class World {
          }
 
          this.notifyAround(var1, var2, var3);
-         Net319.onSetBlock(this, var1, var2, var3, var4);
+         Net319.onSetBlock(this, var1, var2, var3, state);
          return true;
       } else {
          return false;
       }
    }
 
-   private void scheduleFluid(int var1, int var2, int var3, int var4) {
+   void scheduleFluid(int var1, int var2, int var3, int var4) {
       long var5 = pack(var1, var2, var3);
       if (this.fluidPending.add(var5)) {
          ((ArrayList)this.fluidDue.computeIfAbsent(this.tickCount + var4, var0 -> new ArrayList())).add(var5);
       }
    }
 
-   private void scheduleBlock(int var1, int var2, int var3) {
+   void scheduleBlock(int var1, int var2, int var3) {
       long var4 = pack(var1, var2, var3);
       if (this.blockPending.add(var4)) {
          this.blockUpdates.add(var4);
@@ -946,9 +960,10 @@ public final class World {
          int var7 = var4 < 0 ? var3 : var3 + DZ[var4];
          if (var6 >= 0 && var6 <= 255) {
             int var8 = this.getBlock(var5, var6, var7);
+            if (WaterPhysics.contains(this, var5, var6, var7)) scheduleFluid(var5, var6, var7, 5);
             if (Blocks.isFluid(var8)) {
                this.scheduleFluid(var5, var6, var7, Blocks.isWater(var8) ? 5 : 30);
-            } else if (var8 == 7
+            } else if (Aquatic.liveCoral(var8) || var8 == 7
                || var8 == 8
                || Blocks313.needsUpdate(var8)
                || Shapes.handlesUpdate(var8)
@@ -973,6 +988,7 @@ public final class World {
 
    public void resetAllChunks() {
       FastChunkCache.clear();
+      this.redstone.clear();
       this.fluidDue.clear();
       this.fluidPending.clear();
       this.blockUpdates.clear();
@@ -1023,6 +1039,7 @@ public final class World {
 
    public void tick() {
       this.tickCount++;
+      RedstoneLogic.tick(this);
       if (!Perf.FROZEN) {
          this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)
       }
@@ -1053,6 +1070,7 @@ public final class World {
                this.blockUpdate(ux(var8), uy(var8), uz(var8));
             }
          } else {
+            this.redstone.clear(); // authoritative host owns scheduled events
             this.fluidDue.clear();
             this.fluidPending.clear();
             this.blockUpdates.clear();
@@ -1338,6 +1356,7 @@ public final class World {
 
    private void blockUpdate(int var1, int var2, int var3) {
       int var4 = this.getBlock(var1, var2, var3);
+      if (Aquatic.plant(var4) || Aquatic.liveCoral(var4)) { Aquatic.update(this,var1,var2,var3,var4); return; }
       if (Shapes.handlesUpdate(var4)) {
          Shapes.update(this, var1, var2, var3, var4);
          return;
@@ -1870,6 +1889,9 @@ public final class World {
    }
 
    private void fluidUpdate(int var1, int var2, int var3) {
+      if (!Boolean.getBoolean("bc.legacyfluids") && WaterPhysics.contains(this, var1, var2, var3)) {
+         WaterPhysics.update(this, var1, var2, var3); return;
+      }
       int var4 = this.getBlock(var1, var2, var3);
       if (Blocks.isFluid(var4)) {
          boolean var5 = Blocks.isWater(var4);

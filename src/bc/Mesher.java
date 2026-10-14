@@ -56,7 +56,7 @@ public final class Mesher {
       }
 
       for (int f = 0; f < 6; f++) {
-         int id = blocks[ci(x + FN[f][0], y + FN[f][1], z + FN[f][2])] & 0xFFFF;
+         int id = blocks[ci(x + FN[f][0], y + FN[f][1], z + FN[f][2])] & BlockState.ID_MASK;
          if (!Blocks.opaque[id] && !Blocks.isLeaves(id)) {
             return false;
          }
@@ -82,7 +82,7 @@ public final class Mesher {
       boolean anyBlock = false;
       boolean allOpaque = !legacy && var2 < 4;
       for (int i = secStart; i < secEnd; i++) {
-         int id = cblocks[i] & 0xFFFF;
+         int id = cblocks[i] & BlockState.ID_MASK;
          if (id != 0) {
             anyBlock = true;
             if (allOpaque && !Blocks.opaque[id]) {
@@ -184,9 +184,10 @@ public final class Mesher {
       for (int var26 = 0; var26 < 16; var26++) {
          for (int var28 = 0; var28 < 16; var28++) {
             for (int var29 = 0; var29 < 16; var29++) {
-               int var30 = var22[ci(var29 + 1, var26 + 1, var28 + 1)] & 0xFFFF;
+               int var30 = var22[ci(var29 + 1, var26 + 1, var28 + 1)] & BlockState.ID_MASK;
                if (var30 != 0) {
                   var24 = true;
+                  if (BlockState.wet(var22[ci(var29+1,var26+1,var28+1)] & 0xFFFF)) fluid(var4,var1,var29,var26,var28,Blocks.WATER);
                   switch (Blocks.kind[var30]) {
                      case 0:
                         cube(var4, var1, var29, var26, var28, var30, var3);
@@ -368,12 +369,12 @@ public final class Mesher {
       int var12 = ci(var9, var10, var11);
       // Fast-path skip for completely enclosed underground/interior cubes (no exposed faces and not a slime block)
       if (var5 != Redstone319.SLIME_BLOCK
-         && Blocks.opaque[var7[var12 + 324] & 0xFFFF]
-         && Blocks.opaque[var7[var12 - 324] & 0xFFFF]
-         && Blocks.opaque[var7[var12 - 18] & 0xFFFF]
-         && Blocks.opaque[var7[var12 + 18] & 0xFFFF]
-         && Blocks.opaque[var7[var12 + 1] & 0xFFFF]
-         && Blocks.opaque[var7[var12 - 1] & 0xFFFF]) {
+         && Blocks.opaque[var7[var12 + 324] & BlockState.ID_MASK]
+         && Blocks.opaque[var7[var12 - 324] & BlockState.ID_MASK]
+         && Blocks.opaque[var7[var12 - 18] & BlockState.ID_MASK]
+         && Blocks.opaque[var7[var12 + 18] & BlockState.ID_MASK]
+         && Blocks.opaque[var7[var12 + 1] & BlockState.ID_MASK]
+         && Blocks.opaque[var7[var12 - 1] & BlockState.ID_MASK]) {
          return;
       }
       int var13 = tintColor(var1, var5, var2, var4);
@@ -382,7 +383,7 @@ public final class Mesher {
       for (int var15 = 0; var15 < 6; var15++) {
          int[] var16 = FN[var15];
          int var17 = ci(var9 + var16[0], var10 + var16[1], var11 + var16[2]);
-         int var18 = var7[var17] & 0xFFFF;
+         int var18 = var7[var17] & BlockState.ID_MASK;
          if (!Blocks.opaque[var18] && (var5 != 15 || var18 != 15) && !(Blocks.isLeaves(var5) && hiddenLeafFace(var7, var9, var10, var11, var15, var18))) {
             if (Color312.isStainedGlass(var5) || var5 == Blocks313.ICE) {
                // Update 3.12: stained glass is translucent (blended pass); the faces between two panes of the same kind are not drawn
@@ -471,7 +472,7 @@ public final class Mesher {
          fBlk[f] = 0;
          fOpen[f] = false;
          int nb = ci(px + FN[f][0], py + FN[f][1], pz + FN[f][2]);
-         int id = s.B[nb] & 0xFFFF;
+         int id = s.B[nb] & BlockState.ID_MASK;
          if (!Blocks.opaque[id]) {
             int lv = s.L[nb] & 255;
             int sl = lv >> 4 & 15;
@@ -711,7 +712,7 @@ public final class Mesher {
       int var19 = var3 + 1 + var17[1];
       int var20 = var4 + 1 + var17[2];
       int var21 = var16[var5] & 255;
-      if (Blocks.opaque[var15[var5] & 0xFFFF]) {
+      if (Blocks.opaque[var15[var5] & BlockState.ID_MASK]) {
          var21 = var16[var6] & 255;
       }
 
@@ -736,9 +737,9 @@ public final class Mesher {
             int var34 = ci(var31[0], var31[1], var31[2]);
             int var35 = ci(var32[0], var32[1], var32[2]);
             int var36 = ci(var33[0], var33[1], var33[2]);
-            boolean var37 = Blocks.opaque[var15[var34] & 0xFFFF];
-            boolean var38 = Blocks.opaque[var15[var35] & 0xFFFF];
-            boolean var39 = Blocks.opaque[var15[var36] & 0xFFFF];
+            boolean var37 = Blocks.opaque[var15[var34] & BlockState.ID_MASK];
+            boolean var38 = Blocks.opaque[var15[var35] & BlockState.ID_MASK];
+            boolean var39 = Blocks.opaque[var15[var36] & BlockState.ID_MASK];
             int var40 = var37 && var38 ? 3 : (var37 ? 1 : 0) + (var38 ? 1 : 0) + (var39 ? 1 : 0);
             var26 = AOF[var40];
             int var41 = var37 ? var21 : var16[var34] & 0xFF;
@@ -826,7 +827,7 @@ public final class Mesher {
     * is put out - the X is drawn.)
     */
    static void fire(Mesher.Scratch var0, Chunk var1, int x, int y, int z) {
-      int below = var0.B[ci(x + 1, y, z + 1)] & 0xFFFF;
+      int below = var0.B[ci(x + 1, y, z + 1)] & BlockState.ID_MASK;
       boolean floor = Fire.solidTop(below) || Fire.flammability(below) > 0;
       int drawn = 0;
       if (!floor) {
@@ -835,13 +836,13 @@ public final class Mesher {
          float sky = light >> 4 & 15;
          float blk = light & 15;
          for (int[] d : FIRE_SIDES) {
-            if (Fire.flammability(var0.B[ci(x + 1 + d[0], y + 1, z + 1 + d[1])] & 0xFFFF) > 0) {
+            if (Fire.flammability(var0.B[ci(x + 1 + d[0], y + 1, z + 1 + d[1])] & BlockState.ID_MASK) > 0) {
                fireWall(var0, x, y, z, d[0], d[1], sky, blk);
                drawn++;
             }
          }
 
-         if (Fire.flammability(var0.B[ci(x + 1, y + 2, z + 1)] & 0xFFFF) > 0) {
+         if (Fire.flammability(var0.B[ci(x + 1, y + 2, z + 1)] & BlockState.ID_MASK) > 0) {
             fireCeiling(var0, x, y, z, sky, blk);
             drawn++;
          }
@@ -1108,7 +1109,7 @@ public final class Mesher {
    }
 
    static boolean fenceLink(Mesher.Scratch var0, int var1, int var2, int var3, int dir) {
-      int var4 = var0.B[ci(var1, var2, var3)] & 0xFFFF;
+      int var4 = var0.B[ci(var1, var2, var3)] & BlockState.ID_MASK;
       return Blocks.isFence(var4) || Blocks.opaque[var4] || Shapes.fenceLinks(var4, dir);
    }
 
@@ -1219,7 +1220,7 @@ public final class Mesher {
       int blk = 0;
       for (int f = 0; f < 6; f++) {
          int q = ci(x + FN[f][0], y + FN[f][1], z + FN[f][2]);
-         int id = var0.B[q] & 0xFFFF;
+         int id = var0.B[q] & BlockState.ID_MASK;
          if (!Blocks.opaque[id] && !isPartial(id)) {
             int l = var0.L[q] & 255;
             sky = Math.max(sky, l >> 4 & 15);
@@ -1266,7 +1267,7 @@ public final class Mesher {
          double var33 = var40 ? var6[3 + var31] : var6[var31];
          boolean var32 = var40 ? var33 >= 1.0 : var33 <= 0.0;
          if (var32) {
-            int var34 = var0.B[ci(var8 + var15[0], var9 + var15[1], var10 + var15[2])] & 0xFFFF;
+            int var34 = var0.B[ci(var8 + var15[0], var9 + var15[1], var10 + var15[2])] & BlockState.ID_MASK;
             if (Blocks.opaque[var34]) {
                continue;
             }
@@ -1274,7 +1275,7 @@ public final class Mesher {
 
          int var35 = var12;
          int var21 = ci(var8 + var15[0], var9 + var15[1], var10 + var15[2]);
-         if (!Blocks.opaque[var0.B[var21] & 0xFFFF] && !isPartial(var0.B[var21] & 0xFFFF)) {
+         if (!Blocks.opaque[var0.B[var21] & BlockState.ID_MASK] && !isPartial(var0.B[var21] & BlockState.ID_MASK)) {
             var35 = var0.L[var21] & 255;
          }
 
@@ -1320,22 +1321,27 @@ public final class Mesher {
       }
    }
 
+   static int fluidId(int state) { return BlockState.wet(state) ? Blocks.WATER : state & BlockState.ID_MASK; }
+
    static float cornerHeight(Mesher.Scratch var0, int var1, int var2, int var3, int var4, int var5, int var6) {
       float var7 = 0.0F;
       int var8 = 0;
 
       for (int var9 = var5 - 1; var9 <= var5; var9++) {
          for (int var10 = var4 - 1; var10 <= var4; var10++) {
-            int var11 = var0.B[ci(var1 + var10, var2 + 1, var3 + var9)] & 0xFFFF;
+            int var11 = fluidId(var0.B[ci(var1 + var10, var2 + 1, var3 + var9)] & 0xFFFF);
             if (Blocks.sameFluid(var11, var6)) {
                return 1.0F;
             }
 
-            int var12 = var0.B[ci(var1 + var10, var2, var3 + var9)] & 0xFFFF;
+            int raw = var0.B[ci(var1 + var10, var2, var3 + var9)] & 0xFFFF;
+            int var12 = fluidId(raw);
+            if (Blocks.isWater(var12) && (raw & BlockState.FALLING) != 0) return 1;
             if (Blocks.sameFluid(var12, var6)) {
                float var13 = (8 - Blocks.fluidLevel(var12)) / 9.0F;
-               var7 += var13;
-               var8++;
+               int weight=Blocks.fluidLevel(var12)==0?10:1;
+               var7 += var13*weight;
+               var8+=weight;
             } else if (!Blocks.solid[var12]) {
                var8++;
             }
@@ -1363,16 +1369,19 @@ public final class Mesher {
 
       int var26 = var9 ? 23 : 24;
       // Update 3.13: the water of a swamp is greenish, a warm sea turquoise, a frozen one pale (Chunk.waterColor); lava stays as it is
+      int own=var0.B[var11]&BlockState.ID_MASK;
+      boolean slab=Blocks.isSlab(own),topSlab=slab&&Blocks.isTopSlab(own);
       int wc = var9 ? var1.waterColor[var4 * 16 + var2] : 0xFFFFFF;
       float wr = (wc >> 16 & 0xFF) / 255.0F;
       float wg = (wc >> 8 & 0xFF) / 255.0F;
       float wb = (wc & 0xFF) / 255.0F;
 
       for (int var27 = 0; var27 < 6; var27++) {
+         if (slab && (topSlab ? var27==0 : var27==1)) continue;
          int[] var16 = FN[var27];
          int var17 = ci(var6 + var16[0], var7 + var16[1], var8 + var16[2]);
-         int var18 = var0.B[var17] & 0xFFFF;
-         if (!Blocks.opaque[var18] && !Blocks.sameFluid(var18, var5)) {
+         int var18 = var0.B[var17] & BlockState.ID_MASK;
+         if (!Blocks.opaque[var18] && !Blocks.sameFluid(fluidId(var0.B[var17]&0xFFFF), var5)) {
             int var19 = var0.L[var17] & 255;
             if (!var9) {
                var19 = var0.L[var11] & 255;
@@ -1383,7 +1392,8 @@ public final class Mesher {
 
             for (int var22 = 0; var22 < 4; var22++) {
                int[] var23 = FC[var27][var22];
-               float var24 = var23[1] == 1 ? var13[var23[2]][var23[0]] : 0.0F;
+               float var24 = var23[1] == 1 ? Math.min(topSlab?.5F:1, var13[var23[2]][var23[0]]) : slab&&!topSlab?.5F:0.0F;
+               if(slab&&!topSlab)var24=Math.max(.5F,var24);
                uvFor(var27, var23[0], var24, var23[2], var12);
                if (var27 < 2) {
                   var12[0] = var23[0];

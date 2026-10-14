@@ -262,6 +262,7 @@ final class Fire {
    /** The block at (x, y, z) may be burnt up by the fire next to it: it turns into fire or into nothing (TNT blows up). */
    void tryCatch(int x, int y, int z, int chance, int age) {
       int id = w.getBlock(x, y, z);
+      if(WaterPhysics.contains(w,x,y,z))return;
       int flam = flammability(id);
       if (flam > 0 && this.rnd.nextInt(chance) < flam) {
          if (this.rnd.nextInt(age + 10) < 5) {

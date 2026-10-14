@@ -1,9 +1,9 @@
-BLOCKCRAFT V6.6 - ASEPRITE TEXTURE EDITING
+BLOCKCRAFT V6.7 - ASEPRITE TEXTURE EDITING
 ========================================
 No Java editing, compiling, Python or extra Java installation needed.
 
 QUICK START (Windows)
-1. Extract the full V6.6 game into a NEW folder. Run Edit-textures.bat.
+1. Extract the full V6.7 game into a NEW folder. Run Edit-textures.bat.
    It creates resourcepacks\MyTextures\ beside Blockcraft.exe, then opens
    that folder and its searchable index.html in your browser.
    Running the shortcut again opens your existing work; it does NOT reset it.
@@ -29,7 +29,7 @@ FINDING THE RIGHT FACE
 - Different sides, tops, inventory icons and model components can be separate
   PNGs. A shared tile changes every block/item that uses it. Chest walls, lid,
   latch, torch cap/shaft/flame and utility components have separate entries.
-- The kit contains 538 editable atlas cells (532 individual tiles + six sheets).
+- The kit contains 551 editable atlas cells (545 individual tiles + six sheets).
   The remaining solid-white shader helper is deliberately not an editable file.
 - atlas-reference.png is a full 1024x1024 visual reference, NOT a loaded texture.
   Edit the individual files, not the reference. This avoids atlas/PNG conflicts.

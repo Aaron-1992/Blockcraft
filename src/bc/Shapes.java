@@ -511,7 +511,7 @@ final class Shapes {
 
    /** Draws a block of kind {@link #K_SHAPE} (called by the mesher with the chunk's scratch space; x, y, z are chunk-local). */
    static void mesh(Mesher.Scratch s, int x, int y, int z, int id) {
-      Nbr nbr = (dx, dy, dz) -> s.B[Mesher.ci(x + 1 + dx, y + 1 + dy, z + 1 + dz)] & 0xFFFF;
+      Nbr nbr = (dx, dy, dz) -> s.B[Mesher.ci(x + 1 + dx, y + 1 + dy, z + 1 + dz)] & BlockState.ID_MASK;
       double[][] boxes;
       if (isThin(id)) {
          boxes = thinBoxes(nbr, false);
@@ -523,6 +523,8 @@ final class Shapes {
          boxes = Redstone319.wireBoxes(nbr, id);
       } else if (id==Blocks.CHEST||id==Blocks.CHEST_LOOT) {
          boxes=UtilityModels.chest(ChestLids.angle(s.ox+x,s.oy+y,s.oz+z));
+      } else if (Redstone319.isRepeater(id)||RedstoneLogic.comparator(id)) {
+         boxes=RedstoneLogic.model(id,s.B[Mesher.ci(x+1,y+1,z+1)]&65535);
       } else if (isModel(id)) {
          boxes = MODEL[id];
       } else {
@@ -573,7 +575,7 @@ final class Shapes {
          int axis = f < 2 ? 1 : (f < 4 ? 2 : 0);
          boolean positive = fn[axis] > 0;
          double edge = positive ? b[3 + axis] : b[axis];
-         int nb = s.B[Mesher.ci(x + 1 + fn[0], y + 1 + fn[1], z + 1 + fn[2])] & 0xFFFF;
+         int nb = s.B[Mesher.ci(x + 1 + fn[0], y + 1 + fn[1], z + 1 + fn[2])] & BlockState.ID_MASK;
          if ((positive ? edge >= 1.0 : edge <= 0.0) && Blocks.opaque[nb]) {
             continue; // lies against a solid block
          }

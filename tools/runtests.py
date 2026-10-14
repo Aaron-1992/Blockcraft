@@ -111,7 +111,7 @@ def equivalence(classes):
         return False
     # strict pass: with the Update 3.7 worldgen extras (sugar cane, pumpkin patches), the 3.9 smart leaves and the 3.11 back faces switched off, terrain generation, the
     # loaded world and the simulation must be IDENTICAL to Update 3.5 - proof that the extras are purely additive.
-    strict = run_java([TEST_CLASSES, classes, LWJGL], "bc.Equivalence", props=["-Dbc.noextras=true", "-Dbc.leaves=0", "-Dbc.legacymesh=true"])
+    strict = run_java([TEST_CLASSES, classes, LWJGL], "bc.Equivalence", props=["-Dbc.noextras=true", "-Dbc.leaves=0", "-Dbc.legacymesh=true", "-Dbc.legacyfluids=true"])
     if strict.returncode != 0:
         print("--- stderr (tail) ---\n" + strict.stderr[-2500:])
         sys.exit("strict equivalence run failed (exit code %s)" % strict.returncode)

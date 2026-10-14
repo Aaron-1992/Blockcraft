@@ -1,2 +1,2 @@
-pixel-title,pixel-utility-chest-open,pixel-editor-reload,pixel-editor-bow
-# V6.6 packaged Windows EXE: native pack export and hot reload after existing GPU uploads.
+pixel-title,pixel-aquatic-reef,pixel-aquatic-circuits,pixel-editor-bow
+# V6.7: exact packaged Windows EXE/JRE and PNG reload.

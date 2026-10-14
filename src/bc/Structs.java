@@ -31,7 +31,7 @@ public final class Structs {
    static int get(Chunk var0, int var1, int var2, int var3) {
       int var4 = var1 - var0.cx * 16;
       int var5 = var3 - var0.cz * 16;
-      return var4 >= 0 && var4 <= 15 && var5 >= 0 && var5 <= 15 && var2 >= 0 && var2 <= 255 ? var0.blocks[Chunk.idx(var4, var2, var5)] & 0xFFFF : -1;
+      return var4 >= 0 && var4 <= 15 && var5 >= 0 && var5 <= 15 && var2 >= 0 && var2 <= 255 ? var0.blocks[Chunk.idx(var4, var2, var5)] & BlockState.ID_MASK : -1;
    }
 
    static boolean overlaps(Chunk var0, int var1, int var2, int var3, int var4) {

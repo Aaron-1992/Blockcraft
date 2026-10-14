@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.6";
+   public static final String VERSION_STR = "6.7";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -1330,6 +1330,9 @@ public final class Game {
    }
 
    void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz, int worldType, int gameMode, int mapId) {
+      joinMultiplayerWorld(seed,dim,dayTime,sx,sy,sz,worldType,gameMode,mapId,true);
+   }
+   void joinMultiplayerWorld(long seed, int dim, long dayTime, double sx, double sy, double sz, int worldType, int gameMode, int mapId, boolean aquatic) {
       int targetDim = Dim.valid(dim) ? dim : Dim.OVERWORLD;
       int wType = Math.max(0, Math.min(WorldSettings.TYPES - 1, worldType));
       int gMode = Math.max(0, Math.min(4, gameMode));
@@ -1338,7 +1341,7 @@ public final class Game {
          || this.world.seed != seed
          || this.world.dim != targetDim
          || this.world.settings == null
-         || this.world.settings.type != wType) {
+         || this.world.settings.type != wType || this.world.settings.aquatic != aquatic) {
          Panorama.stop(this);
 
          if (this.world != null) {
@@ -1355,6 +1358,7 @@ public final class Game {
 
          WorldSettings ws = new WorldSettings();
          ws.type = wType;
+         ws.aquatic = aquatic;
          ws.mapId = targetMapId;
          this.worldSettings = ws;
          this.rootDir = null;
@@ -4010,7 +4014,7 @@ public final class Game {
       k[K_SNEAK] += ((pl.sneaking && !pl.flying && !wet ? 1.0F : 0.0F) - k[K_SNEAK]) * 0.35F;
       k[K_SPRINT] += ((pl.sprinting && !pl.flying && !pl.sneaking ? 1.0F : 0.0F) - k[K_SPRINT]) * 0.3F;
       k[K_AIR] += ((this.airTicks > 3 ? 1.0F : 0.0F) - k[K_AIR]) * 0.5F;
-      k[K_SWIM] += ((wet && speed > 0.03F ? 1.0F : 0.0F) - k[K_SWIM]) * 0.2F;
+      k[K_SWIM] += ((pl.swimming ? 1.0F : 0.0F) - k[K_SWIM]) * 0.2F;
       k[K_TREAD] += ((wet ? 1.0F : 0.0F) - k[K_TREAD]) * 0.2F;
       k[K_CLIMB] += ((ladder ? 1.0F : 0.0F) - k[K_CLIMB]) * 0.35F;
       k[K_FLY] += ((pl.flying ? 1.0F : 0.0F) - k[K_FLY]) * 0.15F;
@@ -5578,9 +5582,10 @@ public final class Game {
          }
 
          int var21 = this.world.getBlock(var19.x, var19.y, var19.z);
-         if (Blocks.isFluid(var21) && Blocks.fluidLevel(var21) == 0) {
-            int var22 = Blocks.isWater(var21) ? 283 : 284;
-            this.world.setBlock(var19.x, var19.y, var19.z, 0);
+         if (WaterPhysics.source(this.world.getState(var19.x,var19.y,var19.z)) || Blocks.isLava(var21) && Blocks.fluidLevel(var21)==0) {
+            int var22 = WaterPhysics.contains(this.world,var19.x,var19.y,var19.z) ? 283 : 284;
+            if(var22==283)WaterPhysics.drain(this.world,var19.x,var19.y,var19.z);
+            else this.world.setState(var19.x, var19.y, var19.z, 0);
             this.meshNow(var19.x, var19.y, var19.z);
             SoundEngine.play3D(this.world, Blocks.isWater(var21) ? "step_water_1" : "lava_fizz", var19.x + 0.5, var19.y + 0.5, var19.z + 0.5, 0.80F, 1.0F);
             var1.n--;
@@ -5653,14 +5658,15 @@ public final class Game {
          int var15 = this.target.x;
          int var16 = this.target.y;
          int var17 = this.target.z;
-         if (!Blocks.replaceable[this.world.getBlock(var15, var16, var17)]) {
+         if (!Blocks.replaceable[this.world.getBlock(var15, var16, var17)] && !(var2==283 && BlockState.waterloggable(this.world.getBlock(var15,var16,var17)))) {
             var15 += this.target.nx;
             var16 += this.target.ny;
             var17 += this.target.nz;
          }
 
-         if (var16 >= 0 && var16 <= 255 && Blocks.replaceable[this.world.getBlock(var15, var16, var17)]) {
-            this.world.setBlock(var15, var16, var17, var2 == 283 ? 50 : 58);
+         if (var16 >= 0 && var16 <= 255 && (Blocks.replaceable[this.world.getBlock(var15,var16,var17)] || var2==283 && BlockState.waterloggable(this.world.getBlock(var15,var16,var17)))) {
+            if(var2==283)WaterPhysics.fill(this.world,var15,var16,var17);
+            else this.world.setBlock(var15, var16, var17, Blocks.LAVA);
             this.meshNow(var15, var16, var17);
             SoundEngine.play3D(this.world, var2 == 283 ? "step_water_1" : "lava_fizz", var15 + 0.5, var16 + 0.5, var17 + 0.5, 0.80F, 1.0F);
             if (!this.player.creative) {
@@ -5935,6 +5941,7 @@ public final class Game {
                   }
                }
 
+               if(Aquatic.plant(var2) && !WaterPhysics.contains(this.world,var3,var4,var5)) return false;
                int var18 = this.world.getBlock(var3, var4 - 1, var5);
                if (var2 == 32) {
                   if (var9 == 1) {
@@ -5966,7 +5973,7 @@ public final class Game {
                   }
 
                   var2 = 119 + (var10 == 1 ? 0 : (var10 == -1 ? 1 : (var8 == 1 ? 3 : 2)));
-               } else if (Blocks.kind[var2] == 1 && !Blocks.solid[var18] && !(var2 == Blocks.SUGAR_CANE && var18 == Blocks.SUGAR_CANE)) {
+               } else if (Blocks.kind[var2] == 1 && !Blocks.solid[var18] && !(var2 == Blocks.SUGAR_CANE && var18 == Blocks.SUGAR_CANE) && !(var2==Aquatic.KELP&&var18==Aquatic.KELP)) {
                   return false;
                }
 

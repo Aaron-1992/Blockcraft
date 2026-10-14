@@ -156,9 +156,7 @@ final class Redstone319 {
    private static final int[] FDY = {-1, 1, 0, 0, 0, 0};
    private static final int[] FDZ = {0, 0, -1, 1, 0, 0};
 
-   private static final Map<Long, Integer> buttonTimers = new HashMap<>();
-   private static final java.util.Set<Long> redstoneOpened = java.util.concurrent.ConcurrentHashMap.newKeySet();
-   private static boolean updating = false;
+
 
    private Redstone319() {
    }
@@ -628,22 +626,24 @@ final class Redstone319 {
       int rgb = wireTint(p);
 
       boolean upClear = !Blocks.opaque[n.at(0, 1, 0)];
-      boolean upN = upClear && isWire(n.at(0, 1, -1));
-      boolean upS = upClear && isWire(n.at(0, 1, 1));
-      boolean upE = upClear && isWire(n.at(1, 1, 0));
-      boolean upW = upClear && isWire(n.at(-1, 1, 0));
+      boolean upN = upClear && Blocks.solid[n.at(0, 0, -1)] && isWire(n.at(0, 1, -1));
+      boolean upS = upClear && Blocks.solid[n.at(0, 0, 1)] && isWire(n.at(0, 1, 1));
+      boolean upE = upClear && Blocks.solid[n.at(1, 0, 0)] && isWire(n.at(1, 1, 0));
+      boolean upW = upClear && Blocks.solid[n.at(-1, 0, 0)] && isWire(n.at(-1, 1, 0));
 
-      boolean cn = connectsWire(n.at(0, 0, -1)) || upN || (!Blocks.opaque[n.at(0, 0, -1)] && isWire(n.at(0, -1, -1)));
-      boolean cs = connectsWire(n.at(0, 0, 1)) || upS || (!Blocks.opaque[n.at(0, 0, 1)] && isWire(n.at(0, -1, 1)));
-      boolean ce = connectsWire(n.at(1, 0, 0)) || upE || (!Blocks.opaque[n.at(1, 0, 0)] && isWire(n.at(1, -1, 0)));
-      boolean cw = connectsWire(n.at(-1, 0, 0)) || upW || (!Blocks.opaque[n.at(-1, 0, 0)] && isWire(n.at(-1, -1, 0)));
+      boolean cn = RedstoneLogic.connects(n.at(0, 0, -1), 0) || upN || (!Blocks.opaque[n.at(0, 0, -1)] && isWire(n.at(0, -1, -1)));
+      boolean cs = RedstoneLogic.connects(n.at(0, 0, 1), 1) || upS || (!Blocks.opaque[n.at(0, 0, 1)] && isWire(n.at(0, -1, 1)));
+      boolean ce = RedstoneLogic.connects(n.at(1, 0, 0), 2) || upE || (!Blocks.opaque[n.at(1, 0, 0)] && isWire(n.at(1, -1, 0)));
+      boolean cw = RedstoneLogic.connects(n.at(-1, 0, 0), 3) || upW || (!Blocks.opaque[n.at(-1, 0, 0)] && isWire(n.at(-1, -1, 0)));
 
       ArrayList<double[]> out = new ArrayList<>(6);
       boolean straightNS = (cn || cs) && !ce && !cw;
       boolean straightEW = (ce || cw) && !cn && !cs;
       if (straightNS) {
+         cn=cs=true;
          out.add(Shapes.tint(Shapes.tiles(Shapes.px(6, 0, cn ? 0 : 5, 10, 0.75, cs ? 16 : 11), tile, tile, tile), rgb));
       } else if (straightEW) {
+         ce=cw=true;
          out.add(Shapes.tint(Shapes.tiles(Shapes.px(cw ? 0 : 5, 0, 6, ce ? 16 : 11, 0.75, 10), tile, tile, tile), rgb));
       } else {
          // Central junction hub + non-overlapping arms
@@ -702,6 +702,7 @@ final class Redstone319 {
    }
 
    static void addToCreative(ArrayList<Integer> list) {
+      list.add(RedstoneLogic.COMPARATOR);
       list.add(ITEM_REDSTONE);
       list.add(REDSTONE_TORCH);
       list.add(REPEATER_OFF);
@@ -746,6 +747,7 @@ final class Redstone319 {
    }
 
    static boolean isRedstoneUtility(int id) {
+      if (RedstoneLogic.comparator(id)) return true;
       return id == ITEM_REDSTONE
          || id == REDSTONE_BLOCK
          || id == REDSTONE_LAMP
@@ -773,6 +775,7 @@ final class Redstone319 {
       Recipes.shapeless(WOOD_BUTTON, 1, Blocks.PLANKS);
       Recipes.shaped(STONE_PLATE, 1, new String[]{"SS"}, 'S', Blocks.STONE);
       Recipes.shaped(WOOD_PLATE, 1, new String[]{"PP"}, 'P', Blocks.PLANKS);
+      Recipes.shaped(RedstoneLogic.COMPARATOR, 1, new String[]{" T ", "TQT", "SSS"}, 'T', REDSTONE_TORCH, 'Q', Items.QUARTZ, 'S', Blocks.STONE);
       Recipes.shaped(REPEATER_OFF, 1, new String[]{"TRT", "SSS"}, 'T', REDSTONE_TORCH, 'R', ITEM_REDSTONE, 'S', Blocks.STONE);
       Recipes.shaped(PISTON, 1, new String[]{"PPP", "CIC", "CRC"}, 'P', Blocks.PLANKS, 'C', Blocks.COBBLE, 'I', Items.IRON_INGOT, 'R', ITEM_REDSTONE);
       Recipes.shaped(STICKY_PISTON, 1, new String[]{"S", "P"}, 'S', SLIME_BLOCK, 'P', PISTON);
@@ -861,15 +864,16 @@ final class Redstone319 {
    }
 
    static boolean isFloorPart(int id) {
-      return id == REDSTONE_TORCH || id == REDSTONE_TORCH_OFF || id >= LEVER_OFF && id <= WOOD_PLATE_ON || isWire(id) || isRepeater(id);
+      return RedstoneLogic.comparator(id) || id == REDSTONE_TORCH || id == REDSTONE_TORCH_OFF || id >= LEVER_OFF && id <= WOOD_PLATE_ON || isWire(id) || isRepeater(id);
    }
 
    static boolean placesOriented(int id) {
-      return id == REPEATER_OFF || id == PISTON || id == STICKY_PISTON || id == OBSERVER;
+      return id == RedstoneLogic.COMPARATOR || id == REPEATER_OFF || id == PISTON || id == STICKY_PISTON || id == OBSERVER;
    }
 
    static int orientForPlace(Game g, int id, int x, int y, int z) {
       int hf = Shapes.playerFacing(g.player);
+      if (id == RedstoneLogic.COMPARATOR) return id + hf;
       if (id == REPEATER_OFF) {
          return REPEATER_OFF + hf;
       }
@@ -897,6 +901,7 @@ final class Redstone319 {
    }
 
    static int pickItem(int id) {
+      if (RedstoneLogic.comparator(id)) return RedstoneLogic.COMPARATOR;
       if (isWire(id)) {
          return ITEM_REDSTONE;
       }
@@ -932,6 +937,7 @@ final class Redstone319 {
    /** Power (0..15) at (x, y, z), including wire signal strength. */
    static int powerAt(World w, int x, int y, int z) {
       int id = w.getBlock(x, y, z);
+      if (RedstoneLogic.comparator(id)) return (id-RedstoneLogic.COMPARATOR)/4;
       if (isWire(id)) {
          return id - REDSTONE_WIRE0;
       }
@@ -943,32 +949,23 @@ final class Redstone319 {
 
    /** True if any of the 6 neighbours of (x, y, z) provides Redstone power > 0 into (x, y, z). */
    static boolean isPowered(World w, int x, int y, int z) {
-      int[][] dirs = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-      for (int[] d : dirs) {
-         int nx = x + d[0];
-         int ny = y + d[1];
-         int nz = z + d[2];
-         int nb = w.getBlock(nx, ny, nz);
-         if (sourcePower(nb) > 0 || (isWire(nb) && nb > REDSTONE_WIRE0)) {
-            return true;
-         }
-         if (isRepeaterOn(nb)) {
-            int rf = repeaterFacing(nb);
-            if (nx + HDX[rf] == x && ny == y && nz + HDZ[rf] == z) {
-               return true;
-            }
-         }
-         if (observerOn(nb)) {
-            int of = observerFacing(nb);
-            if (observerFeeds(nb,nx,ny,nz,x,y,z)) {
-               return true;
-            }
-         }
-      }
-      return false;
+      return RedstoneLogic.input(w,x,y,z,true)>0;
    }
 
+
    static boolean use(Game g, int x, int y, int z, int id) {
+      if (isRepeater(id)) {
+         int setting=((g.world.getState(x,y,z)>>12)+1)&3;
+         g.world.setState(x,y,z,id|(setting<<12));
+         g.say("Repeater delay: " + (setting+1) + " redstone ticks");
+         propagate(g.world,x,y,z); return true;
+      }
+      if (RedstoneLogic.comparator(id)) {
+         int state=g.world.getState(x,y,z)^0x1000;
+         g.world.setState(x,y,z,state);
+         g.say((state&0x1000)!=0?"Comparator: subtract":"Comparator: compare");
+         propagate(g.world,x,y,z); return true;
+      }
       if (id == LEVER_OFF || id == LEVER_ON) {
          int next = id == LEVER_OFF ? LEVER_ON : LEVER_OFF;
          g.world.setBlock(x, y, z, next);
@@ -982,7 +979,7 @@ final class Redstone319 {
          int next = id == STONE_BUTTON ? STONE_BUTTON_ON : WOOD_BUTTON_ON;
          g.world.setBlock(x, y, z, next);
          SoundEngine.playClickBlock(g.world, x, y, z, true);
-         buttonTimers.put(pack(x, y, z), id == STONE_BUTTON ? 20 : 30);
+         g.world.redstone.buttons.put(pack(x, y, z), id == STONE_BUTTON ? 20 : 30);
          propagate(g.world, x, y, z);
          g.meshNow(x, y, z);
          return true;
@@ -990,27 +987,26 @@ final class Redstone319 {
 
       if (id == NOTE_BLOCK) {
          long key = pack(x, y, z);
-         int note = (notePitches.getOrDefault(key, -1) + 1) % 25;
-         notePitches.put(key, note);
+         int note = (g.world.redstone.notes.getOrDefault(key, -1) + 1) % 25;
+         g.world.redstone.notes.put(key, note);
          playNote(g, x, y, z);
          return true;
       }
 
       if (id == DAYLIGHT_SENSOR || id == DAYLIGHT_SENSOR_ON) {
-         int next = id == DAYLIGHT_SENSOR ? DAYLIGHT_SENSOR_ON : DAYLIGHT_SENSOR;
-         g.world.setBlock(x, y, z, next);
-         propagate(g.world, x, y, z);
-         g.meshNow(x, y, z);
-         return true;
+         int state=g.world.getState(x,y,z)^0x1000;
+         g.world.setState(x,y,z,state);
+         g.say((state&0x1000)!=0?"Daylight sensor: inverted":"Daylight sensor: normal");
+         propagate(g.world,x,y,z);g.meshNow(x,y,z);return true;
       }
 
       return false;
    }
 
-   private static final java.util.Map<Long, Integer> notePitches = new java.util.HashMap<>();
+
 
    private static void playNote(Game g, int x, int y, int z) {
-      int semitone = notePitches.getOrDefault(pack(x, y, z), 0);
+      int semitone = g.world.redstone.notes.getOrDefault(pack(x, y, z), 0);
       SoundEngine.playNoteBlock(g != null ? g.world : null, x, y, z, semitone);
       if (g != null && g.particles != null) {
          g.spawnBreakParticles(x, y + 1, z, REDSTONE_TORCH, 4);
@@ -1060,25 +1056,10 @@ final class Redstone319 {
 
    /** Called from World.notifyAround when block (x, y, z) changes so any Observer watching it emits a pulse. */
    static void onBlockChanged(World w, int x, int y, int z) {
-      if (w == null || updating || y < 1 || y > 254) {
-         return;
-      }
-      for (int f=0;f<6;f++) {
-         int ox=x-observerDx(f),oy=y-observerDy(f),oz=z-observerDz(f);
-         if(oy<1||oy>254)continue;
-         if(w.getBlock(ox,oy,oz)==observerId(f,false)) {
-            w.setBlock(ox,oy,oz,observerId(f,true));
-            buttonTimers.put(pack(ox,oy,oz),4);
-            if(w.game!=null)w.game.meshNow(ox,oy,oz);
-            propagate(w,ox-observerDx(f),oy-observerDy(f),oz-observerDz(f));
-         }
-      }
+      if (w != null) RedstoneLogic.changed(w,x,y,z);
    }
 
    static boolean handlesUpdate(int id) {
-      if (updating) {
-         return false;
-      }
       return isFloorPart(id)
          || id == REDSTONE_BLOCK
          || id == REDSTONE_LAMP
@@ -1128,11 +1109,11 @@ final class Redstone319 {
     * Batches all chunk section re-meshes to execute once at the end.
     */
    static void propagate(World w, int cx, int cy, int cz) {
-      if (updating || w == null) {
+      if (w == null || w.redstone.updating) {
          return;
       }
 
-      updating = true;
+      w.redstone.updating = true;
       try {
          HashSet<Long> remesh = new HashSet<>();
          for (int pass = 0; pass < 3; pass++) {
@@ -1150,30 +1131,24 @@ final class Redstone319 {
             }
          }
       } finally {
-         updating = false;
+         w.redstone.updating = false;
       }
    }
 
    private static boolean relaxWires(World w, int cx, int cy, int cz, ArrayList<int[]> wires, HashSet<Long> remesh) {
       HashMap<Long, Integer> idxMap = new HashMap<>();
-      for (int dy = -4; dy <= 4; dy++) {
-         int y = cy + dy;
-         if (y < 1 || y > 254) {
-            continue;
-         }
-
-         for (int dz = -15; dz <= 15; dz++) {
-            for (int dx = -15; dx <= 15; dx++) {
-               if (Math.abs(dx) + Math.abs(dz) <= 16) {
-                  int wx = cx + dx;
-                  int wz = cz + dz;
-                  int id = w.getBlock(wx, y, wz);
-                  if (isWire(id)) {
-                     idxMap.put(pack(wx, y, wz), wires.size());
-                     wires.add(new int[]{wx, y, wz});
-                  }
-               }
-            }
+      ArrayDeque<int[]> discover=new ArrayDeque<>();
+      for(int dy=-2;dy<=2;dy++)for(int dz=-2;dz<=2;dz++)for(int dx=-2;dx<=2;dx++)
+         if(isWire(w.getBlock(cx+dx,cy+dy,cz+dz))) discover.add(new int[]{cx+dx,cy+dy,cz+dz});
+      while(!discover.isEmpty()) {
+         int[] p=discover.remove();long key=pack(p[0],p[1],p[2]);
+         if(idxMap.containsKey(key))continue;
+         idxMap.put(key,wires.size());wires.add(p);
+         for(int d=0;d<4;d++) {
+            int nx=p[0]+HDX[d],nz=p[2]+HDZ[d],ny=p[1],nb=w.getBlock(nx,ny,nz);
+            if(isWire(nb))discover.add(new int[]{nx,ny,nz});
+            if(Blocks.solid[nb]&&!Blocks.opaque[w.getBlock(p[0],ny+1,p[2])]&&isWire(w.getBlock(nx,ny+1,nz)))discover.add(new int[]{nx,ny+1,nz});
+            if(!Blocks.opaque[nb]&&isWire(w.getBlock(nx,ny-1,nz)))discover.add(new int[]{nx,ny-1,nz});
          }
       }
 
@@ -1187,28 +1162,7 @@ final class Redstone319 {
       int[][] nb6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
       for (int i = 0; i < n; i++) {
          int[] p = wires.get(i);
-         int maxSrc = 0;
-         for (int[] d : nb6) {
-            int nx = p[0] + d[0];
-            int ny = p[1] + d[1];
-            int nz = p[2] + d[2];
-            int nb = w.getBlock(nx, ny, nz);
-            int sp = sourcePower(nb);
-            if (isRepeaterOn(nb)) {
-               int rf = repeaterFacing(nb);
-               if (nx + HDX[rf] == p[0] && ny == p[1] && nz + HDZ[rf] == p[2]) {
-                  sp = 15;
-               }
-            } else if (observerOn(nb)) {
-               int of = observerFacing(nb);
-               if (observerFeeds(nb,nx,ny,nz,p[0],p[1],p[2])) {
-                  sp = 15;
-               }
-            }
-            if (sp > maxSrc) {
-               maxSrc = sp;
-            }
-         }
+         int maxSrc = RedstoneLogic.input(w,p[0],p[1],p[2],false);
          pwr[i] = maxSrc;
          if (maxSrc > 1) {
             q.add(i);
@@ -1231,7 +1185,7 @@ final class Redstone319 {
             int nx = ax + HDX[d];
             int nz = az + HDZ[d];
             offerWireIdx(q, idxMap, pwr, nx, ay, nz, nextP);
-            if (upClear && ay + 1 <= 254) {
+            if (upClear && Blocks.solid[w.getBlock(nx,ay,nz)] && ay + 1 <= 254) {
                offerWireIdx(q, idxMap, pwr, nx, ay + 1, nz, nextP);
             }
             if (ay > 1 && !Blocks.opaque[w.getBlock(nx, ay, nz)]) {
@@ -1287,33 +1241,8 @@ final class Redstone319 {
                }
 
                int id = w.getBlock(x, y, z);
-               // 1. Redstone Torch NOT-gate inverter (turns OFF when block beneath it is powered)
-               if (id == REDSTONE_TORCH || id == REDSTONE_TORCH_OFF) {
-                  boolean supportPow = y > 1 && isSupportPowered(w, x, y - 1, z);
-                  int want = supportPow ? REDSTONE_TORCH_OFF : REDSTONE_TORCH;
-                  if (id != want) {
-                     w.setBlock(x, y, z, want);
-                     remesh.add(key);
-                     changed = true;
-                  }
-                  continue;
-               }
-               // 2. Redstone Repeater (reads rear input, outputs full 15 forward)
-               if (isRepeater(id)) {
-                  int f = repeaterFacing(id);
-                  int inX = x - HDX[f];
-                  int inZ = z - HDZ[f];
-                  int inB = w.getBlock(inX, y, inZ);
-                  boolean inPow = sourcePower(inB) > 0
-                     || (isWire(inB) && inB > REDSTONE_WIRE0)
-                     || (isRepeaterOn(inB) && repeaterFacing(inB) == f)
-                     || (Blocks.opaque[inB] && isSupportPowered(w, inX, y, inZ));
-                  int want = (inPow ? REPEATER_ON : REPEATER_OFF) + f;
-                  if (id != want) {
-                     w.setBlock(x, y, z, want);
-                     remesh.add(key);
-                     changed = true;
-                  }
+               if (id==REDSTONE_TORCH || id==REDSTONE_TORCH_OFF || isRepeater(id) || RedstoneLogic.comparator(id)) {
+                  RedstoneLogic.evaluate(w,x,y,z,id);
                   continue;
                }
                // 3. Pistons & Sticky Pistons
@@ -1335,9 +1264,7 @@ final class Redstone319 {
                   remesh.add(key);
                   changed = true;
                } else if (id == REDSTONE_LAMP_LIT && !pow) {
-                  w.setBlock(x, y, z, REDSTONE_LAMP);
-                  remesh.add(key);
-                  changed = true;
+                  RedstoneLogic.evaluate(w,x,y,z,id);
                } else if (Shapes.isTrap(id)) {
                   boolean open = Shapes.trapOpen(id);
                   if (pow != open) {
@@ -1358,7 +1285,7 @@ final class Redstone319 {
                   int hi = w.getBlock(x, y + 1, z);
                   if (Blocks.isDoorHi(hi)) {
                      if (pow) {
-                        redstoneOpened.add(key);
+                        w.redstone.opened.add(key);
                         if (!open) {
                            w.setBlock(x, y, z, id + 4);
                            w.setBlock(x, y + 1, z, hi + 4);
@@ -1366,7 +1293,7 @@ final class Redstone319 {
                            remesh.add(key);
                            remesh.add(pack(x, y + 1, z));
                         }
-                     } else if (open && redstoneOpened.remove(key)) {
+                     } else if (open && w.redstone.opened.remove(key)) {
                         w.setBlock(x, y, z, id - 4);
                         w.setBlock(x, y + 1, z, hi - 4);
                         SoundEngine.play3D(w, iron ? "iron_door_close" : "door_close", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
@@ -1375,10 +1302,10 @@ final class Redstone319 {
                      }
                   }
                } else if (id == NOTE_BLOCK) {
-                  if (pow && redstoneOpened.add(key)) {
+                  if (pow && w.redstone.opened.add(key)) {
                      playNote(w.game, x, y, z);
                   } else if (!pow) {
-                     redstoneOpened.remove(key);
+                     w.redstone.opened.remove(key);
                   }
                } else if (id == Blocks.TNT && pow) {
                   w.setBlock(x, y, z, 0);
@@ -1392,50 +1319,19 @@ final class Redstone319 {
       return changed;
    }
 
-   private static boolean isSupportPowered(World w, int bx, int by, int bz) {
-      int[][] dirs = {{1, 0, 0}, {-1, 0, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-      for (int[] d : dirs) {
-         int nx = bx + d[0];
-         int ny = by + d[1];
-         int nz = bz + d[2];
-         int nb = w.getBlock(nx, ny, nz);
-         if (sourcePower(nb) > 0 || (isWire(nb) && nb > REDSTONE_WIRE0)) {
-            return true;
-         }
-         if (observerFeeds(nb,nx,ny,nz,bx,by,bz)) return true;
-         if (isRepeaterOn(nb)) {
-            int rf = repeaterFacing(nb);
-            if (nx + HDX[rf] == bx && ny == by && nz + HDZ[rf] == bz) {
-               return true;
-            }
-         }
-      }
-      return false;
+   private static boolean isSupportPowered(World w, int x, int y, int z) {
+      return RedstoneLogic.input(w,x,y,z,true)>0;
    }
 
    private static boolean isPistonPowered(World w, int x, int y, int z, int facing) {
-      int[][] dirs = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
-      for (int[] d : dirs) {
-         if (d[0] == FDX[facing] && d[1] == FDY[facing] && d[2] == FDZ[facing]) {
-            continue;
-         }
-         int nx = x + d[0];
-         int ny = y + d[1];
-         int nz = z + d[2];
-         int nb = w.getBlock(nx, ny, nz);
-         if (sourcePower(nb) > 0 || (isWire(nb) && nb > REDSTONE_WIRE0)) {
-            return true;
-         }
-         if (observerFeeds(nb,nx,ny,nz,x,y,z)) return true;
-         if (isRepeaterOn(nb)) {
-            int rf = repeaterFacing(nb);
-            if (nx + HDX[rf] == x && ny == y && nz + HDZ[rf] == z) {
-               return true;
-            }
-         }
+      for(int[] d:RedstoneLogic.SIX) {
+         if(d[0]==FDX[facing]&&d[1]==FDY[facing]&&d[2]==FDZ[facing])continue;
+         if(RedstoneLogic.signal(w,x+d[0],y+d[1],z+d[2],x,y,z,true)>0)return true;
       }
-      return false;
+      // Java quasi-connectivity: sampled on a block update, not a global piston poll.
+      return RedstoneLogic.input(w,x,y+1,z,true)>0;
    }
+
 
    private static boolean canPistonPush(int id, int y) {
       if (id == 0 || Blocks.replaceable[id]) {
@@ -1465,50 +1361,10 @@ final class Redstone319 {
       int dx = FDX[f];
       int dy = FDY[f];
       int dz = FDZ[f];
-      int count = 0;
-      while (count < 12) {
-         int tx = x + dx * (count + 1);
-         int ty = y + dy * (count + 1);
-         int tz = z + dz * (count + 1);
-         if (ty < 1 || ty > 254) {
-            return false;
-         }
-         int tb = w.getBlock(tx, ty, tz);
-         if (tb == 0 || Blocks.replaceable[tb]) {
-            break;
-         }
-         if (!canPistonPush(tb, ty)) {
-            return false;
-         }
-         count++;
-         if (count == 12) {
-            int endB = w.getBlock(x + dx * 13, y + dy * 13, z + dz * 13);
-            if (endB != 0 && !Blocks.replaceable[endB]) {
-               return false;
-            }
-         }
-      }
-
-      for (int i = count; i >= 1; i--) {
-         int sx = x + dx * i;
-         int sy = y + dy * i;
-         int sz = z + dz * i;
-         int dstX = sx + dx;
-         int dstY = sy + dy;
-         int dstZ = sz + dz;
-         int moved = w.getBlock(sx, sy, sz);
-         if (!Blocks.solid[moved] && moved != SLIME_BLOCK) {
-            int drop = Blocks.drop[moved];
-            if (drop > 0) {
-               w.dropItem(sx + 0.5, sy + 0.3, sz + 0.5, drop, 1);
-            }
-            w.setBlock(sx, sy, sz, 0);
-         } else {
-            w.setBlock(dstX, dstY, dstZ, moved);
-            remesh.add(pack(dstX, dstY, dstZ));
-         }
-         remesh.add(pack(sx, sy, sz));
-      }
+      PistonPlan plan=new PistonPlan(w,x,y,z,dx,dy,dz,false);
+      if(!plan.collect(x+dx,y+dy,z+dz))return false;
+      plan.apply(remesh);
+      w.redstone.extendedAt.put(pack(x,y,z),w.tickCount);
 
       int hx = x + dx;
       int hy = y + dy;
@@ -1535,21 +1391,55 @@ final class Redstone319 {
          w.setBlock(hx, hy, hz, 0);
          remesh.add(pack(hx, hy, hz));
       }
-      if (sticky) {
-         int px = x + dx * 2;
-         int py = y + dy * 2;
-         int pz = z + dz * 2;
-         if (py >= 1 && py <= 254) {
-            int pull = w.getBlock(px, py, pz);
-            if (pull != 0 && Blocks.solid[pull] && canPistonPush(pull, py)) {
-               w.setBlock(hx, hy, hz, pull);
-               w.setBlock(px, py, pz, 0);
-               remesh.add(pack(hx, hy, hz));
-               remesh.add(pack(px, py, pz));
-            }
+      long held=w.tickCount-w.redstone.extendedAt.getOrDefault(pack(x,y,z),w.tickCount-3);
+      w.redstone.extendedAt.remove(pack(x,y,z));
+      if (sticky && held>1) {
+         int px=x+dx*2,py=y+dy*2,pz=z+dz*2,id=w.getBlock(px,py,pz);
+         if(id!=0&&Blocks.solid[id]&&canPistonPush(id,py)) {
+            PistonPlan plan=new PistonPlan(w,x,y,z,-dx,-dy,-dz,true);
+            if(plan.collect(px,py,pz))plan.apply(remesh);
          }
       }
       return true;
+   }
+
+   /** Validate the entire slime-connected assembly before moving anything. Twelve blocks total, not per branch. */
+   private static final class PistonPlan {
+      final World w;final int bx,by,bz,dx,dy,dz;final boolean pulling;
+      final java.util.LinkedHashMap<Long,Integer> blocks=new java.util.LinkedHashMap<>();
+      final java.util.HashSet<Long> broken=new java.util.HashSet<>();
+      PistonPlan(World w,int x,int y,int z,int dx,int dy,int dz,boolean pulling){this.w=w;bx=x;by=y;bz=z;this.dx=dx;this.dy=dy;this.dz=dz;this.pulling=pulling;}
+      boolean collect(int x,int y,int z) {
+         long key=pack(x,y,z);
+         if(blocks.containsKey(key))return true;
+         if(x==bx&&y==by&&z==bz)return false;
+         if(y<1||y>254||!w.isLoaded(x,z))return false;
+         int id=w.getBlock(x,y,z);
+         if(id==0||Blocks.isFluid(id))return true;
+         if(Blocks.replaceable[id]||(!Blocks.solid[id]&&canPistonPush(id,y))) {if(!pulling)broken.add(key);return !pulling;}
+         if(!canPistonPush(id,y)||blocks.size()>=12)return false;
+         blocks.put(key,w.getState(x,y,z));
+         if(!collect(x+dx,y+dy,z+dz))return false;
+         if(id==SLIME_BLOCK)for(int[] d:RedstoneLogic.SIX) {
+            int nx=x+d[0],ny=y+d[1],nz=z+d[2],other=w.getBlock(nx,ny,nz);
+            if(nx==bx&&ny==by&&nz==bz)continue;
+            if(other>=Blocks.GLAZED0&&other<Blocks.GLAZED0+16)continue;
+            if(other!=0&&Blocks.solid[other]&&canPistonPush(other,ny)&&!collect(nx,ny,nz))return false;
+         }
+         return true;
+      }
+      void apply(HashSet<Long> remesh) {
+         for(long k:broken) {
+            int x=unpackX(k),y=unpackY(k),z=unpackZ(k),id=w.getBlock(x,y,z);
+            if(Blocks.drop[id]>0)w.dropItem(x+.5,y+.3,z+.5,Blocks.drop[id],1);
+            w.setBlock(x,y,z,0);remesh.add(k);
+         }
+         for(long k:blocks.keySet()){w.setBlock(unpackX(k),unpackY(k),unpackZ(k),0);remesh.add(k);}
+         for(java.util.Map.Entry<Long,Integer> e:blocks.entrySet()) {
+            long k=e.getKey();int x=unpackX(k)+dx,y=unpackY(k)+dy,z=unpackZ(k)+dz;
+            w.setState(x,y,z,e.getValue());remesh.add(pack(x,y,z));
+         }
+      }
    }
 
    private static long pack(int x, int y, int z) {
@@ -1570,9 +1460,14 @@ final class Redstone319 {
       return (int)(k & 0xFFFL);
    }
 
-   private static final java.util.Set<Long> activePlates = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
 
    /** Called every tick from {@link Game}: button/observer timers, pressure plates, daylight sensors, and Slime Block bounce. */
+   static void recover(World w,int x,int y,int z,int id) {
+      if(id==STONE_BUTTON_ON||id==WOOD_BUTTON_ON)w.redstone.buttons.put(pack(x,y,z),id==STONE_BUTTON_ON?20:30);
+      if(id==STONE_PLATE_ON||id==WOOD_PLATE_ON)w.redstone.plates.add(pack(x,y,z));
+   }
+
    static void tick(Game g) {
       if (g == null || g.world == null || g.player == null) {
          return;
@@ -1580,15 +1475,15 @@ final class Redstone319 {
 
       World w = g.world;
       // 1. Button & Observer auto-release timers
-      if (!buttonTimers.isEmpty()) {
+      if (!w.redstone.buttons.isEmpty()) {
          // Resetting a watched observer can arm another one. Iterate a snapshot
          // so a vertical chain cannot mutate the timer iterator or lose a new pulse.
-         for(Map.Entry<Long,Integer> e:new HashMap<>(buttonTimers).entrySet()) {
-            if(!e.getValue().equals(buttonTimers.get(e.getKey())))continue;
+         for(Map.Entry<Long,Integer> e:new HashMap<>(w.redstone.buttons).entrySet()) {
+            if(!e.getValue().equals(w.redstone.buttons.get(e.getKey())))continue;
             int rem = e.getValue() - 1;
             if (rem <= 0) {
                long k = e.getKey();
-               buttonTimers.remove(k);
+               w.redstone.buttons.remove(k);
                int x = unpackX(k);
                int y = unpackY(k);
                int z = unpackZ(k);
@@ -1605,21 +1500,21 @@ final class Redstone319 {
                   g.meshNow(x, y, z);
                }
             } else {
-               buttonTimers.put(e.getKey(),rem);
+               w.redstone.buttons.put(e.getKey(),rem);
             }
          }
       }
 
       // 2. Re-check any currently depressed pressure plates so they release even if the player sprinted/teleported/died off them!
-      if (!activePlates.isEmpty()) {
-         for (Long k : activePlates.toArray(new Long[0])) {
+      if (!w.redstone.plates.isEmpty()) {
+         for (Long k : w.redstone.plates.toArray(new Long[0])) {
             if (k != null) {
                int x = unpackX(k);
                int y = unpackY(k);
                int z = unpackZ(k);
                int id = w.getBlock(x, y, z);
                if (id != STONE_PLATE_ON && id != WOOD_PLATE_ON) {
-                  activePlates.remove(k);
+                  w.redstone.plates.remove(k);
                } else {
                   checkPlateAt(g, w, x, y, z);
                }
@@ -1642,13 +1537,6 @@ final class Redstone319 {
                int id = w.getBlock(x, y, z);
                if (id >= STONE_PLATE && id <= WOOD_PLATE_ON) {
                   checkPlateAt(g, w, x, y, z);
-               } else if ((id == DAYLIGHT_SENSOR || id == DAYLIGHT_SENSOR_ON) && (w.tickCount & 19L) == 0L) {
-                  int want = day && w.getSky(x, y, z) >= 10 ? DAYLIGHT_SENSOR_ON : DAYLIGHT_SENSOR;
-                  if (id != want) {
-                     w.setBlock(x, y, z, want);
-                     propagate(w, x, y, z);
-                     g.meshNow(x, y, z);
-                  }
                }
             }
          }
@@ -1685,7 +1573,7 @@ final class Redstone319 {
    private static void checkPlateAt(Game g, World w, int x, int y, int z) {
       int id = w.getBlock(x, y, z);
       if (id < STONE_PLATE || id > WOOD_PLATE_ON) {
-         activePlates.remove(pack(x, y, z));
+         w.redstone.plates.remove(pack(x, y, z));
          return;
       }
       boolean isWood = id == WOOD_PLATE || id == WOOD_PLATE_ON;
@@ -1693,9 +1581,9 @@ final class Redstone319 {
       boolean wasOn = id == STONE_PLATE_ON || id == WOOD_PLATE_ON;
       long key = pack(x, y, z);
       if (stood) {
-         activePlates.add(key);
+         w.redstone.plates.add(key);
       } else {
-         activePlates.remove(key);
+         w.redstone.plates.remove(key);
       }
       if (stood != wasOn) {
          int next = isWood ? (stood ? WOOD_PLATE_ON : WOOD_PLATE) : (stood ? STONE_PLATE_ON : STONE_PLATE);

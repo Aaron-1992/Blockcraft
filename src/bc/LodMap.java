@@ -189,7 +189,7 @@ public final class LodMap {
             int logs = 0;
             int id = 0;
             while (y > 0) {
-               id = blocks[Chunk.idx(x, y, z)] & 0xFFFF;
+               id = blocks[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
                if (Blocks.isLeaves(id)) {
                   leaves = true; // the crown of a tree: not ground
                } else if (leaves && Blocks.isLog(id)) {
@@ -203,7 +203,7 @@ public final class LodMap {
 
             if (Blocks.isWater(id)) {
                int bed = y;
-               while (bed > 0 && Blocks.isWater(blocks[Chunk.idx(x, bed, z)] & 0xFFFF)) {
+               while (bed > 0 && Blocks.isWater(blocks[Chunk.idx(x, bed, z)] & BlockState.ID_MASK)) {
                   bed--;
                }
 
@@ -211,7 +211,7 @@ public final class LodMap {
                s.top[i] = (short)(y + 1);
                s.depth[i] = (byte)d;
                s.rgb[i] = waterColor(d);
-               int below = blocks[Chunk.idx(x, bed, z)] & 0xFFFF;
+               int below = blocks[Chunk.idx(x, bed, z)] & BlockState.ID_MASK;
                s.side[i] = shade(averages(true)[below == 0 ? 3 : below], 0.8F);
             } else {
                int g = 0;
@@ -221,7 +221,7 @@ public final class LodMap {
 
                s.top[i] = (short)(y + 1);
                s.rgb[i] = topColor(id, g);
-               int below = y >= 2 ? blocks[Chunk.idx(x, y - 2, z)] & 0xFFFF : id;
+               int below = y >= 2 ? blocks[Chunk.idx(x, y - 2, z)] & BlockState.ID_MASK : id;
                if (below == 0 || skippable(below) || Blocks.isWater(below) || Blocks.isLeaves(below)) {
                   below = id;
                }

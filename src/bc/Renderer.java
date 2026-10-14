@@ -1131,7 +1131,7 @@ public final class Renderer {
                   for (int var11 = yStart; var11 <= yEnd; var11++) {
                      for (int var12 = 0; var12 < 16; var12++) {
                         for (int var13 = 0; var13 < 16; var13++) {
-                           int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & 0xFFFF;
+                           int var14 = var10.blocks[Chunk.idx(var13, var11, var12)] & BlockState.ID_MASK;
                            if (var14 != 0 && Blocks.emit[var14] >= 7) {
                               if (Blocks.isLava(var14) && ((var13 + var12) & 3) != 0) {
                                  continue;

@@ -456,7 +456,8 @@ final class TestsPlayerAnim {
          }
 
          check(g.animK[Game.K_TREAD] > 0.9F && g.animK[Game.K_SWIM] < 0.05F && g.animK[Game.K_AIR] < 0.05F, "treading water: " + g.animK[Game.K_TREAD]);
-         // moving through it: swimming
+         // Player physics selects the sprint-swimming collision pose, not any movement through water.
+         pl.swimming=true;
          for (int i = 0; i < 14; i++) {
             pl.px = pl.x;
             pl.pz = pl.z;
@@ -469,6 +470,7 @@ final class TestsPlayerAnim {
          check(sw.swim > 0.9F && sw.tread > 0.9F, "the pose carries it");
          // out of the water, still in the air: a fall; the state builds up over a few ticks, not at once
          pl.inWater = false;
+         pl.swimming = false;
          pl.onGround = false;
          pl.vy = -0.5;
          pl.px = pl.x;

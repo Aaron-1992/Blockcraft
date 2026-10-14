@@ -152,12 +152,13 @@ final class Tests319 {
          eq(Redstone319.REDSTONE_WIRE0 + 14, w.getBlock(9, y, 8), "wire 2 has power 14");
          eq(Redstone319.REDSTONE_WIRE0 + 13, w.getBlock(10, y, 8), "wire 3 has power 13");
          eq(Redstone319.REDSTONE_LAMP_LIT, w.getBlock(11, y, 8), "redstone lamp lit by wire");
-         check(Shapes.trapOpen(w.getBlock(10, y, 9)), "iron trapdoor opened by redstone wire");
+         check(!Shapes.trapOpen(w.getBlock(10,y,9)), "parallel dust line must not power a side trapdoor");
 
          // Switch the lever OFF -> wire Depowers, lamp turns off, iron trapdoor closes
          Shapes.use(g, 7, y, 8, Redstone319.LEVER_ON);
          eq(Redstone319.REDSTONE_WIRE0, w.getBlock(8, y, 8), "wire 1 unpowered");
-         eq(Redstone319.REDSTONE_LAMP, w.getBlock(11, y, 8), "redstone lamp unlit");
+         TestsAquaticRedstone.advance(w,4);
+         eq(Redstone319.REDSTONE_LAMP, w.getBlock(11, y, 8), "redstone lamp unlit after four game ticks");
          check(!Shapes.trapOpen(w.getBlock(10, y, 9)), "iron trapdoor closed again");
 
          // Manual door toggle stays open across world ticks when unpowered by Redstone
@@ -213,16 +214,18 @@ final class Tests319 {
          // 2. Dynamic wire 3D geometry: isolated wire has 3 boxes (hub + N-S + E-W cross), single neighbor has 2 boxes
          Shapes.Nbr nbr = (nx, ny, nz) -> nx == 1 ? Redstone319.REDSTONE_WIRE0 : 0;
          double[][] boxes1 = Redstone319.wireBoxes(nbr, Redstone319.REDSTONE_WIRE0);
-         eq(2, boxes1.length, "wire connected only to +X emits hub + east arm");
+         eq(1, boxes1.length, "wire without solid step support emits a horizontal line, not an upward strip");
 
          // 3. Redstone Torch NOT-gate inversion (torch on top of block turns OFF when block below is powered)
          w.setBlock(10, y, 2, 1); // stone block
          w.setBlock(10, y + 1, 2, Redstone319.REDSTONE_TORCH);
          w.setBlock(9, y, 2, Redstone319.REDSTONE_BLOCK);
          Redstone319.propagate(w, 9, y, 2);
+         TestsAquaticRedstone.advance(w,2);
          eq(Redstone319.REDSTONE_TORCH_OFF, w.getBlock(10, y + 1, 2), "redstone torch turns OFF when supporting block is powered");
          w.setBlock(9, y, 2, 0);
          Redstone319.propagate(w, 9, y, 2);
+         TestsAquaticRedstone.advance(w,2);
          eq(Redstone319.REDSTONE_TORCH, w.getBlock(10, y + 1, 2), "redstone torch relights when power removed");
 
          // 4. Redstone Repeater boosts weak signal back to 15 in facing direction (+X = dir 2)
@@ -231,6 +234,7 @@ final class Tests319 {
          w.setBlock(4, y, 10, Redstone319.REDSTONE_WIRE0);
          w.setBlock(1, y, 10, Redstone319.REDSTONE_BLOCK);
          Redstone319.propagate(w, 1, y, 10);
+         TestsAquaticRedstone.advance(w,2);
          eq(Redstone319.REPEATER_ON + 2, w.getBlock(3, y, 10), "repeater turns ON from input behind it");
          eq(Redstone319.REDSTONE_WIRE0 + 15, w.getBlock(4, y, 10), "repeater boosts output wire to 15");
 
@@ -242,6 +246,7 @@ final class Tests319 {
          eq(Redstone319.STICKY_PISTON_EXT + 4, w.getBlock(8, y, 12), "sticky piston extended");
          eq(Redstone319.PISTON_HEAD + 4, w.getBlock(9, y, 12), "piston head placed at +X");
          eq(4, w.getBlock(10, y, 12), "cobblestone pushed to (10, y, 12)");
+         TestsAquaticRedstone.advance(w,3); // normal pull, not Java short-pulse block dropping
          w.setBlock(7, y, 12, 0);
          Redstone319.propagate(w, 7, y, 12);
          eq(Redstone319.STICKY_PISTON + 4, w.getBlock(8, y, 12), "sticky piston retracted");

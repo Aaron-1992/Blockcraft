@@ -97,7 +97,7 @@ public final class Chunk {
       in.readFully(hi);
       for (int i = 0; i < dst.length; i++) {
          if (hi[i] != 0) {
-            dst[i] = (short)((hi[i] & 15) << 8 | lo[i] & 255);
+            dst[i] = (short)((hi[i] & 255) << 8 | lo[i] & 255);
          }
       }
    }
@@ -107,7 +107,7 @@ public final class Chunk {
    }
 
    public int get(int var1, int var2, int var3) {
-      return this.blocks[idx(var1, var2, var3)] & 0xFFFF;
+      return this.blocks[idx(var1, var2, var3)] & BlockState.ID_MASK;
    }
 
    public void set(int var1, int var2, int var3, int var4) {
@@ -167,14 +167,14 @@ public final class Chunk {
       int base = sy << 12;
       int end = base + 4096;
       for (int i = base; i < end; i++) {
-         if (!op[b[i] & 0xFFFF]) {
+         if (!op[b[i] & BlockState.ID_MASK]) {
             return false;
          }
       }
       // Check plane immediately above (y = (sy << 4) + 16)
       int topBase = (sy + 1) << 12;
       for (int i = topBase; i < topBase + 256; i++) {
-         if (!op[b[i] & 0xFFFF]) {
+         if (!op[b[i] & BlockState.ID_MASK]) {
             return false;
          }
       }
@@ -182,7 +182,7 @@ public final class Chunk {
       if (sy > 0) {
          int botBase = (sy << 12) - 256;
          for (int i = botBase; i < botBase + 256; i++) {
-            if (!op[b[i] & 0xFFFF]) {
+            if (!op[b[i] & BlockState.ID_MASK]) {
                return false;
             }
          }
@@ -203,10 +203,10 @@ public final class Chunk {
       for (int y = y0; y < y1; y++) {
          int yOff = y << 8;
          for (int k = 0; k < 16; k++) {
-            if (!op[bW[yOff | (k << 4) | 15] & 0xFFFF]
-               || !op[bE[yOff | (k << 4)] & 0xFFFF]
-               || !op[bN[yOff | (15 << 4) | k] & 0xFFFF]
-               || !op[bS[yOff | k] & 0xFFFF]) {
+            if (!op[bW[yOff | (k << 4) | 15] & BlockState.ID_MASK]
+               || !op[bE[yOff | (k << 4)] & BlockState.ID_MASK]
+               || !op[bN[yOff | (15 << 4) | k] & BlockState.ID_MASK]
+               || !op[bS[yOff | k] & BlockState.ID_MASK]) {
                return false;
             }
          }
@@ -219,7 +219,7 @@ public final class Chunk {
          for (int var2 = 0; var2 < 16; var2++) {
             int var3 = 255;
 
-            while (var3 > 0 && Blocks.opacity[this.blocks[idx(var2, var3, var1)] & 0xFFFF] == 0) {
+            while (var3 > 0 && Blocks.opacity[this.blocks[idx(var2, var3, var1)] & BlockState.ID_MASK] == 0) {
                var3--;
             }
 

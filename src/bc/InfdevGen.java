@@ -152,7 +152,7 @@ public final class InfdevGen extends Gen {
          }
          int sy = 0;
          for (int y = 126; y > SEA + 1; y--) {
-            int id = ch.blocks[Chunk.idx(lx, y, lz)] & 0xFFFF;
+            int id = ch.blocks[Chunk.idx(lx, y, lz)] & BlockState.ID_MASK;
             if (id != 0) {
                if (id == Blocks.GRASS) {
                   sy = y;
@@ -170,7 +170,7 @@ public final class InfdevGen extends Gen {
          for (int x = 0; x < 16; x++) {
             int top = 0;
             for (int y = 255; y >= 0; y--) {
-               int id = ch.blocks[Chunk.idx(x, y, z)] & 0xFFFF;
+               int id = ch.blocks[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
                if (Blocks.opacity[id] > 0) {
                   top = y;
                   break;

@@ -729,7 +729,7 @@ public final class Net319 {
             c.send(
                String.format(
                   Locale.ROOT,
-                  "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d %d %d %d %d",
+                  "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d %d %d %d %d %d",
                   cid,
                   seed,
                   dim,
@@ -744,7 +744,8 @@ public final class Net319 {
                   mapId,
                   SkyGen.swKit,
                   SkyGen.tumbleWeaponMode,
-                  SkyGen.soloBots ? 1 : 0
+                  SkyGen.soloBots ? 1 : 0,
+                  curW != null && curW.settings != null && curW.settings.aquatic ? 1 : 0
                )
             );
             c.send("TEAM 1 " + SkyGen.myTeam);
@@ -762,7 +763,7 @@ public final class Net319 {
                Player pl = hg.player;
                int flags = (pl.sneaking ? 1 : 0)
                   | (pl.sprinting ? 2 : 0)
-                  | (pl.inWater ? 4 : 0)
+                  | (pl.swimming ? 4 : 0)
                   | (pl.onGround ? 8 : 0)
                   | (pl.hurtTime > 0 ? 16 : 0)
                   | ((pl.dead || pl.spectator) ? 32 : 0);
@@ -1677,7 +1678,7 @@ public final class Net319 {
          c.send(
             String.format(
                Locale.ROOT,
-               "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d %d %d %d %d",
+               "ASSIGN %d %d %d %d %.3f %.3f %.3f %d %d %d %d %d %d %d %d %d",
                c.id,
                seed,
                dim,
@@ -1692,7 +1693,8 @@ public final class Net319 {
                mapId,
                SkyGen.swKit,
                SkyGen.tumbleWeaponMode,
-               SkyGen.soloBots ? 1 : 0
+               SkyGen.soloBots ? 1 : 0,
+                  curW != null && curW.settings != null && curW.settings.aquatic ? 1 : 0
             )
          );
          c.send("TEAM 1 " + SkyGen.myTeam);
@@ -2165,7 +2167,7 @@ public final class Net319 {
       Player pl = g.player;
       int flags = (pl.sneaking ? 1 : 0)
          | (pl.sprinting ? 2 : 0)
-         | (pl.inWater ? 4 : 0)
+         | (pl.swimming ? 4 : 0)
          | (pl.onGround ? 8 : 0)
          | (pl.hurtTime > 0 ? 16 : 0)
          | ((pl.dead || pl.spectator || SkyGen.localEliminated) ? 32 : 0)
@@ -2312,7 +2314,7 @@ public final class Net319 {
                      SkyGen.myTeam = Math.abs(assignedTeam) & 3;
                      SkyGen.matchState = hostMatchState;
                      if (g != null) {
-                        g.joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, wType, gMode, hostMapId);
+                        g.joinMultiplayerWorld(seed, dim, dayTime, sx, sy, sz, wType, gMode, hostMapId, p.length>=17 && Integer.parseInt(p[16])!=0);
                         w = g.world;
                      } else if (w != null) {
                         w.dayTime = dayTime;
@@ -2543,7 +2545,7 @@ public final class Net319 {
                         applyingRemote = true;
                         try {
                            if (w.chunkAt(bx, bz) != null) {
-                              w.setBlock(bx, by, bz, bid);
+                              w.setState(bx, by, bz, bid);
                            }
                         } finally {
                            applyingRemote = false;

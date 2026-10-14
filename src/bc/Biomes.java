@@ -37,12 +37,13 @@ public final class Biomes {
    public static final int SNOWY_BEACH = 25;
    public static final int FLOWER_FOREST = 26;
    public static final int WARM_OCEAN = 27;
-   public static final int N = 28;
+   public static final int COLD_OCEAN=28, LUKEWARM_OCEAN=29, DEEP_COLD_OCEAN=30, DEEP_LUKEWARM_OCEAN=31, DEEP_FROZEN_OCEAN=32;
+   public static final int N = 33;
 
    public static final String[] NAME = new String[]{
       "Ocean", "Beach", "Plains", "Forest", "Desert", "Ice Plains", "Extreme Hills", "Deep Ocean", "Frozen Ocean", "River", "Frozen River", "Birch Forest",
       "Dark Forest", "Snowy Taiga", "Taiga", "Giant Taiga", "Swamp", "Savanna", "Jungle", "Badlands", "Mushroom Fields", "Ice Spikes", "Stone Shore",
-      "Meadow", "Frozen Peaks", "Snowy Beach", "Flower Forest", "Warm Ocean"
+      "Meadow", "Frozen Peaks", "Snowy Beach", "Flower Forest", "Warm Ocean", "Cold Ocean", "Lukewarm Ocean", "Deep Cold Ocean", "Deep Lukewarm Ocean", "Deep Frozen Ocean"
    };
 
    public static String name(int b) {
@@ -50,7 +51,7 @@ public final class Biomes {
    }
 
    public static boolean ocean(int b) {
-      return b == OCEAN || b == DEEP_OCEAN || b == FROZEN_OCEAN || b == WARM_OCEAN;
+      return b == OCEAN || b == DEEP_OCEAN || b == FROZEN_OCEAN || b == WARM_OCEAN || b>=COLD_OCEAN&&b<=DEEP_FROZEN_OCEAN;
    }
 
    public static boolean river(int b) {
@@ -59,7 +60,7 @@ public final class Biomes {
 
    /** The water of the biome freezes at the top and the ground carries snow. */
    public static boolean snowy(int b) {
-      return b == ICE_PLAINS || b == FROZEN_OCEAN || b == FROZEN_RIVER || b == SNOWY_TAIGA || b == ICE_SPIKES || b == FROZEN_PEAKS || b == SNOWY_BEACH;
+      return b == DEEP_FROZEN_OCEAN || b == ICE_PLAINS || b == FROZEN_OCEAN || b == FROZEN_RIVER || b == SNOWY_TAIGA || b == ICE_SPIKES || b == FROZEN_PEAKS || b == SNOWY_BEACH;
    }
 
    /** No rain, no snow: deserts and badlands. */
@@ -109,8 +110,15 @@ public final class Biomes {
       switch (b) {
          case SWAMP:
             return 0x7FA46A;
+         case LUKEWARM_OCEAN:
+         case DEEP_LUKEWARM_OCEAN:
+            return 0xA4DEEE;
+         case COLD_OCEAN:
+         case DEEP_COLD_OCEAN:
+            return 0xA0BCEF;
          case WARM_OCEAN:
             return 0x9BF2F0;
+         case DEEP_FROZEN_OCEAN:
          case FROZEN_OCEAN:
          case FROZEN_RIVER:
             return 0xB8C8F4;
@@ -126,7 +134,7 @@ public final class Biomes {
    /** The colour of the distant water of a sea or river (the plain blue c is tinted by the biome). */
    public static int lodWater(int biome, int c) {
       int t = waterTint(biome);
-      if (biome == FROZEN_OCEAN || biome == FROZEN_RIVER) {
+      if (biome == FROZEN_OCEAN || biome == DEEP_FROZEN_OCEAN || biome == FROZEN_RIVER) {
          return Lod.shade(0xC8DCF2, 0.9F);
       }
 

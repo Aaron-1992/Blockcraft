@@ -1,9 +1,14 @@
 # Blockcraft
 
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
-Current source version: **V6.6 — art review updates + Aseprite texture editing**.
+Current source version: **V6.7 — aquatic worlds and Java-style redstone**.
 
-Includes the Building, Colors/Nature and Utility/Tools review batches, chest and
+Adds temperature/depth-based oceans, reefs/kelp/icebergs, water flow, swimming
+and waterlogging; directional/timed circuits, comparators and slime-piston
+assemblies. See [controls, compatibility limits and tests](docs/gameplay/aquatic-redstone.md).
+Back up worlds before upgrading; use V6.7 on all multiplayer peers.
+
+Retains the Building, Colors/Nature and Utility/Tools review batches, chest and
 utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
 bricks, planks and cobblestone remain; the bow stays a flat animated sprite, and
 corrected gun poses and held-item lighting are retained. See the
@@ -18,7 +23,7 @@ corrected gun poses and held-item lighting are retained. See the
    **My Aseprite Textures**. After later saves, just press **Reload PNGs**.
 
 No Java/source editing or extra tools needed. The exporter **never overwrites an
-existing pack**. Includes 532 individual tiles and six animation sheets, with
+existing pack**. Includes 545 individual tiles and six animation sheets, with
 filenames, face/component mappings, and Aseprite import/export instructions.
 A separate ready-made texture kit is also available with the release.
 Read the [complete editing guide](package/Texture-editing.txt), including backups
@@ -35,7 +40,7 @@ patch). Your worlds and options are stored in `%USERPROFILE%\.blockcraft112`, so
 you extract a new version into a new folder. The player manual with the full changelog is `package/README.txt`
 (also inside the zip).
 
-**Seeing older art?** Check the title says V6.6 and select **Natural Pixel 32 (Default)**
+**Seeing older art?** Check the title says V6.7 and select **Natural Pixel 32 (Default)**
 in Options > Resource Packs. Older/custom packs deliberately keep their own textures.
 
 > Releases are created by the **Release** GitHub Action (Actions tab -> *Release* -> *Run workflow*), which packages the

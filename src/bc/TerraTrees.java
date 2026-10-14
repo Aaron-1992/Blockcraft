@@ -136,7 +136,7 @@ final class TerraTrees {
             }
 
             int at = Chunk.idx(x, y, z);
-            int old = c.blocks[at] & 0xFFFF;
+            int old = c.blocks[at] & BlockState.ID_MASK;
             if ((v & SOFT) != 0) {
                boolean vine = id >= Blocks313.VINE0 + 1 && id <= Blocks313.VINE0 + 15;
                if (old == 0 || !vine && softBlock(old)) {

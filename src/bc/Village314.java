@@ -599,7 +599,7 @@ final class Village314 {
             int lx = x - c.cx * 16;
             int lz = z - c.cz * 16;
             for (int h = y + 1; h <= Math.min(250, y + 48); h++) {
-               int id = c.blocks[Chunk.idx(lx, h, lz)] & 0xFFFF;
+               int id = c.blocks[Chunk.idx(lx, h, lz)] & BlockState.ID_MASK;
                if (id != 0 && Tpl.vegetation(id)) {
                   c.blocks[Chunk.idx(lx, h, lz)] = 0;
                }
@@ -613,7 +613,7 @@ final class Village314 {
       int lx = x - c.cx * 16;
       int lz = z - c.cz * 16;
       for (int y = 200; y > 40; y--) {
-         int id = c.blocks[Chunk.idx(lx, y, lz)] & 0xFFFF;
+         int id = c.blocks[Chunk.idx(lx, y, lz)] & BlockState.ID_MASK;
          if (id != 0 && !Structs.soft(id) && !Tpl.vegetation(id)) {
             return Blocks.isFluid(id) ? -1 : y;
          }

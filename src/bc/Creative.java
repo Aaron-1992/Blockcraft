@@ -81,6 +81,7 @@ final class Creative {
    }
 
    static int tabOf(int id) {
+      if (id>=Aquatic.SEAGRASS && id<=Aquatic.DEAD) return NATURE;
       if (Redstone319.isRedstoneUtility(id)) {
          return UTILITY;
       }

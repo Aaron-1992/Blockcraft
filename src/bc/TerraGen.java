@@ -200,6 +200,10 @@ public final class TerraGen extends Gen {
          }
       }
 
+      if (st.aquatic && c < -.08 && isle < .2) {
+         double trench=smooth(.28,.60,Math.abs(nRav.noise2(x/95.0,z/95.0)));
+         hd -= 9 * smooth(-.08,-.30,c) * trench;
+      }
       o.c = c;
       o.e = e;
       o.t = t;
@@ -213,6 +217,7 @@ public final class TerraGen extends Gen {
       o.h = (int)clamp(Math.floor(hd), 4.0, 245.0);
       o.tEff = t - Math.max(0.0, o.h - 82.0) * 0.0035;
       o.biome = pick(o);
+      if (st.aquatic && Biomes.ocean(o.biome)) o.biome=Aquatic.ocean(t,o.h);
    }
 
    static int pick(Cl o) {
@@ -386,15 +391,20 @@ public final class TerraGen extends Gen {
          // the floor of a sea, a lake or a river
          rule[2] = 3;
          switch (b) {
+            case Biomes.DEEP_COLD_OCEAN:
             case Biomes.DEEP_OCEAN:
                rule[0] = n2 > 0.1 ? Blocks.GRAVEL : (n > 0.2 ? Blocks.CLAY : Blocks.GRAVEL);
                rule[1] = Blocks.GRAVEL;
                return;
+            case Biomes.DEEP_FROZEN_OCEAN:
+            case Biomes.COLD_OCEAN:
             case Biomes.FROZEN_OCEAN:
             case Biomes.FROZEN_RIVER:
                rule[0] = n2 > 0.0 ? Blocks.GRAVEL : Blocks.SAND;
                rule[1] = Blocks.GRAVEL;
                return;
+            case Biomes.LUKEWARM_OCEAN:
+            case Biomes.DEEP_LUKEWARM_OCEAN:
             case Biomes.WARM_OCEAN:
                rule[0] = n > 0.35 ? Blocks.CLAY : Blocks.SAND;
                rule[1] = Blocks.SAND;
@@ -593,7 +603,7 @@ public final class TerraGen extends Gen {
                b[Chunk.idx(x, y, z)] = 50;
             }
 
-            if (h < 63 && (s.biome == Biomes.FROZEN_OCEAN || s.biome == Biomes.FROZEN_RIVER)) {
+            if (h < 63 && (s.biome == Biomes.FROZEN_OCEAN || s.biome == Biomes.DEEP_FROZEN_OCEAN || s.biome == Biomes.FROZEN_RIVER)) {
                b[Chunk.idx(x, 62, z)] = (short)Blocks313.ICE;
             }
 
@@ -609,7 +619,7 @@ public final class TerraGen extends Gen {
             }
 
             for (int y = 6; y <= top2; y++) {
-               int id = b[Chunk.idx(x, y, z)] & 0xFFFF;
+               int id = b[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
                if (id != 6 && !Blocks.isFluid(id) && this.carve(wx, y, wz)) {
                   b[Chunk.idx(x, y, z)] = (short)(y <= 10 ? 58 : 0);
                }
@@ -624,7 +634,7 @@ public final class TerraGen extends Gen {
                      double f = (double)(y - floor) / Math.max(1, h - floor);
                      double need = 0.85 * (1.0 - Math.pow(Math.min(1.0, f), 0.55));
                      if (rv > need) {
-                        int id = b[Chunk.idx(x, y, z)] & 0xFFFF;
+                        int id = b[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
                         if (id != 6 && !Blocks.isFluid(id)) {
                            b[Chunk.idx(x, y, z)] = (short)(y <= floor + 1 && y <= 12 ? 58 : 0);
                         }
@@ -666,6 +676,7 @@ public final class TerraGen extends Gen {
       }
 
       this.plantShoreAndPatches(ch, hs, bm);
+      if (st.aquatic) Aquatic.decorate(this,ch,hs,bm);
       ch.computeHeightmap();
       return ch;
    }

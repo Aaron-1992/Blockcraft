@@ -260,7 +260,7 @@ public class Gen {
             }
 
             for (int var49 = 6; var49 <= var48; var49++) {
-               int var50 = var4[Chunk.idx(var9, var49, var8)] & 0xFFFF;
+               int var50 = var4[Chunk.idx(var9, var49, var8)] & BlockState.ID_MASK;
                if (var50 != 6 && !Blocks.isFluid(var50) && this.carve(var10, var49, var11)) {
                   var4[Chunk.idx(var9, var49, var8)] = (short)(var49 <= 10 ? 58 : 0);
                }
@@ -284,7 +284,7 @@ public class Gen {
             int var36 = var6[var34 * 16 + var35];
             int var13 = var7[var34 * 16 + var35];
             if (var36 >= 63 && var36 <= 240) {
-               int var37 = var4[Chunk.idx(var35, var36, var34)] & 0xFFFF;
+               int var37 = var4[Chunk.idx(var35, var36, var34)] & BlockState.ID_MASK;
                float var15 = var33.nextFloat();
                if (var4[Chunk.idx(var35, var36 + 1, var34)] == 0) {
                   if (var37 != 2 || var13 != 2 && var13 != 3) {
@@ -413,7 +413,7 @@ public class Gen {
 
          for (int var12 = 0; var12 < var5; var12++) {
             if (var9 >= 0 && var9 < 16 && var10 >= 0 && var10 < 16 && var11 > 0 && var11 < 255) {
-               int var13 = var1.blocks[Chunk.idx(var9, var11, var10)] & 0xFFFF;
+               int var13 = var1.blocks[Chunk.idx(var9, var11, var10)] & BlockState.ID_MASK;
                if (var13 == 1) {
                   var1.blocks[Chunk.idx(var9, var11, var10)] = (short)var3;
                }
@@ -490,7 +490,7 @@ public class Gen {
       int var7 = var3 - var0.cz * 16;
       if (var6 >= 0 && var6 <= 15 && var7 >= 0 && var7 <= 15 && var2 >= 0 && var2 <= 255) {
          int var8 = Chunk.idx(var6, var2, var7);
-         int var9 = var0.blocks[var8] & 0xFFFF;
+         int var9 = var0.blocks[var8] & BlockState.ID_MASK;
          if (!var5 || var9 == 0 || var9 == 29 || Blocks.isLeaves(var9)) {
             if (!Blocks.isFluid(var9)) {
                var0.blocks[var8] = (short)var4;

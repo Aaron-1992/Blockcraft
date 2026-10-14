@@ -19,6 +19,7 @@ public final class Player {
    public boolean sprinting;
    public boolean sneaking;
    public boolean inWater;
+   public boolean swimming;
    public boolean inLava;
    /** ticks left on fire (Update 3.7): 1 damage per second, put out by water */
    public int burn;
@@ -107,6 +108,7 @@ public final class Player {
    }
 
    public double height() {
+      if (swimming) return .6;
       if (BackroomsStalkerMod.isActive() && this.sneaking) {
          return 0.72;
       }
@@ -149,7 +151,7 @@ public final class Player {
          this.updateBox();
          this.inWater = this.fluidIn(var1, true);
          this.inLava = this.fluidIn(var1, false);
-         this.eyeInWater = Blocks.isWater(var1.getBlock(fl(this.x), fl(this.y + this.eye), fl(this.z)));
+         this.eyeInWater = WaterPhysics.submerged(var1,this.x,this.y+this.eye,this.z);
          var2 *= 0.98F;
          var3 *= 0.98F;
          if (this.sneaking) {
@@ -166,8 +168,11 @@ public final class Player {
             this.sprinting = false;
          }
 
-         if (this.creative && this.flying) {
-         }
+         boolean wantSwim=this.inWater&&this.eyeInWater&&this.sprinting&&!this.flying&&!this.sneaking;
+         if (!wantSwim && this.swimming && !this.flying)
+            wantSwim=Phys.collides(var1,new double[]{x-.3,y,z-.3,x+.3,y+1.8,z+.3});
+         this.swimming=wantSwim;
+         this.updateBox();
 
          if (this.jumpDelay > 0) {
             this.jumpDelay--;
@@ -228,7 +233,7 @@ public final class Player {
             }
          }
 
-         float var11 = this.sneaking ? (BackroomsStalkerMod.isActive() ? 0.62F : 1.54F) : 1.62F;
+         float var11 = this.swimming ? .4F : this.sneaking ? (BackroomsStalkerMod.isActive() ? 0.62F : 1.54F) : 1.62F;
          this.eye = this.eye + (var11 - this.eye) * 0.5F;
          if (!this.creative) {
             if (this.inLava && this.invuln == 0) {
@@ -373,8 +378,8 @@ public final class Player {
       double var3 = var2 ? 0.001 : 0.1;
       int var5 = fl(this.bb[0] + var3);
       int var6 = fl(this.bb[3] - var3);
-      int var7 = fl(this.bb[1] + 0.4);
-      int var8 = fl(this.bb[4] - 0.4);
+      int var7 = fl(this.bb[1] + (this.swimming?.001:.4));
+      int var8 = fl(this.bb[4] - (this.swimming?.001:.4));
       int var9 = fl(this.bb[2] + var3);
       int var10 = fl(this.bb[5] - var3);
 
@@ -382,9 +387,9 @@ public final class Player {
          for (int var12 = var9; var12 <= var10; var12++) {
             for (int var13 = var5; var13 <= var6; var13++) {
                int var14 = var1.getBlock(var13, var11, var12);
-               if (var2 ? Blocks.isWater(var14) : Blocks.isLava(var14)) {
-                  double var15 = var11 + (Blocks.sameFluid(var1.getBlock(var13, var11 + 1, var12), var14) ? 1.0 : (8 - Blocks.fluidLevel(var14)) / 9.0);
-                  if (this.bb[1] + 0.4 <= var15) {
+               if (var2 ? WaterPhysics.contains(var1,var13,var11,var12) : Blocks.isLava(var14)) {
+                  double var15 = var11 + (var2 ? WaterPhysics.height(var1,var13,var11,var12) : Blocks.sameFluid(var1.getBlock(var13,var11+1,var12),var14)?1.0:(8-Blocks.fluidLevel(var14))/9.0);
+                  if (this.bb[1] + (this.swimming?.001:.4) <= var15) {
                      return true;
                   }
                }
@@ -417,12 +422,20 @@ public final class Player {
    void travel(World var1, float var2, float var3) {
       if (this.inWater && !this.flying) {
          double var8 = this.y;
-         this.moveFlying(var2, var3, 0.02F);
+         this.moveFlying(var2, var3, this.swimming ? .026F : .02F);
+         if(this.swimming) this.vy += (-Math.sin(Math.toRadians(this.pitch))*.1-this.vy)*.1;
+         double[] current=WaterPhysics.current(var1,fl(x),fl(y+.2),fl(z));
+         this.vx+=current[0]*.014;this.vy+=current[1]*.014;this.vz+=current[2]*.014;
+         int state=var1.getState(fl(x),fl(y+.2),fl(z));
+         if((state&BlockState.ID_MASK)==Blocks.WATER) {
+            if((state&WaterPhysics.BUBBLE_UP)!=0){this.vy=Math.min(.7,this.vy+.06);this.air=300;}
+            if((state&WaterPhysics.BUBBLE_DOWN)!=0){this.vy=Math.max(-.3,this.vy-.03);this.air=300;}
+         }
          this.move(var1, this.vx, this.vy, this.vz);
-         this.vx *= 0.8;
-         this.vy *= 0.8;
-         this.vz *= 0.8;
-         this.vy -= 0.02;
+         this.vx *= this.swimming?.9:.8;
+         this.vy *= .8;
+         this.vz *= this.swimming?.9:.8;
+         if(!this.swimming)this.vy -= .02;
          if (this.collidedH && this.freeAt(var1, this.vx, this.vy + 0.6 - this.y + var8, this.vz)) {
             this.vy = 0.3;
          }
@@ -479,7 +492,7 @@ public final class Player {
       for (int var3 = fl(var2[1]); var3 <= fl(var2[4]); var3++) {
          for (int var4 = fl(var2[2]); var4 <= fl(var2[5]); var4++) {
             for (int var5 = fl(var2[0]); var5 <= fl(var2[3]); var5++) {
-               if (Blocks.isFluid(var1.getBlock(var5, var3, var4))) {
+               if (Blocks.isFluid(var1.getBlock(var5, var3, var4)) || WaterPhysics.contains(var1,var5,var3,var4)) {
                   return true;
                }
             }
@@ -638,7 +651,7 @@ public final class Player {
       this.sneaking = false;
       this.flying = true;
       this.sprinting = var5 && var1 > 0.0F;
-      this.inWater = this.inLava = this.eyeInWater = false;
+      this.swimming = this.inWater = this.inLava = this.eyeInWater = false;
       if (var3) {
          this.vy = this.vy + this.flySpeed * 3.0F;
       }

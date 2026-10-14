@@ -221,6 +221,7 @@ public final class WorldSettings {
    public static final int FLAT_PRESETS = 4;
    public static final String[] FLAT_NAME = new String[]{"Grassland", "Desert", "Snowy", "Sandstone"};
 
+   public boolean aquatic = true; // new worlds; old saves retain their generator
    public int type = DEFAULT;
    public boolean structures = true;
    public boolean bonusChest = false;
@@ -232,6 +233,7 @@ public final class WorldSettings {
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
       s.type = CLASSIC;
+      s.aquatic = false;
       s.structVer = 1;
       return s;
    }
@@ -239,6 +241,7 @@ public final class WorldSettings {
    public WorldSettings copy() {
       WorldSettings s = new WorldSettings();
       s.type = this.type;
+      s.aquatic = this.aquatic;
       s.structures = this.structures;
       s.bonusChest = this.bonusChest;
       s.flat = this.flat;
@@ -273,6 +276,7 @@ public final class WorldSettings {
    }
 
    public void save(Properties p) {
+      p.setProperty("aquatic", Boolean.toString(this.aquatic));
       p.setProperty("gentype", Integer.toString(this.type));
       p.setProperty("structures", Boolean.toString(this.structures));
       p.setProperty("bonus", Boolean.toString(this.bonusChest));
@@ -295,6 +299,7 @@ public final class WorldSettings {
          return classic();
       }
 
+      s.aquatic = Boolean.parseBoolean(p.getProperty("aquatic", "false"));
       s.structVer = 1;
       try {
          s.structVer = Math.max(1, Math.min(2, Integer.parseInt(p.getProperty("structver", "1").trim())));

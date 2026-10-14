@@ -257,7 +257,7 @@ final class Tests313 {
                         if (col.h < Gen.SEA) {
                            for (int y = col.h + 1; y < Gen.SEA; y++) {
                               int id = c.get(x, y, z);
-                              if (!Blocks.isFluid(id) && id != Blocks313.ICE) {
+                              if (!Blocks.isFluid(id) && !Aquatic.plant(id) && !Aquatic.liveCoral(id) && id != Blocks313.ICE && id != Blocks313.PACKED_ICE && id != Blocks.SNOW) {
                                  dry++;
                               }
                            }

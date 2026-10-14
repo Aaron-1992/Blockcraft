@@ -271,7 +271,7 @@ final class Tpl {
             }
 
             for (int y = y0, n = 0; y >= 1 && n < 12; y--, n++) {
-               int id = c.blocks[Chunk.idx(lx, y, lz)] & 0xFFFF;
+               int id = c.blocks[Chunk.idx(lx, y, lz)] & BlockState.ID_MASK;
                if (id != 0 && !Structs.soft(id) && !vegetation(id)) {
                   if (n >= 2) {
                      break;

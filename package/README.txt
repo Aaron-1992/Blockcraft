@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.6  -  an original Minecraft-style voxel sandbox   (EDITION V6.6)
+BLOCKCRAFT V6.7  -  an original Minecraft-style voxel sandbox   (EDITION V6.7)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,38 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.7 - Aquatic worlds and Java-style redstone
+  * New Default/Large/Amplified worlds have temperature/depth-based oceans,
+    deeper seabeds, kelp, seagrass, five coral families, reefs and icebergs.
+    Old saves keep their generation setting; existing chunks are not replaced.
+  * Water reaches seven blocks, routes toward nearby drops, falls, recedes,
+    renews sources, washes away small components and carries swimmers.
+    Soul sand and magma create upward/downward bubble-column forces.
+  * Sprint underwater to swim with a low collision pose; look up/down to steer.
+    Buckets waterlog slabs, stairs, fences, panes/bars, walls, trapdoors,
+    ladders and chests. Break a wet block and its water stays behind.
+  * Directional dust and weak/strong block power; timed torches, burnout,
+    four repeater delays and side locking; one-redstone-tick observer pulses;
+    delayed lamp shutoff; analog/inverted daylight sensors.
+  * Craft comparators with three redstone torches, quartz and three stone.
+    Right-click to toggle compare/subtract; container fullness is readable.
+  * Pistons validate a 12-block assembly before moving it, carry slime-attached
+    blocks, leave glazed terracotta unstuck, and support sticky short-pulse
+    block dropping and quasi-connectivity sampled on updates.
+  * Settings/waterlogging survive chunk saves and multiplayer block updates;
+    hosts synchronize the generator setting before clients generate terrain.
+  * Existing artwork, flat bow, held lighting and Aseprite editing are retained.
+    The editor kit now adds 13 aquatic tiles (545 static tiles + 6 sheets).
+    Your MyTextures folder is not overwritten. Missing new tiles use defaults.
+  * BACK UP saves before upgrading. Use V6.7 on every multiplayer peer. New
+    aquatic block IDs/settings are not intended for downgrade to older games.
+  * Compatibility limits: this is an original implementation, not complete
+    Minecraft Java 1.14 parity. Pistons move blocks instantly (no moving-block
+    entities or slime entity launching); exact update-order/BUD contraptions
+    are not guaranteed. Scheduled tick deadlines restart after world reload.
+    Non-slab waterlogging uses simplified surface clipping. Coral death/growth
+    and aquatic structure/mob catalogs are not a complete vanilla recreation.
 
 WHAT'S NEW IN V6.6 - Art review updates + Aseprite texture editing
   * Includes the building, Colors/Nature and Utility/Tools review changes:

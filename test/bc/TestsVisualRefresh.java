@@ -110,7 +110,7 @@ final class TestsVisualRefresh {
          for(int t=0;t<1024;t++) {
             boolean populated=false;
             for(int c:TexOverhaulV57.readTile(t))if((c>>>24)!=0)populated=true;
-            if(!populated||!TexRemaining32.handles(t))continue;
+            if(!populated||!TexRemaining32.handles(t)||Aquatic.tile(t))continue;
             int[] art=TexRemaining32.paint(t), old=TexRemaining32.previous(t);
             check(!Arrays.equals(art,old),"not the rejected 6.4 artwork "+t);
             check(Arrays.equals(art,TexRemaining32.paint(t)),"deterministic full redraw "+t);
@@ -145,7 +145,7 @@ final class TestsVisualRefresh {
          catch(java.io.IOException e){throw new RuntimeException(e);}
          int changed=0;
          for(int t=0;t<1024;t++) {
-            if(TestsUtilityReview.reopened(t))continue; // protected by the new immutable-baseline guard
+            if(TestsUtilityReview.reopened(t)||Aquatic.tile(t))continue; // protected by the new immutable-baseline guard
             int[] art=t==77?BowSprite.pixels(0,false):TexPixel32.tile(t,TexOverhaulV57.readTile(t),TexRemaining32.animated(t));
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
             check(differs==(TexBuildingReview32.handles(t)||TexColorNature32.handles(t)),"change scope exactly matches requested faces: "+t);
@@ -173,7 +173,7 @@ final class TestsVisualRefresh {
          catch(java.io.IOException e){throw new RuntimeException(e);}
          int changed=0;
          for(int t=0;t<1024;t++) {
-            if(TestsUtilityReview.reopened(t))continue; // latest review has its own exact-scope guard
+            if(TestsUtilityReview.reopened(t)||Aquatic.tile(t))continue; // latest review has its own exact-scope guard
             int[] art=BuildingBlockReviewPreview.pixels(t);
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
             check(differs==TexColorNature32.handles(t),"only this batch's listed cells change "+t);
