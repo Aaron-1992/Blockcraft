@@ -1,19 +1,9 @@
 extracted base zip: Blockcraft-1.12-UPDATE3.5-windows.zip
-extracted update pack: Blockcraft-UPDATE6.6-patch.zip
+extracted update pack: Blockcraft-UPDATE6.7-patch.zip
 installed to C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft
 Mesa: mesa3d-26.2.4-release-msvc.7z (70 MB)
 copied next to javaw.exe: opengl32.dll, libgallium_wgl.dll
 pixel-title: starting via Blockcraft.exe (Launch4j stub)
-pixel-title      exit code 0                     32s  screenshot=yes
+pixel-title      exit code 0                     18s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=TITLE -Dbc.pano=on -Dbc.rd=2 -Dbc.lod=8 -Dbc.win=1280x720
-pixel-utility-chest-open: starting via java.exe -jar Blockcraft.exe
-pixel-utility-chest-open exit code 0                     29s  screenshot=yes
-pixel-editor-reload: starting via java.exe -jar Blockcraft.exe
-pixel-editor-reload exit code 0                     38s  screenshot=yes
-pixel-editor-bow: starting via Blockcraft.exe (Launch4j stub)
-pixel-editor-bow exit code 0                     50s  screenshot=yes
-    | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.mode=1 -Dbc.rd=2 -Dbc.lod=8 -Dbc.win=960x540 -Dbc.cam=140.5,67,74.5,20,10 -Dbc.shot=110 -Dbc.weather=calm -Dbc.hold=268 -Dbc.bowdraw=1 -Db
-GPU preference entries in the registry (2):
-    | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\javaw.exe    REG_SZ    GpuPreference=2;
-    | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\java.exe    REG_SZ    GpuPreference=2;
-RESULT: {"pixel-title": true, "pixel-utility-chest-open": true, "pixel-editor-reload": true, "pixel-editor-bow": true, "gpu_pref_in_registry": true}
+pixel-aquatic-reef: starting via Blockcraft.exe (Launch4j stub)
