@@ -38,6 +38,10 @@ final class UtilityModels {
       for(int id:new int[]{Blocks.FURNACE,Blocks.FURNACE_LIT}){
          java.util.Arrays.fill(Blocks.tiles[id],FURNACE_SIDE);Blocks.tiles[id][0]=FURNACE_TOP;Blocks.tiles[id][2]=id==Blocks.FURNACE?39:40;
       }
+      // Transparent cage holes and inset egg geometry cannot occlude an entire
+      // neighbouring cube face, or the floor beneath them becomes a sky hole.
+      Blocks.opaque[Blocks.SPAWNER]=false;Blocks.opacity[Blocks.SPAWNER]=0;Blocks.cutout[Blocks.SPAWNER]=true;
+      Blocks.opaque[Blocks.DRAGON_EGG]=false;Blocks.opacity[Blocks.DRAGON_EGG]=0;
       // Stepped ovoid shell, not an obsidian cube.
       java.util.Arrays.fill(Blocks.tiles[Blocks.DRAGON_EGG],EGG);
       Shapes.model(Blocks.DRAGON_EGG,new double[][]{
@@ -52,10 +56,11 @@ final class UtilityModels {
       redstone();
    }
    static double[][] chest(double angle) {
-      double[] lid=hinged(Shapes.px(1,9,1,15,14,15),angle,9/16.,15/16.);
-      lid[9]=41;lid[10]=CHEST_SIDE;
-      return new double[][]{Shapes.px(1,0,1,15,1,15),Shapes.px(1,1,1,15,9,2),Shapes.px(1,1,14,15,9,15),
-         Shapes.px(1,1,2,2,9,14),Shapes.px(14,1,2,15,9,14),lid,
+      // Physical latch only: inheriting the old front texture on every hollow
+      // wall stamped additional locks onto the inside of the opened chest.
+      double[] lid=hinged(Shapes.tiles(Shapes.px(1,9,1,15,14,15),CHEST_SIDE,41,CHEST_SIDE),angle,9/16.,15/16.);
+      return new double[][]{part(1,0,1,15,1,15,CHEST_SIDE),part(1,1,1,15,9,2,CHEST_SIDE),part(1,1,14,15,9,15,CHEST_SIDE),
+         part(1,1,2,2,9,14,CHEST_SIDE),part(14,1,2,15,9,14,CHEST_SIDE),lid,
          hinged(part(7,8,0.5,9,11,1,METAL),angle,9/16.,15/16.)};
    }
    static double[][] torch(boolean lit){return new double[][]{part(7,0,7,9,7,9,SHAFT),local(part(6.75,7,6.75,9.25,10,9.25,lit?RED_HEAD:DEAD_HEAD))};}

@@ -122,6 +122,22 @@ final class TestsUtilityReview {
          check(ChestLids.angle(x,y,z)==0,"no animation leaks between worlds");
          eq(Blocks.CHEST,g.world.getBlock(x,y,z),"no new chest save IDs");
       });
+      test("utility review: inset egg and cage holes keep the supporting floor visible",()->{
+         Game g=newGame(1);int x=8,y=72,z=8;g.world.setBlock(x,y-1,z,Blocks.STONE);
+         for(int id:new int[]{Blocks.DRAGON_EGG,Blocks.SPAWNER}) {
+            check(!Blocks.opaque[id],"partial/holed model cannot hide adjacent full faces");
+            boolean floor=false;
+            for(float[][] q:Tests311.quads(g.world,g.world.chunkAt(x,z),x,y,z,id)) {
+               float minx=2,maxx=-1;boolean level=true;
+               for(float[] v:q){minx=Math.min(minx,v[0]);maxx=Math.max(maxx,v[0]);level&=Math.abs(v[1])<.001;}
+               if(level&&minx<.001&&maxx>.999&&Tests311.normal(q)[1]>0)floor=true;
+            }
+            check(floor,"actual mesh includes full support top below "+id);
+         }
+         double[][] chest=UtilityModels.chest(1.45);
+         for(int i=0;i<6;i++)eq(UtilityModels.CHEST_SIDE,(int)chest[i][8],"hollow walls do not repeat old painted latch");
+         eq(UtilityModels.METAL,(int)chest[6][8],"one actual hinged latch");
+      });
       test("utility review: banner pick and native UV strips, raised eye, egg shell and selective component emission",()->{
          for(int color=0;color<16;color++)for(int f=0;f<4;f++)for(int base:new int[]{Decor315.STAND0,Decor315.WALL0})
             eq(Decor315.BANNER_ITEM0+color,Blocks.pickItem(base+color*4+f),"pick retains banner colour, not wool");

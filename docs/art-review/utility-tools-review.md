@@ -43,7 +43,7 @@ Every other atlas cell, including the 16 Building revisions and 100 retained
 Colors/Nature revisions, is unchanged. Previous review scope checks remain in
 place; only the two explicitly reopened pumpkin faces are delegated to this guard.
 
-Local full run: **4,420,100 assertions passed, 0 failed**. Strict terrain/world/tick
+Local full run: **4,420,111 assertions passed, 0 failed**. Strict terrain/world/tick
 comparison still matches the 3.5 reference with legacy features selected:
 397 equal fingerprints, 64 intentionally changed, 145 new. The old mesh flag
 retains historical torch/chest geometry rather than weakening that comparison.
@@ -70,8 +70,11 @@ The icons sheet uses the real GUI model path with a native32 software atlas.
 - [GUI models and banner items](utility-review-icons.png)
 
 Actual-game fixtures have been added for plain/lit utility models, night emission,
-menu-open/menu-closed chest views, and the Tools/Combat inventory. **The remote
-Mesa runs and their image inspection are pending at this checkpoint.** Chest
+menu-open/menu-closed chest views, and the Tools/Combat inventory. The initial remote
+Mesa runs (38618694527, source 1f4e33d) and image inspection completed successfully.
+Inspection exposed floor occlusion beneath the egg/cage and repeated latch artwork
+inside the open chest; those are now corrected and covered by new mesh tests.
+A follow-up actual-game capture is pending at this checkpoint. Chest
 motion smoothness/performance and resource-pack appearance still need visual
 checks. Test totals and coverage establish scope/correctness, not art approval.
 

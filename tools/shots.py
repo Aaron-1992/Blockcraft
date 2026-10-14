@@ -821,7 +821,8 @@ SCENES["pixel-utility-chest-open"] = (_UR+["-Dbc.time=6000","-Dbc.shaders=false"
 SCENES["pixel-utility-chest-closed"] = (_UR+["-Dbc.time=6000","-Dbc.shaders=false","-Dbc.reviewchest=2,67,3",
     "-Dbc.reviewclose=180","-Dbc.cam=2.8,69,0,0,25"],True)
 SCENES["pixel-utility-tools"] = ([a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.shot="))]
-    +["-Dbc.inv=creative","-Dbc.tab=4","-Dbc.shaders=false","-Dbc.shot=140"],True)
+    +["-Dbc.inv=creative","-Dbc.tab=4","-Dbc.mouse=2,2","-Dbc.shaders=false","-Dbc.shot=140"],True)
+SCENES["pixel-utility-tools-page2"] = (SCENES["pixel-utility-tools"][0]+["-Dbc.page=1"],True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 
