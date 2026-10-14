@@ -40,14 +40,15 @@ final class TexRemaining32 {
       return shade(base, xx == 0 || yy == 0 ? -31 : xx == 1 || yy == 1 ? 11 : tone(x,y,base,4));
    }
    static int[] paint(int t) {
-      int[] proof = TexMaterials32.paint(t);
-      if (proof != null) return proof;
-      return previous(t);
+      int[] material = TexMaterials32.paint(t);
+      if (material != null) return material;
+      if (item(t)) return TexItems32.paint(t);
+      return TexNature32.paint(t);
    }
 
    /** 6.4 reference painters, retained while the replacement art direction is reviewed. */
    static int[] previous(int t) {
-      if (animated(t)) return frame(t,0);
+      if (animated(t)) return legacyFrame(t,0);
       if (item(t)) return icon(t);
       if (t == 2 || t == 9 || t >= 550 && t <= 552 || t == 642) return foliage(t);
       if (t >= 25 && t <= 27 || t >= 171 && t <= 178 || t >= 204 && t <= 211 || t == 219
@@ -294,7 +295,9 @@ final class TexRemaining32 {
    }
 
    /** Animated native texels: time changes the bands, never the spatial resolution. */
-   static int[] frame(int t,float phase) {
+   static int[] frame(int t,float phase) { return TexNature32.frame(t,phase); }
+
+   static int[] legacyFrame(int t,float phase) {
       Canvas p=new Canvas(); double a=(phase%16)*Math.PI/8;
       int[] flame={0xF8D779,0xE8AD4B,0xD97B31,0xB7522B};
       int[] palette=t==23?new int[]{0x345F91,0x3D709C,0x487DA4,0x558CAB,0x6C9EB7}:t==24?new int[]{0xA64D2D,0xBE6633,0xD58139,0xE59D48,0xF0BF62}:new int[]{0x58447F,0x68508D,0x795E9E,0x8A72AE,0xA18BBE};

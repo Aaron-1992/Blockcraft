@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.4  -  an original Minecraft-style voxel sandbox   (EDITION V6.4)
+BLOCKCRAFT V6.5  -  an original Minecraft-style voxel sandbox   (EDITION V6.5)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,22 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.5 - Cohesive native-pixel art rework
+  * Replaced all 456 non-protected populated default atlas cells from V6.4,
+    including construction, vegetation, decorations, animation and item icons.
+    This is a structural redraw, not a sharpening or recoloring pass.
+  * Furniture and machinery share the approved timber and masonry. Cracked
+    bricks now have sparse local fractures; Nether brick is charcoal-burgundy.
+  * New tool heads/grips, armor panels, food, mineral and equipment silhouettes.
+    Leaves, crops and flowers have native-pixel stems, veins and petal shapes.
+  * Water, lava, fire and portal animations use five-pigment 32px frames.
+    Glass, metal bars and neutral biome/dye masks retain their transparency/tints.
+  * Kept all 61 protected V6.3 texture cells pixel-for-pixel, including stone
+    bricks, planks, cobblestone and the flat animated bow. Corrected gun poses
+    and held-item lighting are unchanged. Legacy/custom packs stay separate.
+  * Select Natural Pixel 32 (Default) in Options > Resource Packs to see this art.
+    Older packs intentionally retain their original appearance.
 
 WHAT'S NEW IN V6.4 - Complete Natural Pixel 32 pack
   * Finished the remaining default block and item atlas artwork at native 32x32:

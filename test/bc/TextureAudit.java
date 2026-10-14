@@ -24,7 +24,7 @@ public final class TextureAudit {
       Properties approved=new Properties();
       try(InputStream in=new FileInputStream("test/pixel32-approved.properties")){approved.load(in);}
       PrintWriter out=args.length>0?new PrintWriter(args[0],"UTF-8"):new PrintWriter(System.out);
-      out.println("tile\tlabel\tartist\tchanged_texels_vs_6.3\tunique_colors");
+      out.println("tile\tlabel\tartist\tchanged_texels_vs_6.4\tunique_colors");
       int kept=0,redrawn=0;
       for (int t = 0; t < 1024; t++) {
          int[] src = TexOverhaulV57.readTile(t); boolean visible=false;
@@ -33,9 +33,10 @@ public final class TextureAudit {
          boolean keep=approved.containsKey(Integer.toString(t));
          if(!keep&&t!=Tex.WHITE&&!TexRemaining32.handles(t))throw new AssertionError("Uncovered tile "+t);
          int[] art=t==Items.tile[Items.BOW]?BowSprite.pixels(0,false):TexPixel32.tile(t,src,TexRemaining32.animated(t));
+         int[] before=keep||t==Tex.WHITE?art:TexRemaining32.previous(t);
          int changed=0;Set<Integer> colors=new HashSet<>();
-         for(int y=0;y<32;y++)for(int x=0;x<32;x++){int c=art[y*32+x];if(!keep&&c!=src[y/2*16+x/2])changed++;colors.add(c);}
-         out.println(t+"\t"+(names[t]==null?"Model-only face / icon":names[t])+"\t"+(keep?"approved-6.3":t==Tex.WHITE?"utility-white":"native-6.4")+"\t"+changed+"\t"+colors.size());
+         for(int y=0;y<32;y++)for(int x=0;x<32;x++){int c=art[y*32+x];if(!keep&&c!=before[y*32+x])changed++;colors.add(c);}
+         out.println(t+"\t"+(names[t]==null?"Model-only face / icon":names[t])+"\t"+(keep?"approved-6.3":t==Tex.WHITE?"utility-white":TexMaterials32.handles(t)?"material-6.5":TexRemaining32.item(t)?"item-6.5":"nature-6.5")+"\t"+changed+"\t"+colors.size());
          if(keep)kept++;else if(t!=Tex.WHITE)redrawn++;
       }
       out.flush();if(args.length>0)out.close();

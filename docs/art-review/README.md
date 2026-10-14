@@ -1,62 +1,72 @@
-# Cohesive material revision — in progress, not a release
+# V6.5 native-pixel art rework
 
-## Accepted direction, not an approved screenshot
+## Scope and protected references
 
-The user wants believable material structure, no mixels, and a consistent art
-direction when different blocks touch. Their references are the existing stone
-bricks, oak/other planks and cobblestone. They rejected the previous 15-tile proof;
-it is removed, not silently shipped. Its icon changes are also not active.
+This finishes the replacement of the rejected V6.4 default block/item atlas.
+The earlier 15-sample proof and 148-face construction preview were **not**
+artistically approved; this pass is not presented as user-approved either.
+The user asked to proceed with the complete rework rather than more small proofs.
 
-## Current construction pass: 148 populated atlas cells
+All 456 non-protected populated cells are now different from V6.4. The 61 V6.3
+reference cells remain pixel-exact (including normal stone bricks, all six planks,
+cobble and the flat sprite bow). The white renderer utility cell is unchanged.
+`docs/texture-coverage.tsv` identifies every populated cell, its current artist,
+changed texels against **V6.4**, and its color count. Differences and passing tests
+establish implementation coverage, not a numerical measure of artistic quality.
 
-`TexMaterials32` paints construction/material families from one shared vocabulary:
+## Shared art direction
 
-- Native 32×32 texel grid; no resizing or per-face resolution differences.
-- 1px joints and bevels; 2–3px grain clusters; restrained stepped contrast.
-- Actual approved timber arrays for furniture, workstations and mechanisms.
-- Actual approved stone/masonry for housings and variants, not flat grey panels.
-- Related stone families share the same brick dimensions and mortar treatment.
-- Bounded surface variation; no generic sharpening, blur, bevel or noise overlay
-  applied to a finished legacy image.
-- Short cracks confined to individual bricks. Dark charcoal-burgundy Nether brick.
+- Native 32×32 canvases and hard pixel silhouettes; no resizing of old artwork,
+  antialiasing, blur, sharpening, relief filter or generic finishing overlay.
+- `TexMaterials32`: furniture and machine bodies built from the exact protected
+  timber/masonry arrays, 1px joints/edge accents, restrained grain, localized
+  cracked-brick fractures and charcoal-burgundy Nether brick.
+- `PixelArt32`: common material palettes, native polygon/ellipse rasterization,
+  small tonal steps, wood sampling and pointed leaf construction.
+- `TexItems32`: new silhouettes/components for tools, armor, foods, minerals,
+  doors, utilities, equipment and mod icons. Different tool heads, grips, seams,
+  metal edges, gemstone facets, food cuts and natural contours replace the old
+  broad geometric stamps. Protected bow art and weapon pose code are unchanged.
+- `TexNature32`: leaf clusters/veins, grass blades, growth-stage crops, flowers,
+  continuous double-height plants, textiles, transparent surfaces, decorations,
+  and five-pigment periodic water/lava/fire/portal frames. Biome/dye masks remain
+  neutral so the renderer, not an accidentally baked color, applies their tint.
 
-This covers workstations/containers, doors/trapdoors/ladders, mineral and colored
-building materials, stone variants, Nether/End construction materials, prismarine,
-purpur and redstone machine faces. Approval of the *direction* is not approval of
-every newly painted asset. The 61 previous golden hashes still protect the original
-accepted textures and bow pixel-for-pixel. Tools, bows, guns, poses and lighting
-have not been altered by this pass.
+`TexRemaining32.paint` dispatches only to these new artists. Its `previous`
+method retains the V6.4 reference solely for comparison/audit, never as a fallback.
+Legacy/custom resource packs intentionally retain their own art and resolution.
+Choose **Natural Pixel 32 (Default)** in game to see the new artwork.
 
-**Not complete:** the remaining vegetation, animated textures, decorations and
-item icons still need the same art-direction revision. No new version/release has
-been published. The 6.4 release assets and release trigger remain unchanged. Do
-not describe the entire pack as finished based on this pass or passing tests.
+## Review and verification
 
-## Check adjacency, not just isolated samples
+Reviewed enlarged, nearest-neighbor exports of the new item and nature canvases.
+The second iteration refined axe heads, irregular flowering-bush placement and
+instrument cases. Export sheets are actual painter output, not generated concept
+art or a claim that the user has approved the visuals.
 
-`adjacent-materials.png` is an offline rendering of actual painter output, with
-contiguous tiles at identical nearest-neighbour scale, before/after. It is not a
-generated illustration and not an in-game screenshot. Regenerate after compiling:
+Local full tests: **4,175,541 passed, zero failed**. Strict equivalence: 397 unchanged
+fingerprints, 64 intentionally changed, 145 new. Coverage: 61 protected, 456
+redrawn, one utility white. Tests include every cell differing from V6.4,
+new item alpha silhouettes, periodic bounded-palette animations, double-plant
+stem continuity, protected golden hashes, neutral tints, transparent fringes,
+native/legacy extrusion, flat bow animation and corrected hand lighting.
 
-```
-java -Djava.awt.headless=true -cp build/classes:build/test-classes:libs/lwjgl-bundle.jar bc.MaterialCohesionPreview docs/art-review/adjacent-materials.png
-```
+Actual-game fixtures in `tools/shots.py`:
+- `pixel-items`, `pixel-food`, `pixel-resources`: inventory icon rendering.
+- `pixel-garden-plain/lit`: close flowers/crops/foliage with shader lighting off/on.
+- `pixel-cohesion-plain/lit`: neighboring construction faces and a mixed floor.
+- `pixel-nether`, `pixel-bow-full`, `pixel-hand-torch`: animation/material and
+  preserved weapon/lighting integration.
 
-`pixel-cohesion-plain` / `pixel-cohesion-lit` in `tools/shots.py` build a touching
-wall and mixed-material floor in the actual game, with identical camera and
-lighting and shaders off/on. Unlike the old gallery, there is no floating sample
-ceiling obscuring the comparison.
+Remote visual/CI and Windows package checks are pending at this source commit.
+Release receipts now require all four new/shared artists as well as the existing
+renderer, atlas, bow and lighting classes, and compare EXE-embedded game bytes
+against the JAR. V6.5 will be published only after the actual-game/package checks.
 
-Local validation: compilation plus 4,004,055 unit assertions passed, zero failed.
-Includes shared-timber identity, reference cache immutability, masonry joint
-preservation, sparse cracks, native dimensions/alpha, determinism, extrusion UVs,
-existing approved golden hashes and the previous gameplay regressions. Numerical
-tests protect implementation constraints; visual/style review remains necessary.
+## Binary retention
 
-Remote verification completed: CI 38485782392 passed (4,004,055 assertions, zero
-failures; strict equivalence and GLSL checks also passed). Visual 38485782467
-rendered the plain/shader-on adjacent wall/floor scenes, both exit 0. Reviewed
-`ci-results/shots/pixel-cohesion-{plain,lit}-new.png`: common timber grain and
-masonry proportions are visible at matching world scale. Shader grading/emission
-changes apparent brightness, so the plain scene is the primary art comparison.
-These are actual in-game captures, not the offline contact sheet.
+The obsolete, rejected V6.2 generated patch was removed from the working checkout
+so the new patch does not accumulate another large binary in session snapshots.
+Its published GitHub release remains available and was not modified or deleted:
+https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.2
+V6.3 and V6.4 archives are retained locally; all previous release downloads remain.

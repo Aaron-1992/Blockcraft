@@ -103,6 +103,41 @@ final class TestsVisualRefresh {
             check((c>>16&255)==(c>>8&255)&&(c>>8&255)==(c&255),"biome/dye tint masks stay neutral " + t);
          }
       });
+      test("6.5 full redraw: all rejected cells differ from 6.4; icons have new silhouettes", () -> {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);
+         Tex.initPixels();
+         int changed=0, items=0, newSilhouettes=0;
+         for(int t=0;t<1024;t++) {
+            boolean populated=false;
+            for(int c:TexOverhaulV57.readTile(t))if((c>>>24)!=0)populated=true;
+            if(!populated||!TexRemaining32.handles(t))continue;
+            int[] art=TexRemaining32.paint(t), old=TexRemaining32.previous(t);
+            check(!Arrays.equals(art,old),"not the rejected 6.4 artwork "+t);
+            check(Arrays.equals(art,TexRemaining32.paint(t)),"deterministic full redraw "+t);
+            changed++;
+            if(TexRemaining32.item(t)) {
+               items++;int alphaChanges=0;
+               for(int i=0;i<1024;i++) {
+                  if((art[i]>>>24)!=(old[i]>>>24))alphaChanges++;
+                  check((art[i]>>>24)==0||(art[i]>>>24)==255,"hard native sprite edge "+t);
+               }
+               if(alphaChanges>0)newSilhouettes++;
+            }
+         }
+         check(changed==456,"all 456 rejected cells replaced, not just sample faces");
+         check(newSilhouettes==items,"every rejected item receives a new silhouette");
+         for(int t:new int[]{23,24,235,263})for(float phase:new float[]{0,1,7,15.5F}) {
+            int[] frame=TexRemaining32.frame(t,phase);
+            check(Arrays.equals(frame,TexRemaining32.frame(t,phase+16)),"periodic animation "+t);
+            HashSet<Integer> pigments=new HashSet<>();
+            for(int c:frame)if(c!=0)pigments.add(c);
+            check(pigments.size()>=2&&pigments.size()<=5,"five pigment animation; no interpolated pixels "+t);
+         }
+         for(int t:new int[]{574,576,578,580}) {
+            int[] lower=TexRemaining32.paint(t), upper=TexRemaining32.paint(t+1);
+            check((lower[15]>>>24)==255&&(upper[31*32+15]>>>24)==255,"continuous double-plant stem "+t);
+         }
+      });
       test("cohesive materials: shared timber, masonry grid and restrained cracks", () -> {
          ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);
          Tex.initPixels();

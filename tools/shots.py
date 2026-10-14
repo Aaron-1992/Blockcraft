@@ -745,6 +745,19 @@ for _x in range(1,13):
 _COH += ["-Dbc.fill=0,65,0,14,65,9,1;0,66,0,14,74,9,0", "-Dbc.set=" + ";".join(_COH_SET)]
 SCENES["pixel-cohesion-plain"] = (_COH + ["-Dbc.shaders=false"], True)
 SCENES["pixel-cohesion-lit"] = (_COH, True)
+# 6.5: a close planted bed, separate from the crowded all-block gallery.
+_GARDEN_SET = []
+for _x, _id in enumerate([30,31,1172,1173,1175,1176,1177,1178,1179,1180,1181,1170]):
+    _GARDEN_SET.append("%d,67,4,%d" % (_x+1,_id))
+for _x in range(1,13):
+    _GARDEN_SET.extend(["%d,66,6,141" % _x,"%d,67,6,%d" % (_x,124+min(7,_x//2+2))])
+for _x in range(1,13):
+    _GARDEN_SET.append("%d,67,9,%d" % (_x,[12,1165,1166,1167][_x%4]))
+_GARDEN = [a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.cam="))]
+_GARDEN += ["-Dbc.cam=7,69,-1,0,18", "-Dbc.fill=0,65,0,14,65,11,1;0,66,0,14,66,11,2;0,67,0,14,74,11,0",
+            "-Dbc.set="+";".join(_GARDEN_SET)]
+SCENES["pixel-garden-plain"] = (_GARDEN + ["-Dbc.shaders=false"], True)
+SCENES["pixel-garden-lit"] = (_GARDEN, True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

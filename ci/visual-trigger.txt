@@ -1,3 +1,3 @@
-pixel-cohesion-plain,pixel-cohesion-lit
+pixel-items,pixel-food,pixel-resources,pixel-garden-plain,pixel-garden-lit,pixel-cohesion-plain,pixel-cohesion-lit,pixel-nether,pixel-bow-full,pixel-hand-torch
 jar=build
-# Cohesive construction pass: blocks touching in the same wall/floor, plain and shader lighting.
+# Complete 6.5 art rework, actual freshly compiled game.

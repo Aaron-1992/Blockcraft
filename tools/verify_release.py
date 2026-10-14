@@ -20,7 +20,10 @@ REQUIRED = ("Game", "Renderer", "PlayerModel", "Tex", "TexPixel32", "WeaponPose"
 def required(version):
     if tuple(map(int, version.split("."))) < (6, 3):
         return ("Game", "Renderer", "PlayerModel", "Tex", "TexSmooth", "WeaponPose", "BowModel")
-    return REQUIRED + (("TexRemaining32",) if tuple(map(int, version.split("."))) >= (6, 4) else ())
+    extra = ("TexRemaining32",) if tuple(map(int, version.split("."))) >= (6, 4) else ()
+    if tuple(map(int, version.split("."))) >= (6, 5):
+        extra += ("TexMaterials32", "TexItems32", "TexNature32", "PixelArt32")
+    return REQUIRED + extra
 
 
 def properties(raw):
