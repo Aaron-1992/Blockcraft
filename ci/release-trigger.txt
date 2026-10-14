@@ -1,1 +1,2 @@
-6.5
+6.6
+# Verified source 88499ba; CI 38629152787, Visual 38629152869, Windows 38629153212 all passed.
