@@ -8,6 +8,11 @@ import static bc.GameTests.*;
 /** Export the real default pixels, load them through both production loaders, edit and reload them. */
 final class TestsTextureEditor {
    static void run() {
+      test("texture editor: shipped and embedded guides stay identical", () -> {
+         eq(java.nio.file.Files.readString(java.nio.file.Path.of("package/Texture-editing.txt")),
+            java.nio.file.Files.readString(java.nio.file.Path.of("res/texture-editing.txt")),"CLI export and Windows shortcut use the same manual");
+      });
+
       test("Aseprite: lossless native export, safe re-export, folder/ZIP load and animations", () -> {
          Path root = Files.createTempDirectory("blockcraft-texture-editor-");
          try {

@@ -102,7 +102,8 @@ def texture_kit(patch, version):
                         z.writestr(entry, f.read())
         with zipfile.ZipFile(os.path.join(OUT, name)) as z:
             assert z.testzip() is None
-            assert len([n for n in z.namelist() if "/tiles/" in n]) == 532
+            expected_tiles = 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532
+            assert len([n for n in z.namelist() if "/tiles/" in n]) == expected_tiles
             assert len([n for n in z.namelist() if "/animations/" in n]) == 6
     return name
 
@@ -160,12 +161,12 @@ def main():
             "2. Open a PNG in Aseprite and save/export your edits to the same PNG.\n"
             "3. In-game: **Options > Resource Packs > Reload PNGs**, then select **My Aseprite Textures**. "
             "After later saves, just press **Reload PNGs** again.\n\n"
-            "The shortcut never overwrites an existing pack. Includes 532 individual tiles and six animation sheets "
+            "The shortcut never overwrites an existing pack. Includes %d individual tiles and six animation sheets "
             "(water, lava, fire, portal, lit furnace and all eight flat-bow poses). "
             "See `Texture-editing.txt` for Aseprite sheet settings, file locations and backups.\n\n"
             "**Optional ready-made editor kit:** `%s` — extract into the folder containing Blockcraft.exe, "
             "without replacing an already edited MyTextures folder. The game download can generate this same kit itself.\n\n"
-            "V6.5 remains available unchanged. SHA256SUMS.txt checks the three downloads.\n" % kit)
+            "Earlier releases remain available unchanged. SHA256SUMS.txt checks the three downloads.\n" % (545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:
