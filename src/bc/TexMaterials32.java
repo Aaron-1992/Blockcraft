@@ -42,6 +42,7 @@ final class TexMaterials32 {
 
    static int[] paint(int t) {
       if(!handles(t))return null;
+      if(TexColorNature32.handles(t))return TexColorNature32.paint(t);
       if(TexBuildingReview32.handles(t))return TexBuildingReview32.paint(t);
       int[] pixels=new int[1024];
       for(int y=0;y<32;y++)for(int x=0;x<32;x++)pixels[y*32+x]=surface(t,x,y);

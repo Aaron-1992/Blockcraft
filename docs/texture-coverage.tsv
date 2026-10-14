@@ -1,22 +1,22 @@
 tile	label	artist	changed_texels_vs_6.4	unique_colors
 0	Grass Block	approved-6.3	0	10
-1	Grass Block	approved-6.3	0	7
+1	Grass Block	colors-nature-review-unreleased	1024	5
 2	GRASS_SIDE_OVL	nature-6.5	222	17
 3	Stone	approved-6.3	0	10
 4	Cobblestone	approved-6.3	0	23
-5	Sand	approved-6.3	0	5
+5	Sand	colors-nature-review-unreleased	1024	10
 6	Gravel	approved-6.3	0	24
-7	Oak Log	approved-6.3	0	6
-8	Oak Log	approved-6.3	0	12
+7	Oak Log	colors-nature-review-unreleased	1024	11
+8	Oak Log	colors-nature-review-unreleased	1004	30
 9	Oak Leaves	nature-6.5	1018	62
 10	Oak Planks	approved-6.3	0	16
 11	Bedrock	nature-6.5	1024	13
-12	Coal Ore	approved-6.3	0	13
-13	Iron Ore	approved-6.3	0	13
-14	Gold Ore	approved-6.3	0	13
-15	Diamond Ore	approved-6.3	0	13
-16	Redstone Ore	approved-6.3	0	13
-17	Lapis Ore	approved-6.3	0	12
+12	Coal Ore	colors-nature-review-unreleased	335	18
+13	Iron Ore	colors-nature-review-unreleased	391	19
+14	Gold Ore	colors-nature-review-unreleased	408	18
+15	Diamond Ore	colors-nature-review-unreleased	408	20
+16	Redstone Ore	colors-nature-review-unreleased	346	20
+17	Lapis Ore	colors-nature-review-unreleased	301	21
 18	Snow Block	approved-6.3	0	5
 19	Glass	nature-6.5	157	3
 20	Bricks	approved-6.3	0	40
@@ -30,9 +30,9 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 28	Cactus	nature-6.5	1024	13
 29	Cactus	nature-6.5	1024	15
 30	Glowstone	material-6.5	1024	51
-31	Spruce Log	approved-6.3	0	6
-32	Spruce Log	approved-6.3	0	13
-33	Birch Log	approved-6.3	0	10
+31	Spruce Log	colors-nature-review-unreleased	1024	11
+32	Spruce Log	colors-nature-review-unreleased	1024	30
+33	Birch Log	colors-nature-review-unreleased	1024	18
 34	Obsidian	material-6.5	1024	37
 35	Stone Bricks	approved-6.3	0	40
 36	Torch	nature-6.5	137	26
@@ -44,22 +44,22 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 42	Chest	material-6.5	994	53
 43	Monster Spawner	material-6.5	468	12
 44	Mossy Cobblestone	building-review-unreleased	538	29
-48	White Wool	approved-6.3	0	2
-49	Orange Wool	approved-6.3	0	2
-50	Magenta Wool	approved-6.3	0	2
-51	Light Blue Wool	approved-6.3	0	2
-52	Yellow Wool	approved-6.3	0	2
-53	Lime Wool	approved-6.3	0	2
-54	Pink Wool	approved-6.3	0	2
-55	Gray Wool	approved-6.3	0	2
-56	Light Gray Wool	approved-6.3	0	2
-57	Cyan Wool	approved-6.3	0	2
-58	Purple Wool	approved-6.3	0	2
-59	Blue Wool	approved-6.3	0	2
-60	Brown Wool	approved-6.3	0	2
-61	Green Wool	approved-6.3	0	2
-62	Red Wool	approved-6.3	0	2
-63	Black Wool	approved-6.3	0	2
+48	White Wool	colors-nature-review-unreleased	1024	9
+49	Orange Wool	colors-nature-review-unreleased	1024	9
+50	Magenta Wool	colors-nature-review-unreleased	1024	9
+51	Light Blue Wool	colors-nature-review-unreleased	1024	9
+52	Yellow Wool	colors-nature-review-unreleased	1024	9
+53	Lime Wool	colors-nature-review-unreleased	1024	9
+54	Pink Wool	colors-nature-review-unreleased	1024	9
+55	Gray Wool	colors-nature-review-unreleased	1024	9
+56	Light Gray Wool	colors-nature-review-unreleased	1024	9
+57	Cyan Wool	colors-nature-review-unreleased	1024	9
+58	Purple Wool	colors-nature-review-unreleased	1024	9
+59	Blue Wool	colors-nature-review-unreleased	1024	9
+60	Brown Wool	colors-nature-review-unreleased	1024	9
+61	Green Wool	colors-nature-review-unreleased	1024	9
+62	Red Wool	colors-nature-review-unreleased	1024	9
+63	Black Wool	colors-nature-review-unreleased	1024	9
 64	WHITE	utility-white	0	1
 65	Stick	item-6.5	194	22
 66	Coal	item-6.5	409	43
@@ -169,12 +169,12 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 218	Shears	item-6.5	399	56
 219	Sugar Cane	nature-6.5	455	25
 220	Bookshelf	material-6.5	1014	52
-221	Pumpkin	nature-6.5	1024	25
-222	Pumpkin	nature-6.5	1024	12
-223	Carved Pumpkin	nature-6.5	1024	31
-224	Jack o'Lantern	nature-6.5	1024	31
-225	Melon	nature-6.5	1024	25
-226	Melon	nature-6.5	1024	12
+221	Pumpkin	colors-nature-review-unreleased	1024	52
+222	Pumpkin	colors-nature-review-unreleased	1024	36
+223	Carved Pumpkin	colors-nature-review-unreleased	1024	56
+224	Jack o'Lantern	colors-nature-review-unreleased	1024	56
+225	Melon	colors-nature-review-unreleased	1024	56
+226	Melon	colors-nature-review-unreleased	1024	53
 227	Pumpkin Stem	nature-6.5	30	13
 228	Pumpkin Stem	nature-6.5	41	13
 229	Pumpkin Stem	nature-6.5	55	13
@@ -194,12 +194,12 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 243	Melon Slice	item-6.5	402	56
 244	Pumpkin Pie	item-6.5	438	41
 245	Cake	item-6.5	449	54
-246	Oak Log	approved-6.3	0	6
-247	Birch Log	approved-6.3	0	10
-248	Spruce Log	approved-6.3	0	6
+246	Oak Log	colors-nature-review-unreleased	1024	11
+247	Birch Log	colors-nature-review-unreleased	1024	18
+248	Spruce Log	colors-nature-review-unreleased	1024	11
 256	Netherrack	material-6.5	1024	6
 257	Soul Sand	building-review-unreleased	1024	72
-258	Nether Quartz Ore	material-6.5	1024	8
+258	Nether Quartz Ore	colors-nature-review-unreleased	1024	18
 259	Nether Bricks	material-6.5	1024	40
 260	Magma Block	material-6.5	1024	57
 261	Block of Quartz	building-review-unreleased	1024	11
@@ -251,55 +251,55 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 413	Green Concrete	material-6.5	895	5
 414	Red Concrete	material-6.5	902	5
 415	Black Concrete	material-6.5	876	5
-416	White Concrete Powder	material-6.5	567	10
-417	Orange Concrete Powder	material-6.5	539	10
-418	Magenta Concrete Powder	material-6.5	561	10
-419	Light Blue Concrete Powder	material-6.5	557	10
-420	Yellow Concrete Powder	material-6.5	573	10
-421	Lime Concrete Powder	material-6.5	563	10
-422	Pink Concrete Powder	material-6.5	529	10
-423	Gray Concrete Powder	material-6.5	543	10
-424	Light Gray Concrete Powder	material-6.5	543	10
-425	Cyan Concrete Powder	material-6.5	555	10
-426	Purple Concrete Powder	material-6.5	572	10
-427	Blue Concrete Powder	material-6.5	549	10
-428	Brown Concrete Powder	material-6.5	581	10
-429	Green Concrete Powder	material-6.5	589	10
-430	Red Concrete Powder	material-6.5	605	10
-431	Black Concrete Powder	material-6.5	575	10
-432	Terracotta	material-6.5	875	5
-433	White Terracotta	material-6.5	904	5
-434	Orange Terracotta	material-6.5	874	5
-435	Magenta Terracotta	material-6.5	902	5
-436	Light Blue Terracotta	material-6.5	876	5
-437	Yellow Terracotta	material-6.5	881	5
-438	Lime Terracotta	material-6.5	912	5
-439	Pink Terracotta	material-6.5	870	5
-440	Gray Terracotta	material-6.5	902	5
-441	Light Gray Terracotta	material-6.5	909	5
-442	Cyan Terracotta	material-6.5	891	5
-443	Purple Terracotta	material-6.5	885	5
-444	Blue Terracotta	material-6.5	909	5
-445	Brown Terracotta	material-6.5	878	5
-446	Green Terracotta	material-6.5	875	5
-447	Red Terracotta	material-6.5	885	5
-448	Black Terracotta	material-6.5	893	5
-449	White Glazed Terracotta	material-6.5	1024	17
-450	Orange Glazed Terracotta	material-6.5	1024	18
-451	Magenta Glazed Terracotta	material-6.5	1024	18
-452	Light Blue Glazed Terracotta	material-6.5	1024	17
-453	Yellow Glazed Terracotta	material-6.5	1024	18
-454	Lime Glazed Terracotta	material-6.5	1024	18
-455	Pink Glazed Terracotta	material-6.5	1024	18
-456	Gray Glazed Terracotta	material-6.5	1024	17
-457	Light Gray Glazed Terracotta	material-6.5	1024	18
-458	Cyan Glazed Terracotta	material-6.5	1024	18
-459	Purple Glazed Terracotta	material-6.5	1024	18
-460	Blue Glazed Terracotta	material-6.5	1024	18
-461	Brown Glazed Terracotta	material-6.5	1024	14
-462	Green Glazed Terracotta	material-6.5	1024	14
-463	Red Glazed Terracotta	material-6.5	1024	14
-464	Black Glazed Terracotta	material-6.5	1024	14
+416	White Concrete Powder	colors-nature-review-unreleased	1024	9
+417	Orange Concrete Powder	colors-nature-review-unreleased	1024	9
+418	Magenta Concrete Powder	colors-nature-review-unreleased	1024	9
+419	Light Blue Concrete Powder	colors-nature-review-unreleased	1024	8
+420	Yellow Concrete Powder	colors-nature-review-unreleased	1024	9
+421	Lime Concrete Powder	colors-nature-review-unreleased	1024	9
+422	Pink Concrete Powder	colors-nature-review-unreleased	1024	9
+423	Gray Concrete Powder	colors-nature-review-unreleased	1024	9
+424	Light Gray Concrete Powder	colors-nature-review-unreleased	1024	9
+425	Cyan Concrete Powder	colors-nature-review-unreleased	1024	9
+426	Purple Concrete Powder	colors-nature-review-unreleased	1024	9
+427	Blue Concrete Powder	colors-nature-review-unreleased	1024	9
+428	Brown Concrete Powder	colors-nature-review-unreleased	1024	9
+429	Green Concrete Powder	colors-nature-review-unreleased	1024	9
+430	Red Concrete Powder	colors-nature-review-unreleased	1024	9
+431	Black Concrete Powder	colors-nature-review-unreleased	1024	9
+432	Terracotta	colors-nature-review-unreleased	944	19
+433	White Terracotta	colors-nature-review-unreleased	965	19
+434	Orange Terracotta	colors-nature-review-unreleased	971	19
+435	Magenta Terracotta	colors-nature-review-unreleased	962	19
+436	Light Blue Terracotta	colors-nature-review-unreleased	942	19
+437	Yellow Terracotta	colors-nature-review-unreleased	968	19
+438	Lime Terracotta	colors-nature-review-unreleased	968	19
+439	Pink Terracotta	colors-nature-review-unreleased	956	19
+440	Gray Terracotta	colors-nature-review-unreleased	959	19
+441	Light Gray Terracotta	colors-nature-review-unreleased	960	19
+442	Cyan Terracotta	colors-nature-review-unreleased	966	19
+443	Purple Terracotta	colors-nature-review-unreleased	961	19
+444	Blue Terracotta	colors-nature-review-unreleased	962	19
+445	Brown Terracotta	colors-nature-review-unreleased	929	19
+446	Green Terracotta	colors-nature-review-unreleased	960	19
+447	Red Terracotta	colors-nature-review-unreleased	967	19
+448	Black Terracotta	colors-nature-review-unreleased	964	19
+449	White Glazed Terracotta	colors-nature-review-unreleased	1024	8
+450	Orange Glazed Terracotta	colors-nature-review-unreleased	1024	7
+451	Magenta Glazed Terracotta	colors-nature-review-unreleased	1024	7
+452	Light Blue Glazed Terracotta	colors-nature-review-unreleased	1024	9
+453	Yellow Glazed Terracotta	colors-nature-review-unreleased	1024	8
+454	Lime Glazed Terracotta	colors-nature-review-unreleased	1024	8
+455	Pink Glazed Terracotta	colors-nature-review-unreleased	1024	9
+456	Gray Glazed Terracotta	colors-nature-review-unreleased	1024	10
+457	Light Gray Glazed Terracotta	colors-nature-review-unreleased	1024	9
+458	Cyan Glazed Terracotta	colors-nature-review-unreleased	1024	9
+459	Purple Glazed Terracotta	colors-nature-review-unreleased	1024	10
+460	Blue Glazed Terracotta	colors-nature-review-unreleased	1024	10
+461	Brown Glazed Terracotta	colors-nature-review-unreleased	1024	9
+462	Green Glazed Terracotta	colors-nature-review-unreleased	1024	8
+463	Red Glazed Terracotta	colors-nature-review-unreleased	1024	9
+464	Black Glazed Terracotta	colors-nature-review-unreleased	1024	10
 465	Clay	approved-6.3	0	5
 466	White Stained Glass	nature-6.5	1024	3
 467	Orange Stained Glass	nature-6.5	1024	3
@@ -323,16 +323,16 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 485	Block of Emerald	building-review-unreleased	1024	90
 486	Block of Coal	building-review-unreleased	1024	44
 487	Lapis Lazuli Block	building-review-unreleased	1024	43
-488	Emerald Ore	material-6.5	969	8
+488	Emerald Ore	colors-nature-review-unreleased	969	19
 520	Granite	approved-6.3	0	5
 521	Diorite	approved-6.3	0	5
 522	Andesite	building-review-unreleased	1024	39
-523	Red Sand	approved-6.3	0	5
-524	Podzol	material-6.5	1024	10
-525	Podzol	material-6.5	980	10
+523	Red Sand	colors-nature-review-unreleased	1024	10
+524	Podzol	colors-nature-review-unreleased	1024	27
+525	Podzol	colors-nature-review-unreleased	1024	35
 526	Mycelium	material-6.5	962	5
 527	Mycelium	material-6.5	942	10
-528	Coarse Dirt	material-6.5	964	10
+528	Coarse Dirt	colors-nature-review-unreleased	1024	6
 529	Ice	nature-6.5	1024	12
 530	Packed Ice	nature-6.5	1024	12
 531	Red Sandstone	material-6.5	1024	10
@@ -342,15 +342,15 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 536	Jungle Planks	approved-6.3	0	16
 537	Acacia Planks	approved-6.3	0	16
 538	Dark Oak Planks	approved-6.3	0	16
-540	Jungle Log	approved-6.3	0	6
-541	Acacia Log	approved-6.3	0	6
-542	Dark Oak Log	approved-6.3	0	6
-543	Jungle Log	approved-6.3	0	12
-544	Acacia Log	approved-6.3	0	12
-545	Dark Oak Log	approved-6.3	0	12
-546	Jungle Log	approved-6.3	0	6
-547	Acacia Log	approved-6.3	0	6
-548	Dark Oak Log	approved-6.3	0	6
+540	Jungle Log	colors-nature-review-unreleased	1024	11
+541	Acacia Log	colors-nature-review-unreleased	1024	13
+542	Dark Oak Log	colors-nature-review-unreleased	1024	12
+543	Jungle Log	colors-nature-review-unreleased	1024	30
+544	Acacia Log	colors-nature-review-unreleased	1024	32
+545	Dark Oak Log	colors-nature-review-unreleased	1024	32
+546	Jungle Log	colors-nature-review-unreleased	1024	11
+547	Acacia Log	colors-nature-review-unreleased	1024	13
+548	Dark Oak Log	colors-nature-review-unreleased	1024	12
 550	Jungle Leaves	nature-6.5	1018	62
 551	Acacia Leaves	nature-6.5	1013	64
 552	Dark Oak Leaves	nature-6.5	1020	64
@@ -385,7 +385,7 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 584	Red Mushroom Block	nature-6.5	1024	25
 585	Brown Mushroom Block	material-6.5	1024	5
 586	Mushroom Stem	material-6.5	918	10
-587	Snow	material-6.5	966	10
+587	SNOW_SIDE	material-6.5	966	10
 590	ITEM0	item-6.5	418	18
 591	Model-only face / icon	item-6.5	455	19
 592	Model-only face / icon	item-6.5	455	15

@@ -124,7 +124,7 @@ final class TestsVisualRefresh {
                if(alphaChanges>0)newSilhouettes++;
             }
          }
-         check(changed==458,"456 redrawn cells plus two explicitly requested building-review overrides");
+         check(changed==500,"456 redrawn cells plus 44 explicitly reopened reference cells");
          check(newSilhouettes==items,"every rejected item receives a new silhouette");
          for(int t:new int[]{23,24,235,263})for(float phase:new float[]{0,1,7,15.5F}) {
             int[] frame=TexRemaining32.frame(t,phase);
@@ -138,7 +138,7 @@ final class TestsVisualRefresh {
             check((lower[15]>>>24)==255&&(upper[31*32+15]>>>24)==255,"continuous double-plant stem "+t);
          }
       });
-      test("building review: only the requested material families change from the published 6.5 atlas", () -> {
+      test("category reviews: only requested material families change from the published 6.5 atlas", () -> {
          ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);Tex.initPixels();
          java.util.Properties before=new java.util.Properties();
          try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-v65.properties")){before.load(in);}
@@ -147,13 +147,13 @@ final class TestsVisualRefresh {
          for(int t=0;t<1024;t++) {
             int[] art=t==77?BowSprite.pixels(0,false):TexPixel32.tile(t,TexOverhaulV57.readTile(t),TexRemaining32.animated(t));
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
-            check(differs==TexBuildingReview32.handles(t),"change scope exactly matches requested faces: "+t);
+            check(differs==(TexBuildingReview32.handles(t)||TexColorNature32.handles(t)),"change scope exactly matches requested faces: "+t);
             if(!differs)continue;
             changed++;
-            check(art.length==1024&&Arrays.equals(art,TexBuildingReview32.paint(t)),"native deterministic review painter "+t);
+            check(art.length==1024&&Arrays.equals(art,TexColorNature32.handles(t)?TexColorNature32.paint(t):TexBuildingReview32.paint(t)),"native deterministic review painter "+t);
             for(int c:art)check((c>>>24)==255,"building material has no alpha holes "+t);
          }
-         check(changed==16,"16 affected faces, including polished andesite and pillar ends/sides");
+         check(changed==118,"16 building faces plus 102 colors/nature faces");
          for(int t:new int[]{44,656}) {
             int[] rock=TexMaterials32.base(t==44?Tex.COBBLE:Tex.STONEBRICK),art=TexBuildingReview32.paint(t);
             int moss=0;
@@ -162,6 +162,41 @@ final class TestsVisualRefresh {
          }
          for(int c:TexBuildingReview32.paint(487))check((c&255)>(c>>8&255)&&(c&255)>(c>>16&255),"lapis has blue mineral veins, no yellow dots");
          for(int t:new int[]{44,522})check(Arrays.hashCode(TexPixel32.preReviewReference(t))==Integer.parseInt(before.getProperty(Integer.toString(t))),"accurate historical reference for requested exception "+t);
+      });
+      test("colors/nature review: narrow scope, rotated logs, embedded ore and snow-layer mapping", () -> {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);Tex.initPixels();
+         java.util.Properties before=new java.util.Properties(), release=new java.util.Properties();
+         try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-building-review.properties")) {before.load(in);}
+         catch(java.io.IOException e){throw new RuntimeException(e);}
+         try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-v65.properties")) {release.load(in);}
+         catch(java.io.IOException e){throw new RuntimeException(e);}
+         int changed=0;
+         for(int t=0;t<1024;t++) {
+            int[] art=BuildingBlockReviewPreview.pixels(t);
+            boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
+            check(differs==TexColorNature32.handles(t),"only this batch's listed cells change "+t);
+            if(differs){changed++;check(Arrays.equals(art,TexColorNature32.paint(t)),"deterministic dispatch "+t);for(int c:art)check(c>>>24==255,"opaque native face "+t);}
+            if(TexColorNature32.wasProtected(t))check(Arrays.hashCode(TexPixel32.preReviewReference(t))==Integer.parseInt(release.getProperty(Integer.toString(t))),"honest historical reference "+t);
+         }
+         check(changed==102,"all 102 color/nature cells revised; earlier building batch untouched");
+         int[][] logs={{7,246},{33,247},{31,248},{540,546},{541,547},{542,548}};
+         for(int[] pair:logs){int[] side=TexColorNature32.paint(pair[0]),turned=TexColorNature32.paint(pair[1]);for(int y=0;y<32;y++)for(int x=0;x<32;x++)check(side[y*32+x]==turned[x*32+y],"horizontal logs rotate the same native artwork");}
+         for(int t:new int[]{12,13,14,15,16,17,258,488}) {
+            int[] host=t==258?TexMaterials32.paint(256):TexMaterials32.base(Tex.STONE),art=TexColorNature32.paint(t);int changedRock=0;
+            for(int i=0;i<1024;i++)if(host[i]!=art[i])changedRock++;
+            check(changedRock>100&&changedRock<350,"ore seams leave the majority of the original host rock intact "+t);
+         }
+         for(int tile:Blocks.tiles[Blocks313.SNOW_LAYER])check(tile==Tex.SNOW,"loose snow is not snow-covered dirt on any face");
+         check(Blocks.box[Blocks313.SNOW_LAYER][4]==.125,"snow remains a thin layer, not a full block");
+         check(Arrays.hashCode(BuildingBlockReviewPreview.pixels(Tex.SNOW))==Integer.parseInt(release.getProperty("18")),"snow block texture unchanged");
+         HashSet<Integer> designs=new HashSet<>();
+         for(int dye=0;dye<16;dye++) {
+            int[] wool=TexColorNature32.paint(48+dye),glaze=TexColorNature32.paint(449+dye);
+            HashSet<Integer> shades=new HashSet<>();for(int c:wool)shades.add(c);
+            check(shades.size()>2,"wool has more than the old two-tone checkerboard");designs.add(Arrays.hashCode(glaze));
+            check(!Arrays.equals(TexColorNature32.paint(416+dye),TexMaterials32.paint(400+dye)),"loose powder differs from solid concrete");
+         }
+         check(designs.size()==16,"all glazed designs are distinct");
       });
       test("cohesive materials: shared timber, masonry grid and restrained cracks", () -> {
          ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);

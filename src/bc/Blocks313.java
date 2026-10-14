@@ -147,7 +147,8 @@ final class Blocks313 {
       Blocks.def(PACKED_ICE, "Packed Ice", 0.5F, true, TexArt313.PACKED_ICE);
       pick(PACKED_ICE, false, 0);
       Blocks.drop[PACKED_ICE] = 0;
-      Blocks.def(SNOW_LAYER, "Snow", 0.1F, false, TexArt313.SNOW_SIDE);
+      // Loose snow is snow on every face, not a snow-capped dirt cube.
+      Blocks.def(SNOW_LAYER, "Snow", 0.1F, false, Tex.SNOW);
       box(SNOW_LAYER, 0.0, 0.0, 0.0, 1.0, 0.125, 1.0);
       Blocks.solid[SNOW_LAYER] = false;
       Blocks.coll[SNOW_LAYER] = null;

@@ -774,6 +774,36 @@ _BR += ["-Dbc.cam=8,69.5,-1,0,7", "-Dbc.shot=240",
         "-Dbc.fill=0,65,0,16,65,10,1;0,66,0,16,75,10,0", "-Dbc.set="+";".join(_BR_SET)]
 SCENES["pixel-building-review-plain"] = (_BR+["-Dbc.shaders=false"],True)
 SCENES["pixel-building-review-lit"] = (_BR,True)
+# Colors/nature review: isolated native source fixtures, not a new release package.
+def _category_wall(rows, height=2):
+    props=[a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.cam=","-Dbc.shot="))]
+    cells=[]
+    for row,blocks in enumerate(rows):
+        for col,block in enumerate(blocks):
+            for dx in range(2):
+                for dy in range(height):
+                    cells.append("%d,%d,8,%d" % (1+col*2+dx,67+row*height+dy,block))
+    props += ["-Dbc.cam=9,70,-2,0,10", "-Dbc.shot=240", "-Dbc.fill=0,65,0,18,65,10,1;0,66,0,18,76,10,0"]
+    return props,cells
+_REVIEW_DYES=[0,1,4,5,7,9,14,15]
+_RC,_RC_SET=_category_wall([[34+c for c in _REVIEW_DYES],[1050+c for c in _REVIEW_DYES],
+                           [1066+c for c in _REVIEW_DYES],[1083+c for c in _REVIEW_DYES]],1)
+SCENES["pixel-color-review"] = (_RC+["-Dbc.set="+";".join(_RC_SET),"-Dbc.shaders=false"],True)
+_RG,_RG_SET=_category_wall([[1099+i for i in range(8)],[1099+i for i in range(8,16)]])
+SCENES["pixel-glazed-review"] = (_RG+["-Dbc.set="+";".join(_RG_SET),"-Dbc.shaders=false"],True)
+_RN,_RN_SET=_category_wall([[19,20,21,22,23,24,1026,1138],[9,11,10,1156,1157,1158,161,170]])
+for _i,_block in enumerate([3,7,1143,1144,1146,3,161,170]):
+    for _dx in range(2):
+        for _z in range(3,8):
+            _RN_SET.append("%d,66,%d,%d" % (1+_i*2+_dx,_z,_block))
+for _x in [11,12]:
+    for _z in [3,4,5]: _RN_SET.append("%d,67,%d,1149" % (_x,_z))
+for _i,_block in enumerate([9,11,10,1156,1157,1158]):
+    _RN_SET.append("%d,66,1,%d" % (1+_i*3,_block))
+_RN_SET.append("17,66,4,18") # unchanged full snow block alongside the thin layers
+_RN += ["-Dbc.set="+";".join(_RN_SET)]
+SCENES["pixel-nature-review-plain"] = (_RN+["-Dbc.shaders=false"],True)
+SCENES["pixel-nature-review-lit"] = (_RN,True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

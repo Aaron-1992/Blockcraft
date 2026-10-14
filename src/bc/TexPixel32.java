@@ -149,12 +149,21 @@ final class TexPixel32 {
       return earth(Tex.STONE, x, y);
    }
 
-   /** Historical reference for the two formerly protected tiles the user explicitly
-    * requested changing. Used by comparison/audit only, never by active dispatch. */
+   /** Historical reference for formerly protected cells explicitly reopened by the
+    * user. Comparison/audit only; active default dispatch uses the review painters. */
    static int[] preReviewReference(int t) {
-      if(t!=Tex.MOSSY&&t!=TexArt313.ANDESITE)throw new IllegalArgumentException("Not a review exception: "+t);
+      if(t!=44&&t!=522&&!TexColorNature32.wasProtected(t))throw new IllegalArgumentException("Not a review exception: "+t);
       int[] p=new int[1024];
-      for(int y=0;y<32;y++)for(int x=0;x<32;x++)p[y*32+x]=t==Tex.MOSSY?rubble(t,x,y):earth(t,x,y);
+      for(int y=0;y<32;y++)for(int x=0;x<32;x++) {
+         int c;
+         if(t==44)c=rubble(t,x,y);
+         else if(earthTile(t))c=earth(t,x,y);
+         else if(t>=12&&t<=17)c=ore(t,x,y);
+         else if(t==8||t==32||t>=543&&t<=545)c=rings(t,x,y);
+         else if(TexColorNature32.log(t))c=bark(t,x,y);
+         else {int[] w=Tex.WOOL[t-48];c=shade(Tex.rgb(w[0],w[1],w[2]),((x+y)&1)==0?6:-6);}
+         p[y*32+x]=c;
+      }
       return p;
    }
 

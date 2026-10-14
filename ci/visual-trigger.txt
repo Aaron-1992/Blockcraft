@@ -1,3 +1,3 @@
-pixel-building-review-plain,pixel-building-review-lit
+pixel-color-review,pixel-glazed-review,pixel-nature-review-plain,pixel-nature-review-lit
 jar=build
-# Building-tab feedback work in progress, not the published V6.5 package.
+# Colors/nature review, not published or user-approved. Keep the prior building pass unchanged.
