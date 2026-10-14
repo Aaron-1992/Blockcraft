@@ -83,7 +83,16 @@ assembly preserved all 327 bundled files and the exact smoke-tested patch bytes.
 Release source SHA-256:
 `7b8788e898a2fa2b700dea9ec566b3989b62b5999e13cbd4f8764f0db8428cf0`
 
-Prepared assets (publication triggered after the above checks):
+Published as [V6.5](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.5)
+at 2026-10-14 00:20:44 UTC, target `23a29db449ae465235d23ab36ff97b921627607e`.
+Release **38489577013** and final CI **38489577028** succeeded. Both assets are
+uploaded, non-draft and non-prerelease. GitHub's asset API SHA-256 digests and
+sizes match the locally verified full/patch archives exactly (82,139,419 and
+33,290,380 bytes). Direct asset re-download in this sandbox was blocked by its
+release-assets host restriction; publication verification therefore uses those
+GitHub-provided digests, not a claim of a successful local re-download.
+
+Published assets:
 - Full ZIP SHA-256: `84269d8a9f39e2bf4168e746cacbc6433785ff6ec0796a87e716d52ccdc53d42`
 - Patch SHA-256: `8f06436c37db3e2dd7b179f6cef1c446860369d6a13b529909b4b39afdd95db7`
 
