@@ -239,11 +239,7 @@ public final class Renderer {
                   }
 
                   int surfSy = Math.max(3, Math.min(14, var14.hm[136] >> 4));
-                  for (int step = 0; step < 16; step++) {
-                     int var17 = surfSy + ((step & 1) == 0 ? -(step >> 1) : ((step + 1) >> 1));
-                     if (var17 < 0 || var17 >= 16) {
-                        continue;
-                     }
+                  for (int var17 : SECTION_ORDER[surfSy]) {
                      Section var18 = var14.sections[var17];
                      if (var18.dirty && !var18.inFlight) {
                         if (var9 >= var2 || this.inflight.get() >= var3) {
@@ -280,6 +276,18 @@ public final class Renderer {
          return;
       }
    }
+
+   /** Visit every section once, even when the surface is above section seven. */
+   static int[] sectionOrder(int surface) {
+      int[] order=new int[16];int n=0;
+      for(int step=0;n<16;step++) {
+         int sy=surface+((step&1)==0?-(step>>1):((step+1)>>1));
+         if(sy>=0&&sy<16)order[n++]=sy;
+      }
+      return order;
+   }
+   private static final int[][] SECTION_ORDER=new int[16][];
+   static {for(int sy=0;sy<16;sy++)SECTION_ORDER[sy]=sectionOrder(sy);}
 
    public void uploadMeshes(int var1) {
       this.uploadMeshes(var1, 3000000L);

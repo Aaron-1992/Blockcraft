@@ -1,2 +1,3 @@
 pixel-title,pixel-aquatic-reef,pixel-aquatic-circuits,pixel-editor-bow
 # V6.7: exact packaged Windows EXE/JRE and PNG reload.
+# Repeat after tall-terrain loading fix and embedded guide synchronization.

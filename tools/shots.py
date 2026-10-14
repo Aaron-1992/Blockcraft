@@ -17,6 +17,7 @@ import glob
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -854,13 +855,28 @@ def run_scene(java, label, jar, name, props, timeout):
     cmd = ["xvfb-run", "-a", "-s", "-screen 0 1280x800x24 +extension GLX +render -noreset",
            java, "-Xmx1g", "-Duser.home=" + home] + props + ["-jar", jar]
     t0 = time.time()
+    proc = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, start_new_session=True)
     try:
-        r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=timeout)
-        status = "exit %d" % r.returncode
-        err = (r.stderr or "")[-1500:]
+        _stdout, stderr = proc.communicate(timeout=timeout)
+        status = "exit %d" % proc.returncode
+        err = (stderr or "")[-1500:]
     except subprocess.TimeoutExpired:
         status = "TIMEOUT"
         err = ""
+        # Capture Java stacks before terminating the entire xvfb-run process tree.
+        try:
+            ps = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True, timeout=10)
+            for line in ps.stdout.splitlines():
+                if "-Duser.home=" + home in line:
+                    pid = line.split(None, 1)[0]
+                    dump = subprocess.run(["jcmd", pid, "Thread.print"], capture_output=True, text=True, timeout=15)
+                    err += dump.stdout + dump.stderr
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            err += str(exc)
+        finally:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.communicate(timeout=15)
     dt = time.time() - t0
     TIMES.append("%s/%s: %s in %.0fs" % (name, label, status, dt))
     shots = sorted(glob.glob(os.path.join(home, ".blockcraft112", "screenshots", "*.png")))
@@ -871,8 +887,11 @@ def run_scene(java, label, jar, name, props, timeout):
     elif err:
         with open(os.path.join(OUT, "logs", "%s-%s.log" % (name, label)), "w") as f:
             f.write(err)
+    if status == "TIMEOUT" and err:
+        with open(os.path.join(OUT, "logs", "%s-%s-threads.log" % (name, label)), "w") as f:
+            f.write(err)
     png = None
-    if shots:
+    if shots and status == "exit 0":
         png = os.path.join(OUT, "%s-%s.png" % (name, label))
         shutil.copy(shots[-1], png)
     shutil.rmtree(home, ignore_errors=True)
@@ -950,6 +969,7 @@ def main():
     # Keep earlier verified scenes when rerunning a targeted subset.
     os.makedirs(OUT, exist_ok=True)
     rows = []
+    failures = 0
     for name in names:
         props, only_new = SCENES[name]
         got = {}
@@ -957,6 +977,7 @@ def main():
             if only_new and label != "new":
                 continue
             got[label] = run_scene(java, label, jar, name, props, a.timeout)
+            failures += not bool(got[label])
         row = {"scene": name, "diff": None}
         have = [l for l in got if got[l]]
         if len(have) >= 1:
@@ -972,6 +993,8 @@ def main():
                 os.remove(got[l])
     write_report(rows)
     print(open(os.path.join(OUT, "report.md")).read())
+    if failures:
+        sys.exit("%d requested render(s) failed or produced no screenshot" % failures)
 
 
 if __name__ == "__main__":

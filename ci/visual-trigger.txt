@@ -1,3 +1,4 @@
 pixel-aquatic-reef,pixel-aquatic-ice,pixel-aquatic-circuits,pixel-editor-bow
 jar=build
 # V6.7: actual generated aquatic terrain, circuit/waterlogging bench and preserved PNG/bow workflow.
+# Repeat after full-height mesh scheduling fix; missing captures now fail the check.

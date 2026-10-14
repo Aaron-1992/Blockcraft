@@ -9,6 +9,14 @@ public final class TestsAquaticRedstone {
    static void advance(World w,int ticks){for(int i=0;i<ticks;i++)w.tick();}
    public static void main(String[] args){run();System.out.println("Aquatic/redstone: "+passed+" passed, "+failed+" failed");System.exit(failed==0?0:1);}
    static void run(){
+      test("renderer: tall-terrain loading schedules all sixteen sections, including bedrock",()->{
+         for(int surface=0;surface<16;surface++) {
+            int[] order=Renderer.sectionOrder(surface);int mask=0;
+            for(int sy:order){check(sy>=0&&sy<16,"valid section");check((mask&(1<<sy))==0,"scheduled exactly once");mask|=1<<sy;}
+            eq(65535,mask,"no forgotten section for surface "+surface);eq(surface,order[0],"surface first");
+         }
+      });
+
       test("aquatic: saved properties, old chunks, waterlogged slabs and bucket extraction",()->{
          Game g=newGame(1);World w=g.world;int x=8,y=GROUND+1,z=8;
          w.setBlock(x,y,z,Blocks.WATER);w.setBlock(x,y,z,Blocks.SLAB0);
