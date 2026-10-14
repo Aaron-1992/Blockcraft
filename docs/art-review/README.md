@@ -58,10 +58,34 @@ Actual-game fixtures in `tools/shots.py`:
 - `pixel-nether`, `pixel-bow-full`, `pixel-hand-torch`: animation/material and
   preserved weapon/lighting integration.
 
-Remote visual/CI and Windows package checks are pending at this source commit.
+Remote verification completed:
+- CI **38488288667** and **38488964803**: 4,175,541 assertions, zero failures;
+  strict equivalence, shader syntax and native coverage checks passed.
+- Visual **38488288632**: all ten world/inventory/weapon scenes exited 0.
+  Actual shader-off/on plant and material captures, bow, torch-lit hand and lava
+  were inspected; no atlas/alpha errors were observed.
+- Visual **38488964794**: title and three unobscured inventory captures exited 0.
+  The cursor is outside the inventory so tooltips cannot conceal the new icons.
+- Windows **38488964860**: all seven scenes captured, exit 0, and GPU preference
+  registry checks passed. Title/inventories/bow/hand launched through Launch4j;
+  the two long-property fixtures launched the EXE payload through bundled Java.
+  The initial run's missing legacy title capture was not counted as a pass: the
+  final run uses the production-style panorama title, and the smoke harness now
+  fails if *any* requested capture is missing instead of accepting one success.
+  Windows and Linux title images visibly identify V6.5 / Natural Pixel 32.
+
 Release receipts now require all four new/shared artists as well as the existing
 renderer, atlas, bow and lighting classes, and compare EXE-embedded game bytes
-against the JAR. V6.5 will be published only after the actual-game/package checks.
+against the JAR. Both packaged `--build-info` entry points report V6.5, native
+32px atlas, flat sprite bow and single-lightmap hand lighting. Full archive
+assembly preserved all 327 bundled files and the exact smoke-tested patch bytes.
+
+Release source SHA-256:
+`7b8788e898a2fa2b700dea9ec566b3989b62b5999e13cbd4f8764f0db8428cf0`
+
+Prepared assets (publication triggered after the above checks):
+- Full ZIP SHA-256: `84269d8a9f39e2bf4168e746cacbc6433785ff6ec0796a87e716d52ccdc53d42`
+- Patch SHA-256: `8f06436c37db3e2dd7b179f6cef1c446860369d6a13b529909b4b39afdd95db7`
 
 ## Binary retention
 
