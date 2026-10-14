@@ -1,2 +1,2 @@
-title,pixel-items,pixel-food,pixel-garden-plain,pixel-cohesion-lit,pixel-bow-full,pixel-hand-torch
-# V6.5: actual packaged EXE, complete art rework.
+pixel-title,pixel-items,pixel-food,pixel-garden-plain,pixel-cohesion-lit,pixel-bow-full,pixel-hand-torch
+# V6.5: every capture required; allow late launcher captures and keep inventory tooltip out of frame.

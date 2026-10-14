@@ -720,7 +720,7 @@ SCENES["pixel-materials"] = ([a for a in _P32 if not a.startswith("-Dbc.cam=")] 
 
 SCENES["pixel-materials-plain"] = (SCENES["pixel-materials"][0] + ["-Dbc.shaders=false"], True)
 # 6.4: native remaining families, items and alpha/animation integration.
-_P32_INV = [a for a in SCENES["inv-creative-2"][0] if not a.startswith("-Dbc.page=")]
+_P32_INV = [a for a in SCENES["inv-creative-2"][0] if not a.startswith("-Dbc.page=")] + ["-Dbc.mouse=0,0"]
 SCENES["pixel-items"] = (_P32_INV + ["-Dbc.tab=4", "-Dbc.page=0"], True)
 SCENES["pixel-food"] = (_P32_INV + ["-Dbc.tab=5", "-Dbc.page=0"], True)
 SCENES["pixel-resources"] = (_P32_INV + ["-Dbc.tab=6", "-Dbc.page=0"], True)
@@ -758,6 +758,7 @@ _GARDEN += ["-Dbc.cam=7,69,-1,0,18", "-Dbc.fill=0,65,0,14,65,11,1;0,66,0,14,66,1
             "-Dbc.set="+";".join(_GARDEN_SET)]
 SCENES["pixel-garden-plain"] = (_GARDEN + ["-Dbc.shaders=false"], True)
 SCENES["pixel-garden-lit"] = (_GARDEN, True)
+SCENES["pixel-title"] = (["-Dbc.auto=1", "-Dbc.title=TITLE", "-Dbc.pano=on", "-Dbc.rd=2", "-Dbc.lod=8", "-Dbc.win=1280x720"], True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

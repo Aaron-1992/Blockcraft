@@ -37,11 +37,11 @@ jobs:
         run: ls -la releases/ && sha256sum releases/*.zip
 
       - name: Smoke test (real Blockcraft.exe, software OpenGL)
-        continue-on-error: true
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           SCENES="$(head -n1 ci/windows-trigger.txt | tr -d '[:space:]')"
           case "$SCENES" in ''|*[!a-z0-9,-]*|[0-9]*) SCENES="title,day-plain,farm";; esac
           echo "scenes: $SCENES"

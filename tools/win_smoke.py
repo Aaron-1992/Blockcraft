@@ -129,6 +129,15 @@ def run_scene(game_dir, name, props, timeout):
             time.sleep(2)
         time.sleep(3)
         status += " (+ the second start)"
+    # A successful launcher process can finish before its child writes the capture.
+    # Do not delete that child's home immediately by starting the next scene.
+    if p.returncode == 0 and not glob.glob(os.path.join(home, "screenshots", "*.png")):
+        deadline = min(t0 + timeout, time.time() + 30)
+        while time.time() < deadline and not os.path.exists(os.path.join(home, "crash.log")):
+            if glob.glob(os.path.join(home, "screenshots", "*.png")):
+                status += " (capture after launcher exit)"
+                break
+            time.sleep(0.25)
     dt = time.time() - t0
     for f in ("latest.log", "crash.log"):
         src = os.path.join(home, f)
@@ -177,7 +186,7 @@ def main():
     except Exception as e:
         log("could not read the registry: %s" % e)
     log("RESULT: " + json.dumps(results))
-    sys.exit(0 if any(results.values()) else 1)
+    sys.exit(0 if results and all(results.values()) else 1)
 
 
 if __name__ == "__main__":
