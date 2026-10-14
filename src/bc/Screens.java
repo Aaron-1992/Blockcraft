@@ -110,7 +110,7 @@ final class Screens {
          });
       ui.button("Quit Game", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
       gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
-      gui.text("Textures: " + (TexPixel32.enabled() ? "Natural Pixel 32px" : ResourcePacks.activeId() + " 16px"),
+      gui.text("Textures: " + ResourcePacks.activeId() + (TexPixel32.enabled() ? " 32px" : " 16px"),
          4.0F, gui.h - 22.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
@@ -860,9 +860,9 @@ final class Screens {
 
       float by = gui.h - 24.0F;
       float third = (pw - 8.0F) / 3.0F;
-      ui.button("Refresh", px, by, third, 20.0F, true, "Scan resourcepacks/ for newly added folders or .zip packs.", () -> {
-         ResourcePacks.refresh();
-         ui.say("Refreshed packs (" + ResourcePacks.list().size() + ")");
+      ui.button("Reload PNGs", px, by, third, 20.0F, true, "Reload edited PNGs and scan resourcepacks/. Refreshes the active pack immediately.", () -> {
+         ResourcePacks.reload(g);
+         ui.say("Reloaded PNGs: " + ResourcePacks.active().title);
       });
       ui.button("Mods...", px + third + 4.0F, by, third, 20.0F, true, "Open the Modrinth-style Mods manager.", () -> {
          g.modsReturn = g.packsReturn != null ? g.packsReturn : Game.S.TITLE;

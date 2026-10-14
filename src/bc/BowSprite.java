@@ -9,6 +9,12 @@ final class BowSprite {
    static final int SIZE = 32;
    private static final int[] textures = new int[8];
    private BowSprite() {}
+   private static boolean dirty;
+   static void invalidate() { dirty = true; }
+   static int[] renderPixels(int stage, boolean arrow) {
+      int[] custom = ResourcePacks.overridePixels(77, (arrow ? 4 : 0) + Math.max(0, Math.min(3, stage)), SIZE);
+      return custom != null ? custom : pixels(stage, arrow);
+   }
 
    static int stage(float draw) {
       if (draw <= 0) return 0;
@@ -70,6 +76,13 @@ final class BowSprite {
    }
 
    static void draw(float draw, boolean nocked, float bright) {
+      if (dirty) {
+         for (int i = 0; i < textures.length; i++) {
+            if (textures[i] != 0) GL11.glDeleteTextures(textures[i]);
+            textures[i] = 0;
+         }
+         dirty = false;
+      }
       int s = stage(draw), index = s + (nocked ? 4 : 0);
       GL11.glPushAttrib(GL11.GL_ENABLE_BIT | GL11.GL_CURRENT_BIT | GL11.GL_TEXTURE_BIT | GL11.GL_COLOR_BUFFER_BIT);
       GL11.glDisable(GL11.GL_CULL_FACE);
@@ -77,7 +90,7 @@ final class BowSprite {
       GL11.glEnable(GL11.GL_ALPHA_TEST);
       GL11.glAlphaFunc(GL11.GL_GREATER, 0.1F);
       GL11.glEnable(GL11.GL_TEXTURE_2D);
-      if (textures[index] == 0) textures[index] = Tex.upload(SIZE, SIZE, pixels(s, nocked), false, false);
+      if (textures[index] == 0) textures[index] = Tex.upload(SIZE, SIZE, renderPixels(s, nocked), false, false);
       GL11.glBindTexture(GL11.GL_TEXTURE_2D, textures[index]);
       GL11.glColor4f(bright, bright, bright, 1);
       GL11.glBegin(GL11.GL_QUADS);

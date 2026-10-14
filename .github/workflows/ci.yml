@@ -25,6 +25,12 @@ jobs:
       - name: Build (javac) and make the update pack
         run: python3 tools/build.py --patch
 
+      - name: Verify packaged EXE/JAR and texture editing assets
+        run: |
+          python3 -m unittest discover -s tools -p test_verify_release.py
+          VER=$(python3 -c 'import sys; sys.path.insert(0, "tools"); import build; print(build.game_version())')
+          python3 tools/verify_release.py "releases/Blockcraft-UPDATE$VER-patch.zip" "$VER"
+
       - name: GLSL syntax check of every shader (no GPU needed)
         run: python3 tools/glsl_check.py
 

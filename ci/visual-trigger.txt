@@ -1,3 +1,3 @@
-pixel-utility-banners-plain,pixel-utility-banners-lit
+pixel-editor-reload,pixel-editor-bow
 jar=build
-# Close the thin inter-fold light slits found in the final cloth inspection; other 11-scene evidence is source a6e14de.
+# V6.6 native PNG pack reload: magenta checker stone and teal flat bow are intentional smoke-test markers.

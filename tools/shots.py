@@ -829,6 +829,9 @@ _UB += ["-Dbc.fill=0,66,0,12,66,8,1;0,67,0,12,74,8,0;1,67,6,4,71,6,27",
         "-Dbc.cam=6,69.5,-1,0,12","-Dbc.shot=200","-Dbc.worldonly=true"]
 SCENES["pixel-utility-banners-plain"] = (_UB+["-Dbc.shaders=false"],True)
 SCENES["pixel-utility-banners-lit"] = (_UB,True)
+# V6.6: editor pack round trip and hot reload through the actual renderer, not a mock.
+SCENES["pixel-editor-reload"] = (SCENES["pixel-utility-review-plain"][0] + ["-Dbc.reviewpack=true"], True)
+SCENES["pixel-editor-bow"] = (SCENES["pixel-bow-full"][0] + ["-Dbc.reviewpack=true", "-Dbc.shot=150"], True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

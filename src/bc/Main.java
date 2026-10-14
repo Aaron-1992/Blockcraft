@@ -23,6 +23,11 @@ public final class Main {
             System.out.println("hand.lighting=single-lightmap");
             return; // No window, GPU, native libraries, options or saved-world writes.
          }
+         if (var0.length >= 1 && "--export-textures".equals(var0[0])) {
+            if (var0.length > 2) throw new IllegalArgumentException("Usage: --export-textures [new-folder]");
+            TextureEditor.export(java.nio.file.Path.of(var0.length == 2 ? var0[1] : "resourcepacks/MyTextures"));
+            return;
+         }
          new Game().run();
          // everything is saved and closed; do not let a lingering AWT thread (the skin file dialog) keep the process alive
          System.exit(0);

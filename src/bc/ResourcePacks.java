@@ -53,6 +53,7 @@ public final class ResourcePacks {
       public final String badgeText;
       final Properties props = new Properties();
       final Map<Integer, int[]> tileOverrides = new HashMap<>();
+      final Map<Integer, int[][]> animations = new HashMap<>();
 
       public Pack(String id, String title, String subtitle, boolean builtIn, boolean classicBase, Path path, int badgeColor) {
          this(id, title, subtitle, builtIn, classicBase, path, badgeColor, classicBase ? "3.5" : "5.9");
@@ -104,9 +105,9 @@ public final class ResourcePacks {
             "",
             "Supported files inside a pack folder or .zip:",
             "  - pack.properties      : name, description, base=Default|Classic, saturation, contrast",
-            "  - atlas.png            : 256x256 or 512x1024 terrain/item atlas image (non-empty 16x16 cells override tiles)",
-            "  - tiles/<id>.png       : 16x16 PNG override for tile index <id> (0..2047)",
-            "  - tiles/<block>.png    : 16x16 PNG override by block name (e.g. grass_top.png, cobblestone.png, oak_planks.png)"
+            "  - atlas.png            : legacy 16px atlas; tileSize=32 in pack.properties enables native 1024x1024 atlas and Default base",
+            "  - tiles/<id>.png       : 16x16 or 32x32 PNG override for tile index <id> (0..1023)",
+            "  - tiles/<block>.png    : PNG override by legacy alias; use exported numeric_name.png for unambiguous IDs"
          );
          try {
             Files.writeString(readme, txt, StandardCharsets.UTF_8);
@@ -309,6 +310,7 @@ public final class ResourcePacks {
       }
       activeId = active().id;
       Tex.reloadPixels();
+      BowSprite.invalidate();
       LodMap.resetAverages();
       Renderer.clearItemGeo();
       if (g != null) {
@@ -321,6 +323,12 @@ public final class ResourcePacks {
             g.rend.lod.invalidateAll();
          }
       }
+   }
+
+   public static synchronized void reload(Game g) {
+      String selected = activeId();
+      refresh();
+      select(selected, g);
    }
 
    /** Called at the end of {@link Tex#initPixels()} to apply pack-specific colour grading and PNG tile overrides. */
@@ -348,13 +356,49 @@ public final class ResourcePacks {
          gradePixels(pix, sat, con, rMul, gMul, bMul, retro);
       }
 
-      for (Map.Entry<Integer, int[]> e : p.tileOverrides.entrySet()) {
-         int tile = e.getKey();
-         int[] tpx = e.getValue();
-         if (tile >= 0 && tile < 2048 && tpx != null && tpx.length == 256) {
-            writeTile(pix, tile, tpx);
-         }
+      for (int tile = 0; tile < Tex.COLS * Tex.COLS; tile++) {
+         int[] px = overridePixels(tile, 0, 16);
+         if (px != null) writeTile(pix, tile, px);
       }
+   }
+
+   /** Opt-in: old packs keep their original 16px rendering. Missing native cells inherit Default. */
+   static boolean native32() {
+      return ID_DEFAULT.equals(activeId) || "32".equals(active().props.getProperty("tileSize", "").trim());
+   }
+
+   static int[] resize(int[] pixels, int size) {
+      int from = (int)Math.sqrt(pixels.length);
+      if (from == size) return pixels;
+      int[] out = new int[size * size];
+      for (int y = 0; y < size; y++) for (int x = 0; x < size; x++)
+         out[y * size + x] = pixels[(y * from / size) * from + x * from / size];
+      return out;
+   }
+
+   /** Static PNGs take precedence over animation strips, even if completely transparent. */
+   static synchronized int[] overridePixels(int tile, int frame, int size) {
+      if (ID_DEFAULT.equals(activeId)) return null;
+      Pack p = active();
+      int[] px = p.tileOverrides.get(tile);
+      if (px == null) {
+         int[][] frames = p.animations.get(tile);
+         if (frames != null) px = frames[Math.floorMod(frame, frames.length)];
+      }
+      return px == null ? null : resize(px, size);
+   }
+
+   private static void readAnimations(Pack pack, String name, InputStream in) throws IOException {
+      int tile = resolveTileName(name);
+      if (tile < 0) return;
+      if (!TextureEditor.animated(tile)) throw new IOException("This tile has no animation: " + name);
+      BufferedImage img = ImageIO.read(in);
+      int frames = tile == 77 ? 8 : 16;
+      if (img == null || img.getHeight() != 32 || img.getWidth() != 32 * frames)
+         throw new IOException("Expected " + (32 * frames) + "x32 animation PNG: " + name);
+      int[][] pixels = new int[frames][1024];
+      for (int i = 0; i < frames; i++) img.getRGB(i * 32, 0, 32, 32, pixels[i], 0, 32);
+      pack.animations.put(tile, pixels);
    }
 
    private static void writeTile(int[] pix, int tile, int[] tpx) {
@@ -425,7 +469,7 @@ public final class ResourcePacks {
       String title = props.getProperty("name", id.replace('_', ' '));
       String desc = props.getProperty("description", "Custom folder resource pack (" + id + ")");
       boolean classic = "classic".equalsIgnoreCase(props.getProperty("base", "default").trim());
-      Pack pack = new Pack(id, title, desc, false, classic, folder, 0xFF26A69A);
+      Pack pack = new Pack(id, title, desc, false, classic, folder, 0xFF26A69A, "32".equals(props.getProperty("tileSize")) ? "32px" : "16px");
       pack.props.putAll(props);
 
       Path atlasFile = folder.resolve("atlas.png");
@@ -436,6 +480,14 @@ public final class ResourcePacks {
          }
       }
 
+      Path animDir = folder.resolve("animations");
+      if (Files.isDirectory(animDir)) {
+         try (DirectoryStream<Path> ds = Files.newDirectoryStream(animDir, "*.png")) {
+            for (Path file : ds) try (InputStream in = Files.newInputStream(file)) {
+               readAnimations(pack, file.getFileName().toString(), in);
+            } catch (IOException e) { System.err.println("[packs] " + file + ": " + e.getMessage()); }
+         } catch (IOException e) { System.err.println("[packs] " + e.getMessage()); }
+      }
       Path tilesDir = folder.resolve("tiles");
       if (Files.isDirectory(tilesDir)) {
          try (DirectoryStream<Path> ds = Files.newDirectoryStream(tilesDir, "*.png")) {
@@ -443,12 +495,11 @@ public final class ResourcePacks {
                int tileIdx = resolveTileName(tp.getFileName().toString());
                if (tileIdx >= 0) {
                   try (InputStream in = Files.newInputStream(tp)) {
-                     int[] px = readTile16(in);
+                     int[] px = readTile(in);
                      if (px != null) {
                         pack.tileOverrides.put(tileIdx, px);
                      }
-                  } catch (IOException ignored) {
-                  }
+                  } catch (IOException e) { System.err.println("[packs] " + tp + ": " + e.getMessage()); }
                }
             }
          } catch (IOException ignored) {
@@ -463,6 +514,7 @@ public final class ResourcePacks {
       Properties props = new Properties();
       Map<Integer, int[]> overrides = new HashMap<>();
       byte[] atlasBytes = null;
+      Map<String, byte[]> animationBytes = new HashMap<>();
 
       try (ZipFile zf = new ZipFile(zipPath.toFile())) {
          ZipEntry pe = zf.getEntry("pack.properties");
@@ -484,17 +536,20 @@ public final class ResourcePacks {
                continue;
             }
             String name = ze.getName().replace('\\', '/');
+            if (name.startsWith("animations/") && name.endsWith(".png")) {
+               try (InputStream in = zf.getInputStream(ze)) { animationBytes.put(name.substring(11), in.readAllBytes()); }
+            }
             int slash = name.lastIndexOf('/');
             String baseName = slash >= 0 ? name.substring(slash + 1) : name;
             if ((name.startsWith("tiles/") || name.startsWith("textures/")) && baseName.toLowerCase(Locale.ROOT).endsWith(".png")) {
                int tileIdx = resolveTileName(baseName);
                if (tileIdx >= 0) {
                   try (InputStream in = zf.getInputStream(ze)) {
-                     int[] px = readTile16(in);
+                     int[] px = readTile(in);
                      if (px != null) {
                         overrides.put(tileIdx, px);
                      }
-                  }
+                  } catch (IOException e) { System.err.println("[packs] " + fn + "/" + name + ": " + e.getMessage()); }
                }
             }
          }
@@ -505,12 +560,16 @@ public final class ResourcePacks {
       String title = props.getProperty("name", id.replace('_', ' '));
       String desc = props.getProperty("description", "Custom zip resource pack (" + fn + ")");
       boolean classic = "classic".equalsIgnoreCase(props.getProperty("base", "default").trim());
-      Pack pack = new Pack(id, title, desc, false, classic, zipPath, 0xFFAB47BC);
+      Pack pack = new Pack(id, title, desc, false, classic, zipPath, 0xFFAB47BC, "32".equals(props.getProperty("tileSize")) ? "32px" : "16px");
       pack.props.putAll(props);
       if (atlasBytes != null) {
          loadAtlasOverrides(pack, new ByteArrayInputStream(atlasBytes));
       }
       pack.tileOverrides.putAll(overrides);
+      for (Map.Entry<String, byte[]> e : animationBytes.entrySet()) {
+         try { readAnimations(pack, e.getKey(), new ByteArrayInputStream(e.getValue())); }
+         catch (IOException ex) { System.err.println("[packs] " + fn + ": " + ex.getMessage()); }
+      }
       return pack;
    }
 
@@ -520,16 +579,18 @@ public final class ResourcePacks {
          if (img == null) {
             return;
          }
-         int cols = img.getWidth() / 16;
-         int rows = img.getHeight() / 16;
+         int size = "32".equals(pack.props.getProperty("tileSize")) ? 32 : 16;
+         int cols = img.getWidth() / size;
+         int rows = img.getHeight() / size;
+         if ((cols != 16 && cols != 32) || rows > 64 || img.getWidth() % size != 0 || img.getHeight() % size != 0) return;
          for (int ty = 0; ty < rows; ty++) {
             for (int tx = 0; tx < cols; tx++) {
                int tile = cols == 16 ? (ty * 16 + tx) : (ty * 32 + tx);
-               if (tile < 0 || tile >= 2048) {
+               if (tile < 0 || tile >= Tex.COLS * Tex.COLS) {
                   continue;
                }
-               int[] cell = new int[256];
-               img.getRGB(tx * 16, ty * 16, 16, 16, cell, 0, 16);
+               int[] cell = new int[size * size];
+               img.getRGB(tx * size, ty * size, size, size, cell, 0, size);
                boolean nonEmpty = false;
                for (int v : cell) {
                   if ((v >>> 24) != 0) {
@@ -546,14 +607,12 @@ public final class ResourcePacks {
       }
    }
 
-   private static int[] readTile16(InputStream in) throws IOException {
+   private static int[] readTile(InputStream in) throws IOException {
       BufferedImage img = ImageIO.read(in);
-      if (img == null || img.getWidth() < 16 || img.getHeight() < 16) {
-         return null;
-      }
-      int[] px = new int[256];
-      img.getRGB(0, 0, 16, 16, px, 0, 16);
-      return px;
+      if (img == null || img.getWidth() != img.getHeight() || (img.getWidth() != 16 && img.getWidth() != 32))
+         throw new IOException("Tile PNG must be exactly 16x16 or 32x32 (not cropped/scaled).");
+      int size = img.getWidth();
+      return img.getRGB(0, 0, size, size, null, 0, size);
    }
 
    static int resolveTileName(String fileName) {
@@ -561,8 +620,8 @@ public final class ResourcePacks {
          ? fileName.substring(0, fileName.length() - 4).trim().toLowerCase(Locale.ROOT)
          : fileName.trim().toLowerCase(Locale.ROOT);
       try {
-         int idx = Integer.parseInt(stem);
-         return idx >= 0 && idx < 2048 ? idx : -1;
+         int idx = Integer.parseInt(stem.split("_", 2)[0]);
+         return idx >= 0 && idx < Tex.COLS * Tex.COLS ? idx : -1;
       } catch (NumberFormatException ignored) {
       }
       switch (stem) {

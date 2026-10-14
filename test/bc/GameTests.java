@@ -1729,6 +1729,7 @@ public final class GameTests {
       Tests319.run();
       TestsVisualRefresh.run();
       TestsUtilityReview.run();
+      TestsTextureEditor.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

@@ -1065,11 +1065,18 @@ public final class Tex {
       }
    }
 
+   /** Shared with headless pack round-trip tests: edits must survive the animation upload. */
+   static int[] animationPixels(int tile, int[] pixels, float phase, int size) {
+      int[] custom = ResourcePacks.overridePixels(tile, (int)phase, size);
+      if (custom != null) return custom;
+      if (size != TexPixel32.SIZE) return pixels;
+      if (tile == 40) return TexUtility32.furnace(true, (int)phase);
+      return TexRemaining32.animated(tile) ? TexRemaining32.frame(tile, phase) : TexPixel32.tile(tile, pixels, true);
+   }
+
    private static void upload(int x, int y, int[] pixels, boolean mips) {
       int tile = (y / 16) * COLS + x / 16;
-      int[] cur = renderTileSize == TexPixel32.SIZE
-         ? (TexRemaining32.animated(tile) ? TexRemaining32.frame(tile, Math.max(0, lastBlendKey) / 16.0F) : TexPixel32.tile(tile, pixels, true))
-         : pixels;
+      int[] cur = animationPixels(tile, pixels, Math.max(0, lastBlendKey) / 16.0F, renderTileSize);
       int scale = renderTileSize / 16;
       x *= scale;
       y *= scale;

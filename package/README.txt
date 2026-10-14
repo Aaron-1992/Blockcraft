@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.5  -  an original Minecraft-style voxel sandbox   (EDITION V6.5)
+BLOCKCRAFT V6.6  -  an original Minecraft-style voxel sandbox   (EDITION V6.6)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,21 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.6 - Art review updates + Aseprite texture editing
+  * Includes the building, Colors/Nature and Utility/Tools review changes:
+    revised ores/logs/wool/powders/glazes, utility faces, slimmer tools/armor,
+    TNT lettering, scarier pumpkins, egg, cake, paper/book and Eye of Ender.
+  * Hinged chest lids, raised portal eyes, six-facing observers, folded banner
+    models and pick-block, torch components and localized emission.
+  * Keeps the accepted planks/cobble/stone-brick references, shears and
+    flint-and-steel; flat bow animation, gun poses and held lighting remain.
+  * Edit-textures.bat exports the ACTUAL native 32px PNGs, six animation
+    sheets, searchable index and instructions for editing in Aseprite.
+  * Options > Resource Packs > Reload PNGs applies saved edits immediately.
+    Native custom packs retain crisp 32px pixels, transparency, animated
+    textures and held bow sprites. Old 16px packs remain supported.
+  * Export never overwrites your pack. See Texture-editing.txt beside the EXE.
 
 WHAT'S NEW IN V6.5 - Cohesive native-pixel art rework
   * Replaced all 456 non-protected populated default atlas cells from V6.4,

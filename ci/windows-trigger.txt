@@ -1,2 +1,2 @@
-pixel-title,pixel-items,pixel-food,pixel-garden-plain,pixel-cohesion-lit,pixel-bow-full,pixel-hand-torch
-# V6.5: every capture required; allow late launcher captures and keep inventory tooltip out of frame.
+pixel-title,pixel-utility-chest-open,pixel-editor-reload,pixel-editor-bow
+# V6.6 packaged Windows EXE: native pack export and hot reload after existing GPU uploads.

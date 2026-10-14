@@ -21,6 +21,8 @@ import hashlib
 import os
 import re
 import shutil
+import subprocess
+import tempfile
 import sys
 import zipfile
 
@@ -78,6 +80,33 @@ def notes(version, full_name, patch_name):
     ) % {"v": version, "full": full_name, "patch": patch_name, "new": whats_new(version)}
 
 
+def texture_kit(patch, version):
+    """Export from the verified, packaged JAR, never from separate/stale build classes."""
+    name = "Blockcraft-V%s-Aseprite-textures.zip" % version
+    with tempfile.TemporaryDirectory(prefix="texture-kit-", dir=B.BUILD) as tmp:
+        jar = os.path.join(tmp, "blockcraft.jar")
+        with zipfile.ZipFile(patch) as z:
+            with open(jar, "wb") as f:
+                f.write(z.read("Blockcraft/blockcraft.jar"))
+        pack = os.path.join(tmp, "resourcepacks", "MyTextures")
+        subprocess.run([B.java_exe(), "-Djava.awt.headless=true", "-jar", jar, "--export-textures", pack], check=True, timeout=120)
+        with zipfile.ZipFile(os.path.join(OUT, name), "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+            for folder, dirs, files in os.walk(pack):
+                dirs.sort()
+                for fn in sorted(files):
+                    path = os.path.join(folder, fn)
+                    entry = zipfile.ZipInfo(os.path.relpath(path, tmp).replace(os.sep, "/"), B.FIXED_TIME)
+                    entry.compress_type = zipfile.ZIP_DEFLATED
+                    entry.external_attr = 0o644 << 16
+                    with open(path, "rb") as f:
+                        z.writestr(entry, f.read())
+        with zipfile.ZipFile(os.path.join(OUT, name)) as z:
+            assert z.testzip() is None
+            assert len([n for n in z.namelist() if "/tiles/" in n]) == 532
+            assert len([n for n in z.namelist() if "/animations/" in n]) == 6
+    return name
+
+
 def main():
     version = sys.argv[1] if len(sys.argv) > 1 else B.game_version()
     patch = find_patch(version)
@@ -122,8 +151,26 @@ def main():
     with zipfile.ZipFile(patch) as z:
         assert z.testzip() is None
 
+    release_notes = notes(version, full_name, patch_name)
+    if tuple(map(int, version.split("."))) >= (6, 6):
+        kit = texture_kit(patch, version)
+        release_notes += (
+            "\n### Edit the textures in Aseprite\n\n"
+            "1. Run **Edit-textures.bat** inside the extracted game folder. It exports the actual 32px PNGs and opens a searchable index.\n"
+            "2. Open a PNG in Aseprite and save/export your edits to the same PNG.\n"
+            "3. In-game: **Options > Resource Packs > Reload PNGs**, then select **My Aseprite Textures**. "
+            "After later saves, just press **Reload PNGs** again.\n\n"
+            "The shortcut never overwrites an existing pack. Includes 532 individual tiles and six animation sheets "
+            "(water, lava, fire, portal, lit furnace and all eight flat-bow poses). "
+            "See `Texture-editing.txt` for Aseprite sheet settings, file locations and backups.\n\n"
+            "**Optional ready-made editor kit:** `%s` — extract into the folder containing Blockcraft.exe, "
+            "without replacing an already edited MyTextures folder. The game download can generate this same kit itself.\n\n"
+            "V6.5 remains available unchanged. SHA256SUMS.txt checks the three downloads.\n" % kit)
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
-        f.write(notes(version, full_name, patch_name))
+        f.write(release_notes)
+    with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:
+        for name in sorted(glob.glob(os.path.join(OUT, "*.zip"))):
+            f.write(hashlib.sha256(open(name, "rb").read()).hexdigest() + "  " + os.path.basename(name) + "\n")
     with open(os.path.join(OUT, "VERSION"), "w") as f:
         f.write(version)
 

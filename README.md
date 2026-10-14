@@ -1,14 +1,28 @@
 # Blockcraft
 
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
-Current source version: **V6.5 — cohesive native-pixel art rework**.
+Current source version: **V6.6 — art review updates + Aseprite texture editing**.
 
-The default pack uses crisp 32×32 artwork across blocks, plants, animations and item
-icons. V6.5 replaces the 456 non-protected atlas cells from V6.4 while preserving the
-61 reference cells, including stone bricks, planks, cobblestone and the flat animated
-bow. Corrected gun poses and held-item lighting are retained. See the
-[art review and verification record](docs/art-review/README.md) and the full player
-manual/changelog in `package/README.txt`.
+Includes the Building, Colors/Nature and Utility/Tools review batches, chest and
+utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
+bricks, planks and cobblestone remain; the bow stays a flat animated sprite, and
+corrected gun poses and held-item lighting are retained. See the
+[review record](docs/art-review/utility-tools-review.md) and `package/README.txt`.
+
+## Edit textures in Aseprite
+
+1. Run **Edit-textures.bat** in the extracted game folder. It creates
+   `resourcepacks/MyTextures/` and opens a searchable picture index.
+2. Edit a **32×32 PNG** in Aseprite and save/export to the same PNG filename.
+3. In-game, open **Options → Resource Packs → Reload PNGs**, then select
+   **My Aseprite Textures**. After later saves, just press **Reload PNGs**.
+
+No Java/source editing or extra tools needed. The exporter **never overwrites an
+existing pack**. Includes 532 individual tiles and six animation sheets, with
+filenames, face/component mappings, and Aseprite import/export instructions.
+A separate ready-made texture kit is also available with the release.
+Read the [complete editing guide](package/Texture-editing.txt), including backups
+and the difference between editable PNGs and the reference atlas.
 
 ## Download and play (the easy way)
 
@@ -21,7 +35,7 @@ patch). Your worlds and options are stored in `%USERPROFILE%\.blockcraft112`, so
 you extract a new version into a new folder. The player manual with the full changelog is `package/README.txt`
 (also inside the zip).
 
-**Seeing older art?** Check the title says V6.5 and select **Natural Pixel 32 (Default)**
+**Seeing older art?** Check the title says V6.6 and select **Natural Pixel 32 (Default)**
 in Options > Resource Packs. Older/custom packs deliberately keep their own textures.
 
 > Releases are created by the **Release** GitHub Action (Actions tab -> *Release* -> *Run workflow*), which packages the

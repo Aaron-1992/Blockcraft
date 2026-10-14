@@ -23,6 +23,8 @@ def required(version):
     extra = ("TexRemaining32",) if tuple(map(int, version.split("."))) >= (6, 4) else ()
     if tuple(map(int, version.split("."))) >= (6, 5):
         extra += ("TexMaterials32", "TexItems32", "TexNature32", "PixelArt32")
+    if tuple(map(int, version.split("."))) >= (6, 6):
+        extra += ("TextureEditor", "ResourcePacks", "UtilityModels", "ChestLids", "TexUtility32", "TexTools32", "TexBuildingReview32", "TexColorNature32", "TexGlazedReview32")
     return REQUIRED + extra
 
 
@@ -57,6 +59,16 @@ def verify(archive, version):
     with zipfile.ZipFile(archive) as z:
         exe, jar = (z.read("Blockcraft/" + n) for n in ("Blockcraft.exe", "blockcraft.jar"))
         receipt = inspect_payload(exe, jar, version, B.source_fingerprint())
+        if tuple(map(int, version.split("."))) >= (6, 6):
+            with zipfile.ZipFile(io.BytesIO(jar)) as game:
+                for name in ("texture-editing.txt", "texture-names.tsv"):
+                    with open(os.path.join(B.ROOT, "res", name), "rb") as f:
+                        if game.read(name) != f.read():
+                            raise ValueError("Stale texture editor resource: " + name)
+            for name in ("Edit-textures.bat", "Texture-editing.txt", "README.txt"):
+                with open(os.path.join(B.ROOT, "package", name), "rb") as f:
+                    if z.read("Blockcraft/" + name) != f.read():
+                        raise ValueError("Stale packaged instructions/shortcut: " + name)
     with tempfile.TemporaryDirectory() as tmp:
         for name, data in (("Blockcraft.exe", exe), ("blockcraft.jar", jar)):
             path = os.path.join(tmp, name)

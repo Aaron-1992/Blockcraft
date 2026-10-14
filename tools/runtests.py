@@ -131,7 +131,7 @@ def unit(classes):
     if not os.path.exists(os.path.join(ROOT, "test", "bc", "GameTests.java")):
         print("unit: no GameTests yet")
         return True
-    r = run_java([TEST_CLASSES, classes, LWJGL], "bc.GameTests")
+    r = run_java([TEST_CLASSES, classes, LWJGL, os.path.join(ROOT, "res")], "bc.GameTests")
     print(r.stdout)
     if r.returncode != 0:
         print(r.stderr[-3000:])

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.5";
+   public static final String VERSION_STR = "6.6";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -577,6 +577,7 @@ public final class Game {
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
+         if (Boolean.getBoolean("bc.reviewpack")) TextureEditor.smokeFrame(this, this.autoFrames);
          if (this.autoFrames == 1) {
             if(Boolean.getBoolean("bc.worldonly"))this.hideGui=true;
             if (var2 != null) {

@@ -1,0 +1,539 @@
+0	Grass Top
+1	Dirt
+2	Grass Side Ovl
+3	Stone
+4	Cobble
+5	Sand
+6	Gravel
+7	Log Side
+8	Log Top
+9	Leaves
+10	Planks
+11	Bedrock
+12	Coal
+13	Iron
+14	Gold
+15	Diamond
+16	Redstone
+17	Lapis
+18	Snow
+19	Glass
+20	Bricks
+21	Sandstone Side
+22	Sandstone Top
+23	Water
+24	Lava
+25	Tallgrass
+26	Flower Red
+27	Flower Yellow
+28	Cactus Side
+29	Cactus Top
+30	Glowstone
+31	Spruce Side
+32	Spruce Top
+33	Birch Side
+34	Obsidian
+35	Stonebrick
+36	Torch
+37	Craft Top
+38	Craft Side
+39	Furnace Front
+40	Furnace On
+41	Chest Top
+42	Chest Side
+43	Spawner
+44	Mossy
+48	Wool0
+49	Orange Wool
+50	Magenta Wool
+51	Light Blue Wool
+52	Yellow Wool
+53	Lime Wool
+54	Pink Wool
+55	Gray Wool
+56	Light Gray Wool
+57	Cyan Wool
+58	Purple Wool
+59	Blue Wool
+60	Brown Wool
+61	Green Wool
+62	Red Wool
+63	Black Wool
+64	White
+65	Stick
+66	Coal
+67	Iron Ingot
+68	Gold Ingot
+69	Diamond
+70	Leather
+71	Feather
+72	String
+73	Bone
+74	Gunpowder
+75	Flint
+76	Arrow
+77	Bow
+78	Apple
+79	Raw Porkchop
+80	Cooked Porkchop
+81	Raw Beef
+82	Steak
+83	Raw Chicken
+84	Cooked Chicken
+85	Raw Mutton
+86	Cooked Mutton
+87	Rotten Flesh
+88	Oak Door
+105	Wooden Sword
+106	Wooden Pickaxe
+107	Wooden Axe
+108	Wooden Shovel
+109	Stone Sword
+110	Stone Pickaxe
+111	Stone Axe
+112	Stone Shovel
+113	Iron Sword
+114	Iron Pickaxe
+115	Iron Axe
+116	Iron Shovel
+117	Golden Sword
+118	Golden Pickaxe
+119	Golden Axe
+120	Golden Shovel
+121	Diamond Sword
+122	Diamond Pickaxe
+123	Diamond Axe
+124	Diamond Shovel
+135	Leather Cap
+136	Leather Tunic
+137	Leather Pants
+138	Leather Boots
+139	Iron Helmet
+140	Iron Chestplate
+141	Iron Leggings
+142	Iron Boots
+143	Golden Helmet
+144	Golden Chestplate
+145	Golden Leggings
+146	Golden Boots
+147	Diamond Helmet
+148	Diamond Chestplate
+149	Diamond Leggings
+150	Diamond Boots
+160	Oak Door
+161	Oak Door
+170	Farmland
+171	Wheat
+172	Wheat
+173	Wheat
+174	Wheat
+175	Wheat
+176	Wheat
+177	Wheat
+178	Wheat
+179	Ladder
+180	TNT
+181	TNT
+182	TNT
+183	BED_TOP_HEAD
+184	BED_TOP_FOOT
+185	BED_SIDE
+190	Bucket
+191	Water Bucket
+192	Lava Bucket
+193	Wheat Seeds
+194	Wheat
+195	Bread
+196	Flint and Steel
+198	Wooden Hoe
+199	Stone Hoe
+200	Iron Hoe
+201	Golden Hoe
+202	Diamond Hoe
+203	Farmland
+204	Carrots
+205	Carrots
+206	Carrots
+207	Carrots
+208	Potatoes
+209	Potatoes
+210	Potatoes
+211	Potatoes
+212	Hay Bale
+213	Hay Bale
+214	Carrot
+215	Potato
+216	Baked Potato
+217	Bone Meal
+218	Shears
+219	Sugar Cane
+220	Bookshelf
+221	Pumpkin
+222	Pumpkin
+223	Carved Pumpkin
+224	Jack o'Lantern
+225	Melon
+226	Melon
+227	Pumpkin Stem
+228	Pumpkin Stem
+229	Pumpkin Stem
+230	Pumpkin Stem
+231	Cake
+232	Cake
+233	Cake
+234	Cake
+235	Fire
+236	Sugar
+237	Paper
+238	Book
+239	Milk Bucket
+240	Egg
+241	Pumpkin Seeds
+242	Melon Seeds
+243	Melon Slice
+244	Pumpkin Pie
+245	Cake
+246	Oak Log
+247	Birch Log
+248	Spruce Log
+256	Netherrack
+257	Soul Sand
+258	Nether Quartz Ore
+259	Nether Bricks
+260	Magma Block
+261	Block of Quartz
+262	Block of Quartz
+263	Nether Portal
+264	End Stone
+265	End Portal Frame
+266	Model-only face / icon
+267	End Portal Frame
+268	End Portal
+269	Model-only face / icon
+272	Nether Quartz
+273	Nether Brick
+274	Blaze Rod
+275	Blaze Powder
+276	Ghast Tear
+277	Gold Nugget
+278	Ender Pearl
+279	Eye of Ender
+280	Emerald
+281	Orange Dye
+282	Magenta Dye
+283	Light Blue Dye
+284	Yellow Dye
+285	Lime Dye
+286	Pink Dye
+287	Gray Dye
+288	Light Gray Dye
+289	Cyan Dye
+290	Purple Dye
+291	Blue Dye
+292	Brown Dye
+293	Green Dye
+294	Red Dye
+295	Black Dye
+400	White Concrete
+401	Orange Concrete
+402	Magenta Concrete
+403	Light Blue Concrete
+404	Yellow Concrete
+405	Lime Concrete
+406	Pink Concrete
+407	Gray Concrete
+408	Light Gray Concrete
+409	Cyan Concrete
+410	Purple Concrete
+411	Blue Concrete
+412	Brown Concrete
+413	Green Concrete
+414	Red Concrete
+415	Black Concrete
+416	White Concrete Powder
+417	Orange Concrete Powder
+418	Magenta Concrete Powder
+419	Light Blue Concrete Powder
+420	Yellow Concrete Powder
+421	Lime Concrete Powder
+422	Pink Concrete Powder
+423	Gray Concrete Powder
+424	Light Gray Concrete Powder
+425	Cyan Concrete Powder
+426	Purple Concrete Powder
+427	Blue Concrete Powder
+428	Brown Concrete Powder
+429	Green Concrete Powder
+430	Red Concrete Powder
+431	Black Concrete Powder
+432	Terracotta
+433	White Terracotta
+434	Orange Terracotta
+435	Magenta Terracotta
+436	Light Blue Terracotta
+437	Yellow Terracotta
+438	Lime Terracotta
+439	Pink Terracotta
+440	Gray Terracotta
+441	Light Gray Terracotta
+442	Cyan Terracotta
+443	Purple Terracotta
+444	Blue Terracotta
+445	Brown Terracotta
+446	Green Terracotta
+447	Red Terracotta
+448	Black Terracotta
+449	White Glazed Terracotta
+450	Orange Glazed Terracotta
+451	Magenta Glazed Terracotta
+452	Light Blue Glazed Terracotta
+453	Yellow Glazed Terracotta
+454	Lime Glazed Terracotta
+455	Pink Glazed Terracotta
+456	Gray Glazed Terracotta
+457	Light Gray Glazed Terracotta
+458	Cyan Glazed Terracotta
+459	Purple Glazed Terracotta
+460	Blue Glazed Terracotta
+461	Brown Glazed Terracotta
+462	Green Glazed Terracotta
+463	Red Glazed Terracotta
+464	Black Glazed Terracotta
+465	Clay
+466	White Stained Glass
+467	Orange Stained Glass
+468	Magenta Stained Glass
+469	Light Blue Stained Glass
+470	Yellow Stained Glass
+471	Lime Stained Glass
+472	Pink Stained Glass
+473	Gray Stained Glass
+474	Light Gray Stained Glass
+475	Cyan Stained Glass
+476	Purple Stained Glass
+477	Blue Stained Glass
+478	Brown Stained Glass
+479	Green Stained Glass
+480	Red Stained Glass
+481	Black Stained Glass
+482	Block of Iron
+483	Block of Gold
+484	Block of Diamond
+485	Block of Emerald
+486	Block of Coal
+487	Lapis Lazuli Block
+488	Emerald Ore
+520	Granite
+521	Diorite
+522	Andesite
+523	Red Sand
+524	Podzol
+525	Podzol
+526	Mycelium
+527	Mycelium
+528	Coarse Dirt
+529	Ice
+530	Packed Ice
+531	Red Sandstone
+532	Red Sandstone
+534	Spruce Planks
+535	Birch Planks
+536	Jungle Planks
+537	Acacia Planks
+538	Dark Oak Planks
+540	Jungle Log
+541	Acacia Log
+542	Dark Oak Log
+543	Jungle Log
+544	Acacia Log
+545	Dark Oak Log
+546	Jungle Log
+547	Acacia Log
+548	Dark Oak Log
+550	Jungle Leaves
+551	Acacia Leaves
+552	Dark Oak Leaves
+553	Fern
+554	Dead Bush
+556	Blue Orchid
+557	Allium
+558	Azure Bluet
+559	Red Tulip
+560	Orange Tulip
+561	White Tulip
+562	Pink Tulip
+563	Oxeye Daisy
+564	Cornflower
+565	Lily of the Valley
+566	Brown Mushroom
+567	Red Mushroom
+570	Tall Grass
+571	Tall Grass
+572	Large Fern
+573	Large Fern
+574	Sunflower
+575	Sunflower
+576	Lilac
+577	Lilac
+578	Rose Bush
+579	Rose Bush
+580	Peony
+581	Peony
+582	Lily Pad
+583	Vines
+584	Red Mushroom Block
+585	Brown Mushroom Block
+586	Mushroom Stem
+587	SNOW_SIDE
+590	ITEM0
+591	Model-only face / icon
+592	Model-only face / icon
+593	Model-only face / icon
+594	Model-only face / icon
+595	Model-only face / icon
+600	Iron Bars
+601	EDGE0
+602	Model-only face / icon
+603	Model-only face / icon
+604	Model-only face / icon
+605	Model-only face / icon
+606	Model-only face / icon
+607	Model-only face / icon
+608	Model-only face / icon
+609	Model-only face / icon
+610	Model-only face / icon
+611	Model-only face / icon
+612	Model-only face / icon
+613	Model-only face / icon
+614	Model-only face / icon
+615	Model-only face / icon
+616	Model-only face / icon
+617	Model-only face / icon
+618	BARS_EDGE
+620	Oak Trapdoor
+621	Birch Trapdoor
+622	Spruce Trapdoor
+623	Jungle Trapdoor
+624	Acacia Trapdoor
+625	Dark Oak Trapdoor
+626	Iron Trapdoor
+630	BED_FOOT0
+631	Model-only face / icon
+632	Model-only face / icon
+633	Model-only face / icon
+634	BED_HEAD0
+635	Model-only face / icon
+636	Model-only face / icon
+637	Model-only face / icon
+638	BED_SIDE
+639	PILLOW_TOP
+640	PILLOW_SIDE
+641	CLOTH
+642	BUSHY_FROND
+643	Block of Redstone
+644	Redstone Lamp
+645	Redstone Lamp
+646	Redstone Torch
+647	Redstone Wire
+648	Polished Granite
+649	Polished Diorite
+650	Polished Andesite
+651	Chiseled Sandstone
+652	Smooth Sandstone
+653	Chiseled Red Sandstone
+654	Smooth Red Sandstone
+655	Chiseled Stone Bricks
+656	Mossy Stone Bricks
+657	Cracked Stone Bricks
+658	Slime Block
+659	Sea Lantern
+660	Redstone Dust
+661	Redstone Wire
+662	Redstone Torch
+663	Redstone Repeater
+664	Redstone Repeater
+665	Piston
+666	Piston
+667	Sticky Piston
+668	Piston
+669	Daylight Sensor
+670	Note Block
+671	Observer
+672	Golden Apple
+673	Golden Carrot
+674	Cookie
+675	Mushroom Stew
+676	Bowl
+677	Compass
+678	Clock
+679	Fire Charge
+680	Prismarine
+681	Prismarine Bricks
+682	Dark Prismarine
+683	Purpur Block
+684	Purpur Pillar
+685	Purpur Pillar
+686	Bone Block
+687	Bone Block
+688	Tactical Pistol
+689	Assault SMG
+690	Heavy Sniper
+691	TNT Frag Grenade
+692	Murderer's Knife
+693	C4 Explosive
+694	Siege Cannon
+695	Mortar Launcher
+700	White Bed
+701	Orange Bed
+702	Magenta Bed
+703	Light Blue Bed
+704	Yellow Bed
+705	Lime Bed
+706	Pink Bed
+707	Gray Bed
+708	Light Gray Bed
+709	Cyan Bed
+710	Purple Bed
+711	Blue Bed
+712	Brown Bed
+713	Green Bed
+714	Red Bed
+715	Black Bed
+716	White Banner
+717	Orange Banner
+718	Magenta Banner
+719	Light Blue Banner
+720	Yellow Banner
+721	Lime Banner
+722	Pink Banner
+723	Gray Banner
+724	Light Gray Banner
+725	Cyan Banner
+726	Purple Banner
+727	Blue Banner
+728	Brown Banner
+729	Green Banner
+730	Red Banner
+731	Black Banner
+742	Model-only face / icon
+760	Cap
+761	Shaft
+762	Red Head
+763	Dead Head
+764	Chest Side
+765	Furnace Side
+766	Furnace Top
+767	Day On
+768	Eye Top
+769	Eye Side
+770	Metal
+771	Button Stone
+772	Button Wood
+773	Egg
+774	Flame
+775	Obs Back
+776	Obs Back On
+777	Repeater Edge
+778	Rod
+779	Cloth Edge
+780	Lever Base

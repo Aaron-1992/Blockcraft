@@ -8,7 +8,7 @@ package bc;
 final class TexPixel32 {
    static final int SIZE = 32;
    private TexPixel32() {}
-   static boolean enabled() { return ResourcePacks.ID_DEFAULT.equals(ResourcePacks.activeId()); }
+   static boolean enabled() { return ResourcePacks.native32(); }
 
    static float hash(int x, int y, int seed) {
       int h = x * 374761393 + y * 668265263 + seed * 144269;
@@ -169,6 +169,8 @@ final class TexPixel32 {
 
    /** Native art, preserving the approved 6.3 families. Unknown extension tiles keep nearest sampling. */
    static int[] tile(int tile, int[] src, boolean animated) {
+      int[] custom = ResourcePacks.overridePixels(tile, 0, SIZE);
+      if (custom != null) return custom;
       // 6.3 painters below stay byte-for-byte stable. Every other populated family
       // is now painted natively, not silently enlarged from the old CPU atlas.
       boolean populated = false;
@@ -209,7 +211,7 @@ final class TexPixel32 {
          for (int y = 0; y < 16; y++) System.arraycopy(source, (Tex.ty(t) + y) * Tex.PX + Tex.tx(t), low, y * 16, 16);
          boolean anim = t == Tex.WATER || t == Tex.LAVA || t == 235 || t == TexArt312.PORTAL;
          int[] high = tile(t, low, anim);
-         if (t == Items.tile[Items.BOW]) high = BowSprite.pixels(0, false);
+         if (t == Items.tile[Items.BOW]) high = BowSprite.renderPixels(0, false);
          for (int y = 0; y < SIZE; y++) System.arraycopy(high, y * SIZE, out, ((t / Tex.COLS) * SIZE + y) * width + (t % Tex.COLS) * SIZE, SIZE);
       }
       return out;

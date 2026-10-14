@@ -1,0 +1,89 @@
+BLOCKCRAFT V6.6 - ASEPRITE TEXTURE EDITING
+========================================
+No Java editing, compiling, Python or extra Java installation needed.
+
+QUICK START (Windows)
+1. Extract the full V6.6 game into a NEW folder. Run Edit-textures.bat.
+   It creates resourcepacks\MyTextures\ beside Blockcraft.exe, then opens
+   that folder and its searchable index.html in your browser.
+   Running the shortcut again opens your existing work; it does NOT reset it.
+   Alternative: extract the separate Aseprite texture kit ZIP into the game
+   folder (the one containing Blockcraft.exe). Do not overwrite an edited pack.
+2. In index.html, search for a block/item or tile ID. Open its PNG from the
+   tiles\ folder in Aseprite. Filenames contain the correct tile ID and name.
+3. Keep the canvas 32x32, retain alpha transparency and export/save as PNG
+   to the SAME path/name. A .aseprite project is fine as a working copy, but
+   the game only loads your exported PNG, not .aseprite files.
+4. Launch the game. Options > Resource Packs > Reload PNGs, then scroll down
+   and Select 'My Aseprite Textures'. That selection is saved.
+5. For every later edit: save PNG in Aseprite, return to Resource Packs and
+   press Reload PNGs. The active pack, held items, animations and world meshes
+   reload immediately; no game restart or re-export is necessary.
+
+FINDING THE RIGHT FACE
+- index.html is a searchable picture catalog. Expand 'Used by' for block
+  faces and model components. TEXTURES.tsv is the same index in tabular form.
+- The number is an ATLAS TILE ID, NOT a block/item ID or Minecraft's tile ID.
+  Keep the number and underscore prefix; you may change the descriptive suffix.
+  Do not leave two PNGs with the same numeric ID in tiles/.
+- Different sides, tops, inventory icons and model components can be separate
+  PNGs. A shared tile changes every block/item that uses it. Chest walls, lid,
+  latch, torch cap/shaft/flame and utility components have separate entries.
+- The kit contains 538 editable atlas cells (532 individual tiles + six sheets).
+  The remaining solid-white shader helper is deliberately not an editable file.
+- atlas-reference.png is a full 1024x1024 visual reference, NOT a loaded texture.
+  Edit the individual files, not the reference. This avoids atlas/PNG conflicts.
+- Biome foliage/grass and dyed model masks are tinted by the game. Keep neutral
+  masks gray if you want existing biome/dye colors to remain correct.
+- Models, lighting/emission rules, entity skins, sky and UI/font artwork are
+  separate systems. This kit covers the default block/item atlas and its bow,
+  water/lava/fire/portal/furnace frames; it does not change shapes or game rules.
+
+ANIMATIONS (animations\)
+- Water, lava, fire, portal and lit furnace: 512x32 PNG, sixteen 32x32 frames
+  in a horizontal strip, left to right. Frames step at 10 fps; no blurry tween.
+- Bow: 256x32 PNG, eight 32x32 frames left to right:
+    0 idle without arrow       4 idle with arrow
+    1 light pull, no arrow     5 light pull with arrow
+    2 medium pull, no arrow    6 medium pull with arrow
+    3 full pull, no arrow      7 full pull with arrow
+  Frame 0 is also the inventory icon. Grip pivot is pixel (8,16); keep it
+  there so the bow stays in the hand. Bow remains a flat sprite, not 3D.
+- Aseprite: open the sheet, then File > Import Sprite Sheet, horizontal strip,
+  frame width/height 32. For looping sheets set frame duration to 100 ms.
+  Export Sprite Sheet back as a horizontal PNG with no border, spacing,
+  trimming or extrusion, keeping the original total dimensions and filename.
+  Bow frames are selected by draw state, not by timeline duration.
+- A tiles/<same-number>_anything.png deliberately overrides a sheet with a
+  static image. Remove that duplicate to restore the animation. The starter
+  kit avoids such duplicates. A static bow override replaces all bow poses.
+
+PIXEL RULES AND SAFETY
+- Use nearest-neighbor if resizing previews. Do not resize the actual tiles.
+  PNG RGB/RGBA or indexed PNG is supported; keep transparency where intended.
+- Entirely transparent individual PNGs are valid and hide that tile. Deleting
+  a file instead restores the built-in fallback after Reload PNGs.
+- Native packs require tileSize=32 and base=Default in pack.properties.
+  Older 16px packs remain separate. Use the numeric-name filenames in this kit,
+  not the historical Minecraft-style aliases (which use old mappings).
+- Invalid-size PNGs are rejected with a [packs] warning in the console. Use
+  Blockcraft-debug.bat to see diagnostics. Never silently cropped to 16 pixels.
+- Back up MyTextures regularly, and copy it to resourcepacks/ in future installs.
+  It lives beside the game, NOT in the saved-world directory. New releases do
+  not overwrite it: the shortcut exports only when MyTextures does not exist.
+- To start another pack, rename/copy MyTextures to another unique folder and
+  edit its name in pack.properties. Run Edit-textures.bat to create a fresh
+  MyTextures only after the original is safely renamed/backed up.
+- Select Natural Pixel 32 (Default) to switch back at any time.
+
+ADVANCED / SHARING
+Java CLI (also Linux/macOS with Java 21):
+  java -Djava.awt.headless=true -jar blockcraft.jar --export-textures NEW_FOLDER
+The destination must not exist. Only built-in defaults are exported; the
+command never merges or overwrites an existing artist pack.
+For a shareable resource-pack ZIP, ZIP the CONTENTS of MyTextures so that
+pack.properties, tiles/ and animations/ are at the archive root. Place that
+ZIP in resourcepacks/. Avoid keeping a ZIP and folder with identical names.
+A native atlas.png (1024x1024) is also accepted, but individual files win and
+empty atlas cells mean fallback. The kit uses individual PNGs to remove any
+ambiguity, including intentional fully transparent tiles.
