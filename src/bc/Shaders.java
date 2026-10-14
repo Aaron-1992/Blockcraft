@@ -1149,41 +1149,11 @@ public final class Shaders {
 
    /** Update 3.19: (tile, strength) x 16 for the tiles that only blocks giving light (emit >= 12) use: the pumpkin's skin is also on the jack o'lantern, the furnace's cobblestone sides too - those do not glow. */
    static float[] computeEmissive() {
-      int n = Tex.COLS * Tex.COLS;
-      boolean[] lit = new boolean[n];
-      boolean[] plain = new boolean[n];
-      float[] strength = new float[n];
-      for (int id = 1; id < Blocks.MAX; id++) {
-         if (Blocks.name[id] == null) {
-            continue;
-         }
-
-         // small light sources (torches, fire, plants that shine) glow strongly - their halo is all there is to see of them; big surfaces (a lava lake, a wall of glowstone) a lot less
-         float s = id == Blocks.LAVA ? 0.20F : (Blocks.kind[id] == 0 || Blocks.kind[id] == 3 ? 0.50F : 1.0F);
-         for (int f = 0; f < 6; f++) {
-            int t = Blocks.tiles[id][f];
-            if (t >= 0 && t < n) {
-               if (Blocks.emit[id] >= 12) {
-                  lit[t] = true;
-                  strength[t] = Math.max(strength[t], s);
-               } else {
-                  plain[t] = true;
-               }
-            }
-         }
-      }
-
-      float[] a = new float[32];
-      int k = 0;
-      for (int t = 0; t < n && k < 16; t++) {
-         if (lit[t] && !plain[t]) {
-            a[k * 2] = t;
-            a[k * 2 + 1] = strength[t];
-            k++;
-         }
-      }
-
-      return a;
+      // Deliberate material whitelist; electrical power is not visible emission.
+      // Components use dedicated atlas cells, so wooden handles and machine casings
+      // cannot acquire emission merely because a lit block shares their texture.
+      return new float[]{24,.20F,235,1,30,.65F,40,.65F,224,.6F,260,.7F,
+         263,.75F,268,.75F,645,.82F,659,.82F,774,1,760,1,762,.8F,776,.3F,661,.4F,36,1};
    }
 
    /**

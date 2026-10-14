@@ -42,6 +42,7 @@ final class TexMaterials32 {
 
    static int[] paint(int t) {
       if(!handles(t))return null;
+      if(TexUtility32.handles(t))return TexUtility32.paint(t);
       if(TexColorNature32.handles(t))return TexColorNature32.paint(t);
       if(TexBuildingReview32.handles(t))return TexBuildingReview32.paint(t);
       int[] pixels=new int[1024];

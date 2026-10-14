@@ -1005,6 +1005,11 @@ public final class Tex {
       }
 
       TexExtra.blocks();
+      for(int tile=760;tile<=780;tile++) {
+         int[] nativePixels=TexUtility32.paint(tile),low=new int[256];
+         for(int y=0;y<16;y++)for(int x=0;x<16;x++)low[y*16+x]=nativePixels[y*64+x*2];
+         blit(tile,low);
+      }
       ResourcePacks.applyPostProcess(atlasPixels);
    }
 
@@ -1057,6 +1062,7 @@ public final class Tex {
          int b = a + 1 & 15;
          boolean mips = (step & 3) == 0;
          GL11.glBindTexture(3553, atlas);
+         if(TexPixel32.enabled())upload(tx(40),ty(40),TexUtility32.furnace(true,a),mips);
          upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix), mips);
          upload(tx(24), ty(24), blendFrames(lavaFrames[a], lavaFrames[b], mix), mips);
          upload(tx(235), ty(235), blendFrames(TexArt37.fireFrames[a], TexArt37.fireFrames[b], mix), mips);

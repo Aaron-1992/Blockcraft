@@ -73,6 +73,9 @@ final class Redstone319 {
    static final int OBSERVER = 2001;
    /** Observer ON pulse (4 horizontal facings 0..3): 2005..2008. */
    static final int OBSERVER_ON = 2005;
+   // Preserve saved horizontal IDs; 2010..2020 belong to the Backrooms mod.
+   static final int OBSERVER_VERTICAL = 2030; // down, up
+   static final int OBSERVER_VERTICAL_ON = 2032;
 
    static final int ITEM_REDSTONE = 450;
    static final int GOLDEN_APPLE = 451;
@@ -841,11 +844,20 @@ final class Redstone319 {
    }
 
    static boolean isObserver(int id) {
-      return id >= OBSERVER && id < OBSERVER_ON + 4;
+      return id >= OBSERVER && id < OBSERVER_ON + 4 || id >= OBSERVER_VERTICAL && id <= OBSERVER_VERTICAL_ON + 1;
    }
 
    static int observerFacing(int id) {
-      return (id - OBSERVER) & 3;
+      return id >= OBSERVER_VERTICAL ? 4 + ((id - OBSERVER_VERTICAL) & 1) : (id - OBSERVER) & 3;
+   }
+
+   static boolean observerOn(int id) {return id>=OBSERVER_ON&&id<OBSERVER_ON+4||id>=OBSERVER_VERTICAL_ON&&id<=OBSERVER_VERTICAL_ON+1;}
+   static int observerId(int facing,boolean on){return facing<4?(on?OBSERVER_ON:OBSERVER)+facing:(on?OBSERVER_VERTICAL_ON:OBSERVER_VERTICAL)+facing-4;}
+   static int observerDx(int f){return f<4?HDX[f]:0;}
+   static int observerDy(int f){return f==4?-1:f==5?1:0;}
+   static int observerDz(int f){return f<4?HDZ[f]:0;}
+   static boolean observerFeeds(int id,int sx,int sy,int sz,int x,int y,int z) {
+      int f=observerFacing(id);return observerOn(id)&&sx-observerDx(f)==x&&sy-observerDy(f)==y&&sz-observerDz(f)==z;
    }
 
    static boolean isFloorPart(int id) {
@@ -862,6 +874,8 @@ final class Redstone319 {
          return REPEATER_OFF + hf;
       }
       if (id == OBSERVER) {
+         if(g.player.pitch>45)return observerId(4,false);
+         if(g.player.pitch<-45)return observerId(5,false);
          return OBSERVER + hf;
       }
       if (id == PISTON || id == STICKY_PISTON) {
@@ -921,7 +935,7 @@ final class Redstone319 {
       if (isWire(id)) {
          return id - REDSTONE_WIRE0;
       }
-      if (isRepeaterOn(id) || (id >= OBSERVER_ON && id < OBSERVER_ON + 4)) {
+      if (isRepeaterOn(id) || observerOn(id)) {
          return 15;
       }
       return sourcePower(id);
@@ -944,9 +958,9 @@ final class Redstone319 {
                return true;
             }
          }
-         if (nb >= OBSERVER_ON && nb < OBSERVER_ON + 4) {
+         if (observerOn(nb)) {
             int of = observerFacing(nb);
-            if (nx - HDX[of] == x && ny == y && nz - HDZ[of] == z) {
+            if (observerFeeds(nb,nx,ny,nz,x,y,z)) {
                return true;
             }
          }
@@ -1049,17 +1063,14 @@ final class Redstone319 {
       if (w == null || updating || y < 1 || y > 254) {
          return;
       }
-      for (int f = 0; f < 4; f++) {
-         int ox = x - HDX[f];
-         int oz = z - HDZ[f];
-         int ob = w.getBlock(ox, y, oz);
-         if (ob == OBSERVER + f) {
-            w.setBlock(ox, y, oz, OBSERVER_ON + f);
-            buttonTimers.put(pack(ox, y, oz), 4);
-            if (w.game != null) {
-               w.game.meshNow(ox, y, oz);
-            }
-            propagate(w, ox - HDX[f], y, oz - HDZ[f]);
+      for (int f=0;f<6;f++) {
+         int ox=x-observerDx(f),oy=y-observerDy(f),oz=z-observerDz(f);
+         if(oy<1||oy>254)continue;
+         if(w.getBlock(ox,oy,oz)==observerId(f,false)) {
+            w.setBlock(ox,oy,oz,observerId(f,true));
+            buttonTimers.put(pack(ox,oy,oz),4);
+            if(w.game!=null)w.game.meshNow(ox,oy,oz);
+            propagate(w,ox-observerDx(f),oy-observerDy(f),oz-observerDz(f));
          }
       }
    }
@@ -1188,9 +1199,9 @@ final class Redstone319 {
                if (nx + HDX[rf] == p[0] && ny == p[1] && nz + HDZ[rf] == p[2]) {
                   sp = 15;
                }
-            } else if (nb >= OBSERVER_ON && nb < OBSERVER_ON + 4) {
+            } else if (observerOn(nb)) {
                int of = observerFacing(nb);
-               if (nx - HDX[of] == p[0] && ny == p[1] && nz - HDZ[of] == p[2]) {
+               if (observerFeeds(nb,nx,ny,nz,p[0],p[1],p[2])) {
                   sp = 15;
                }
             }
@@ -1391,6 +1402,7 @@ final class Redstone319 {
          if (sourcePower(nb) > 0 || (isWire(nb) && nb > REDSTONE_WIRE0)) {
             return true;
          }
+         if (observerFeeds(nb,nx,ny,nz,bx,by,bz)) return true;
          if (isRepeaterOn(nb)) {
             int rf = repeaterFacing(nb);
             if (nx + HDX[rf] == bx && ny == by && nz + HDZ[rf] == bz) {
@@ -1414,6 +1426,7 @@ final class Redstone319 {
          if (sourcePower(nb) > 0 || (isWire(nb) && nb > REDSTONE_WIRE0)) {
             return true;
          }
+         if (observerFeeds(nb,nx,ny,nz,x,y,z)) return true;
          if (isRepeaterOn(nb)) {
             int rf = repeaterFacing(nb);
             if (nx + HDX[rf] == x && ny == y && nz + HDZ[rf] == z) {
@@ -1584,10 +1597,10 @@ final class Redstone319 {
                   SoundEngine.playClickBlock(w, x, y, z, false);
                   propagate(w, x, y, z);
                   g.meshNow(x, y, z);
-               } else if (id >= OBSERVER_ON && id < OBSERVER_ON + 4) {
-                  int f = id - OBSERVER_ON;
-                  w.setBlock(x, y, z, OBSERVER + f);
-                  propagate(w, x - HDX[f], y, z - HDZ[f]);
+               } else if (observerOn(id)) {
+                  int f = observerFacing(id);
+                  w.setBlock(x, y, z, observerId(f,false));
+                  propagate(w, x-observerDx(f), y-observerDy(f), z-observerDz(f));
                   g.meshNow(x, y, z);
                }
             } else {

@@ -108,21 +108,7 @@ final class Decor315 {
    }
 
    private static double[][] bannerBoxes(int color, boolean wall, int facing) {
-      int plank = Blocks.tiles[Blocks.PLANKS][0];
-      int tint = Color312.fleece(color);
-      int cloth = TexArt315.CLOTH;
-      ArrayList<double[]> b = new ArrayList<>();
-      // canonical: the flag looks north (towards -z), the pole / wall is behind it
-      if (wall) {
-         b.add(Shapes.local(Shapes.tiles(Shapes.px(0, 13, 13, 16, 15, 16), plank, plank, plank)));
-         b.add(Shapes.local(Shapes.tint(Shapes.tiles(Shapes.px(0.5, -11, 12, 15.5, 13, 13), cloth, cloth, cloth), tint)));
-      } else {
-         b.add(Shapes.local(Shapes.tiles(Shapes.px(7, 0, 7, 9, 28, 9), plank, plank, plank)));
-         b.add(Shapes.local(Shapes.tiles(Shapes.px(0, 28, 6, 16, 30, 8), plank, plank, plank)));
-         b.add(Shapes.local(Shapes.tint(Shapes.tiles(Shapes.px(0.5, 4, 6, 15.5, 28, 7), cloth, cloth, cloth), tint)));
-      }
-
-      return Shapes.turnAll(b.toArray(new double[0][]), Shapes.turns(0, facing));
+      return UtilityModels.banner(color,wall,facing);
    }
 
    // ------------------------------------------------------------------ registration

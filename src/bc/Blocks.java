@@ -369,6 +369,8 @@ public final class Blocks {
 
    /** The item you get for a block that is placed in a facing/age variant: what pick-block and drops use. 0 = nothing. */
    public static int pickItem(int var0) {
+      if (Decor315.isBanner(var0)) return Decor315.BANNER_ITEM0+Decor315.bannerColor(var0);
+      if (Redstone319.isObserver(var0)) return Redstone319.OBSERVER;
       if (isStair(var0)) {
          return 93 + stairSlabMaterial(var0) * 4;
       } else if (isSlab(var0)) {
@@ -989,5 +991,6 @@ public final class Blocks {
       Shapes.register();
       Decor315.register();
       Redstone319.register();
+      UtilityModels.register();
    }
 }

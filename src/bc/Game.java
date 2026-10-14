@@ -3791,6 +3791,7 @@ public final class Game {
    }
 
    void update(double var1) {
+      ChestLids.update(this,var1);
       File dropped;
       while (this.skins != null && (dropped = this.skinDrops.poll()) != null) {
          this.importSkin(dropped);

@@ -18,6 +18,7 @@ final class TexRemaining32 {
          || t >= 672 && t <= 679 || t >= 688 && t <= 695 || t >= 700 && t <= 731 || t == 742;
    }
    static boolean handles(int t) {
+      if (TexUtility32.handles(t)) return true;
       if (TexColorNature32.handles(t)) return true;
       if (t == 44 || t == 522) return true; // Explicitly revised in the building-tab review.
       if (t == 77) return false; // the approved animated BowSprite owns this cell
@@ -42,6 +43,7 @@ final class TexRemaining32 {
       return shade(base, xx == 0 || yy == 0 ? -31 : xx == 1 || yy == 1 ? 11 : tone(x,y,base,4));
    }
    static int[] paint(int t) {
+      if (TexUtility32.handles(t)) return TexUtility32.paint(t);
       if (TexColorNature32.handles(t)) return TexColorNature32.paint(t);
       int[] material = TexMaterials32.paint(t);
       if (material != null) return material;
@@ -51,6 +53,7 @@ final class TexRemaining32 {
 
    /** 6.4 reference painters, retained while the replacement art direction is reviewed. */
    static int[] previous(int t) {
+      if(t>=760&&t<=780)return new int[1024];
       if(t==44||t==522||TexColorNature32.wasProtected(t))return TexPixel32.preReviewReference(t);
       if (animated(t)) return legacyFrame(t,0);
       if (item(t)) return icon(t);

@@ -488,7 +488,7 @@ final class Shapes {
          return new double[][]{trapBox(trap(trapKind(id), false, false, 0))};
       }
 
-      if (id >= 1900 && id <= 2020 && isModel(id)) {
+      if (isModel(id)) {
          return MODEL[id];
       }
 
@@ -521,6 +521,8 @@ final class Shapes {
          boxes = gateBoxes(id);
       } else if (Redstone319.isWire(id)) {
          boxes = Redstone319.wireBoxes(nbr, id);
+      } else if (id==Blocks.CHEST||id==Blocks.CHEST_LOOT) {
+         boxes=UtilityModels.chest(ChestLids.angle(s.ox+x,s.oy+y,s.oz+z));
       } else if (isModel(id)) {
          boxes = MODEL[id];
       } else {
@@ -584,6 +586,8 @@ final class Shapes {
                Mesher.uvFor(f, px, py, pz, uv);
             }
 
+            if(b.length>18&&f>=2){uv[0]=(float)(b[15]+uv[0]*(b[17]-b[15]));uv[1]=(float)(b[16]+uv[1]*(b[18]-b[16]));}
+            if(b.length>14&&b[12]!=0){double cy=py-b[13],cz=pz-b[14],c=Math.cos(b[12]),sn=Math.sin(b[12]);py=(float)(b[13]+cy*c-cz*sn);pz=(float)(b[14]+cy*sn+cz*c);}
             s.qx[i] = x + px;
             s.qy[i] = y + py;
             s.qz[i] = z + pz;
