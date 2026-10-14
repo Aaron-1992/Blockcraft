@@ -48,6 +48,19 @@ Tests additionally check opaque native faces, deterministic painter dispatch,
 retained masonry beneath moss, absence of yellow lapis dots and the exact old
 reference arrays for the two explicitly reopened textures.
 
-Actual-game verification pending: `pixel-building-review-plain/lit` in
-`tools/shots.py` render adjacent 2×2 samples plus a floor with unchanged material
-controls and quartz/purpur ends, from the newly compiled source (`jar=build`).
+Remote verification completed on source commit `c5de3eb`:
+
+- CI **38493273347** passed: 4,196,058 assertions, zero failures, plus strict
+  equivalence, shader syntax and native coverage checks.
+- Visual **38493273332** passed. `pixel-building-review-plain/lit` rendered from
+  the freshly compiled source (`jar=build`), exit 0 in 21s / 81s respectively.
+- Inspected both actual game PNGs in `ci-results/shots/`: adjacent 2×2 wall samples
+  show the new carved motifs, distinct andesite, fine moss, dark blue lapis,
+  trapped soul faces and saturated emerald facets. The floor includes untouched
+  stone, cobble, planks and stone-brick controls plus quartz/purpur end faces.
+  Pillar grooves continue through vertically adjacent blocks and all faces render
+  without alpha holes or incorrect atlas selection.
+
+The files are `pixel-building-review-{plain,lit}-new.png`. They document rendering
+and the implemented revision, not user acceptance. No release was published for
+this batch; V6.5 downloads remain unchanged while the category review continues.
