@@ -74,7 +74,17 @@ Visual **38495229743** rendered all four scenes (exit 0). Reviewed the colors an
 all 16 glaze designs in the actual game; powder/wool/clay show distinct surface
 structure beside unchanged concrete. The nature shots confirm snow is white on
 top and sides while remaining a shallow layer over dirt. The final ore iteration
-and an elevated log-end/snow view are awaiting the follow-up visual run.
+and elevated log-end/snow view were verified in follow-up Visual **38496066332**:
+plain/lit/overview exited 0 in 16s / 59s / 11s. Inspected all three final PNGs,
+including the six log-end samples, thin white snow over dirt, and the unchanged
+full snow-block control. Mineral deposits now use branched networks rather than
+the first draft's repeated isolated strokes. Final CI **38496066379** passed with
+**4,412,628 assertions, zero failures**, strict equivalence, shader syntax and
+native coverage checks. Source commit: `71d789f`.
+
+These checks establish rendering and scope protection, not artistic approval.
+The current Colors/Nature and earlier Building revisions remain unapproved and
+unreleased. V6.5 download archives are unchanged.
 
 Actual-game fixtures: `pixel-color-review`, `pixel-glazed-review`,
 `pixel-nature-review-plain/lit` use `jar=build`, with unchanged concrete controls,
