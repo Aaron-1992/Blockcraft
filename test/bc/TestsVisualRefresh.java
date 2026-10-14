@@ -124,7 +124,7 @@ final class TestsVisualRefresh {
                if(alphaChanges>0)newSilhouettes++;
             }
          }
-         check(changed==456,"all 456 rejected cells replaced, not just sample faces");
+         check(changed==458,"456 redrawn cells plus two explicitly requested building-review overrides");
          check(newSilhouettes==items,"every rejected item receives a new silhouette");
          for(int t:new int[]{23,24,235,263})for(float phase:new float[]{0,1,7,15.5F}) {
             int[] frame=TexRemaining32.frame(t,phase);
@@ -137,6 +137,31 @@ final class TestsVisualRefresh {
             int[] lower=TexRemaining32.paint(t), upper=TexRemaining32.paint(t+1);
             check((lower[15]>>>24)==255&&(upper[31*32+15]>>>24)==255,"continuous double-plant stem "+t);
          }
+      });
+      test("building review: only the requested material families change from the published 6.5 atlas", () -> {
+         ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);Tex.initPixels();
+         java.util.Properties before=new java.util.Properties();
+         try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-v65.properties")){before.load(in);}
+         catch(java.io.IOException e){throw new RuntimeException(e);}
+         int changed=0;
+         for(int t=0;t<1024;t++) {
+            int[] art=t==77?BowSprite.pixels(0,false):TexPixel32.tile(t,TexOverhaulV57.readTile(t),TexRemaining32.animated(t));
+            boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(Integer.toString(t)));
+            check(differs==TexBuildingReview32.handles(t),"change scope exactly matches requested faces: "+t);
+            if(!differs)continue;
+            changed++;
+            check(art.length==1024&&Arrays.equals(art,TexBuildingReview32.paint(t)),"native deterministic review painter "+t);
+            for(int c:art)check((c>>>24)==255,"building material has no alpha holes "+t);
+         }
+         check(changed==16,"16 affected faces, including polished andesite and pillar ends/sides");
+         for(int t:new int[]{44,656}) {
+            int[] rock=TexMaterials32.base(t==44?Tex.COBBLE:Tex.STONEBRICK),art=TexBuildingReview32.paint(t);
+            int moss=0;
+            for(int i=0;i<1024;i++)if(rock[i]!=art[i])moss++;
+            check(moss>100&&moss<460,"fine moss preserves most underlying masonry "+t);
+         }
+         for(int c:TexBuildingReview32.paint(487))check((c&255)>(c>>8&255)&&(c&255)>(c>>16&255),"lapis has blue mineral veins, no yellow dots");
+         for(int t:new int[]{44,522})check(Arrays.hashCode(TexPixel32.preReviewReference(t))==Integer.parseInt(before.getProperty(Integer.toString(t))),"accurate historical reference for requested exception "+t);
       });
       test("cohesive materials: shared timber, masonry grid and restrained cracks", () -> {
          ResourcePacks.select(ResourcePacks.ID_DEFAULT,null);

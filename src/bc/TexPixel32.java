@@ -149,6 +149,15 @@ final class TexPixel32 {
       return earth(Tex.STONE, x, y);
    }
 
+   /** Historical reference for the two formerly protected tiles the user explicitly
+    * requested changing. Used by comparison/audit only, never by active dispatch. */
+   static int[] preReviewReference(int t) {
+      if(t!=Tex.MOSSY&&t!=TexArt313.ANDESITE)throw new IllegalArgumentException("Not a review exception: "+t);
+      int[] p=new int[1024];
+      for(int y=0;y<32;y++)for(int x=0;x<32;x++)p[y*32+x]=t==Tex.MOSSY?rubble(t,x,y):earth(t,x,y);
+      return p;
+   }
+
    /** Native art, preserving the approved 6.3 families. Unknown extension tiles keep nearest sampling. */
    static int[] tile(int tile, int[] src, boolean animated) {
       // 6.3 painters below stay byte-for-byte stable. Every other populated family

@@ -759,6 +759,21 @@ _GARDEN += ["-Dbc.cam=7,69,-1,0,18", "-Dbc.fill=0,65,0,14,65,11,1;0,66,0,14,66,1
 SCENES["pixel-garden-plain"] = (_GARDEN + ["-Dbc.shaders=false"], True)
 SCENES["pixel-garden-lit"] = (_GARDEN, True)
 SCENES["pixel-title"] = (["-Dbc.auto=1", "-Dbc.title=TITLE", "-Dbc.pano=on", "-Dbc.rd=2", "-Dbc.lod=8", "-Dbc.win=1280x720"], True)
+# Building-tab feedback: adjacent 2x2 samples, with original stone/cobble floor controls.
+_BR = [a for a in _COH if not a.startswith(("-Dbc.fill=","-Dbc.set=","-Dbc.cam=","-Dbc.shot="))]
+_BR_SET = []
+for _r,_row in enumerate([[1029,1956,1137,1025,1040,1135,1136],[1142,1942,72,1948,1943,1945,1947]]):
+    for _i,_block in enumerate(_row):
+        for _dx in range(2):
+            for _dy in range(2):
+                _BR_SET.append("%d,%d,8,%d" % (1+_i*2+_dx,67+_r*2+_dy,_block))
+for _x in range(1,15):
+    for _z in range(3,8):
+        _BR_SET.append("%d,66,%d,%d" % (_x,_z,[1,4,27,1029,1956,5,17][_x%7]))
+_BR += ["-Dbc.cam=8,69.5,-1,0,7", "-Dbc.shot=240",
+        "-Dbc.fill=0,65,0,16,65,10,1;0,66,0,16,75,10,0", "-Dbc.set="+";".join(_BR_SET)]
+SCENES["pixel-building-review-plain"] = (_BR+["-Dbc.shaders=false"],True)
+SCENES["pixel-building-review-lit"] = (_BR,True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

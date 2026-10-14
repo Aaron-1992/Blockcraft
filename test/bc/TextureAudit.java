@@ -36,7 +36,7 @@ public final class TextureAudit {
          int[] before=keep||t==Tex.WHITE?art:TexRemaining32.previous(t);
          int changed=0;Set<Integer> colors=new HashSet<>();
          for(int y=0;y<32;y++)for(int x=0;x<32;x++){int c=art[y*32+x];if(!keep&&c!=before[y*32+x])changed++;colors.add(c);}
-         out.println(t+"\t"+(names[t]==null?"Model-only face / icon":names[t])+"\t"+(keep?"approved-6.3":t==Tex.WHITE?"utility-white":TexMaterials32.handles(t)?"material-6.5":TexRemaining32.item(t)?"item-6.5":"nature-6.5")+"\t"+changed+"\t"+colors.size());
+         out.println(t+"\t"+(names[t]==null?"Model-only face / icon":names[t])+"\t"+(keep?"approved-6.3":t==Tex.WHITE?"utility-white":TexBuildingReview32.handles(t)?"building-review-unreleased":TexMaterials32.handles(t)?"material-6.5":TexRemaining32.item(t)?"item-6.5":"nature-6.5")+"\t"+changed+"\t"+colors.size());
          if(keep)kept++;else if(t!=Tex.WHITE)redrawn++;
       }
       out.flush();if(args.length>0)out.close();

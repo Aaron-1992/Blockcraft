@@ -43,7 +43,7 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 41	Chest	material-6.5	983	31
 42	Chest	material-6.5	994	53
 43	Monster Spawner	material-6.5	468	12
-44	Mossy Cobblestone	approved-6.3	0	44
+44	Mossy Cobblestone	building-review-unreleased	538	29
 48	White Wool	approved-6.3	0	2
 49	Orange Wool	approved-6.3	0	2
 50	Magenta Wool	approved-6.3	0	2
@@ -198,14 +198,14 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 247	Birch Log	approved-6.3	0	10
 248	Spruce Log	approved-6.3	0	6
 256	Netherrack	material-6.5	1024	6
-257	Soul Sand	material-6.5	1024	6
+257	Soul Sand	building-review-unreleased	1024	72
 258	Nether Quartz Ore	material-6.5	1024	8
 259	Nether Bricks	material-6.5	1024	40
 260	Magma Block	material-6.5	1024	57
-261	Block of Quartz	material-6.5	1024	15
-262	Block of Quartz	material-6.5	1024	5
+261	Block of Quartz	building-review-unreleased	1024	11
+262	Block of Quartz	building-review-unreleased	1024	11
 263	Nether Portal	nature-6.5	1024	5
-264	End Stone	material-6.5	1024	10
+264	End Stone	building-review-unreleased	1024	27
 265	End Portal Frame	nature-6.5	1024	46
 266	End Portal Frame with Eye	nature-6.5	1024	88
 267	End Portal Frame	nature-6.5	1024	40
@@ -320,13 +320,13 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 482	Block of Iron	material-6.5	1024	20
 483	Block of Gold	material-6.5	1024	20
 484	Block of Diamond	material-6.5	1024	29
-485	Block of Emerald	material-6.5	1024	28
-486	Block of Coal	material-6.5	1024	5
-487	Lapis Lazuli Block	material-6.5	1024	32
+485	Block of Emerald	building-review-unreleased	1024	90
+486	Block of Coal	building-review-unreleased	1024	44
+487	Lapis Lazuli Block	building-review-unreleased	1024	43
 488	Emerald Ore	material-6.5	969	8
 520	Granite	approved-6.3	0	5
 521	Diorite	approved-6.3	0	5
-522	Andesite	approved-6.3	0	9
+522	Andesite	building-review-unreleased	1024	39
 523	Red Sand	approved-6.3	0	5
 524	Podzol	material-6.5	1024	10
 525	Podzol	material-6.5	980	10
@@ -438,13 +438,13 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 647	Redstone Wire	nature-6.5	252	8
 648	Polished Granite	material-6.5	977	15
 649	Polished Diorite	material-6.5	970	15
-650	Polished Andesite	material-6.5	985	15
-651	Chiseled Sandstone	material-6.5	1024	22
+650	Polished Andesite	building-review-unreleased	1024	65
+651	Chiseled Sandstone	building-review-unreleased	1024	15
 652	Smooth Sandstone	material-6.5	1024	10
-653	Chiseled Red Sandstone	material-6.5	1024	22
+653	Chiseled Red Sandstone	building-review-unreleased	1024	15
 654	Smooth Red Sandstone	material-6.5	1024	10
-655	Chiseled Stone Bricks	material-6.5	998	64
-656	Mossy Stone Bricks	material-6.5	996	45
+655	Chiseled Stone Bricks	building-review-unreleased	973	15
+656	Mossy Stone Bricks	building-review-unreleased	1003	50
 657	Cracked Stone Bricks	material-6.5	983	52
 658	Slime Block	nature-6.5	1024	20
 659	Sea Lantern	material-6.5	1024	15
@@ -472,8 +472,8 @@ tile	label	artist	changed_texels_vs_6.4	unique_colors
 681	Prismarine Bricks	material-6.5	1024	40
 682	Dark Prismarine	material-6.5	1024	40
 683	Purpur Block	material-6.5	1024	40
-684	Purpur Pillar	material-6.5	1024	10
-685	Purpur Pillar	material-6.5	1024	13
+684	Purpur Pillar	building-review-unreleased	1024	91
+685	Purpur Pillar	building-review-unreleased	1024	36
 686	Bone Block	material-6.5	1024	9
 687	Bone Block	material-6.5	1024	15
 688	Tactical Pistol	item-6.5	294	43

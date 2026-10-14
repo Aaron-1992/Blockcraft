@@ -17,7 +17,7 @@ final class TexMaterials32 {
    private static final Map<Integer,int[]> BASES=new HashMap<>();
 
    static boolean handles(int t) {
-      return t==21||t==22||t==30||t==34||t>=37&&t<=43||t==160||t==161||t==179
+      return t==44||t==522||t==21||t==22||t==30||t==34||t>=37&&t<=43||t==160||t==161||t==179
          ||t==170||t==203||t==212||t==213||t==220
          ||t>=256&&t<=262||t==264||t==269
          ||t>=400&&t<=464||t>=482&&t<=488
@@ -42,6 +42,7 @@ final class TexMaterials32 {
 
    static int[] paint(int t) {
       if(!handles(t))return null;
+      if(TexBuildingReview32.handles(t))return TexBuildingReview32.paint(t);
       int[] pixels=new int[1024];
       for(int y=0;y<32;y++)for(int x=0;x<32;x++)pixels[y*32+x]=surface(t,x,y);
       Face f=new Face(pixels);

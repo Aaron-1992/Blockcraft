@@ -18,6 +18,7 @@ final class TexRemaining32 {
          || t >= 672 && t <= 679 || t >= 688 && t <= 695 || t >= 700 && t <= 731 || t == 742;
    }
    static boolean handles(int t) {
+      if (t == 44 || t == 522) return true; // Explicitly revised in the building-tab review.
       if (t == 77) return false; // the approved animated BowSprite owns this cell
       if (item(t) || animated(t)) return true;
       return t == 2 || t == 9 || t == 11 || t == 19 || t == 21 || t == 22 || t >= 25 && t <= 30
@@ -48,6 +49,7 @@ final class TexRemaining32 {
 
    /** 6.4 reference painters, retained while the replacement art direction is reviewed. */
    static int[] previous(int t) {
+      if(t==44||t==522)return TexPixel32.preReviewReference(t);
       if (animated(t)) return legacyFrame(t,0);
       if (item(t)) return icon(t);
       if (t == 2 || t == 9 || t >= 550 && t <= 552 || t == 642) return foliage(t);
