@@ -23,7 +23,9 @@ jobs:
           java-version: "21"
 
       - name: Build (javac) and make the update pack
-        run: python3 tools/build.py --patch
+        run: |
+          python3 tools/build.py --patch
+          echo "BC_VERSION=$(python3 -c 'import sys; sys.path.insert(0, "tools"); import build; print(build.game_version())')" >> "$GITHUB_ENV"
 
       - name: Verify packaged EXE/JAR and texture editing assets
         run: |
@@ -48,9 +50,11 @@ jobs:
           python3 tools/ci_annotate.py build/runtests.log "test output" notice
           if [ -f build/equivalence-diff.txt ]; then python3 tools/ci_annotate.py build/equivalence-diff.txt "equivalence diff" error; fi
 
-      - name: Keep the update pack
+      - name: Keep the latest update pack (optional; Releases remain the delivery channel)
+        continue-on-error: true # Storage quota must not turn passing tests into a failed build.
         uses: actions/upload-artifact@v4
         with:
           name: update-pack
-          path: releases/*.zip
+          path: releases/Blockcraft-UPDATE${{ env.BC_VERSION }}-patch.zip
+          retention-days: 3
           if-no-files-found: error

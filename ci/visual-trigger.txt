@@ -1,3 +1,4 @@
 pixel-arcade-lamps,pixel-arcade-panel,pixel-editor-bow
 jar=build
 # V6.9 real renderer: lamp wall, joined panels, retained flat bow.
+# Final V6.9: verify ROM-import output reset and final packaged bytes.

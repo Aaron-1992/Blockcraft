@@ -171,3 +171,14 @@ files. Key events go to the host; panel frames and physical lamp changes are
 replicated. Players on a shared keypad share control. Keep the host near the
 arcade so its chunks remain loaded. Multiplayer is still the game's existing
 prototype networking, not a secured public dedicated-server protocol.
+
+SUPPLIED GAME PROGRAM'S WORKING MEMORY
+-------------------------------------
+RAM 0..199 is the 10x20 board, row-major; 256..283 holds seven sets of four
+sprite masks. Registers 0..8 are graphics/scratch arguments. Registers 10/11
+are piece x/y, 12 rotation, 13 current piece, 14 next piece, 15 color, 16 lines,
+17 score, 18 gravity timer, 19 paused, 20 game over, 21 queued keys, 22 gravity
+interval, 23 saved x, 25 saved rotation, 26 current mask; 27..31 are scratch.
+Labels in FallingBlocks.asm identify the main loop, movement, collision,
+locking, row compaction, spawning and drawing routines. These conventions
+belong to the example program, not to the processor's instruction set.

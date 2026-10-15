@@ -1,2 +1,3 @@
 pixel-title,pixel-arcade-lamps,pixel-arcade-panel
 # V6.9 exact packaged executable, actual ROM/keypad controls and both screens.
+# Final V6.9: verify ROM-import output reset and final packaged bytes.

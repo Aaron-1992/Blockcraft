@@ -73,6 +73,10 @@ public final class TestsRaster {
          RasterComputer.input(w,World.pack(-5,y,0),0,1);RasterComputer.input(w,World.pack(-6,y,0),0,2);ticks(w,1);eq(3,w.raster.cpus.get(cp).out[0],"all connected keypads are read, not arbitrary one");
          w.setState(0,y,-1,0);ticks(w,6);eq(Redstone319.REDSTONE_LAMP,w.getBlock(0,y,1),"output falls and lamp obeys delay");
          w.setState(-7,y,0,RasterComputer.ROM);ticks(w,1);check(!RasterComputer.network(w,cp).error.isEmpty(),"duplicate ROM faults bus");w.setState(-7,y,0,0);
+         w.setState(0,y,-1,Redstone319.REDSTONE_BLOCK);ticks(w,6);w.setState(0,y,0,RasterComputer.CPU+1);
+         setField(g,"root",Files.createTempDirectory("raster-import-").toFile());g.target=hit(-2,y,0,0,1,0);g.runCommand("/rasterload Pattern.asm");ticks(w,6);
+         eq(0,w.raster.cpus.get(cp).out[6],"import resets stopped CPU output");eq(Redstone319.REDSTONE_LAMP,w.getBlock(0,y,1),"import notifies real redstone when output falls");check(Arrays.equals(RasterPrograms.testPattern(),w.raster.roms.get(rom)),"actual import installs alternate program");
+         int[] imported=w.raster.roms.get(rom);g.runCommand("/rasterload ../bad.asm");check(imported==w.raster.roms.get(rom),"path traversal refused without modifying ROM");
          java.lang.reflect.Field inboxField=Net319.class.getDeclaredField("inbox");inboxField.setAccessible(true);
          @SuppressWarnings("unchecked") Queue<String> inbox=(Queue<String>)inboxField.get(null);
          java.lang.reflect.Field client=Net319.class.getDeclaredField("clientConnected"),host=Net319.class.getDeclaredField("hosting");client.setAccessible(true);host.setAccessible(true);boolean oc=client.getBoolean(null),oh=host.getBoolean(null);
