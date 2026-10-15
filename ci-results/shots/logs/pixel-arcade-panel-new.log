@@ -1,0 +1,8 @@
+GL: 4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4 / llvmpipe (LLVM 20.1.2, 256 bits)
+[arcade-smoke] frame=180 panels=28 lamps=448 score=0 lines=0
+[arcade-smoke] frame=240 panels=28 lamps=448 score=30 lines=0
+[arcade-smoke] frame=300 panels=28 lamps=448 score=54 lines=0
+[arcade-smoke] frame=360 panels=28 lamps=448 score=74 lines=0
+[arcade-smoke] frame=420 panels=28 lamps=448 score=74 lines=0
+[arcade-smoke] frame=480 panels=28 lamps=448 score=74 lines=0
+AUTO screenshot; chunks=187 fps=15
