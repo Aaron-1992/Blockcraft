@@ -1,15 +1,17 @@
-# Visual run 2026-10-15 00:07:55 UTC
+# Visual run 2026-10-15 01:10:25 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
-| pixel-aquatic-reef | new | n/a |
-| pixel-aquatic-ice | new | n/a |
-| pixel-aquatic-circuits | new | n/a |
+| pixel-computer-overview | new | n/a |
+| pixel-computer-output | new | n/a |
+| pixel-facing-open | new | n/a |
+| pixel-facing-closed | new | n/a |
 | pixel-editor-bow | new | n/a |
 
 ## timings
 
-- pixel-aquatic-reef/new: exit 0 in 28s
-- pixel-aquatic-ice/new: exit 0 in 102s
-- pixel-aquatic-circuits/new: exit 0 in 10s
-- pixel-editor-bow/new: exit 0 in 28s
+- pixel-computer-overview/new: exit 0 in 43s
+- pixel-computer-output/new: exit 0 in 45s
+- pixel-facing-open/new: exit 0 in 11s
+- pixel-facing-closed/new: exit 0 in 11s
+- pixel-editor-bow/new: exit 0 in 40s
