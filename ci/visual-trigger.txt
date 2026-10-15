@@ -1,3 +1,3 @@
 pixel-computer-overview,pixel-computer-output,pixel-facing-open,pixel-facing-closed,pixel-editor-bow
 jar=build
-# V6.8 physical CPU, animated facing and retained flat bow / PNG reload.
+# V6.8 final: real draw-ring LOD coverage and isolated actual-placement facing fixture.

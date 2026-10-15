@@ -1,2 +1,2 @@
 pixel-title,pixel-computer-overview,pixel-computer-output,pixel-facing-open,pixel-editor-bow
-# V6.8 actual Windows executable: physical computer, furniture orientation and Aseprite bow.
+# V6.8 final executable: real draw-ring LOD coverage, isolated facing fixture and retained bow.

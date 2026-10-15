@@ -95,7 +95,7 @@ public final class TestsComputer {
          for(long k:w.circuit.cables)check((w.getState(World.ux(k),World.uy(k),World.uz(k))&0x8000)==0,"no cable contention");
          int[][] expected={{1,1,0},{2,1,1},{3,2,1},{1,2,1},{2,2,2}};
          for(int[] e:expected){step(g);eq(e[0],val(w,CircuitComputer.PC),"instruction PC");eq(e[1],val(w,CircuitComputer.ACC),"instruction accumulator");eq(e[2],val(w,CircuitComputer.OUT),"OUT register");eq(e[2],val(w,CircuitComputer.DISPLAY),"real output display");}
-         for(int i=0;i<4;i++){var c=CircuitComputer.BITS[i];Redstone319.propagate(w,OX+c.x(),Y,OZ+c.z()-1);tick(w,6);eq((2&(8>>i))!=0?Redstone319.REDSTONE_LAMP_LIT:Redstone319.REDSTONE_LAMP,w.getBlock(OX+c.x(),Y,OZ+c.z()-1),"binary redstone lamp "+i);}
+         for(int i=0;i<4;i++){var c=CircuitComputer.BITS[i];tick(w,6);eq((2&(8>>i))!=0?Redstone319.REDSTONE_LAMP_LIT:Redstone319.REDSTONE_LAMP,w.getBlock(OX+c.x(),Y,OZ+c.z()-1),"binary redstone lamp "+i);}
          use(g,CircuitComputer.RESET);advance(w,18);eq(0,val(w,CircuitComputer.PC),"reset PC");eq(0,val(w,CircuitComputer.ACC),"reset accumulator");eq(0,val(w,CircuitComputer.OUT),"reset output");
          // Sever the ALU's actual output wire. LOAD 1 must now load zero, not a scripted expected answer.
          w.setState(OX+38,Y,OZ+7,0);advance(w,8);step(g);eq(0,val(w,CircuitComputer.ACC),"broken physical data wire changes computation");w.shutdown();
@@ -151,6 +151,23 @@ public final class TestsComputer {
          tick(w,5);eq(Blocks.FURNACE_LIT,w.getBlock(2,70,2),"real ignition");eq(3,Facing.direction(w.getState(2,70,2)),"facing after ignition");
          tick(w,205);eq(Items.IRON_INGOT,t.slots[2].id,"cooking still works");eq(3,Facing.direction(w.getState(2,70,2)),"facing after smelting");
          t.burn=1;tick(w,2);eq(Blocks.FURNACE,w.getBlock(2,70,2),"real extinguish");eq(3,Facing.direction(w.getState(2,70,2)),"facing after extinguish");w.shutdown();
+      });
+      test("computer: ordinary World.tick drives the entire machine, dust adapter and lamps",()->{
+         Game g=machine();World w=g.world;use(g,CircuitComputer.CLOCK);tick(w,180);
+         eq(1,val(w,CircuitComputer.PC),"world-tick PC after four instructions");eq(2,val(w,CircuitComputer.ACC),"world-tick accumulator");eq(1,val(w,CircuitComputer.OUT),"world-tick output");
+         for(int i=0;i<4;i++){var c=CircuitComputer.BITS[i];eq(i==3?Redstone319.REDSTONE_LAMP_LIT:Redstone319.REDSTONE_LAMP,w.getBlock(OX+c.x(),Y,OZ+c.z()-1),"lamps update without a test-only propagate call");}
+         put(w,0,80,0,Circuit.INPUT,0,2);w.setState(-1,80,0,Redstone319.REDSTONE_BLOCK);w.setState(1,80,0,Circuit.CABLE);
+         w.setState(2,79,0,Blocks.STONE);w.setState(2,80,0,Redstone319.REDSTONE_WIRE0);w.setState(3,80,0,Redstone319.REDSTONE_LAMP);tick(w,12);
+         eq(15,val(w,1,80,0),"ordinary redstone enters adapter");eq(Redstone319.REDSTONE_LAMP_LIT,w.getBlock(3,80,0),"bus drives ordinary dust and lamp");
+         w.setState(-1,80,0,0);tick(w,12);eq(0,val(w,1,80,0),"adapter releases without feedback");eq(Redstone319.REDSTONE_LAMP,w.getBlock(3,80,0),"ordinary lamp releases");w.shutdown();
+      });
+      test("renderer: moving to an elevated computer cannot hide LOD behind out-of-range old meshes",()->{
+         for(double x:new double[]{-16.1,-.1,0,8,16,40})for(double z:new double[]{-32,-.1,0,58})for(int d:new int[]{2,5,8}){
+            int cx=(int)Math.floor(x/16),cz=(int)Math.floor(z/16);
+            check(Renderer.realChunkInRange(cx+d+1,cz,x,z,d),"draw ring boundary covered");
+            check(!Renderer.realChunkInRange(cx+d+2,cz,x,z,d),"old mesh outside ring must expose LOD");
+            check(!Renderer.realChunkInRange(cx+d+1,cz+d+1,x,z,d),"diagonal outside circular ring must expose LOD");
+         }
       });
       test("computer: example builder uses actual command, preserves ground and rejects invalid height/mode",()->{
          Game g=newGame(1);g.runCommand("/computer");check(g.world.circuit.nodes.size()>40,"command builds hardware");eq(Blocks.GRASS,g.world.getBlock(8,GROUND,8),"existing terrain untouched");check(g.player.flying,"safe flying viewpoint");g.world.shutdown();

@@ -25,6 +25,8 @@ WHAT'S NEW IN V6.8 - Buildable redstone computer + furniture facing
   * Chests, furnaces and crafting tables now face the player on placement.
     Chest lids follow the correct hinge. Furnace cycling, bucket waterlogging,
     saves and multiplayer block edits preserve facing and inventory.
+  * Flying to the board no longer leaves distant-terrain gaps where old,
+    out-of-range chunk meshes incorrectly suppressed their LOD replacements.
   * Existing art, flat sprite bow, held lighting and Aseprite editing remain.
     V6.6 and V6.7 downloads remain unchanged. Back up saves; use V6.8 on all
     multiplayer peers. These new IDs/properties are not downgrade-compatible.

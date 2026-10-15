@@ -185,7 +185,15 @@ public final class Renderer {
     */
    public boolean chunkMeshed(int var1, int var2) {
       Chunk var3 = this.g.world.chunk(var1, var2);
-      return var3 != null && var3.lit && var3.everMeshed;
+      return var3 != null && var3.lit && var3.everMeshed
+         && realChunkInRange(var1,var2,this.camX,this.camZ,this.g.opt.renderDistance);
+   }
+
+   /** Old, still-loaded meshes outside the draw ring must NOT hide their distant-terrain replacement.
+    * Particularly visible after flying up to /computer: otherwise whole ground tiles become sky holes. */
+   static boolean realChunkInRange(int cx,int cz,double camX,double camZ,int distance){
+      int dx=cx-((int)Math.floor(camX)>>4),dz=cz-((int)Math.floor(camZ)>>4),r=distance+1;
+      return (long)dx*dx+(long)dz*dz<=(long)r*r;
    }
 
    public void scheduleMeshes(World var1, int var2) {
