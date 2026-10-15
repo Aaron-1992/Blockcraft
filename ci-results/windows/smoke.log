@@ -4,13 +4,13 @@ installed to C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraf
 Mesa: mesa3d-26.2.4-release-msvc.7z (70 MB)
 copied next to javaw.exe: opengl32.dll, libgallium_wgl.dll
 pixel-title: starting via Blockcraft.exe (Launch4j stub)
-pixel-title      exit code 0                     25s  screenshot=yes
+pixel-title      exit code 0                     23s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.title=TITLE -Dbc.pano=on -Dbc.rd=2 -Dbc.lod=8 -Dbc.win=1280x720
 pixel-arcade-lamps: starting via Blockcraft.exe (Launch4j stub)
-pixel-arcade-lamps exit code 0                     45s  screenshot=yes
+pixel-arcade-lamps exit code 0                     39s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.gen=2 -Dbc.mode=1 -Dbc.rd=5 -Dbc.lod=6 -Dbc.win=1280x720 -Dbc.cam=8.5,68,8.5,180,0 -Dbc.shot=480 -Dbc.time=6000 -Dbc.weather=calm -Dbc.emp
 pixel-arcade-panel: starting via Blockcraft.exe (Launch4j stub)
-pixel-arcade-panel exit code 0                     43s  screenshot=yes
+pixel-arcade-panel exit code 0                     39s  screenshot=yes
     | Picked up JAVA_TOOL_OPTIONS: -Dbc.auto=1 -Dbc.seed=12345 -Dbc.gen=2 -Dbc.mode=1 -Dbc.rd=5 -Dbc.lod=6 -Dbc.win=1280x720 -Dbc.cam=8.5,68,8.5,180,0 -Dbc.shot=480 -Dbc.time=6000 -Dbc.weather=calm -Dbc.emp
 GPU preference entries in the registry (2):
     | C:\Users\RUNNER~1\AppData\Local\Temp\bc-win-smoke\install\Blockcraft\jre\bin\javaw.exe    REG_SZ    GpuPreference=2;
