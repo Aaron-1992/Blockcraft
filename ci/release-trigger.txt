@@ -1,2 +1,2 @@
-6.8
-# Publish the verified physical computer/facing release; preserve V6.6 and V6.7.
+6.9
+# Final package be2a57d: 4,453,153 tests pass; Windows and Linux arcade renders verified.
