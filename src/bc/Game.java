@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.8";
+   public static final String VERSION_STR = "6.9";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -577,6 +577,7 @@ public final class Game {
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
+         if (System.getProperty("bc.arcade")!=null) RasterArcade.smoke(this,this.autoFrames);
          if (System.getProperty("bc.computer")!=null) CircuitComputer.smoke(this,this.autoFrames);
          if (this.autoFrames==70&&Boolean.getBoolean("bc.facingreview")) Facing.smoke(this);
          if (Boolean.getBoolean("bc.reviewpack")) TextureEditor.smokeFrame(this, this.autoFrames);
@@ -1909,6 +1910,7 @@ public final class Game {
    }
 
    void setScreen(Game.S var1) {
+      if(var1!=Game.S.PLAY)RasterComputer.release(this);
       Game.S var2 = this.screen;
       this.screen = var1;
       if (var1 != Game.S.PLAY) {
@@ -2119,7 +2121,10 @@ public final class Game {
       this.chatOpenedAt = System.currentTimeMillis();
    }
 
+   RasterComputer.Focus rasterFocus;
+
    void onKey(int var1, int var2, int var3) {
+      if(RasterComputer.onKey(this,var1,var2))return;
       if (var2 != 0) {
          if (var1 == 300 && var2 == 1) {
             this.setFullscreen(!this.opt.fullscreen);
@@ -2486,6 +2491,7 @@ public final class Game {
    }
 
    void onMouse(int var1, int var2) {
+      if(RasterComputer.captured(this)) {leftDown=rightDown=leftPressed=rightPressed=false;return;}
       boolean var3 = var2 == 1;
       if (this.screen == Game.S.PLAY) {
          if (var1 == 0) {
@@ -2603,6 +2609,10 @@ public final class Game {
 
          try {
             switch (var2[0].toLowerCase()) {
+               case "rasterload":
+                  RasterComputer.loadProgram(this,var2.length>1?var2[1]:"FallingBlocks.asm");break;
+               case "arcade":
+                  RasterArcade.build(this);break;
                case "computer":
                   CircuitComputer.build(this);
                   break;
@@ -3982,6 +3992,7 @@ public final class Game {
    }
 
    boolean key(int var1) {
+      if(RasterComputer.captured(this))return false;
       return this.window != 0L && GLFW.glfwGetKey(this.window, var1) == 1;
    }
 
@@ -6666,6 +6677,7 @@ public final class Game {
 
          this.drawHotbar();
          Circuit.hud(this);
+         RasterComputer.hud(this);
          if (this.player.spectator) {
             this.drawSpectatorHud();
          } else if (this.player.adventure && this.target != null && this.world != null && this.screen == Game.S.PLAY) {

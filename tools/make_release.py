@@ -166,7 +166,26 @@ def main():
             "See `Texture-editing.txt` for Aseprite sheet settings, file locations and backups.\n\n"
             "**Optional ready-made editor kit:** `%s` — extract into the folder containing Blockcraft.exe, "
             "without replacing an already edited MyTextures folder. The game download can generate this same kit itself.\n\n"
-            "Earlier releases remain available unchanged. SHA256SUMS.txt checks the three downloads.\n" % (545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
+            "Earlier releases remain available unchanged. SHA256SUMS.txt checks all downloads.\n" % (545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
+    if version == "6.9":
+        world_name = "Blockcraft-Block-Drop-World.zip"
+        world = os.path.join(ROOT, world_name)
+        with zipfile.ZipFile(world) as z:
+            assert z.testzip() is None
+            assert z.read("Block_Drop_V69/raster.dat")[:4] == b"RAS1"
+            assert z.read("FallingBlocks.asm") == open(os.path.join(ROOT, "package/FallingBlocks.asm"), "rb").read()
+        shutil.copy(world, os.path.join(OUT, world_name))
+        release_notes += ("\n### Play the lamp-screen arcade\n\n"
+            "Download **Blockcraft-Block-Drop-World.zip** as well as the V6.9 game/patch. "
+            "Extract it and run **Install-world.bat** (never overwrites an existing world), "
+            "then open **Block Drop - Lamp Arcade and Modular Displays** in Singleplayer. "
+            "Right-click the keypad on your left and press **Enter**. "
+            "Arrows move/rotate, Down soft-drops, Space hard-drops, P pauses, Escape leaves controls.\n\n"
+            "28 joined panels provide a 16x28 color screen; 448 ordinary redstone lamps mirror it. "
+            "Separate CPU, ROM, RAM and GPU blocks run the included editable FallingBlocks.asm program. "
+            "Add panels for more pixels, up to 64x64. The existing game image is not automatically stretched. "
+            "Use view distance 5+; do not open the new save in an older game version. "
+            "See Raster-guide.txt for circuit layout, instruction set, crafting and limitations.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

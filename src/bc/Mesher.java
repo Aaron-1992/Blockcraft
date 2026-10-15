@@ -109,6 +109,7 @@ public final class Mesher {
       }
 
       Mesher.Scratch var4 = (Mesher.Scratch)TL.get();
+      var4.world=var0;
       var4.o.clear();
       var4.t.clear();
       int var5 = var1.cx * 16;
@@ -1461,6 +1462,7 @@ public final class Mesher {
    }
 
    static final class Scratch {
+      World world;
       final short[] B = new short[5832];
       final byte[] L = new byte[5832];
       final Mesher.FB o = new Mesher.FB();

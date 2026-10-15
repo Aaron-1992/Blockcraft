@@ -69,6 +69,7 @@ final class RedstoneLogic {
 
    /** Directional connection, shared by signal routing and the dust model. */
    static boolean connects(int id, int dir) {
+      if(RasterComputer.handles(id))return RasterComputer.kind(id)==1||RasterComputer.kind(id)==8&&(RasterComputer.face(id)>>1)==(dir>>1);
       if(Circuit.handles(id))return Circuit.cable(id)||(Circuit.face(id)>>1)==(dir>>1);
       if (Redstone319.isRepeater(id) || comparator(id)) return (facing(id) >> 1) == (dir >> 1);
       if (Redstone319.isObserver(id)) return Redstone319.observerFacing(id) == dir;
@@ -90,6 +91,10 @@ final class RedstoneLogic {
    }
    static int direct(World w, int x, int y, int z, int tx, int ty, int tz, boolean dust, boolean strong) {
       int id=w.getBlock(x,y,z), dx=tx-x,dy=ty-y,dz=tz-z;
+      if(RasterComputer.handles(id)){
+         if(strong)return 0;if(RasterComputer.kind(id)==1){RasterVM.Cpu cpu=w.raster.cpus.get(World.pack(x,y,z));int f=RasterComputer.face(id);return cpu!=null&&dy==0&&dx==Circuit.DX[f]&&dz==Circuit.DZ[f]?cpu.out[6]&15:0;}
+         return RasterComputer.lampPower(id,dx,dy,dz);
+      }
       if(Circuit.handles(id))return strong?0:Math.max(0,Circuit.output(w,x,y,z,tx,ty,tz));
       if (Redstone319.isWire(id)) {
          if (!dust || dy>0) return 0;

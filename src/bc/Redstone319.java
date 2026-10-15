@@ -1339,6 +1339,7 @@ final class Redstone319 {
       }
       if (y <= 0
          || y >= 255
+         || RasterComputer.handles(id)
          || id == Blocks.BEDROCK
          || id == Blocks.OBSIDIAN
          || id == Blocks.FURNACE

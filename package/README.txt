@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.8  -  an original Minecraft-style voxel sandbox   (EDITION V6.8)
+BLOCKCRAFT V6.9  -  an original Minecraft-style voxel sandbox   (EDITION V6.9)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,19 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.9 - Modular pixel screens and a programmable lamp arcade
+
+  * Display panels join edge-to-edge: 4x4 pixels per block, up to 64x64.
+  * Separate processor, editable ROM, 4K-word RAM, GPU, keypad, data cable,
+    lamp adapter and directional pixel drivers. No hidden Tetris controller.
+  * /arcade builds a playable falling-block computer with a color panel wall
+    and 448 ordinary redstone lamps. A matching native world is also supplied.
+  * Empty-hand right-click keypad, ENTER to start. Arrows move/rotate, SPACE
+    drops, P pauses, ESC leaves controls. See Raster-guide.txt for full details.
+  * FallingBlocks.asm is the actual editable program, not pseudocode.
+  * Existing 32px art, flat bow, held lighting and V6.8 circuit blocks preserved.
+  * Use V6.9 on every multiplayer client. Back up saves before updating.
 
 WHAT'S NEW IN V6.8 - Buildable redstone computer + furniture facing
   * In Creative, type /computer to build a working 4-bit stored-program

@@ -1,2 +1,2 @@
-pixel-title,pixel-computer-overview,pixel-computer-output,pixel-facing-open,pixel-editor-bow
-# V6.8 final executable: real draw-ring LOD coverage, isolated facing fixture and retained bow.
+pixel-title,pixel-arcade-lamps,pixel-arcade-panel
+# V6.9 exact packaged executable, actual ROM/keypad controls and both screens.

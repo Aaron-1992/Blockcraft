@@ -129,7 +129,7 @@ def build_jar(classes_dir, jar_path):
                     continue
                 entries[rel] = open(p, "rb").read()
     receipt = "version=%s\nsource.sha256=%s\n" % (game_version(), source_fingerprint())
-    for name in ("Circuit", "CircuitComputer", "Facing", "BlockState", "Shapes", "Mesher", "World", "Net319", "Aquatic", "RedstoneLogic", "WaterPhysics", "Game", "Renderer", "PlayerModel", "Tex", "TexPixel32", "TexRemaining32", "TexMaterials32", "TextureEditor", "ResourcePacks", "UtilityModels", "ChestLids", "TexUtility32", "TexTools32", "TexBuildingReview32", "TexColorNature32", "TexGlazedReview32", "TexItems32", "TexNature32", "PixelArt32", "WeaponPose", "BowSprite", "HandLighting", "ShaderSrc", "Shaders"):
+    for name in ("RasterVM", "RasterComputer", "RasterPrograms", "RasterArcade", "Circuit", "CircuitComputer", "Facing", "BlockState", "Shapes", "Mesher", "World", "Net319", "Aquatic", "RedstoneLogic", "WaterPhysics", "Game", "Renderer", "PlayerModel", "Tex", "TexPixel32", "TexRemaining32", "TexMaterials32", "TextureEditor", "ResourcePacks", "UtilityModels", "ChestLids", "TexUtility32", "TexTools32", "TexBuildingReview32", "TexColorNature32", "TexGlazedReview32", "TexItems32", "TexNature32", "PixelArt32", "WeaponPose", "BowSprite", "HandLighting", "ShaderSrc", "Shaders"):
         receipt += "class.%s.sha256=%s\n" % (name, hashlib.sha256(entries["bc/%s.class" % name]).hexdigest())
     entries["bc-build.properties"] = receipt.encode("utf-8")
     os.makedirs(os.path.dirname(jar_path), exist_ok=True)

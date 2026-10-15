@@ -36,6 +36,7 @@ public final class World {
    public long tickCount;
    final RedstoneLogic.State redstone = new RedstoneLogic.State();
    final Circuit.State circuit = new Circuit.State();
+   final RasterComputer.State raster = new RasterComputer.State();
    public long dayTime = 1000L;
    public Consumer<Chunk> unloadHook;
    public boolean saveEnabled = true;
@@ -115,6 +116,7 @@ public final class World {
       this.fight = dimension == Dim.END ? new EndFight(this) : null;
       this.loadPopulated();
       this.loadTiles();
+      RasterComputer.load(this);
       if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
          // chunk files from before 3.11 have no summary yet: a background thread makes them (chunks that are loaded are summarised from live data)
@@ -314,6 +316,7 @@ public final class World {
             this.fire.scanChunk(var22);
             RedstoneLogic.loaded(this, var22);
             Circuit.loaded(this,var22);
+            RasterComputer.loaded(this,var22);
             this.lightChunk(var22);
 
             for (int var24 = -1; var24 <= 1; var24++) {
@@ -348,6 +351,7 @@ public final class World {
             }
 
             this.chunks.remove(key(var23.cx, var23.cz));
+            this.raster.dirty=true;
             var23.unloaded = true;
             if (this.unloadHook != null) {
                this.unloadHook.accept(var23);
@@ -371,6 +375,7 @@ public final class World {
       this.chunks.put(k, fresh);
       this.lightChunk(fresh);
       Circuit.loaded(this,fresh);
+      RasterComputer.loaded(this,fresh);
       for (Section s : fresh.sections) {
          s.dirty = true;
       }
@@ -457,6 +462,7 @@ public final class World {
       }
 
       this.saveTiles();
+      RasterComputer.save(this);
       this.savePopulated();
       if (this.dim == Dim.OVERWORLD) {
          this.lodMap.save(this.dir);
@@ -865,6 +871,7 @@ public final class World {
          }
 
          var5.set(var6, var2, var7, state);
+         RasterComputer.changed(this,var1,var2,var3,var8,var4);
          var5.modified = true;
          var5.lodDirty = this.tickCount + 1L;
          if (var4 == Blocks.FIRE) {
@@ -956,7 +963,7 @@ public final class World {
       }
    }
 
-   private void notifyAround(int var1, int var2, int var3) {
+   void notifyAround(int var1, int var2, int var3) {
       for (int var4 = -1; var4 < 6; var4++) {
          int var5 = var4 < 0 ? var1 : var1 + DX[var4];
          int var6 = var4 < 0 ? var2 : var2 + DY[var4];
@@ -994,6 +1001,7 @@ public final class World {
       FastChunkCache.clear();
       this.redstone.clear();
       this.circuit.clear();
+      this.raster.clear();
       this.fluidDue.clear();
       this.fluidPending.clear();
       this.blockUpdates.clear();
@@ -1045,6 +1053,7 @@ public final class World {
    public void tick() {
       this.tickCount++;
       Circuit.tick(this);
+      RasterComputer.tick(this);
       RedstoneLogic.tick(this);
       if (!Perf.FROZEN) {
          this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)

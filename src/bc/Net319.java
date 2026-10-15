@@ -842,6 +842,10 @@ public final class Net319 {
                }
             }
 
+            if(curW!=null){
+               for(var e:curW.raster.pixels.entrySet())c.send(rasterPacket(curW,0,e.getKey(),Long.toHexString(e.getValue())));
+               for(var e:curW.raster.statuses.entrySet())c.send(rasterPacket(curW,1,e.getKey(),e.getValue()));
+            }
             for (Map.Entry<Integer, ConcurrentHashMap<Long, String>> td : tilesByDim.entrySet()) {
                for (String tilePkt : td.getValue().values()) {
                   c.send(tilePkt);
@@ -910,6 +914,7 @@ public final class Net319 {
                   broadcastExcept(c.id, "CHAT * " + c.name + " joined the world");
                }
             } else if (line.startsWith("POSE ")
+               || line.startsWith("RASTERKEY ")
                || line.startsWith("BLOCK ")
                || line.startsWith("CHAT ")
                || line.startsWith("HIT ")
@@ -932,7 +937,7 @@ public final class Net319 {
                || line.startsWith("MODS ")
                || line.startsWith("ENV ")) {
                inbox.add(line);
-               if (!line.startsWith("MOB_HIT ") && !line.startsWith("MOB_ACT ")) {
+               if (!line.startsWith("RASTERKEY ") && !line.startsWith("MOB_HIT ") && !line.startsWith("MOB_ACT ")) {
                   broadcastExcept(c.id, line);
                }
             }
@@ -953,6 +958,10 @@ public final class Net319 {
          }
       }
    }
+
+   static String rasterPacket(World w,int type,long k,String data){return "RASTER "+w.dim+" "+type+" "+World.ux(k)+" "+World.uy(k)+" "+World.uz(k)+" "+data;}
+   static void rasterBroadcast(World w,int type,long k,String data){if(type==1)w.raster.statuses.put(k,data);if(isHosting())broadcastExcept(-1,rasterPacket(w,type,k,data));}
+   static void rasterKeys(World w,long k,int held,int events){if(isClientConnected()&&!isHosting()&&clientConn!=null)clientConn.send("RASTERKEY "+w.dim+" "+World.ux(k)+" "+World.uy(k)+" "+World.uz(k)+" "+held+" "+events);else RasterComputer.input(w,k,held,events);}
 
    // ------------------------------------------------------------------ Client Join
    private static String[] parseHostPort(String ep) {
@@ -2533,6 +2542,12 @@ public final class Net319 {
                      g.say("*".equals(sender) ? "§e" + msg : "<" + sender + "> " + msg);
                   }
                }
+               case "RASTER" -> {
+                  if(!isHosting()&&p.length==7&&w!=null&&w.dim==Integer.parseInt(p[1]))RasterComputer.receive(w,Integer.parseInt(p[2]),World.pack(Integer.parseInt(p[3]),Integer.parseInt(p[4]),Integer.parseInt(p[5])),p[6]);
+               }
+               case "RASTERKEY" -> {
+                  if(isHosting()&&p.length==7&&w!=null&&w.dim==Integer.parseInt(p[1]))RasterComputer.input(w,World.pack(Integer.parseInt(p[2]),Integer.parseInt(p[3]),Integer.parseInt(p[4])),Integer.parseInt(p[5]),Integer.parseInt(p[6]));
+               }
                case "BLOCK" -> {
                   if (p.length >= 5) {
                      int bx = Integer.parseInt(p[1]);
@@ -2546,7 +2561,7 @@ public final class Net319 {
                         try {
                            if (w.chunkAt(bx, bz) != null) {
                               w.setState(bx, by, bz, bid);
-                           }
+                           }else w.raster.pixels.remove(World.pack(bx,by,bz));
                         } finally {
                            applyingRemote = false;
                         }

@@ -82,7 +82,7 @@ final class Creative {
 
    static int tabOf(int id) {
       if (id>=Aquatic.SEAGRASS && id<=Aquatic.DEAD) return NATURE;
-      if (Redstone319.isRedstoneUtility(id) || Circuit.handles(id)) {
+      if (Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id)) {
          return UTILITY;
       }
 
@@ -199,7 +199,7 @@ final class Creative {
 
             return 4;
          case UTILITY:
-            return Redstone319.isRedstoneUtility(id) || Circuit.handles(id) ? 1 : 0;
+            return Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id) ? 1 : 0;
          default:
             return 0;
       }
@@ -273,7 +273,7 @@ final class Creative {
 
    /** A short word for what an item is (shown under its name in the tooltip). */
    static String kind(int id) {
-      if (Redstone319.isRedstoneUtility(id) || Circuit.handles(id)) {
+      if (Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id)) {
          return "Redstone";
       }
 

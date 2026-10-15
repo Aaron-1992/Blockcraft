@@ -1732,6 +1732,7 @@ public final class GameTests {
       TestsTextureEditor.run();
       TestsAquaticRedstone.run();
       TestsComputer.run();
+      TestsRaster.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

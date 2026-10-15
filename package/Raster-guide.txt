@@ -1,0 +1,173 @@
+BLOCKCRAFT V6.9 - MODULAR DISPLAYS AND THE BLOCK DROP ARCADE
+==========================================================
+
+QUICK START
+-----------
+Install the V6.9 game update before opening the new world. Do not open this
+world in V6.8 or earlier: those versions do not know the new block IDs.
+
+World: Block Drop - Lamp Arcade and Modular Displays.
+You start on the glass observation deck. The Game Keypad is just to your left
+at (1,82,30). Right-click it with an empty hand. The camera looks at the lamp
+wall; press ENTER to start. You can still look around with the mouse.
+
+  LEFT / A       move left          RIGHT / D    move right
+  UP / W         rotate clockwise  DOWN / S     soft drop
+  SPACE          hard drop         P            pause/resume
+  ENTER / R      new game          ESC          leave the keypad
+
+Leaving the keypad restores normal movement; it does NOT pause the program.
+Use P first if you want the game paused. Right-clicking a display panel also
+captures the controls and looks at that panel wall, useful when flying close.
+The top HUD shows decimal score, lines, level and pause/game-over status.
+The pixels above the board show lines in hexadecimal and level modulo 16.
+The small shape to the right is the next piece. Lamp pixels are monochrome;
+the nearby modular display shows the same frame in color.
+
+This is an original Tetris-style falling-block program: seven tetrominoes,
+rotation with simple horizontal wall kicks, 10x20 board, soft/hard drop,
+completed-row removal, increasing gravity, next piece, score and game over.
+It is not an official Tetris rules implementation: no hold, ghost piece,
+seven-bag randomizer, SRS kicks, T-spin scoring or lock delay. Score is 100 per
+cleared line plus 2 per hard-drop row. Normal gravity starts at one row per
+second, accelerates every ten lines, and bottoms out at four ticks per row.
+
+THE ACTUAL HARDWARE
+-------------------
+On the workshop floor at y=72, z=6:
+  (-8,72,6) Raster Processor       (-6,72,6) Program ROM
+  (-4,72,6) 4K Word RAM            (-2,72,6) Graphics Coprocessor
+  ( 0,72,6) Lamp Screen Adapter
+
+Cyan Raster Data Cable joins these modules, both screens and the keypad.
+This is a separate data cable, not the V6.8 four-bit bus or redstone dust.
+One connected network needs exactly ONE processor, ROM, RAM and GPU.
+All hardware must be loaded; use view distance 5 or higher for the demo.
+Multiple processors/memory modules on one bus fault instead of picking one
+arbitrarily. Cutting the cable at (-7,72,5) disconnects the processor and
+freezes execution. Repair it with Raster Data Cable to resume. A disconnected
+screen retains its last frame. No invisible game controller keeps playing.
+
+Right-click processor: Run/Stop. Sneak + right-click: reset processor.
+Reset resets PC/registers/output/frame and starts the ROM at instruction 0;
+it does not automatically clear RAM. The supplied game program clears its
+own board on startup/restart. CPU execution, registers, stack, ROM, RAM and
+panel pixels persist in the world's versioned raster.dat file. Back up the
+WHOLE save folder, not just its chunk files. Breaking a memory module destroys
+its stored data; keep your .asm source file. Raster hardware is piston-immovable.
+
+MODULAR SCREENS
+---------------
+Each Display Panel is a full block containing 4x4 independently addressed
+pixels in a fixed 16-color palette. Put panels edge-to-edge in a single plane,
+all facing the same direction. There is no artificial border between panels.
+A 4-wide by 7-high wall is 16x28 pixels. Add a column and it becomes 20x28.
+Build complete rectangles for predictable results; holes remain absent pixels.
+Each wall is anchored at its top-left when viewed from the front. It can face
+north, south, east or west. Panels face you when placed. Screen walls on the
+same data bus mirror the framebuffer, clipped to each wall's own resolution.
+Programs can query the largest attached wall's dimensions. Maximum canvas:
+64x64 pixels (16x16 panels); larger walls are clipped, not stretched.
+
+The supplied game draws at native 16x28 resolution. Adding panels adds usable
+pixels; it does not stretch the game or silently change its board dimensions.
+Edit the ROM to use extra space, or write a different program entirely.
+
+The lamp wall is 16x28 ORDINARY redstone lamps, one pixel each: x=0..15,
+y=72..99, z=0. Each has a Lamp Pixel Driver directly behind it at z=-1,
+facing south. Coplanar, touching, same-facing drivers form a lamp screen.
+A Lamp Screen Adapter on the network enables output to these drivers.
+Drivers face the direction you LOOK when placed. Put them behind lamps and
+look toward the lamps. A lit driver supplies real level-15 redstone only in
+its forward direction. Any nonzero framebuffer color lights that pixel.
+Lamps retain normal four-tick switch-off behavior, so the big lamp screen has
+a short afterglow. Color panels update immediately and are easier for fast play.
+
+BUILD YOUR OWN
+--------------
+All nine hardware items are in Creative > Decoration and Utility, searchable
+by their names. Crafting recipes are available in survival too. Existing V6.8
+4-bit circuit components and the old /computer demonstration are unchanged.
+In Creative, /arcade constructs a complete new arcade above nearby terrain
+without replacing existing blocks, and places you on its observation deck.
+It also exports the editable example programs without overwriting your edits.
+
+PROGRAMMING THE ROM (HOST / SINGLE PLAYER)
+-----------------------------------------
+Look at a Program ROM block and enter:
+  /rasterload FallingBlocks.asm
+  /rasterload Pattern.asm
+
+The first use creates missing examples in:
+  %USERPROFILE%\.blockcraft112\computer-programs\
+Edit files there in a text editor, then import them again. Only simple .asm
+filenames in that folder are accepted. The shipped FallingBlocks.asm is the
+same source assembled into the demo ROM, not documentation-only pseudocode.
+Import resets the connected CPU, preserving RAM; click Run if it was stopped.
+Custom programs cannot access files, the network or the host operating system.
+
+32 signed 32-bit registers, numbered 0..31. 4096 RAM words. 4096 instructions
+maximum in ROM. 32-entry call stack. Four integers per instruction internally.
+All register, RAM and PC accesses are checked. Divide-by-zero, stack faults
+and invalid opcodes halt with a visible fault. Infinite loops yield after
+12,000 instructions per world tick, so they cannot block the engine forever.
+Long frames (for example multiple line clears) can take more than one slice.
+
+Assembly: one instruction per line; decimal integers or 0x-prefixed hex;
+semicolon starts a comment. A line ending in ':' defines a branch label.
+Operands below called a,b,c are register NUMBERS unless stated otherwise.
+
+  HALT                 stop until processor reset
+  LI a immediate       register[a] = literal integer
+  MOV a b              register[a] = register[b]
+  ADD/SUB/MUL/DIV/MOD a b     register[a] op= register[b]
+  AND/OR/XOR/SHL/SHR a b     bitwise op / unsigned right shift
+  LD a b               register[a] = RAM[register[b]]
+  ST a b               RAM[register[a]] = register[b]
+  JMP label            unconditional jump
+  JZ/JNZ a label       jump if register[a] is zero / nonzero
+  JLT a b label        signed less-than branch
+  CALL label / RET     call / return
+  IN a port            read input port (literal port number)
+  OUT port a           write output port (literal 0..7)
+  WAIT ticks           yield; literal 1..1200 world ticks, 20 ticks/sec
+  RAND a b             reproducible pseudorandom integer 0..register[b]-1
+  CLEAR a              fill framebuffer with register[a] & 15
+  PIXEL a b c          set pixel (register[a],register[b]) to register[c] & 15
+  PRESENT              publish framebuffer to attached display/lamp walls
+
+Input ports:
+  0: queued key press bits, consumed on read. Left=1, Right=2, Rotate=4,
+     Down=8, HardDrop=16, Pause=32, Restart=64. Left/right support key repeat.
+  1: currently held left/right/down bits (input expires if sender disappears).
+  2/3: canvas width/height in pixels.
+  16..21: adjacent redstone input, in N,S,E,W,below,above order.
+
+Output ports 0..7 retain signed integers, shown in the console HUD. Port 6's
+low nibble also drives ordinary redstone out of the processor's marked front.
+The falling-block example reserves ports 0..5 for score/lines/level/paused/
+game-over/next-piece and writes 0x4244 to port 7 to select its named game HUD.
+Other programs show the raw output registers instead.
+
+Graphics/grid instructions use these register conventions:
+  r0 = 16-bit 4x4 sprite mask (bit 0 top-left, bits 0..3 first row)
+  r1,r2 = x,y; r3 = color; r4 = RAM base; r5,r6 = grid width,height
+  r8 = collision result (0 clear, 1 occupied or outside the grid)
+
+  SPRITE    draw set mask bits at x,y in the framebuffer, clipping at edges
+  HIT       test the mask at x,y against a RAM grid; nonzero cells are occupied
+  STAMP     write mask cells into a RAM grid using r3; outside cells set r8
+  BLIT      draw the RAM rectangle at framebuffer x,y (values & 15)
+  DIGIT     draw low hexadecimal digit of r0 in a 3x5 font at x,y, color r3
+
+These are generic graphics and memory operations, not game-specific opcodes.
+Collision, rotation, gravity, scoring and row clearing are assembled ROM code.
+Coordinates start at the top-left; x increases right, y increases down.
+
+MULTIPLAYER
+-----------
+All participants need V6.9+. Only the host executes processors and imports ROM
+files. Key events go to the host; panel frames and physical lamp changes are
+replicated. Players on a shared keypad share control. Keep the host near the
+arcade so its chunks remain loaded. Multiplayer is still the game's existing
+prototype networking, not a secured public dedicated-server protocol.

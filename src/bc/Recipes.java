@@ -304,6 +304,7 @@ public final class Recipes {
       Decor315.recipes();
       Redstone319.recipes();
       Circuit.recipes();
+      RasterComputer.recipes();
    }
 
    static final class Recipe {

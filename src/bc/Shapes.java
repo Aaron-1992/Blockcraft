@@ -525,6 +525,8 @@ final class Shapes {
          boxes=Facing.chest(s.B[Mesher.ci(x+1,y+1,z+1)]&65535,ChestLids.angle(s.ox+x,s.oy+y,s.oz+z));
       } else if (Redstone319.isRepeater(id)||RedstoneLogic.comparator(id)) {
          boxes=RedstoneLogic.model(id,s.B[Mesher.ci(x+1,y+1,z+1)]&65535);
+      } else if (id>=RasterComputer.PANEL&&id<RasterComputer.PANEL+4) {
+         boxes=RasterComputer.model(s,x,y,z,id);
       } else if (Circuit.cable(id)) {
          boxes=Circuit.cableBoxes(nbr,Circuit.value(id),(s.B[Mesher.ci(x+1,y+1,z+1)]&0x8000)!=0);
       } else if (isModel(id)) {
@@ -595,6 +597,7 @@ final class Shapes {
          int selfGlow = (id > Redstone319.REDSTONE_WIRE0 && id <= Redstone319.REDSTONE_WIRE0 + 15)
             ? 6 + (id - Redstone319.REDSTONE_WIRE0) * 9 / 15
             : Blocks.emit[id];
+         if(id>=RasterComputer.PANEL&&id<RasterComputer.PANEL+4&&b[7]!=0x172431)selfGlow=15;
          float blk = Math.max(light & 15, selfGlow);
          for (int i = 0; i < 4; i++) {
             corner(b,f,i,xyz,uv);
@@ -629,6 +632,7 @@ final class Shapes {
    /** Right click: a gate, wooden trapdoor, lever or button opens/closes/toggles. */
    static boolean use(Game g, int x, int y, int z, int id) {
       if (Circuit.use(g,x,y,z,id)) return true;
+      if (RasterComputer.use(g,x,y,z,id)) return true;
       if (Redstone319.use(g, x, y, z, id)) {
          return true;
       }
@@ -663,7 +667,7 @@ final class Shapes {
    }
 
    static boolean placesSpecially(int id) {
-      return Circuit.node(id) || isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
+      return RasterComputer.handles(id) || Circuit.node(id) || isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
    }
 
    /** The way the player looks, as a facing (0 north, 1 south, 2 east, 3 west). */
@@ -713,7 +717,10 @@ final class Shapes {
 
       int id = held.id;
       int put = id;
-      if(Circuit.node(id)){
+      if(RasterComputer.handles(id)){
+         put=RasterComputer.pick(id);
+         if(put!=RasterComputer.CABLE)put+=Shapes.playerFacing(g.player)^(put==RasterComputer.PIXEL?0:1);
+      } else if(Circuit.node(id)){
          put=Circuit.id(Circuit.kind(id),0,playerFacing(g.player));
       } else if (isGate(id)) {
          put = gate(gateKind(id), false, playerFacing(g.player));
