@@ -1,9 +1,9 @@
 GL: 4.5 (Compatibility Profile) Mesa 26.2.4 (git-9a0169f2a7) / llvmpipe (LLVM 23.1.2, 256 bits)
-[computer-smoke] frame=120 4-bit Register@-7,-14=3 4-bit Register@23,-2=2 4-bit Register@23,10=1 Hex Display@23,22=1
-[computer-smoke] frame=180 4-bit Register@-7,-14=3 4-bit Register@23,-2=3 4-bit Register@23,10=2 Hex Display@23,22=2
-[computer-smoke] frame=240 4-bit Register@-7,-14=2 4-bit Register@23,-2=3 4-bit Register@23,10=3 Hex Display@23,22=3
-[computer-smoke] frame=300 4-bit Register@-7,-14=2 4-bit Register@23,-2=4 4-bit Register@23,10=4 Hex Display@23,22=4
-[computer-smoke] frame=360 4-bit Register@-7,-14=2 4-bit Register@23,-2=5 4-bit Register@23,10=5 Hex Display@23,22=5
-[computer-smoke] frame=420 4-bit Register@-7,-14=1 4-bit Register@23,-2=6 4-bit Register@23,10=5 Hex Display@23,22=5
-[computer-smoke] frame=480 4-bit Register@-7,-14=1 4-bit Register@23,-2=7 4-bit Register@23,10=6 Hex Display@23,22=6
-AUTO screenshot; chunks=191 fps=11
+[computer-smoke] frame=120 4-bit Register@-7,-14=1 4-bit Register@23,-2=1 4-bit Register@23,10=0 Hex Display@23,22=0
+[computer-smoke] frame=180 4-bit Register@-7,-14=3 4-bit Register@23,-2=2 4-bit Register@23,10=1 Hex Display@23,22=1
+[computer-smoke] frame=240 4-bit Register@-7,-14=2 4-bit Register@23,-2=2 4-bit Register@23,10=2 Hex Display@23,22=2
+[computer-smoke] frame=300 4-bit Register@-7,-14=1 4-bit Register@23,-2=3 4-bit Register@23,10=2 Hex Display@23,22=2
+[computer-smoke] frame=360 4-bit Register@-7,-14=3 4-bit Register@23,-2=4 4-bit Register@23,10=3 Hex Display@23,22=3
+[computer-smoke] frame=420 4-bit Register@-7,-14=2 4-bit Register@23,-2=4 4-bit Register@23,10=4 Hex Display@23,22=4
+[computer-smoke] frame=480 4-bit Register@-7,-14=3 4-bit Register@23,-2=5 4-bit Register@23,10=4 Hex Display@23,22=4
+AUTO screenshot; chunks=191 fps=18
