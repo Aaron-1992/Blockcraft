@@ -1,0 +1,8 @@
+GL: 4.5 (Compatibility Profile) Mesa 26.2.4 (git-9a0169f2a7) / llvmpipe (LLVM 23.1.2, 256 bits)
+[shadow-smoke] panels=192 lamps=768 frame=102 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=323 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=447 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=598 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=69 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=181 speakers=2
+AUTO screenshot; chunks=176 fps=8

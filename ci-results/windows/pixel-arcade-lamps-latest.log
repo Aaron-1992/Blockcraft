@@ -1,8 +1,0 @@
-GL: 4.5 (Compatibility Profile) Mesa 26.2.4 (git-9a0169f2a7) / llvmpipe (LLVM 23.1.2, 256 bits)
-[arcade-smoke] frame=180 panels=28 lamps=448 score=0 lines=0
-[arcade-smoke] frame=240 panels=28 lamps=448 score=30 lines=0
-[arcade-smoke] frame=300 panels=28 lamps=448 score=54 lines=0
-[arcade-smoke] frame=360 panels=28 lamps=448 score=74 lines=0
-[arcade-smoke] frame=420 panels=28 lamps=448 score=74 lines=0
-[arcade-smoke] frame=480 panels=28 lamps=448 score=74 lines=0
-AUTO screenshot; chunks=176 fps=17
