@@ -1,2 +1,2 @@
-6.6
-# Verified source 88499ba; CI 38629152787, Visual 38629152869, Windows 38629153212 all passed.
+6.7
+# Publish the verified, Windows-tested aquatic/redstone build as a NEW release. Never replace V6.6.
