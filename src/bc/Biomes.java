@@ -131,6 +131,17 @@ public final class Biomes {
       }
    }
 
+   /** Underwater haze, separate from the texture tint: warmer seas are clearer and greener. */
+   static int waterFog(int biome) {
+      return switch(biome) {
+         case WARM_OCEAN -> 0x176B80;
+         case LUKEWARM_OCEAN,DEEP_LUKEWARM_OCEAN -> 0x15536B;
+         case COLD_OCEAN,DEEP_COLD_OCEAN,FROZEN_OCEAN,DEEP_FROZEN_OCEAN,FROZEN_RIVER -> 0x183C62;
+         case SWAMP -> 0x354333;
+         default -> 0x0D2961;
+      };
+   }
+
    /** The colour of the distant water of a sea or river (the plain blue c is tinted by the biome). */
    public static int lodWater(int biome, int c) {
       int t = waterTint(biome);

@@ -880,7 +880,7 @@ public final class Blocks {
             drop[var61] = 0;
          }
 
-         opacity[var48] = 3;
+         opacity[var48] = Boolean.getBoolean("bc.legacyfluids") ? 3 : 1; // aquatic-era water admits skylight
          opacity[var55] = 2;
          emit[var55] = 15;
       }

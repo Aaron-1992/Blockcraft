@@ -56,7 +56,7 @@ jobs:
           for f in ci-results/windows/*-crash.log; do [ -f "$f" ] && python tools/ci_annotate.py "$f" "$(basename $f)" error; done || true
 
       - name: Commit results to the branch
-        if: always()
+        if: always() && !cancelled()
         shell: bash
         run: |
           git config user.name "blockcraft-ci"

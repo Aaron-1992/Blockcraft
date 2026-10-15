@@ -721,7 +721,7 @@ public final class Renderer {
          this.viewPitch += (float)(Math.sin(ph * 1.9 + 2.5) * shk * 1.2);
       }
 
-      boolean var6 = var4.eyeInWater;
+      boolean var6 = WaterPhysics.submerged(var5,this.camX,this.camY,this.camZ);
       boolean var7 = Blocks.isLava(var5.getBlock((int)Math.floor(this.camX), (int)Math.floor(this.camY), (int)Math.floor(this.camZ)));
       int var8 = (int)Math.floor(this.camX);
       int var9 = (int)Math.floor(this.camY);
@@ -774,11 +774,14 @@ public final class Renderer {
       var12 *= 1.0F - 0.30F * wxFog;
       if (var6) {
          float var17 = 0.35F + 0.65F * this.daylight;
-         var41 = 0.05F * var17;
-         var42 = 0.16F * var17;
-         var43 = 0.38F * var17;
+         Chunk waterChunk=var5.chunkAt(var8,var10);
+         int biome=waterChunk==null?Biomes.OCEAN:waterChunk.biome[(var10&15)*16+(var8&15)]&255;
+         int fog=Biomes.waterFog(biome);
+         var41 = (fog>>16&255)/255F * var17;
+         var42 = (fog>>8&255)/255F * var17;
+         var43 = (fog&255)/255F * var17;
          var11 = 0.0F;
-         var12 = 18.0F;
+         var12 = biome==Biomes.WARM_OCEAN?32F:biome==Biomes.SWAMP?12F:22F;
       }
 
       if (var7) {

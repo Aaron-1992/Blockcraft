@@ -17,6 +17,8 @@ including newly explored chunks. Existing chunks are never regenerated. Hosts
 send the property before clients construct their generator. Classic and
 minigame terrain retain their existing generators.
 
+- Water transmits skylight with one level of attenuation per block; warm/cold
+  seas have distinct underwater haze and visibility rather than uniformly dark blue.
 - Water advances every five game ticks, reaches seven blocks horizontally,
   prefers nearby drops, falls, recedes when its supply is removed, and renews
   source blocks between two sources over a supporting block/source.
@@ -89,6 +91,8 @@ a fresh kit into your backed-up pack, rather than overwriting old edits.
 `python3 tools/runtests.py` runs historical equivalence and the full suite.
 The equivalence process explicitly selects legacy fluid behavior; the new
 behavior is exercised separately by `test/bc/TestsAquaticRedstone.java`.
+The mesh scheduler also visits all sixteen vertical sections, fixing a loading
+stall when terrain near spawn extends above Y=127.
 That suite tests flow/recession/routing, waterlogging/buckets/fire, swimming,
 bubbles, biome/decorating determinism, unsigned chunk/network states, generator
 handshake, circuit timing/locking/burnout, analog comparators, long networks,

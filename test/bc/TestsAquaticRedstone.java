@@ -72,6 +72,14 @@ public final class TestsAquaticRedstone {
          p.setPos(20.5,y,20.5);p.tick(w,0,0,false,false,false);check(!p.swimming&&p.height()==1.8,"exiting water restores standing pose with clearance");
          w.shutdown();
       });
+      test("aquatic: skylight penetrates reefs instead of blacking out after five water blocks",()->{
+         Game g=newGame(1);World w=g.world;int y=GROUND+1;
+         for(int x=0;x<16;x++)for(int z=0;z<16;z++)for(int dy=0;dy<10;dy++)w.setBlock(x,y+dy,z,Blocks.WATER);
+         w.setBlock(8,y+1,8,Aquatic.SEAGRASS);
+         check(w.getSky(8,y+1,8)>=5,"nine blocks underwater retain daylight");
+         eq(1,Blocks.opacity[Aquatic.SEAGRASS],"vegetation does not darken water disproportionately");
+         check(Biomes.waterFog(Biomes.WARM_OCEAN)!=Biomes.waterFog(Biomes.COLD_OCEAN),"warm/cold underwater haze differs");w.shutdown();
+      });
       test("aquatic: biome bands, versioned generation and deterministic vegetation",()->{
          eq(Biomes.WARM_OCEAN,Aquatic.ocean(.8,50),"warm shallow sea");
          eq(Biomes.LUKEWARM_OCEAN,Aquatic.ocean(.65,50),"lukewarm sea");

@@ -18,7 +18,7 @@ final class Aquatic {
          int texture=id==DEAD?TILE_END:TILE+id-SEAGRASS;
          Blocks.def(id,name,plant(id)?0:.7F,!plant(id),texture);
          if(plant(id)) {
-            Blocks.kind[id]=1;Blocks.solid[id]=false;Blocks.opacity[id]=3;
+            Blocks.kind[id]=1;Blocks.solid[id]=false;Blocks.opacity[id]=1;
             Blocks.coll[id]=null;Blocks.cutout[id]=true;Blocks.replaceable[id]=true;
             Blocks.box[id]=new double[]{.1,0,.1,.9,id==KELP?1:.8,.9};
          }
