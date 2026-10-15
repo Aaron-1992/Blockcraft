@@ -447,18 +447,10 @@ public final class SoundEngine {
       }
       BANK.put("rain_loop", new Sample("rain_loop", sr, rain));
 
-      // 5. Note Block Acoustic Piano / Harp Pluck
-      short[] note = new short[(int)(sr * 0.65)];
-      for (int i = 0; i < note.length; i++) {
-         double t = i / (double)sr;
-         double env = Math.exp(-t * 6.5);
-         double f = 440.0;
-         double v = (Math.sin(2.0 * Math.PI * f * t)
-            + 0.40 * Math.sin(4.0 * Math.PI * f * t) * Math.exp(-t * 10.0)
-            + 0.18 * Math.sin(6.0 * Math.PI * f * t) * Math.exp(-t * 16.0)) * env;
-         note[i] = (short)(Math.max(-1.0, Math.min(1.0, v * 0.68)) * 26000.0);
+      // Material-selected note instruments, synthesized locally (no external samples).
+      for(int instrument=0;instrument<NoteBlocks.NAMES.length;instrument++){
+         String key="note_"+NoteBlocks.NAMES[instrument];BANK.put(key,new Sample(key,sr,NoteBlocks.samples(instrument,sr)));
       }
-      BANK.put("note_harp", new Sample("note_harp", sr, note));
 
       // 6. Item Pickup Pop fallback (if not loaded from soundbank.bin)
       if (!BANK.containsKey("item_pop")) {
@@ -1102,7 +1094,8 @@ public final class SoundEngine {
    /** Plays a Note Block note at (x, y, z) pitched according to the block underneath and note pitch (0..24). */
    public static void playNoteBlock(World w, int x, int y, int z, int pitchStep) {
       float pitch = (float)Math.pow(2.0, (pitchStep - 12) / 12.0);
-      play3D(w, "note_harp", x + 0.5, y + 0.5, z + 0.5, 1.0F, pitch);
+      int instrument=w==null?0:NoteBlocks.instrument(w.getBlock(x,y-1,z));
+      play3D(w, "note_"+NoteBlocks.NAMES[instrument], x + 0.5, y + 0.5, z + 0.5, 1.0F, pitch);
    }
 
    private static boolean isSamplePlaying(String key) {

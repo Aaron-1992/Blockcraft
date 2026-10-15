@@ -26,6 +26,12 @@ def payload(version="6.5", source="expected", tamper=False, tamper_media=False):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_midi_and_note_hardware_receipts(self):
+        jar=payload("6.11")
+        self.assertEqual(inspect_payload(jar,jar,"6.11","expected")["version"],"6.11")
+        for c in ("MidiCompiler","NoteBlocks","Redstone319","SoundEngine"):
+            self.assertIn(c,required("6.11"))
+
     def test_original_cartridge_receipt(self):
         jar=payload("6.10")
         self.assertEqual(inspect_payload(jar,jar,"6.10","expected")["version"],"6.10")

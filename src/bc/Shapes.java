@@ -632,6 +632,7 @@ final class Shapes {
    /** Right click: a gate, wooden trapdoor, lever or button opens/closes/toggles. */
    static boolean use(Game g, int x, int y, int z, int id) {
       if (Circuit.use(g,x,y,z,id)) return true;
+      if (MidiCompiler.use(g,x,y,z,id)) return true;
       if (RasterComputer.use(g,x,y,z,id)) return true;
       if (Redstone319.use(g, x, y, z, id)) {
          return true;

@@ -220,6 +220,24 @@ def main():
             "Device buffering, renderer updates, lamp afterglow and network latency still add delay. "
             "Custom media must also be copied to multiplayer clients; no large-file streaming. "
             "See the source verification report for automated tests and real-renderer evidence; no physical speaker audition or two-PC multiplayer test is claimed.\n")
+    if version == "6.11":
+        release_notes += ("\n### Turn a MIDI into a real redstone build\n\n"
+            "Find **MIDI Build Compiler** in Creative (search MIDI). Run `/mididemo` for an original example and the input folder, "
+            "or copy your own `.mid`/`.midi` into `%USERPROFILE%\\.blockcraft112\\midi`. "
+            "Place the compiler on a short pillar above a clear area, right-click it and enter `/midi Workshop.mid`. "
+            "Read the preview, then `/midibuild` to confirm. Right-click the generated **stone button** to play. "
+            "The build uses ordinary repeaters, dust and tuned note blocks, and still works after removing the compiler.\n\n"
+            "**16 note-block instruments** now respond to the block beneath them. Wood gives bass; sand snare; glass hi-hat; "
+            "stone bass drum; clay flute; gold bell; wool guitar; packed ice chime; bone/iron xylophones; soul sand cowbell; "
+            "pumpkin didgeridoo; emerald bit; hay banjo; glowstone pling; default harp. "
+            "Tuning persists through saves and pistons; keep the space above clear. All sounds are locally synthesized.\n\n"
+            "**Limits:** Creative host imports/builds; MIDI type 0/1 and tempo maps/SMPTE; 100ms quantized timing plus a fixed 100ms lead-in; "
+            "six-note chords; octave folding into each instrument's two-octave range; fixed strikes rather than MIDI sustain/velocity/bends. "
+            "The straight physical track is capped at 256 blocks and must stay loaded. For long files choose sections, e.g. "
+            "`/midi MySong.mid 30 8`. Invalid input, oversized chords, occupied space and unloaded build areas are refused instead of silently truncated/overwritten. "
+            "Follow the track to hear distant notes. **MIDI-guide.txt** in the game has complete instructions.\n\n"
+            "Existing V6.10 worlds/hardware and the prior artwork/sprite-bow/lighting changes are retained. Back up worlds before updating; "
+            "this release adds `notes.properties` for persistent tuning. Audio data and actual redstone timing are tested; no physical-device or two-PC audition is claimed.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

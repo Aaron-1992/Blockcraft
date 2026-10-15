@@ -11,6 +11,7 @@ final class RedstoneLogic {
    record Event(long due, long order, long pos, int oldId, int kind, int value) {}
    static final class State {
       long sequence;
+      boolean notesSaveBlocked;final Map<Long,Long> noteHits=new HashMap<>();
       boolean updating;
       final PriorityQueue<Event> queue = new PriorityQueue<>(Comparator.comparingLong(Event::due).thenComparingLong(Event::order));
       final Map<Long, Event> pending = new HashMap<>();
@@ -18,7 +19,7 @@ final class RedstoneLogic {
       final Set<Long> opened = new HashSet<>(), plates = new HashSet<>(), sensors = new HashSet<>(), comparators = new HashSet<>();
       final Map<Long, ArrayDeque<Long>> torchChanges = new HashMap<>();
       final Map<Long, Long> burnout = new HashMap<>(), extendedAt = new HashMap<>();
-      void clear() { queue.clear(); pending.clear(); buttons.clear(); notes.clear(); opened.clear(); plates.clear(); sensors.clear(); comparators.clear(); torchChanges.clear(); burnout.clear(); extendedAt.clear(); }
+      void clear() { noteHits.clear();notesSaveBlocked=false; queue.clear(); pending.clear(); buttons.clear(); notes.clear(); opened.clear(); plates.clear(); sensors.clear(); comparators.clear(); torchChanges.clear(); burnout.clear(); extendedAt.clear(); }
    }
    private RedstoneLogic() {}
    static boolean comparator(int id) { return id >= COMPARATOR && id < COMPARATOR + 64; }

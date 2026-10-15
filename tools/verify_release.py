@@ -31,6 +31,8 @@ def required(version):
         extra += ("RasterVM", "RasterComputer", "RasterPrograms", "RasterArcade")
     if tuple(map(int, version.split("."))) >= (6, 10):
         extra += ("RasterAudio", "RasterClip", "RasterMedia", "ShadowMachine", "SoundEngine")
+    if tuple(map(int, version.split("."))) >= (6, 11):
+        extra += ("MidiCompiler", "NoteBlocks", "Redstone319", "Blocks", "Creative")
     return REQUIRED + extra
 
 
@@ -82,6 +84,7 @@ def verify(archive, version):
                 with zipfile.ZipFile(io.BytesIO(jar)) as game:
                     with open(os.path.join(B.ROOT,"res/media/shadow-signal.bcv"),"rb") as media:
                         if game.read("media/shadow-signal.bcv") != media.read(): raise ValueError("Stale original media cartridge")
+            if tuple(map(int, version.split("."))) >= (6, 11): guides += ("MIDI-guide.txt",)
             for name in guides:
                 with open(os.path.join(B.ROOT, "package", name), "rb") as f:
                     if z.read("Blockcraft/" + name) != f.read():

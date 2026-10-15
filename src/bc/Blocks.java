@@ -508,7 +508,7 @@ public final class Blocks {
       Redstone319.addToCreative(var1);
       Aquatic.creative(var1);
       Circuit.creative(var1);
-      RasterComputer.creative(var1);
+      RasterComputer.creative(var1);var1.add(MidiCompiler.BLOCK);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -1000,6 +1000,6 @@ public final class Blocks {
       RedstoneLogic.register();
       Aquatic.register();
       Circuit.register();
-      RasterComputer.register();
+      RasterComputer.register();MidiCompiler.register();
    }
 }

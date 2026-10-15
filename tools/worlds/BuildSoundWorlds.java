@@ -50,7 +50,7 @@ public final class BuildSoundWorlds {
       System.out.println("Verified "+path.getFileName()+": "+((radius*2+1)*(radius*2+1))+" native chunks, "+n.speakers.size()+" speaker(s).");
    }
    public static void main(String[] args)throws Exception{
-      if(!Game.VERSION_STR.equals("6.10"))throw new IOException("Compile against V6.10");Path bundle=Path.of(args[0]);Files.createDirectories(bundle);
+      if(!Game.VERSION_STR.equals("6.10")&&!(args.length>1&&args[1].equals("--verify")))throw new IOException("Compile against V6.10");Path bundle=Path.of(args[0]);Files.createDirectories(bundle);
       if(args.length>1&&args[1].equals("--verify")){verify(bundle.resolve("Shadow_Signal_V610"),true);verify(bundle.resolve("Block_Drop_Sound_V610"),false);}
       else {build(bundle.resolve("Shadow_Signal_V610"),true);build(bundle.resolve("Block_Drop_Sound_V610"),false);
       Files.writeString(bundle.resolve("FallingBlocks-Sound.asm"),RasterPrograms.fallingSource());Files.writeString(bundle.resolve("MediaPlayer.asm"),ShadowMachine.source());}

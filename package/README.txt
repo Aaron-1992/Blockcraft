@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.10  -  an original Minecraft-style voxel sandbox   (EDITION V6.10)
+BLOCKCRAFT V6.11  -  an original Minecraft-style voxel sandbox   (EDITION V6.11)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,29 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.11 - MIDI-to-redstone compiler and note-block instruments
+
+  * New MIDI Build Compiler block. Import a .mid/.midi file, preview its cost,
+    then confirm a build of REAL repeaters, dust and tuned note blocks.
+    Remove the compiler afterwards: the physical circuit still plays.
+  * Find it in Creative > Decoration and Utility, or search MIDI. Right-click
+    to enter /midi filename.mid; /midibuild confirms. Creative host only.
+  * /mididemo creates an original Workshop.mid example without overwriting.
+    User files go in %USERPROFILE%\.blockcraft112\midi\.
+  * 16 synthesized note-block instruments selected by the block UNDERNEATH:
+    wood bass, sand snare, glass hi-hat, stone bass drum, clay flute, gold bell,
+    wool guitar, packed-ice chime, bone xylophone, iron xylophone, soul-sand
+    cowbell, pumpkin didgeridoo, emerald bit, hay banjo, glowstone pling,
+    otherwise harp. Right-click cycles 25 pitches. Keep the top clear.
+  * Tuning now survives save/load and piston movement. Back up notes.properties
+    with your worlds. Host note events carry instrument/pitch to clients.
+  * Musical approximation: 100ms timing, six-note chords, octave folding;
+    no sustain/velocity/pitch-bend reproduction. Maximum 256-block track.
+    Import long files in sections: /midi MySong.mid 30 8. Nothing is silently
+    truncated. Existing blocks/occupied air prevent the whole build.
+  * MIDI-guide.txt has setup, limits and controls. Existing V6.10 machines,
+    textures, flat sprite bow and held lighting are unchanged.
 
 WHAT'S NEW IN V6.10 - Sound machines and original silhouette cinema
 

@@ -1,4 +1,3 @@
-pixel-shadow-lamps,pixel-shadow-panel,pixel-arcade-lamps,pixel-editor-bow
+pixel-midi,pixel-shadow-panel,pixel-editor-bow
 jar=build
-# V6.10 real renderer, original cinema and retained flat bow.
-# Final PCM continuity: batched 75ms renderer cadence, bounded under-62ms slack.
+# V6.11 real MIDI-generated redstone, compiler removed before play; retained cinema and bow.

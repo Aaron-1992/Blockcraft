@@ -1,0 +1,125 @@
+BLOCKCRAFT V6.11 - MIDI BUILD COMPILER AND NOTE-BLOCK INSTRUMENTS
+================================================================
+
+THIS GENERATES A REAL REDSTONE BUILD, NOT A MIDI PLAYER
+------------------------------------------------------
+Find MIDI Build Compiler in Creative > Decoration and Utility (search MIDI).
+It also has a crafting recipe: iron/redstone, quartz/note block/quartz,
+iron/redstone, arranged as IRI / QNQ / IRI.
+Building requires Creative and the single-player/multiplayer host.
+The compiler imports a file, previews its cost, and places ordinary repeaters,
+dust, tuned note blocks and the instrument-selecting blocks beneath them.
+After building, remove the compiler or delete the MIDI: the BUTTON and REAL
+REDSTONE still play the circuit. Break its wiring and playback stops there.
+
+QUICK START
+-----------
+1. Install V6.11. Back up saves before updating.
+2. Run /mididemo once. This creates .blockcraft112/midi/Workshop.mid, an
+   original eight-note, four-instrument example. Existing files are preserved.
+3. Copy your own .mid or .midi files into:
+      Windows: %USERPROFILE%\.blockcraft112\midi\
+      Linux:   ~/.blockcraft112/midi/
+   Use simple names, e.g. MySong.mid (letters, numbers, underscore or dash).
+4. Place a MIDI Build Compiler on a short pillar, at least THREE blocks above
+   the highest ground/block in the build area. Leave a clear area to its SOUTH
+   (+Z), starting three blocks east (+X). The generated track is raised, not
+   carved through your terrain or existing buildings.
+5. Empty-hand right-click the compiler. It opens the command input:
+      /midi Workshop.mid
+   Or use your filename. This ONLY PREVIEWS; it places nothing yet.
+6. Read the footprint, note/repeater counts and conversion warnings. Still
+   looking at that compiler, type:
+      /midibuild
+   Every support, note, reserved-air cell and isolation border must be empty
+   and loaded. If not, the whole build is refused before any block is placed.
+7. Right-click the stone BUTTON at the beginning of the generated track.
+   Its coordinates are printed after building. Follow the track to hear
+   distant notes: these are positional sounds, not a global music stream.
+   Wait for the pulse to finish (song length + about one second) before replay.
+
+LONG FILES / EXCERPTS
+--------------------
+You can select a range rather than silently losing later notes:
+  /midi MySong.mid 30 8
+This takes note starts from second 30 up to (but not including) second 38.
+The original timing within that window is preserved on the redstone grid.
+Notes held from before the window are not synthesized as new note starts.
+
+Each build is a straight, inspectable track, at most 256 blocks long, with a
+16-block-wide clear envelope and five blocks of vertical clearance. Choose
+shorter sections if the preview is too long or outside your loaded chunks.
+Increase view distance and keep ALL of the circuit loaded during playback.
+Short pieces and selected sections are the intended use; this is NOT an
+unlimited whole-song/large-orchestra converter or a chunk-loading machine.
+
+HOW THE CONVERSION WORKS
+-----------------------
+- Standard MIDI file types 0 and 1; PPQ tempo changes across tracks and SMPTE
+  timing are supported. MIDI type 2 (independent sequences) is refused.
+- Note starts are rounded to 100ms redstone ticks (normally <=50ms error).
+  A fixed 100ms startup delay lets the first repeater fire. The preview reports
+  this. Repeaters encode the timing; no hidden per-song playback scheduler.
+- Up to six distinct notes per quantized chord. Chords exceeding that are
+  refused, never silently reduced. Identical pitch/instrument duplicates in
+  the same chord are merged and reported.
+- General MIDI program families are approximated with available note-block
+  instruments. Bass, guitar, flute, mallets, bells, chip leads and banjo have
+  dedicated mappings; others fall back to harp. Channel 10 maps percussion
+  to bass drum, snare and hi-hat. This is not a full GM SoundFont renderer.
+- Each instrument has 25 note-block pitches. Out-of-range melodic notes are
+  shifted by whole octaves into its range, preserving pitch class. The preview
+  reports the number shifted. Drums use the center tuning.
+- Note-off, sustain pedal, velocity/dynamics, pitch bend and aftertouch are
+  not reproduced: ordinary note blocks make fixed-decay strikes.
+- Files <=1 MiB, <=100,000 MIDI events, <=512 selected notes, <=120 seconds
+  per selected window, plus the physical 256-block track limit. Dense pieces
+  generally require much shorter windows. Invalid/oversized input is refused.
+- A failed new preview clears the old pending confirmation. A preview isn't
+  saved across quitting; generated blocks and their tuning ARE saved.
+
+NOTE-BLOCK INSTRUMENTS
+---------------------
+The block directly BELOW a normal Note Block now selects its sound:
+
+  Default / dirt / grass          Harp / piano-like pluck
+  Wood-family blocks              Bass
+  Sand / gravel / concrete powder Snare
+  Glass / stained glass           Hi-hat
+  Stone-family blocks             Bass drum
+  Clay                            Flute
+  Gold block                      Bell
+  Wool (all colors)               Guitar
+  Packed ice                      Chime
+  Bone block                      Xylophone
+  Iron block                      Iron xylophone
+  Soul sand                       Cowbell
+  Pumpkin / carved pumpkin        Didgeridoo
+  Emerald block                   Bit / chip lead
+  Hay bale                        Banjo
+  Glowstone                       Pling
+
+The specific material rules take precedence over wood/stone families.
+All 16 waveforms are locally synthesized; no external instrument recording
+or MIDI synthesizer/device is required. Harp range is F#3..F#5 (MIDI 54..78);
+bass/didgeridoo start two octaves lower, guitar one lower, flute/cowbell one
+higher, bell/chime/xylophone two higher. Other pitched voices use harp range.
+
+Right-click to tune through 0..24; the instrument and pitch are shown in chat.
+A solid block OR any other block occupying the cell directly above silences
+playback. Redstone triggers on the rising edge, not repeatedly while held high.
+Changing the material underneath changes the timbre on the next strike.
+Tuning survives save/load and piston moves. Breaking/replacing a note block
+resets it to pitch 0. Keep notes.properties with the rest of the world backup;
+older game versions do not understand this saved tuning. Corrupt tuning files
+are preserved and block new compiler builds rather than being overwritten.
+
+MULTIPLAYER AND LIMITS
+---------------------
+Everyone should use V6.11. Only the host imports/builds and tunes note blocks.
+Host note events carry the actual instrument/pitch to clients; clients do not
+need the MIDI file. Playback is still local/positional, with network latency.
+No real two-computer/device audition is claimed by automated checks.
+
+Existing Shadow Signal, Block Drop, display hardware, textures, flat sprite
+bow and held lighting are retained. This update does not replace your worlds.

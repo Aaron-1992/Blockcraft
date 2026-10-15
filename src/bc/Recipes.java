@@ -304,7 +304,7 @@ public final class Recipes {
       Decor315.recipes();
       Redstone319.recipes();
       Circuit.recipes();
-      RasterComputer.recipes();RasterComputer.mediaRecipes();
+      RasterComputer.recipes();RasterComputer.mediaRecipes();MidiCompiler.recipe();
    }
 
    static final class Recipe {

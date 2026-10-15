@@ -986,11 +986,9 @@ final class Redstone319 {
       }
 
       if (id == NOTE_BLOCK) {
-         long key = pack(x, y, z);
-         int note = (g.world.redstone.notes.getOrDefault(key, -1) + 1) % 25;
-         g.world.redstone.notes.put(key, note);
-         playNote(g, x, y, z);
-         return true;
+         if(Net319.isClientConnected()&&!Net319.isHosting()){g.say("The host tunes note blocks; playback is synchronized.");return true;}
+         int note=(NoteBlocks.pitch(g.world,x,y,z)+1)%25;NoteBlocks.tune(g.world,x,y,z,note);NoteBlocks.play(g.world,x,y,z);
+         g.say("Note "+note+" / 24 - "+NoteBlocks.NAMES[NoteBlocks.instrument(g.world.getBlock(x,y-1,z))]);return true;
       }
 
       if (id == DAYLIGHT_SENSOR || id == DAYLIGHT_SENSOR_ON) {
@@ -1004,14 +1002,6 @@ final class Redstone319 {
    }
 
 
-
-   private static void playNote(Game g, int x, int y, int z) {
-      int semitone = g.world.redstone.notes.getOrDefault(pack(x, y, z), 0);
-      SoundEngine.playNoteBlock(g != null ? g.world : null, x, y, z, semitone);
-      if (g != null && g.particles != null) {
-         g.spawnBreakParticles(x, y + 1, z, REDSTONE_TORCH, 4);
-      }
-   }
 
    static boolean placeWire(Game g, Stack s) {
       if (s == null || s.id != ITEM_REDSTONE || g.target == null || g.player.adventure) {
@@ -1303,7 +1293,7 @@ final class Redstone319 {
                   }
                } else if (id == NOTE_BLOCK) {
                   if (pow && w.redstone.opened.add(key)) {
-                     playNote(w.game, x, y, z);
+                     NoteBlocks.play(w, x, y, z);
                   } else if (!pow) {
                      w.redstone.opened.remove(key);
                   }
@@ -1430,6 +1420,8 @@ final class Redstone319 {
          return true;
       }
       void apply(HashSet<Long> remesh) {
+         java.util.Map<Long,Integer> tuning=new java.util.HashMap<>();
+         for(long k:blocks.keySet())if((blocks.get(k)&4095)==NOTE_BLOCK)tuning.put(k,NoteBlocks.pitch(w,unpackX(k),unpackY(k),unpackZ(k)));
          for(long k:broken) {
             int x=unpackX(k),y=unpackY(k),z=unpackZ(k),id=w.getBlock(x,y,z);
             if(Blocks.drop[id]>0)w.dropItem(x+.5,y+.3,z+.5,Blocks.drop[id],1);
@@ -1438,12 +1430,12 @@ final class Redstone319 {
          for(long k:blocks.keySet()){w.setBlock(unpackX(k),unpackY(k),unpackZ(k),0);remesh.add(k);}
          for(java.util.Map.Entry<Long,Integer> e:blocks.entrySet()) {
             long k=e.getKey();int x=unpackX(k)+dx,y=unpackY(k)+dy,z=unpackZ(k)+dz;
-            w.setState(x,y,z,e.getValue());remesh.add(pack(x,y,z));
+            w.setState(x,y,z,e.getValue());if(tuning.containsKey(k))NoteBlocks.tune(w,x,y,z,tuning.get(k));remesh.add(pack(x,y,z));
          }
       }
    }
 
-   private static long pack(int x, int y, int z) {
+   static long pack(int x, int y, int z) {
       return ((long)(x & 0x3FFFFFF) << 38) | ((long)(z & 0x3FFFFFF) << 12) | (y & 0xFFF);
    }
 

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.10";
+   public static final String VERSION_STR = "6.11";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -577,6 +577,7 @@ public final class Game {
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
+         if (Boolean.getBoolean("bc.midi")) MidiCompiler.smoke(this,this.autoFrames);
          if (System.getProperty("bc.shadow")!=null) ShadowMachine.smoke(this,this.autoFrames);
          if (System.getProperty("bc.arcade")!=null) RasterArcade.smoke(this,this.autoFrames);
          if (System.getProperty("bc.computer")!=null) CircuitComputer.smoke(this,this.autoFrames);
@@ -2610,6 +2611,10 @@ public final class Game {
 
          try {
             switch (var2[0].toLowerCase()) {
+               case "midi": case "midibuild":
+                  MidiCompiler.command(this,var2);break;
+               case "mididemo":
+                  MidiCompiler.exportDemo(this);break;
                case "mediaload":
                   RasterMedia.loadProgram(this,var2.length>1?var2[1]:"shadow-signal");break;
                case "shadow":

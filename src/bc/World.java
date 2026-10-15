@@ -117,7 +117,7 @@ public final class World {
       this.loadPopulated();
       this.loadTiles();
       RasterComputer.load(this);
-      RasterMedia.load(this);
+      RasterMedia.load(this);NoteBlocks.load(this);
       if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
          // chunk files from before 3.11 have no summary yet: a background thread makes them (chunks that are loaded are summarised from live data)
@@ -464,7 +464,7 @@ public final class World {
 
       this.saveTiles();
       RasterComputer.save(this);
-      RasterMedia.save(this);
+      RasterMedia.save(this);NoteBlocks.save(this);
       this.savePopulated();
       if (this.dim == Dim.OVERWORLD) {
          this.lodMap.save(this.dir);
@@ -874,7 +874,7 @@ public final class World {
          }
 
          var5.set(var6, var2, var7, state);
-         RasterComputer.changed(this,var1,var2,var3,var8,var4);
+         RasterComputer.changed(this,var1,var2,var3,var8,var4);NoteBlocks.changed(this,var1,var2,var3,var8,var4);
          var5.modified = true;
          var5.lodDirty = this.tickCount + 1L;
          if (var4 == Blocks.FIRE) {
