@@ -1,4 +1,4 @@
-# Visual run 2026-10-15 21:06:27 UTC
+# Visual run 2026-10-15 21:12:28 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
@@ -8,6 +8,6 @@
 
 ## timings
 
-- pixel-arcade-lamps/new: exit 0 in 50s
-- pixel-arcade-panel/new: exit 0 in 41s
-- pixel-editor-bow/new: exit 0 in 41s
+- pixel-arcade-lamps/new: exit 0 in 39s
+- pixel-arcade-panel/new: exit 0 in 34s
+- pixel-editor-bow/new: exit 0 in 31s
