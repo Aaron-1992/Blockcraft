@@ -54,10 +54,10 @@ final class RasterAudio {
       for(var e:streams.entrySet()){
          Stream s=e.getValue();Cursor c=s.cursor;if(c==null)continue;
          if(now-c.received>250_000_000L||e.getKey().world!=listenerWorld||!playing){streams.remove(e.getKey(),s);continue;}
-         // Allow one frame of slack: 512-sample device blocks do not divide 2205-sample video frames.
+         // Allow one frame plus one device block of slack: 512-sample device blocks do not divide 2205-sample video frames.
          // Resetting to every new frame would discard tails and cause a 20 Hz audio glitch.
          // Seeks/loops still reset immediately, and a stalled producer can never be run past.
-         if(s.lastPcm!=c.pcm||s.pos<c.start-RasterClip.SAMPLES_PER_FRAME||s.pos>c.end||c.start<s.lastStart||c.start>s.lastStart+RasterClip.SAMPLES_PER_FRAME){s.pos=c.start;s.smooth=0;s.ramp=64;}
+         if(s.lastPcm!=c.pcm||s.pos<c.start-RasterClip.SAMPLES_PER_FRAME-512||s.pos>c.end||c.start<s.lastStart){s.pos=c.start;s.smooth=0;s.ramp=64;}
          else if(s.starved&&s.pos<c.end)s.ramp=64;
          s.starved=false;
          s.lastStart=c.start;s.lastPcm=c.pcm;

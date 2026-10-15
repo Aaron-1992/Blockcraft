@@ -1,3 +1,4 @@
 pixel-shadow-lamps,pixel-shadow-panel,pixel-arcade-lamps,pixel-editor-bow
 jar=build
 # V6.10 real renderer, original cinema and retained flat bow.
+# Final PCM continuity: batched 75ms renderer cadence, bounded under-62ms slack.

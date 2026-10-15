@@ -38,6 +38,11 @@ public final class TestsMedia {
          for(int i=0;i<600;i++){RasterAudio.video(w,key,clip,i*512/2205,.7F);float[] l=new float[512],r=new float[512];mixed+=RasterAudio.mix(l,r,512,1);RasterAudio.Stream stream=RasterAudio.streams.get(new RasterAudio.Key(w,key));check(stream.pos<=stream.cursor.end(),"no audio ahead of submitted frame");}
          check(600*512-mixed<=512,"at most one device block of initial slack, not gaps at every frame");w.shutdown();
       });
+      test("audio: batched simulation ticks keep continuous PCM at a 75ms renderer cadence",()->{
+         Game g=newGame(1);World w=g.world;g.player.setPos(8.5,80,8.5);RasterAudio.listener(g);RasterAudio.stopWorld(w);long key=World.pack(10,81,10);RasterClip clip=original();int last=0;
+         for(int i=0;i<600;i++){int frame=(i*512/3308)*3308/2205;RasterAudio.video(w,key,clip,frame,.7F);RasterAudio.mix(new float[512],new float[512],512,1);int pos=RasterAudio.streams.get(new RasterAudio.Key(w,key)).pos;check(pos-last>=0&&pos-last<=512,"two ticks in one render update do not skip PCM (block "+i+", frame "+frame+", delta "+(pos-last)+")");last=pos;}
+         w.shutdown();
+      });
       test("media: physical ROM playback, seek, mute, cable cut, restart and native save mapping",()->{
          Game g=newGame(1);World w=g.world;ShadowMachine.install(w,0,72,0);g.player.setPos(5.5,77,46.5);RasterAudio.listener(g);ticks(w,2);
          long cp=World.pack(-20,72,6),key=World.pack(2,77,45),cart=World.pack(-10,72,6);RasterComputer.Network n=RasterComputer.network(w,cp);RasterVM.Cpu c=w.raster.cpus.get(cp);

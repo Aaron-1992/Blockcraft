@@ -1,3 +1,4 @@
 pixel-title,pixel-shadow-lamps,pixel-shadow-panel,pixel-arcade-panel
 # V6.10 exact executable: original movie, speakers, real lamps and sound ROM.
 # Retry result publication: game stage passed; resync/autostash result commits.
+# Final PCM continuity: batched 75ms renderer cadence, bounded under-62ms slack.

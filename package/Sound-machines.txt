@@ -82,7 +82,7 @@ IMPORTANT: MOVING IMAGE / AUDIO TIMING
 ------------------------------------
 BCV1 uses 20 frames per second and exactly 2,205 mono PCM samples per frame at
 44,100 Hz. The ROM's frame number drives both displays and audio. Audio cannot
-run ahead beyond the last submitted frame. Up to one frame of slack absorbs
+run ahead beyond the last submitted frame. A bounded frame/device-block buffer (under 62ms) absorbs
 the difference between 512-sample device blocks and 2,205-sample video frames.
 Pause, seek, loop and restart reset
 or hold the same audio position. If simulation stalls, audio can hold/stutter

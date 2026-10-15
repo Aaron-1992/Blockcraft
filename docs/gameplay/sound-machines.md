@@ -25,7 +25,7 @@ The physical CPU, Program ROM, RAM, GPU, cables, keypad and screens still drive 
 
 ## Sound and persistence
 
-Mono 44.1 kHz data is mixed into the existing stereo SoundEngine before environmental processing. Speakers have distance rolloff, stereo pan, mute and quiet modes. An audible soundtrack ducks background music. Audio cannot consume data beyond the last submitted frame. One frame of slack avoids repeatedly discarding PCM tails at the 512-sample device / 2,205-sample video boundary; seeks and loops reset immediately. This is not zero-latency/sample-perfect physical-screen sync: device buffers, mesh updates, lamp afterglow and networking add delay. Simulation stalls can cause audio holds/stutters.
+Mono 44.1 kHz data is mixed into the existing stereo SoundEngine before environmental processing. Speakers have distance rolloff, stereo pan, mute and quiet modes. An audible soundtrack ducks background music. Audio cannot consume data beyond the last submitted frame. A bounded frame/device-block buffer (under 62ms) avoids repeatedly discarding PCM tails at the 512-sample device / 2,205-sample video boundary; seeks and loops reset immediately. This is not zero-latency/sample-perfect physical-screen sync: device buffers, mesh updates, lamp afterglow and networking add delay. Simulation stalls can cause audio holds/stutters.
 
 Native saves persist ROM/CPU/RAM/framebuffer state plus `media.properties` cartridge references. Custom data is content-addressed in `world/media/<SHA256>.bcv`; corrupt maps are preserved rather than overwritten. Imports are bounded, simple-name only and Creative-host only. See the guide for `Make-media.py` (PNG sequence + PCM16 WAV), `/mediaload` and file limits.
 
