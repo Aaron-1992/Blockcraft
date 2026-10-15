@@ -1,8 +1,8 @@
 GL: 4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4 / llvmpipe (LLVM 20.1.2, 256 bits)
-[shadow-smoke] panels=192 lamps=768 frame=83 speakers=2
-[shadow-smoke] panels=192 lamps=768 frame=296 speakers=2
-[shadow-smoke] panels=192 lamps=768 frame=399 speakers=2
-[shadow-smoke] panels=192 lamps=768 frame=509 speakers=2
-[shadow-smoke] panels=192 lamps=768 frame=619 speakers=2
-[shadow-smoke] panels=192 lamps=768 frame=81 speakers=2
-AUTO screenshot; chunks=176 fps=13
+[shadow-smoke] panels=192 lamps=768 frame=82 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=284 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=385 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=478 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=579 speakers=2
+[shadow-smoke] panels=192 lamps=768 frame=29 speakers=2
+AUTO screenshot; chunks=176 fps=12
