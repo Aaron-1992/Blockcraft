@@ -1,2 +1,2 @@
-6.9
-# Final package be2a57d: 4,453,153 tests pass; Windows and Linux arcade renders verified.
+6.10
+# Final c60b0b1 package: 6,438,736/0; actual distributed saves; Windows/Linux renders verified.
