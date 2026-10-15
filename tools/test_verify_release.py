@@ -6,11 +6,15 @@ import zipfile
 from verify_release import required, inspect_payload
 
 
-def payload(version="6.5", source="expected", tamper=False):
+def payload(version="6.5", source="expected", tamper=False, tamper_media=False):
     data = {"bc/" + c + ".class": c.encode() for c in required(version)}
     text = "version=%s\nsource.sha256=%s\n" % (version, source)
     for c in required(version):
         text += "class.%s.sha256=%s\n" % (c, hashlib.sha256(data["bc/" + c + ".class"]).hexdigest())
+    if tuple(map(int, version.split("."))) >= (6, 10):
+        data["media/shadow-signal.bcv"] = b"original-cartridge"
+        text += "media.shadow-signal.sha256=" + hashlib.sha256(data["media/shadow-signal.bcv"]).hexdigest() + "\n"
+        if tamper_media: data["media/shadow-signal.bcv"] = b"changed-cartridge"
     data["bc-build.properties"] = text.encode()
     if tamper:
         data["bc/Renderer.class"] = b"old-renderer"
@@ -22,6 +26,13 @@ def payload(version="6.5", source="expected", tamper=False):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_original_cartridge_receipt(self):
+        jar=payload("6.10")
+        self.assertEqual(inspect_payload(jar,jar,"6.10","expected")["version"],"6.10")
+        bad=payload("6.10",tamper_media=True)
+        with self.assertRaisesRegex(ValueError,"media cartridge"):
+            inspect_payload(bad,bad,"6.10","expected")
+
     def test_current_embedded_game(self):
         jar = payload()
         receipt = inspect_payload(b"launcher-stub" + jar, jar, "6.5", "expected")

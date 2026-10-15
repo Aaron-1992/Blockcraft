@@ -21,6 +21,7 @@ final class RasterArcade {
       for(int z=5;z<=30;z++)p.put(ox+9,y,oz+z,RasterComputer.CABLE);
       for(int h=1;h<=9;h++)p.put(ox+9,y+h,oz+30,RasterComputer.CABLE);
       p.put(ox+9,y+10,oz+30,RasterComputer.KEYS+1);
+      p.put(ox+9,y+10,oz+31,RasterComputer.SPEAKER+1);
       int[] modules={RasterComputer.CPU|4096,RasterComputer.ROM,RasterComputer.RAM,RasterComputer.GPU,RasterComputer.LAMPS};
       for(int i=0;i<modules.length;i++)p.put(ox+i*2,y,oz+6,modules[i]+1);
       // Stairs to the observation deck, plus lit floor trim. No decoration carries data.

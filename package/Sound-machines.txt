@@ -1,0 +1,159 @@
+BLOCKCRAFT V6.10 - SOUND MACHINES
+================================
+
+SHADOW SIGNAL IS ORIGINAL
+-------------------------
+This is the original-demo alternative, NOT the Bad Apple!! video or song.
+It is a new 32-second black-and-white pixel animation: a scarf-wearing dancer,
+a crescent, birds, petals and a skyline, with an original synthesized score.
+No external video, recording or character artwork was used. Animation and
+music generation source is in tools/media/make_shadow_signal.py in the repo.
+The included score uses a triangle lead, sine bass/pads and synthesized drums.
+It contains occasional high-contrast scene cuts, not a rapid full-screen strobe.
+
+INSTALL AND PLAY
+----------------
+Update the GAME to V6.10 first, then extract Blockcraft-Sound-Machines.zip.
+Close Blockcraft and run Install-worlds.bat. It installs two separate NEW saves
+and refuses to overwrite either existing destination. Your V6.9 world is safe.
+Use view distance 5 or higher. Open either world in Singleplayer:
+
+  Shadow Signal - Original Silhouette Cinema
+    Empty-hand right-click the keypad on your left, then ENTER.
+    SPACE or P: play/pause     LEFT/RIGHT: seek five seconds
+    ENTER/R: restart          M: mute/unmute all connected speakers
+    ESC: leave controls       Mouse: look around
+    The 32-second clip loops. Leaving the keypad does NOT pause the machine.
+    The 64x48 panel wall is native resolution; the 32x24 lamp wall samples
+    every other pixel. Lamps retain normal four-tick switch-off afterglow.
+    Fly closer and right-click the panel wall for a larger, sharper view.
+    There is a second speaker beside that screen, not just at the console.
+
+  Block Drop - Sound Edition
+    Same controls as V6.9: arrows move/rotate, Down soft-drops, Space hard-drops,
+    P pauses, Enter/R restarts, Escape leaves. M toggles speakers.
+    Sound cues cover movement, rotation, starting, pausing, locking, line
+    clears and game over. They are TONE instructions in the editable ROM,
+    not hidden event detection. Both new saves start PAUSED.
+
+The world's native folders are Shadow_Signal_V610 and Block_Drop_Sound_V610.
+Manual install: copy them into %USERPROFILE%\.blockcraft112\saves\
+(Linux: ~/.blockcraft112/saves/). Do not open these saves in an older game.
+
+YOUR EXISTING V6.9 BLOCK DROP WORLD
+---------------------------------
+Back up your save. In Creative, look at any connected Block Drop component
+and enter /arcadesound. It installs the new sound ROM and adds a speaker in an
+empty space beside the keypad if needed. THIS RESETS THE CURRENT GAME.
+It recognizes the exact old/new supplied programs and refuses to replace a
+custom ROM or existing blocks. For a modified program, import your chosen
+FallingBlocks-Sound.asm manually and connect a speaker yourself.
+
+/arcade now builds the sound edition. /shadow builds a new cinema machine.
+Both builders require Creative and the multiplayer host; they refuse to
+replace existing blocks. /computer and all V6.8 four-bit blocks still work.
+
+REUSABLE HARDWARE
+-----------------
+Two new craftable items in Creative > Decoration and Utility:
+
+Raster Speaker: connect it to the same Raster Data Cable as your processor.
+Right-click toggles mute. Empty-hand sneak/right-click toggles quiet/normal.
+M at any connected keypad toggles all speakers. Sound uses distance rolloff
+and stereo panning, with a 48-block maximum radius. At most eight speakers
+per machine emit audio. Sound volume in Options controls these world sounds;
+background music is gently ducked while an audible movie soundtrack plays.
+
+Media Cartridge: stores a reference to actual BCV1 frame/audio data. A ROM
+controls playback, pause and seeking; it is not a hardcoded video player block.
+Exactly one loaded cartridge must be on the bus for VIDEO instructions.
+The normal processor/ROM/RAM/GPU blocks are still required. Breaking a required
+connection stops execution and streaming sound; repairing it resumes the
+saved instruction position. Disconnecting a speaker makes that speaker silent.
+CPU Run/Stop, reset and saved PC/registers work as before.
+
+Lamp Screen Adapter: right-click now cycles 1x, 2x, 4x, 8x sampling.
+1x is the old one-lamp-per-pixel behavior. The supplied cinema uses 2x so a
+64x48 framebuffer can drive a practical 32x24 wall of 768 REAL redstone lamps.
+Use one adapter per network. Panels still address every native framebuffer
+pixel; adding panels adds resolution, not automatic stretching.
+
+IMPORTANT: MOVING IMAGE / AUDIO TIMING
+------------------------------------
+BCV1 uses 20 frames per second and exactly 2,205 mono PCM samples per frame at
+44,100 Hz. The ROM's frame number drives both displays and audio. Audio cannot
+run ahead beyond the last submitted frame. Up to one frame of slack absorbs
+the difference between 512-sample device blocks and 2,205-sample video frames.
+Pause, seek, loop and restart reset
+or hold the same audio position. If simulation stalls, audio can hold/stutter
+instead of drifting through the soundtrack. Renderer uploads, audio-device
+buffering and network latency still add delay; this is an in-world display,
+not a zero-latency desktop video player. Lamp afterglow is especially visible
+on moving images; use the panel wall for the sharp version.
+
+CARTRIDGES AND YOUR OWN MEDIA
+----------------------------
+Creative host/single player: look at a Media Cartridge and enter:
+  /mediaload shadow-signal
+This loads the bundled original clip. No extra download is needed.
+
+For your own media, Make-media.py packs a numbered PNG sequence plus PCM16 WAV:
+  python -m pip install Pillow
+  python Make-media.py frames/ soundtrack.wav MyMovie.bcv --width 64 --height 48
+
+Use 20 PNG frames per second, maximum 2,400 frames (120 seconds), 1..64 pixels
+in each dimension. The converter numerically sorts names, resizes/thresholds
+frames to monochrome, downmixes/resamples audio to mono 44.1 kHz, and trims or
+pads it to exactly match the frames. Transparent pixels become black. It
+refuses to overwrite output files. Supply media you have permission to use.
+It is not a video downloader; decode your own video into PNGs/WAV separately.
+
+Put MyMovie.bcv in %USERPROFILE%\.blockcraft112\media\, look at the cartridge,
+and /mediaload MyMovie.bcv. Import requires the Creative host. Files are
+bounded (16 MiB compressed; max 64x64/120 seconds); only simple .bcv filenames
+inside that media directory are accepted. No external codecs or executable
+scripts run inside the game. Up to eight imported clips per loaded world.
+
+Imported media is copied into the save's media/<SHA256>.bcv folder and linked
+in media.properties. Back up the WHOLE world including this folder,
+media.properties and raster.dat. The built-in clip is shipped in the game.
+Breaking a cartridge erases its assignment, not the external source file.
+A corrupt cartridge-map file is preserved instead of being silently replaced.
+
+ROM EXTENSIONS (OLD OPCODE NUMBERS UNCHANGED)
+-------------------------------------------
+  TONE a b c     register a = MIDI note (24..108)
+                 register b = duration in milliseconds (20..1000)
+                 register c = waveform in bits 0..1, volume 0..15 in bits 8..11
+                 waveforms: 0 sine, 1 triangle, 2 harmonic chip, 3 noise
+                 Example: LI 0 72 / LI 1 100 / LI 2 0x901 / TONE 0 1 2
+                 Maximum 8 requests per CPU tick and 32 per world tick.
+
+  VIDEO a b      register a = frame index; register b bit 0 = audio enabled.
+                 Copies the cartridge frame into the GPU, presents it and
+                 submits audio from the same frame. No separate PRESENT needed.
+                 Flag 0 shows the frame silently (used for pause).
+
+  IN a 32/33     cartridge width / height
+  IN a 34/35     cartridge frame count / fps
+
+Use WAIT 1 between VIDEO frames. The ordinary arithmetic/branches/IN/OUT remain
+unchanged. MediaPlayer.asm is the actual generic playback program. Its r10 is
+the frame counter, r13 loop count, r19 pause. OUT7=0x4d50 selects the media HUD;
+OUT0/1/2/3/4 are frame/length/fps/paused/loops. This is just a program convention.
+/rasterload MediaPlayer.asm imports it while looking at a Program ROM.
+Missing examples are exported to .blockcraft112/computer-programs/ without
+overwriting your edits. FallingBlocks-Sound.asm is a new name, so your old
+FallingBlocks.asm is not silently replaced.
+
+MULTIPLAYER
+-----------
+Everyone needs V6.10. Only the host runs ROMs and imports media. Panel frames,
+lamp changes, tones and media frame/audio commands are replicated. A late
+joiner starts audio at the current host frame, not the beginning of the song.
+The original clip is included on every client. For CUSTOM clips, copy the
+matching hash-named .bcv from the host's world/media folder into each client's
+.blockcraft112/media folder too; large files are not streamed over the game's
+prototype block protocol. Missing audio data produces a message, not a crash.
+Keep the host near the machines so their chunks remain loaded. Network/renderer
+latency can affect sync; this is still Blockcraft's prototype multiplayer.

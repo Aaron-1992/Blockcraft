@@ -17,6 +17,7 @@ It deliberately does NOT compile anything: the released bytes are exactly the co
 Used by .github/workflows/release.yml; can be run locally too:  python3 tools/make_release.py [version]
 """
 import glob
+import json
 import hashlib
 import os
 import re
@@ -186,6 +187,39 @@ def main():
             "Add panels for more pixels, up to 64x64. The existing game image is not automatically stretched. "
             "Use view distance 5+; do not open the new save in an older game version. "
             "See Raster-guide.txt for circuit layout, instruction set, crafting and limitations.\n")
+    if version == "6.10":
+        world_name = "Blockcraft-Sound-Machines.zip"
+        world = os.path.join(ROOT,world_name)
+        with zipfile.ZipFile(world) as z:
+            assert z.testzip() is None
+            for folder,count in (("Shadow_Signal_V610",81),("Block_Drop_Sound_V610",49)):
+                assert z.read(folder+"/raster.dat")[:4] == b"RAS1"
+                assert sum(n.startswith(folder+"/") and n.endswith(".gz") for n in z.namelist()) == count
+            assert b"shadow-signal" in z.read("Shadow_Signal_V610/media.properties")
+            for name in ("FallingBlocks-Sound.asm","MediaPlayer.asm","Sound-machines.txt","Raster-guide.txt","Make-media.py"):
+                assert z.read(name) == open(os.path.join(ROOT,"package",name),"rb").read()
+            for name,digest in json.loads(z.read("World-SHA256.json")).items():
+                assert hashlib.sha256(z.read(name)).hexdigest() == digest
+        shutil.copy(world,os.path.join(OUT,world_name))
+        release_notes += ("\n### Two new sound-machine worlds\n\n"
+            "Download **Blockcraft-Sound-Machines.zip**, update the game to **V6.10**, extract the whole ZIP and run **Install-worlds.bat**. "
+            "It installs two separate saves and refuses to overwrite existing destinations. Your V6.9 world is not replaced.\n\n"
+            "* **Shadow Signal — Original Silhouette Cinema:** a new 32-second black-and-white animation and synthesized score, "
+            "**not the Bad Apple!! video/song**. A 64×48 panel wall and 32×24 real redstone lamps are driven by an editable media ROM. "
+            "Right-click the left keypad, then **Enter**. Space/P pauses, arrows seek five seconds, Enter/R restarts, M mutes, Escape leaves. "
+            "The real lamps retain redstone afterglow; look left/fly closer to the panel wall for the sharper image.\n"
+            "* **Block Drop — Sound Edition:** the existing ROM game now emits its own sound cues through a physical speaker. "
+            "Its controls are unchanged; M toggles audio.\n\n"
+            "Both saves start paused. Use view distance 5+. Speaker, cartridge, lamp sampling, custom PNG/WAV conversion and instruction-set details "
+            "are in **Sound-machines.txt**. The original clip is already inside the game. **MediaPlayer.asm** and **FallingBlocks-Sound.asm** "
+            "are editable programs, not a hidden video/game controller. No texture/bow/lighting redesign in this update.\n\n"
+            "**Existing V6.9 world:** back it up, look at a connected Block Drop component in Creative and type `/arcadesound`. "
+            "It adds a speaker and upgrades only the exact supplied ROM; **this resets the current game**. Custom ROMs and existing blocks are not overwritten. "
+            "`/shadow` builds a new cinema; `/arcade` builds the sound edition.\n\n"
+            "Audio is driven by the displayed ROM frame and bounded so it cannot run through a paused/stalled movie. "
+            "Device buffering, renderer updates, lamp afterglow and network latency still add delay. "
+            "Custom media must also be copied to multiplayer clients; no large-file streaming. "
+            "See the source verification report for automated tests and real-renderer evidence; no physical speaker audition or two-PC multiplayer test is claimed.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

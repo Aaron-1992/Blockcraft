@@ -1,0 +1,64 @@
+; Generic 20fps cartridge player. r10 frame, r11 length, r13 loops, r19 pause.
+LI 0 0x4d50
+OUT 7 0
+LI 10 0
+LI 13 0
+LI 19 1
+loop:
+IN 11 34
+IN 12 35
+IN 21 0
+MOV 0 21
+LI 31 64
+AND 0 31
+JZ 0 pause
+LI 10 0
+LI 13 0
+LI 19 0
+pause:
+MOV 0 21
+LI 31 48
+AND 0 31
+JZ 0 left
+LI 31 1
+XOR 19 31
+left:
+MOV 0 21
+LI 31 1
+AND 0 31
+JZ 0 right
+LI 31 100
+SUB 10 31
+LI 31 0
+JLT 31 10 right
+LI 10 0
+right:
+MOV 0 21
+LI 31 2
+AND 0 31
+JZ 0 bound
+LI 31 100
+ADD 10 31
+bound:
+JLT 10 11 draw
+MOV 10 11
+LI 31 1
+SUB 10 31
+draw:
+OUT 0 10
+OUT 1 11
+OUT 2 12
+OUT 3 19
+OUT 4 13
+LI 0 1
+SUB 0 19
+VIDEO 10 0
+JNZ 19 wait
+LI 31 1
+ADD 10 31
+JLT 10 11 wait
+LI 10 0
+ADD 13 31
+wait:
+WAIT 1
+JMP loop

@@ -29,6 +29,8 @@ def required(version):
         extra += ("Circuit", "CircuitComputer", "Facing", "BlockState", "Shapes", "Mesher", "World", "Net319", "Aquatic", "RedstoneLogic", "WaterPhysics")
     if tuple(map(int, version.split("."))) >= (6, 9):
         extra += ("RasterVM", "RasterComputer", "RasterPrograms", "RasterArcade")
+    if tuple(map(int, version.split("."))) >= (6, 10):
+        extra += ("RasterAudio", "RasterClip", "RasterMedia", "ShadowMachine", "SoundEngine")
     return REQUIRED + extra
 
 
@@ -56,6 +58,9 @@ def inspect_payload(exe, jar, version, source_hash):
             actual = hashlib.sha256(j.read("bc/" + cls + ".class")).hexdigest()
             if actual != receipt.get("class." + cls + ".sha256"):
                 raise ValueError("Missing/modified visual update class: " + cls)
+        if tuple(map(int, version.split("."))) >= (6, 10):
+            if hashlib.sha256(j.read("media/shadow-signal.bcv")).hexdigest() != receipt.get("media.shadow-signal.sha256"):
+                raise ValueError("Missing/modified original media cartridge")
         return receipt
 
 
@@ -72,6 +77,11 @@ def verify(archive, version):
             guides=("Edit-textures.bat", "Texture-editing.txt", "README.txt")
             if tuple(map(int, version.split("."))) >= (6, 8): guides += ("Computer-guide.txt",)
             if tuple(map(int, version.split("."))) >= (6, 9): guides += ("Raster-guide.txt", "FallingBlocks.asm",)
+            if tuple(map(int, version.split("."))) >= (6, 10):
+                guides += ("Sound-machines.txt", "FallingBlocks-Sound.asm", "MediaPlayer.asm", "Make-media.py")
+                with zipfile.ZipFile(io.BytesIO(jar)) as game:
+                    with open(os.path.join(B.ROOT,"res/media/shadow-signal.bcv"),"rb") as media:
+                        if game.read("media/shadow-signal.bcv") != media.read(): raise ValueError("Stale original media cartridge")
             for name in guides:
                 with open(os.path.join(B.ROOT, "package", name), "rb") as f:
                     if z.read("Blockcraft/" + name) != f.read():

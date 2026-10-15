@@ -107,6 +107,10 @@ MOV 27 21
 LI 31 64
 AND 27 31
 JZ 27 pausekey
+LI 0 67
+LI 1 140
+LI 2 2305
+TONE 0 1 2
 LI 19 0
 JMP restart
 pausekey:
@@ -116,9 +120,22 @@ AND 27 31
 JZ 27 active
 LI 31 1
 XOR 19 31
+LI 0 76
+LI 1 80
+LI 2 1537
+TONE 0 1 2
 active:
 JNZ 20 draw
 JNZ 19 draw
+MOV 27 21
+LI 31 3
+AND 27 31
+JZ 27 nomovetone
+LI 0 60
+LI 1 35
+LI 2 1281
+TONE 0 1 2
+nomovetone:
 MOV 27 21
 LI 31 1
 AND 27 31
@@ -145,6 +162,10 @@ MOV 27 21
 LI 31 4
 AND 27 31
 JZ 27 drop
+LI 0 72
+LI 1 60
+LI 2 1793
+TONE 0 1 2
 MOV 25 12
 MOV 23 10
 LI 31 1
@@ -243,9 +264,17 @@ CALL mask
 CALL test
 JZ 8 spawnok
 LI 20 1
+LI 0 36
+LI 1 650
+LI 2 2562
+TONE 0 1 2
 spawnok:
 RET
 lock:
+LI 0 43
+LI 1 100
+LI 2 2562
+TONE 0 1 2
 MOV 0 26
 MOV 1 10
 MOV 2 11
@@ -272,6 +301,10 @@ LI 31 1
 ADD 16 31
 LI 31 100
 ADD 17 31
+LI 0 84
+LI 1 180
+LI 2 2817
+TONE 0 1 2
 MOV 28 29
 shiftrow:
 JZ 28 cleartop

@@ -849,6 +849,8 @@ SCENES["pixel-aquatic-circuits"] = (_RS+["-Dbc.set="+";".join(_RS_SET)],True)
 _CPU=["-Dbc.auto=1","-Dbc.seed=12345","-Dbc.gen=2","-Dbc.mode=1","-Dbc.rd=5","-Dbc.lod=6",
       "-Dbc.win=1280x720","-Dbc.cam=8.5,68,8.5,180,0","-Dbc.shot=480","-Dbc.time=6000",
       "-Dbc.weather=calm","-Dbc.emptyhand=1","-Dbc.worldonly=true","-Dbc.shaders=false"]
+SCENES["pixel-shadow-lamps"]=(_CPU+["-Dbc.shadow=lamps"],True)
+SCENES["pixel-shadow-panel"]=(_CPU+["-Dbc.shadow=panel"],True)
 SCENES["pixel-arcade-lamps"]=(_CPU+["-Dbc.arcade=lamps"],True)
 SCENES["pixel-arcade-panel"]=(_CPU+["-Dbc.arcade=panel"],True)
 SCENES["pixel-computer-overview"]=(_CPU+["-Dbc.computer=overview"],True)

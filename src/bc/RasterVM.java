@@ -5,7 +5,7 @@ import java.util.*;
 /** General integer processor and small graphics coprocessor. No game rules live in the interpreter.
  * Four words per instruction: opcode,a,b,c. All addresses/branches are bounds checked. */
 final class RasterVM {
-   static final String[] OPS={"HALT","LI","MOV","ADD","SUB","MUL","DIV","MOD","AND","OR","XOR","SHL","SHR","LD","ST","JMP","JZ","JNZ","JLT","CALL","RET","IN","OUT","WAIT","RAND","CLEAR","PIXEL","SPRITE","HIT","STAMP","BLIT","PRESENT","DIGIT"};
+   static final String[] OPS={"HALT","LI","MOV","ADD","SUB","MUL","DIV","MOD","AND","OR","XOR","SHL","SHR","LD","ST","JMP","JZ","JNZ","JLT","CALL","RET","IN","OUT","WAIT","RAND","CLEAR","PIXEL","SPRITE","HIT","STAMP","BLIT","PRESENT","DIGIT","TONE","VIDEO"};
    static final class Cpu {
       int pc,wait,sp,rng=0x1234567;
       final int[] r=new int[32],stack=new int[32],out=new int[8];
@@ -13,7 +13,7 @@ final class RasterVM {
       String fault="";int width=16,height=28;
       void reset(){pc=wait=sp=0;Arrays.fill(r,0);Arrays.fill(out,0);Arrays.fill(frame,(byte)0);fault="";}
    }
-   interface IO {int input(int port);void present(Cpu cpu);default void output(int port,int value){}}
+   interface IO {int input(int port);void present(Cpu cpu);default void output(int port,int value){}default void tone(int note,int ms,int voice){}default void video(Cpu cpu,int frame,int flags){throw new IllegalArgumentException("No media coprocessor");}}
    static int reg(int i){if(i<0||i>=32)throw new IllegalArgumentException("Register outside 0..31");return i;}
    static int addr(int i,int[] mem){if(i<0||i>=mem.length)throw new IllegalArgumentException("Memory address "+i);return i;}
    static void pixel(Cpu c,int x,int y,int v){if(x>=0&&x<c.width&&y>=0&&y<c.height)c.frame[y*64+x]=(byte)(v&15);}
@@ -52,6 +52,8 @@ final class RasterVM {
             case 30 -> {if(r[5]<0||r[5]>64||r[6]<0||r[6]>64||r[4]<0||(long)r[4]+r[5]*r[6]>mem.length)throw new IllegalArgumentException("Blit bounds");for(int y=0;y<r[6];y++)for(int x=0;x<r[5];x++)pixel(c,r[1]+x,r[2]+y,mem[r[4]+y*r[5]+x]);}
             case 31 -> io.present(c);
             case 32 -> {int[] digits={0x7b6f,0x2492,0x73e7,0x73cf,0x5bc9,0x79cf,0x79ef,0x7249,0x7bef,0x7bcf,0x2bed,0x6bae,0x7927,0x6b6e,0x79e7,0x79e4};int bits=digits[r[0]&15];for(int y=0;y<5;y++)for(int x=0;x<3;x++)if((bits&(1<<(14-y*3-x)))!=0)pixel(c,r[1]+x,r[2]+y,r[3]);}
+            case 33 -> io.tone(r[reg(a)],r[reg(b)],r[reg(d)]);
+            case 34 -> io.video(c,r[reg(a)],r[reg(b)]);
             default -> throw new IllegalArgumentException("Unknown opcode "+op);
          }
       }}catch(RuntimeException e){c.fault=e.getMessage()==null?e.getClass().getSimpleName():e.getMessage();}

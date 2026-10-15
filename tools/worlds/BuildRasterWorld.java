@@ -12,6 +12,7 @@ public final class BuildRasterWorld {
    static World fresh(Path path,WorldSettings settings){World w=new World(690069L,path.toFile(),0,settings);w.weather.enabled=false;w.disasters.enabled=false;w.fire.spread=false;w.trees.enabled=false;w.dayTime=6000;return w;}
    static void ticks(World w,int n){for(int i=0;i<n;i++)w.tick();}
    public static void main(String[] args)throws Exception{
+      if(!Game.VERSION_STR.equals("6.9"))throw new IOException("Historical V6.9 builder: compile against the published V6.9 JAR, or use BuildSoundWorlds for V6.10");
       Path path=Path.of(args[0]);if(Files.exists(path.resolve("level.properties")))throw new IOException("Refusing to overwrite an existing world");
       WorldSettings settings=new WorldSettings();settings.type=WorldSettings.FLAT;settings.flat=0;settings.structures=false;settings.bonusChest=false;
       World w=fresh(path,settings);for(int z=-3;z<=3;z++)for(int x=-3;x<=3;x++){Chunk c=w.gen.generate(x,z);w.chunks.put(World.key(x,z),c);w.lightChunk(c);}

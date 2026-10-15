@@ -117,6 +117,7 @@ public final class World {
       this.loadPopulated();
       this.loadTiles();
       RasterComputer.load(this);
+      RasterMedia.load(this);
       if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
          // chunk files from before 3.11 have no summary yet: a background thread makes them (chunks that are loaded are summarised from live data)
@@ -463,6 +464,7 @@ public final class World {
 
       this.saveTiles();
       RasterComputer.save(this);
+      RasterMedia.save(this);
       this.savePopulated();
       if (this.dim == Dim.OVERWORLD) {
          this.lodMap.save(this.dir);
@@ -506,6 +508,7 @@ public final class World {
    }
 
    public void shutdown() {
+      RasterAudio.stopWorld(this);
       this.lodMap.stop = true;
       this.pool.shutdownNow();
    }
@@ -1001,7 +1004,7 @@ public final class World {
       FastChunkCache.clear();
       this.redstone.clear();
       this.circuit.clear();
-      this.raster.clear();
+      RasterAudio.stopWorld(this);this.raster.clear();
       this.fluidDue.clear();
       this.fluidPending.clear();
       this.blockUpdates.clear();

@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.9  -  an original Minecraft-style voxel sandbox   (EDITION V6.9)
+BLOCKCRAFT V6.10  -  an original Minecraft-style voxel sandbox   (EDITION V6.10)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,23 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.10 - Sound machines and original silhouette cinema
+
+  * Block Drop sound cues are real TONE instructions in its editable ROM.
+  * Reusable Raster Speaker and Media Cartridge blocks; distance/pan, mute,
+    quiet volume, frame-locked audio, pause, seeking, looping and save/resume.
+  * /shadow builds a 64x48 display and 32x24 redstone-lamp cinema machine.
+    SHADOW SIGNAL is an ORIGINAL 32-second animation and synthesized score,
+    not the Bad Apple video, song or character artwork.
+  * /arcadesound safely upgrades the supplied V6.9 ROM (resets the game), or
+    use the separate Block Drop - Sound Edition save in the new world bundle.
+  * Space/P pauses cinema, arrows seek, Enter restarts, M mutes, Esc leaves.
+    See Sound-machines.txt, MediaPlayer.asm, FallingBlocks-Sound.asm.
+  * Original media is included in the game. Custom PNG/WAV media can be packed
+    with Make-media.py and imported by the host. Matching versions required.
+  * Monochrome panel geometry is merged without losing addressable pixels.
+    Existing textures, flat bow, lighting and V6.8/V6.9 hardware are preserved.
 
 WHAT'S NEW IN V6.9 - Modular pixel screens and a programmable lamp arcade
 

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.9";
+   public static final String VERSION_STR = "6.10";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -577,6 +577,7 @@ public final class Game {
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
+         if (System.getProperty("bc.shadow")!=null) ShadowMachine.smoke(this,this.autoFrames);
          if (System.getProperty("bc.arcade")!=null) RasterArcade.smoke(this,this.autoFrames);
          if (System.getProperty("bc.computer")!=null) CircuitComputer.smoke(this,this.autoFrames);
          if (this.autoFrames==70&&Boolean.getBoolean("bc.facingreview")) Facing.smoke(this);
@@ -2609,6 +2610,12 @@ public final class Game {
 
          try {
             switch (var2[0].toLowerCase()) {
+               case "mediaload":
+                  RasterMedia.loadProgram(this,var2.length>1?var2[1]:"shadow-signal");break;
+               case "shadow":
+                  ShadowMachine.build(this);break;
+               case "arcadesound":
+                  ShadowMachine.upgrade(this);break;
                case "rasterload":
                   RasterComputer.loadProgram(this,var2.length>1?var2[1]:"FallingBlocks.asm");break;
                case "arcade":

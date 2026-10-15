@@ -41,6 +41,12 @@ jobs:
           set -o pipefail
           python3 tools/runtests.py 2>&1 | tee build/runtests.log
 
+      - name: Reload and verify the actual distributed V6.10 sound worlds
+        run: |
+          python3 -m zipfile -e Blockcraft-Sound-Machines.zip build/distributed-sound-worlds
+          javac -cp build/classes:libs/lwjgl-bundle.jar -d build/world-classes tools/worlds/BuildSoundWorlds.java
+          java -Xmx2g -Djava.awt.headless=true -cp build/classes:build/world-classes:libs/lwjgl-bundle.jar bc.BuildSoundWorlds build/distributed-sound-worlds --verify
+
       - name: Native texture coverage (no silently inherited atlas cells)
         run: java -Djava.awt.headless=true -cp build/classes:build/test-classes:libs/lwjgl-bundle.jar bc.TextureAudit build/texture-coverage.tsv
 

@@ -1,3 +1,7 @@
+V6.10 NOTE: sound-enabled Block Drop uses the same layout plus a speaker.
+See Sound-machines.txt for the original cinema, TONE/VIDEO instructions,
+media import and safe upgrades. The old V6.9 world is not overwritten.
+
 BLOCKCRAFT V6.9 - MODULAR DISPLAYS AND THE BLOCK DROP ARCADE
 ==========================================================
 

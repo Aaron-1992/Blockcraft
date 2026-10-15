@@ -43,7 +43,7 @@ public final class TestsRaster {
          boolean rejected=false;try{RasterVM.assemble("a:\na:\nHALT");}catch(IllegalArgumentException e){rejected=true;}check(rejected,"duplicate labels rejected");
       });
       test("raster: registered, craftable, canonical blocks with no ID overlap",()->{
-         ArrayList<Integer> ids=new ArrayList<>();RasterComputer.creative(ids);eq(9,ids.size(),"nine hardware items");
+         ArrayList<Integer> ids=new ArrayList<>();RasterComputer.creative(ids);eq(11,ids.size(),"eleven hardware items");
          for(int id:ids){check(Blocks.name[id]!=null,"registered name");check(Shapes.modelBoxes(id)!=null,"world and inventory model");eq(Creative.UTILITY,Creative.tabOf(id),"utility tab");eq(id,Blocks.pickItem(id),"canonical pick");check(!Circuit.handles(id),"old computer namespace untouched");}
          for(int f=0;f<4;f++){eq(RasterComputer.PIXEL,Blocks.pickItem(RasterComputer.PIXEL+4+f),"powered driver pick");eq(15,RasterComputer.lampPower(RasterComputer.PIXEL+4+f,Circuit.DX[f],0,Circuit.DZ[f]),"driver only powers forward");eq(0,RasterComputer.lampPower(RasterComputer.PIXEL+4+f,-Circuit.DX[f],0,-Circuit.DZ[f]),"no backwards power");}
       });

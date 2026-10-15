@@ -1,3 +1,2 @@
-pixel-title,pixel-arcade-lamps,pixel-arcade-panel
-# V6.9 exact packaged executable, actual ROM/keypad controls and both screens.
-# Final V6.9: verify ROM-import output reset and final packaged bytes.
+pixel-title,pixel-shadow-lamps,pixel-shadow-panel,pixel-arcade-panel
+# V6.10 exact executable: original movie, speakers, real lamps and sound ROM.

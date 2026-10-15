@@ -1349,6 +1349,7 @@ public final class SoundEngine {
 
    /** Per-tick update called from Game.tick() to drive footsteps, weather/block ambience, delayed speed-of-sound events, and music selection. */
    public static void tick(Game g) {
+      RasterAudio.listener(g);
       ensureLoaded();
       if (g == null) {
          return;
@@ -1721,6 +1722,8 @@ public final class SoundEngine {
                }
             }
 
+            RasterAudio.mix(mixL,mixR,frames,sVol);
+
             // 2. Apply Real-Life 3D Room / Cave Schroeder Reverb & Canyon Echo to world sounds
             float wet = realAcoustics ? reverbWet : 0.0F;
             float fb = reverbFeedback;
@@ -1775,7 +1778,7 @@ public final class SoundEngine {
             }
 
             // 4. Mix Minecraft Legacy Console Edition Music Stream (single active track at a time, rotating Battle themes)
-            float mVol = masterMusicVol;
+            float mVol = masterMusicVol*RasterAudio.duck;
             if (mVol > 0.001F) {
                String activeKey;
                float fade;
