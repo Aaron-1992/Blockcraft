@@ -1,2 +1,2 @@
-6.7
-# Publish the verified, Windows-tested aquatic/redstone build as a NEW release. Never replace V6.6.
+6.8
+# Publish the verified physical computer/facing release; preserve V6.6 and V6.7.
