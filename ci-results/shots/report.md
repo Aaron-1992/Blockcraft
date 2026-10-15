@@ -1,4 +1,4 @@
-# Visual run 2026-10-15 01:10:25 UTC
+# Visual run 2026-10-15 01:22:09 UTC
 
 | scene | rendered by | differing pixels (ref vs new) |
 |---|---|---|
@@ -10,8 +10,8 @@
 
 ## timings
 
-- pixel-computer-overview/new: exit 0 in 43s
-- pixel-computer-output/new: exit 0 in 45s
-- pixel-facing-open/new: exit 0 in 11s
-- pixel-facing-closed/new: exit 0 in 11s
-- pixel-editor-bow/new: exit 0 in 40s
+- pixel-computer-overview/new: exit 0 in 50s
+- pixel-computer-output/new: exit 0 in 48s
+- pixel-facing-open/new: exit 0 in 10s
+- pixel-facing-closed/new: exit 0 in 10s
+- pixel-editor-bow/new: exit 0 in 38s
