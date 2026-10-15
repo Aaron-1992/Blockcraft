@@ -21,8 +21,10 @@ final class BlockState {
       if (next < 0 || next > 65535) return -1;
       if ((next & ~ID_MASK) != 0) return next;
       int before = old & ID_MASK;
+      int facing=Facing.same(before,next)?old&Facing.MASK:0;
       if (wet(old) && next == 0) return Blocks.WATER;
-      if (waterloggable(next) && (wet(old) || before == Blocks.WATER)) return next | WATERLOGGED;
+      if (waterloggable(next) && (wet(old) || before == Blocks.WATER)) return next | WATERLOGGED | facing;
+      if(Facing.same(before,next))return next|facing;
       if (Redstone319.isRepeater(before) && Redstone319.isRepeater(next)
          || (before==Redstone319.DAYLIGHT_SENSOR||before==Redstone319.DAYLIGHT_SENSOR_ON)&&(next==Redstone319.DAYLIGHT_SENSOR||next==Redstone319.DAYLIGHT_SENSOR_ON)
          || RedstoneLogic.comparator(before) && RedstoneLogic.comparator(next)) return next | (old & 0xF000);

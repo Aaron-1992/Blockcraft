@@ -411,7 +411,7 @@ public final class Mesher {
             float var20 = 1.0F;
             float var21 = 1.0F;
             float var22 = 1.0F;
-            int var23 = Blocks.tiles[var5][var15];
+            int var23 = Facing.tile(var0.B[var12]&65535,var15);
             if (Blocks.tint[var5] == 2 || var19 && var15 == 0) {
                var20 = (var13 >> 16 & 0xFF) / 255.0F;
                var21 = (var13 >> 8 & 0xFF) / 255.0F;
@@ -430,6 +430,7 @@ public final class Mesher {
                var0.rot = Redstone319.faceRot(var5, var15);
             }
 
+            if(Facing.handles(var5)&&var15<2)var0.rot=(var0.rot+Shapes.turns(0,Facing.direction(var0.B[var12]&65535)))&3;
             quad(var0, var15, var2, var3, var4, var17, var12, var23, var20 * jit, var21 * jit, var22 * jit, 1.0F, var6, 0.0F, var14);
             if (!legacy && Blocks.emit[var5] > 0) {
                float selfBl = lu(Blocks.emit[var5]);

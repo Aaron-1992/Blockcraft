@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.7  -  an original Minecraft-style voxel sandbox   (EDITION V6.7)
+BLOCKCRAFT V6.8  -  an original Minecraft-style voxel sandbox   (EDITION V6.8)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,30 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.8 - Buildable redstone computer + furniture facing
+  * In Creative, type /computer to build a working 4-bit stored-program
+    computer above clear terrain. No existing blocks are replaced.
+  * Physical, editable 16-word ROM, accumulator, program counter, ALU,
+    visible isolated bus wiring, hex display and four actual redstone lamps.
+    The example counts 1..F,0. Break wires or edit ROM to change what it does.
+  * Orange clock: RIGHT-CLICK Run/Stop; empty-hand sneak/right-click Step.
+    Red reset button resets registers without erasing the program.
+    Aim at components for live values and control hints. Computer-guide.txt
+    includes the board map, instruction set, wiring rules and example programs.
+  * Sixteen reusable, craftable circuit parts plus a 3D nibble bus. This uses
+    custom redstone-compatible blocks, not vanilla-only Minecraft circuitry.
+    About two seconds per instruction; roughly six per counter increment.
+  * Chests, furnaces and crafting tables now face the player on placement.
+    Chest lids follow the correct hinge. Furnace cycling, bucket waterlogging,
+    saves and multiplayer block edits preserve facing and inventory.
+  * Existing art, flat sprite bow, held lighting and Aseprite editing remain.
+    V6.6 and V6.7 downloads remain unchanged. Back up saves; use V6.8 on all
+    multiplayer peers. These new IDs/properties are not downgrade-compatible.
+  * Limits: four-bit values, 16 instructions, no terminal/OS. Chunk unloading
+    pauses computation; reload restarts clock phase after signals settle.
+    A bus touching an unloaded chunk boundary pauses all computer registers
+    and clocks in that world. Wider redstone still is not exact Java parity.
 
 WHAT'S NEW IN V6.7 - Aquatic worlds and Java-style redstone
   * New Default/Large/Amplified worlds have temperature/depth-based oceans,

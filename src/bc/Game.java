@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.7";
+   public static final String VERSION_STR = "6.8";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -577,6 +577,8 @@ public final class Game {
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
+         if (System.getProperty("bc.computer")!=null) CircuitComputer.smoke(this,this.autoFrames);
+         if (this.autoFrames==70&&Boolean.getBoolean("bc.facingreview")) Facing.smoke(this);
          if (Boolean.getBoolean("bc.reviewpack")) TextureEditor.smokeFrame(this, this.autoFrames);
          if (this.autoFrames == 1) {
             if(Boolean.getBoolean("bc.worldonly"))this.hideGui=true;
@@ -2601,6 +2603,9 @@ public final class Game {
 
          try {
             switch (var2[0].toLowerCase()) {
+               case "computer":
+                  CircuitComputer.build(this);
+                  break;
                case "gamemode":
                case "gm":
                   String var16 = var2.length > 1 ? var2[1].toLowerCase() : "";
@@ -3018,7 +3023,7 @@ public final class Game {
                   SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
                   break;
                case "help":
-                  this.say("Commands: /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
+                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
                   if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
@@ -6012,7 +6017,7 @@ public final class Game {
                   }
                }
 
-               if (!this.world.setBlock(var3, var4, var5, var2)) {
+               if (!this.world.setBlock(var3, var4, var5, Facing.placement(var2,this.player,this.world.getState(var3,var4,var5)))) {
                   return false;
                }
                SoundEngine.playBlockPlace(this.world, var2, var3, var4, var5);
@@ -6660,6 +6665,7 @@ public final class Game {
          }
 
          this.drawHotbar();
+         Circuit.hud(this);
          if (this.player.spectator) {
             this.drawSpectatorHud();
          } else if (this.player.adventure && this.target != null && this.world != null && this.screen == Game.S.PLAY) {

@@ -1,2 +1,2 @@
-pixel-title,pixel-aquatic-reef,pixel-aquatic-circuits,pixel-editor-bow
-# V6.7 final executable: underwater light/haze, mesh loading, native PNG/bow.
+pixel-title,pixel-computer-overview,pixel-computer-output,pixel-facing-open,pixel-editor-bow
+# V6.8 actual Windows executable: physical computer, furniture orientation and Aseprite bow.

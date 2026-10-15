@@ -522,9 +522,11 @@ final class Shapes {
       } else if (Redstone319.isWire(id)) {
          boxes = Redstone319.wireBoxes(nbr, id);
       } else if (id==Blocks.CHEST||id==Blocks.CHEST_LOOT) {
-         boxes=UtilityModels.chest(ChestLids.angle(s.ox+x,s.oy+y,s.oz+z));
+         boxes=Facing.chest(s.B[Mesher.ci(x+1,y+1,z+1)]&65535,ChestLids.angle(s.ox+x,s.oy+y,s.oz+z));
       } else if (Redstone319.isRepeater(id)||RedstoneLogic.comparator(id)) {
          boxes=RedstoneLogic.model(id,s.B[Mesher.ci(x+1,y+1,z+1)]&65535);
+      } else if (Circuit.cable(id)) {
+         boxes=Circuit.cableBoxes(nbr,Circuit.value(id),(s.B[Mesher.ci(x+1,y+1,z+1)]&0x8000)!=0);
       } else if (isModel(id)) {
          boxes = MODEL[id];
       } else {
@@ -547,6 +549,9 @@ final class Shapes {
       if(b.length>14&&b[12]!=0){
          double y=xyz[1]-b[13],z=xyz[2]-b[14],co=Math.cos(b[12]),sn=Math.sin(b[12]);
          xyz[1]=(float)(b[13]+y*co-z*sn);xyz[2]=(float)(b[14]+y*sn+z*co);
+      }
+      if(b.length>19)for(int i=0;i<((int)b[19]&3);i++){
+         float xx=xyz[0];xyz[0]=1-xyz[2];xyz[2]=xx;
       }
    }
 
@@ -571,12 +576,13 @@ final class Shapes {
             continue;
          }
 
-         int[] fn = Mesher.FN[f];
+         int worldFace=b.length>19?Facing.worldFace(f,(int)b[19]):f;
+         int[] fn = Mesher.FN[worldFace];
          int axis = f < 2 ? 1 : (f < 4 ? 2 : 0);
          boolean positive = fn[axis] > 0;
          double edge = positive ? b[3 + axis] : b[axis];
          int nb = s.B[Mesher.ci(x + 1 + fn[0], y + 1 + fn[1], z + 1 + fn[2])] & BlockState.ID_MASK;
-         if ((positive ? edge >= 1.0 : edge <= 0.0) && Blocks.opaque[nb]) {
+         if (b.length<=19 && (positive ? edge >= 1.0 : edge <= 0.0) && Blocks.opaque[nb]) {
             continue; // lies against a solid block
          }
 
@@ -595,7 +601,7 @@ final class Shapes {
             s.qx[i] = x + xyz[0];s.qy[i] = y + xyz[1];s.qz[i] = z + xyz[2];
             s.qu[i] = uv[0];
             s.qv[i] = uv[1];
-            float shade = Mesher.SHADE[f];
+            float shade = Mesher.SHADE[worldFace];
             s.qr[i] = shade * tr;
             s.qg[i] = shade * tg;
             s.qb[i] = shade * tb;
@@ -622,6 +628,7 @@ final class Shapes {
    // ------------------------------------------------------------------ the world: use, place, update
    /** Right click: a gate, wooden trapdoor, lever or button opens/closes/toggles. */
    static boolean use(Game g, int x, int y, int z, int id) {
+      if (Circuit.use(g,x,y,z,id)) return true;
       if (Redstone319.use(g, x, y, z, id)) {
          return true;
       }
@@ -656,7 +663,7 @@ final class Shapes {
    }
 
    static boolean placesSpecially(int id) {
-      return isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
+      return Circuit.node(id) || isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
    }
 
    /** The way the player looks, as a facing (0 north, 1 south, 2 east, 3 west). */
@@ -706,7 +713,9 @@ final class Shapes {
 
       int id = held.id;
       int put = id;
-      if (isGate(id)) {
+      if(Circuit.node(id)){
+         put=Circuit.id(Circuit.kind(id),0,playerFacing(g.player));
+      } else if (isGate(id)) {
          put = gate(gateKind(id), false, playerFacing(g.player));
       } else if (isTrap(id)) {
          if (ny == 0) {

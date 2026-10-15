@@ -369,6 +369,7 @@ public final class Blocks {
 
    /** The item you get for a block that is placed in a facing/age variant: what pick-block and drops use. 0 = nothing. */
    public static int pickItem(int var0) {
+      if (Circuit.handles(var0)) return Circuit.pick(var0);
       if (Decor315.isBanner(var0)) return Decor315.BANNER_ITEM0+Decor315.bannerColor(var0);
       if (Redstone319.isObserver(var0)) return Redstone319.OBSERVER;
       if (isStair(var0)) {
@@ -505,6 +506,7 @@ public final class Blocks {
       Decor315.addToCreative(var1);
       Redstone319.addToCreative(var1);
       Aquatic.creative(var1);
+      Circuit.creative(var1);
       int[] var14 = new int[var1.size()];
 
       for (int var18 = 0; var18 < var14.length; var18++) {
@@ -995,5 +997,6 @@ public final class Blocks {
       UtilityModels.register();
       RedstoneLogic.register();
       Aquatic.register();
+      Circuit.register();
    }
 }

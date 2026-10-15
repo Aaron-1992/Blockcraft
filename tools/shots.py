@@ -846,6 +846,15 @@ _RS_SET=["2,67,3,1905","3,67,3,1920","4,67,3,1920","5,67,3,1962","6,67,3,1920","
          "10,67,3,1900","11,67,3,1972","12,67,3,1",
          "4,67,11,4209","6,67,11,4311","8,67,11,4214","10,67,11,5613"]
 SCENES["pixel-aquatic-circuits"] = (_RS+["-Dbc.set="+";".join(_RS_SET)],True)
+_CPU=["-Dbc.auto=1","-Dbc.seed=12345","-Dbc.gen=2","-Dbc.mode=1","-Dbc.rd=5","-Dbc.lod=6",
+      "-Dbc.win=1280x720","-Dbc.cam=8.5,68,8.5,180,0","-Dbc.shot=480","-Dbc.time=6000",
+      "-Dbc.weather=calm","-Dbc.emptyhand=1","-Dbc.worldonly=true","-Dbc.shaders=false"]
+SCENES["pixel-computer-overview"]=(_CPU+["-Dbc.computer=overview"],True)
+SCENES["pixel-computer-output"]=(_CPU+["-Dbc.computer=close"],True)
+_FACE=[a for a in _COH if not a.startswith(("-Dbc.cam=","-Dbc.shot="))]+["-Dbc.cam=9,72,-5,0,30",
+      "-Dbc.shot=180","-Dbc.facingreview=true","-Dbc.worldonly=true","-Dbc.shaders=false","-Dbc.reviewchest=6,67,3"]
+SCENES["pixel-facing-open"]=(_FACE,True)
+SCENES["pixel-facing-closed"]=([a for a in _FACE if not a.startswith("-Dbc.reviewchest=")],True)
 DEFAULT_SCENES = ["title", "day-plain", "mobs", "farm", "farm-close", "sheep36", "pigs36", "inv-creative-2"]
 
 

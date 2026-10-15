@@ -303,6 +303,7 @@ public final class Recipes {
       Shapes.recipes();
       Decor315.recipes();
       Redstone319.recipes();
+      Circuit.recipes();
    }
 
    static final class Recipe {

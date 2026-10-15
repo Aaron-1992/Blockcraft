@@ -1,12 +1,14 @@
 # Blockcraft
 
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
-Current source version: **V6.7 — aquatic worlds and Java-style redstone**.
+In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
+
+Current source version: **V6.8 — buildable redstone computer and furniture facing**.
 
 Adds temperature/depth-based oceans, reefs/kelp/icebergs, water flow, swimming
 and waterlogging; directional/timed circuits, comparators and slime-piston
 assemblies. See [controls, compatibility limits and tests](docs/gameplay/aquatic-redstone.md).
-Back up worlds before upgrading; use V6.7 on all multiplayer peers.
+Back up worlds before upgrading; use V6.8 on all multiplayer peers.
 
 Retains the Building, Colors/Nature and Utility/Tools review batches, chest and
 utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
@@ -40,7 +42,7 @@ patch). Your worlds and options are stored in `%USERPROFILE%\.blockcraft112`, so
 you extract a new version into a new folder. The player manual with the full changelog is `package/README.txt`
 (also inside the zip).
 
-**Seeing older art?** Check the title says V6.7 and select **Natural Pixel 32 (Default)**
+**Seeing older art?** Check the title says V6.8 and select **Natural Pixel 32 (Default)**
 in Options > Resource Packs. Older/custom packs deliberately keep their own textures.
 
 > Releases are created by the **Release** GitHub Action (Actions tab -> *Release* -> *Run workflow*), which packages the

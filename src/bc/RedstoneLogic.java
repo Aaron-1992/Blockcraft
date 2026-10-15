@@ -69,6 +69,7 @@ final class RedstoneLogic {
 
    /** Directional connection, shared by signal routing and the dust model. */
    static boolean connects(int id, int dir) {
+      if(Circuit.handles(id))return Circuit.cable(id)||(Circuit.face(id)>>1)==(dir>>1);
       if (Redstone319.isRepeater(id) || comparator(id)) return (facing(id) >> 1) == (dir >> 1);
       if (Redstone319.isObserver(id)) return Redstone319.observerFacing(id) == dir;
       return Redstone319.isWire(id) || Redstone319.sourcePower(id) > 0
@@ -89,6 +90,7 @@ final class RedstoneLogic {
    }
    static int direct(World w, int x, int y, int z, int tx, int ty, int tz, boolean dust, boolean strong) {
       int id=w.getBlock(x,y,z), dx=tx-x,dy=ty-y,dz=tz-z;
+      if(Circuit.handles(id))return strong?0:Math.max(0,Circuit.output(w,x,y,z,tx,ty,tz));
       if (Redstone319.isWire(id)) {
          if (!dust || dy>0) return 0;
          if (dy<0) return id-Redstone319.REDSTONE_WIRE0;

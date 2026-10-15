@@ -35,6 +35,7 @@ public final class World {
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
    final RedstoneLogic.State redstone = new RedstoneLogic.State();
+   final Circuit.State circuit = new Circuit.State();
    public long dayTime = 1000L;
    public Consumer<Chunk> unloadHook;
    public boolean saveEnabled = true;
@@ -312,6 +313,7 @@ public final class World {
             this.chunks.put(readyKey, var22);
             this.fire.scanChunk(var22);
             RedstoneLogic.loaded(this, var22);
+            Circuit.loaded(this,var22);
             this.lightChunk(var22);
 
             for (int var24 = -1; var24 <= 1; var24++) {
@@ -368,6 +370,7 @@ public final class World {
       Net319.applyEditsToChunk(this, fresh);
       this.chunks.put(k, fresh);
       this.lightChunk(fresh);
+      Circuit.loaded(this,fresh);
       for (Section s : fresh.sections) {
          s.dirty = true;
       }
@@ -983,12 +986,14 @@ public final class World {
             }
          }
       }
+      Circuit.changed(this,var1,var2,var3);
       Redstone319.onBlockChanged(this, var1, var2, var3);
    }
 
    public void resetAllChunks() {
       FastChunkCache.clear();
       this.redstone.clear();
+      this.circuit.clear();
       this.fluidDue.clear();
       this.fluidPending.clear();
       this.blockUpdates.clear();
@@ -1039,6 +1044,7 @@ public final class World {
 
    public void tick() {
       this.tickCount++;
+      Circuit.tick(this);
       RedstoneLogic.tick(this);
       if (!Perf.FROZEN) {
          this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)

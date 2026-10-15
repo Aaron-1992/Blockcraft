@@ -25,6 +25,8 @@ def required(version):
         extra += ("TexMaterials32", "TexItems32", "TexNature32", "PixelArt32")
     if tuple(map(int, version.split("."))) >= (6, 6):
         extra += ("TextureEditor", "ResourcePacks", "UtilityModels", "ChestLids", "TexUtility32", "TexTools32", "TexBuildingReview32", "TexColorNature32", "TexGlazedReview32")
+    if tuple(map(int, version.split("."))) >= (6, 8):
+        extra += ("Circuit", "CircuitComputer", "Facing", "BlockState", "Shapes", "Mesher", "World", "Net319", "Aquatic", "RedstoneLogic", "WaterPhysics")
     return REQUIRED + extra
 
 
@@ -65,7 +67,9 @@ def verify(archive, version):
                     with open(os.path.join(B.ROOT, "res", name), "rb") as f:
                         if game.read(name) != f.read():
                             raise ValueError("Stale texture editor resource: " + name)
-            for name in ("Edit-textures.bat", "Texture-editing.txt", "README.txt"):
+            guides=("Edit-textures.bat", "Texture-editing.txt", "README.txt")
+            if tuple(map(int, version.split("."))) >= (6, 8): guides += ("Computer-guide.txt",)
+            for name in guides:
                 with open(os.path.join(B.ROOT, "package", name), "rb") as f:
                     if z.read("Blockcraft/" + name) != f.read():
                         raise ValueError("Stale packaged instructions/shortcut: " + name)

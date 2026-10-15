@@ -27,13 +27,13 @@ final class WaterPhysics {
       int state=w.getState(x,y,z),id=state&BlockState.ID_MASK;
       if(!source(state))return false;
       if(Aquatic.plant(id)) { w.setState(x,y,z,0); w.dropItem(x+.5,y+.3,z+.5,Blocks.drop[id],1); }
-      else w.setState(x,y,z,BlockState.wet(state)?id:0);
+      else w.setState(x,y,z,BlockState.wet(state)?state&~BlockState.WATERLOGGED:0);
       return true;
    }
    static boolean fill(World w,int x,int y,int z) {
       int id=w.getBlock(x,y,z);
       if(w.dim==Dim.NETHER)return true; // bucket empties, water evaporates
-      if(BlockState.waterloggable(id))return w.setState(x,y,z,id|BlockState.WATERLOGGED);
+      if(BlockState.waterloggable(id))return w.setState(x,y,z,w.getState(x,y,z)|BlockState.WATERLOGGED);
       if(id==0||Blocks.replaceable[id]||Blocks.isWater(id))return w.setState(x,y,z,Blocks.WATER);
       return false;
    }

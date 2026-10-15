@@ -1,0 +1,173 @@
+BLOCKCRAFT V6.8 - BUILDABLE 4-BIT COMPUTER
+=======================================
+
+QUICK START
+1. Open a Creative world. Back up existing saves before upgrading.
+2. Let nearby terrain load; use view distance 5 or higher.
+3. Press T, type /computer, and press Enter.
+   This builds a 47 x 61 block glass platform above you, without replacing
+   existing blocks, and puts you in a flying viewpoint. It needs 34 blocks
+   of clear height above the highest nearby terrain. Lower ground works best.
+4. Fly down to the orange Computer Clock near the front of the board.
+   RIGHT-CLICK: RUN / STOP. The counter starts at 1 and counts through F, 0.
+   One instruction takes about two seconds; one counter increment uses
+   three instructions, so allow roughly six seconds between output changes.
+5. To single-step, stop the clock, select an EMPTY hotbar slot, then hold
+   Sneak (default Shift) and right-click the clock. Allow two seconds for
+   the queued step. Repeated clicks do not queue multiple instructions.
+6. The red Computer Reset Button next to the clock resets the PC,
+   accumulator and output to zero. It does not erase the program.
+   Reset while running restarts the program; reset while stopped stays stopped.
+
+Aim at any circuit block to see its live value, name and controls in the HUD.
+Hex digits 0..9,A..F represent numbers 0..15. Arithmetic wraps modulo 16.
+The large hex output and four actual redstone lamps show the output register;
+from west to east the lamps have weights 8,4,2,1.
+
+WHAT THIS IS
+A real, editable, physically connected stored-program machine assembled from
+independent blocks: program counter, accumulator, ALU, physical ROM cells,
+branch selector, instruction decoders, output register and clock.
+There is no hidden CPU object, terminal app or pre-animated counting display.
+The /computer command only places blocks. Breaking a data wire changes the
+calculation. Editing the physical ROM changes the executed program.
+
+The components are custom Blockcraft redstone-compatible parts, NOT a claim
+that this machine uses only vanilla Minecraft redstone. The four-bit bus
+carries a nibble on one cable. It does not emulate four separate dust wires.
+All components are in the Creative Utility category (search '4-bit', 'Hex',
+'Computer', 'ROM' or 'Program Counter'). They are also craftable; see below.
+
+BOARD MAP
+Coordinates below are relative to the platform's northwest corner (minimum
+X and Z). The absolute origin and chip height are printed when /computer runs.
+North is -Z, east is +X. All demo chips face north.
+
+                 X=8              X=22                    X=38
+ Z=8        PC register        ROM reader                    ALU
+ Z=10..25                         opcode / operand memory at X=25 / 27
+ Z=20       PC selector                                accumulator
+ Z=32       OUT decoder      HALT decoder (X=20)        output register
+ Z=44       write AND        CLOCK (X=20) RESET (X=32)   hex output
+ Z=54       bit 8 (X=8)  bit 4 (X=18)  bit 2 (X=28)  bit 1 (X=38)
+
+Each of the 12 bus nets has its own visible layer under the glass. Vertical
+trunks and routed crossings are separated; nearby cables in any of the six
+axis directions connect. Diagonal cables do not connect. Fly under the
+platform to inspect or rewire it. A red cable means conflicting drivers.
+
+PROGRAMMING THE PHYSICAL ROM
+STOP, then RESET before changing the program. Right-click a Hex Constant to
+increment it; empty-hand sneak/right-click decrements it. Values wrap 0..F.
+The two 16-cell columns beside the ROM reader are OPCODE and OPERAND.
+Address 0 is the first row (Z=10 on this board); address F is the last (Z=25).
+Each row stores one eight-bit instruction as two editable four-bit blocks.
+
+ Opcode   Meaning                         Operand
+ 0        LOAD accumulator                immediate 0..F
+ 1        ADD to accumulator               immediate 0..F
+ 2        SUBTRACT from accumulator        immediate 0..F
+ 3        XOR accumulator                  immediate 0..F
+ 4        AND accumulator                  immediate 0..F
+ 5        OR accumulator                   immediate 0..F
+ 6        OUT accumulator to display       ignored
+ 7        JUMP                            target address 0..F
+ 8        JUMP if accumulator is zero     target address 0..F
+ 9..E     No operation                    ignored
+ F        HALT                            ignored
+
+Default counting program:
+ Address  Opcode  Operand
+ 0        0       1         LOAD 1
+ 1        6       0         OUT
+ 2        1       1         ADD 1
+ 3        7       1         JUMP 1
+ 4..F     F       0         HALT (unused)
+
+Try changing address 2's operand from 1 to 2: the output becomes 1,3,5,...,F,1.
+Try LOAD A / XOR F / OUT / HALT: enter 0A,3F,60,F0 in the first four rows.
+That program outputs 5. Reset, then Run. HALT prevents further clock pulses;
+reset returns the PC to address 0. The clock's Run toggle is preserved.
+
+BUILDING YOUR OWN CIRCUITS
+Chip front/red = output; back/cyan = A; left/gold = B; right/violet = C.
+Chip front follows the direction you look when placing it (like a repeater).
+Chests/furnaces/crafting tables instead face toward the player on placement.
+
+ Hex Constant: front outputs its right-click editable nibble.
+ ALU: A=accumulator, B=operand, C=opcode. 0..5 use the table above;
+      other opcodes pass A. Operations use only the low four bits.
+ Register: A=data, B=clock, C=reset. Captures on a zero-to-nonzero clock
+           edge; holds while the clock is high. Reset has priority.
+ ROM Reader: A=address. Front=operand; LEFT is a SECOND OUTPUT (opcode),
+             not an input. Put constants on the reader's right, three and
+             five blocks over, starting two blocks behind it and continuing
+             backward for 16 rows. Rotate the whole bank with the reader.
+             Missing/non-constant memory cells produce HALT, not a guessed word.
+ PC Selector: A=old PC, B=operand, C=opcode; BOTTOM=accumulator.
+              Normally PC+1, JUMP/JZ choose operand, HALT retains PC.
+ Equality: compare A with the right-click editable nibble; output F if equal.
+ AND / XOR / Adder: A and B. NOT: inverse of A's four bits.
+ Multiplexer: C=0 chooses A; any nonzero C chooses B.
+ Clock: front=clock; A=halt, C=reset. Run emits one-tick pulses with a
+        40-tick settling interval. Step requests one pulse, not a faster clock.
+ Reset Button: front outputs F for a short pulse; connect it to reset inputs.
+ Hex Display: displays A and also forwards A through its front output.
+ Bit Output: right-click cycles masks 1,2,4,8; outputs F if that bit of A is set.
+ Redstone Bus Input: reads ordinary redstone power 0..15 at A and drives the
+                    bus from its front. Use this to bridge dust/switches to bus.
+
+BUS RULES
+Cables carry 0..15 without attenuation and can run vertically. Only component
+output ports drive cable nets. Ordinary dust connects through an Input adapter;
+it does not directly drive the bus. Cable/component outputs can power normal
+dust and lamps. They supply weak power, not strong power through solid blocks.
+A net with no driver is zero. Conflicting driver values produce a red fault and
+zero, rather than combining values or silently remembering an old charge.
+Keep separate nets at least one empty block apart, including vertical trunks.
+Registers sample together from stable previous outputs. Combinational blocks
+have a tick of latency. Allow settling time; very long combinational chains
+may need manual stepping. Clock timing is game ticks, so lag slows real time.
+
+CRAFTING
+Bus cable (makes 8):   G R G    G=glass, R=redstone dust
+                      G R G
+                      G R G
+Each component:         R      S=stone, Q=quartz
+                      R C R
+                      S Q S
+C is stone for a Hex Constant. For each subsequent component, C is the
+preceding component in this order:
+Constant -> ALU -> Register -> ROM -> PC Selector -> Equality -> AND -> NOT ->
+Clock -> Reset Button -> Hex Display -> Bit Output -> Adder -> Redstone Input ->
+XOR -> Multiplexer. Creative mode is easier for large experiments.
+
+SAVES, MULTIPLAYER AND LIMITS
+ROM cells, facing, register values, comparison settings, masks and Run mode
+are raw block states, saved in chunks and sent in normal multiplayer edits.
+Only the host simulates circuits. Remote controls send their settings through
+block edits. Use V6.8 on EVERY peer; older clients do not know these blocks.
+This does not add per-client private programs or a multiplayer security model.
+On reload, wires are rediscovered, circuits settle and clock phase restarts.
+The exact fractional time to the next pulse is not saved. Unloaded circuits do
+not compute offline. A cable touching an unloaded chunk boundary pauses the
+world's computer clocks/registers until nearby chunks load and signals settle.
+Keep the board in view/within loaded chunks while running it.
+No graphics terminal, keyboard, filesystem, sound synthesizer or OS is included.
+This is a deliberately small 16-instruction, four-bit educational computer.
+
+FACING FIXES
+New chests, furnaces and crafting tables can face any horizontal direction.
+Furnace ignition/extinguishing, chest waterlogging/bucket extraction, saves
+and multiplayer edits keep the facing. Chest lids rotate around the matching
+hinge, not the old north-only axis. Existing blocks keep their legacy north
+orientation; re-place them for another direction. Existing doors, beds, gates,
+logs, pistons, observers and repeaters retain their existing orientation systems.
+No new full Minecraft parity claim is made for the wider redstone system.
+
+ART AND TEXTURES
+Existing reviewed 32px artwork, flat sprite bow, held lighting and Aseprite
+editing are retained. The new chips reuse utility materials plus geometric
+readouts/colored ports; these colors/digit shapes are model geometry, not new
+editable PNG tiles. Edit-textures.bat still exports 545 tiles and six sheets.
+Never overwrite your edited MyTextures folder when updating the game.
