@@ -1,2 +1,2 @@
-6.14
-# Native Create FOUNDATION only; full parity remains unfinished.
+6.15
+# Tested dedicated machinery, frame interpolation, visible belts and directional water.
