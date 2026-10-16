@@ -849,8 +849,9 @@ SCENES["pixel-aquatic-circuits"] = (_RS+["-Dbc.set="+";".join(_RS_SET)],True)
 _CPU=["-Dbc.auto=1","-Dbc.seed=12345","-Dbc.gen=2","-Dbc.mode=1","-Dbc.rd=5","-Dbc.lod=6",
       "-Dbc.win=1280x720","-Dbc.cam=8.5,68,8.5,180,0","-Dbc.shot=480","-Dbc.time=6000",
       "-Dbc.weather=calm","-Dbc.emptyhand=1","-Dbc.worldonly=true","-Dbc.shaders=false"]
-SCENES["pixel-kinetic-workshop"]=([a for a in _CPU if a!="-Dbc.shot=480"]+["-Dbc.shot=1200","-Dbc.kinetics=workshop","-Dbc.test=true"],True)
-SCENES["pixel-kinetic-machine"]=([a for a in _CPU if a not in ("-Dbc.worldonly=true","-Dbc.shot=480")]+["-Dbc.shot=1200","-Dbc.kinetics=machine","-Dbc.test=true"],True)
+SCENES["pixel-kinetic-workshop"]=([a for a in _CPU if a!="-Dbc.shot=480"]+["-Dbc.shot=2400","-Dbc.kinetics=workshop","-Dbc.test=true"],True)
+SCENES["pixel-kinetic-machine"]=([a for a in _CPU if a not in ("-Dbc.worldonly=true","-Dbc.shot=480")]+["-Dbc.shot=2400","-Dbc.kinetics=machine","-Dbc.test=true"],True)
+SCENES["pixel-kinetic-shaded"]=([a for a in SCENES["pixel-kinetic-workshop"][0] if a!="-Dbc.shaders=false"]+["-Dbc.shaders=true"],True)
 SCENES["pixel-midi-listen"]=([a for a in _CPU if a!="-Dbc.worldonly=true"]+["-Dbc.midigui=listen","-Dbc.test=true"],True)
 SCENES["pixel-midi-gui"]=([a for a in _CPU if a!="-Dbc.worldonly=true"]+["-Dbc.midigui=true"],True)
 SCENES["pixel-midi"]=(_CPU+["-Dbc.midi=true"],True)

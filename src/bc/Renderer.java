@@ -2281,7 +2281,7 @@ public final class Renderer {
                      float var19 = Tex.tv(var30);
 
                      for (int var20 = 0; var20 < 4; var20++) {
-                        if(UtilityModels.componentIcon(var0)) {
+                        if(UtilityModels.componentIcon(var0)||Kinetics.handles(var0)) {
                            float[] xyz=new float[3];Shapes.corner(var27,var29,var20,xyz,var22);
                            GL11.glTexCoord2f(var18+var22[0]*Tex.TS,var19+var22[1]*Tex.TS);
                            GL11.glVertex3f(xyz[0]-.5F,xyz[1]-.5F,xyz[2]-.5F);
@@ -2380,6 +2380,7 @@ public final class Renderer {
       World var2 = this.g.world;
       GL11.glEnable(2929);
 
+      KineticRender.draw(this,var1);
       for (Item var4 : var2.items) {
          double var5 = var4.x + var4.vx * var1;
          double var7 = var4.y + var4.vy * var1;

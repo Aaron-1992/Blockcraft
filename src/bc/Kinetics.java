@@ -6,9 +6,9 @@ import java.util.concurrent.ConcurrentHashMap;
 /** Native rotational network foundation. Reference geometry: Create 6.0.10 (MIT code;
  * see package/Create-code-license.txt). Not a Forge loader or a complete Create port. */
 final class Kinetics {
-   static final int BASE=3980,TYPES=12;
-   static final int SHAFT=0,COG=1,LARGE=2,GEARBOX=3,MOTOR=4,WHEEL=5,CLUTCH=6,SHIFT=7,SPEED=8,STRESS=9,PRESS=10,MILL=11;
-   static final String[] NAMES={"Shaft","Cogwheel","Large Cogwheel","Gearbox","Creative Motor","Water Wheel","Clutch","Gearshift","Speedometer","Stressometer","Mechanical Press","Millstone"};
+   static final int BASE=3980,TYPES=14;
+   static final int SHAFT=0,COG=1,LARGE=2,GEARBOX=3,MOTOR=4,WHEEL=5,CLUTCH=6,SHIFT=7,SPEED=8,STRESS=9,PRESS=10,MILL=11,BELT=12,DEPOT=13;
+   static final String[] NAMES={"Shaft","Cogwheel","Large Cogwheel","Gearbox","Creative Motor","Water Wheel","Clutch","Gearshift","Speedometer","Stressometer","Mechanical Press","Millstone","Mechanical Belt","Depot"};
    static final int[] SPEEDS={0,16,32,64,128,256,-16,-32,-64,-128,-256,8,-8,4,-4,1};
    static final int ALLOY=930,IRON_SHEET=931,GOLD_SHEET=932,FLOUR=933,WRENCH=934;
    static final int MAX_NODES=4096;
@@ -24,13 +24,13 @@ final class Kinetics {
    static int axis(int id){return (id-BASE)%3;}
    static int id(int kind,int axis){return BASE+kind*3+axis;}
    static int pick(int id){return id(kind(id),0);}
-   static boolean machine(int id){return handles(id)&&(kind(id)==PRESS||kind(id)==MILL);}
+   static boolean machine(int id){return handles(id)&&(kind(id)==PRESS||kind(id)==MILL||kind(id)==BELT||kind(id)==DEPOT);}
    static Reading reading(World w,long key){return w.kinetics.readings.getOrDefault(key,new Reading(0,0,0,"No power"));}
    static void register(){
       for(int k=0;k<TYPES;k++)for(int a=0;a<3;a++){
          int id=id(k,a);if(!"Unknown".equals(Blocks.name[id]))throw new IllegalStateException("Kinetic block ID collision: "+id);
          Blocks.def(id,NAMES[k],2,false,UtilityModels.METAL);Blocks.solid[id]=true;Blocks.opacity[id]=0;Blocks.drop[id]=pick(id);Blocks.mineClass[id]=Items.C_PICK;
-         Blocks.coll[id]=Blocks.box[id]=new double[]{0,0,0,1,1,1};
+         Blocks.coll[id]=Blocks.box[id]=new double[]{0,0,0,1,k==BELT||k==DEPOT?.75:1,1};
          Shapes.model(id,KineticModels.model(id,0,0));
       }
    }
@@ -47,6 +47,8 @@ final class Kinetics {
       Recipes.shaped(id(LARGE,0),1,new String[]{"PPP","PCP","PPP"},'P',Blocks.PLANKS,'C',id(COG,0));
       Recipes.shaped(WRENCH,1,new String[]{"G G"," A "," S "},'G',Items.GOLD_INGOT,'A',ALLOY,'S',Items.STICK);
       for(int k:new int[]{GEARBOX,CLUTCH,SHIFT,SPEED,STRESS,PRESS,MILL,WHEEL})Recipes.shaped(id(k,0),1,new String[]{" S ","ACA"," B "},'S',id(SHAFT,0),'A',ALLOY,'C',k==PRESS?Blocks.IRON_BLOCK:k==MILL?Blocks.COBBLE:k==WHEEL?Blocks.PLANKS:k==GEARBOX?id(COG,0):Redstone319.ITEM_REDSTONE,'B',k==CLUTCH?Redstone319.LEVER_OFF:k==SHIFT?Redstone319.STONE_BUTTON:k==SPEED?Items.QUARTZ:k==STRESS?Blocks.GLASS:k==WHEEL?id(LARGE,0):Blocks313.ANDESITE);
+      Recipes.shaped(id(BELT,0),4,new String[]{"LLL","SSS"},'L',Items.LEATHER,'S',id(SHAFT,0));
+      Recipes.shaped(id(DEPOT,0),1,new String[]{" I ","AAA"},'I',Items.IRON_INGOT,'A',ALLOY);
       Recipes.smelt.put(FLOUR,new Stack(Items.BREAD,1));
    }
    static void changed(World w,int x,int y,int z,int old,int next){
@@ -65,6 +67,8 @@ final class Kinetics {
       int id=block(w,p),k=kind(id),a=axis(id),d=component(dx,dy,dz,a);
       if(Math.abs(dx)+Math.abs(dy)+Math.abs(dz)!=1)return 0;
       if(k==GEARBOX){if(d!=0)return 0;int first=a==0?1:0;int along=component(dx,dy,dz,first);return along!=0?along:-(dx+dy+dz);}
+      if(k==DEPOT)return 0;
+      if(k==BELT)return a!=1&&dy==0?1:0;
       if(d==0)return 0;
       if(k==CLUTCH&&powered(w,p))return 0;
       if(k==SHIFT&&d<0&&powered(w,p))return -1;
@@ -85,10 +89,16 @@ final class Kinetics {
       int id=block(w,p),k=kind(id);if(k==MOTOR)return SPEEDS[(raw(w,p)>>>12)&15];
       if(k!=WHEEL||axis(id)==1)return 0;
       int x=World.ux(p),y=World.uy(p),z=World.uz(p),a=axis(id);
-      // Native milestone rule: actual water in the rim plane drives a compact wheel. No water = no torque.
-      for(int[] d:Circuit.DIR)if(component(d[0],d[1],d[2],a)==0&&Blocks.isWater(w.getBlock(x+d[0],y+d[1],z+d[2])))return (raw(w,p)&0x1000)!=0?-8:8;
-      return 0;
+      // Torque is r cross flow, projected onto the axle. Still water has no torque.
+      double torque=0;
+      for(int[] d:Circuit.DIR)if(component(d[0],d[1],d[2],a)==0){
+         int xx=x+d[0],yy=y+d[1],zz=z+d[2];if(!w.isLoaded(xx,zz)||!WaterPhysics.contains(w,xx,yy,zz))continue;
+         double[] flow=WaterPhysics.current(w,xx,yy,zz);
+         torque+=a==0?d[1]*flow[2]-d[2]*flow[1]:d[0]*flow[1]-d[1]*flow[0];
+      }
+      return Math.abs(torque)<.01?0:Math.copySign(8,torque);
    }
+
    static void solve(World w){
       State s=w.kinetics;Set<Long> unseen=new TreeSet<>();for(long p:s.nodes)if(w.isLoaded(World.ux(p),World.uz(p))&&handles(block(w,p)))unseen.add(p);
       s.readings.clear();if(unseen.size()>MAX_NODES){for(long p:unseen)s.readings.put(p,new Reading(0,0,0,"Safety limit: 4096 loaded kinetic blocks"));s.dirty=false;return;}
@@ -121,20 +131,20 @@ final class Kinetics {
    static void tick(World w){
       State s=w.kinetics;if(s.nodes.isEmpty())return;
       if(s.dirty||w.tickCount%4==0)solve(w);
-      for(var e:s.readings.entrySet())if(e.getValue().rpm!=0){double angle=s.angles.getOrDefault(e.getKey(),0D)+e.getValue().rpm*Math.PI/600;s.angles.put(e.getKey(),Math.IEEEremainder(angle,Math.PI*2));if(w.tickCount%2==0)RasterComputer.dirty(w,e.getKey());}
+      for(var e:s.readings.entrySet())if(e.getValue().rpm!=0){double angle=s.angles.getOrDefault(e.getKey(),0D)+e.getValue().rpm*Math.PI/600;s.angles.put(e.getKey(),Math.IEEEremainder(angle,Math.PI*2));}
       if(!Net319.isClientConnected()||Net319.isHosting())KineticMachines.tick(w);
    }
    static boolean use(Game g,int x,int y,int z,int id){
       if(!handles(id))return false;
       if(Net319.isClientConnected()&&!Net319.isHosting()){g.say("Native kinetics: host edits only in this milestone.");return true;}
       long p=World.pack(x,y,z);Stack hand=g.inv[g.sel];
-      if(hand!=null&&hand.id==WRENCH){g.world.setState(x,y,z,id(kind(id),(axis(id)+1)%3)|(g.world.getState(x,y,z)&0xF000));g.say(NAMES[kind(id)]+": axis "+"XYZ".charAt((axis(id)+1)%3));return true;}
-      if(machine(id)){KineticMachines.open(g,p);return true;}
+      if(hand!=null&&hand.id==WRENCH){g.world.setState(x,y,z,id(kind(id),(kind(id)==BELT?(axis(id)==0?2:0):(axis(id)+1)%3))|(g.world.getState(x,y,z)&0xF000));return true;}
+      if(machine(id)){KineticTransport.use(g,p);return true;}
       int k=kind(id),meta=g.world.getState(x,y,z)>>>12;
       if(k==MOTOR){if(!g.player.creative){g.say("Creative Motor requires Creative mode.");return true;}g.world.setState(x,y,z,id|(((meta+(g.player.sneaking?15:1))&15)<<12));}
-      else if(k==WHEEL)g.world.setState(x,y,z,id|((meta^1)<<12));
-      solve(g.world);g.say(describe(g.world,p));return true;
+
+      solve(g.world);return true;
    }
    static String describe(World w,long p){Reading r=reading(w,p);return String.format(Locale.ROOT,"%s: %.0f RPM | %.0f / %.0f SU%s",NAMES[kind(block(w,p))],r.rpm,r.stress,r.capacity,r.fault.isEmpty()?"":" | "+r.fault);}
-   static void hud(Game g){if(g.target==null||g.world==null||g.screen!=Game.S.PLAY)return;long p=World.pack(g.target.x,g.target.y,g.target.z);if(!handles(block(g.world,p)))return;String line=describe(g.world,p);float scale=Math.min(1,(g.gui.w-24)/Gui.textWidth(line));g.gui.centered(line,g.gui.w/2,g.gui.h/2+26,0xffead6b1,true,scale);}
+   static void hud(Game g){if(g.target==null||g.world==null||g.screen!=Game.S.PLAY)return;long p=World.pack(g.target.x,g.target.y,g.target.z);if(!handles(block(g.world,p)))return;String line=describe(g.world,p);int kind=kind(block(g.world,p));if(kind==PRESS)line="Press: place a belt/depot two blocks below";else if(kind==BELT||kind==DEPOT)line="Use: place held items / empty hand: collect | "+line;else if(kind==MILL)line="Use: insert grain / empty hand: collect | "+line;float scale=Math.min(1,(g.gui.w-24)/Gui.textWidth(line));g.gui.centered(line,g.gui.w/2,g.gui.h/2+26,0xffead6b1,true,scale);}
 }

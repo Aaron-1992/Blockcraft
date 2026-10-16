@@ -103,7 +103,7 @@ def texture_kit(patch, version):
                         z.writestr(entry, f.read())
         with zipfile.ZipFile(os.path.join(OUT, name)) as z:
             assert z.testzip() is None
-            expected_tiles = 550 if tuple(map(int, version.split("."))) >= (6, 14) else 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532
+            expected_tiles = 558 if tuple(map(int, version.split("."))) >= (6, 15) else 550 if tuple(map(int, version.split("."))) >= (6, 14) else 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532
             assert len([n for n in z.namelist() if "/tiles/" in n]) == expected_tiles
             assert len([n for n in z.namelist() if "/animations/" in n]) == 6
     return name
@@ -167,7 +167,7 @@ def main():
             "See `Texture-editing.txt` for Aseprite sheet settings, file locations and backups.\n\n"
             "**Optional ready-made editor kit:** `%s` — extract into the folder containing Blockcraft.exe, "
             "without replacing an already edited MyTextures folder. The game download can generate this same kit itself.\n\n"
-            "Earlier releases remain available unchanged. SHA256SUMS.txt checks all downloads.\n" % (550 if tuple(map(int, version.split("."))) >= (6, 14) else 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
+            "Earlier releases remain available unchanged. SHA256SUMS.txt checks all downloads.\n" % (558 if tuple(map(int, version.split("."))) >= (6, 15) else 550 if tuple(map(int, version.split("."))) >= (6, 14) else 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
     if version == "6.9":
         world_name = "Blockcraft-Block-Drop-World.zip"
         world = os.path.join(ROOT, world_name)
@@ -296,6 +296,24 @@ def main():
             "All Rights Reserved assets are NOT redistributed. Models/sprites are original Blockcraft work. "
             "**Create-foundation.txt** explains all current controls, provisional recipes and missing systems. "
             "Prior MIDI, redstone computers, sound/display worlds, approved art, sprite bow and held lighting are retained.\n")
+    if version == "6.15":
+        release_notes += ("\n### Visible machinery — no normal machine menus\n\n"
+            "Dedicated original component textures use constant texel density instead of stretched planks/stone. "
+            "Machines now render with partial-tick interpolation every frame, independently of chunk rebuilds.\n\n"
+            "**Straight horizontal belts and depots** carry visible, persistent stacks. An overhead press stamps whole "
+            "batches on the belt/depot two blocks below it. Drop ingredients into a millstone or insert them by hand; "
+            "empty-hand use collects output. Routine motor/wrench/wheel interactions no longer post status in chat.\n\n"
+            "**Water-current direction drives the wheel:** still water stops it; opposite falling/horizontal currents "
+            "reverse it, and opposing torque cancels. Manual wheel reversal is removed.\n\n"
+            "Search **create** in Creative, or run **/kinetics** in clear loaded air for a belt/press/depot factory "
+            "and waterfall-driven wheel. Place belts segment by segment in a straight line; power the axle side. "
+            "Use with an item to insert one, sneak-use to insert the stack, empty hand to collect. "
+            "Read **Create-foundation.txt** for the full controls.\n\n"
+            "**Still not full Create:** no two-pulley belt connector/inclines/funnels yet, and contraptions, trains, "
+            "logistics and many machines remain unfinished. Wheel geometry is compact; machine edits/processing "
+            "are host-only. Old press inventories are retained for extraction/finishing, but no new press inputs "
+            "enter the old hidden slots. Back up `kinetics.dat`; do not downgrade a belt world to V6.14. "
+            "Original 32px component art only; no upstream restricted assets redistributed.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

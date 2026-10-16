@@ -3,12 +3,14 @@
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
 In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
 
-Current source version: **V6.14 — native Create project: foundation milestone (NOT full Create)**.
+Current source version: **V6.15 — native Create project: visible machinery, belts and current-driven wheels (NOT full Create)**.
 
 Native mechanical parts now include shafts/cogs, a gearbox, motor/water-wheel
-sources, redstone clutch/gearshift, gauges, and prototype press/millstone processing.
+sources, redstone clutch/gearshift, gauges, and visible belt/depot pressing and hand-fed millstone processing.
+Dedicated component art replaces stretched block skins, and mechanisms animate
+every render frame. Water-wheel direction follows real currents, not a toggle.
 Search **create** in Creative, or use **/kinetics** for an inspectable example factory.
-**This is not full Create:** belts, contraptions, trains, logistics and other major
+**This is not full Create:** inclined belts, funnels, contraptions, trains, logistics and other major
 systems are unfinished. [Exact status and roadmap](docs/create/STATUS.md) ·
 [Foundation guide](package/Create-foundation.txt).
 
@@ -17,12 +19,12 @@ Right-click a **MIDI Build Compiler** in Creative, select a MIDI and click
 track or flying alongside it. **Play section** uses Start/Length; **Stop** ends
 listening. Audio is local and stops when closing the menu. **Build circuit**
 still makes independent physical redstone; its default section is five seconds.
-[Download V6.14](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.14) · [MIDI guide](package/MIDI-guide.txt).
+[Download V6.15](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.15) · [MIDI guide](package/MIDI-guide.txt).
 
 Adds temperature/depth-based oceans, reefs/kelp/icebergs, water flow, swimming
 and waterlogging; directional/timed circuits, comparators and slime-piston
 assemblies. See [controls, compatibility limits and tests](docs/gameplay/aquatic-redstone.md).
-Back up worlds before upgrading; use V6.14 on all multiplayer peers.
+Back up worlds before upgrading; use V6.15 on all multiplayer peers.
 
 Retains the Building, Colors/Nature and Utility/Tools review batches, chest and
 utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
@@ -39,7 +41,7 @@ corrected gun poses and held-item lighting are retained. See the
    **My Aseprite Textures**. After later saves, just press **Reload PNGs**.
 
 No Java/source editing or extra tools needed. The exporter **never overwrites an
-existing pack**. Includes 550 individual tiles and six animation sheets, with
+existing pack**. Includes 558 individual tiles and six animation sheets, with
 filenames, face/component mappings, and Aseprite import/export instructions.
 A separate ready-made texture kit is also available with the release.
 Read the [complete editing guide](package/Texture-editing.txt), including backups
@@ -56,7 +58,7 @@ patch). Your worlds and options are stored in `%USERPROFILE%\.blockcraft112`, so
 you extract a new version into a new folder. The player manual with the full changelog is `package/README.txt`
 (also inside the zip).
 
-**Seeing older art?** Check the title says V6.14 and select **Natural Pixel 32 (Default)**
+**Seeing older art?** Check the title says V6.15 and select **Natural Pixel 32 (Default)**
 in Options > Resource Packs. Older/custom packs deliberately keep their own textures.
 
 > Releases are created by the **Release** GitHub Action (Actions tab -> *Release* -> *Run workflow*), which packages the

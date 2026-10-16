@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.14  -  an original Minecraft-style voxel sandbox   (EDITION V6.14)
+BLOCKCRAFT V6.15  -  an original Minecraft-style voxel sandbox   (EDITION V6.15)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,21 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.15 - Visible machines, smooth rotation, belts and water torque
+
+  * New dedicated machine textures at consistent pixel density, not stretched
+    block skins. Frame-interpolated models replace tick/chunk-based animation.
+  * Working straight horizontal belts and depots with visible saved cargo.
+    Presses stamp batches on the belt/depot two blocks below, without menus.
+  * Drop ingredients into the millstone or insert by hand; collect with empty
+    hand. Routine right-click motor/wrench status no longer fills chat.
+  * Actual water-current torque drives water wheels: still water stops them;
+    opposite current direction reverses them. No manual wheel toggle.
+  * /kinetics is now a real belt/press/depot line plus a waterfall-powered wheel.
+    See Create-foundation.txt for controls, upgrade safety and explicit limits.
+  * Still NOT full Create. Straight segment-by-segment belts only for now;
+    funnels, inclined belts, contraptions, trains and many systems are missing.
 
 WHAT'S NEW IN V6.14 - Native Create FOUNDATION, NOT the full mod
 

@@ -26,6 +26,12 @@ def payload(version="6.5", source="expected", tamper=False, tamper_media=False):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_visible_kinetic_receipts(self):
+        jar=payload("6.15")
+        self.assertEqual(inspect_payload(jar,jar,"6.15","expected")["version"],"6.15")
+        for cls in ("KineticRender","KineticTransport","Gui"):
+            self.assertIn(cls,required("6.15"))
+
     def test_native_kinetic_receipts(self):
         jar=payload("6.14")
         self.assertEqual(inspect_payload(jar,jar,"6.14","expected")["version"],"6.14")

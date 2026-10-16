@@ -698,7 +698,7 @@ public class Gui {
                float[] var26 = new float[]{var2, var2 + var4, var2 + var4, var2};
                float[] var28 = new float[]{var3, var3, var3 + var4, var3 + var4};
                this.face(Blocks.tiles[var1][0], var26, var28, 1.0F, var24, true);
-            } else if (UtilityModels.componentIcon(var1)) {
+            } else if (UtilityModels.componentIcon(var1)||Kinetics.handles(var1)) {
                componentIcon(var1,var2,var3,var4);
             } else if (iconBoxes(var1) != null) {
                int[] var6 = tintFor(var1);

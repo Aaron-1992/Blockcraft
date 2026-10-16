@@ -39,6 +39,8 @@ def required(version):
         extra += ("MidiPlayback",)
     if tuple(map(int, version.split("."))) >= (6, 14):
         extra += ("Kinetics", "KineticModels", "KineticMachines", "KineticArt", "KineticWorkshop", "Menu")
+    if tuple(map(int, version.split("."))) >= (6, 15):
+        extra += ("KineticRender", "KineticTransport", "Gui")
     return REQUIRED + extra
 
 

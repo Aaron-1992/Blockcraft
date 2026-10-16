@@ -528,7 +528,7 @@ final class Shapes {
       } else if (id>=RasterComputer.PANEL&&id<RasterComputer.PANEL+4) {
          boxes=RasterComputer.model(s,x,y,z,id);
       } else if (Kinetics.handles(id)) {
-         boxes=KineticModels.world(s,x,y,z,id);
+         return; // Drawn once per render frame by KineticRender, not baked into chunk meshes.
       } else if (Circuit.cable(id)) {
          boxes=Circuit.cableBoxes(nbr,Circuit.value(id),(s.B[Mesher.ci(x+1,y+1,z+1)]&0x8000)!=0);
       } else if (isModel(id)) {
@@ -549,6 +549,11 @@ final class Shapes {
       for(int axis=0;axis<3;axis++)xyz[axis]=(float)b[axis+c[axis]*3];
       if(b.length>11&&b[11]!=0)Mesher.uvFor(face,c[0],c[1],c[2],uv);
       else Mesher.uvFor(face,xyz[0],xyz[1],xyz[2],uv);
+      if(b.length>23&&b[23]==1){
+         // One texel density for every component: crop to its dimensions, never stretch a block face.
+         int u=face<4?0:2,v=face<2?2:1;
+         uv[0]*=(float)(b[u+3]-b[u]);uv[1]*=(float)(b[v+3]-b[v]);
+      }
       if(b.length>18&&face>=2){uv[0]=(float)(b[15]+uv[0]*(b[17]-b[15]));uv[1]=(float)(b[16]+uv[1]*(b[18]-b[16]));}
       if(b.length>14&&b[12]!=0){
          double y=xyz[1]-b[13],z=xyz[2]-b[14],co=Math.cos(b[12]),sn=Math.sin(b[12]);
@@ -727,6 +732,7 @@ final class Shapes {
       int put = id;
       if(Kinetics.handles(id)){
          put=Kinetics.id(Kinetics.kind(id),nx!=0?0:ny!=0?1:2);
+         if(Kinetics.kind(id)==Kinetics.BELT&&ny!=0)put=Kinetics.id(Kinetics.BELT,(playerFacing(g.player)&1)==0?0:2);
          if(Kinetics.kind(id)==Kinetics.MOTOR&&!g.player.creative)return false;
       }else if(RasterComputer.handles(id)){
          put=RasterComputer.pick(id);

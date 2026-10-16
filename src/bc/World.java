@@ -1808,6 +1808,7 @@ public final class World {
    }
 
    private void tickItem(World.Item var1) {
+      if(KineticTransport.capture(this,var1))return;
       if (var1.eye) {
          EndPortals.tickEye(this, var1);
          return;
