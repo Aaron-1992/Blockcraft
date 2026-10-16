@@ -849,8 +849,8 @@ SCENES["pixel-aquatic-circuits"] = (_RS+["-Dbc.set="+";".join(_RS_SET)],True)
 _CPU=["-Dbc.auto=1","-Dbc.seed=12345","-Dbc.gen=2","-Dbc.mode=1","-Dbc.rd=5","-Dbc.lod=6",
       "-Dbc.win=1280x720","-Dbc.cam=8.5,68,8.5,180,0","-Dbc.shot=480","-Dbc.time=6000",
       "-Dbc.weather=calm","-Dbc.emptyhand=1","-Dbc.worldonly=true","-Dbc.shaders=false"]
-SCENES["pixel-kinetic-workshop"]=([a for a in _CPU if a!="-Dbc.shot=480"]+["-Dbc.shot=1200","-Dbc.kinetics=workshop"],True)
-SCENES["pixel-kinetic-machine"]=([a for a in _CPU if a not in ("-Dbc.worldonly=true","-Dbc.shot=480")]+["-Dbc.shot=1200","-Dbc.kinetics=machine"],True)
+SCENES["pixel-kinetic-workshop"]=([a for a in _CPU if a!="-Dbc.shot=480"]+["-Dbc.shot=1200","-Dbc.kinetics=workshop","-Dbc.test=true"],True)
+SCENES["pixel-kinetic-machine"]=([a for a in _CPU if a not in ("-Dbc.worldonly=true","-Dbc.shot=480")]+["-Dbc.shot=1200","-Dbc.kinetics=machine","-Dbc.test=true"],True)
 SCENES["pixel-midi-listen"]=([a for a in _CPU if a!="-Dbc.worldonly=true"]+["-Dbc.midigui=listen","-Dbc.test=true"],True)
 SCENES["pixel-midi-gui"]=([a for a in _CPU if a!="-Dbc.worldonly=true"]+["-Dbc.midigui=true"],True)
 SCENES["pixel-midi"]=(_CPU+["-Dbc.midi=true"],True)
@@ -909,7 +909,8 @@ def run_scene(java, label, jar, name, props, timeout):
         with open(os.path.join(OUT, "logs", "%s-%s-threads.log" % (name, label)), "w") as f:
             f.write(err)
     png = None
-    if shots and status == "exit 0":
+    kinetic_ok = not name.startswith("pixel-kinetic-") or (os.path.exists(log) and "[kinetics] press=" in open(log, encoding="utf-8", errors="replace").read())
+    if shots and status == "exit 0" and kinetic_ok:
         png = os.path.join(OUT, "%s-%s.png" % (name, label))
         shutil.copy(shots[-1], png)
     shutil.rmtree(home, ignore_errors=True)

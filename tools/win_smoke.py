@@ -145,7 +145,9 @@ def run_scene(game_dir, name, props, timeout):
             shutil.copy(src, os.path.join(OUT, "%s-%s" % (name, f)))
     shots = sorted(glob.glob(os.path.join(home, "screenshots", "*.png")))
     ok = False
-    if shots:
+    kinetic_log = os.path.join(home, "latest.log")
+    kinetic_ok = not name.startswith("pixel-kinetic-") or (os.path.exists(kinetic_log) and "[kinetics] press=" in open(kinetic_log, encoding="utf-8", errors="replace").read())
+    if shots and kinetic_ok:
         try:
             from PIL import Image
             im = Image.open(shots[-1]).convert("RGB")

@@ -1,2 +1,4 @@
 pixel-title,pixel-kinetic-workshop,pixel-kinetic-machine,pixel-midi-listen
 # V6.14 exact EXE: rotational network, press/mill output and retained MIDI listening.
+
+# Require successful real-machine processing marker; strict native exception handling.

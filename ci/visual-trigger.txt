@@ -1,3 +1,5 @@
 pixel-kinetic-workshop,pixel-kinetic-machine,pixel-midi-listen
 jar=build
 # V6.14 native Create foundation only; real machines process real inventories.
+
+# Require successful real-machine processing marker; strict native exception handling.
