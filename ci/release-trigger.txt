@@ -1,2 +1,2 @@
-6.12
-# Tested 8b73c9d: 6,775,594/0; Windows/Linux GUI and independent physical MIDI playback passed.
+6.13
+# Tested 1aec210: 7,568,489/0; Windows/Linux Play/Stop/Restart PCM, GUI building and physical playback passed.
