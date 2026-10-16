@@ -1,2 +1,2 @@
-6.10
-# Final c60b0b1 package: 6,438,736/0; actual distributed saves; Windows/Linux renders verified.
+6.11
+# Tested b7848e1: 6,773,165/0, Windows/Linux physical MIDI circuit and note triggers verified.
