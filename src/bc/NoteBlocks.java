@@ -4,7 +4,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Material-selected note instruments. No MIDI player: every sound is a real block trigger. */
+/** Material-selected world note instruments. MidiPlayback reuses this same synthesized sound bank. */
 final class NoteBlocks {
    static final String[] NAMES={"harp","bass","snare","hat","basedrum","flute","bell","guitar","chime","xylophone","iron_xylophone","cow_bell","didgeridoo","bit","banjo","pling"};
    static final int[] LOW={54,30,54,54,54,66,78,42,78,78,54,66,30,54,54,54};

@@ -1,2 +1,2 @@
-pixel-title,pixel-midi-gui,pixel-midi
-# V6.12 packaged EXE: real picker/preview/build GUI and physical note playback.
+pixel-title,pixel-midi-listen,pixel-midi-gui,pixel-midi
+# V6.13 exact EXE: centered PCM, real Play/Stop/Restart buttons and physical circuits.

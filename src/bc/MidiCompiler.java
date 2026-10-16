@@ -38,7 +38,18 @@ final class MidiCompiler {
       return 0;
    }
    static Song parse(byte[] data,double start,double duration)throws Exception{
-      if(data.length>MAX_BYTES||data.length<14||!Double.isFinite(start)||start<0||!Double.isFinite(duration)||duration<=0||duration>120)throw new IOException("Use a MIDI under 1 MiB and a 0..120 second excerpt");
+      return parse(data,start,duration,120,MAX_NOTES,6);
+   }
+   static Song playback(byte[] data,double start,double duration,boolean whole)throws Exception{
+      Song song=parse(data,whole?0:start,whole?3600:duration,3600,50000,32);
+      if(whole&&song.outside()>0)throw new IOException("Full-song playback supports up to 60 minutes. Select a section instead; nothing was truncated.");
+      return song;
+   }
+   private static Song parse(byte[] data,double start,double duration,int maxSeconds,int maxNotes,int maxChord)throws Exception{
+      if(data.length>MAX_BYTES)throw new IOException("MIDI file exceeds the 1 MiB limit.");
+      if(data.length<14)throw new IOException("Not a standard MIDI file: header is missing.");
+      if(!Double.isFinite(start)||start<0)throw new IOException("Start must be a finite, non-negative number of seconds.");
+      if(!Double.isFinite(duration)||duration<=0||duration>maxSeconds)throw new IOException("Length must be greater than 0 and at most "+maxSeconds+" seconds.");
       MidiFileFormat format=MidiSystem.getMidiFileFormat(new ByteArrayInputStream(data));if(format.getType()!=0&&format.getType()!=1)throw new IOException("Only synchronous MIDI type 0/1 is supported");
       Sequence seq=MidiSystem.getSequence(new ByteArrayInputStream(data));if(seq.getResolution()<=0)throw new IOException("Invalid MIDI timebase");
       List<Entry> all=new ArrayList<>();Track[] tracks=seq.getTracks();for(int t=0;t<tracks.length;t++)for(int i=0;i<tracks[t].size();i++){if(all.size()>=100000)throw new IOException("Too many MIDI events");MidiEvent e=tracks[t].get(i);all.add(new Entry(e.getTick(),t,i,e.getMessage()));}
@@ -55,10 +66,10 @@ final class MidiCompiler {
          int instrument=gm(programs[m.getChannel()],m.getData1(),m.getChannel()),key=m.getData1(),p;
          if(m.getChannel()==9)p=12;else {int old=key;while(key<NoteBlocks.LOW[instrument])key+=12;while(key>NoteBlocks.LOW[instrument]+24)key-=12;p=key-NoteBlocks.LOW[instrument];if(key!=old)folded++;}
          int tick=(int)Math.round((seconds-start)*10);Note note=new Note(tick,p,instrument);Set<Note> chord=chords.computeIfAbsent(tick,k->new LinkedHashSet<>());if(!chord.add(note))merged++;
-         if(chord.size()>6)throw new IOException("More than six distinct notes in a 100ms chord; simplify tracks or select an excerpt");
+         if(chord.size()>maxChord)throw new IOException("More than "+maxChord+" distinct notes in a 100ms chord; simplify tracks or select a section");
       }
       List<Note> notes=new ArrayList<>();for(var c:chords.values())notes.addAll(c);
-      if(notes.isEmpty()||notes.size()>MAX_NOTES)throw new IOException("Choose an excerpt containing 1..512 notes");return new Song(List.copyOf(notes),folded,merged,outside);
+      if(notes.isEmpty()||notes.size()>maxNotes)throw new IOException("Choose a selection containing 1.."+maxNotes+" notes");return new Song(List.copyOf(notes),folded,merged,outside);
    }
    static Plan plan(Song song,int x,int y,int z)throws IOException{
       if(y<3||y>253)throw new IOException("Need room above and below the circuit");Plan p=new Plan(x,y,z);p.support(0,0);p.put(0,0,0,Redstone319.STONE_BUTTON);

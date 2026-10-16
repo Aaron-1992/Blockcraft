@@ -26,6 +26,11 @@ def payload(version="6.5", source="expected", tamper=False, tamper_media=False):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_midi_player_receipt(self):
+        jar=payload("6.13")
+        self.assertEqual(inspect_payload(jar,jar,"6.13","expected")["version"],"6.13")
+        self.assertIn("MidiPlayback",required("6.13"))
+
     def test_midi_gui_receipt(self):
         jar=payload("6.12")
         self.assertEqual(inspect_payload(jar,jar,"6.12","expected")["version"],"6.12")

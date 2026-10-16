@@ -1,7 +1,39 @@
-BLOCKCRAFT V6.12 - MIDI BUILD COMPILER AND NOTE-BLOCK INSTRUMENTS
+BLOCKCRAFT V6.13 - MIDI BUILD COMPILER AND NOTE-BLOCK INSTRUMENTS
 ================================================================
 
-THIS GENERATES A REAL REDSTONE BUILD, NOT A MIDI PLAYER
+LISTEN WITHOUT BUILDING - NEW IN V6.13
+-------------------------------------
+Right-click the MIDI Build Compiler in Creative, select your MIDI, then click
+Play full. It plays the ENTIRE file using the game's actual note-block sounds,
+not your operating system's MIDI synthesizer. You stay where you are: sound
+is centered on your own speakers/headphones, with no distance attenuation.
+No redstone, loaded build area or flying alongside a track is required.
+
+Play section uses the Start/Length fields. Play full ignores those fields and
+always starts at the beginning. The old default five seconds only applies to
+the section/build preview. A rejected physical build does not disable audio.
+Stop cancels scheduled notes AND ringing tails; Play again restarts. Playback
+ends naturally after the last strike decays. Close/Escape, choosing another
+file, editing input, changing worlds or losing compiler access stops listening.
+Keep this menu open to listen. This is LOCAL listening, not a shared server
+jukebox; other players do not hear it. Sounds volume controls it, and background
+music is lowered while it plays. It is not saved as a world program.
+
+NOTE-BLOCK SOUND RULES: the same 16 instrument bank/program-family mapping,
+25 pitches (two octaves) per instrument, octave folding, 100ms quantized note
+starts and 100ms lead-in. Fixed-decay strikes: MIDI sustain, note lengths,
+velocity and pitch bends are not reproduced. Duplicate converted notes merge.
+The audio device clocks playback even while the single-player world is paused.
+
+The 256-block rail, 512-note build cap and six physical lanes do NOT apply to
+listening. Audio safety limits are 1 MiB, standard MIDI type 0/1, 100,000 events,
+50,000 converted notes, 60 minutes per playback and 32 distinct notes per
+100ms chord. These are software limits, not intrinsic note-block pitch rules.
+Oversized input is refused with an explanation, never silently truncated.
+Longer files can use Play section. Build circuit remains a separate option
+with its existing physical limits, described below.
+
+BUILD CIRCUIT GENERATES REAL REDSTONE, NOT A HIDDEN PLAYER
 ------------------------------------------------------
 Find MIDI Build Compiler in Creative > Decoration and Utility (search MIDI).
 It also has a crafting recipe: iron/redstone, quartz/note block/quartz,
@@ -14,7 +46,7 @@ REDSTONE still play the circuit. Break its wiring and playback stops there.
 
 QUICK START - NO COMMANDS OR FILE COPYING REQUIRED
 ------------------------------------------------
-1. Install V6.12. Back up saves before updating.
+1. Install V6.13. Back up saves before updating.
 2. In Creative, place a MIDI Build Compiler and empty-hand right-click it.
 3. Browse to your .mid or .midi and click it. Home, Downloads, MIDI folder,
    Drives, Up and page buttons are available; the wheel changes pages.
@@ -130,7 +162,7 @@ are preserved and block new compiler builds rather than being overwritten.
 
 MULTIPLAYER AND LIMITS
 ---------------------
-Everyone should use V6.12. Only the host imports/builds and tunes note blocks.
+Everyone should use V6.13. Only the host imports/builds and tunes note blocks.
 Host note events carry the actual instrument/pitch to clients; clients do not
 need the MIDI file. Playback is still local/positional, with network latency.
 No real two-computer/device audition is claimed by automated checks.

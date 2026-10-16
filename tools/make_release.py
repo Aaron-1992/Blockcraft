@@ -257,6 +257,24 @@ def main():
             "Includes MIDI-guide.txt. Back up saves; use V6.12 on multiplayer peers. Existing worlds, display/audio "
             "hardware, artwork, flat sprite bow and held lighting are retained. The user's DSi Shop file was not "
             "provided, so that particular MIDI has not been validated.\n")
+    if version == "6.13":
+        release_notes += ("\n### Play the MIDI with note-block sounds, without building a track\n\n"
+            "Right-click a **MIDI Build Compiler** in Creative, select your MIDI and click **Play full**. "
+            "The entire file plays using the game's actual note-block sample bank, centered on your speakers/headphones. "
+            "**No 256-block rail, no terrain clearance and no flying after the music.**\n\n"
+            "**Play section** uses Start/Length; **Play full** ignores the default five-second build section. "
+            "**Stop** cancels notes and their ringing tails. Play again restarts. Keep the menu open: Close/Escape, "
+            "editing input, changing files/worlds or losing compiler access stops playback. Listening is **local only**, "
+            "not broadcast to other players. Sounds volume applies and background music is lowered while playing.\n\n"
+            "Keeps the 16 note-block sounds, two-octave/25-pitch ranges, octave folding, 100ms timing and fixed strikes "
+            "instead of MIDI sustain/velocity/bends. The audio device drives timing even with the world paused. "
+            "Listening bypasses the 512-note build cap and six physical lanes. Software safety limits are "
+            "**1 MiB/type 0 or 1 MIDI, 100,000 events, 50,000 converted notes, 60 minutes and 32 notes per chord**. "
+            "Oversized input is explained, not silently truncated.\n\n"
+            "**Build circuit** remains a separate button with unchanged physical limits and independent redstone playback. "
+            "Existing worlds, note tuning, display/audio hardware, artwork, sprite bow and held lighting are retained. "
+            "Back up saves before updating; see MIDI-guide.txt. Automated checks verify the mixer and full-song timing; "
+            "no physical-speaker audition is claimed.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

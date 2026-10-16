@@ -1770,8 +1770,11 @@ public final class SoundEngine {
                mixR[i] = masterLpR;
             }
 
+            // Local MIDI listening is sample-clocked, centered and unaffected by world distance/acoustics.
+            MidiPlayback.mix(mixL,mixR,frames,sVol);
+
             // 4. Mix Minecraft Legacy Console Edition Music Stream (single active track at a time, rotating Battle themes)
-            float mVol = masterMusicVol*RasterAudio.duck;
+            float mVol = masterMusicVol*RasterAudio.duck*MidiPlayback.musicGain();
             if (mVol > 0.001F) {
                String activeKey;
                float fade;

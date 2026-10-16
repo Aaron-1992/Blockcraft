@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.12";
+   public static final String VERSION_STR = "6.13";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -913,6 +913,7 @@ public final class Game {
    }
 
    void shutdown() {
+      MidiPlayback.stop(this.midiScreen);
       try {
          if (this.world != null) {
             this.saveWorld();
@@ -1917,7 +1918,7 @@ public final class Game {
    void setScreen(Game.S var1) {
       if(var1!=Game.S.PLAY)RasterComputer.release(this);
       Game.S var2 = this.screen;
-      if(var2==Game.S.MIDI&&var1!=Game.S.MIDI)this.midiScreen=null;
+      if(var2==Game.S.MIDI&&var1!=Game.S.MIDI){MidiPlayback.stop(this.midiScreen);this.midiScreen=null;}
       this.screen = var1;
       if (var1 != Game.S.PLAY) {
          this.bowCharge = 0;
@@ -3845,6 +3846,7 @@ public final class Game {
    }
 
    void update(double var1) {
+      if(this.midiScreen!=null)this.midiScreen.checkPlayback();
       ChestLids.update(this,var1);
       File dropped;
       while (this.skins != null && (dropped = this.skinDrops.poll()) != null) {

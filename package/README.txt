@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.12  -  an original Minecraft-style voxel sandbox   (EDITION V6.12)
+BLOCKCRAFT V6.13  -  an original Minecraft-style voxel sandbox   (EDITION V6.13)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,20 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.13 - Listen to MIDI with note-block sounds, no track
+
+  * Select a MIDI in the compiler menu and click Play full. No blocks are
+    placed, no 256-block rail, and no flying after positional sounds.
+  * Play section uses Start/Length; Stop cancels the notes and ringing tails.
+    Sound stays centered on your own speakers/headphones. Keep the menu open;
+    Close/Escape or editing the input stops playback. Local listening only.
+  * Uses the actual 16 note-block samples, 25 pitches per instrument, octave
+    folding and 100ms timing. No MIDI sustain, velocity or pitch bends.
+  * Audio is not limited to 512 notes or six building lanes. Safety limits:
+    1 MiB MIDI, 50,000 converted notes, 60 minutes and 32 notes per chord.
+    Build circuit remains available separately with its physical limitations.
+    See MIDI-guide.txt for the complete listening/building controls and limits.
 
 WHAT'S NEW IN V6.12 - Direct MIDI selection and GUI building
 
