@@ -103,7 +103,7 @@ def texture_kit(patch, version):
                         z.writestr(entry, f.read())
         with zipfile.ZipFile(os.path.join(OUT, name)) as z:
             assert z.testzip() is None
-            expected_tiles = 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532
+            expected_tiles = 550 if tuple(map(int, version.split("."))) >= (6, 14) else 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532
             assert len([n for n in z.namelist() if "/tiles/" in n]) == expected_tiles
             assert len([n for n in z.namelist() if "/animations/" in n]) == 6
     return name
@@ -167,7 +167,7 @@ def main():
             "See `Texture-editing.txt` for Aseprite sheet settings, file locations and backups.\n\n"
             "**Optional ready-made editor kit:** `%s` — extract into the folder containing Blockcraft.exe, "
             "without replacing an already edited MyTextures folder. The game download can generate this same kit itself.\n\n"
-            "Earlier releases remain available unchanged. SHA256SUMS.txt checks all downloads.\n" % (545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
+            "Earlier releases remain available unchanged. SHA256SUMS.txt checks all downloads.\n" % (550 if tuple(map(int, version.split("."))) >= (6, 14) else 545 if tuple(map(int, version.split("."))) >= (6, 7) else 532, kit))
     if version == "6.9":
         world_name = "Blockcraft-Block-Drop-World.zip"
         world = os.path.join(ROOT, world_name)
