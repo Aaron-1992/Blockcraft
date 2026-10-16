@@ -1,19 +1,3 @@
 GL: 4.5 (Compatibility Profile) Mesa 26.2.4 (git-9a0169f2a7) / llvmpipe (LLVM 23.1.2, 256 bits)
-java.lang.RuntimeException: Kinetic workshop smoke failed
-	at bc.KineticWorkshop.smoke(KineticWorkshop.java:52)
-	at bc.Game.autoTest(Game.java:583)
-	at bc.Game.loop(Game.java:3767)
-	at bc.Game.run(Game.java:332)
-	at bc.Main.main(Main.java:31)
-Caused by: java.io.IOException: Falling water did not drive wheel
-	at bc.KineticWorkshop.smoke(KineticWorkshop.java:46)
-	... 4 more
-java.lang.RuntimeException: Kinetic workshop smoke failed
-	at bc.KineticWorkshop.smoke(KineticWorkshop.java:52)
-	at bc.Game.autoTest(Game.java:583)
-	at bc.Game.loop(Game.java:3767)
-	at bc.Game.run(Game.java:332)
-	at bc.Main.main(Main.java:31)
-Caused by: java.io.IOException: Falling water did not drive wheel
-	at bc.KineticWorkshop.smoke(KineticWorkshop.java:46)
-	... 4 more
+[kinetics] press=8 iron sheets via belt to depot at 128 RPM; mill=2 flour; directional flowing wheel; no GUI
+AUTO screenshot; chunks=192 fps=15
