@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.11";
+   public static final String VERSION_STR = "6.12";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -574,9 +574,12 @@ public final class Game {
          if (++this.autoFrames >= 108) {
             this.autoShotNow = true;
          }
+      } else if(this.screen==Game.S.MIDI&&System.getProperty("bc.midigui")!=null){
+         MidiScreen.smoke(this,++this.autoFrames);
       } else if (this.screen == Game.S.PLAY || this.screen == Game.S.INV || this.screen == Game.S.ADV) {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
+         if (System.getProperty("bc.midigui")!=null)MidiScreen.smoke(this,this.autoFrames);
          if (Boolean.getBoolean("bc.midi")) MidiCompiler.smoke(this,this.autoFrames);
          if (System.getProperty("bc.shadow")!=null) ShadowMachine.smoke(this,this.autoFrames);
          if (System.getProperty("bc.arcade")!=null) RasterArcade.smoke(this,this.autoFrames);
@@ -1914,6 +1917,7 @@ public final class Game {
    void setScreen(Game.S var1) {
       if(var1!=Game.S.PLAY)RasterComputer.release(this);
       Game.S var2 = this.screen;
+      if(var2==Game.S.MIDI&&var1!=Game.S.MIDI)this.midiScreen=null;
       this.screen = var1;
       if (var1 != Game.S.PLAY) {
          this.bowCharge = 0;
@@ -1988,6 +1992,7 @@ public final class Game {
    }
 
    void onScroll(double var1) {
+      if(this.screen==Game.S.MIDI){if(midiScreen!=null)midiScreen.scroll(var1);return;}
       if (this.ui.onWheel(var1)) {
          return;
       }
@@ -2018,6 +2023,7 @@ public final class Game {
    }
 
    void onChar(int var1) {
+      if(this.screen==Game.S.MIDI){if(midiScreen!=null)midiScreen.character(var1);return;}
       if (this.screen == Game.S.CHAT) {
          if (System.currentTimeMillis() - this.chatOpenedAt < 80L && (var1 == 116 || var1 == 84)) {
             return;
@@ -2123,9 +2129,11 @@ public final class Game {
       this.chatOpenedAt = System.currentTimeMillis();
    }
 
+   MidiScreen midiScreen;
    RasterComputer.Focus rasterFocus;
 
    void onKey(int var1, int var2, int var3) {
+      if(this.screen==Game.S.MIDI){if(midiScreen!=null)midiScreen.key(var1,var2);return;}
       if(RasterComputer.onKey(this,var1,var2))return;
       if (var2 != 0) {
          if (var1 == 300 && var2 == 1) {
@@ -3053,7 +3061,8 @@ public final class Game {
                   }
             }
          } catch (Exception var12) {
-            this.say("§cInvalid arguments");
+            if(var2[0].equalsIgnoreCase("midi")||var2[0].equalsIgnoreCase("midibuild")||var2[0].equalsIgnoreCase("mididemo"))this.say("§cMIDI: "+MidiCompiler.explain(var12));
+            else this.say("§cInvalid arguments");
          }
       }
    }
@@ -6190,6 +6199,7 @@ public final class Game {
    void render() {
       this.updateZoom();
       int var1 = this.guiScaleAuto();
+      if(this.screen==Game.S.MIDI)var1=Math.max(1,Math.min(var1,Math.min(this.fbW/400,this.fbH/300)));
       GL11.glViewport(0, 0, this.fbW, this.fbH);
       this.activeBtnsSwap();
       boolean var2 = this.world != null && this.screen != Game.S.LOADING;
@@ -6290,6 +6300,9 @@ public final class Game {
             } else if (this.screen == Game.S.DEAD) {
                this.drawDead();
             }
+            break;
+         case MIDI:
+            if(this.midiScreen!=null)this.midiScreen.draw();
             break;
          case SKINS:
             this.ui.backdrop(0.5F);
@@ -7469,6 +7482,7 @@ public final class Game {
       SKINS,
       PACKS,
       MODS,
+      MIDI,
       CREDITS,
       DEAD;
    }

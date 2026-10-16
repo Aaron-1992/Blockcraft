@@ -3,12 +3,18 @@
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
 In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
 
-Current source version: **V6.8 — buildable redstone computer and furniture facing**.
+Current source version: **V6.12 — direct MIDI file picker and safe GUI building**.
+
+Right-click a **MIDI Build Compiler** in Creative, browse to your MIDI file,
+preview a section and click **Build circuit**. No commands, renaming or copying
+files required. The default is the first **5 seconds**, not the whole song.
+The generated note blocks, repeaters and dust play independently of the importer.
+[Download V6.12](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.12) · [MIDI guide](package/MIDI-guide.txt).
 
 Adds temperature/depth-based oceans, reefs/kelp/icebergs, water flow, swimming
 and waterlogging; directional/timed circuits, comparators and slime-piston
 assemblies. See [controls, compatibility limits and tests](docs/gameplay/aquatic-redstone.md).
-Back up worlds before upgrading; use V6.8 on all multiplayer peers.
+Back up worlds before upgrading; use V6.12 on all multiplayer peers.
 
 Retains the Building, Colors/Nature and Utility/Tools review batches, chest and
 utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone

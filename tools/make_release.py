@@ -238,6 +238,25 @@ def main():
             "Follow the track to hear distant notes. **MIDI-guide.txt** in the game has complete instructions.\n\n"
             "Existing V6.10 worlds/hardware and the prior artwork/sprite-bow/lighting changes are retained. Back up worlds before updating; "
             "this release adds `notes.properties` for persistent tuning. Audio data and actual redstone timing are tested; no physical-device or two-PC audition is claimed.\n")
+    if version == "6.12":
+        release_notes += ("\n### MIDI importing without command typing\n\n"
+            "In Creative, **right-click a MIDI Build Compiler**, browse directly to your `.mid`/`.midi`, "
+            "preview the section, then click **Build circuit**. Home, Downloads, drives, folders and pagination "
+            "are built in. Files can stay where they are; spaces, Unicode names and uppercase extensions work.\n\n"
+            "The default selection is the **first 5 seconds**, not the whole song. Edit Start/Length and Preview "
+            "for another section. The screen reports notes, instruments, omitted/outside-section notes, octave folds, "
+            "repeaters, footprint and button coordinates. The default height finds empty space **above terrain**, "
+            "with a final no-overwrite check when building. **Go to button** brings you to the physical start.\n\n"
+            "Fixed generic 'Invalid arguments' MIDI errors and the need to keep aiming at the compiler after preview. "
+            "Invalid files, permissions, clearance, unloaded areas and conversion limits now have specific diagnostics. "
+            "Changing input invalidates stale previews; builds recheck host permissions and the original compiler.\n\n"
+            "Playback remains real redstone with all **16 material-selected note instruments**; the compiler and MIDI "
+            "are unnecessary afterward. Limits remain: Creative host, 1 MiB/type 0 or 1 MIDI, 100ms timing, "
+            "512 notes, six-note chords, 120s selected duration and a **256-block rail**. Dense/long tracks may need "
+            "much shorter sections. No velocity/sustain/bend reproduction; follow the track for positional sound.\n\n"
+            "Includes MIDI-guide.txt. Back up saves; use V6.12 on multiplayer peers. Existing worlds, display/audio "
+            "hardware, artwork, flat sprite bow and held lighting are retained. The user's DSi Shop file was not "
+            "provided, so that particular MIDI has not been validated.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

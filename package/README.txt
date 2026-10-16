@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.11  -  an original Minecraft-style voxel sandbox   (EDITION V6.11)
+BLOCKCRAFT V6.12  -  an original Minecraft-style voxel sandbox   (EDITION V6.12)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,20 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.12 - Direct MIDI selection and GUI building
+
+  * Right-click the MIDI Build Compiler in Creative to browse directly to a
+    local MIDI. No commands, copying or filename restrictions in the GUI.
+  * Click a file to preview. Default: first FIVE seconds, not the whole song.
+    Edit Start and Length, Preview, then Build circuit. Go to button takes
+    you to the physical start; right-click the button to play.
+  * Automatically finds clear space above terrain; never overwrites blocks.
+    Shows specific errors and rechecks the captured compiler/world on Build.
+    You no longer have to keep aiming at the compiler after preview.
+  * Existing real redstone playback and all 16 note instruments retained.
+    Limits remain: short sections, 256-block rail, 512 notes, six-note chords.
+    See MIDI-guide.txt for full instructions, safety and conversion limits.
 
 WHAT'S NEW IN V6.11 - MIDI-to-redstone compiler and note-block instruments
 

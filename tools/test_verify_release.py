@@ -26,6 +26,11 @@ def payload(version="6.5", source="expected", tamper=False, tamper_media=False):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_midi_gui_receipt(self):
+        jar=payload("6.12")
+        self.assertEqual(inspect_payload(jar,jar,"6.12","expected")["version"],"6.12")
+        self.assertIn("MidiScreen",required("6.12"))
+
     def test_midi_and_note_hardware_receipts(self):
         jar=payload("6.11")
         self.assertEqual(inspect_payload(jar,jar,"6.11","expected")["version"],"6.11")

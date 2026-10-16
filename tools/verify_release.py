@@ -33,6 +33,8 @@ def required(version):
         extra += ("RasterAudio", "RasterClip", "RasterMedia", "ShadowMachine", "SoundEngine")
     if tuple(map(int, version.split("."))) >= (6, 11):
         extra += ("MidiCompiler", "NoteBlocks", "Redstone319", "Blocks", "Creative")
+    if tuple(map(int, version.split("."))) >= (6, 12):
+        extra += ("MidiScreen",)
     return REQUIRED + extra
 
 

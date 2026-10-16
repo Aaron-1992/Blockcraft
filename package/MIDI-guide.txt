@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.11 - MIDI BUILD COMPILER AND NOTE-BLOCK INSTRUMENTS
+BLOCKCRAFT V6.12 - MIDI BUILD COMPILER AND NOTE-BLOCK INSTRUMENTS
 ================================================================
 
 THIS GENERATES A REAL REDSTONE BUILD, NOT A MIDI PLAYER
@@ -12,54 +12,68 @@ dust, tuned note blocks and the instrument-selecting blocks beneath them.
 After building, remove the compiler or delete the MIDI: the BUTTON and REAL
 REDSTONE still play the circuit. Break its wiring and playback stops there.
 
-QUICK START
------------
-1. Install V6.11. Back up saves before updating.
-2. Run /mididemo once. This creates .blockcraft112/midi/Workshop.mid, an
-   original eight-note, four-instrument example. Existing files are preserved.
-3. Copy your own .mid or .midi files into:
-      Windows: %USERPROFILE%\.blockcraft112\midi\
-      Linux:   ~/.blockcraft112/midi/
-   Use simple names, e.g. MySong.mid (letters, numbers, underscore or dash).
-4. Place a MIDI Build Compiler on a short pillar, at least THREE blocks above
-   the highest ground/block in the build area. Leave a clear area to its SOUTH
-   (+Z), starting three blocks east (+X). The generated track is raised, not
-   carved through your terrain or existing buildings.
-5. Empty-hand right-click the compiler. It opens the command input:
-      /midi Workshop.mid
-   Or use your filename. This ONLY PREVIEWS; it places nothing yet.
-6. Read the footprint, note/repeater counts and conversion warnings. Still
-   looking at that compiler, type:
-      /midibuild
-   Every support, note, reserved-air cell and isolation border must be empty
-   and loaded. If not, the whole build is refused before any block is placed.
-7. Right-click the stone BUTTON at the beginning of the generated track.
-   Its coordinates are printed after building. Follow the track to hear
-   distant notes: these are positional sounds, not a global music stream.
-   Wait for the pulse to finish (song length + about one second) before replay.
+QUICK START - NO COMMANDS OR FILE COPYING REQUIRED
+------------------------------------------------
+1. Install V6.12. Back up saves before updating.
+2. In Creative, place a MIDI Build Compiler and empty-hand right-click it.
+3. Browse to your .mid or .midi and click it. Home, Downloads, MIDI folder,
+   Drives, Up and page buttons are available; the wheel changes pages.
+   Files can stay anywhere you can read them. Spaces, Unicode names and
+   uppercase .MID/.MIDI extensions are supported. No renaming required.
+4. Selecting a file previews the FIRST FIVE SECONDS by default, not the whole
+   song. Edit Start and Length (seconds), then Preview to change the section.
+   Tab switches fields; Backspace edits; Enter previews. Nothing is built yet.
+5. Read the note/instrument counts, notes outside the section, pitch folding,
+   footprint and start-button coordinates. Default height is ABOVE TERRAIN:
+   the entire proposed envelope is raised above the highest occupied cell.
+   You do not need to put the compiler on a pillar. Nothing is dug away.
+6. Click Build circuit. It rechecks the world, compiler, permissions, loaded
+   area and every reserved cell before placing anything. You do not need to
+   keep the crosshair on the compiler. Moving/removing the file after a
+   successful preview does not change the circuit that was previewed.
+7. Click Go to button to fly to the start (Creative only), or Close to stay
+   where you are. Right-click the physical stone button to play.
+   Follow the track to hear distant notes: sound is positional, not global.
+   Wait for the pulse to finish (section length + about one second) to replay.
 
-LONG FILES / EXCERPTS
---------------------
-You can select a range rather than silently losing later notes:
-  /midi MySong.mid 30 8
-This takes note starts from second 30 up to (but not including) second 38.
-The original timing within that window is preserved on the redstone grid.
-Notes held from before the window are not synthesized as new note starts.
+If the preview or build fails, the screen displays the actual reason. Change
+Length for an oversized/unloaded track; simplify tracks for a chord over six
+notes; re-preview above terrain for occupied space. Changing a field, file or
+height setting invalidates the old preview. Escape/Close discards the menu
+session, not blocks already built. Import/build is Creative-host-only.
 
-Each build is a straight, inspectable track, at most 256 blocks long, with a
-16-block-wide clear envelope and five blocks of vertical clearance. Choose
-shorter sections if the preview is too long or outside your loaded chunks.
-Increase view distance and keep ALL of the circuit loaded during playback.
-Short pieces and selected sections are the intended use; this is NOT an
-unlimited whole-song/large-orchestra converter or a chunk-loading machine.
+SECTIONS AND OPTIONAL LEGACY COMMANDS
+------------------------------------
+Start 30 and Length 8 selects note starts from second 30 up to (excluding) 38.
+The timing within that window is preserved on the redstone grid. Notes held
+from before the window are not synthesized as new note starts.
+
+Each build is a straight track, at most 256 blocks long, in a 16-block-wide,
+five-block-high empty envelope. Choose shorter sections if it is too long or
+outside loaded chunks. Increase view distance and keep the whole circuit
+loaded while playing. This is for short pieces/sections, NOT an unlimited
+whole-song/orchestral converter. Maximum selected duration is 120 seconds;
+the rail, 512-note or six-note-chord limits can require much shorter sections.
+
+For an original eight-note/four-instrument example, /mididemo creates
+Workshop.mid without replacing existing files; open MIDI folder in the picker.
+The MIDI folder is %USERPROFILE%\.blockcraft112\midi on Windows or
+~/.blockcraft112/midi on Linux. It is optional for the GUI.
+
+Legacy commands remain available: /midi opens the picker when aiming at a
+compiler. /midi Workshop.mid previews a simple filename in the MIDI folder;
+/midi MySong.mid 30 8 selects a section. /midibuild confirms the last successful
+COMMAND preview without requiring the crosshair to remain on the compiler.
+GUI previews use the GUI Build circuit button. Command failures now show the
+actual MIDI error instead of "Invalid arguments".
 
 HOW THE CONVERSION WORKS
 -----------------------
 - Standard MIDI file types 0 and 1; PPQ tempo changes across tracks and SMPTE
   timing are supported. MIDI type 2 (independent sequences) is refused.
 - Note starts are rounded to 100ms redstone ticks (normally <=50ms error).
-  A fixed 100ms startup delay lets the first repeater fire. The preview reports
-  this. Repeaters encode the timing; no hidden per-song playback scheduler.
+  A fixed 100ms startup delay lets the first repeater fire. Repeaters encode
+  the timing; no hidden per-song playback scheduler.
 - Up to six distinct notes per quantized chord. Chords exceeding that are
   refused, never silently reduced. Identical pitch/instrument duplicates in
   the same chord are merged and reported.
@@ -116,7 +130,7 @@ are preserved and block new compiler builds rather than being overwritten.
 
 MULTIPLAYER AND LIMITS
 ---------------------
-Everyone should use V6.11. Only the host imports/builds and tunes note blocks.
+Everyone should use V6.12. Only the host imports/builds and tunes note blocks.
 Host note events carry the actual instrument/pitch to clients; clients do not
 need the MIDI file. Playback is still local/positional, with network latency.
 No real two-computer/device audition is claimed by automated checks.
