@@ -40,15 +40,15 @@ and the difference between editable PNGs and the reference atlas.
 ## Download and play (the easy way)
 
 1. Open the **[Releases page](../../releases/latest)** of this repository (right side of the repo's front page: *Releases*).
-2. Download **`Blockcraft-V<version>-windows.zip`** (about 82 MB, Java is inside - nothing to install).
+2. Download **`Blockcraft-V<version>-windows.zip`** (about 88 MB, Java is inside - nothing to install).
 3. Right-click the zip -> *Extract All...* into a **new folder**, open the `Blockcraft` folder, run **`Blockcraft.exe`**.
 
-No git, no pulling, no branches. Every update gets its own release with the complete game zip (and a smaller ~33 MB
+No git, no pulling, no branches. Every update gets its own release with the complete game zip (and a smaller ~39 MB
 patch). Your worlds and options are stored in `%USERPROFILE%\.blockcraft112`, so they survive updates, even when
 you extract a new version into a new folder. The player manual with the full changelog is `package/README.txt`
 (also inside the zip).
 
-**Seeing older art?** Check the title says V6.8 and select **Natural Pixel 32 (Default)**
+**Seeing older art?** Check the title says V6.12 and select **Natural Pixel 32 (Default)**
 in Options > Resource Packs. Older/custom packs deliberately keep their own textures.
 
 > Releases are created by the **Release** GitHub Action (Actions tab -> *Release* -> *Run workflow*), which packages the

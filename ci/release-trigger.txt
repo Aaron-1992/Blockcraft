@@ -1,2 +1,2 @@
-6.11
-# Tested b7848e1: 6,773,165/0, Windows/Linux physical MIDI circuit and note triggers verified.
+6.12
+# Tested 8b73c9d: 6,775,594/0; Windows/Linux GUI and independent physical MIDI playback passed.
