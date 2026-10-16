@@ -1,2 +1,2 @@
-6.13
-# Tested 1aec210: 7,568,489/0; Windows/Linux Play/Stop/Restart PCM, GUI building and physical playback passed.
+6.14
+# Native Create FOUNDATION only; full parity remains unfinished.
