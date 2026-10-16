@@ -97,7 +97,7 @@
     {
       "source": "AllBlocks",
       "name": "belt",
-      "status": "not_implemented",
+      "status": "native_partial",
       "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
     },
     {
@@ -373,7 +373,7 @@
     {
       "source": "AllBlocks",
       "name": "depot",
-      "status": "not_implemented",
+      "status": "native_partial",
       "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
     },
     {

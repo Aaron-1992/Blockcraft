@@ -34,9 +34,9 @@ final class TestsKinetics {
       test("kinetic upgrade: real water-current torque and quiet interaction",()->{
          Game g=newGame(1);World w=g.world;long wheel=put(w,0,75,0,Kinetics.WHEEL,0,0);
          w.setBlock(0,75,1,Blocks.WATER);eq(0D,Kinetics.source(w,wheel),"still water cannot turn wheel");
-         w.setState(0,75,1,Blocks.WATER|BlockState.FALLING);eq(8D,Kinetics.source(w,wheel),"falling water positive rim");
-         w.setBlock(0,75,1,0);w.setState(0,75,-1,Blocks.WATER|BlockState.FALLING);eq(-8D,Kinetics.source(w,wheel),"opposite waterfall reverses");
-         w.setState(0,75,1,Blocks.WATER|BlockState.FALLING);eq(0D,Kinetics.source(w,wheel),"opposing currents cancel");
+         w.setState(0,75,1,(Blocks.WATER+1)|BlockState.FALLING);eq(8D,Kinetics.source(w,wheel),"falling water positive rim");
+         w.setBlock(0,75,1,0);w.setState(0,75,-1,(Blocks.WATER+1)|BlockState.FALLING);eq(-8D,Kinetics.source(w,wheel),"opposite waterfall reverses");
+         w.setState(0,75,1,(Blocks.WATER+1)|BlockState.FALLING);eq(0D,Kinetics.source(w,wheel),"opposing currents cancel");
          w.setBlock(0,75,-1,0);w.setBlock(0,75,1,0);
          w.setBlock(0,76,0,Blocks.WATER);w.setBlock(0,76,1,Blocks.WATER+1);check(Kinetics.source(w,wheel)>0,"horizontal current across upper rim");
          w.setBlock(0,76,1,0);w.setBlock(0,76,-1,Blocks.WATER+1);check(Kinetics.source(w,wheel)<0,"reversing gradient reverses wheel");
@@ -81,7 +81,7 @@ final class TestsKinetics {
          put(w,2,76,1,Kinetics.SHIFT,0,0);w.setBlock(2,77,1,Redstone319.REDSTONE_BLOCK);Kinetics.solve(w);speed(w,end,128);w.shutdown();
       });
       test("native kinetics: water capacity, ratio-weighted stress, conflicting sources and overspeed",()->{
-         Game g=newGame(1);World w=g.world;long wheel=put(w,0,75,0,Kinetics.WHEEL,0,0);w.setState(0,75,1,Blocks.WATER|BlockState.FALLING);put(w,1,75,0,Kinetics.LARGE,0,0);put(w,1,76,1,Kinetics.COG,0,0);put(w,2,76,1,Kinetics.LARGE,0,0);put(w,2,77,2,Kinetics.COG,0,0);long press=put(w,3,77,2,Kinetics.PRESS,0,0);Kinetics.solve(w);speed(w,press,32);eq(256D,Kinetics.reading(w,wheel).capacity(),"water capacity");
+         Game g=newGame(1);World w=g.world;long wheel=put(w,0,75,0,Kinetics.WHEEL,0,0);w.setState(0,75,1,(Blocks.WATER+1)|BlockState.FALLING);put(w,1,75,0,Kinetics.LARGE,0,0);put(w,1,76,1,Kinetics.COG,0,0);put(w,2,76,1,Kinetics.LARGE,0,0);put(w,2,77,2,Kinetics.COG,0,0);long press=put(w,3,77,2,Kinetics.PRESS,0,0);Kinetics.solve(w);speed(w,press,32);eq(256D,Kinetics.reading(w,wheel).capacity(),"water capacity");
          long extra=put(w,4,77,2,Kinetics.MILL,0,0);Kinetics.solve(w);speed(w,press,0);check(Kinetics.reading(w,press).fault().equals("Overstressed"),"real shared stress budget");w.setBlock(4,77,2,0);Kinetics.solve(w);speed(w,press,32);w.setBlock(0,75,1,0);Kinetics.solve(w);speed(w,press,0);w.shutdown();
          g=newGame(1);w=g.world;long a=put(w,0,75,0,Kinetics.MOTOR,0,3);put(w,1,75,0,Kinetics.SHAFT,0,0);put(w,2,75,0,Kinetics.MOTOR,0,4);Kinetics.solve(w);check(Kinetics.reading(w,a).fault().contains("Conflicting"),"incompatible motors stall safely");put(w,2,75,0,Kinetics.MOTOR,0,3);Kinetics.solve(w);speed(w,a,64);w.shutdown();
          g=newGame(1);w=g.world;a=put(w,0,75,0,Kinetics.MOTOR,0,3);for(int i=1;i<=3;i++){put(w,i,74+i,i-1,Kinetics.LARGE,0,0);put(w,i,75+i,i,Kinetics.COG,0,0);}Kinetics.solve(w);check(Kinetics.reading(w,a).fault().contains("Overspeed"),"256 RPM safety ceiling, not silent clipping");w.shutdown();
@@ -98,7 +98,7 @@ final class TestsKinetics {
       });
       test("native kinetics: chunk boundaries, world-local state and safe workshop",()->{
          Game g=newGame(1);World w=g.world;long motor=put(w,46,75,0,Kinetics.MOTOR,0,3);put(w,47,75,0,Kinetics.SHAFT,0,0);Kinetics.solve(w);check(Kinetics.reading(w,motor).fault().contains("Load"),"unloaded frontier stalls network");w.ensureChunkLoaded(3,0);Kinetics.solve(w);speed(w,motor,64);w.shutdown();
-         g=newGame(1);w=g.world;g.player.setPos(0,75,0);KineticWorkshop.build(g);for(int i=0;i<210;i++)w.tick();long press=World.pack(7,78,7);KineticMachines.Machine m=w.kinetics.machines.get(press);check(m!=null&&m.tile.slots[0]!=null&&m.tile.slots[0].id==Kinetics.IRON_SHEET,"actual example world ticks process iron");
+         g=newGame(1);w=g.world;g.player.setPos(0,75,0);KineticWorkshop.build(g);for(int i=0;i<210;i++){w.tick();for(int yy=82;yy>=78;yy--)WaterPhysics.update(w,14,yy,4);}eq(8D,Kinetics.source(w,World.pack(14,79,3)),"example waterfall remains flowing after real fluid updates");long press=World.pack(7,78,7);KineticMachines.Machine m=w.kinetics.machines.get(press);check(m!=null&&m.tile.slots[0]!=null&&m.tile.slots[0].id==Kinetics.IRON_SHEET,"actual example world ticks process iron");
          Kinetics.State empty=new Kinetics.State();check(empty.nodes.isEmpty()&&empty.machines.isEmpty(),"independent worlds");w.shutdown();
       });
    }

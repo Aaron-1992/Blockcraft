@@ -1,2 +1,3 @@
 pixel-title,pixel-kinetic-workshop,pixel-kinetic-machine,pixel-kinetic-shaded,pixel-midi-listen
 # V6.15 exact EXE: require eight sheets transported and stamped without GUI.
+# Seed falling flowing-water cells, not source blocks; fluid-update regression added.

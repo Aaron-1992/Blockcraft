@@ -15,7 +15,7 @@ final class KineticWorkshop {
       p.put(World.pack(x+3,y,z-2),Kinetics.id(Kinetics.MOTOR,0)|(3<<12));p.put(World.pack(x+4,y,z+4),Kinetics.id(Kinetics.DEPOT,0));
       p.put(World.pack(x+11,y+1,z),Kinetics.id(Kinetics.WHEEL,0));p.put(World.pack(x+12,y+1,z),Kinetics.id(Kinetics.SHAFT,0));p.put(World.pack(x+13,y+1,z),Kinetics.id(Kinetics.MILL,0));
       // A real source above an open column: downward water on the +Z rim gives +X torque.
-      for(int yy=y;yy<=y+3;yy++)p.put(World.pack(x+11,yy,z+1),Blocks.WATER|BlockState.FALLING);
+      for(int yy=y;yy<=y+3;yy++)p.put(World.pack(x+11,yy,z+1),(Blocks.WATER+1)|BlockState.FALLING);
       p.put(World.pack(x+11,y+4,z+1),Blocks.WATER);
       p.put(World.pack(x+11,y-1,z+1),0);
       for(int yy=y;yy<=y+4;yy++)for(int[] d:new int[][]{{-1,0},{1,0},{0,1}})p.put(World.pack(x+11+d[0],yy,z+1+d[1]),Blocks.GLASS);

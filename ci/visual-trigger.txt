@@ -1,3 +1,4 @@
 pixel-kinetic-workshop,pixel-kinetic-machine,pixel-kinetic-shaded,pixel-midi-listen
 jar=build
 # V6.15 frame-interpolated components, actual belt-to-depot stamping, current-driven wheel.
+# Seed falling flowing-water cells, not source blocks; fluid-update regression added.
