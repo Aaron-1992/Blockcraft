@@ -1,0 +1,19 @@
+GL: 4.5 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4 / llvmpipe (LLVM 20.1.2, 256 bits)
+java.lang.RuntimeException: Kinetic workshop smoke failed
+	at bc.KineticWorkshop.smoke(KineticWorkshop.java:52)
+	at bc.Game.autoTest(Game.java:583)
+	at bc.Game.loop(Game.java:3767)
+	at bc.Game.run(Game.java:332)
+	at bc.Main.main(Main.java:31)
+Caused by: java.io.IOException: Falling water did not drive wheel
+	at bc.KineticWorkshop.smoke(KineticWorkshop.java:46)
+	... 4 more
+java.lang.RuntimeException: Kinetic workshop smoke failed
+	at bc.KineticWorkshop.smoke(KineticWorkshop.java:52)
+	at bc.Game.autoTest(Game.java:583)
+	at bc.Game.loop(Game.java:3767)
+	at bc.Game.run(Game.java:332)
+	at bc.Main.main(Main.java:31)
+Caused by: java.io.IOException: Falling water did not drive wheel
+	at bc.KineticWorkshop.smoke(KineticWorkshop.java:46)
+	... 4 more
