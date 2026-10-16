@@ -275,6 +275,27 @@ def main():
             "Existing worlds, note tuning, display/audio hardware, artwork, sprite bow and held lighting are retained. "
             "Back up saves before updating; see MIDI-guide.txt. Automated checks verify the mixer and full-song timing; "
             "no physical-speaker audition is claimed.\n")
+    if version == "6.14":
+        release_notes += ("\n### Native Create project: foundation milestone — NOT full Create\n\n"
+            "This begins a native mechanical expansion inside Blockcraft, without Minecraft or Forge. "
+            "**Full Create is not implemented.** Belts, moving contraptions, trains, logistics, fluid/heat systems, "
+            "most processing and full multiplayer remain unfinished. See the source `docs/create/STATUS.md` for the pinned scope.\n\n"
+            "Working foundation: signed rotational networks; three-axis shafts; small/large cogs with direction and "
+            "2:1 ratios; bevel gearing and gearboxes; Creative Motor and compact water wheel; stress/overload checks; "
+            "redstone clutch/gearshift; speed/stress gauges; prototype mechanical press and millstone with real "
+            "inputs/outputs and saved inventory/progress. **These prototypes do not yet use Create's depot/belt processing.**\n\n"
+            "Search **create** in Creative. Place parts against the desired shaft face; use the **Kinetic Wrench** to "
+            "rotate them. Right-click the motor to choose RPM and machines to open their inventory. "
+            "**/kinetics** builds an ordinary-block example factory in clear loaded air, with a 2:1 press branch and "
+            "redstone-controlled mill. Breaking a drive connection stops its actual production.\n\n"
+            "Native safety limits: 256 RPM, 4096 loaded kinetic blocks, host-only configuration/inventories. "
+            "The initial compact wheel accepts water beside its rim; exact flow scoring/multiblock geometry, complete "
+            "recipes and collision/visual parity are not claimed. Conflicts stall instead of destroying blocks. "
+            "Back up saves, including new `kinetics.dat`, and use V6.14 on all peers.\n\n"
+            "Reference target: Create 6.0.10. MIT code attribution ships in **Create-code-license.txt**; upstream "
+            "All Rights Reserved assets are NOT redistributed. Models/sprites are original Blockcraft work. "
+            "**Create-foundation.txt** explains all current controls, provisional recipes and missing systems. "
+            "Prior MIDI, redstone computers, sound/display worlds, approved art, sprite bow and held lighting are retained.\n")
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

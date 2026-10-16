@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.13  -  an original Minecraft-style voxel sandbox   (EDITION V6.13)
+BLOCKCRAFT V6.14  -  an original Minecraft-style voxel sandbox   (EDITION V6.14)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,21 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.14 - Native Create FOUNDATION, NOT the full mod
+
+  * Starts the native Create project inside Blockcraft. No Minecraft needed.
+    This is explicitly an incomplete foundation milestone, not full Create.
+  * Signed RPM networks, shafts/cogs/gearboxes, water wheel and Creative Motor,
+    stress limits, clutch/gearshift, speed/stress gauges, press/mill prototypes.
+  * Real item inputs/outputs and persistent processing; original animated
+    models and five native 32px sprites. Existing artwork is preserved.
+  * Search create in Creative. /kinetics builds a clear-air example factory.
+    See Create-foundation.txt for controls, recipes and important differences.
+  * Belts, contraptions, trains, logistics, fluids/heat, most processing and
+    full multiplayer are NOT implemented. Do not expect full Create parity.
+  * Create 6.0.10 code reference is MIT; upstream artwork is All Rights
+    Reserved and is NOT bundled. See Create-code-license.txt.
 
 WHAT'S NEW IN V6.13 - Listen to MIDI with note-block sounds, no track
 

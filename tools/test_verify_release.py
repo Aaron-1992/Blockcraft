@@ -26,6 +26,12 @@ def payload(version="6.5", source="expected", tamper=False, tamper_media=False):
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_native_kinetic_receipts(self):
+        jar=payload("6.14")
+        self.assertEqual(inspect_payload(jar,jar,"6.14","expected")["version"],"6.14")
+        for cls in ("Kinetics","KineticModels","KineticMachines","KineticArt","KineticWorkshop","Menu"):
+            self.assertIn(cls,required("6.14"))
+
     def test_midi_player_receipt(self):
         jar=payload("6.13")
         self.assertEqual(inspect_payload(jar,jar,"6.13","expected")["version"],"6.13")

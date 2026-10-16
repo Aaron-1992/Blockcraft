@@ -1329,6 +1329,7 @@ final class Redstone319 {
       }
       if (y <= 0
          || y >= 255
+         || Kinetics.machine(id)
          || RasterComputer.handles(id)
          || id == Blocks.BEDROCK
          || id == Blocks.OBSIDIAN

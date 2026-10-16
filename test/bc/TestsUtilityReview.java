@@ -21,7 +21,7 @@ final class TestsUtilityReview {
          try(java.io.InputStream in=new java.io.FileInputStream("test/pixel32-color-nature.properties")){before.load(in);}
          int changed=0;
          for(int t=0;t<1024;t++) {
-            if(Aquatic.tile(t))continue;
+            if(Aquatic.tile(t)||KineticArt.tile(t))continue; // Five newly allocated sprites; historical art remains guarded.
             int[] art=BuildingBlockReviewPreview.pixels(t);
             boolean differs=Arrays.hashCode(art)!=Integer.parseInt(before.getProperty(""+t));
             check(differs==reopened(t),"exact requested review scope "+t);

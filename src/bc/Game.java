@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.13";
+   public static final String VERSION_STR = "6.14";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -580,6 +580,7 @@ public final class Game {
          String var2 = System.getProperty("bc.cam");
          this.autoFrames++;
          if (System.getProperty("bc.midigui")!=null)MidiScreen.smoke(this,this.autoFrames);
+         if (System.getProperty("bc.kinetics")!=null)KineticWorkshop.smoke(this,this.autoFrames);
          if (Boolean.getBoolean("bc.midi")) MidiCompiler.smoke(this,this.autoFrames);
          if (System.getProperty("bc.shadow")!=null) ShadowMachine.smoke(this,this.autoFrames);
          if (System.getProperty("bc.arcade")!=null) RasterArcade.smoke(this,this.autoFrames);
@@ -2620,6 +2621,8 @@ public final class Game {
 
          try {
             switch (var2[0].toLowerCase()) {
+               case "kinetics":
+                  KineticWorkshop.build(this);break;
                case "midi": case "midibuild":
                   MidiCompiler.command(this,var2);break;
                case "mididemo":
@@ -3062,7 +3065,8 @@ public final class Game {
                   }
             }
          } catch (Exception var12) {
-            if(var2[0].equalsIgnoreCase("midi")||var2[0].equalsIgnoreCase("midibuild")||var2[0].equalsIgnoreCase("mididemo"))this.say("§cMIDI: "+MidiCompiler.explain(var12));
+            if(var2[0].equalsIgnoreCase("kinetics"))this.say("§cKinetics: "+var12.getMessage());
+            else if(var2[0].equalsIgnoreCase("midi")||var2[0].equalsIgnoreCase("midibuild")||var2[0].equalsIgnoreCase("mididemo"))this.say("§cMIDI: "+MidiCompiler.explain(var12));
             else this.say("§cInvalid arguments");
          }
       }
@@ -6703,7 +6707,7 @@ public final class Game {
          }
 
          this.drawHotbar();
-         Circuit.hud(this);
+         Circuit.hud(this);Kinetics.hud(this);
          RasterComputer.hud(this);
          if (this.player.spectator) {
             this.drawSpectatorHud();

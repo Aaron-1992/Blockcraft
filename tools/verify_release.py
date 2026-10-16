@@ -37,6 +37,8 @@ def required(version):
         extra += ("MidiScreen",)
     if tuple(map(int, version.split("."))) >= (6, 13):
         extra += ("MidiPlayback",)
+    if tuple(map(int, version.split("."))) >= (6, 14):
+        extra += ("Kinetics", "KineticModels", "KineticMachines", "KineticArt", "KineticWorkshop", "Menu")
     return REQUIRED + extra
 
 
@@ -89,6 +91,7 @@ def verify(archive, version):
                     with open(os.path.join(B.ROOT,"res/media/shadow-signal.bcv"),"rb") as media:
                         if game.read("media/shadow-signal.bcv") != media.read(): raise ValueError("Stale original media cartridge")
             if tuple(map(int, version.split("."))) >= (6, 11): guides += ("MIDI-guide.txt",)
+            if tuple(map(int, version.split("."))) >= (6, 14): guides += ("Create-foundation.txt", "Create-code-license.txt")
             for name in guides:
                 with open(os.path.join(B.ROOT, "package", name), "rb") as f:
                     if z.read("Blockcraft/" + name) != f.read():

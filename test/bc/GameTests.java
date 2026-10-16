@@ -1733,7 +1733,7 @@ public final class GameTests {
       TestsAquaticRedstone.run();
       TestsComputer.run();
       TestsRaster.run();
-      TestsMedia.run();TestsMidi.run();TestsMidiGui.run();TestsMidiPlayback.run();
+      TestsMedia.run();TestsMidi.run();TestsMidiGui.run();TestsMidiPlayback.run();TestsKinetics.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {

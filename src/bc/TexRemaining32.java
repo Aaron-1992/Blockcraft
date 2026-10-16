@@ -18,6 +18,7 @@ final class TexRemaining32 {
          || t >= 672 && t <= 679 || t >= 688 && t <= 695 || t >= 700 && t <= 731 || t == 742;
    }
    static boolean handles(int t) {
+      if(KineticArt.tile(t))return true;
       if (Aquatic.tile(t)) return true;
       if (TexUtility32.handles(t)) return true;
       if (TexColorNature32.handles(t)) return true;
@@ -44,6 +45,7 @@ final class TexRemaining32 {
       return shade(base, xx == 0 || yy == 0 ? -31 : xx == 1 || yy == 1 ? 11 : tone(x,y,base,4));
    }
    static int[] paint(int t) {
+      if(KineticArt.tile(t))return KineticArt.paint(t);
       if (Aquatic.tile(t)) return Aquatic.paint(t);
       if (TexUtility32.handles(t)) return TexUtility32.paint(t);
       if (TexColorNature32.handles(t)) return TexColorNature32.paint(t);

@@ -527,6 +527,8 @@ final class Shapes {
          boxes=RedstoneLogic.model(id,s.B[Mesher.ci(x+1,y+1,z+1)]&65535);
       } else if (id>=RasterComputer.PANEL&&id<RasterComputer.PANEL+4) {
          boxes=RasterComputer.model(s,x,y,z,id);
+      } else if (Kinetics.handles(id)) {
+         boxes=KineticModels.world(s,x,y,z,id);
       } else if (Circuit.cable(id)) {
          boxes=Circuit.cableBoxes(nbr,Circuit.value(id),(s.B[Mesher.ci(x+1,y+1,z+1)]&0x8000)!=0);
       } else if (isModel(id)) {
@@ -551,6 +553,10 @@ final class Shapes {
       if(b.length>14&&b[12]!=0){
          double y=xyz[1]-b[13],z=xyz[2]-b[14],co=Math.cos(b[12]),sn=Math.sin(b[12]);
          xyz[1]=(float)(b[13]+y*co-z*sn);xyz[2]=(float)(b[14]+y*sn+z*co);
+      }
+      if(b.length>22){
+         int axis=(int)b[20],u=(axis+1)%3,v=(axis+2)%3;double a=xyz[u]-.5,other=xyz[v]-.5,co=Math.cos(b[21]),sn=Math.sin(b[21]);xyz[u]=(float)(.5+a*co-other*sn);xyz[v]=(float)(.5+a*sn+other*co);
+         float xx=xyz[0],yy=xyz[1],zz=xyz[2];int turn=(int)b[22];xyz[turn%3]=xx;xyz[(turn+1)%3]=yy;xyz[(turn+2)%3]=zz;
       }
       if(b.length>19)for(int i=0;i<((int)b[19]&3);i++){
          float xx=xyz[0];xyz[0]=1-xyz[2];xyz[2]=xx;
@@ -631,6 +637,7 @@ final class Shapes {
    // ------------------------------------------------------------------ the world: use, place, update
    /** Right click: a gate, wooden trapdoor, lever or button opens/closes/toggles. */
    static boolean use(Game g, int x, int y, int z, int id) {
+      if (Kinetics.use(g,x,y,z,id)) return true;
       if (Circuit.use(g,x,y,z,id)) return true;
       if (MidiCompiler.use(g,x,y,z,id)) return true;
       if (RasterComputer.use(g,x,y,z,id)) return true;
@@ -668,7 +675,7 @@ final class Shapes {
    }
 
    static boolean placesSpecially(int id) {
-      return RasterComputer.handles(id) || Circuit.node(id) || isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
+      return Kinetics.handles(id) || RasterComputer.handles(id) || Circuit.node(id) || isGate(id) || isTrap(id) || isCarpet(id) || Redstone319.isFloorPart(id) || Redstone319.placesOriented(id);
    }
 
    /** The way the player looks, as a facing (0 north, 1 south, 2 east, 3 west). */
@@ -718,7 +725,10 @@ final class Shapes {
 
       int id = held.id;
       int put = id;
-      if(RasterComputer.handles(id)){
+      if(Kinetics.handles(id)){
+         put=Kinetics.id(Kinetics.kind(id),nx!=0?0:ny!=0?1:2);
+         if(Kinetics.kind(id)==Kinetics.MOTOR&&!g.player.creative)return false;
+      }else if(RasterComputer.handles(id)){
          put=RasterComputer.pick(id);
          if(put!=RasterComputer.CABLE)put+=Shapes.playerFacing(g.player)^(put==RasterComputer.PIXEL?0:1);
       } else if(Circuit.node(id)){

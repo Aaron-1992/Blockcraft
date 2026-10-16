@@ -21,7 +21,7 @@ final class TestsTextureEditor {
             int[] before = TexPixel32.atlas(Tex.atlasPixels);
             Path pack = root.resolve("MyTextures");
             TextureEditor.export(pack);
-            try (var files = Files.list(pack.resolve("tiles"))) { eq(545, (int)files.count(), "all static art tiles exported"); }
+            try (var files = Files.list(pack.resolve("tiles"))) { eq(550, (int)files.count(), "all static art tiles exported"); }
             try (var files = Files.list(pack.resolve("animations"))) { eq(6, (int)files.count(), "all animated atlas slots exported"); }
             check(Files.isRegularFile(pack.resolve("index.html")), "searchable catalog exported");
             byte[] manifest = Files.readAllBytes(pack.resolve("TEXTURES.tsv"));

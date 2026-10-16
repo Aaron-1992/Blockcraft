@@ -1005,7 +1005,7 @@ public final class Tex {
       }
 
       TexExtra.blocks();
-      Aquatic.initPixels();
+      Aquatic.initPixels();KineticArt.low();
       ResourcePacks.applyPostProcess(atlasPixels);
    }
 

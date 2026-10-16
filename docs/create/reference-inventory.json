@@ -1,0 +1,1442 @@
+{
+  "reference": "Create 6.0.10 for Minecraft 1.21.1",
+  "tag": "mc1.21.1-6.0.10",
+  "commit": "ac0c444d9828da3453ae8cc65338e8de063286fb",
+  "scope": "Named literal registration calls in upstream AllBlocks/AllItems; generated variants, recipes and behavior are not exhaustively represented by this inventory. No entry is certified full parity.",
+  "registrations": [
+    {
+      "source": "AllBlocks",
+      "name": "adjustable_chain_gearshift",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "analog_lever",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_alloy_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_belt_funnel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_casing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_door",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_encased_cogwheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_encased_large_cogwheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_encased_shaft",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_funnel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_ladder",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_scaffolding",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_table_cloth",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "andesite_tunnel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "basin",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "belt",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "blaze_burner",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "bound_cardboard_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_belt_funnel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_casing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_door",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_encased_cogwheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_encased_large_cogwheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_encased_shaft",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_funnel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_ladder",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_scaffolding",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_table_cloth",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "brass_tunnel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "cardboard_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "cart_assembler",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "chain_conveyor",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "chute",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "clipboard",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "clockwork_bearing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "clutch",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "cogwheel",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "content_observer",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "contraption_controls",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "controller_rail",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "controls",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_backtank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_casing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_door",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_ladder",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_scaffolding",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_table_cloth",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copper_valve_handle",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copycat_bars",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copycat_base",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copycat_panel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "copycat_step",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "creative_crate",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "creative_fluid_tank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "creative_motor",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "crushing_wheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "crushing_wheel_controller",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "cuckoo_clock",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "deepslate_zinc_ore",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "deployer",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "depot",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "desk_bell",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "display_board",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "display_link",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "elevator_contact",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "elevator_pulley",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "encased_chain_drive",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "encased_fan",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "encased_fluid_pipe",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "experience_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "factory_gauge",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "fake_track",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "fluid_pipe",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "fluid_tank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "fluid_valve",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "flywheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "framed_glass_door",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "framed_glass_trapdoor",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "gantry_carriage",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "gantry_shaft",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "gearbox",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "gearshift",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "glass_fluid_pipe",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "hand_crank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "haunted_bell",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "hose_pulley",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "industrial_iron_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "item_drain",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "item_hatch",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "item_vault",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "large_bogey",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "large_cogwheel",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "large_water_wheel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "lectern_controller",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "linear_chassis",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "lit_blaze_burner",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_arm",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_bearing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_crafter",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_drill",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_harvester",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_mixer",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_piston",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_piston_head",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_plough",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_press",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_pump",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_roller",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mechanical_saw",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "metal_bracket",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "metal_girder",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "metal_girder_encased_shaft",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "millstone",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "minecart_anchor",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "mysterious_cuckoo_clock",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "netherite_backtank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "nixie_tube",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "nozzle",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "package_frogport",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "packager",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "peculiar_bell",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "piston_extension_pole",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "placard",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "portable_fluid_interface",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "portable_storage_interface",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "powered_latch",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "powered_shaft",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "powered_toggle_latch",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "pulley_magnet",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "pulse_extender",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "pulse_repeater",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "pulse_timer",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "radial_chassis",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "railway_casing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "raw_zinc_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "redstone_contact",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "redstone_link",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "redstone_requester",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "refined_radiance_casing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "repackager",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "rope",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "rope_pulley",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "rose_quartz_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "rose_quartz_lamp",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "rose_quartz_tiles",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "rotation_speed_controller",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "sail_frame",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "schematic_table",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "schematicannon",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "secondary_linear_chassis",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "sequenced_gearshift",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "shadow_steel_casing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "shaft",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "small_bogey",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "small_rose_quartz_tiles",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "smart_chute",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "smart_fluid_pipe",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "speedometer",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "spout",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "steam_engine",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "steam_whistle",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "steam_whistle_extension",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "sticker",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "sticky_mechanical_piston",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "stock_link",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "stock_ticker",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "stockpile_switch",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "stressometer",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "track",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "track_observer",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "track_signal",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "track_station",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "train_door",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "train_trapdoor",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "turntable",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "water_wheel",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "water_wheel_structure",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "weathered_iron_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "weighted_ejector",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "white_sail",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "windmill_bearing",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "wooden_bracket",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "zinc_block",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllBlocks",
+      "name": "zinc_ore",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllBlocks.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "attribute_filter",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "bar_of_chocolate",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "belt_connector",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "blaze_cake",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "blaze_cake_base",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "builders_tea",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "cardboard",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "cardboard_boots",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "cardboard_chestplate",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "cardboard_helmet",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "cardboard_leggings",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "cardboard_sword",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "chest_minecart_contraption",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "chocolate_glazed_berries",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "chromatic_compound",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "copper_backtank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "copper_backtank_placeable",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "copper_diving_boots",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "copper_diving_helmet",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "crafting_blueprint",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "creative_blaze_cake",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "crushed_raw_",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "empty_blaze_burner",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "empty_schematic",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "experience_nugget",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "extendo_grip",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "filter",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "furnace_minecart_contraption",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "goggles",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "handheld_worldshaper",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "honeyed_apple",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "linked_controller",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "minecart_contraption",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "minecart_coupling",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "netherite_backtank",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "netherite_backtank_placeable",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "netherite_diving_boots",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "netherite_diving_helmet",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "package_filter",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "potato_cannon",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "red_sand_paper",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "refined_radiance",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "sand_paper",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "schedule",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "schematic",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "schematic_and_quill",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "shadow_steel",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "shopping_list",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "super_glue",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "sweet_roll",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "tree_fertilizer",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "vertical_gearbox",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "wand_of_symmetry",
+      "status": "not_implemented",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    },
+    {
+      "source": "AllItems",
+      "name": "wrench",
+      "status": "native_partial",
+      "reference_url": "https://github.com/Creators-of-Create/Create/blob/ac0c444d9828da3453ae8cc65338e8de063286fb/src/main/java/com/simibubi/create/AllItems.java"
+    }
+  ]
+}

@@ -450,6 +450,6 @@ public final class Items {
       // ---- Update 3.12 ----
       Items312.register();
       Decor315.registerItems();
-      Redstone319.registerItems();
+      Redstone319.registerItems();Kinetics.items();
    }
 }

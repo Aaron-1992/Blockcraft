@@ -82,7 +82,7 @@ final class Creative {
 
    static int tabOf(int id) {
       if (id>=Aquatic.SEAGRASS && id<=Aquatic.DEAD) return NATURE;
-      if (id==MidiCompiler.BLOCK || Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id)) {
+      if (Kinetics.handles(id) || id>=Kinetics.ALLOY&&id<=Kinetics.WRENCH || id==MidiCompiler.BLOCK || Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id)) {
          return UTILITY;
       }
 
@@ -199,7 +199,7 @@ final class Creative {
 
             return 4;
          case UTILITY:
-            return id==MidiCompiler.BLOCK || Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id) ? 1 : 0;
+            return Kinetics.handles(id) || id>=Kinetics.ALLOY&&id<=Kinetics.WRENCH || id==MidiCompiler.BLOCK || Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id) ? 1 : 0;
          default:
             return 0;
       }
@@ -253,6 +253,7 @@ final class Creative {
       ArrayList<Integer> hits = new ArrayList<>();
       for (int id : all) {
          String n = Items.name(id).toLowerCase(Locale.ROOT);
+         if(Kinetics.handles(id)||id>=Kinetics.ALLOY&&id<=Kinetics.WRENCH)n="create kinetic "+n;
          boolean ok = true;
          for (String w : words) {
             ok &= n.contains(w);
@@ -273,7 +274,7 @@ final class Creative {
 
    /** A short word for what an item is (shown under its name in the tooltip). */
    static String kind(int id) {
-      if (id==MidiCompiler.BLOCK || Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id)) {
+      if (Kinetics.handles(id) || id>=Kinetics.ALLOY&&id<=Kinetics.WRENCH || id==MidiCompiler.BLOCK || Redstone319.isRedstoneUtility(id) || Circuit.handles(id) || RasterComputer.handles(id)) {
          return "Redstone";
       }
 

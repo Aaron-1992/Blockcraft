@@ -303,7 +303,7 @@ public final class Recipes {
       Shapes.recipes();
       Decor315.recipes();
       Redstone319.recipes();
-      Circuit.recipes();
+      Circuit.recipes();Kinetics.recipes();
       RasterComputer.recipes();RasterComputer.mediaRecipes();MidiCompiler.recipe();
    }
 

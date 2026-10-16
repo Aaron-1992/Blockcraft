@@ -1,0 +1,88 @@
+BLOCKCRAFT V6.14 - NATIVE CREATE PROJECT: FOUNDATION MILESTONE
+===========================================================
+THIS IS NOT FULL CREATE. It is a working first native mechanical subsystem,
+not the official Create mod, not a Forge/NeoForge loader, and not a finished
+feature-parity port. No Minecraft installation is required.
+
+The reference target is Create 6.0.10 for mc1.21.1, commit
+ac0c444d9828da3453ae8cc65338e8de063286fb. Code is MIT licensed; the current
+upstream assets are All Rights Reserved. This build uses original generated
+Blockcraft artwork and existing Blockcraft material textures, NOT Create's
+asset files. See Create-code-license.txt and docs/create/STATUS.md in source.
+
+TRY THE WORKING FOUNDATION
+--------------------------
+1. Back up your saves before updating. Use V6.14 on multiplayer peers.
+2. Creative inventory: search "create" or "kinetic" to find the new parts.
+3. Place a Creative Motor. Axles align with the face you placed against.
+   Right-click the motor to cycle 0,16,32,64,128,256,-16,-32,-64,-128,-256,
+   8,-8,4,-4,1 RPM. A motor starts OFF; it is Creative-only and not craftable.
+4. Connect shafts end-to-end. Small cogs with parallel axles connect beside
+   each other in their rotation plane, reversing direction. Large/small cogs
+   connect diagonally in that plane: large to small doubles RPM and reverses;
+   small to large halves it. Perpendicular large cogs provide bevel gearing.
+5. A Gearbox has four ports in the plane perpendicular to its axis. Its
+   opposed/adjacent ports change rotation direction. Hold the Kinetic Wrench
+   and right-click a part to cycle X/Y/Z orientation without losing settings.
+6. Connect a Mechanical Press or Millstone by its shaft ends. Right-click to
+   open its native two-slot processing inventory. Put ingredients on the left
+   and take outputs from the right. Shift-click works. This is a prototype
+   native processing UI, NOT Create's completed depot/belt processing system.
+7. A powered Clutch disconnects rotation. A powered Gearshift reverses the
+   output. Use ordinary levers/redstone; their power is not mechanical torque.
+   Aim at a part for signed RPM, total network stress/capacity and fault text.
+   Speedometer/stressometer pointers also reflect the computed readings.
+
+For an ordinary-block example factory, run /kinetics as Creative host in
+clear, loaded air. It builds a motor/2:1 gear/press branch, a redstone-controlled
+mill branch, and a water-wheel mill, with eight test ingredients per machine.
+The command checks the whole envelope before building and never clears blocks.
+Remove a shaft or source and production stops. It is not a scripted output
+machine: the example uses the same solver/inventories as hand-built machines.
+
+MECHANICS IN THIS MILESTONE
+---------------------------
+- World-local signed rotation and reciprocal gear ratios on all three axes.
+- Capacity and stress calculated at each component's actual geared speed.
+  A water wheel supplies 32 SU per RPM; a Creative Motor supplies 16384 SU per
+  RPM. Press load is 8 SU per RPM, millstone load is 4. Shafts/gears are free.
+- Overstress, contradictory sources/gear loops, overspeed and unloaded network
+  frontiers stop the affected component. Fix the cause and it recovers.
+  Native faults stall rather than destroying blocks. Maximum speed: 256 RPM.
+- The compact water wheel needs water beside its rim in the rotation plane;
+  its axle must be horizontal. It makes 8 RPM. Right-click reverses it.
+  Exact flowing-water scoring and Create's multiblock wheel geometry are NOT
+  implemented. Stationary water also drives this initial compact model.
+- Press: iron ingot -> iron sheet; gold ingot -> golden sheet.
+  Millstone: wheat -> flour; cobblestone -> gravel; gravel -> sand.
+  Flour smelts into bread. These are the CURRENT subset, not the full recipes.
+- One operation takes 6400 accumulated absolute RPM-ticks: 200 game ticks at
+  32 RPM, 100 ticks at 64 RPM. Stopped/full-output machines consume nothing.
+- Native foundation crafting uses andesite + iron ingot -> two alloys;
+  alloys make shafts; planks and shafts make cogs. Recipes are provisional,
+  not exact Create survival progression. The Creative Motor is never craftable.
+- Machine slots and partial progress are stored in kinetics.dat. Include it
+  in backups. Breaking a machine returns remaining inventory once; machines
+  cannot be pushed by ordinary pistons. Corrupt inventory files are preserved
+  and block further processing/opening instead of being overwritten.
+- Network safety budget: 4096 loaded kinetic blocks per world; saved machine
+  inventory limit: 16384. Parts need their connected chunk frontier loaded.
+- Models are original/provisional, with tick-driven rotating geometry and new
+  native 32x32 sprites. Full Create visual/model/collision parity is NOT claimed.
+- Configuration and machine inventory interaction are host-only for now.
+  Full multiplayer machine/contraption synchronization remains unfinished.
+
+NOT YET IMPLEMENTED
+-------------------
+Belts, depots and funnels; filters and automated item routing; basins/mixers,
+crushing wheels, fans, deployers and sequenced assembly; fluid pipes/tanks,
+boilers/steam engines; bearings, glue, mechanical pistons, pulleys and moving
+contraptions; drills/saws/harvesters/ploughs; rails, bogeys, trains, signals,
+stations and schedules; packaging/stock management/logistics; full redstone
+links/display integration; schematics/Schematicannon and Ponder-style tutorials;
+the remaining materials, recipes, decorative sets and multiplayer parity.
+
+Existing MIDI listening/building, redstone computers, sound/display worlds,
+32px art, sprite bow and held lighting remain available. No existing world is
+regenerated by this update. The existing material-art fixtures remain guarded;
+only five previously unused atlas cells (1000..1004) are new sprites.

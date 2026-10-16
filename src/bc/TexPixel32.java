@@ -171,6 +171,7 @@ final class TexPixel32 {
    static int[] tile(int tile, int[] src, boolean animated) {
       int[] custom = ResourcePacks.overridePixels(tile, 0, SIZE);
       if (custom != null) return custom;
+      if(tile>=KineticArt.BASE&&tile<KineticArt.BASE+KineticArt.COUNT)return KineticArt.paint(tile);
       // 6.3 painters below stay byte-for-byte stable. Every other populated family
       // is now painted natively, not silently enlarged from the old CPU atlas.
       boolean populated = false;

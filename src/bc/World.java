@@ -35,6 +35,7 @@ public final class World {
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
    final RedstoneLogic.State redstone = new RedstoneLogic.State();
+   final Kinetics.State kinetics=new Kinetics.State();
    final Circuit.State circuit = new Circuit.State();
    final RasterComputer.State raster = new RasterComputer.State();
    public long dayTime = 1000L;
@@ -117,7 +118,7 @@ public final class World {
       this.loadPopulated();
       this.loadTiles();
       RasterComputer.load(this);
-      RasterMedia.load(this);NoteBlocks.load(this);
+      RasterMedia.load(this);NoteBlocks.load(this);KineticMachines.load(this);
       if (var3 != null && dimension == Dim.OVERWORLD) {
          this.lodMap.load(var3);
          // chunk files from before 3.11 have no summary yet: a background thread makes them (chunks that are loaded are summarised from live data)
@@ -316,7 +317,7 @@ public final class World {
             this.chunks.put(readyKey, var22);
             this.fire.scanChunk(var22);
             RedstoneLogic.loaded(this, var22);
-            Circuit.loaded(this,var22);
+            Circuit.loaded(this,var22);Kinetics.loaded(this,var22);
             RasterComputer.loaded(this,var22);
             this.lightChunk(var22);
 
@@ -351,8 +352,9 @@ public final class World {
                this.saveChunk(var23);
             }
 
+            Kinetics.unloaded(this,var23);
             this.chunks.remove(key(var23.cx, var23.cz));
-            this.raster.dirty=true;
+            this.raster.dirty=true;this.kinetics.dirty=true;
             var23.unloaded = true;
             if (this.unloadHook != null) {
                this.unloadHook.accept(var23);
@@ -375,7 +377,7 @@ public final class World {
       Net319.applyEditsToChunk(this, fresh);
       this.chunks.put(k, fresh);
       this.lightChunk(fresh);
-      Circuit.loaded(this,fresh);
+      Circuit.loaded(this,fresh);Kinetics.loaded(this,fresh);
       RasterComputer.loaded(this,fresh);
       for (Section s : fresh.sections) {
          s.dirty = true;
@@ -463,7 +465,7 @@ public final class World {
       }
 
       this.saveTiles();
-      RasterComputer.save(this);
+      RasterComputer.save(this);KineticMachines.save(this);
       RasterMedia.save(this);NoteBlocks.save(this);
       this.savePopulated();
       if (this.dim == Dim.OVERWORLD) {
@@ -874,7 +876,7 @@ public final class World {
          }
 
          var5.set(var6, var2, var7, state);
-         RasterComputer.changed(this,var1,var2,var3,var8,var4);NoteBlocks.changed(this,var1,var2,var3,var8,var4);
+         Kinetics.changed(this,var1,var2,var3,var8,var4);RasterComputer.changed(this,var1,var2,var3,var8,var4);NoteBlocks.changed(this,var1,var2,var3,var8,var4);
          var5.modified = true;
          var5.lodDirty = this.tickCount + 1L;
          if (var4 == Blocks.FIRE) {
@@ -1003,7 +1005,7 @@ public final class World {
    public void resetAllChunks() {
       FastChunkCache.clear();
       this.redstone.clear();
-      this.circuit.clear();
+      this.circuit.clear();this.kinetics.clear();
       RasterAudio.stopWorld(this);this.raster.clear();
       this.fluidDue.clear();
       this.fluidPending.clear();
@@ -1055,6 +1057,7 @@ public final class World {
 
    public void tick() {
       this.tickCount++;
+      Kinetics.tick(this);
       Circuit.tick(this);
       RasterComputer.tick(this);
       RedstoneLogic.tick(this);

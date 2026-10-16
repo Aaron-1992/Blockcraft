@@ -10,6 +10,7 @@ final class Menu {
    static final int CREATIVE = 4;
    /** Update 3.12: a villager's trades (profession in {@link #profession}). */
    static final int TRADE = 5;
+   static final int KINETIC = 6;
    static final int NORMAL = 0;
    static final int OUTPUT = 1;
    static final int ARMOR = 2;
@@ -113,6 +114,9 @@ final class Menu {
             this.add(this.out, 0, 124.0F, 35.0F, 1);
             this.playerInv(84.0F, 142.0F, 8.0F);
             break;
+         case 6:
+            this.title=Kinetics.NAMES[Kinetics.kind(g.world.getBlock(tile.x,tile.y,tile.z))];
+            this.add(tile.slots,0,44,35,0);this.add(tile.slots,2,116,35,3);this.playerInv(84,142,8);break;
          case 2:
             this.title = "Furnace";
             this.add(this.tile.slots, 0, 56.0F, 17.0F, 0);
@@ -315,6 +319,7 @@ final class Menu {
       if (this.grid != null) {
          this.out[0] = Recipes.find(this.grid, this.gw, this.gh);
       }
+      if(this.kind==KINETIC)return;
       if (this.tile != null && this.g != null && this.g.world != null) {
          Net319.onTileChanged(this.g.world, this.tile);
       }
@@ -471,7 +476,7 @@ final class Menu {
                   var1.arr[var1.idx] = null;
                }
             }
-            if (this.tile != null && this.g != null && this.g.world != null) {
+            if (this.kind!=KINETIC && this.tile != null && this.g != null && this.g.world != null) {
                Net319.onTileChanged(this.g.world, this.tile);
             }
          }
@@ -598,6 +603,8 @@ final class Menu {
                      var3 = insert(this.tile.slots, var2, 1, 2, true);
                   }
                   break;
+               case 6:
+                  if(KineticMachines.output(Kinetics.kind(g.world.getBlock(tile.x,tile.y,tile.z)),var2.id)!=0)var3=insert(tile.slots,var2,0,1,true);break;
                case 3:
                   var3 = insert(this.tile.slots, var2, 0, 27, true);
             }
@@ -741,6 +748,11 @@ final class Menu {
          if (this.trades.length == 0) {
             var1.text("Hrmmm.", var4 + 60.0F, var5 + 40.0F, -12566464, false);
          }
+      } else if(this.kind==KINETIC){
+         var1.arrow(var4+78,var5+37,-7631989,tile.cook/200F,-13730510);
+         var1.text("Input",var4+40,var5+23,-12566464,false);var1.text("Output",var4+109,var5+23,-12566464,false);
+         Kinetics.Reading read=Kinetics.reading(g.world,World.pack(tile.x,tile.y,tile.z));
+         var1.text(Game.clipText(read.fault().isEmpty()?String.format(java.util.Locale.ROOT,"%.0f RPM / %.0f SU",read.rpm(),read.stress()):read.fault(),158),var4+8,var5+63,-12566464,false);
       } else if (this.kind == 2) {
          float var10 = this.tile.cook / 200.0F;
          var1.arrow(var4 + 84.0F, var5 + 37.0F, -7631989, var10, -13730510);
