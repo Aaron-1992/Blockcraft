@@ -3,6 +3,7 @@ package com.blockcraft.pe;
 import android.content.Context;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -13,8 +14,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.zip.DataFormatException;
+import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.Inflater;
 
 /**
  * Blockcraft PE (Pocket Edition) v1.11 — World Generation, Structures & Streaming:
@@ -509,7 +513,19 @@ public final class PeWorld {
    }
 
    public final PeChunk[] chunkGrid = new PeChunk[ACTIVE_SLOTS];
-   private final HashMap<Long, byte[]> savedChunks = new HashMap<Long, byte[]>();
+
+   /** In-memory snapshot; save files continue to store the legacy raw chunk bytes. */
+   private static final class SavedChunkData {
+      final byte[] data;
+      final boolean compressed;
+
+      SavedChunkData(byte[] data, boolean compressed) {
+         this.data = data;
+         this.compressed = compressed;
+      }
+   }
+
+   private final HashMap<Long, SavedChunkData> savedChunks = new HashMap<Long, SavedChunkData>();
    public final ArrayList<FallingTree> fallingTrees = new ArrayList<FallingTree>();
 
    public int viewRadiusChunks = 5;
@@ -768,11 +784,68 @@ public final class PeWorld {
       for (int i = 0; i < ACTIVE_SLOTS; i++) {
          PeChunk c = this.chunkGrid[i];
          if (c.loaded && c.modified) {
-            byte[] copy = new byte[CHUNK_BYTES];
-            System.arraycopy(c.blocks, 0, copy, 0, CHUNK_BYTES);
-            this.savedChunks.put(chunkKey(c.cx, c.cz), copy);
+            this.savedChunks.put(chunkKey(c.cx, c.cz), compressChunkSnapshot(c.blocks));
+            c.modified = false; // The retained snapshot is current; avoid recompressing it on every save.
          }
       }
+   }
+
+   private static SavedChunkData compressChunkSnapshot(byte[] blocks) {
+      Deflater deflater = new Deflater(Deflater.BEST_SPEED);
+      ByteArrayOutputStream out = new ByteArrayOutputStream(CHUNK_BYTES / 8);
+      byte[] buffer = new byte[4096];
+      try {
+         deflater.setInput(blocks, 0, CHUNK_BYTES);
+         deflater.finish();
+         while (!deflater.finished()) {
+            int count = deflater.deflate(buffer);
+            if (count <= 0) throw new IllegalStateException("Chunk compressor stopped before finishing");
+            out.write(buffer, 0, count);
+         }
+      } finally {
+         deflater.end();
+      }
+      byte[] packed = out.toByteArray();
+      if (packed.length < CHUNK_BYTES) return new SavedChunkData(packed, true);
+      return new SavedChunkData(Arrays.copyOf(blocks, CHUNK_BYTES), false);
+   }
+
+   private static void restoreChunkSnapshot(SavedChunkData snapshot, byte[] destination) {
+      if (destination.length < CHUNK_BYTES) throw new IllegalArgumentException("Chunk destination is too small");
+      if (!snapshot.compressed) {
+         if (snapshot.data.length != CHUNK_BYTES) throw new IllegalStateException("Invalid raw saved chunk size");
+         System.arraycopy(snapshot.data, 0, destination, 0, CHUNK_BYTES);
+         return;
+      }
+
+      Inflater inflater = new Inflater();
+      int total = 0;
+      try {
+         inflater.setInput(snapshot.data);
+         while (!inflater.finished() && total < CHUNK_BYTES) {
+            int count = inflater.inflate(destination, total, CHUNK_BYTES - total);
+            if (count > 0) {
+               total += count;
+            } else if (inflater.needsInput() || inflater.needsDictionary()) {
+               break;
+            } else {
+               throw new IllegalStateException("Chunk decompressor stopped before finishing");
+            }
+         }
+         if (total != CHUNK_BYTES || !inflater.finished()) {
+            throw new IllegalStateException("Saved chunk did not restore to the expected size");
+         }
+      } catch (DataFormatException e) {
+         throw new IllegalStateException("Saved chunk data is corrupt", e);
+      } finally {
+         inflater.end();
+      }
+   }
+
+   long savedChunkStorageBytes() {
+      long total = 0L;
+      for (SavedChunkData chunk : this.savedChunks.values()) total += chunk.data.length;
+      return total;
    }
 
    public boolean saveWorld(Context context) {
@@ -812,13 +885,15 @@ public final class PeWorld {
             out.writeInt(this.hotbarCount[i]);
          }
          out.writeInt(this.savedChunks.size());
-         for (Map.Entry<Long, byte[]> entry : this.savedChunks.entrySet()) {
+         byte[] chunkBuffer = new byte[CHUNK_BYTES];
+         for (Map.Entry<Long, SavedChunkData> entry : this.savedChunks.entrySet()) {
             long key = entry.getKey();
             int cx = (int)(key >> 32);
             int cz = (int)key;
             out.writeInt(cx);
             out.writeInt(cz);
-            out.write(entry.getValue(), 0, CHUNK_BYTES);
+            restoreChunkSnapshot(entry.getValue(), chunkBuffer);
+            out.write(chunkBuffer, 0, CHUNK_BYTES);
          }
          // Save 27-slot player backpack after chunks (backwards-compatible trailer)
          out.writeInt(0x42414731); // "BAG1"
@@ -903,7 +978,7 @@ public final class PeWorld {
                int cz = in.readInt();
                byte[] data = new byte[CHUNK_BYTES];
                in.readFully(data);
-               this.savedChunks.put(chunkKey(cx, cz), data);
+               this.savedChunks.put(chunkKey(cx, cz), compressChunkSnapshot(data));
             }
             try {
                int bagMagic = in.readInt();
@@ -1464,22 +1539,20 @@ public final class PeWorld {
    private void loadOrGenerateChunkIntoSlot(PeChunk slot, int cx, int cz) {
       ensureNoiseInitialized();
       if (slot.loaded && slot.modified && (slot.cx != cx || slot.cz != cz)) {
-         byte[] copy = new byte[CHUNK_BYTES];
-         System.arraycopy(slot.blocks, 0, copy, 0, CHUNK_BYTES);
-         this.savedChunks.put(chunkKey(slot.cx, slot.cz), copy);
+         this.savedChunks.put(chunkKey(slot.cx, slot.cz), compressChunkSnapshot(slot.blocks));
       }
 
       slot.cx = cx;
       slot.cz = cz;
       slot.loaded = true;
 
-      byte[] saved = this.savedChunks.get(chunkKey(cx, cz));
+      SavedChunkData saved = this.savedChunks.get(chunkKey(cx, cz));
       if (saved != null) {
          Arrays.fill(slot.surfaceY, (short)0);
          Arrays.fill(slot.biomeMap, (byte)-1);
          slot.structureType = STRUCTURE_NONE;
-         System.arraycopy(saved, 0, slot.blocks, 0, CHUNK_BYTES);
-         slot.modified = true;
+         restoreChunkSnapshot(saved, slot.blocks);
+         slot.modified = false; // The map already contains an authoritative saved snapshot.
          slot.recomputeSectionCounts();
          Arrays.fill(slot.sectionDirty, true);
       } else {

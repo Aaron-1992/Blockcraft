@@ -564,8 +564,17 @@ public class PeCoreTest {
       streamWorld.ensureChunksAroundPlayer(1);
       check(loadedChunkCount(streamWorld) == 2, "Each streaming call may add at most one new chunk");
 
-      // Place block near spawn AND travel 4,000 blocks away in the infinite world!
+      // Evict an edited spawn chunk to exercise the compressed in-memory save cache.
       world.setBlock(3, 72, -3, PeWorld.B_GOLD_BLOCK);
+      world.px = 256.5; // Chunk (16, -1) aliases the edited chunk's 16x16 ring-buffer slot.
+      world.pz = -0.5;
+      world.ensureChunksAroundPlayer(1);
+      long savedChunkBytes = world.savedChunkStorageBytes();
+      check(savedChunkBytes > 0 && savedChunkBytes < (PeWorld.CHUNK_BYTES * 3L) / 4L,
+         "Evicted terrain chunks must use less than 75% of their raw memory footprint, bytes=" + savedChunkBytes);
+      System.out.println("Modified-chunk memory snapshot: " + savedChunkBytes + " of " + PeWorld.CHUNK_BYTES + " bytes");
+
+      // Travel 4,000 blocks away in the infinite world!
       world.px = 2405.5;
       world.pz = -3208.5;
       world.ensureChunksAroundPlayer(64);
@@ -579,6 +588,9 @@ public class PeCoreTest {
       // Wipe in-memory state and reload from disk
       PeWorld loaded = new PeWorld();
       check(loaded.loadWorld(ctx, 0), "loadWorld(0) must succeed");
+      long reloadedChunkBytes = loaded.savedChunkStorageBytes();
+      check(reloadedChunkBytes > 0 && reloadedChunkBytes < (2L * PeWorld.CHUNK_BYTES * 3L) / 4L,
+         "Raw save-file chunks must re-enter the compressed in-memory cache after loading");
       check(loadedChunkCount(loaded) == 81,
          "Loading a distant save must restore its inner working set and stream outer chunks incrementally");
       check(loaded.getBlock(2405, 82, -3208) == PeWorld.B_DIAMOND_BLOCK, "Saved distant Diamond Block at (2405, 82, -3208) must be restored");
@@ -897,7 +909,7 @@ public class PeCoreTest {
          check(nonZero >= 16, "Item id=" + itemId + " (" + PeWorld.getItemName(itemId) + ") tile=" + tile + " has crisp outlined pixel art (" + nonZero + " px)");
       }
 
-      System.out.println("PeCoreTest PASSED: World of Color, save migration, infinite-world streaming, cached biome/height generation, river channels, deterministic biome-aware structures, bounded section meshing, gameplay controls, mobile UI, and pixel-art atlas verified!");
+      System.out.println("PeCoreTest PASSED: World of Color, save migration, compressed chunk snapshots, infinite-world streaming, cached biome/height generation, river channels, deterministic biome-aware structures, bounded section meshing, gameplay controls, mobile UI, and pixel-art atlas verified!");
    }
 }
 """
