@@ -210,8 +210,10 @@ WHAT'S NEW IN BLOCKCRAFT PE v{version}
   select different structures, with flat-pad and headroom checks.
 * Chunk section meshing now visits distance-ring perimeters directly while
   preserving the existing per-frame rebuild budget.
-* Save format remains compatible with v1.10. Edited chunks and player progress
-  persist; unmodified chunks use the updated deterministic terrain generator.
+* Edited-chunk snapshots use fast in-memory compression, with raw fallback when
+  compression would not save space. The on-disk save layout is unchanged from v1.11.
+* A live per-column top-solid cache makes surface queries constant-time and is
+  maintained across block edits, chunk eviction, and save/load.
 
 Existing features include the 16-color material families, survival dye mixing,
 water-hardening concrete powder, a 27-slot backpack, touch controls, saved
@@ -246,10 +248,14 @@ bundle is separate from Blockcraft's desktop release.
   and meadow ruins. Structure sites reject unsafe slopes and insufficient headroom.
 - Chunk loading and VBO section meshing traverse each distance-ring perimeter
   once, retaining the existing generation and GPU rebuild budgets.
+- Edited chunks are kept in a fast-DEFLATE in-memory cache, using raw storage only
+  when compression is not smaller. Saves are serialized in the existing raw chunk
+  layout, so the file format is unchanged from v1.11.
+- A live per-column top-solid cache replaces repeated vertical scans and stays
+  synchronized through placement, mining, chunk reload, and generated structures.
 
-The save format is unchanged from v1.10: edited chunks and player progress are
-preserved. Unmodified chunks regenerate with the updated terrain and structure
-rules when visited, so terrain next to previously edited chunks may transition.
+Unmodified chunks regenerate with the deterministic terrain and structure rules
+when visited, so terrain next to previously edited chunks may transition.
 
 ### Existing PE features
 World of Color materials and dyes, survival color crafting, concrete-powder
@@ -260,7 +266,7 @@ desktop feature set.
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.11"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.12"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")

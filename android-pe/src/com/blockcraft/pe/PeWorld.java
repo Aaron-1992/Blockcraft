@@ -21,7 +21,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.Inflater;
 
 /**
- * Blockcraft PE (Pocket Edition) v1.11 — World Generation, Structures & Streaming:
+ * Blockcraft PE (Pocket Edition) v1.12 — World Generation, Structures & Streaming:
  * - Seed-stable Perlin terrain, coarse cached temperature/humidity biomes, per-chunk heightmaps,
  *   3D caves and water-filled river valleys
  * - Fixed-seed starter village plus bounded biome-selected structures in deterministic 6x6 chunk regions
@@ -29,7 +29,7 @@ import java.util.zip.Inflater;
  * - High-refresh movement interpolation, AABB physics, touch controls, crafting, crops and block interaction
  */
 public final class PeWorld {
-   public static final String APP_VERSION = "1.11";
+   public static final String APP_VERSION = "1.12";
 
    // Screen States
    public static final int SCREEN_TITLE = 0;

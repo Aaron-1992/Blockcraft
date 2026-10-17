@@ -402,7 +402,7 @@ public class PeCoreTest {
 
    public static void main(String[] args) throws Exception {
       Context ctx = new Context();
-      check("1.11".equals(PeWorld.APP_VERSION), "PE source version must match the world-generation release");
+      check("1.12".equals(PeWorld.APP_VERSION), "PE source version must match the world-generation release");
 
       // 1. Verify World of Color block IDs, desktop palette mapping, names, and 16x16 atlased art.
       check(PeColors.ALL_BLOCKS.length == 96, "World of Color catalogue must contain 6 complete 16-block families");
