@@ -314,6 +314,17 @@ public final class PeWorld {
    public static final int Y_SEA = 60;
    public static final int Y_DECK = 64;
 
+   private static final boolean[] SOLID_GROUND_BLOCK = createSolidGroundBlockLookup();
+
+   private static boolean[] createSolidGroundBlockLookup() {
+      boolean[] lookup = new boolean[256];
+      for (int id = 0; id < lookup.length; id++) {
+         byte block = (byte)id;
+         lookup[id] = isSolid(block) && !isLeaves(block);
+      }
+      return lookup;
+   }
+
    public static final byte STRUCTURE_NONE = 0;
    public static final byte STRUCTURE_STARTER_COTTAGE = 1;
    public static final byte STRUCTURE_STARTER_FARM = 2;
@@ -429,8 +440,9 @@ public final class PeWorld {
       public final byte[] blocks = new byte[CHUNK_BYTES];
       public final int[] sectionNonAir = new int[SECTIONS_Y];
       public final boolean[] sectionDirty = new boolean[SECTIONS_Y];
-      /** 16x16 heightmap plus a coarse 4x4 seed-derived biome cache; neither is serialized. */
+      /** Terrain height, live highest-solid height, and coarse biome caches; none are serialized. */
       public final short[] surfaceY = new short[16 * 16];
+      public final short[] highestSolidY = new short[16 * 16];
       public final byte[] biomeMap = new byte[4 * 4];
       public byte structureType = STRUCTURE_NONE;
 
@@ -443,6 +455,7 @@ public final class PeWorld {
          Arrays.fill(this.sectionNonAir, 0);
          Arrays.fill(this.sectionDirty, true);
          Arrays.fill(this.surfaceY, (short)0);
+         Arrays.fill(this.highestSolidY, (short)-1);
          Arrays.fill(this.biomeMap, (byte)-1);
          this.structureType = STRUCTURE_NONE;
          this.maxY = 0;
@@ -451,15 +464,21 @@ public final class PeWorld {
 
       public void recomputeSectionCounts() {
          Arrays.fill(this.sectionNonAir, 0);
+         Arrays.fill(this.highestSolidY, (short)-1);
          int highest = 0;
          for (int lz = 0; lz < 16; lz++) {
             int zBase = lz << 11;
             for (int lx = 0; lx < 16; lx++) {
                int colBase = zBase | (lx << 7);
+               int column = (lz << 4) | lx;
                for (int y = 0; y < WORLD_H; y++) {
-                  if (this.blocks[colBase | y] != B_AIR) {
+                  byte block = this.blocks[colBase | y];
+                  if (block != B_AIR) {
                      this.sectionNonAir[y >> 4]++;
                      if (y > highest) highest = y;
+                  }
+                  if (y > 0 && y < WORLD_H - 1 && SOLID_GROUND_BLOCK[block & 0xFF]) {
+                     this.highestSolidY[column] = (short)y;
                   }
                }
             }
@@ -1592,6 +1611,7 @@ public final class PeWorld {
       byte prev = c.blocks[idx];
       if (prev == id) return;
       c.blocks[idx] = id;
+      updateHighestSolidY(c, lx, wy, lz, id);
       int sy = wy >> 4;
       if (prev == B_AIR && id != B_AIR) {
          c.sectionNonAir[sy]++;
@@ -1601,15 +1621,29 @@ public final class PeWorld {
       }
    }
 
-   private static int topSolidLocal(PeChunk c, int lx, int lz) {
-      int colBase = (lz << 11) | (lx << 7);
-      for (int y = WORLD_H - 2; y >= 1; y--) {
-         byte b = c.blocks[colBase | y];
-         if (isSolid(b) && !isLeaves(b)) {
-            return y;
+   private static void updateHighestSolidY(PeChunk c, int lx, int wy, int lz, byte id) {
+      if (wy <= 0 || wy >= WORLD_H - 1) return;
+      int column = (lz << 4) | lx;
+      int highest = c.highestSolidY[column];
+      boolean countsAsGround = SOLID_GROUND_BLOCK[id & 0xFF];
+      if (wy > highest) {
+         if (countsAsGround) c.highestSolidY[column] = (short)wy;
+      } else if (wy == highest && !countsAsGround) {
+         int colBase = (lz << 11) | (lx << 7);
+         int replacement = -1;
+         for (int y = wy - 1; y >= 1; y--) {
+            if (SOLID_GROUND_BLOCK[c.blocks[colBase | y] & 0xFF]) {
+               replacement = y;
+               break;
+            }
          }
+         c.highestSolidY[column] = (short)replacement;
       }
-      return Y_DECK;
+   }
+
+   private static int topSolidLocal(PeChunk c, int lx, int lz) {
+      int highest = c.highestSolidY[(lz << 4) | lx];
+      return highest >= 1 ? highest : Y_DECK;
    }
 
    private static int chunkHash(int x, int z, long seed) {
@@ -2287,6 +2321,7 @@ public final class PeWorld {
       if (prev == id) return;
 
       c.blocks[idx] = id;
+      updateHighestSolidY(c, lx, wy, lz, id);
       c.modified = true;
       int sy = wy >> 4;
       if (prev == B_AIR && id != B_AIR) {

@@ -381,6 +381,25 @@ public class PeCoreTest {
       return count;
    }
 
+   private static int scanTopSolidY(PeWorld.PeChunk chunk, int lx, int lz) {
+      int colBase = (lz << 11) | (lx << 7);
+      for (int y = PeWorld.WORLD_H - 2; y >= 1; y--) {
+         byte block = chunk.blocks[colBase | y];
+         if (PeWorld.isSolid(block) && !PeWorld.isLeaves(block)) return y;
+      }
+      return PeWorld.Y_DECK;
+   }
+
+   private static void verifyHeightCache(PeWorld.PeChunk chunk) {
+      for (int lz = 0; lz < 16; lz++) for (int lx = 0; lx < 16; lx++) {
+         int col = (lz << 4) | lx;
+         int expected = scanTopSolidY(chunk, lx, lz);
+         int cached = chunk.highestSolidY[col] >= 1 ? chunk.highestSolidY[col] : PeWorld.Y_DECK;
+         check(cached == expected, "Cached top-solid height must match a full scan at chunk "
+               + chunk.cx + "," + chunk.cz + " column " + lx + "," + lz + ": " + cached + " != " + expected);
+      }
+   }
+
    public static void main(String[] args) throws Exception {
       Context ctx = new Context();
       check("1.11".equals(PeWorld.APP_VERSION), "PE source version must match the world-generation release");
@@ -470,6 +489,16 @@ public class PeCoreTest {
       check(world.slotExists[0], "World slot 0 must exist on disk after creation");
       check(loadedChunkCount(world) == 81,
          "New worlds must synchronously warm only the inner 9x9 chunk area and stream the outer ring in later ticks");
+      int verifiedHeightChunks = 0;
+      for (int ci = 0; ci < PeWorld.ACTIVE_SLOTS; ci++) {
+         PeWorld.PeChunk heightChunk = world.chunkGrid[ci];
+         if (heightChunk.loaded) {
+            verifyHeightCache(heightChunk);
+            verifiedHeightChunks++;
+         }
+      }
+      check(verifiedHeightChunks == 81,
+         "Every synchronously generated terrain, village, and landmark chunk must initialize its live height cache");
       check(world.invId[6] == PeWorld.B_WOOL_WHITE && world.invCount[6] == 4,
          "Survival must provide a small wool base stack for the new color-crafting path");
       int riverBankedColumns = 0;
@@ -508,6 +537,25 @@ public class PeCoreTest {
          "Generated chunks must retain a 16x16 heightmap and a populated coarse 4x4 biome cache");
       check(world.getBiomeAt(4, 4) == spawnBiome,
          "The same aligned 4x4 climate cell must return one cached biome");
+
+      // The live top-solid cache must track placement, removal, and legacy y-boundary behavior.
+      PeWorld heightMutationWorld = new PeWorld();
+      heightMutationWorld.worldType = PeWorld.WTYPE_SUPERFLAT;
+      heightMutationWorld.ensureChunksAroundPlayer(1);
+      check(heightMutationWorld.topSolidY(2, 2) == 63, "Superflat ground cache must start at the grass surface");
+      heightMutationWorld.setBlock(2, 80, 2, PeWorld.B_GOLD_BLOCK);
+      check(heightMutationWorld.topSolidY(2, 2) == 80, "Placing a high solid block must raise the cached top");
+      heightMutationWorld.setBlock(2, 80, 2, PeWorld.B_AIR);
+      check(heightMutationWorld.topSolidY(2, 2) == 63, "Removing the cached top block must reveal the next solid block");
+      heightMutationWorld.setBlock(2, 63, 2, PeWorld.B_AIR);
+      check(heightMutationWorld.topSolidY(2, 2) == 62, "Breaking the surface must lower the cached top by one");
+      heightMutationWorld.setBlock(2, 126, 2, PeWorld.B_GOLD_BLOCK);
+      check(heightMutationWorld.topSolidY(2, 2) == 126, "The top cache must include the highest scanned world layer");
+      heightMutationWorld.setBlock(2, 126, 2, PeWorld.B_AIR);
+      heightMutationWorld.setBlock(2, 127, 2, PeWorld.B_GOLD_BLOCK);
+      check(heightMutationWorld.topSolidY(2, 2) == 62,
+         "The cache must preserve legacy top-solid scan boundaries at y=0 and y=127");
+      verifyHeightCache(heightMutationWorld.chunkGrid[PeWorld.slotIndex(0, 0)]);
 
       int negativeSite = PeWorld.structureSiteChunkX(-1, 0, world.seed);
       int positiveSite = PeWorld.structureSiteChunkX(0, 0, world.seed);
@@ -595,6 +643,10 @@ public class PeCoreTest {
          "Loading a distant save must restore its inner working set and stream outer chunks incrementally");
       check(loaded.getBlock(2405, 82, -3208) == PeWorld.B_DIAMOND_BLOCK, "Saved distant Diamond Block at (2405, 82, -3208) must be restored");
       check(loaded.getBlock(3, 72, -3) == PeWorld.B_GOLD_BLOCK, "Saved spawn Gold Block at (3, 72, -3) must also be restored");
+      PeWorld.PeChunk reloadedSpawnChunk = loaded.chunkGrid[PeWorld.slotIndex(0, -1)];
+      check(reloadedSpawnChunk.cx == 0 && reloadedSpawnChunk.cz == -1 && loaded.topSolidY(3, -3) == 72,
+         "Reloaded edited chunks must rebuild an accurate live top-solid cache");
+      verifyHeightCache(reloadedSpawnChunk);
       check(Math.abs(loaded.px - 2405.5) < 0.01 && Math.abs(loaded.pz - (-3208.5)) < 0.01, "Saved distant player position must be restored");
 
       // A v1.8 (format v2) save used IDs 98..115 for items; it must migrate rather than become new blocks.
@@ -909,7 +961,7 @@ public class PeCoreTest {
          check(nonZero >= 16, "Item id=" + itemId + " (" + PeWorld.getItemName(itemId) + ") tile=" + tile + " has crisp outlined pixel art (" + nonZero + " px)");
       }
 
-      System.out.println("PeCoreTest PASSED: World of Color, save migration, compressed chunk snapshots, infinite-world streaming, cached biome/height generation, river channels, deterministic biome-aware structures, bounded section meshing, gameplay controls, mobile UI, and pixel-art atlas verified!");
+      System.out.println("PeCoreTest PASSED: World of Color, save migration, compressed chunk snapshots, live top-solid caching, infinite-world streaming, cached biome/height generation, river channels, deterministic biome-aware structures, bounded section meshing, gameplay controls, mobile UI, and pixel-art atlas verified!");
    }
 }
 """
