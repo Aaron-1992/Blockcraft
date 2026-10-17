@@ -571,6 +571,7 @@ public class PeCoreTest {
             world.topSolidY(sx * 16 + 8, sz * 16 + 8);
             PeWorld.PeChunk candidate = world.chunkGrid[PeWorld.slotIndex(sx, sz)];
             if (candidate.cx == sx && candidate.cz == sz && candidate.structureType > PeWorld.STRUCTURE_STARTER_BLACKSMITH) {
+               verifyHeightCache(candidate);
                landmarkX = sx;
                landmarkZ = sz;
                landmarkType = candidate.structureType;
@@ -589,7 +590,10 @@ public class PeCoreTest {
             int sz = PeWorld.structureSiteChunkZ(rx, rz, varietyWorld.seed);
             varietyWorld.topSolidY(sx * 16 + 8, sz * 16 + 8);
             PeWorld.PeChunk candidate = varietyWorld.chunkGrid[PeWorld.slotIndex(sx, sz)];
-            if (candidate.cx == sx && candidate.cz == sz) varietyMask |= 1 << candidate.structureType;
+            if (candidate.cx == sx && candidate.cz == sz) {
+               verifyHeightCache(candidate);
+               varietyMask |= 1 << candidate.structureType;
+            }
          }
       }
       check((varietyMask & 0x1F0) == 0x1F0,
@@ -602,6 +606,7 @@ public class PeCoreTest {
       PeWorld.PeChunk reorderedLandmark = reorderedWorld.chunkGrid[PeWorld.slotIndex(landmarkX, landmarkZ)];
       check(landmarkSurface == reorderedSurface && reorderedLandmark.structureType == landmarkType,
          "Biome-aware structures and terrain must be identical when the same chunk is generated first");
+      verifyHeightCache(reorderedLandmark);
 
       // The streaming budget is strict and repeated calls must not reload an already resident chunk.
       PeWorld streamWorld = new PeWorld();
