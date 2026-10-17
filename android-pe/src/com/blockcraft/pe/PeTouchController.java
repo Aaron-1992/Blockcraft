@@ -1,10 +1,11 @@
 package com.blockcraft.pe;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.view.MotionEvent;
 
 /**
- * Multi-Touch Pocket Edition Controller tailored for the Samsung Galaxy A55 5G (2340x1080).
+ * Multi-touch controls for landscape Android phones and tablets.
  *
  * Key design features:
  * 1. Camera look dragging NEVER triggers mining, block placement, or attacks by accident.
@@ -76,8 +77,8 @@ public final class PeTouchController {
    }
 
    public void updateLayout(int w, int h) {
-      this.screenW = Math.max(640, w);
-      this.screenH = Math.max(360, h);
+      this.screenW = Math.max(1, w);
+      this.screenH = Math.max(1, h);
       float scale = this.screenH / 1080.0F;
       this.safeMarginX = 72.0F * scale;
 
@@ -369,11 +370,51 @@ public final class PeTouchController {
       }
    }
 
+   private static final String PREFS_NAME = "blockcraft_pe_preferences";
+
+   public void loadPreferences(Context context, PeWorld world) {
+      if (context == null) return;
+      try {
+         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+         this.useAnalogStick = prefs.getBoolean("analog_stick", this.useAnalogStick);
+         this.touchTapToInteract = prefs.getBoolean("tap_to_interact", this.touchTapToInteract);
+         this.sensitivityLevel = Math.max(0, Math.min(2, prefs.getInt("sensitivity", this.sensitivityLevel)));
+         if (world != null) {
+            world.autoJump = prefs.getBoolean("auto_jump", world.autoJump);
+            world.viewRadiusChunks = Math.max(4, Math.min(6, prefs.getInt("render_distance", world.viewRadiusChunks)));
+         }
+         PeTextures.activePackMode = Math.max(0, Math.min(PeTextures.PACK_NAMES.length - 1,
+            prefs.getInt("resource_pack", PeTextures.activePackMode)));
+      } catch (Throwable ignored) {
+      }
+   }
+
+   private void savePreferences(Context context, PeWorld world) {
+      if (context == null) return;
+      try {
+         SharedPreferences.Editor edit = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
+         edit.putBoolean("analog_stick", this.useAnalogStick);
+         edit.putBoolean("tap_to_interact", this.touchTapToInteract);
+         edit.putInt("sensitivity", this.sensitivityLevel);
+         if (world != null) {
+            edit.putBoolean("auto_jump", world.autoJump);
+            edit.putInt("render_distance", world.viewRadiusChunks);
+         }
+         edit.putInt("resource_pack", PeTextures.activePackMode);
+         edit.apply();
+      } catch (Throwable ignored) {
+      }
+   }
+
+   public float menuScale() {
+      return Math.min(this.screenH / 1080.0F, this.screenW / 2340.0F);
+   }
+
    // ====================================================================
    //  Menu & Modal Screen Touch Handling
    // ====================================================================
    private void handleMenuScreenTap(float x, float y, Context context, PeWorld world, PeAudio audio) {
-      float scale = this.screenH / 1080.0F;
+      float scale = menuScale();
       float cx = this.screenW * 0.5F;
 
       if (world.screen == PeWorld.SCREEN_TITLE) {
@@ -528,24 +569,28 @@ public final class PeTouchController {
          // 1. Movement Pad: Joystick vs D-Pad
          if (inRect(x, y, bx, 194.0F * scale, bw, bh)) {
             this.useAnalogStick = !this.useAnalogStick;
+            savePreferences(context, world);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 2. Look / Interact Mode: Dedicated Buttons Only vs Buttons + Stationary Tap
          if (inRect(x, y, bx, 300.0F * scale, bw, bh)) {
             this.touchTapToInteract = !this.touchTapToInteract;
+            savePreferences(context, world);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 3. Look Sensitivity
          if (inRect(x, y, bx, 406.0F * scale, bw, bh)) {
             this.sensitivityLevel = (this.sensitivityLevel + 1) % 3;
+            savePreferences(context, world);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
          // 4. Auto-Jump ON / OFF
          if (inRect(x, y, bx, 512.0F * scale, bw, bh)) {
             world.autoJump = !world.autoJump;
+            savePreferences(context, world);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
@@ -553,13 +598,15 @@ public final class PeTouchController {
          if (inRect(x, y, bx, 618.0F * scale, bw, bh)) {
             world.viewRadiusChunks = (world.viewRadiusChunks >= 6) ? 4 : (world.viewRadiusChunks + 1);
             world.ensureChunksAroundPlayer(64);
+            savePreferences(context, world);
             if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
             return;
          }
-         // 6. Resource Pack Version Switcher (V1.7 Realistic / V1.6 Fusion / V1.5 Pixel Art / V1.4 Painted)
+         // 6. Cycle between the installed mobile texture-pack styles.
          if (inRect(x, y, bx, 724.0F * scale, bw, bh)) {
             PeTextures.cycleTexturePack();
             world.showBanner("Resource Pack: " + PeTextures.PACK_NAMES[PeTextures.activePackMode]);
+            savePreferences(context, world);
             if (audio != null) audio.playSfx("levelup", 0.9F, 1.1F);
             return;
          }
@@ -591,7 +638,7 @@ public final class PeTouchController {
    }
 
    private void handleInventoryAndCraftingTap(float x, float y, PeWorld world, PeAudio audio) {
-      float scale = this.screenH / 1080.0F;
+      float scale = menuScale();
 
       // Bottom Hotbar selection (or instant Backpack <-> Hotbar Swap when a Backpack slot is selected!)
       if (y >= this.hotbarY && y <= this.hotbarY + this.hotbarSlotSize
@@ -629,12 +676,12 @@ public final class PeTouchController {
          return;
       }
 
-      // 4 Category Tabs in Header Bar: [ BACKPACK & CRAFT ] [ BUILDING ] [ NATURE ] [ TOOLS ]
+      // Five thumb-friendly tabs: backpack, building, nature, tools, and the color catalogue.
       float tabY = py + 18.0F * scale;
       float tabH = 74.0F * scale;
-      float tabW = 310.0F * scale;
-      for (int t = 0; t < 4; t++) {
-         float tx = px + 390.0F * scale + t * (tabW + 14.0F * scale);
+      float tabW = 258.0F * scale;
+      for (int t = 0; t < 5; t++) {
+         float tx = px + 390.0F * scale + t * (tabW + 9.0F * scale);
          if (inRect(x, y, tx, tabY, tabW, tabH)) {
             world.invCategory = t;
             world.selectedInvSlot = -1;
@@ -643,7 +690,7 @@ public final class PeTouchController {
          }
       }
 
-      int cat = Math.max(0, Math.min(3, world.invCategory));
+      int cat = Math.max(0, Math.min(4, world.invCategory));
       float startX = px + 38.0F * scale;
       float startY = py + 150.0F * scale;
 
@@ -708,22 +755,31 @@ public final class PeTouchController {
             return;
          }
       } else {
-         // Tabs 1..3 Left Half (24 Category Blocks/Items): 6 cols x 4 rows
-         int[] catItems = PeWorld.CREATIVE_TABS[cat - 1];
-         int cols = 6;
+         // Tabs 1..3 use a 6x4 catalogue; Colors show a 4x4 swatch grid for one selected family.
+         int[] catItems = (cat == 4)
+            ? (world.colorFamily == 6 ? PeColors.DYE_ITEMS : PeColors.FAMILY_BLOCKS[Math.max(0, Math.min(5, world.colorFamily))])
+            : PeWorld.CREATIVE_TABS[cat - 1];
+         int cols = cat == 4 ? 4 : 6;
          float cell = 148.0F * scale;
+         float gridX = cat == 4 ? startX + 145.0F * scale : startX;
          for (int i = 0; i < catItems.length; i++) {
             int c = i % cols;
             int r = i / cols;
-            float bx = startX + c * cell;
+            float bx = gridX + c * cell;
             float by = startY + r * cell;
             if (inRect(x, y, bx, by, cell, cell)) {
                int item = catItems[i];
                if (world.mode == PeWorld.MODE_CREATIVE) {
                   world.hotbarId[world.selectedSlot] = item;
-                  world.hotbarCount[world.selectedSlot] = (item <= PeWorld.MAX_BLOCK_ID) ? 64 : 1;
+                  world.hotbarCount[world.selectedSlot] = PeWorld.isToolOrWeapon(item) ? 1 : 64;
                   world.showBanner("Equipped " + PeWorld.getItemName(item));
                   if (audio != null) audio.playSfx("pop", 0.85F, 1.1F);
+               } else if (cat == 4 && world.colorFamily == 6) {
+                  world.tryCraftDye(i, audio);
+               } else if (cat == 4) {
+                  world.selectedColor = i;
+                  world.showBanner("Selected " + PeColors.NAMES[i] + " - tap a material family to craft");
+                  if (audio != null) audio.playSfx("click", 0.75F, 1.0F);
                } else {
                   // In Survival, if the player owns this item in their 27-slot backpack, equip it straight into the active hotbar slot!
                   int foundBag = -1;
@@ -747,8 +803,33 @@ public final class PeTouchController {
          }
       }
 
-      // Right Half (8 Crafting/Smelting Recipes): 2 cols x 4 rows
       float craftStartX = px + 980.0F * scale;
+      if (cat == 4) {
+         float familyCardW = 448.0F * scale;
+         float familyCardH = 132.0F * scale;
+         for (int family = 0; family < PeColors.SELECTOR_NAMES.length; family++) {
+            boolean dyes = family == 6;
+            int col = dyes ? 0 : (family & 1);
+            int row = dyes ? 3 : (family >> 1);
+            float bx = craftStartX + col * (familyCardW + 18.0F * scale);
+            float by = startY + row * (familyCardH + 16.0F * scale);
+            float cardW = dyes ? familyCardW * 2.0F + 18.0F * scale : familyCardW;
+            if (inRect(x, y, bx, by, cardW, familyCardH)) {
+               world.colorFamily = family;
+               if (world.mode == PeWorld.MODE_SURVIVAL && family < 6) {
+                  world.tryCraftColorBlock(family, world.selectedColor, audio);
+               } else {
+                  world.showBanner(family == 6 ? "Choose a dye color to craft or mix"
+                     : "Color family: " + PeColors.SELECTOR_NAMES[family]);
+                  if (audio != null) audio.playSfx("click", 0.85F, 1.1F);
+               }
+               return;
+            }
+         }
+         return;
+      }
+
+      // Right Half (8 Crafting/Smelting Recipes): 2 cols x 4 rows
       float craftColW = 448.0F * scale;
       float craftRowH = 132.0F * scale;
       int baseRecipe = (cat == 0) ? 0 : ((cat - 1) * 8);

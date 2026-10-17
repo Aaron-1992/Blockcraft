@@ -9,8 +9,8 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 /**
- * OpenGL ES 3.0 / 2.0 SurfaceView & Renderer for Blockcraft PE v1.1 (Infinite Worlds)
- * on Samsung Galaxy A55 5G (120Hz Super AMOLED 2340x1080).
+ * OpenGL ES 2.0-compatible renderer for the standalone Blockcraft Pocket Edition.
+ * Menus adapt to both viewport width and height across landscape phones and tablets.
  */
 public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceView.Renderer {
    public final PeWorld world;
@@ -31,7 +31,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
    private float tickAccum = 0.0F;
    private int fpsFrames = 0;
    private long fpsTimerMs = 0L;
-   private int currentFps = 120;
+   private int currentFps = 60;
    private float panoramaYaw = 0.0F;
 
    public PeGLSurfaceView(Context context) {
@@ -47,6 +47,8 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.world.screen = PeWorld.SCREEN_TITLE;
 
       this.touch = new PeTouchController();
+      this.touch.loadPreferences(context, this.world);
+      this.world.ensureChunksAroundPlayer(64);
       this.audio = new PeAudio();
       this.textures = new PeTextures();
       this.shaders = new PeShaders();
@@ -107,7 +109,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       }
 
       if (this.world.screen == PeWorld.SCREEN_PLAY) {
-         // Apply camera touch look deltas at full 120Hz display refresh rate
+         // Apply camera look deltas on every renderer frame, independent of simulation tick rate.
          this.world.yaw += this.touch.consumeYawDelta();
          this.world.pitch = Math.max(-89.0F, Math.min(89.0F, this.world.pitch + this.touch.consumePitchDelta()));
 
@@ -152,7 +154,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       GLES20.glClearColor(skyR, skyG, skyB, 1.0F);
       GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
 
-      // 120Hz Sub-Tick Camera & View-Bobbing Interpolation (eliminates 20Hz walking jitter!)
+      // High-refresh camera and view-bobbing interpolation between fixed 20Hz simulation ticks.
       boolean isMenuPanorama = (this.world.screen == PeWorld.SCREEN_TITLE
          || this.world.screen == PeWorld.SCREEN_WORLD_SELECT
          || this.world.screen == PeWorld.SCREEN_CREATE_WORLD);
@@ -175,7 +177,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       float rightX = (float)Math.cos(yawRad);
       float rightZ = (float)Math.sin(yawRad);
 
-      // Smooth 120Hz View Bobbing while walking on solid ground
+      // Smooth view bobbing while walking on solid ground.
       float walkBobY = (!isMenuPanorama && this.world.onGround && !this.world.flying)
          ? (float)(Math.sin(interpWalk * 3.0F) * 0.028F) : 0.0F;
       float walkBobSide = (!isMenuPanorama && this.world.onGround && !this.world.flying)
@@ -232,7 +234,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
             }
          }
 
-         // First-Person 3D Held Tool / Weapon / Torch / 6-Face 3D Block with smooth 120Hz walk bobbing & swing arc
+         // First-Person 3D Held Tool / Weapon / Torch / 6-Face 3D Block with smooth high-refresh walk bobbing & swing arc
          float bob = (float)Math.sin(interpWalk * 2.4F) * 0.018F;
          int heldId = this.world.hotbarId[this.world.selectedSlot];
          this.mesher.addFirstPersonHeld3D(heldId, camX, camY, camZ, useYaw, usePitch,
@@ -253,7 +255,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
    //  Menu Screens (Title, World Select, Create World, Pause, Settings, Inventory/Crafting)
    // ====================================================================
    private void renderMenuScreen() {
-      float scale = this.height / 1080.0F;
+      float scale = Math.min(this.height / 1080.0F, this.width / 2340.0F);
       float cx = this.width * 0.5F;
 
       if (this.world.screen == PeWorld.SCREEN_INVENTORY) {
@@ -334,14 +336,9 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
          this.mesher.drawCard2D(px, 82.0F * scale, pw, 892.0F * scale, 0xF0121620, 0xFF3A5270);
          this.mesher.addRect2D(px + 20.0F * scale, 98.0F * scale, pw - 40.0F * scale, 84.0F * scale, 0xD01A2230);
 
-         float bw = 1020.0F * scale;
-         float bx = cx - bw * 0.5F;
-         float bh = 104.0F * scale;
-      } else if (this.world.screen == PeWorld.SCREEN_SETTINGS) {
          float bw = 1040.0F * scale;
          float bx = cx - bw * 0.5F;
          float bh = 90.0F * scale;
-         this.mesher.drawCard2D(bx - 56.0F * scale, 96.0F * scale, bw + 112.0F * scale, 888.0F * scale, 0xEC10141C, 0xFF3A5270);
          for (int i = 0; i < 6; i++) {
             int acc = (i == 1 || i == 4 || i == 5) ? 0xFF54E882 : 0xFF5CA8FF;
             this.mesher.drawButton2D(bx, (194.0F + i * 106.0F) * scale, bw, bh, 0xFF202C3C, acc, false);
@@ -371,10 +368,10 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
       this.mesher.begin2D();
       if (this.world.screen == PeWorld.SCREEN_TITLE) {
          this.mesher.addTextCentered2D(this.textures, "BLOCKCRAFT PE", cx, 142.0F * scale, 6.4F * scale, 0xFFFFEA68);
-         this.mesher.addTextCentered2D(this.textures, "v1.8  -  BRAND-NEW TEXTURES & ALL BLOCKS GALLERY", cx, 304.0F * scale, 2.50F * scale, 0xFF98FFB8);
+         this.mesher.addTextCentered2D(this.textures, "v" + PeWorld.APP_VERSION + "  -  WORLD OF COLOR & TOUCH UI", cx, 304.0F * scale, 2.50F * scale, 0xFF98FFB8);
          this.mesher.addTextCentered2D(this.textures, "PLAY SINGLEPLAYER", cx, 538.0F * scale, 4.1F * scale, 0xFFFFFFFF);
          this.mesher.addTextCentered2D(this.textures, "CONTROLS & SETTINGS", cx, 690.0F * scale, 3.8F * scale, 0xFFE4F2FF);
-         this.mesher.addTextCentered2D(this.textures, "Samsung Galaxy A55 5G  |  120Hz Sub-Tick Physics & Infinite Chunks", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
+         this.mesher.addTextCentered2D(this.textures, "ANDROID POCKET EDITION  |  TOUCH CONTROLS  |  LOCAL WORLDS", cx, 952.0F * scale, 2.6F * scale, 0xFFB8D4F0);
       } else if (this.world.screen == PeWorld.SCREEN_WORLD_SELECT) {
          float pw = 1540.0F * scale;
          float px = cx - pw * 0.5F;
@@ -420,220 +417,300 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
    }
 
    // ====================================================================
-   //  4-Tab Inventory, 27-Slot Player Backpack, Crafting & Creative Screen
+   //  5-Tab Inventory, 27-Slot Player Backpack, Crafting & World of Color
    // ====================================================================
    private void renderInventoryAndCraftingScreen(float scale) {
       float panelW = 1940.0F * scale;
       float panelH = 790.0F * scale;
       float px = (this.width - panelW) * 0.5F;
       float py = 90.0F * scale;
-      int cat = Math.max(0, Math.min(3, this.world.invCategory));
-      int[] catItems = (cat >= 1) ? PeWorld.CREATIVE_TABS[cat - 1] : null;
-      int baseRecipe = (cat == 0) ? 0 : ((cat - 1) * 8);
+      int cat = Math.max(0, Math.min(4, this.world.invCategory));
+      int family = Math.max(0, Math.min(6, this.world.colorFamily));
+      int[] catItems = cat == 0 ? null : (cat == 4
+         ? (family == 6 ? PeColors.DYE_ITEMS : PeColors.FAMILY_BLOCKS[family])
+         : PeWorld.CREATIVE_TABS[cat - 1]);
+      int baseRecipe = cat == 0 ? 0 : (cat - 1) * 8;
 
       this.mesher.begin2D();
       this.mesher.addRect2D(0, 0, this.width, this.height, 0x88080C14);
       this.mesher.drawCard2D(px, py, panelW, panelH, 0xF2121620, 0xFF3A5270);
       this.mesher.addRect2D(px + 18.0F * scale, py + 16.0F * scale, panelW - 36.0F * scale, 80.0F * scale, 0xD81A2230);
 
-      // 4 Category Tab Buttons in Header Bar: [Backpack & Craft] [Building] [Nature] [Tools]
+      // Five compact, aligned categories leave a dedicated World of Color tab beside the close button.
       float tabY = py + 18.0F * scale;
       float tabH = 74.0F * scale;
-      float tabW = 310.0F * scale;
-      for (int t = 0; t < 4; t++) {
-         float tx = px + 390.0F * scale + t * (tabW + 14.0F * scale);
-         boolean activeTab = (t == cat);
+      float tabW = 258.0F * scale;
+      for (int t = 0; t < 5; t++) {
+         float tx = px + 390.0F * scale + t * (tabW + 9.0F * scale);
+         boolean activeTab = t == cat;
          this.mesher.drawButton2D(tx, tabY, tabW, tabH,
             activeTab ? 0xFF285842 : 0xFF202A3A,
             activeTab ? 0xFF54E882 : 0xFF4A6688, activeTab);
       }
-
-      // Close Button
-      this.mesher.drawButton2D(px + panelW - 216.0F * scale, py + 18.0F * scale, 196.0F * scale, 74.0F * scale, 0xFF682626, 0xFFFF6868, false);
+      this.mesher.drawButton2D(px + panelW - 216.0F * scale, py + 18.0F * scale,
+         196.0F * scale, 74.0F * scale, 0xFF682626, 0xFFFF6868, false);
 
       float startX = px + 38.0F * scale;
       float startY = py + 150.0F * scale;
-      int curHeld = this.world.hotbarId[this.world.selectedSlot];
-
-      if (cat == 0) {
-         // Tab 0 Left Half: 9x3 Player Backpack Grid (27 Slots) + Item Action Bar
-         float bagCell = 98.0F * scale;
-         for (int i = 0; i < 27; i++) {
-            int c = i % 9;
-            int r = i / 9;
-            boolean sel = (i == this.world.selectedInvSlot);
-            this.mesher.drawSlot2D(startX + c * bagCell + 4.0F * scale, startY + r * bagCell + 4.0F * scale,
-               bagCell - 8.0F * scale, sel, 0);
-         }
-         // Selected Item Inspector & Quick-Swap Bar below the 9x3 Backpack Grid
-         float barY = startY + 3.0F * bagCell + 20.0F * scale;
-         this.mesher.drawCard2D(startX, barY, 882.0F * scale, 148.0F * scale, 0xE618202E, 0xFF466284);
-         this.mesher.drawButton2D(startX + 430.0F * scale, barY + 26.0F * scale, 220.0F * scale, 96.0F * scale,
-            0xFF265C3E, 0xFF54E882, this.world.selectedInvSlot >= 0);
-         this.mesher.drawButton2D(startX + 666.0F * scale, barY + 26.0F * scale, 196.0F * scale, 96.0F * scale,
-            0xFF5E2828, 0xFFFF6868, false);
-      } else {
-         // Tabs 1..3 Left Half: 6x4 Categorized Block/Item Palette (24 Items per Tab)
-         int cols = 6;
-         float cell = 148.0F * scale;
-         for (int i = 0; i < catItems.length; i++) {
-            int c = i % cols;
-            int r = i / cols;
-            boolean isEquipped = (catItems[i] == curHeld);
-            this.mesher.drawSlot2D(startX + c * cell + 6.0F * scale, startY + r * cell + 6.0F * scale,
-               cell - 12.0F * scale, isEquipped, 0);
-         }
-      }
-
-      // Right Half: 2x4 Large Crafting/Smelting Cards (8 Recipes per Tab)
       float craftStartX = px + 980.0F * scale;
       float craftColW = 448.0F * scale;
       float craftRowH = 132.0F * scale;
-      for (int i = 0; i < 8; i++) {
-         int recipeIdx = getDisplayRecipeIndex(cat, baseRecipe, i);
-         if (recipeIdx >= PeWorld.RECIPES.length) break;
-         int c = i & 1;
-         int r = i >> 1;
-         PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
-         boolean canCraft = (this.world.mode == PeWorld.MODE_CREATIVE)
-            || (this.world.countItemInHotbar(rec.costId) >= rec.costCount);
-         int bg = canCraft ? 0xFF224C34 : 0xFF202632;
-         int acc = canCraft ? 0xFF54E882 : 0xFF425066;
-         float rx = craftStartX + c * (craftColW + 18.0F * scale);
-         float ry = startY + r * (craftRowH + 16.0F * scale);
-         this.mesher.drawButton2D(rx, ry, craftColW, craftRowH, bg, acc, canCraft);
-         this.mesher.drawSlot2D(rx + 14.0F * scale, ry + 18.0F * scale, 96.0F * scale, false, 0xD8161C24);
+      int curHeld = this.world.hotbarId[this.world.selectedSlot];
+
+      if (cat == 0) {
+         float bagCell = 98.0F * scale;
+         for (int i = 0; i < 27; i++) {
+            boolean selected = i == this.world.selectedInvSlot;
+            int bg = (this.world.invId[i] == PeWorld.B_AIR || this.world.invCount[i] <= 0) ? 0 : 0;
+            this.mesher.drawSlot2D(startX + (i % 9) * bagCell + 4.0F * scale,
+               startY + (i / 9) * bagCell + 4.0F * scale, bagCell - 8.0F * scale, selected, bg);
+         }
+         float barY = startY + 3.0F * bagCell + 20.0F * scale;
+         this.mesher.drawCard2D(startX, barY, 882.0F * scale, 148.0F * scale, 0xE618202E, 0xFF466284);
+         this.mesher.drawButton2D(startX + 430.0F * scale, barY + 26.0F * scale,
+            220.0F * scale, 96.0F * scale, 0xFF265C3E, 0xFF54E882, this.world.selectedInvSlot >= 0);
+         this.mesher.drawButton2D(startX + 666.0F * scale, barY + 26.0F * scale,
+            196.0F * scale, 96.0F * scale, 0xFF5E2828, 0xFFFF6868, false);
+      } else {
+         int cols = cat == 4 ? 4 : 6;
+         float cell = 148.0F * scale;
+         float gridX = cat == 4 ? startX + 145.0F * scale : startX;
+         for (int i = 0; i < catItems.length; i++) {
+            int c = i % cols;
+            int r = i / cols;
+            boolean equipped = catItems[i] == curHeld;
+            boolean selectedColor = cat == 4 && family < 6 && this.world.mode == PeWorld.MODE_SURVIVAL
+               && i == this.world.selectedColor;
+            this.mesher.drawSlot2D(gridX + c * cell + 6.0F * scale,
+               startY + r * cell + 6.0F * scale, cell - 12.0F * scale, equipped || selectedColor, 0);
+         }
       }
 
-      // Bottom 9-Slot Hotbar + [CLOSE] Slot
+      // Right pane is either the familiar recipe board or six family filters for colored block sets.
+      if (cat == 4) {
+         float familyCardW = 448.0F * scale;
+         float familyCardH = 132.0F * scale;
+         for (int f = 0; f < PeColors.SELECTOR_NAMES.length; f++) {
+            boolean dyes = f == 6;
+            int col = dyes ? 0 : (f & 1);
+            int row = dyes ? 3 : (f >> 1);
+            float rx = craftStartX + col * (familyCardW + 18.0F * scale);
+            float ry = startY + row * (familyCardH + 16.0F * scale);
+            float cardW = dyes ? familyCardW * 2.0F + 18.0F * scale : familyCardW;
+            boolean selected = f == family;
+            this.mesher.drawButton2D(rx, ry, cardW, familyCardH,
+               selected ? 0xFF254B37 : 0xFF202A38,
+               selected ? 0xFF54E882 : 0xFF4A6688, selected);
+            this.mesher.drawSlot2D(rx + 14.0F * scale, ry + 18.0F * scale, 96.0F * scale, false, 0xD8161C24);
+         }
+      } else {
+         for (int i = 0; i < 8; i++) {
+            int recipeIdx = getDisplayRecipeIndex(cat, baseRecipe, i);
+            if (recipeIdx >= PeWorld.RECIPES.length) break;
+            int col = i & 1;
+            int row = i >> 1;
+            PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
+            boolean canCraft = this.world.mode == PeWorld.MODE_CREATIVE
+               || this.world.countItemInHotbar(rec.costId) >= rec.costCount;
+            float rx = craftStartX + col * (craftColW + 18.0F * scale);
+            float ry = startY + row * (craftRowH + 16.0F * scale);
+            this.mesher.drawButton2D(rx, ry, craftColW, craftRowH,
+               canCraft ? 0xFF224C34 : 0xFF202632,
+               canCraft ? 0xFF54E882 : 0xFF425066, canCraft);
+            this.mesher.drawSlot2D(rx + 14.0F * scale, ry + 18.0F * scale,
+               96.0F * scale, false, 0xD8161C24);
+         }
+      }
+
+      // Bottom 9-slot hotbar plus the familiar close slot.
       float hs = this.touch.hotbarSlotSize;
       float hx = this.touch.hotbarX;
       float hy = this.touch.hotbarY;
-      this.mesher.drawCard2D(hx - 8.0F * scale, hy - 8.0F * scale, hs * 10.0F + 16.0F * scale, hs + 16.0F * scale, 0xE812161E, 0xFF3A4E68);
-      for (int s = 0; s < 10; s++) {
-         float sx = hx + s * hs;
-         boolean sel = (s == this.world.selectedSlot);
-         int special = (s == 9) ? 0xD8682828 : 0;
-         this.mesher.drawSlot2D(sx + 3.0F * scale, hy + 3.0F * scale, hs - 6.0F * scale, sel, special);
+      this.mesher.drawCard2D(hx - 8.0F * scale, hy - 8.0F * scale,
+         hs * 10.0F + 16.0F * scale, hs + 16.0F * scale, 0xE812161E, 0xFF3A4E68);
+      for (int slot = 0; slot < 10; slot++) {
+         float sx = hx + slot * hs;
+         boolean selected = slot == this.world.selectedSlot;
+         int special = slot == 9 ? 0xD8682828 : 0;
+         this.mesher.drawSlot2D(sx + 3.0F * scale, hy + 3.0F * scale, hs - 6.0F * scale, selected, special);
       }
       this.mesher.flush2D(this.shaders, this.textures.whiteTexId, this.orthoMatrix);
 
-      // Pass B: Isometric 3D Block Previews & Crisp Pixel-Art Item Sprites
+      // Pass B: crisp icons; colored swatches use a centered 4x4 layout with readable names below.
       this.mesher.begin2D();
       if (cat == 0) {
          float bagCell = 98.0F * scale;
          for (int i = 0; i < 27; i++) {
             int id = this.world.invId[i];
             if (id != PeWorld.B_AIR && this.world.invCount[i] > 0) {
-               int c = i % 9;
-               int r = i / 9;
-               this.mesher.addItemOrBlockIcon2D(startX + c * bagCell + 16.0F * scale,
-                  startY + r * bagCell + 16.0F * scale, bagCell - 32.0F * scale, id);
+               this.mesher.addItemOrBlockIcon2D(startX + (i % 9) * bagCell + 16.0F * scale,
+                  startY + (i / 9) * bagCell + 16.0F * scale, bagCell - 32.0F * scale, id);
             }
          }
-         int inspectId = (this.world.selectedInvSlot >= 0 && this.world.invId[this.world.selectedInvSlot] > 0)
+         int inspectId = this.world.selectedInvSlot >= 0 && this.world.invId[this.world.selectedInvSlot] > 0
             ? this.world.invId[this.world.selectedInvSlot] : curHeld;
          if (inspectId > 0) {
             float barY = startY + 3.0F * bagCell + 20.0F * scale;
             this.mesher.addItemOrBlockIcon2D(startX + 22.0F * scale, barY + 26.0F * scale, 96.0F * scale, inspectId);
          }
+      } else if (cat == 4) {
+         float cell = 148.0F * scale;
+         float gridX = startX + 145.0F * scale;
+         for (int i = 0; i < 16; i++) {
+            float bx = gridX + (i % 4) * cell;
+            float by = startY + (i / 4) * cell;
+            this.mesher.addItemOrBlockIcon2D(bx + 36.0F * scale, by + 18.0F * scale, 76.0F * scale, catItems[i]);
+         }
+         float familyCardW = 448.0F * scale;
+         float familyCardH = 132.0F * scale;
+         for (int f = 0; f < PeColors.SELECTOR_NAMES.length; f++) {
+            boolean dyes = f == 6;
+            int col = dyes ? 0 : (f & 1);
+            int row = dyes ? 3 : (f >> 1);
+            float rx = craftStartX + col * (familyCardW + 18.0F * scale);
+            float ry = startY + row * (familyCardH + 16.0F * scale);
+            int preview = dyes ? PeColors.DYE_ITEMS[14] : PeColors.FAMILY_BLOCKS[f][14];
+            this.mesher.addItemOrBlockIcon2D(rx + 27.0F * scale, ry + 28.0F * scale,
+               70.0F * scale, preview);
+         }
       } else {
          int cols = 6;
          float cell = 148.0F * scale;
          for (int i = 0; i < catItems.length; i++) {
-            int c = i % cols;
-            int r = i / cols;
-            this.mesher.addItemOrBlockIcon2D(startX + c * cell + 24.0F * scale, startY + r * cell + 24.0F * scale,
-               cell - 48.0F * scale, catItems[i]);
+            this.mesher.addItemOrBlockIcon2D(startX + (i % cols) * cell + 24.0F * scale,
+               startY + (i / cols) * cell + 24.0F * scale, cell - 48.0F * scale, catItems[i]);
          }
       }
-      for (int i = 0; i < 8; i++) {
-         int recipeIdx = getDisplayRecipeIndex(cat, baseRecipe, i);
-         if (recipeIdx >= PeWorld.RECIPES.length) break;
-         int c = i & 1;
-         int r = i >> 1;
-         PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
-         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 28.0F * scale;
-         float by = startY + r * (craftRowH + 16.0F * scale) + 32.0F * scale;
-         this.mesher.addItemOrBlockIcon2D(bx, by, 68.0F * scale, rec.outId);
+      if (cat != 4) {
+         for (int i = 0; i < 8; i++) {
+            int recipeIdx = getDisplayRecipeIndex(cat, baseRecipe, i);
+            if (recipeIdx >= PeWorld.RECIPES.length) break;
+            int col = i & 1;
+            int row = i >> 1;
+            PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
+            float bx = craftStartX + col * (craftColW + 18.0F * scale) + 28.0F * scale;
+            float by = startY + row * (craftRowH + 16.0F * scale) + 32.0F * scale;
+            this.mesher.addItemOrBlockIcon2D(bx, by, 68.0F * scale, rec.outId);
+         }
       }
-      for (int s = 0; s < 9; s++) {
-         int id = this.world.hotbarId[s];
-         if (id != PeWorld.B_AIR && this.world.hotbarCount[s] > 0) {
-            this.mesher.addItemOrBlockIcon2D(hx + s * hs + 14.0F * scale, hy + 14.0F * scale,
-               hs - 28.0F * scale, id);
+      for (int slot = 0; slot < 9; slot++) {
+         int id = this.world.hotbarId[slot];
+         if (id != PeWorld.B_AIR && this.world.hotbarCount[slot] > 0) {
+            this.mesher.addItemOrBlockIcon2D(hx + slot * hs + 14.0F * scale,
+               hy + 14.0F * scale, hs - 28.0F * scale, id);
          }
       }
       this.mesher.flush2D(this.shaders, this.textures.atlasTexId, this.orthoMatrix);
 
-      // Pass C: Labels & Stack Counts
+      // Pass C: responsive labels, material names, stack counts, and action hints.
       this.mesher.begin2D();
-      String leftHdr = (cat == 0) ? "PLAYER BACKPACK (36 SLOTS)"
-         : ((this.world.mode == PeWorld.MODE_CREATIVE) ? "CREATIVE PALETTE" : "BLOCK & ITEM CATALOG");
+      String leftHdr = cat == 0 ? "PLAYER BACKPACK (36 SLOTS)"
+         : (cat == 4 ? "WORLD OF COLOR" : (this.world.mode == PeWorld.MODE_CREATIVE ? "CREATIVE PALETTE" : "BLOCK & ITEM CATALOG"));
       this.mesher.addText2D(this.textures, leftHdr, startX, py + 36.0F * scale, 2.75F * scale, 0xFFFFEA68);
-
-      for (int t = 0; t < 4; t++) {
-         float tx = px + 390.0F * scale + t * (tabW + 14.0F * scale);
+      for (int t = 0; t < 5; t++) {
+         float tx = px + 390.0F * scale + t * (tabW + 9.0F * scale);
          this.mesher.addTextCentered2D(this.textures, PeWorld.INV_TAB_NAMES[t],
-            tx + tabW * 0.5F, tabY + 24.0F * scale, 2.35F * scale,
+            tx + tabW * 0.5F, tabY + 24.0F * scale, 2.05F * scale,
             t == cat ? 0xFFFFFFFF : 0xFFB8D4F0);
       }
+      this.mesher.addTextCentered2D(this.textures, "CLOSE", px + panelW - 118.0F * scale,
+         py + 38.0F * scale, 3.0F * scale, 0xFFFFFFFF);
 
-      this.mesher.addText2D(this.textures, "TAP A RECIPE CARD TO CRAFT OR SMELT:", craftStartX, py + 114.0F * scale, 2.45F * scale, 0xFF98FFB8);
-      String subHint = (cat == 0)
-         ? "TAP A BACKPACK SLOT + TAP A HOTBAR SLOT BELOW TO SWAP:"
-         : (this.world.mode == PeWorld.MODE_CREATIVE ? "TAP ANY BLOCK/TOOL TO EQUIP IN HOTBAR:" : "TAP CATEGORY TABS ABOVE FOR MORE RECIPES:");
-      this.mesher.addText2D(this.textures, subHint, startX, py + 114.0F * scale, 2.35F * scale, 0xFFB8E2FF);
-      this.mesher.addTextCentered2D(this.textures, "CLOSE", px + panelW - 118.0F * scale, py + 38.0F * scale, 3.0F * scale, 0xFFFFFFFF);
+      if (cat == 4) {
+         String selectedGroup = family == 6 ? "16 CRAFTABLE DYES" : "16 " + PeColors.FAMILY_NAMES[family] + " COLORS";
+         this.mesher.addText2D(this.textures, selectedGroup,
+            startX + 8.0F * scale, py + 114.0F * scale, 2.0F * scale, 0xFFB8E2FF);
+         String familyHeader = this.world.mode == PeWorld.MODE_SURVIVAL
+            ? (family == 6 ? "TAP A DYE TO MAKE OR MIX IT" : "SELECT A COLOR, THEN CRAFT A MATERIAL")
+            : "CHOOSE A MATERIAL FAMILY";
+         this.mesher.addTextCentered2D(this.textures, familyHeader, craftStartX + 457.0F * scale,
+            py + 114.0F * scale, 1.95F * scale, 0xFF98FFB8);
+         for (int i = 0; i < 16; i++) {
+            float bx = startX + 145.0F * scale + (i % 4) * 148.0F * scale;
+            float by = startY + (i / 4) * 148.0F * scale;
+            this.mesher.addTextCentered2D(this.textures, PeColors.NAMES[i], bx + 74.0F * scale,
+               by + 119.0F * scale, 1.55F * scale, 0xFFE4ECF8);
+         }
+         String[] familyHints = {
+            "DYE + WHITE WOOL", "POWDER + WATER", "8 TERRACOTTA + DYE", "SAND + GRAVEL + DYE",
+            "8 GLASS + DYE", "COOK STAINED CLAY", "FLOWERS / ORES / MIXES"
+         };
+         for (int f = 0; f < PeColors.SELECTOR_NAMES.length; f++) {
+            boolean dyes = f == 6;
+            int col = dyes ? 0 : (f & 1);
+            int row = dyes ? 3 : (f >> 1);
+            float rx = craftStartX + col * (448.0F + 18.0F) * scale;
+            float ry = startY + row * (132.0F + 16.0F) * scale;
+            this.mesher.addText2D(this.textures, PeColors.SELECTOR_NAMES[f], rx + 124.0F * scale,
+               ry + 42.0F * scale, 2.0F * scale, f == family ? 0xFFFFFFFF : 0xFFD8E4F2);
+            this.mesher.addText2D(this.textures, familyHints[f], rx + 124.0F * scale,
+               ry + 83.0F * scale, 1.7F * scale, f == family ? 0xFF98FFB8 : 0xFF9EADC2);
+         }
+      } else {
+         this.mesher.addText2D(this.textures, "TAP A RECIPE CARD TO CRAFT OR SMELT:",
+            craftStartX, py + 114.0F * scale, 2.25F * scale, 0xFF98FFB8);
+         String subHint = cat == 0 ? "TAP A BACKPACK SLOT, THEN A HOTBAR SLOT TO SWAP"
+            : (this.world.mode == PeWorld.MODE_CREATIVE ? "TAP A BLOCK OR TOOL TO EQUIP IT" : "TAP TO EQUIP ITEMS YOU ALREADY OWN");
+         this.mesher.addText2D(this.textures, subHint, startX, py + 114.0F * scale, 2.0F * scale, 0xFFB8E2FF);
+      }
 
       if (cat == 0) {
          float bagCell = 98.0F * scale;
          for (int i = 0; i < 27; i++) {
             if (this.world.invId[i] != PeWorld.B_AIR && this.world.invCount[i] > 1) {
-               int c = i % 9;
-               int r = i / 9;
                this.mesher.addText2D(this.textures, String.valueOf(this.world.invCount[i]),
-                  startX + c * bagCell + bagCell - 38.0F * scale,
-                  startY + r * bagCell + bagCell - 30.0F * scale, 2.2F * scale, 0xFFFFFFFF);
+                  startX + (i % 9) * bagCell + bagCell - 38.0F * scale,
+                  startY + (i / 9) * bagCell + bagCell - 30.0F * scale, 2.2F * scale, 0xFFFFFFFF);
             }
          }
          float barY = startY + 3.0F * bagCell + 20.0F * scale;
          int selBag = this.world.selectedInvSlot;
-         int inspectId = (selBag >= 0 && this.world.invId[selBag] > 0) ? this.world.invId[selBag] : curHeld;
-         int inspectCnt = (selBag >= 0 && this.world.invId[selBag] > 0) ? this.world.invCount[selBag] : this.world.hotbarCount[this.world.selectedSlot];
-         String inspectTitle = (inspectId > 0) ? (PeWorld.getItemName(inspectId) + " (x" + Math.max(1, inspectCnt) + ")") : "Empty Slot Selected";
-         String inspectSub = (selBag >= 0) ? ("Backpack Slot #" + (selBag + 1) + " selected") : ("Hotbar Slot #" + (this.world.selectedSlot + 1) + " active");
-         this.mesher.addText2D(this.textures, inspectTitle, startX + 132.0F * scale, barY + 34.0F * scale, 2.45F * scale, 0xFFFFF4B8);
-         this.mesher.addText2D(this.textures, inspectSub, startX + 132.0F * scale, barY + 80.0F * scale, 2.15F * scale, 0xFF98E8FF);
-         this.mesher.addTextCentered2D(this.textures, "TO HOTBAR", startX + 540.0F * scale, barY + 58.0F * scale, 2.45F * scale, 0xFFFFFFFF);
-         this.mesher.addTextCentered2D(this.textures, "DROP / CLEAR", startX + 764.0F * scale, barY + 58.0F * scale, 2.25F * scale, 0xFFFFD0D0);
+         int inspectId = selBag >= 0 && this.world.invId[selBag] > 0 ? this.world.invId[selBag] : curHeld;
+         int inspectCount = selBag >= 0 && this.world.invId[selBag] > 0
+            ? this.world.invCount[selBag] : this.world.hotbarCount[this.world.selectedSlot];
+         String inspectTitle = inspectId > 0
+            ? PeWorld.getItemName(inspectId) + " (x" + Math.max(1, inspectCount) + ")" : "Empty Slot Selected";
+         String inspectSub = selBag >= 0 ? "Backpack Slot #" + (selBag + 1) + " selected"
+            : "Hotbar Slot #" + (this.world.selectedSlot + 1) + " active";
+         this.mesher.addText2D(this.textures, inspectTitle, startX + 132.0F * scale,
+            barY + 34.0F * scale, 2.45F * scale, 0xFFFFF4B8);
+         this.mesher.addText2D(this.textures, inspectSub, startX + 132.0F * scale,
+            barY + 80.0F * scale, 2.15F * scale, 0xFF98E8FF);
+         this.mesher.addTextCentered2D(this.textures, "TO HOTBAR", startX + 540.0F * scale,
+            barY + 58.0F * scale, 2.45F * scale, 0xFFFFFFFF);
+         this.mesher.addTextCentered2D(this.textures, "DROP / CLEAR", startX + 764.0F * scale,
+            barY + 58.0F * scale, 2.25F * scale, 0xFFFFD0D0);
       }
 
-      for (int i = 0; i < 8; i++) {
-         int recipeIdx = getDisplayRecipeIndex(cat, baseRecipe, i);
-         if (recipeIdx >= PeWorld.RECIPES.length) break;
-         int c = i & 1;
-         int r = i >> 1;
-         PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
-         int have = this.world.countItemInHotbar(rec.costId);
-         boolean ok = (this.world.mode == PeWorld.MODE_CREATIVE) || (have >= rec.costCount);
-         float bx = craftStartX + c * (craftColW + 18.0F * scale) + 122.0F * scale;
-         float by = startY + r * (craftRowH + 16.0F * scale);
-         this.mesher.addText2D(this.textures, rec.label, bx, by + 30.0F * scale, 2.25F * scale, 0xFFFFFFFF);
-         String status = (this.world.mode == PeWorld.MODE_CREATIVE)
-            ? "TAP TO EQUIP (" + rec.outCount + "x)"
-            : (ok ? "READY TO CRAFT! (" + have + "/" + rec.costCount + ")"
+      if (cat != 4) {
+         for (int i = 0; i < 8; i++) {
+            int recipeIdx = getDisplayRecipeIndex(cat, baseRecipe, i);
+            if (recipeIdx >= PeWorld.RECIPES.length) break;
+            int col = i & 1;
+            int row = i >> 1;
+            PeWorld.CraftRecipe rec = PeWorld.RECIPES[recipeIdx];
+            int have = this.world.countItemInHotbar(rec.costId);
+            boolean ready = this.world.mode == PeWorld.MODE_CREATIVE || have >= rec.costCount;
+            float bx = craftStartX + col * (craftColW + 18.0F * scale) + 122.0F * scale;
+            float by = startY + row * (craftRowH + 16.0F * scale);
+            this.mesher.addText2D(this.textures, rec.label, bx, by + 30.0F * scale,
+               2.05F * scale, 0xFFFFFFFF);
+            String status = this.world.mode == PeWorld.MODE_CREATIVE
+               ? "TAP TO EQUIP (" + rec.outCount + "x)"
+               : (ready ? "READY TO CRAFT! (" + have + "/" + rec.costCount + ")"
                   : "Need " + rec.costCount + "x " + PeWorld.getItemName(rec.costId) + " (" + have + ")");
-         this.mesher.addText2D(this.textures, status, bx, by + 76.0F * scale, 2.05F * scale,
-            ok ? 0xFF88FFB0 : 0xFFFFB880);
-      }
-      for (int s = 0; s < 9; s++) {
-         if (this.world.hotbarId[s] != PeWorld.B_AIR && this.world.hotbarCount[s] > 1) {
-            this.mesher.addText2D(this.textures, String.valueOf(this.world.hotbarCount[s]),
-               hx + s * hs + hs - 38.0F * scale, hy + hs - 30.0F * scale, 2.3F * scale, 0xFFFFFFFF);
+            this.mesher.addText2D(this.textures, status, bx, by + 76.0F * scale,
+               1.85F * scale, ready ? 0xFF88FFB0 : 0xFFFFB880);
          }
       }
-      this.mesher.addTextCentered2D(this.textures, "X", hx + 9.5F * hs, hy + 28.0F * scale, 3.2F * scale, 0xFFFFFFFF);
+      for (int slot = 0; slot < 9; slot++) {
+         if (this.world.hotbarId[slot] != PeWorld.B_AIR && this.world.hotbarCount[slot] > 1) {
+            this.mesher.addText2D(this.textures, String.valueOf(this.world.hotbarCount[slot]),
+               hx + slot * hs + hs - 38.0F * scale, hy + hs - 30.0F * scale, 2.3F * scale, 0xFFFFFFFF);
+         }
+      }
+      this.mesher.addTextCentered2D(this.textures, "X", hx + 9.5F * hs,
+         hy + 28.0F * scale, 3.2F * scale, 0xFFFFFFFF);
       this.mesher.flush2D(this.shaders, this.textures.fontTexId, this.orthoMatrix);
    }
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Builds the standalone Android Pocket Edition APK for Blockcraft PE (com.blockcraft.pe),
-optimized for the Samsung Galaxy A55 5G (Exynos 1480 / Xclipse 530 GPU / 120Hz 1080x2340 / Android 14 API 34).
+built as a standalone Android app (API 26+), with responsive landscape menus and no model-specific runtime assumptions.
 
 Outputs into build/release-pe/ (strictly separated from PC releases):
-    Blockcraft-PE-v<ver>-Samsung-A55-5G.apk
+    Blockcraft-PE-v<ver>.apk
     Blockcraft-PE-v<ver>-android-bundle.zip
     release-notes.md
     VERSION
@@ -107,94 +107,74 @@ def update_manifest_icon(manifest_src, manifest_dst):
 
 def build_readme(version, apk_name):
     return f"""========================================================================
-  BLOCKCRAFT PE (POCKET EDITION) v{version} — ANDROID (SAMSUNG GALAXY A55 5G)
+  BLOCKCRAFT PE (POCKET EDITION) v{version} — ANDROID
 ========================================================================
 
-Note: This is the standalone Android Pocket Edition release of Blockcraft.
-PC and PE releases are strictly separated — this release contains ONLY the
-Android Pocket Edition build and no PC files.
+Standalone Android Pocket Edition. PC and PE releases remain separate; this
+bundle contains only the Android app and its installation notes.
 
 WHAT'S NEW IN BLOCKCRAFT PE v{version}
 --------------------------------------
-* True Infinite Worlds (`PeWorld` & `PeChunkMesher`):
-  - Explore endlessly in every direction! Deterministic 16x128x16 chunks stream
-    seamlessly around the player at any coordinate using a lock-free O(1) 16x16
-    active chunk ring buffer (`256` active chunk slots).
-  - Persistent Infinite Chunk Saving (`world_0..2.bcpe` v2): every modified
-    chunk across the infinite world is saved and restored at any coordinate.
-  - Multi-Biome Overworld: Emerald Forests, Flower Meadows (Poppies, Dandelions,
-    Tall Grass), Golden Deserts with Cacti, Snowy Taiga with Spruce Pines & Ice
-    Lakes, Mountain Peaks, 3D Caves, Ore Veins & Explorer Cabins.
-* Hand-Crafted Pixel-Art Texture Overhaul (`PeTextures`):
-  - Ported the PC game's Update 3.18 / 3.19 `TexPaint` & `TexPaint319` painters:
-    * Crisp pixel-art Oak & Spruce Leaves with 16 overlapping 4x3 / 3x4 leaf
-      blade clusters, cast shadows, 4-tone sunlit leaf tips, and organic sky
-      cutouts (plus interior leaf-to-leaf face culling!).
-    * Multi-tone Grass Top & hanging Grass Side skirt with drop shadow over
-      pebble-strewn Dirt.
-    * Voronoi Cobblestone & Mossy Cobble, cracked FBM Stone, 3D-shaded Ore
-      veins, grooved Bark Logs with concentric growth rings, 4-board Planks,
-      Stone Bricks, Crafting Table, Furnace, Chest, Bookshelf, and bevelled
-      Tool/Item sprites.
-* High-Performance 120Hz VBO Engine (`PeChunkMesher`):
-  - O(1) empty sky section skipping via per-section non-air block counters.
-  - Direct column bit-shift indexing `((lz << 11) | (lx << 7) | wy)` with
-    pre-fetched cardinal neighbor chunks.
-  - Interior leaf-to-leaf face culling and configurable Render Distance
-    (`9x9`, `11x11`, or `13x13` Chunks) in Settings.
-  - Complete removal of AI bots and mobs for lag-free single-player performance.
-* Redesigned Mobile-Friendly UI (`PeGLSurfaceView` & `PeTouchController`):
-  - Dark-glass cards with double borders, top specular highlights & recessed
-    item slots.
-  - Circular Virtual Analog Joystick ring + glowing thumb puck (or Classic
-    5-Button D-Pad), circular right-thumb action arc (`[MINE]`, `[PLACE]`,
-    `[JUMP]`) with mini item icons, top quick-action pills (`[|| PAUSE]`,
-    `[BAG / CRAFT]`, `[FLY]`), and target block tooltip pill under the crosshair.
+* World of Color: 96 blocks across 16-color wool, concrete, stained terracotta,
+  concrete powder, stained glass, and glazed terracotta families. The palette
+  uses dedicated crisp 16x16 textures and a touch-friendly family selector.
+* Concrete powder hardens when water touches its side/top and falls through
+  open cells. Nearby updates are deliberately bounded for mobile performance.
+* Inventory polish: a fifth Colors tab, 4x4 named swatches, six material-family
+  cards plus a Dyes collection, and responsive menu scaling constrained by both
+  viewport dimensions.
+* Survival dye progression: gather base colors, mix the desktop color recipes,
+  and craft wool, stained terracotta, glass, and concrete powder; lapis ore adds
+  blue dye, while concrete powder hardens beside water and glazed clay is cooked.
+* Settings are now visible and tappable. Control style, tap-to-interact,
+  sensitivity, auto-jump, render distance, and resource-pack selection persist.
+* Save format v3 reserves unsigned-byte block IDs through 178 and relocates
+  non-block items, including dyes, above that range. Existing v1.8/v2 worlds are migrated on load.
+* Existing PE features remain standalone: infinite saved worlds, biome terrain,
+  crafting, a 27-slot backpack, touch controls, pixel-art textures, and optional
+  high-refresh display mode selection when the device exposes one.
 
-HOW TO INSTALL ON SAMSUNG GALAXY A55 5G
----------------------------------------
-1. Download `{apk_name}` directly to your Samsung Galaxy A55 5G.
-2. Tap `{apk_name}` in Samsung "My Files" or your browser Downloads and tap
-   Install / Update.
-3. Launch "Blockcraft PE" in landscape mode!
+INSTALL
+-------
+1. Install `{apk_name}` on a supported Android device (Android 8.0 / API 26+).
+2. If prompted, allow installation from the source you used to download the APK.
+3. Launch Blockcraft PE in landscape mode. Worlds are stored locally on-device.
 """
 
 
 def build_release_notes(version, apk_name, bundle_name):
-    return f"""## Blockcraft PE (Pocket Edition) v{version} — Realistic 5.6 x MC Texture Engine, Fixed Recurve Bow & Multi-Version Resource Pack Switcher (Samsung Galaxy A55 5G)
+    return f"""## Blockcraft PE v{version} — Android
 
-> **Separate Pocket Edition Release**: This release contains **only** the Android Pocket Edition (`com.blockcraft.pe`) and does **not** include any PC files. PC (`v*`) and PE (`pe-v*`) releases are kept strictly separated.
+Standalone Pocket Edition release for Android 8.0/API 26 and newer. The PE
+bundle is separate from Blockcraft's desktop release and is not tied to a
+specific phone model or display refresh rate.
 
-### Download & Install on Samsung Galaxy A55 5G (Android 14 / One UI 6)
-1. Download **`{apk_name}`** below under **Assets** directly on your phone (or download `{bundle_name}`).
-2. Open **`{apk_name}`** from your browser downloads or Samsung **My Files** and tap **Install / Update**.
+### Downloads
+- **`{apk_name}`** — install directly on an Android device.
+- **`{bundle_name}`** — APK plus README.
 
-### What's New in Blockcraft PE `pe-v{version}`
-* **Fixed Face Culling & Side-Face Texture Orientation (`PeChunkMesher` & `PeWorld`)**:
-  * **Fixed Counter-Clockwise (`GL_CCW`) Winding & Upright UV Mapping on All 6 Faces**: Re-engineered the North (`-Z`), South (`+Z`), East (`+X`), and West (`-X`) quad vertex order across `meshSection`, `emitCustomBox`, and `addDynamicBox` to `(Top-Left, Bottom-Left, Bottom-Right, Top-Right)` when viewed from outside each face. Every outer face of terrain blocks, slabs, stairs, fences, doors, torches, and chests now winds strictly `GL_CCW` (zero missing/inside-out faces under `glCullFace(GL_BACK)`) AND renders every side texture (`Grass Side`, `Furnace Front`, `Crafting Table Side`, `Chest Front`, `Oak/Spruce/Birch Bark`, `Pumpkin/Jack o'Lantern Face`, `Bookshelf`) right-side-up (`+Y` at top, `-Y` at bottom) without any 90° rotation or mirroring!
-  * **Fixed `shouldRenderFace` & `isOpaque` Culling Rules**:
-    * Fixed `B_FARMLAND` (`0.9375` height) being marked `isOpaque`, which previously caused adjacent dirt/grass blocks to cull their lower face strip and leave a visible seam.
-    * Fixed leaf-to-leaf internal face culling (`face == 1, 3, 5`) making tree canopies look hollow when viewed from `-Y`, `+Z`, or `-X` with `GL_CULL_FACE` enabled.
-    * Fixed `shouldRenderFace` so top faces of `0.5`-high Slabs, Beds, `0.9375`-high Farmland, and `0.75`-high Enchanting Tables are never culled by solid blocks above them, and subsurface water/lava uses `topY = 1.0F` when covered by water/lava above so underwater pockets never show air gaps.
-    * Widened horizontal chunk frustum culling (`distSq > 1024.0F`, `dot < -0.68F`) so tall trees, watchtowers, and hills at the top/bottom edges of wide-FOV screens never pop out when pitching the camera up or down.
-* **Trees Actually Fall Over in 3D (`PeWorld.FallingTree` & `PeChunkMesher.addFallingTrees3D`)**:
-  * Ported PC Update 3.10's (`src/bc/Trees.java`) animated 3D tree-felling system! Chopping a natural tree trunk (`B_LOG_OAK`, `B_LOG_SPRUCE`, `B_LOG_BIRCH`, `B_LOG_JUNGLE`) detaches the connected trunk and leaf canopy (`up to 160 blocks`), hinges on the cut base block, and smoothly tips over **0° → 90°** (`cubic ease-in` gravity acceleration at 120Hz) away from the player before crashing onto the ground, placing fallen trunk logs & leaves along the terrain and dropping harvested wood!
-* **Real 3D First-Person Tools, Weapons, Torches & Isometric 3D Inventory Block Icons (`PeChunkMesher.addFirstPersonHeld3D` & `addItemOrBlockIcon2D`)**:
-  * **First-Person 3D Tools & Weapons**: Replaced the flat cube placeholder in the bottom-right hand with multi-part 3D voxel-extruded models for **Pickaxes** (3D diagonal oak handle + metallic collar + curved twin-tip pick head), **Swords** (pommel + grip + wide crossguard + stepped 3D blade), **Axes** (handle + bearded 3D axe bit + poll), **Shovels** (handle + wide 3D scoop blade), **Bows** (curved limbs + taut bowstring), **Torches** (3D stick + glowing ember head), **6-Face 3D Blocks / Slabs / Stairs**, and a **3D First-Person Player Arm** when empty-handed, complete with 120Hz walk bobbing and forward-and-down mining/chopping swing arcs!
-  * **3-Face Isometric 3D Block Icons in Hotbar & Inventory**: All 3D blocks in the Hotbar and Inventory now render as 3-face isometric 3D cubes/slabs (`Top + Front-Left + Right` shaded faces with true slab heights), while tools, weapons, food, ingots, doors, ladders, and plants render as crisp pixel-art sprites.
-* **Upgraded 4-Tab Inventory, 27-Slot Player Backpack (`36` Total Slots) & Fixed Gameplay Interactions (`PeWorld`, `PeGLSurfaceView` & `PeTouchController`)**:
-  * **36-Slot Player Inventory (`9` Hotbar + `27` Backpack Slots, persisted in `world_0..2.bcpe` `"BAG1"`)**: Fixed `giveItem` overwriting the player's currently held tool when all 9 hotbar slots were occupied! Picked-up blocks and crafted items now stack across all 36 slots and overflow cleanly into the **27-slot Player Backpack** (`Tab 0: Backpack & Craft`).
-  * **Interactive Slot Swapping & Item Management**: Tap any slot in your `9x3` Backpack grid and tap any Hotbar slot (or tap `[TO HOTBAR]` / double-tap the slot) to swap or stack items between your Backpack and Hotbar, or tap `[DROP / CLEAR]` to discard unwanted items. In Survival mode, tapping any owned item in the Building/Nature/Tools tabs automatically equips it from your Backpack into your active Hotbar slot!
-  * **Fixed All Wood Types in Crafting & Fixed World Interactions**:
-    * Crafting recipes requiring Wood Logs (`Oak Planks x4`, `Charcoal x2`) now accept **Oak, Spruce, Birch, or Jungle Logs**, and recipes requiring Planks (`Crafting Table`, `Sticks`, `Chest`, `Door`, `Bed`, `Fences`, `Slabs`, `Stairs`, `Wooden Tools`) accept **any Plank type** across all 36 Hotbar + Backpack slots.
-    * Breaking a block underneath a **Sand** or **Gravel** column now immediately settles the entire column above it downward.
-    * Tapping the upper or lower half of an **Oak Door** toggles or mines the door cleanly.
-    * Tapping `[PLACE]` on a placed **Crafting Table**, **Furnace**, or **Chest** opens the Inventory & Crafting screen; tapping `[PLACE]` with an **Ender Pearl** teleports you forward along your look ray; and tapping `[PLACE]` with a **Bow** fires a ranged arrow strike!
+### What's new
+- Fixed the Settings screen's unreachable controls and aligned its visible
+  button rows with touch hitboxes.
+- Added a five-tab inventory with a 4x4 swatch grid, six material families,
+  and a 16-dye collection; creative selection and survival color crafting are
+  available from the same touch UI.
+- Added gathered base dyes, desktop-inspired dye mixing, recipes for wool,
+  stained terracotta, glass and concrete powder, plus Lapis Ore drops for blue
+  dye. Concrete powder hardens beside water and stained terracotta can be cooked
+  into glazed terracotta.
+- Added bounded concrete-powder falling and water-hardening updates.
+- Made menu scaling fit both viewport width and height; settings now persist.
+- Bumped the save format to v3 and migrate v1.8/v2 item IDs so existing worlds
+  do not reinterpret swords, tools, or food as newly added color blocks.
+
+The mobile edition now has an interactive survival color-crafting loop, but it
+still does not include the full desktop release's wider gameplay feature set.
 """
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.5"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.10"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")
@@ -296,7 +276,7 @@ def main():
             "-dname", "CN=Blockcraft PE, OU=Mobile, O=Blockcraft, L=Vienna, S=AT, C=AT",
         ])
 
-        apk_name = f"Blockcraft-PE-v{version}-Samsung-A55-5G.apk"
+        apk_name = f"Blockcraft-PE-v{version}.apk"
         final_apk = os.path.join(OUT_DIR, apk_name)
         run_cmd([
             apksigner, "sign",

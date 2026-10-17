@@ -9,8 +9,7 @@ import android.view.Window;
 import android.view.WindowManager;
 
 /**
- * Blockcraft PE (Pocket Edition) Main Activity for Samsung Galaxy A55 5G
- * (Android 14 / One UI 6, 120Hz Super AMOLED 2340x1080 edge-to-edge landscape).
+ * Generic Android entry point for the standalone Blockcraft Pocket Edition.
  */
 public final class MainActivity extends Activity {
    private PeGLSurfaceView glView;
@@ -24,13 +23,13 @@ public final class MainActivity extends Activity {
       window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
       window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-      // Enable edge-to-edge display across the Samsung Galaxy A55 5G hole-punch camera cutout
+      // Let the renderer use the full landscape viewport, including supported display cutouts.
       WindowManager.LayoutParams lp = window.getAttributes();
       if (Build.VERSION.SDK_INT >= 28) {
          lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
       }
-      // Request 120Hz Super AMOLED refresh rate on Samsung Galaxy A55 5G
-      request120HzDisplayMode(lp);
+      // Prefer the fastest mode exposed by this device, without assuming a model or refresh rate.
+      requestBestSupportedRefreshRate(lp);
       window.setAttributes(lp);
 
       this.glView = new PeGLSurfaceView(this);
@@ -38,24 +37,24 @@ public final class MainActivity extends Activity {
       applyImmersiveFullscreen();
    }
 
-   private void request120HzDisplayMode(WindowManager.LayoutParams lp) {
+   private void requestBestSupportedRefreshRate(WindowManager.LayoutParams lp) {
       try {
          if (Build.VERSION.SDK_INT >= 23) {
             Display display = getWindowManager().getDefaultDisplay();
             Display.Mode[] modes = display.getSupportedModes();
             Display.Mode bestMode = null;
-            float bestRate = 60.0F;
+            float bestRate = 0.0F;
             for (int i = 0; i < modes.length; i++) {
-               Display.Mode m = modes[i];
-               if (m.getRefreshRate() > bestRate) {
-                  bestRate = m.getRefreshRate();
-                  bestMode = m;
+               Display.Mode candidate = modes[i];
+               if (candidate.getRefreshRate() > bestRate) {
+                  bestRate = candidate.getRefreshRate();
+                  bestMode = candidate;
                }
             }
             if (bestMode != null) {
                lp.preferredDisplayModeId = bestMode.getModeId();
+               lp.preferredRefreshRate = bestRate;
             }
-            lp.preferredRefreshRate = 120.0F;
          }
       } catch (Throwable ignored) {
       }

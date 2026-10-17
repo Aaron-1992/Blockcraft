@@ -17,8 +17,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Blockcraft PE (Pocket Edition) v1.2 — PC Update 3.5+ Single-Player Infinite World Engine:
- * - 120Hz Sub-Tick Camera & Movement Interpolation (prevPx/prevPy/prevPz, prevWalkDist, prevEyeHeight)
+ * Blockcraft PE (Pocket Edition) v1.10 — PC Update 3.5+ Single-Player Infinite World Engine:
+ * - High-Refresh Sub-Tick Camera & Movement Interpolation (prevPx/prevPy/prevPz, prevWalkDist, prevEyeHeight)
  *   + Smooth Independent-Axis AABB Box Physics (0.58 x 1.78) with 0.5-Slab Step-Up, Auto-Jump & Ladder Climbing
  * - PC Update 3.5 Perlin Noise Terrain Generator (Noise.java: Continents, Ridges, Temperature/Humidity Biomes & 3D Caves)
  *   with zero Math.sin/Math.cos overhead during chunk streaming
@@ -26,6 +26,8 @@ import java.util.zip.GZIPOutputStream;
  *   Slabs, Fences, Doors, Ladders, Crops (Wheat, Sugar Cane, Pumpkins, Melons, Hay Bales) & 24 Crafting/Smelting Recipes
  */
 public final class PeWorld {
+   public static final String APP_VERSION = "1.10";
+
    // Screen States
    public static final int SCREEN_TITLE = 0;
    public static final int SCREEN_WORLD_SELECT = 1;
@@ -68,7 +70,7 @@ public final class PeWorld {
       "Desert Oasis"
    };
 
-   // Block IDs (0..84)
+   // Stable legacy block IDs (0..88); World of Color variants continue at 89..177, followed by Lapis Ore at 178.
    public static final byte B_AIR = 0;
    public static final byte B_STONE = 1;
    public static final byte B_GRASS = 2;
@@ -160,27 +162,144 @@ public final class PeWorld {
    public static final byte B_STAIR_COBBLE = 86;
    public static final byte B_STAIR_STONEBRICK = 87;
    public static final byte B_DOOR_OAK_OPEN = 88;
-   public static final int MAX_BLOCK_ID = 88;
+   // Desktop 1.12-style World of Color. The legacy block IDs 1..88 are stable;
+   // these new IDs are unsigned bytes, so all block access must mask with 0xFF.
+   public static final byte B_WOOL_ORANGE = 89;
+   public static final byte B_WOOL_MAGENTA = 90;
+   public static final byte B_WOOL_LIGHT_BLUE = 91;
+   public static final byte B_WOOL_LIME = 92;
+   public static final byte B_WOOL_PINK = 93;
+   public static final byte B_WOOL_GRAY = 94;
+   public static final byte B_WOOL_LIGHT_GRAY = 95;
+   public static final byte B_WOOL_CYAN = 96;
+   public static final byte B_WOOL_PURPLE = 97;
+   public static final byte B_WOOL_BROWN = 98;
+   public static final byte B_WOOL_BLACK = 99;
 
-   // Item IDs (98+)
-   public static final int I_SWORD_WOOD = 98;
-   public static final int I_PICK_WOOD = 99;
-   public static final int I_SWORD_IRON = 100;
-   public static final int I_SWORD_DIAMOND = 101;
-   public static final int I_PICK_IRON = 102;
-   public static final int I_PICK_DIAMOND = 103;
-   public static final int I_SHOVEL_DIAMOND = 104;
-   public static final int I_AXE_IRON = 105;
-   public static final int I_BOW = 106;
-   public static final int I_ARROW = 107;
-   public static final int I_GOLDEN_APPLE = 108;
-   public static final int I_STEAK = 109;
-   public static final int I_ENDER_PEARL = 110;
-   public static final int I_IRON_INGOT = 111;
-   public static final int I_GOLD_INGOT = 112;
-   public static final int I_DIAMOND = 113;
-   public static final int I_COAL = 114;
-   public static final int I_BREAD = 115;
+   public static final byte B_CONCRETE_WHITE = 100;
+   public static final byte B_CONCRETE_ORANGE = 101;
+   public static final byte B_CONCRETE_MAGENTA = 102;
+   public static final byte B_CONCRETE_LIGHT_BLUE = 103;
+   public static final byte B_CONCRETE_LIME = 104;
+   public static final byte B_CONCRETE_PINK = 105;
+   public static final byte B_CONCRETE_LIGHT_GRAY = 106;
+   public static final byte B_CONCRETE_CYAN = 107;
+   public static final byte B_CONCRETE_PURPLE = 108;
+   public static final byte B_CONCRETE_BLUE = 109;
+   public static final byte B_CONCRETE_BROWN = 110;
+   public static final byte B_CONCRETE_GREEN = 111;
+   public static final byte B_CONCRETE_RED = 112;
+   public static final byte B_CONCRETE_BLACK = 113;
+
+   public static final byte B_TERRACOTTA_WHITE = 114;
+   public static final byte B_TERRACOTTA_ORANGE = 115;
+   public static final byte B_TERRACOTTA_MAGENTA = 116;
+   public static final byte B_TERRACOTTA_LIGHT_BLUE = 117;
+   public static final byte B_TERRACOTTA_YELLOW = 118;
+   public static final byte B_TERRACOTTA_LIME = 119;
+   public static final byte B_TERRACOTTA_PINK = 120;
+   public static final byte B_TERRACOTTA_GRAY = 121;
+   public static final byte B_TERRACOTTA_LIGHT_GRAY = 122;
+   public static final byte B_TERRACOTTA_CYAN = 123;
+   public static final byte B_TERRACOTTA_PURPLE = 124;
+   public static final byte B_TERRACOTTA_BLUE = 125;
+   public static final byte B_TERRACOTTA_BROWN = 126;
+   public static final byte B_TERRACOTTA_GREEN = 127;
+   public static final byte B_TERRACOTTA_RED = (byte)128;
+   public static final byte B_TERRACOTTA_BLACK = (byte)129;
+
+   public static final byte B_STAINED_GLASS_WHITE = (byte)130;
+   public static final byte B_STAINED_GLASS_ORANGE = (byte)131;
+   public static final byte B_STAINED_GLASS_MAGENTA = (byte)132;
+   public static final byte B_STAINED_GLASS_LIGHT_BLUE = (byte)133;
+   public static final byte B_STAINED_GLASS_YELLOW = (byte)134;
+   public static final byte B_STAINED_GLASS_LIME = (byte)135;
+   public static final byte B_STAINED_GLASS_PINK = (byte)136;
+   public static final byte B_STAINED_GLASS_GRAY = (byte)137;
+   public static final byte B_STAINED_GLASS_LIGHT_GRAY = (byte)138;
+   public static final byte B_STAINED_GLASS_CYAN = (byte)139;
+   public static final byte B_STAINED_GLASS_PURPLE = (byte)140;
+   public static final byte B_STAINED_GLASS_BLUE = (byte)141;
+   public static final byte B_STAINED_GLASS_BROWN = (byte)142;
+   public static final byte B_STAINED_GLASS_GREEN = (byte)143;
+   public static final byte B_STAINED_GLASS_RED = (byte)144;
+   public static final byte B_STAINED_GLASS_BLACK = (byte)145;
+
+   public static final byte B_CONCRETE_POWDER_WHITE = (byte)146;
+   public static final byte B_CONCRETE_POWDER_ORANGE = (byte)147;
+   public static final byte B_CONCRETE_POWDER_MAGENTA = (byte)148;
+   public static final byte B_CONCRETE_POWDER_LIGHT_BLUE = (byte)149;
+   public static final byte B_CONCRETE_POWDER_YELLOW = (byte)150;
+   public static final byte B_CONCRETE_POWDER_LIME = (byte)151;
+   public static final byte B_CONCRETE_POWDER_PINK = (byte)152;
+   public static final byte B_CONCRETE_POWDER_GRAY = (byte)153;
+   public static final byte B_CONCRETE_POWDER_LIGHT_GRAY = (byte)154;
+   public static final byte B_CONCRETE_POWDER_CYAN = (byte)155;
+   public static final byte B_CONCRETE_POWDER_PURPLE = (byte)156;
+   public static final byte B_CONCRETE_POWDER_BLUE = (byte)157;
+   public static final byte B_CONCRETE_POWDER_BROWN = (byte)158;
+   public static final byte B_CONCRETE_POWDER_GREEN = (byte)159;
+   public static final byte B_CONCRETE_POWDER_RED = (byte)160;
+   public static final byte B_CONCRETE_POWDER_BLACK = (byte)161;
+
+   public static final byte B_GLAZED_TERRACOTTA_WHITE = (byte)162;
+   public static final byte B_GLAZED_TERRACOTTA_ORANGE = (byte)163;
+   public static final byte B_GLAZED_TERRACOTTA_MAGENTA = (byte)164;
+   public static final byte B_GLAZED_TERRACOTTA_LIGHT_BLUE = (byte)165;
+   public static final byte B_GLAZED_TERRACOTTA_YELLOW = (byte)166;
+   public static final byte B_GLAZED_TERRACOTTA_LIME = (byte)167;
+   public static final byte B_GLAZED_TERRACOTTA_PINK = (byte)168;
+   public static final byte B_GLAZED_TERRACOTTA_GRAY = (byte)169;
+   public static final byte B_GLAZED_TERRACOTTA_LIGHT_GRAY = (byte)170;
+   public static final byte B_GLAZED_TERRACOTTA_CYAN = (byte)171;
+   public static final byte B_GLAZED_TERRACOTTA_PURPLE = (byte)172;
+   public static final byte B_GLAZED_TERRACOTTA_BLUE = (byte)173;
+   public static final byte B_GLAZED_TERRACOTTA_BROWN = (byte)174;
+   public static final byte B_GLAZED_TERRACOTTA_GREEN = (byte)175;
+   public static final byte B_GLAZED_TERRACOTTA_RED = (byte)176;
+   public static final byte B_GLAZED_TERRACOTTA_BLACK = (byte)177;
+   public static final byte B_LAPIS_ORE = (byte)178;
+   public static final int MAX_BLOCK_ID = 178;
+
+   // Item IDs moved out of the unsigned-byte block range. Version 1.8 saves are migrated on load.
+   public static final int I_SWORD_WOOD = 256;
+   public static final int I_PICK_WOOD = 257;
+   public static final int I_SWORD_IRON = 258;
+   public static final int I_SWORD_DIAMOND = 259;
+   public static final int I_PICK_IRON = 260;
+   public static final int I_PICK_DIAMOND = 261;
+   public static final int I_SHOVEL_DIAMOND = 262;
+   public static final int I_AXE_IRON = 263;
+   public static final int I_BOW = 264;
+   public static final int I_ARROW = 265;
+   public static final int I_GOLDEN_APPLE = 266;
+   public static final int I_STEAK = 267;
+   public static final int I_ENDER_PEARL = 268;
+   public static final int I_IRON_INGOT = 269;
+   public static final int I_GOLD_INGOT = 270;
+   public static final int I_DIAMOND = 271;
+   public static final int I_COAL = 272;
+   public static final int I_BREAD = 273;
+   public static final int I_DYE_WHITE = 274;
+   public static final int I_DYE_ORANGE = 275;
+   public static final int I_DYE_MAGENTA = 276;
+   public static final int I_DYE_LIGHT_BLUE = 277;
+   public static final int I_DYE_YELLOW = 278;
+   public static final int I_DYE_LIME = 279;
+   public static final int I_DYE_PINK = 280;
+   public static final int I_DYE_GRAY = 281;
+   public static final int I_DYE_LIGHT_GRAY = 282;
+   public static final int I_DYE_CYAN = 283;
+   public static final int I_DYE_PURPLE = 284;
+   public static final int I_DYE_BLUE = 285;
+   public static final int I_DYE_BROWN = 286;
+   public static final int I_DYE_GREEN = 287;
+   public static final int I_DYE_RED = 288;
+   public static final int I_DYE_BLACK = 289;
+
+   public static int dyeItem(int color) {
+      return I_DYE_WHITE + Math.max(0, Math.min(15, color));
+   }
 
    // Infinite Streaming Chunk Ring-Buffer Constants
    public static final int ACTIVE_GRID = 16;
@@ -194,6 +313,7 @@ public final class PeWorld {
 
    private static final int SAVE_MAGIC = 0x42435045; // "BCPE"
    private static final int SAVE_VERSION_INFINITE = 2;
+   private static final int SAVE_VERSION_CURRENT = 3;
 
    /**
     * PC Update 3.5 Perlin Noise Generator (ported from src/bc/Noise.java).
@@ -326,7 +446,7 @@ public final class PeWorld {
    /**
     * PC Update 3.10 Animated 3D Falling Tree:
     * Topples smoothly from 0..90 degrees around the cut log pivot (pivotX, pivotY, pivotZ)
-    * at 120Hz (via getAngleDegrees(partial)) before crashing onto the ground and placing its
+    * at high frame rates (via getAngleDegrees(partial)) before crashing onto the ground and placing its
     * fallen trunk logs and canopy leaves!
     */
    public static final class FallingTree {
@@ -382,7 +502,9 @@ public final class PeWorld {
    public int createMode = MODE_SURVIVAL;
    public int createWorldType = WTYPE_LARGE_BIOMES;
    public int createSeedIdx = 0;
-   public int invCategory = 0; // 0 = Backpack & Craft, 1 = Building, 2 = Nature & Decor, 3 = Tools & Combat
+   public int invCategory = 0; // 0 = Backpack, 1 = Building, 2 = Nature, 3 = Tools, 4 = World of Color
+   public int colorFamily = 0;
+   public int selectedColor = 14;
    public int selectedInvSlot = -1;
 
    // Saved World Metadata Cache for Slots 0..2
@@ -404,7 +526,7 @@ public final class PeWorld {
    public long tickCount = 0L;
    public float dayTime = 0.22F;
 
-   // Player State + 120Hz Sub-Tick Interpolation State
+   // Player State + High-Refresh Sub-Tick Interpolation State
    public double px = 0.5;
    public double py = 72.0;
    public double pz = 0.5;
@@ -448,12 +570,9 @@ public final class PeWorld {
    public String bannerMessage = "";
    public int bannerTicks = 0;
 
-   // 4-Tab Inventory & Creative Palette (Tab 0 = 27-Slot Player Backpack, Tabs 1..3 = 72 Categorized Blocks/Items)
+   // 5-Tab Inventory & Creative Palette (the final tab filters all six color families)
    public static final String[] INV_TAB_NAMES = new String[]{
-      "Backpack & Craft",
-      "Building Blocks",
-      "Nature & Decor",
-      "Tools & Combat"
+      "BACKPACK", "BUILD", "NATURE", "TOOLS", "COLORS"
    };
 
    public static final int[][] CREATIVE_TABS = new int[][]{
@@ -475,9 +594,11 @@ public final class PeWorld {
       {
          I_PICK_DIAMOND, I_SWORD_DIAMOND, I_SHOVEL_DIAMOND, I_PICK_IRON, I_SWORD_IRON, I_AXE_IRON,
          I_PICK_WOOD, I_SWORD_WOOD, I_GOLDEN_APPLE, I_STEAK, I_BREAD, B_TNT,
-         B_GOLD_BLOCK, B_IRON_BLOCK, B_DIAMOND_BLOCK, B_EMERALD_BLOCK, B_WOOL_WHITE, B_WOOL_RED,
-         B_WOOL_BLUE, B_WOOL_GREEN, B_WOOL_YELLOW, B_SNOW, B_ICE, B_SLIME_BLOCK
-      }
+         B_GOLD_BLOCK, B_IRON_BLOCK, B_DIAMOND_BLOCK, B_EMERALD_BLOCK, B_REDSTONE_BLOCK, B_COAL_BLOCK,
+         B_SNOW, B_ICE, B_SLIME_BLOCK, B_OBSIDIAN, B_END_STONE, (B_LAPIS_ORE & 0xFF)
+      },
+      // Tab 3: Six complete 16-color material families (filtered by colorFamily)
+      PeColors.ALL_BLOCKS
    };
 
    // Crafting & Furnace Smelting Recipes for Single-Player Survival (3 Tabs x 8 Recipes = 24 Recipes)
@@ -648,7 +769,7 @@ public final class PeWorld {
             new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(tmpFile)))
          );
          out.writeInt(SAVE_MAGIC);
-         out.writeInt(SAVE_VERSION_INFINITE);
+         out.writeInt(SAVE_VERSION_CURRENT);
          out.writeInt(this.mode);
          out.writeInt(this.worldType);
          out.writeLong(this.seed);
@@ -704,6 +825,11 @@ public final class PeWorld {
       }
    }
 
+   /** Version 1.8 stored non-block items in 98..115, which is now part of the expanded block catalogue. */
+   public static int migrateLegacyItemId(int id) {
+      return id >= 98 && id <= 115 ? I_SWORD_WOOD + (id - 98) : id;
+   }
+
    public boolean loadWorld(Context context, int slot) {
       slot = Math.max(0, Math.min(2, slot));
       File dir = getSavesDir(context);
@@ -715,7 +841,7 @@ public final class PeWorld {
          );
          int magic = in.readInt();
          int ver = in.readInt();
-         if (magic != SAVE_MAGIC || (ver != SAVE_VERSION_INFINITE && ver != 1)) {
+         if (magic != SAVE_MAGIC || (ver < 1 || ver > SAVE_VERSION_CURRENT)) {
             in.close();
             return false;
          }
@@ -736,7 +862,8 @@ public final class PeWorld {
          this.hunger = in.readInt();
          this.selectedSlot = Math.max(0, Math.min(8, in.readInt()));
          for (int i = 0; i < 9; i++) {
-            this.hotbarId[i] = in.readInt();
+            int savedId = in.readInt();
+            this.hotbarId[i] = ver < SAVE_VERSION_CURRENT ? migrateLegacyItemId(savedId) : savedId;
             this.hotbarCount[i] = in.readInt();
          }
 
@@ -746,7 +873,7 @@ public final class PeWorld {
          resetActiveChunks();
          this.savedChunks.clear();
 
-         if (ver == SAVE_VERSION_INFINITE) {
+         if (ver >= SAVE_VERSION_INFINITE) {
             int count = in.readInt();
             for (int i = 0; i < count; i++) {
                int cx = in.readInt();
@@ -759,7 +886,8 @@ public final class PeWorld {
                int bagMagic = in.readInt();
                if (bagMagic == 0x42414731) {
                   for (int i = 0; i < 27; i++) {
-                     this.invId[i] = in.readInt();
+                     int savedId = in.readInt();
+                     this.invId[i] = ver < SAVE_VERSION_CURRENT ? migrateLegacyItemId(savedId) : savedId;
                      this.invCount[i] = in.readInt();
                   }
                }
@@ -915,6 +1043,7 @@ public final class PeWorld {
          this.invId[3] = B_BED_RED;         this.invCount[3] = 1;
          this.invId[4] = I_BREAD;           this.invCount[4] = 4;
          this.invId[5] = I_ENDER_PEARL;     this.invCount[5] = 2;
+         this.invId[6] = B_WOOL_WHITE;      this.invCount[6] = 4;
       }
    }
 
@@ -993,6 +1122,182 @@ public final class PeWorld {
                this.invCount[i] = 0;
             }
          }
+      }
+   }
+
+   private static final int[][] DYE_MIXES = {
+      {1, 14, 4}, {2, 10, 6}, {3, 11, 0}, {5, 13, 0}, {6, 14, 0},
+      {7, 15, 0}, {8, 7, 0}, {9, 11, 13}, {10, 11, 14}, {12, 14, 13}
+   };
+
+   private static int directDyeSource(int color) {
+      switch (color) {
+         case 0: return B_SNOW;
+         case 4: return B_FLOWER_YELLOW;
+         case 13: return B_CACTUS;
+         case 14: return B_FLOWER_RED;
+         case 15: return I_COAL;
+         default: return 0;
+      }
+   }
+
+   /** Craft one gathered base dye or two mixed dyes using the desktop World-of-Color combinations. */
+   public boolean tryCraftDye(int color, PeAudio audio) {
+      if (color < 0 || color >= 16) return false;
+      int source = directDyeSource(color);
+      if (source > 0) {
+         if (countItemInHotbar(source) < 1) {
+            showBanner("Need 1x " + getItemName(source) + " to make " + PeColors.NAMES[color] + " Dye");
+            if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+            return false;
+         }
+         consumeItemFromHotbar(source, 1);
+         giveItem(dyeItem(color), 1);
+         showBanner("Made " + PeColors.NAMES[color] + " Dye");
+         if (audio != null) audio.playSound("levelup", 0.85F, 1.05F);
+         return true;
+      }
+
+      if (color == 11) {
+         showBanner("Mine Lapis Ore for Blue Dye");
+         if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+         return false;
+      }
+      for (int[] mix : DYE_MIXES) {
+         if (mix[0] != color) continue;
+         int first = dyeItem(mix[1]);
+         int second = dyeItem(mix[2]);
+         if (countItemInHotbar(first) < 1 || countItemInHotbar(second) < 1) {
+            showBanner("Mix 1x " + getItemName(first) + " + 1x " + getItemName(second));
+            if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+            return false;
+         }
+         consumeItemFromHotbar(first, 1);
+         consumeItemFromHotbar(second, 1);
+         giveItem(dyeItem(color), 2);
+         showBanner("Mixed 2x " + PeColors.NAMES[color] + " Dye");
+         if (audio != null) audio.playSound("levelup", 0.85F, 1.05F);
+         return true;
+      }
+      showBanner("Gather the matching flower or material first");
+      return false;
+   }
+
+   private boolean craftColorRecipe(int outputId, int outputCount, int[] ingredientIds, int[] ingredientCounts,
+                                    PeAudio audio) {
+      for (int i = 0; i < ingredientIds.length; i++) {
+         int have = countItemInHotbar(ingredientIds[i]);
+         if (have < ingredientCounts[i]) {
+            showBanner("Need " + ingredientCounts[i] + "x " + getItemName(ingredientIds[i]) + " (have " + have + ")");
+            if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+            return false;
+         }
+      }
+      for (int i = 0; i < ingredientIds.length; i++) {
+         consumeItemFromHotbar(ingredientIds[i], ingredientCounts[i]);
+      }
+      giveItem(outputId, outputCount);
+      showBanner("Crafted " + outputCount + "x " + getItemName(outputId));
+      if (audio != null) audio.playSound("levelup", 0.85F, 1.1F);
+      return true;
+   }
+
+   private int countAnyItems(int[] itemIds) {
+      int total = 0;
+      for (int itemId : itemIds) total += countItemInHotbar(itemId);
+      return total;
+   }
+
+   private void consumeAnyItems(int[] itemIds, int count) {
+      int remaining = count;
+      for (int itemId : itemIds) {
+         int take = Math.min(remaining, countItemInHotbar(itemId));
+         if (take > 0) consumeItemFromHotbar(itemId, take);
+         remaining -= take;
+         if (remaining <= 0) break;
+      }
+   }
+
+   private static int[] withBaseMaterial(int base, int[] colored) {
+      int[] all = new int[colored.length + 1];
+      all[0] = base;
+      System.arraycopy(colored, 0, all, 1, colored.length);
+      return all;
+   }
+
+   private boolean craftColorMaterialRecipe(int outputId, int outputCount, int[] materialIds,
+                                            int materialCount, int color, PeAudio audio) {
+      int dye = dyeItem(color);
+      int dyeCount = countItemInHotbar(dye);
+      if (dyeCount < 1) {
+         showBanner("Need 1x " + getItemName(dye) + " to color these blocks");
+         if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+         return false;
+      }
+      int materialHave = countAnyItems(materialIds);
+      if (materialHave < materialCount) {
+         showBanner("Need " + materialCount + "x material blocks (have " + materialHave + ")");
+         if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+         return false;
+      }
+      consumeAnyItems(materialIds, materialCount);
+      consumeItemFromHotbar(dye, 1);
+      giveItem(outputId, outputCount);
+      showBanner("Crafted " + outputCount + "x " + getItemName(outputId));
+      if (audio != null) audio.playSound("levelup", 0.85F, 1.1F);
+      return true;
+   }
+
+   private boolean craftDyedWool(int color, PeAudio audio) {
+      int outputId = PeColors.WOOL_BLOCKS[color];
+      for (int woolId : PeColors.WOOL_BLOCKS) {
+         if (woolId == outputId || countItemInHotbar(woolId) < 1) continue;
+         int dye = dyeItem(color);
+         if (countItemInHotbar(dye) < 1) {
+            showBanner("Need 1x " + getItemName(dye) + " to color wool");
+            if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+            return false;
+         }
+         consumeItemFromHotbar(woolId, 1);
+         consumeItemFromHotbar(dye, 1);
+         giveItem(outputId, 1);
+         showBanner("Crafted " + getItemName(outputId));
+         if (audio != null) audio.playSound("levelup", 0.85F, 1.1F);
+         return true;
+      }
+      showBanner("Need 1x wool of a different color");
+      if (audio != null) audio.playSound("click", 0.7F, 0.75F);
+      return false;
+   }
+
+   /** One-tap survival recipes for the selected World-of-Color material and color. */
+   public boolean tryCraftColorBlock(int family, int color, PeAudio audio) {
+      if (family < 0 || family >= 6 || color < 0 || color >= 16) return false;
+      if (this.mode == MODE_CREATIVE) {
+         giveItem(PeColors.FAMILY_BLOCKS[family][color], 64);
+         showBanner("Equipped " + getItemName(PeColors.FAMILY_BLOCKS[family][color]));
+         return true;
+      }
+      switch (family) {
+         case 0:
+            return craftDyedWool(color, audio);
+         case 1:
+            showBanner("Make Concrete Powder, then set it beside water");
+            return false;
+         case 2:
+            return craftColorMaterialRecipe(PeColors.TERRACOTTA_BLOCKS[color], 8,
+               withBaseMaterial(B_TERRACOTTA, PeColors.TERRACOTTA_BLOCKS), 8, color, audio);
+         case 3:
+            return craftColorRecipe(PeColors.POWDER_BLOCKS[color], 8,
+               new int[]{B_SAND, B_GRAVEL, dyeItem(color)}, new int[]{4, 4, 1}, audio);
+         case 4:
+            return craftColorMaterialRecipe(PeColors.STAINED_GLASS_BLOCKS[color], 8,
+               withBaseMaterial(B_GLASS, PeColors.STAINED_GLASS_BLOCKS), 8, color, audio);
+         case 5:
+            return craftColorRecipe(PeColors.GLAZED_BLOCKS[color], 1,
+               new int[]{PeColors.TERRACOTTA_BLOCKS[color]}, new int[]{1}, audio);
+         default:
+            return false;
       }
    }
 
@@ -1217,7 +1522,7 @@ public final class PeWorld {
          }
       }
 
-      // Lay out ALL 88 PE blocks (B_STONE = 1 .. MAX_BLOCK_ID = 88) in 15 columns x 6 rows in front of spawn (wz = -4..-19)
+      // Lay out every block ID in 15 columns, including the complete World of Color set.
       for (int id = 1; id <= MAX_BLOCK_ID; id++) {
          int idx = id - 1;
          int col = idx % 15;
@@ -1318,6 +1623,7 @@ public final class PeWorld {
                   if (y <= 16 && hash <= 1) b = B_DIAMOND_ORE;
                   else if (y <= 28 && hash <= 4) b = B_GOLD_ORE;
                   else if (y <= 24 && hash == 5) b = B_REDSTONE_ORE;
+                  else if (y <= 32 && hash <= 7) b = B_LAPIS_ORE;
                   else if (y <= 54 && hash <= 11) b = B_IRON_ORE;
                   else if (hash <= 19) b = B_COAL_ORE;
                   else if (hash == 20) b = B_GRAVEL;
@@ -1327,6 +1633,10 @@ public final class PeWorld {
             }
             for (int y = h + 1; y <= Y_SEA; y++) {
                setChunkLocal(c, lx, y, lz, (biome == 2 && y == Y_SEA) ? B_ICE : B_WATER);
+            }
+            int clayHash = (wx * 734287) ^ (wz * 439829) ^ (int)this.seed;
+            if (h < Y_SEA && h >= Y_SEA - 5 && spawnDist > 28.0 && (clayHash & 31) == 0) {
+               setChunkLocal(c, lx, h, lz, B_TERRACOTTA);
             }
          }
       }
@@ -1742,12 +2052,18 @@ public final class PeWorld {
       return 1.0;
    }
 
+   public static boolean isGlassBlock(byte id) {
+      return id == B_GLASS || PeColors.isStainedGlass(id & 0xFF);
+   }
+
    public static boolean isOpaque(byte id) {
-      return id != B_AIR && id != B_WATER && id != B_LAVA && id != B_GLASS
-         && !isLeaves(id) && !isSlab(id) && !isStair(id) && id != B_FARMLAND
-         && id != B_ICE && id != B_SLIME_BLOCK && !isCrossPlant(id)
-         && id != B_BARS && id != B_BED_RED && id != B_FENCE_OAK
-         && id != B_DOOR_OAK && id != B_DOOR_OAK_OPEN && id != B_LADDER && id != B_CHEST && id != B_CACTUS;
+      int blockId = id & 0xFF;
+      return blockId != B_AIR && blockId != B_WATER && blockId != B_LAVA && blockId != B_GLASS
+         && !PeColors.isStainedGlass(blockId)
+         && !isLeaves(id) && !isSlab(id) && !isStair(id) && blockId != B_FARMLAND
+         && blockId != B_ICE && blockId != B_SLIME_BLOCK && !isCrossPlant(id)
+         && blockId != B_BARS && blockId != B_BED_RED && blockId != B_FENCE_OAK
+         && blockId != B_DOOR_OAK && blockId != B_DOOR_OAK_OPEN && blockId != B_LADDER && blockId != B_CHEST && blockId != B_CACTUS;
    }
 
    public static boolean isLightEmitter(byte id) {
@@ -1756,7 +2072,9 @@ public final class PeWorld {
    }
 
    public static int getFaceTile(byte id, int face) {
-      switch (id) {
+      int coloredTile = PeColors.tileForBlock(id & 0xFF);
+      if (coloredTile >= 0) return coloredTile;
+      switch (id & 0xFF) {
          case B_STONE: return PeTextures.T_STONE;
          case B_GRASS: return face == 0 ? PeTextures.T_GRASS_TOP : (face == 1 ? PeTextures.T_DIRT : PeTextures.T_GRASS_SIDE);
          case B_DIRT: return PeTextures.T_DIRT;
@@ -1798,6 +2116,7 @@ public final class PeWorld {
          case B_TORCH: return PeTextures.T_TORCH;
          case B_CHEST: return face <= 1 ? PeTextures.T_CHEST_TOP : (face == 3 ? PeTextures.T_CHEST_FRONT : PeTextures.T_CHEST_SIDE);
          case B_DIAMOND_ORE: return PeTextures.T_DIAMOND_ORE;
+         case (B_LAPIS_ORE & 0xFF): return PeTextures.T_LAPIS_ORE;
          case B_DIAMOND_BLOCK: return PeTextures.T_DIAMOND_BLOCK;
          case B_CRAFTING_TABLE: return face == 0 ? PeTextures.T_CRAFT_TOP : (face == 1 ? PeTextures.T_PLANKS_OAK : PeTextures.T_CRAFT_SIDE);
          case B_FURNACE: return face == 3 ? PeTextures.T_FURNACE_FRONT : PeTextures.T_FURNACE_SIDE;
@@ -1850,6 +2169,9 @@ public final class PeWorld {
    }
 
    public static int getItemTile(int id) {
+      if (id < 0) id &= 0xFF;
+      int dyeColor = PeColors.dyeColorForItem(id);
+      if (dyeColor >= 0) return PeColors.FAMILY_TILES[0][dyeColor];
       if (id == B_GRASS) return PeTextures.T_GRASS_SIDE;
       if (id == B_SNOW) return PeTextures.T_SNOW_SIDE;
       if (id == B_BED_RED) return PeTextures.T_BED_RED;
@@ -1880,6 +2202,11 @@ public final class PeWorld {
    }
 
    public static String getItemName(int id) {
+      if (id < 0) id &= 0xFF;
+      int dyeColor = PeColors.dyeColorForItem(id);
+      if (dyeColor >= 0) return PeColors.NAMES[dyeColor] + " Dye";
+      String colorName = PeColors.nameForBlock(id);
+      if (colorName != null) return colorName;
       switch (id) {
          case 0: return "Empty Hand";
          case B_GRASS: return "Grass Block";
@@ -1924,6 +2251,7 @@ public final class PeWorld {
          case B_IRON_ORE: return "Iron Ore";
          case B_COAL_ORE: return "Coal Ore";
          case B_DIAMOND_ORE: return "Diamond Ore";
+         case (B_LAPIS_ORE & 0xFF): return "Lapis Lazuli Ore";
          case B_REDSTONE_ORE: return "Redstone Ore";
          case B_GOLD_BLOCK: return "Gold Block";
          case B_DIAMOND_BLOCK: return "Diamond Block";
@@ -2019,10 +2347,16 @@ public final class PeWorld {
    public void settleGravityColumnAbove(int wx, int wy, int wz) {
       for (int checkY = wy + 1; checkY < WORLD_H - 1; checkY++) {
          byte above = getBlockFast(wx, checkY, wz);
-         if (above == B_SAND || above == B_GRAVEL) {
+         boolean powder = PeColors.isPowder(above & 0xFF);
+         if (above == B_SAND || above == B_GRAVEL || powder) {
             int destY = checkY;
-            while (destY > 1 && getBlockFast(wx, destY - 1, wz) == B_AIR) {
-               destY--;
+            while (destY > 1) {
+               byte below = getBlockFast(wx, destY - 1, wz);
+               if (below == B_AIR || (powder && (below == B_WATER || below == B_LAVA || below == B_TALL_GRASS))) {
+                  destY--;
+               } else {
+                  break;
+               }
             }
             if (destY != checkY) {
                setBlock(wx, checkY, wz, B_AIR);
@@ -2034,11 +2368,50 @@ public final class PeWorld {
       }
    }
 
+   private boolean concretePowderTouchesWater(int x, int y, int z) {
+      return getBlockFast(x + 1, y, z) == B_WATER || getBlockFast(x - 1, y, z) == B_WATER
+         || getBlockFast(x, y, z + 1) == B_WATER || getBlockFast(x, y, z - 1) == B_WATER
+         || getBlockFast(x, y + 1, z) == B_WATER;
+   }
+
+   /** One World-of-Color powder update: water hardens it; otherwise it falls through empty/fluid cells. */
+   public void tickConcretePowderAt(int x, int y, int z) {
+      if (y <= 1 || y >= WORLD_H - 1) return;
+      byte powder = getBlockFast(x, y, z);
+      int powderId = powder & 0xFF;
+      if (!PeColors.isPowder(powderId)) return;
+      if (concretePowderTouchesWater(x, y, z)) {
+         setBlock(x, y, z, (byte)PeColors.hardenedBlock(powderId));
+         return;
+      }
+      byte below = getBlockFast(x, y - 1, z);
+      if (below == B_AIR || below == B_WATER || below == B_LAVA || below == B_TALL_GRASS) {
+         setBlock(x, y, z, B_AIR);
+         setBlock(x, y - 1, z, powder);
+      }
+   }
+
+   private void tickConcretePowderNearPlayer() {
+      int centerX = (int)Math.floor(this.px);
+      int centerY = (int)Math.floor(this.py);
+      int centerZ = (int)Math.floor(this.pz);
+      // Staggered local simulation keeps mobile costs bounded and makes nearby powder react promptly.
+      for (int dy = -4; dy <= 4; dy++) {
+         int y = centerY + dy;
+         if (y <= 1 || y >= WORLD_H - 1) continue;
+         for (int dz = -4; dz <= 4; dz++) {
+            for (int dx = -4; dx <= 4; dx++) {
+               tickConcretePowderAt(centerX + dx, y, centerZ + dz);
+            }
+         }
+      }
+   }
+
    /**
     * PC Update 3.10 Animated 3D Tree Felling:
     * When chopping the base/trunk log of a natural tree, collects the trunk logs and canopy leaves,
     * removes them from the static chunk grid, and launches an animated 3D FallingTree that topples
-    * smoothly from 0..90 degrees at 120Hz before crashing onto the ground and placing the fallen trunk!
+    * smoothly from 0..90 degrees at high frame rates before crashing onto the ground and placing the fallen trunk!
     */
    public boolean fellTreeIfNatural(int x, int y, int z, byte logType) {
       int leavesAround = 0;
@@ -2206,6 +2579,11 @@ public final class PeWorld {
    private void awardSurvivalBlockDrop(byte broken) {
       if (this.mode != MODE_SURVIVAL || broken == B_AIR) return;
       if (broken == B_TALL_GRASS) return;
+      if (broken == B_LAPIS_ORE) {
+         giveItem(I_DYE_BLUE, 4 + (int)(this.tickCount & 3L));
+         showBanner("Found Blue Dye from Lapis Ore");
+         return;
+      }
       if (isLeaves(broken)) {
          if ((this.tickCount & 3L) == 0L) {
             giveItem(B_PLANKS_OAK, 1);
@@ -2351,6 +2729,7 @@ public final class PeWorld {
                }
             }
             setBlock(pxPlace, finalY, pzPlace, heldByte);
+            if (PeColors.isPowder(held & 0xFF)) tickConcretePowderAt(pxPlace, finalY, pzPlace);
             if (this.mode != MODE_CREATIVE) {
                consumeSelectedSlot(1);
             }
@@ -2400,7 +2779,7 @@ public final class PeWorld {
       if (this.screen != SCREEN_PLAY) {
          return;
       }
-      // Snapshot previous tick state for 120Hz sub-tick camera & view-bobbing interpolation!
+      // Snapshot previous tick state for high-refresh sub-tick camera & view-bobbing interpolation!
       this.prevPx = this.px;
       this.prevPy = this.py;
       this.prevPz = this.pz;
@@ -2409,6 +2788,7 @@ public final class PeWorld {
       this.prevSwingAnim = this.swingAnim;
 
       this.tickCount++;
+      if ((this.tickCount & 7L) == 0L) tickConcretePowderNearPlayer();
       if (this.hurtTime > 0) this.hurtTime--;
       if (this.invulnTicks > 0) this.invulnTicks--;
       if (this.bannerTicks > 0) this.bannerTicks--;
@@ -2425,7 +2805,7 @@ public final class PeWorld {
       float targetEye = (this.sneaking && !this.flying) ? 1.46F : 1.62F;
       this.eyeHeight += (targetEye - this.eyeHeight) * 0.45F;
 
-      // Stream at most 1 new chunk per tick while moving for zero frame hitches at 120Hz
+      // Stream at most 1 new chunk per tick while moving for zero frame hitches at high frame rates
       ensureChunksAroundPlayer(1);
 
       // 1. Player Movement & Right-Handed Camera Basis:

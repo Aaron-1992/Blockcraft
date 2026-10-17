@@ -178,6 +178,7 @@ public final class PeChunkMesher {
    // ====================================================================
    private static boolean shouldRenderFace(byte self, byte neighbor, int face) {
       if (neighbor == PeWorld.B_AIR) return true;
+      if (PeWorld.isGlassBlock(self) && PeWorld.isGlassBlock(neighbor)) return false;
       // Cutout foliage blocks (Oak, Spruce, Birch Leaves) have sky cutouts so all 6 faces
       // not against a solid opaque block must be rendered to prevent one-way invisible faces!
       if (PeWorld.isLeaves(self)) {
@@ -788,7 +789,7 @@ public final class PeChunkMesher {
     * PC Update 3.10 Animated 3D Falling Trees Renderer:
     * Smoothly rotates every trunk log and canopy leaf block of each active FallingTree
     * around its cut hinge pivot (pivotX + 0.5, pivotY, pivotZ + 0.5) by getAngleDegrees(partial)
-    * from 0..90 degrees at 120Hz!
+    * from 0..90 degrees at high refresh rates!
     */
    public void addFallingTrees3D(PeWorld world, float partial, float dayBright) {
       if (world.fallingTrees.isEmpty()) return;
@@ -840,7 +841,7 @@ public final class PeChunkMesher {
 
    /**
     * Renders True 3D First-Person Held Tools, Weapons, Torches & 6-Face 3D Blocks
-    * in the camera's local coordinate frame (right, up, fwd) with 120Hz walk bobbing & swing arc!
+    * in the camera's local coordinate frame (right, up, fwd) with high-refresh walk bobbing & swing arc!
     */
    public void addFirstPersonHeld3D(int heldId, float camX, float camY, float camZ,
                                     float yawDeg, float pitchDeg, float swingProgress,

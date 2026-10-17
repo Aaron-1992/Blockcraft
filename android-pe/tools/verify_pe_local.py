@@ -38,15 +38,54 @@ public class AssetManager {
    }
 }
 """,
+    "android/content/SharedPreferences.java": """
+package android.content;
+public interface SharedPreferences {
+   boolean getBoolean(String key, boolean defValue);
+   int getInt(String key, int defValue);
+   Editor edit();
+   interface Editor {
+      Editor putBoolean(String key, boolean value);
+      Editor putInt(String key, int value);
+      void apply();
+   }
+}
+""",
     "android/content/Context.java": """
 package android.content;
 import android.content.res.AssetManager;
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 public class Context {
+   public static final int MODE_PRIVATE = 0;
+   private static final Map<String, MemoryPreferences> ALL_PREFERENCES = new HashMap<String, MemoryPreferences>();
    private final AssetManager assets = new AssetManager();
    private final File filesDir = new File(System.getProperty("java.io.tmpdir", "/tmp"), "pe-test-files");
    public AssetManager getAssets() { return assets; }
    public File getFilesDir() { filesDir.mkdirs(); return filesDir; }
+   public synchronized SharedPreferences getSharedPreferences(String name, int mode) {
+      MemoryPreferences prefs = ALL_PREFERENCES.get(name);
+      if (prefs == null) { prefs = new MemoryPreferences(); ALL_PREFERENCES.put(name, prefs); }
+      return prefs;
+   }
+   private static final class MemoryPreferences implements SharedPreferences {
+      private final Map<String, Object> values = new HashMap<String, Object>();
+      public boolean getBoolean(String key, boolean defValue) {
+         Object value = values.get(key); return value instanceof Boolean ? ((Boolean)value).booleanValue() : defValue;
+      }
+      public int getInt(String key, int defValue) {
+         Object value = values.get(key); return value instanceof Integer ? ((Integer)value).intValue() : defValue;
+      }
+      public Editor edit() {
+         return new Editor() {
+            private final Map<String, Object> pending = new HashMap<String, Object>();
+            public Editor putBoolean(String key, boolean value) { pending.put(key, Boolean.valueOf(value)); return this; }
+            public Editor putInt(String key, int value) { pending.put(key, Integer.valueOf(value)); return this; }
+            public void apply() { values.putAll(pending); }
+         };
+      }
+   }
 }
 """,
     "android/view/Display.java": """
@@ -324,17 +363,74 @@ package com.blockcraft.pe;
 
 import android.content.Context;
 import android.view.MotionEvent;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class PeCoreTest {
    private static void check(boolean cond, String msg) {
       if (!cond) throw new AssertionError("FAIL: " + msg);
    }
 
-   public static void main(String[] args) {
+   public static void main(String[] args) throws Exception {
       Context ctx = new Context();
 
-      // 1. Verify Pixel-Art Texture Atlas (TexPaint / TexPaint319) & Authentic 16x6 (8x11 cell) font.bin decoding
+      // 1. Verify World of Color block IDs, desktop palette mapping, names, and 16x16 atlased art.
+      check(PeColors.ALL_BLOCKS.length == 96, "World of Color catalogue must contain 6 complete 16-block families");
+      check(PeWorld.MAX_BLOCK_ID == 178, "Unsigned-byte block catalogue must include every color block and Lapis Ore through ID 178");
+      check(PeWorld.migrateLegacyItemId(98) == PeWorld.I_SWORD_WOOD
+            && PeWorld.migrateLegacyItemId(115) == PeWorld.I_BREAD
+            && PeWorld.migrateLegacyItemId(89) == 89,
+         "Legacy v1.8 item IDs must migrate without changing existing block IDs");
+      boolean[] seenColorBlocks = new boolean[256];
+      boolean[] seenColorTiles = new boolean[256];
+      for (int family = 0; family < PeColors.FAMILY_BLOCKS.length; family++) {
+         for (int color = 0; color < 16; color++) {
+            int id = PeColors.FAMILY_BLOCKS[family][color];
+            int tile = PeWorld.getItemTile(id);
+            check(id > 0 && id <= PeWorld.MAX_BLOCK_ID && !seenColorBlocks[id],
+               "Color blocks must use distinct positive unsigned IDs; duplicate/invalid ID=" + id);
+            seenColorBlocks[id] = true;
+            check(tile == PeColors.FAMILY_TILES[family][color] && tile >= 0 && tile < 256 && !seenColorTiles[tile],
+               "Color family block must map to a unique in-range texture tile");
+            seenColorTiles[tile] = true;
+            check(PeColors.nameForBlock(id) != null && PeWorld.getItemName(id).equals(PeColors.nameForBlock(id)),
+               "Color block must have a material-aware item name");
+            check(PeWorld.isOpaque((byte)id) == (family != 4),
+               "Only stained glass family blocks should be transparent");
+         }
+      }
+      check(PeWorld.I_SWORD_WOOD > PeWorld.MAX_BLOCK_ID && PeWorld.I_BREAD > PeWorld.MAX_BLOCK_ID
+            && PeWorld.I_DYE_WHITE > PeWorld.MAX_BLOCK_ID && PeWorld.I_DYE_BLACK > PeWorld.I_DYE_WHITE,
+         "Non-block inventory items and dye IDs must not collide with unsigned byte block IDs");
+      check(PeColors.DYE_ITEMS.length == 16, "The Colors UI must expose all 16 dye item variants");
+      for (int color = 0; color < 16; color++) {
+         int dye = PeColors.DYE_ITEMS[color];
+         check(PeColors.dyeColorForItem(dye) == color
+               && PeWorld.getItemName(dye).equals(PeColors.NAMES[color] + " Dye")
+               && PeWorld.getItemTile(dye) == PeColors.FAMILY_TILES[0][color],
+            "Every dye item must keep its color identity, readable name, and matching crisp swatch icon");
+      }
+      check(PeWorld.getFaceTile(PeWorld.B_LAPIS_ORE, 3) == PeTextures.T_LAPIS_ORE,
+         "Lapis Ore must map to its own blue ore texture");
+
+      // 2. Verify Pixel-Art Texture Atlas (TexPaint / TexPaint319) & Authentic 16x6 (8x11 cell) font.bin decoding
       int[] atlas = PeTextures.generateAtlasPixels();
+      for (int family = 0; family < PeColors.FAMILY_TILES.length; family++) {
+         for (int color = 0; color < 16; color++) {
+            int tile = PeColors.FAMILY_TILES[family][color];
+            int tx = (tile & 15) * 16;
+            int ty = (tile >> 4) * 16;
+            int painted = 0;
+            for (int y = 0; y < 16; y++) {
+               for (int x = 0; x < 16; x++) {
+                  if (atlas[(ty + y) * 256 + tx + x] != 0) painted++;
+               }
+            }
+            check(painted >= 180, "Each World of Color material tile must contain visible 16x16 art, family=" + family + " color=" + color);
+         }
+      }
       check(atlas.length == 256 * 256, "Atlas pixel count must be 65536");
       int leafTx0 = (PeTextures.T_LEAVES_OAK & 15) * 16;
       int leafTy0 = (PeTextures.T_LEAVES_OAK >> 4) * 16;
@@ -363,6 +459,8 @@ public class PeCoreTest {
       world.createNewSinglePlayerWorld(ctx, 0, PeWorld.MODE_SURVIVAL, PeWorld.WTYPE_LARGE_BIOMES, 884219551L);
       check(world.screen == PeWorld.SCREEN_PLAY, "New world must enter SCREEN_PLAY");
       check(world.slotExists[0], "World slot 0 must exist on disk after creation");
+      check(world.invId[6] == PeWorld.B_WOOL_WHITE && world.invCount[6] == 4,
+         "Survival must provide a small wool base stack for the new color-crafting path");
 
       // Place block near spawn AND travel 4,000 blocks away in the infinite world!
       world.setBlock(3, 72, -3, PeWorld.B_GOLD_BLOCK);
@@ -383,7 +481,157 @@ public class PeCoreTest {
       check(loaded.getBlock(3, 72, -3) == PeWorld.B_GOLD_BLOCK, "Saved spawn Gold Block at (3, 72, -3) must also be restored");
       check(Math.abs(loaded.px - 2405.5) < 0.01 && Math.abs(loaded.pz - (-3208.5)) < 0.01, "Saved distant player position must be restored");
 
-      // 3. Verify Right-Handed Walking Left (-X) and Right (+X) at yaw = 0 (facing -Z)
+      // A v1.8 (format v2) save used IDs 98..115 for items; it must migrate rather than become new blocks.
+      File oldSave = new File(PeWorld.getSavesDir(ctx), "world_2.bcpe");
+      DataOutputStream legacy = new DataOutputStream(new GZIPOutputStream(new FileOutputStream(oldSave)));
+      legacy.writeInt(0x42435045); legacy.writeInt(2);
+      legacy.writeInt(PeWorld.MODE_SURVIVAL); legacy.writeInt(PeWorld.WTYPE_SUPERFLAT);
+      legacy.writeLong(55L); legacy.writeLong(0L); legacy.writeFloat(0.22F);
+      legacy.writeDouble(0.5); legacy.writeDouble(66.0); legacy.writeDouble(0.5);
+      legacy.writeFloat(0.0F); legacy.writeFloat(0.0F); legacy.writeBoolean(false);
+      legacy.writeInt(20); legacy.writeInt(20); legacy.writeInt(0);
+      for (int slot = 0; slot < 9; slot++) {
+         legacy.writeInt(slot == 0 ? 98 : 0); legacy.writeInt(slot == 0 ? 1 : 0);
+      }
+      legacy.writeInt(0); legacy.writeInt(0x42414731);
+      for (int slot = 0; slot < 27; slot++) {
+         legacy.writeInt(slot == 0 ? 115 : 0); legacy.writeInt(slot == 0 ? 3 : 0);
+      }
+      legacy.close();
+      PeWorld migrated = new PeWorld();
+      check(migrated.loadWorld(ctx, 2), "legacy v1.8 save must remain loadable after the item-ID expansion");
+      check(migrated.hotbarId[0] == PeWorld.I_SWORD_WOOD && migrated.invId[0] == PeWorld.I_BREAD
+            && migrated.invCount[0] == 3,
+         "legacy hotbar and backpack IDs must migrate to non-overlapping item IDs");
+
+      // 3. Verify concrete powder hardens beside water and falls through open space.
+      PeWorld colorWorld = new PeWorld();
+      colorWorld.createNewSinglePlayerWorld(ctx, 1, PeWorld.MODE_CREATIVE, PeWorld.WTYPE_SUPERFLAT, 91L);
+      int powderRed = PeColors.POWDER_BLOCKS[14];
+      int concreteRed = PeColors.CONCRETE_BLOCKS[14];
+      colorWorld.setBlock(6, 90, 6, (byte)powderRed);
+      colorWorld.setBlock(7, 90, 6, PeWorld.B_WATER);
+      colorWorld.tickConcretePowderAt(6, 90, 6);
+      check(colorWorld.getBlock(6, 90, 6) == (byte)concreteRed,
+         "red concrete powder must harden when water touches a side");
+      colorWorld.setBlock(10, 90, 10, (byte)PeColors.POWDER_BLOCKS[0]);
+      colorWorld.setBlock(10, 89, 10, PeWorld.B_AIR);
+      colorWorld.tickConcretePowderAt(10, 90, 10);
+      check(colorWorld.getBlock(10, 90, 10) == PeWorld.B_AIR
+            && colorWorld.getBlock(10, 89, 10) == (byte)PeColors.POWDER_BLOCKS[0],
+         "concrete powder must fall one block at a time through open space");
+
+      // Survival dyes: gather base colors, mix secondary colors, then make colored wool/material batches.
+      PeWorld dyeWorld = new PeWorld();
+      dyeWorld.mode = PeWorld.MODE_SURVIVAL;
+      dyeWorld.hotbarId[0] = PeWorld.B_FLOWER_RED; dyeWorld.hotbarCount[0] = 1;
+      dyeWorld.hotbarId[1] = PeWorld.B_FLOWER_YELLOW; dyeWorld.hotbarCount[1] = 1;
+      check(dyeWorld.tryCraftDye(14, null) && dyeWorld.tryCraftDye(4, null),
+         "Red and Yellow Dye must be craftable from gathered flowers");
+      check(dyeWorld.tryCraftDye(1, null) && dyeWorld.countItemInHotbar(PeWorld.I_DYE_ORANGE) == 2,
+         "Desktop dye mixing must consume Red + Yellow and produce two Orange Dye");
+      dyeWorld.hotbarId[2] = PeWorld.B_WOOL_WHITE; dyeWorld.hotbarCount[2] = 1;
+      dyeWorld.hotbarId[3] = PeWorld.I_DYE_RED; dyeWorld.hotbarCount[3] = 1;
+      check(dyeWorld.tryCraftColorBlock(0, 14, null)
+            && dyeWorld.countItemInHotbar(PeColors.WOOL_BLOCKS[14]) == 1,
+         "Survival Colors family must dye wool using a gathered base block and matching dye");
+
+      PeWorld materialCraftWorld = new PeWorld();
+      materialCraftWorld.mode = PeWorld.MODE_SURVIVAL;
+      materialCraftWorld.hotbarId[0] = PeWorld.B_TERRACOTTA; materialCraftWorld.hotbarCount[0] = 4;
+      materialCraftWorld.hotbarId[1] = PeColors.TERRACOTTA_BLOCKS[2]; materialCraftWorld.hotbarCount[1] = 4;
+      materialCraftWorld.hotbarId[2] = PeWorld.I_DYE_RED; materialCraftWorld.hotbarCount[2] = 1;
+      check(materialCraftWorld.tryCraftColorBlock(2, 14, null)
+            && materialCraftWorld.countItemInHotbar(PeColors.TERRACOTTA_BLOCKS[14]) == 8,
+         "Eight plain or colored terracotta plus one dye must craft eight selected-color terracotta blocks");
+      materialCraftWorld.hotbarId[3] = PeWorld.B_SAND; materialCraftWorld.hotbarCount[3] = 4;
+      materialCraftWorld.hotbarId[4] = PeWorld.B_GRAVEL; materialCraftWorld.hotbarCount[4] = 4;
+      materialCraftWorld.hotbarId[5] = PeWorld.I_DYE_BLUE; materialCraftWorld.hotbarCount[5] = 1;
+      check(materialCraftWorld.tryCraftColorBlock(3, 11, null)
+            && materialCraftWorld.countItemInHotbar(PeColors.POWDER_BLOCKS[11]) == 8,
+         "Four sand, four gravel, and a dye must craft eight concrete powder");
+
+      // Two adjacent stained-glass blocks should not emit their shared internal face.
+      int glassA = PeColors.STAINED_GLASS_BLOCKS[14];
+      int glassB = PeColors.STAINED_GLASS_BLOCKS[13];
+      colorWorld.setBlock(20, 90, 20, (byte)glassA);
+      colorWorld.setBlock(21, 90, 20, (byte)glassB);
+      int glassVertices = new PeChunkMesher().buildSectionGeometry(colorWorld, 1, 5, 1, new float[10000]);
+      check(glassVertices == 60, "adjacent stained-glass blocks must cull the two shared face sets (expected 60 vertices)");
+      check(colorWorld.saveWorld(ctx), "world with unsigned color-block IDs must save in the new format");
+      PeWorld colorReloaded = new PeWorld();
+      check(colorReloaded.loadWorld(ctx, 1), "world containing color blocks must reload");
+      check(colorReloaded.getBlock(20, 90, 20) == (byte)glassA
+            && colorReloaded.getBlock(21, 90, 20) == (byte)glassB
+            && !PeWorld.isOpaque(colorReloaded.getBlock(20, 90, 20)),
+         "signed-byte stained-glass IDs must survive save/load and remain transparent");
+
+      // 4. Verify World of Color inventory selection and settings persistence/hitboxes.
+      PeWorld uiWorld = new PeWorld();
+      uiWorld.screen = PeWorld.SCREEN_INVENTORY;
+      uiWorld.mode = PeWorld.MODE_CREATIVE;
+      PeTouchController uiTouch = new PeTouchController();
+      uiTouch.updateLayout(540, 360);
+      check(Math.abs(uiTouch.menuScale() - (540.0F / 2340.0F)) < 0.001F,
+         "touch menu scale must use the real narrow landscape viewport, matching renderer scaling");
+      uiTouch.updateLayout(2340, 1080);
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1790.0F, 145.0F), ctx, uiWorld, null);
+      check(uiWorld.invCategory == 4, "fifth inventory tab must open World of Color");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1870.0F, 306.0F), ctx, uiWorld, null);
+      check(uiWorld.colorFamily == 1, "right-side material family card must select Concrete");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 753.0F, 758.0F), ctx, uiWorld, null);
+      check(uiWorld.hotbarId[uiWorld.selectedSlot] == concreteRed && uiWorld.hotbarCount[uiWorld.selectedSlot] == 64,
+         "4x4 World of Color swatches must equip the tapped concrete color");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1650.0F, 750.0F), ctx, uiWorld, null);
+      check(uiWorld.colorFamily == 6, "wide bottom color selector must open the 16-dye collection");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 753.0F, 758.0F), ctx, uiWorld, null);
+      check(uiWorld.hotbarId[uiWorld.selectedSlot] == PeWorld.I_DYE_RED
+            && uiWorld.hotbarCount[uiWorld.selectedSlot] == 64,
+         "Creative Dyes swatches must equip stackable dye items instead of block-family IDs");
+
+      PeWorld survivalColorUI = new PeWorld();
+      survivalColorUI.screen = PeWorld.SCREEN_INVENTORY;
+      survivalColorUI.mode = PeWorld.MODE_SURVIVAL;
+      survivalColorUI.invCategory = 4;
+      survivalColorUI.colorFamily = 0;
+      survivalColorUI.hotbarId[0] = PeWorld.B_WOOL_WHITE; survivalColorUI.hotbarCount[0] = 1;
+      survivalColorUI.hotbarId[1] = PeWorld.I_DYE_RED; survivalColorUI.hotbarCount[1] = 1;
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 753.0F, 758.0F), ctx, survivalColorUI, null);
+      check(survivalColorUI.selectedColor == 14, "survival swatch tap must store the selected dye color");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1400.0F, 306.0F), ctx, survivalColorUI, null);
+      check(survivalColorUI.countItemInHotbar(PeColors.WOOL_BLOCKS[14]) == 1,
+         "survival material-family card must execute its matching color recipe");
+      survivalColorUI.hotbarId[2] = PeWorld.B_FLOWER_RED; survivalColorUI.hotbarCount[2] = 1;
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1650.0F, 750.0F), ctx, survivalColorUI, null);
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 753.0F, 758.0F), ctx, survivalColorUI, null);
+      check(survivalColorUI.countItemInHotbar(PeWorld.I_DYE_RED) == 1,
+         "survival Dyes collection must craft a dye from gathered flowers through touch UI");
+
+      uiWorld.screen = PeWorld.SCREEN_SETTINGS;
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 239.0F), ctx, uiWorld, null);
+      check(!uiTouch.useAnalogStick, "visible Settings row hitbox must toggle the movement control");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 345.0F), ctx, uiWorld, null);
+      check(uiTouch.touchTapToInteract, "second Settings row hitbox must toggle stationary tap interaction");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 451.0F), ctx, uiWorld, null);
+      check(uiTouch.sensitivityLevel == 2, "third Settings row hitbox must advance look sensitivity");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 557.0F), ctx, uiWorld, null);
+      check(!uiWorld.autoJump, "fourth Settings row hitbox must toggle auto-jump");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 663.0F), ctx, uiWorld, null);
+      check(uiWorld.viewRadiusChunks == 6, "fifth Settings row hitbox must advance render distance");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 769.0F), ctx, uiWorld, null);
+      check(PeTextures.activePackMode == 1, "sixth Settings row hitbox must cycle resource packs");
+      PeTouchController restoredSettings = new PeTouchController();
+      restoredSettings.loadPreferences(ctx, uiWorld);
+      check(!restoredSettings.useAnalogStick && restoredSettings.touchTapToInteract
+            && restoredSettings.sensitivityLevel == 2 && !uiWorld.autoJump && uiWorld.viewRadiusChunks == 6
+            && PeTextures.activePackMode == 1,
+         "all visible control, performance, and resource-pack settings must persist between activity instances");
+      uiTouch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, 1170.0F, 895.0F), ctx, uiWorld, null);
+      check(uiWorld.screen == PeWorld.SCREEN_TITLE, "Settings Done button must return to the previous screen");
+      PeTextures.activePackMode = 0;
+      PeTextures.dirtyAtlas = false;
+
+      // 5. Verify Right-Handed Walking Left (-X) and Right (+X) at yaw = 0 (facing -Z)
       PeWorld moveWorld = new PeWorld();
       moveWorld.createNewSinglePlayerWorld(ctx, 1, PeWorld.MODE_CREATIVE, PeWorld.WTYPE_SUPERFLAT, 12345L);
       moveWorld.flying = true;
@@ -425,7 +673,7 @@ public class PeCoreTest {
       check(Math.abs(moveWorld.py - 64.5) < 0.05,
          "Walking onto a 0.5-height Oak Slab must step up smoothly to Y=64.5 without vertical bounce, got Y=" + moveWorld.py);
 
-      // 4. Verify Camera Look Isolation (Dragging camera NEVER triggers mining, attack, or block place!)
+      // 6. Verify Camera Look Isolation (Dragging camera NEVER triggers mining, attack, or block place!)
       touch.resetPointers(moveWorld);
       float lookX0 = 1400.0F, lookY0 = 450.0F;
       touch.onTouchEvent(new MotionEvent(MotionEvent.ACTION_DOWN, 0, 0, lookX0, lookY0), ctx, moveWorld, null);
@@ -437,7 +685,7 @@ public class PeCoreTest {
       check(!touch.miningHeld && !touch.attackTapped && !touch.placeTapped,
          "Releasing finger after camera look must NEVER trigger attack or block placement!");
 
-      // 5. Verify Single-Player Crafting, 36-Slot Backpack, Animated 3D Falling Trees, 3D Tools & VBO Mesher
+      // 7. Verify Single-Player Crafting, 36-Slot Backpack, Animated 3D Falling Trees, 3D Tools & VBO Mesher
       moveWorld.giveItem(PeWorld.B_LOG_BIRCH, 2);
       check(moveWorld.tryCraftRecipe(0, null), "Crafting Planks x4 from Birch Log must succeed via flexible wood matching");
 
@@ -520,7 +768,7 @@ public class PeCoreTest {
             check(nonZero >= 12, "Block id=" + id + " face=" + face + " tile=" + tile + " has crisp pixel art (" + nonZero + " px)");
          }
       }
-      for (int itemId = PeWorld.I_SWORD_WOOD; itemId <= PeWorld.I_BREAD; itemId++) {
+      for (int itemId = PeWorld.I_SWORD_WOOD; itemId <= PeWorld.I_DYE_BLACK; itemId++) {
          int tile = PeWorld.getItemTile(itemId);
          int tx0 = (tile & 15) * 16;
          int ty0 = (tile >> 4) * 16;
@@ -533,7 +781,7 @@ public class PeCoreTest {
          check(nonZero >= 16, "Item id=" + itemId + " (" + PeWorld.getItemName(itemId) + ") tile=" + tile + " has crisp outlined pixel art (" + nonZero + " px)");
       }
 
-      System.out.println("PeCoreTest PASSED: Master Pixel-Art Texture Overhaul, CCW Face Winding, Upright Side UVs, Animated 3D Falling Trees, 3D Tools, 36-Slot Backpack, and Controls verified!");
+      System.out.println("PeCoreTest PASSED: World of Color dyes/recipes, lapis mining support, legacy-save migration, powder physics, mobile UI hitboxes/preferences, pixel-art atlas, infinite worlds, and gameplay controls verified!");
    }
 }
 """

@@ -10,8 +10,7 @@ import java.util.Map;
 import java.util.Random;
 
 /**
- * Low-latency Android AudioTrack SFX & Ambient Music Engine for Blockcraft PE
- * on Samsung Galaxy A55 5G (API 26..34).
+ * Low-latency Android AudioTrack sound-effects and ambient-music engine (API 26+).
  */
 public final class PeAudio {
    private static final int SAMPLE_RATE = 22050;

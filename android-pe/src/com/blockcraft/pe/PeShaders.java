@@ -3,7 +3,7 @@ package com.blockcraft.pe;
 import android.opengl.GLES20;
 
 /**
- * OpenGL ES 2.0 / 3.0 GLSL Shader Pipeline for Blockcraft PE (Samsung Galaxy A55 5G Xclipse 530 GPU).
+ * OpenGL ES 2.0-compatible GLSL shader pipeline for Blockcraft Pocket Edition.
  */
 public final class PeShaders {
    private static final String VS_3D =

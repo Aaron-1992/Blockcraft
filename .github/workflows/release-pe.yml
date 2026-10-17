@@ -1,17 +1,17 @@
 name: Release PE
 
-# Publishes Blockcraft PE (Pocket Edition for Android / Samsung Galaxy A55 5G) as a strictly
+# Publishes Blockcraft PE (standalone Android Pocket Edition) as a strictly
 # separated GitHub Release (tag pe-v<ver>) containing ONLY the Android APK & PE bundle —
 # never including PC versions, while .github/workflows/release.yml remains strictly for PC releases.
 #
 # Trigger: Actions tab -> Release PE -> Run workflow, or push a change to ci/pe-release-trigger.txt
-# (first line = PE version to publish, e.g. 1.0).
+# (first line = PE version to publish, e.g. 1.10).
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "PE version to publish, e.g. 1.0"
-        default: "1.0"
+        description: "PE version to publish, e.g. 1.10"
+        default: "1.10"
   push:
     branches: ["arena/**"]
     paths: ["ci/pe-release-trigger.txt"]
@@ -36,14 +36,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Build & Verify Blockcraft PE APK (Samsung Galaxy A55 5G)
+      - name: Build & Verify Blockcraft PE APK
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -eo pipefail
           VER="$INPUT_VERSION"
           if [ -z "$VER" ]; then VER="$(head -n1 ci/pe-release-trigger.txt | tr -d '[:space:]')"; fi
-          if [ -z "$VER" ]; then VER="1.0"; fi
+          if [ -z "$VER" ]; then VER="1.10"; fi
           echo "PE version: '$VER'"
           mkdir -p build
           python3 android-pe/tools/build_pe_apk.py "$VER" 2>&1 | tee build/release-pe.log
@@ -54,7 +54,7 @@ jobs:
         run: |
           VER="$(cat build/release-pe/VERSION | tr -d '[:space:]')"
           TAG="pe-v$VER"
-          TITLE="Blockcraft PE v$VER (Android / Samsung Galaxy A55 5G)"
+          TITLE="Blockcraft PE v$VER (Android)"
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "PE release $TAG exists -> replacing its PE assets"
             gh release upload "$TAG" build/release-pe/*.apk build/release-pe/*.zip --clobber

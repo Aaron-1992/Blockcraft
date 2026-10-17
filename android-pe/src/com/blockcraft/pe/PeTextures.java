@@ -179,13 +179,108 @@ public final class PeTextures {
    public static final int T_ITEM_COAL = 159;
    public static final int T_ITEM_BREAD = 160;
 
+   // World of Color block textures (all tiles remain crisp 16x16 pixel art).
+   public static final int T_WOOL_ORANGE = 161;
+   public static final int T_WOOL_MAGENTA = 162;
+   public static final int T_WOOL_LIGHT_BLUE = 163;
+   public static final int T_WOOL_LIME = 164;
+   public static final int T_WOOL_PINK = 165;
+   public static final int T_WOOL_GRAY = 166;
+   public static final int T_WOOL_LIGHT_GRAY = 167;
+   public static final int T_WOOL_CYAN = 168;
+   public static final int T_WOOL_PURPLE = 169;
+   public static final int T_WOOL_BROWN = 170;
+   public static final int T_WOOL_BLACK = 171;
+
+   public static final int T_CONCRETE_WHITE = 172;
+   public static final int T_CONCRETE_ORANGE = 173;
+   public static final int T_CONCRETE_MAGENTA = 174;
+   public static final int T_CONCRETE_LIGHT_BLUE = 175;
+   public static final int T_CONCRETE_LIME = 176;
+   public static final int T_CONCRETE_PINK = 177;
+   public static final int T_CONCRETE_LIGHT_GRAY = 178;
+   public static final int T_CONCRETE_CYAN = 179;
+   public static final int T_CONCRETE_PURPLE = 180;
+   public static final int T_CONCRETE_BROWN = 181;
+   public static final int T_CONCRETE_GREEN = 182;
+   public static final int T_CONCRETE_BLACK = 183;
+
+   public static final int T_TERRACOTTA_WHITE = 184;
+   public static final int T_TERRACOTTA_ORANGE = 185;
+   public static final int T_TERRACOTTA_MAGENTA = 186;
+   public static final int T_TERRACOTTA_LIGHT_BLUE = 187;
+   public static final int T_TERRACOTTA_YELLOW = 188;
+   public static final int T_TERRACOTTA_LIME = 189;
+   public static final int T_TERRACOTTA_PINK = 190;
+   public static final int T_TERRACOTTA_GRAY = 191;
+   public static final int T_TERRACOTTA_LIGHT_GRAY = 192;
+   public static final int T_TERRACOTTA_CYAN = 193;
+   public static final int T_TERRACOTTA_PURPLE = 194;
+   public static final int T_TERRACOTTA_BLUE = 195;
+   public static final int T_TERRACOTTA_BROWN = 196;
+   public static final int T_TERRACOTTA_GREEN = 197;
+   public static final int T_TERRACOTTA_RED = 198;
+   public static final int T_TERRACOTTA_BLACK = 199;
+
+   public static final int T_POWDER_WHITE = 200;
+   public static final int T_POWDER_ORANGE = 201;
+   public static final int T_POWDER_MAGENTA = 202;
+   public static final int T_POWDER_LIGHT_BLUE = 203;
+   public static final int T_POWDER_YELLOW = 204;
+   public static final int T_POWDER_LIME = 205;
+   public static final int T_POWDER_PINK = 206;
+   public static final int T_POWDER_GRAY = 207;
+   public static final int T_POWDER_LIGHT_GRAY = 208;
+   public static final int T_POWDER_CYAN = 209;
+   public static final int T_POWDER_PURPLE = 210;
+   public static final int T_POWDER_BLUE = 211;
+   public static final int T_POWDER_BROWN = 212;
+   public static final int T_POWDER_GREEN = 213;
+   public static final int T_POWDER_RED = 214;
+   public static final int T_POWDER_BLACK = 215;
+
+   public static final int T_STAINED_GLASS_WHITE = 216;
+   public static final int T_STAINED_GLASS_ORANGE = 217;
+   public static final int T_STAINED_GLASS_MAGENTA = 218;
+   public static final int T_STAINED_GLASS_LIGHT_BLUE = 219;
+   public static final int T_STAINED_GLASS_YELLOW = 220;
+   public static final int T_STAINED_GLASS_LIME = 221;
+   public static final int T_STAINED_GLASS_PINK = 222;
+   public static final int T_STAINED_GLASS_GRAY = 223;
+   public static final int T_STAINED_GLASS_LIGHT_GRAY = 224;
+   public static final int T_STAINED_GLASS_CYAN = 225;
+   public static final int T_STAINED_GLASS_PURPLE = 226;
+   public static final int T_STAINED_GLASS_BLUE = 227;
+   public static final int T_STAINED_GLASS_BROWN = 228;
+   public static final int T_STAINED_GLASS_GREEN = 229;
+   public static final int T_STAINED_GLASS_RED = 230;
+   public static final int T_STAINED_GLASS_BLACK = 231;
+
+   public static final int T_GLAZED_WHITE = 232;
+   public static final int T_GLAZED_ORANGE = 233;
+   public static final int T_GLAZED_MAGENTA = 234;
+   public static final int T_GLAZED_LIGHT_BLUE = 235;
+   public static final int T_GLAZED_YELLOW = 236;
+   public static final int T_GLAZED_LIME = 237;
+   public static final int T_GLAZED_PINK = 238;
+   public static final int T_GLAZED_GRAY = 239;
+   public static final int T_GLAZED_LIGHT_GRAY = 240;
+   public static final int T_GLAZED_CYAN = 241;
+   public static final int T_GLAZED_PURPLE = 242;
+   public static final int T_GLAZED_BLUE = 243;
+   public static final int T_GLAZED_BROWN = 244;
+   public static final int T_GLAZED_GREEN = 245;
+   public static final int T_GLAZED_RED = 246;
+   public static final int T_GLAZED_BLACK = 247;
+   public static final int T_LAPIS_ORE = 248;
+
    public static final int FONT_COLS = 16;
    public static final int FONT_CELL_W = 8;
    public static final int FONT_CELL_H = 11;
 
    public static int activePackMode = 0;
    public static final String[] PACK_NAMES = {
-      "Brand-New Overhaul (V1.8)",
+      "World of Color (PE 1.10)",
       "Realistic 5.6 x MC (V1.7)",
       "V1.6 (5.6 x MC Fusion)",
       "V1.5 (Bold Pixel Art)",
@@ -356,7 +451,7 @@ public final class PeTextures {
             && tile != T_BUSHY_FROND_OAK && tile != T_BUSHY_FROND_SPRUCE && tile != T_BUSHY_FROND_BIRCH
             && tile != T_TALL_GRASS && tile != T_FLOWER_RED && tile != T_FLOWER_YELLOW && tile != T_TORCH;
          src = applyRealisticRelief(tilePixels, activePackMode == 0 ? 0.85F : 0.72F, wrap);
-      } else if (activePackMode == 3 && tile < 128) {
+      } else if (activePackMode == 3 && (tile < 128 || tile >= T_WOOL_ORANGE)) {
          src = applyRealisticRelief(tilePixels, 1.15F, false);
       }
       int tx0 = (tile & 15) * 16;
@@ -465,6 +560,7 @@ public final class PeTextures {
       blitTile(px, T_GOLD_ORE, paintOre(c(0xFCEE4B), c(0xC99E18), c(0xFFFFB5), 803, 6, false));
       blitTile(px, T_DIAMOND_ORE, paintOre(c(0x5DECF5), c(0x25A0B5), c(0xD2FFFF), 804, 5, true));
       blitTile(px, T_REDSTONE_ORE, paintOre(c(0xE32626), c(0x8F0E0E), c(0xFF7B7B), 805, 7, true));
+      blitTile(px, T_LAPIS_ORE, paintOre(c(0x355ED0), c(0x1D347D), c(0x91B2FF), 806, 7, false));
 
       // 6. Bricks, Stone Bricks, Glass, Obsidian, Glowstone
       blitTile(px, T_BRICKS, paintBricks());
@@ -536,16 +632,18 @@ public final class PeTextures {
       blitTile(px, T_END_STONE, paintEndStone());
       blitTile(px, T_PURPUR, paintPurpur());
 
-      blitTile(px, T_WOOL_WHITE, paintWool(0xEAECED, 1000));
-      blitTile(px, T_WOOL_RED, paintWool(0xA62B24, 1014));
-      blitTile(px, T_WOOL_BLUE, paintWool(0x2F3E9E, 1011));
-      blitTile(px, T_WOOL_GREEN, paintWool(0x3B511A, 1013));
-      blitTile(px, T_WOOL_YELLOW, paintWool(0xF0C629, 1004));
-      blitTile(px, T_TERRACOTTA, paintMineralStone(480, new int[]{c(0x8E563C), c(0x985E42), c(0xA2664A), c(0xAC7052)}));
-      blitTile(px, T_CONCRETE_GRAY, paintConcrete(0x383C40, 501));
-      blitTile(px, T_CONCRETE_YELLOW, paintConcrete(0xF0B418, 502));
-      blitTile(px, T_CONCRETE_BLUE, paintConcrete(0x2C3E98, 503));
-      blitTile(px, T_CONCRETE_RED, paintConcrete(0xA22420, 504));
+      blitTile(px, T_TERRACOTTA, paintTerracotta(0x985E43, 480));
+      for (int color = 0; color < 16; color++) {
+         int wool = PeColors.WOOL_RGB[color];
+         int concrete = PeColors.CONCRETE_RGB[color];
+         int terracotta = PeColors.TERRACOTTA_RGB[color];
+         blitTile(px, PeColors.FAMILY_TILES[0][color], paintWool(wool, 1000 + color * 17));
+         blitTile(px, PeColors.FAMILY_TILES[1][color], paintConcrete(concrete, 501 + color * 13));
+         blitTile(px, PeColors.FAMILY_TILES[2][color], paintTerracotta(terracotta, 1440 + color * 19));
+         blitTile(px, PeColors.FAMILY_TILES[3][color], paintConcretePowder(concrete, 1500 + color * 23));
+         blitTile(px, PeColors.FAMILY_TILES[4][color], paintStainedGlass(wool, 1600 + color * 29));
+         blitTile(px, PeColors.FAMILY_TILES[5][color], paintGlazedTerracotta(terracotta, wool, color));
+      }
 
       // 10. Crack Stages (0..9)
       paintCrackStages(px);
@@ -1737,6 +1835,91 @@ public final class PeTextures {
          for (int x = 0; x < N; x++) {
             float k = 0.97F + 0.06F * fbm(x, y, seed);
             p[y * N + x] = mul(base, k);
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintTerracotta(int hex, int seed) {
+      int base = c(hex);
+      int light = mul(base, 1.09F);
+      int dark = mul(base, 0.88F);
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float band = (float)Math.sin((y + (x >> 2)) * 0.68F + (fbm(x, y, seed) - 0.5F) * 0.22F);
+            int col = band > 0.42F ? light : (band < -0.42F ? dark : base);
+            float grain = (hash(x, y, seed + 1) - 0.5F) * 0.035F;
+            p[y * N + x] = mul(col, 1.0F + grain);
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintConcretePowder(int hex, int seed) {
+      int base = c(hex);
+      int light = mul(base, 1.14F);
+      int dark = mul(base, 0.78F);
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            float grain = fbm(x, y, seed) * 0.62F + hash(x, y, seed + 1) * 0.38F;
+            int col = grain > 0.70F ? light : (grain < 0.25F ? dark : base);
+            // Small, irregular sand-like flecks keep powder visibly granular at 16x16.
+            if (hash(x >> 1, y >> 1, seed + 2) > 0.79F) col = mul(col, 0.86F);
+            p[y * N + x] = col;
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintStainedGlass(int hex, int seed) {
+      int base = c(hex);
+      int edge = mul(base, 0.60F);
+      int hi = mix(c(0xFFFFFF), base, 0.32F);
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            boolean border = x == 0 || y == 0 || x == 15 || y == 15;
+            boolean frame = x == 1 || y == 1 || x == 14 || y == 14;
+            int col = border ? argb(218, (edge >> 16) & 255, (edge >> 8) & 255, edge & 255)
+               : (frame ? argb(174, (base >> 16) & 255, (base >> 8) & 255, base & 255)
+               : argb(116, (base >> 16) & 255, (base >> 8) & 255, base & 255));
+            if (!border && !frame && Math.abs(x - y - 3) <= 1) {
+               col = argb(190, (hi >> 16) & 255, (hi >> 8) & 255, hi & 255);
+            } else if (!border && x == 12 && y >= 4 && y <= 10) {
+               col = argb(156, (hi >> 16) & 255, (hi >> 8) & 255, hi & 255);
+            }
+            int jitter = (int)((hash(x, y, seed) - 0.5F) * 8.0F);
+            if (!border && !frame) col = add(col, jitter);
+            p[y * N + x] = col;
+         }
+      }
+      return p;
+   }
+
+   private static int[] paintGlazedTerracotta(int baseHex, int accentHex, int color) {
+      int base = c(baseHex);
+      int accent = c(accentHex);
+      int dark = mul(base, 0.58F);
+      int light = mix(c(0xFFFFFF), base, 0.34F);
+      int second = mix(accent, base, 0.38F);
+      int[] p = new int[N * N];
+      for (int y = 0; y < N; y++) {
+         for (int x = 0; x < N; x++) {
+            int dx = Math.abs(x - 7) - (x >= 8 ? 1 : 0);
+            int dy = Math.abs(y - 7) - (y >= 8 ? 1 : 0);
+            int edge = Math.max(dx, dy);
+            boolean diagonal = Math.abs(x - y) <= 1 || Math.abs(x + y - 15) <= 1;
+            boolean cross = (x == 7 || x == 8 || y == 7 || y == 8);
+            int col;
+            if (edge >= 7) col = dark;
+            else if (edge == 5) col = light;
+            else if (edge == 2) col = accent;
+            else if (diagonal) col = (color & 1) == 0 ? light : second;
+            else if (cross) col = second;
+            else col = base;
+            p[y * N + x] = col;
          }
       }
       return p;
