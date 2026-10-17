@@ -9,8 +9,11 @@ Outputs into build/release-pe/ (strictly separated from PC releases):
     release-notes.md
     VERSION
 """
+import base64
+import binascii
 import glob
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -91,6 +94,88 @@ def run_cmd(cmd, **kw):
     if res.returncode != 0:
         raise RuntimeError(f"Command failed ({res.returncode}): {' '.join(cmd)}")
     return res
+
+
+def resolve_signing_config(environ=None):
+    """Read a persistent signing key from environment variables, if configured.
+
+    Local builds may fall back to a disposable development key. Release workflows set
+    BLOCKCRAFT_PE_REQUIRE_PERSISTENT_SIGNING=1 so they can never publish with a new key.
+    """
+    env = os.environ if environ is None else environ
+    encoded = env.get("BLOCKCRAFT_PE_KEYSTORE_B64", "").strip()
+    store_password = env.get("BLOCKCRAFT_PE_STORE_PASSWORD", "")
+    key_alias = env.get("BLOCKCRAFT_PE_KEY_ALIAS", "").strip()
+    key_password = env.get("BLOCKCRAFT_PE_KEY_PASSWORD", "")
+    expected_fingerprint = env.get("BLOCKCRAFT_PE_EXPECTED_CERT_SHA256", "").strip()
+    required = env.get("BLOCKCRAFT_PE_REQUIRE_PERSISTENT_SIGNING", "").strip().lower() in ("1", "true", "yes")
+
+    values = (encoded, store_password, key_alias, key_password)
+    if not any(values):
+        if required:
+            raise RuntimeError(
+                "Persistent PE signing is required, but signing secrets are missing. "
+                "Configure BLOCKCRAFT_PE_KEYSTORE_B64, BLOCKCRAFT_PE_STORE_PASSWORD, "
+                "BLOCKCRAFT_PE_KEY_ALIAS, and BLOCKCRAFT_PE_KEY_PASSWORD."
+            )
+        return None
+    if not all(values):
+        raise RuntimeError(
+            "Persistent PE signing configuration is incomplete; all four BLOCKCRAFT_PE_* signing values are required."
+        )
+    if required and not expected_fingerprint:
+        raise RuntimeError(
+            "Persistent PE releases also require the BLOCKCRAFT_PE_EXPECTED_CERT_SHA256 repository variable to pin the signing identity."
+        )
+    if expected_fingerprint:
+        expected_fingerprint = normalize_sha256_fingerprint(expected_fingerprint)
+    try:
+        keystore_data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise RuntimeError("BLOCKCRAFT_PE_KEYSTORE_B64 is not valid base64") from exc
+    if not keystore_data:
+        raise RuntimeError("BLOCKCRAFT_PE_KEYSTORE_B64 decoded to an empty file")
+    return {
+        "keystore_data": keystore_data,
+        "store_password": store_password,
+        "key_alias": key_alias,
+        "key_password": key_password,
+        "expected_cert_sha256": expected_fingerprint,
+    }
+
+
+def normalize_sha256_fingerprint(value):
+    """Accept a SHA-256 digest with optional colon separators and return lowercase hex."""
+    compact = value.strip().replace(":", "").replace(" ", "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", compact):
+        raise RuntimeError("BLOCKCRAFT_PE_EXPECTED_CERT_SHA256 must contain exactly 64 hexadecimal digits")
+    return compact
+
+
+def certificate_sha256_from_apksigner(output):
+    match = re.search(r"Signer #\d+ certificate SHA-256 digest:\s*([0-9A-Fa-f: ]+)", output)
+    if not match:
+        raise RuntimeError("apksigner did not report a SHA-256 signer certificate fingerprint")
+    return normalize_sha256_fingerprint(match.group(1))
+
+
+def verify_apk_signing_identity(output, expected_fingerprint):
+    actual = certificate_sha256_from_apksigner(output)
+    expected = normalize_sha256_fingerprint(expected_fingerprint) if expected_fingerprint else ""
+    if expected and actual != expected:
+        raise RuntimeError("APK signer certificate fingerprint does not match the configured PE signing identity")
+    return actual
+
+
+def write_private_file(path, data):
+    """Write sensitive key material with owner-only permissions where supported."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(data)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
 
 
 def update_manifest_icon(manifest_src, manifest_dst):
@@ -180,6 +265,7 @@ def main():
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")
 
+    signing_config = resolve_signing_config()
     print(f"=== Running headless verification (PeCoreTest) for Blockcraft PE v{version} ===")
     run_cmd([sys.executable, os.path.join(PE_DIR, "tools", "verify_pe_local.py")], cwd=ROOT)
 
@@ -265,33 +351,55 @@ def main():
         run_cmd([zipalign, "-f", "-p", "4", unaligned_apk, aligned_apk])
 
         keystore = os.path.join(work, "pe-release.jks")
-        run_cmd([
-            "keytool", "-genkeypair", "-v",
-            "-keystore", keystore,
-            "-storepass", "blockcraftpe",
-            "-keypass", "blockcraftpe",
-            "-alias", "pekey",
-            "-keyalg", "RSA",
-            "-keysize", "2048",
-            "-validity", "10000",
-            "-dname", "CN=Blockcraft PE, OU=Mobile, O=Blockcraft, L=Vienna, S=AT, C=AT",
-        ])
+        if signing_config is None:
+            # Developer convenience only: this throwaway key cannot update an APK signed by another run.
+            print("WARNING: using a disposable local PE signing key; never publish this APK as an update.")
+            key_alias = "pekey"
+            ks_pass_arg = "pass:blockcraftpe"
+            key_pass_arg = "pass:blockcraftpe"
+            run_cmd([
+                "keytool", "-genkeypair", "-v",
+                "-keystore", keystore,
+                "-storepass", "blockcraftpe",
+                "-keypass", "blockcraftpe",
+                "-alias", key_alias,
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "10000",
+                "-dname", "CN=Blockcraft PE, OU=Mobile, O=Blockcraft, L=Vienna, S=AT, C=AT",
+            ])
+        else:
+            write_private_file(keystore, signing_config["keystore_data"])
+            key_alias = signing_config["key_alias"]
+            # apksigner reads the values from the process environment; never echo passwords in logs.
+            ks_pass_arg = "env:BLOCKCRAFT_PE_STORE_PASSWORD"
+            key_pass_arg = "env:BLOCKCRAFT_PE_KEY_PASSWORD"
 
         apk_name = f"Blockcraft-PE-v{version}.apk"
         final_apk = os.path.join(OUT_DIR, apk_name)
         run_cmd([
             apksigner, "sign",
             "--ks", keystore,
-            "--ks-key-alias", "pekey",
-            "--ks-pass", "pass:blockcraftpe",
-            "--key-pass", "pass:blockcraftpe",
+            "--ks-key-alias", key_alias,
+            "--ks-pass", ks_pass_arg,
+            "--key-pass", key_pass_arg,
             "--v1-signing-enabled", "true",
             "--v2-signing-enabled", "true",
             "--v3-signing-enabled", "true",
             "--out", final_apk,
             aligned_apk,
         ])
-        run_cmd([apksigner, "verify", "--verbose", final_apk])
+        verification = run_cmd(
+            [apksigner, "verify", "--verbose", "--print-certs", final_apk],
+            capture_output=True, text=True,
+        )
+        verification_output = (verification.stdout or "") + (verification.stderr or "")
+        print(verification_output, end="")
+        if signing_config is not None and signing_config["expected_cert_sha256"]:
+            signer_sha256 = verify_apk_signing_identity(
+                verification_output, signing_config["expected_cert_sha256"]
+            )
+            print("Verified persistent PE signer SHA-256: " + signer_sha256)
 
         readme_txt = build_readme(version, apk_name)
         bundle_name = f"Blockcraft-PE-v{version}-android-bundle.zip"

@@ -6,6 +6,7 @@ name: Release PE
 #
 # Trigger: Actions tab -> Release PE -> Run workflow, or push a change to ci/pe-release-trigger.txt
 # (first line = PE version to publish, e.g. 1.11).
+# Releases fail closed unless a persistent keystore and its passwords are configured as Actions secrets.
 on:
   workflow_dispatch:
     inputs:
@@ -39,8 +40,15 @@ jobs:
       - name: Build & Verify Blockcraft PE APK
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
+          BLOCKCRAFT_PE_KEYSTORE_B64: ${{ secrets.BLOCKCRAFT_PE_KEYSTORE_B64 }}
+          BLOCKCRAFT_PE_STORE_PASSWORD: ${{ secrets.BLOCKCRAFT_PE_STORE_PASSWORD }}
+          BLOCKCRAFT_PE_KEY_ALIAS: ${{ secrets.BLOCKCRAFT_PE_KEY_ALIAS }}
+          BLOCKCRAFT_PE_KEY_PASSWORD: ${{ secrets.BLOCKCRAFT_PE_KEY_PASSWORD }}
+          BLOCKCRAFT_PE_EXPECTED_CERT_SHA256: ${{ vars.BLOCKCRAFT_PE_EXPECTED_CERT_SHA256 }}
+          BLOCKCRAFT_PE_REQUIRE_PERSISTENT_SIGNING: "1"
         run: |
           set -eo pipefail
+          python3 android-pe/tools/test_build_pe_apk.py
           VER="$INPUT_VERSION"
           if [ -z "$VER" ]; then VER="$(head -n1 ci/pe-release-trigger.txt | tr -d '[:space:]')"; fi
           if [ -z "$VER" ]; then VER="1.11"; fi
