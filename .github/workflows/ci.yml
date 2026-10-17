@@ -22,6 +22,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: PE persistent-signing configuration tests
+        run: python3 android-pe/tools/test_build_pe_apk.py
+
+      - name: PE world-generation, cache, structure, and save regressions
+        run: python3 android-pe/tools/verify_pe_local.py
+
       - name: Build (javac) and make the update pack
         run: |
           python3 tools/build.py --patch
