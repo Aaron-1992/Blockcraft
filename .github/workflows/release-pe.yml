@@ -5,13 +5,13 @@ name: Release PE
 # never including PC versions, while .github/workflows/release.yml remains strictly for PC releases.
 #
 # Trigger: Actions tab -> Release PE -> Run workflow, or push a change to ci/pe-release-trigger.txt
-# (first line = PE version to publish, e.g. 1.10).
+# (first line = PE version to publish, e.g. 1.11).
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "PE version to publish, e.g. 1.10"
-        default: "1.10"
+        description: "PE version to publish, e.g. 1.11"
+        default: "1.11"
   push:
     branches: ["arena/**"]
     paths: ["ci/pe-release-trigger.txt"]
@@ -43,7 +43,7 @@ jobs:
           set -eo pipefail
           VER="$INPUT_VERSION"
           if [ -z "$VER" ]; then VER="$(head -n1 ci/pe-release-trigger.txt | tr -d '[:space:]')"; fi
-          if [ -z "$VER" ]; then VER="1.10"; fi
+          if [ -z "$VER" ]; then VER="1.11"; fi
           echo "PE version: '$VER'"
           mkdir -p build
           python3 android-pe/tools/build_pe_apk.py "$VER" 2>&1 | tee build/release-pe.log

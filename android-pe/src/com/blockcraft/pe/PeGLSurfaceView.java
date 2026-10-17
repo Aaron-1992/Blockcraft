@@ -48,7 +48,7 @@ public final class PeGLSurfaceView extends GLSurfaceView implements GLSurfaceVie
 
       this.touch = new PeTouchController();
       this.touch.loadPreferences(context, this.world);
-      this.world.ensureChunksAroundPlayer(64);
+      this.world.ensureChunksAroundPlayer(24); // Center preview is already loaded; keep the panorama to 25 chunks.
       this.audio = new PeAudio();
       this.textures = new PeTextures();
       this.shaders = new PeShaders();

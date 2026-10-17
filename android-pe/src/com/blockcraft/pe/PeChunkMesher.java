@@ -65,63 +65,76 @@ public final class PeChunkMesher {
    }
 
    public void updateDirtySections(PeWorld world, int maxRebuildsPerFrame) {
+      if (maxRebuildsPerFrame <= 0) return;
       int rebuilt = 0;
       int pCx = ((int)Math.floor(world.px)) >> 4;
       int pCz = ((int)Math.floor(world.pz)) >> 4;
       int rad = Math.max(3, Math.min(7, world.viewRadiusChunks));
 
       for (int ring = 0; ring <= rad && rebuilt < maxRebuildsPerFrame; ring++) {
-         for (int dz = -ring; dz <= ring && rebuilt < maxRebuildsPerFrame; dz++) {
-            for (int dx = -ring; dx <= ring && rebuilt < maxRebuildsPerFrame; dx++) {
-               if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
-               int cx = pCx + dx;
-               int cz = pCz + dz;
-               int slot = PeWorld.slotIndex(cx, cz);
-               PeWorld.PeChunk chunk = world.chunkGrid[slot];
-               if (!chunk.loaded || chunk.cx != cx || chunk.cz != cz) continue;
-
-               if (this.sectionCx[slot] != cx || this.sectionCz[slot] != cz) {
-                  this.sectionCx[slot] = cx;
-                  this.sectionCz[slot] = cz;
-                  for (int sy = 0; sy < PeWorld.SECTIONS_Y; sy++) {
-                     chunk.sectionDirty[sy] = true;
-                     this.sectionVerts[slot * PeWorld.SECTIONS_Y + sy] = 0;
-                  }
-               }
-
-               for (int sy = 0; sy < PeWorld.SECTIONS_Y; sy++) {
-                  if (!chunk.sectionDirty[sy]) continue;
-                  chunk.sectionDirty[sy] = false;
-                  int idx = slot * PeWorld.SECTIONS_Y + sy;
-
-                  if (chunk.sectionNonAir[sy] <= 0) {
-                     this.sectionVerts[idx] = 0;
-                     continue;
-                  }
-
-                  int verts = meshSection(world, chunk, cx, sy, cz, this.scratch3D);
-                  this.sectionVerts[idx] = verts;
-                  if (verts > 0) {
-                     this.uploadBuf3D.clear();
-                     this.uploadBuf3D.put(this.scratch3D, 0, verts * FLOATS_PER_VERT_3D);
-                     this.uploadBuf3D.position(0);
-                     GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, this.sectionVbo[idx]);
-                     GLES20.glBufferData(
-                        GLES20.GL_ARRAY_BUFFER,
-                        verts * STRIDE_3D,
-                        this.uploadBuf3D,
-                        GLES20.GL_STATIC_DRAW
-                     );
-                     GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
-                  }
-                  rebuilt++;
-                  if (rebuilt >= maxRebuildsPerFrame) {
-                     return;
-                  }
-               }
+         if (ring == 0) {
+            rebuilt += rebuildChunkSections(world, pCx, pCz, maxRebuildsPerFrame - rebuilt);
+            continue;
+         }
+         // Traverse each Chebyshev ring once instead of rescanning its whole square.
+         for (int dx = -ring; dx <= ring && rebuilt < maxRebuildsPerFrame; dx++) {
+            rebuilt += rebuildChunkSections(world, pCx + dx, pCz - ring, maxRebuildsPerFrame - rebuilt);
+            if (rebuilt < maxRebuildsPerFrame) {
+               rebuilt += rebuildChunkSections(world, pCx + dx, pCz + ring, maxRebuildsPerFrame - rebuilt);
+            }
+         }
+         for (int dz = -ring + 1; dz < ring && rebuilt < maxRebuildsPerFrame; dz++) {
+            rebuilt += rebuildChunkSections(world, pCx - ring, pCz + dz, maxRebuildsPerFrame - rebuilt);
+            if (rebuilt < maxRebuildsPerFrame) {
+               rebuilt += rebuildChunkSections(world, pCx + ring, pCz + dz, maxRebuildsPerFrame - rebuilt);
             }
          }
       }
+   }
+
+   private int rebuildChunkSections(PeWorld world, int cx, int cz, int remaining) {
+      if (remaining <= 0) return 0;
+      int slot = PeWorld.slotIndex(cx, cz);
+      PeWorld.PeChunk chunk = world.chunkGrid[slot];
+      if (!chunk.loaded || chunk.cx != cx || chunk.cz != cz) return 0;
+
+      if (this.sectionCx[slot] != cx || this.sectionCz[slot] != cz) {
+         this.sectionCx[slot] = cx;
+         this.sectionCz[slot] = cz;
+         for (int sy = 0; sy < PeWorld.SECTIONS_Y; sy++) {
+            chunk.sectionDirty[sy] = true;
+            this.sectionVerts[slot * PeWorld.SECTIONS_Y + sy] = 0;
+         }
+      }
+
+      int rebuilt = 0;
+      for (int sy = 0; sy < PeWorld.SECTIONS_Y && rebuilt < remaining; sy++) {
+         if (!chunk.sectionDirty[sy]) continue;
+         chunk.sectionDirty[sy] = false;
+         int idx = slot * PeWorld.SECTIONS_Y + sy;
+         if (chunk.sectionNonAir[sy] <= 0) {
+            this.sectionVerts[idx] = 0;
+            continue;
+         }
+
+         int verts = meshSection(world, chunk, cx, sy, cz, this.scratch3D);
+         this.sectionVerts[idx] = verts;
+         if (verts > 0) {
+            this.uploadBuf3D.clear();
+            this.uploadBuf3D.put(this.scratch3D, 0, verts * FLOATS_PER_VERT_3D);
+            this.uploadBuf3D.position(0);
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, this.sectionVbo[idx]);
+            GLES20.glBufferData(
+               GLES20.GL_ARRAY_BUFFER,
+               verts * STRIDE_3D,
+               this.uploadBuf3D,
+               GLES20.GL_STATIC_DRAW
+            );
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0);
+         }
+         rebuilt++;
+      }
+      return rebuilt;
    }
 
    public void drawWorldChunks(PeShaders sh, PeWorld world, float[] mvp,

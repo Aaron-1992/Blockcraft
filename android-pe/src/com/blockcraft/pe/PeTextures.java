@@ -280,7 +280,7 @@ public final class PeTextures {
 
    public static int activePackMode = 0;
    public static final String[] PACK_NAMES = {
-      "World of Color (PE 1.10)",
+      "World of Color (PE 1.11)",
       "Realistic 5.6 x MC (V1.7)",
       "V1.6 (5.6 x MC Fusion)",
       "V1.5 (Bold Pixel Art)",

@@ -115,24 +115,22 @@ bundle contains only the Android app and its installation notes.
 
 WHAT'S NEW IN BLOCKCRAFT PE v{version}
 --------------------------------------
-* World of Color: 96 blocks across 16-color wool, concrete, stained terracotta,
-  concrete powder, stained glass, and glazed terracotta families. The palette
-  uses dedicated crisp 16x16 textures and a touch-friendly family selector.
-* Concrete powder hardens when water touches its side/top and falls through
-  open cells. Nearby updates are deliberately bounded for mobile performance.
-* Inventory polish: a fifth Colors tab, 4x4 named swatches, six material-family
-  cards plus a Dyes collection, and responsive menu scaling constrained by both
-  viewport dimensions.
-* Survival dye progression: gather base colors, mix the desktop color recipes,
-  and craft wool, stained terracotta, glass, and concrete powder; lapis ore adds
-  blue dye, while concrete powder hardens beside water and glazed clay is cooked.
-* Settings are now visible and tappable. Control style, tap-to-interact,
-  sensitivity, auto-jump, render distance, and resource-pack selection persist.
-* Save format v3 reserves unsigned-byte block IDs through 178 and relocates
-  non-block items, including dyes, above that range. Existing v1.8/v2 worlds are migrated on load.
-* Existing PE features remain standalone: infinite saved worlds, biome terrain,
-  crafting, a 27-slot backpack, touch controls, pixel-art textures, and optional
-  high-refresh display mode selection when the device exposes one.
+* World-generation performance: new and loaded worlds warm the inner 9x9
+  chunk area, then stream the outer view ring incrementally. The title panorama
+  uses a non-persistent 25-chunk preview instead of generating a playable save.
+* Biome climate is sampled on globally aligned 4x4 cells and cached per chunk;
+  a 16x16 heightmap is reused by terrain, vegetation, and structure placement.
+* Added seed-deterministic, water-filled river valleys and one bounded landmark
+  site per 6x6 chunk region. Desert, mountain, forest, snowy, and meadow regions
+  select different structures, with flat-pad and headroom checks.
+* Chunk section meshing now visits distance-ring perimeters directly while
+  preserving the existing per-frame rebuild budget.
+* Save format remains compatible with v1.10. Edited chunks and player progress
+  persist; unmodified chunks use the updated deterministic terrain generator.
+
+Existing features include the 16-color material families, survival dye mixing,
+water-hardening concrete powder, a 27-slot backpack, touch controls, saved
+infinite worlds, pixel-art textures, and optional high-refresh display mode.
 
 INSTALL
 -------
@@ -146,35 +144,38 @@ def build_release_notes(version, apk_name, bundle_name):
     return f"""## Blockcraft PE v{version} — Android
 
 Standalone Pocket Edition release for Android 8.0/API 26 and newer. The PE
-bundle is separate from Blockcraft's desktop release and is not tied to a
-specific phone model or display refresh rate.
+bundle is separate from Blockcraft's desktop release.
 
 ### Downloads
 - **`{apk_name}`** — install directly on an Android device.
 - **`{bundle_name}`** — APK plus README.
 
 ### What's new
-- Fixed the Settings screen's unreachable controls and aligned its visible
-  button rows with touch hitboxes.
-- Added a five-tab inventory with a 4x4 swatch grid, six material families,
-  and a 16-dye collection; creative selection and survival color crafting are
-  available from the same touch UI.
-- Added gathered base dyes, desktop-inspired dye mixing, recipes for wool,
-  stained terracotta, glass and concrete powder, plus Lapis Ore drops for blue
-  dye. Concrete powder hardens beside water and stained terracotta can be cooked
-  into glazed terracotta.
-- Added bounded concrete-powder falling and water-hardening updates.
-- Made menu scaling fit both viewport width and height; settings now persist.
-- Bumped the save format to v3 and migrate v1.8/v2 item IDs so existing worlds
-  do not reinterpret swords, tools, or food as newly added color blocks.
+- Reduced synchronous world warm-up to the inner 9x9 chunk area; remaining
+  chunks stream incrementally. The title panorama is now a non-persistent,
+  25-chunk preview and no longer creates a full playable world/save.
+- Replaced temporary terrain arrays with a cached 16x16 heightmap and a compact
+  4x4 biome cache. Biome climate samples are globally aligned in 4-block cells.
+- Added deterministic river valleys and region-based, biome-aware structures:
+  desert pyramids, mountain watchtowers, forest explorer cabins, snowy cabins,
+  and meadow ruins. Structure sites reject unsafe slopes and insufficient headroom.
+- Chunk loading and VBO section meshing traverse each distance-ring perimeter
+  once, retaining the existing generation and GPU rebuild budgets.
 
-The mobile edition now has an interactive survival color-crafting loop, but it
-still does not include the full desktop release's wider gameplay feature set.
+The save format is unchanged from v1.10: edited chunks and player progress are
+preserved. Unmodified chunks regenerate with the updated terrain and structure
+rules when visited, so terrain next to previously edited chunks may transition.
+
+### Existing PE features
+World of Color materials and dyes, survival color crafting, concrete-powder
+physics, local infinite-world saves, touch UI, pixel-art textures, and
+high-refresh mode selection remain included. PE remains separate from the wider
+desktop feature set.
 """
 
 
 def main():
-    version = sys.argv[1] if len(sys.argv) > 1 else "1.10"
+    version = sys.argv[1] if len(sys.argv) > 1 else "1.11"
     version = version.lstrip("vV")
     if version.startswith("pe-"):
         version = version[3:].lstrip("vV")

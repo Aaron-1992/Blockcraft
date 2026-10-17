@@ -17,16 +17,15 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Blockcraft PE (Pocket Edition) v1.10 — PC Update 3.5+ Single-Player Infinite World Engine:
- * - High-Refresh Sub-Tick Camera & Movement Interpolation (prevPx/prevPy/prevPz, prevWalkDist, prevEyeHeight)
- *   + Smooth Independent-Axis AABB Box Physics (0.58 x 1.78) with 0.5-Slab Step-Up, Auto-Jump & Ladder Climbing
- * - PC Update 3.5 Perlin Noise Terrain Generator (Noise.java: Continents, Ridges, Temperature/Humidity Biomes & 3D Caves)
- *   with zero Math.sin/Math.cos overhead during chunk streaming
- * - Multi-Building Villages, Desert Pyramids, Ruined Watchtowers, Oak/Spruce/Birch Trees, Tree Felling (Update 3.10),
- *   Slabs, Fences, Doors, Ladders, Crops (Wheat, Sugar Cane, Pumpkins, Melons, Hay Bales) & 24 Crafting/Smelting Recipes
+ * Blockcraft PE (Pocket Edition) v1.11 — World Generation, Structures & Streaming:
+ * - Seed-stable Perlin terrain, coarse cached temperature/humidity biomes, per-chunk heightmaps,
+ *   3D caves and water-filled river valleys
+ * - Fixed-seed starter village plus bounded biome-selected structures in deterministic 6x6 chunk regions
+ * - Budgeted ring-buffer streaming and section meshing keep world warm-up and frame work bounded
+ * - High-refresh movement interpolation, AABB physics, touch controls, crafting, crops and block interaction
  */
 public final class PeWorld {
-   public static final String APP_VERSION = "1.10";
+   public static final String APP_VERSION = "1.11";
 
    // Screen States
    public static final int SCREEN_TITLE = 0;
@@ -311,6 +310,17 @@ public final class PeWorld {
    public static final int Y_SEA = 60;
    public static final int Y_DECK = 64;
 
+   public static final byte STRUCTURE_NONE = 0;
+   public static final byte STRUCTURE_STARTER_COTTAGE = 1;
+   public static final byte STRUCTURE_STARTER_FARM = 2;
+   public static final byte STRUCTURE_STARTER_BLACKSMITH = 3;
+   public static final byte STRUCTURE_DESERT_PYRAMID = 4;
+   public static final byte STRUCTURE_WATCHTOWER = 5;
+   public static final byte STRUCTURE_EXPLORER_CABIN = 6;
+   public static final byte STRUCTURE_SNOWY_CABIN = 7;
+   public static final byte STRUCTURE_MEADOW_RUIN = 8;
+
+   private static final int STRUCTURE_REGION_CHUNKS = 6;
    private static final int SAVE_MAGIC = 0x42435045; // "BCPE"
    private static final int SAVE_VERSION_INFINITE = 2;
    private static final int SAVE_VERSION_CURRENT = 3;
@@ -415,11 +425,22 @@ public final class PeWorld {
       public final byte[] blocks = new byte[CHUNK_BYTES];
       public final int[] sectionNonAir = new int[SECTIONS_Y];
       public final boolean[] sectionDirty = new boolean[SECTIONS_Y];
+      /** 16x16 heightmap plus a coarse 4x4 seed-derived biome cache; neither is serialized. */
+      public final short[] surfaceY = new short[16 * 16];
+      public final byte[] biomeMap = new byte[4 * 4];
+      public byte structureType = STRUCTURE_NONE;
+
+      public PeChunk() {
+         Arrays.fill(this.biomeMap, (byte)-1);
+      }
 
       public void clear() {
          Arrays.fill(this.blocks, B_AIR);
          Arrays.fill(this.sectionNonAir, 0);
          Arrays.fill(this.sectionDirty, true);
+         Arrays.fill(this.surfaceY, (short)0);
+         Arrays.fill(this.biomeMap, (byte)-1);
+         this.structureType = STRUCTURE_NONE;
          this.maxY = 0;
          this.modified = false;
       }
@@ -522,6 +543,7 @@ public final class PeWorld {
    private PerlinNoise nHum;
    private PerlinNoise nCave1;
    private PerlinNoise nCave2;
+   private PerlinNoise nRiver;
 
    public long tickCount = 0L;
    public float dayTime = 0.22F;
@@ -668,6 +690,7 @@ public final class PeWorld {
       this.nHum = new PerlinNoise(r.nextLong());
       this.nCave1 = new PerlinNoise(r.nextLong());
       this.nCave2 = new PerlinNoise(r.nextLong());
+      this.nRiver = new PerlinNoise(r.nextLong());
    }
 
    public void syncInterpolationState() {
@@ -901,7 +924,7 @@ public final class PeWorld {
          this.mineProgress = 0.0F;
          this.eyeHeight = 1.62F;
          syncInterpolationState();
-         ensureChunksAroundPlayer(256);
+         ensureChunksAroundPlayer(81); // Warm the inner 9x9; the outer view ring streams during play.
          this.screen = SCREEN_PLAY;
          showBanner("Loaded World " + (slot + 1) + " (" + MODE_NAMES[this.mode] + ")");
          return true;
@@ -941,7 +964,7 @@ public final class PeWorld {
 
       this.px = 0.5;
       this.pz = 0.5;
-      ensureChunksAroundPlayer(256);
+      ensureChunksAroundPlayer(81); // Avoid blocking on the full 11x11 view radius.
 
       int sy = topSolidY(0, 0) + 1;
       this.px = 0.5;
@@ -964,9 +987,39 @@ public final class PeWorld {
       showBanner("Created Infinite World " + (this.currentSlot + 1) + " - " + WTYPE_NAMES[this.worldType]);
    }
 
+   /** Initializes the deterministic title-screen preview without touching any save slot. */
    public void generateWorld(Context context, int newMode, int worldTypeOrMap) {
-      createNewSinglePlayerWorld(context, this.currentSlot, newMode <= 1 ? newMode : MODE_SURVIVAL,
-         worldTypeOrMap % 3, 884219551L + worldTypeOrMap * 997L);
+      this.currentSlot = 0;
+      this.mode = newMode <= 1 ? newMode : MODE_SURVIVAL;
+      this.worldType = worldTypeOrMap % 3;
+      this.seed = 884219551L + worldTypeOrMap * 997L;
+      ensureNoiseInitialized();
+      resetActiveChunks();
+      this.savedChunks.clear();
+      this.fallingTrees.clear();
+      this.tickCount = 0L;
+      this.dayTime = 0.22F;
+      this.px = 0.5;
+      this.py = 72.0;
+      this.pz = 0.5;
+      this.vx = this.vy = this.vz = 0.0;
+      this.yaw = 0.0F;
+      this.pitch = 6.0F;
+      this.health = 20;
+      this.hunger = 20;
+      this.flying = false;
+      this.sneaking = false;
+      this.mineY = -1;
+      this.mineProgress = 0.0F;
+      this.screen = SCREEN_TITLE;
+      ensureChunksAroundPlayer(1);
+      this.py = topSolidY(0, 0) + 1.0;
+      this.spawnX = this.px;
+      this.spawnY = this.py;
+      this.spawnZ = this.pz;
+      this.onGround = true;
+      equipDefaultLoadout();
+      syncInterpolationState();
    }
 
    public String currentWorldSummary() {
@@ -1364,6 +1417,7 @@ public final class PeWorld {
    //  Infinite World Streaming & Deterministic Perlin Chunk Generation
    // ====================================================================
    public void ensureChunksAroundPlayer(int maxNewChunks) {
+      if (maxNewChunks <= 0) return;
       ensureNoiseInitialized();
       int pCx = ((int)Math.floor(this.px)) >> 4;
       int pCz = ((int)Math.floor(this.pz)) >> 4;
@@ -1371,19 +1425,32 @@ public final class PeWorld {
       int generated = 0;
 
       for (int ring = 0; ring <= rad && generated < maxNewChunks; ring++) {
-         for (int dz = -ring; dz <= ring && generated < maxNewChunks; dz++) {
-            for (int dx = -ring; dx <= ring && generated < maxNewChunks; dx++) {
-               if (Math.max(Math.abs(dx), Math.abs(dz)) != ring) continue;
-               int cx = pCx + dx;
-               int cz = pCz + dz;
-               PeChunk slot = this.chunkGrid[slotIndex(cx, cz)];
-               if (!slot.loaded || slot.cx != cx || slot.cz != cz) {
-                  loadOrGenerateChunkIntoSlot(slot, cx, cz);
-                  generated++;
-               }
+         if (ring == 0) {
+            generated += ensureChunkLoaded(pCx, pCz);
+            continue;
+         }
+         // Visit only the perimeter. The previous square scan discarded most of its
+         // candidates with a distance test, which was needlessly expensive each tick.
+         for (int dx = -ring; dx <= ring && generated < maxNewChunks; dx++) {
+            generated += ensureChunkLoaded(pCx + dx, pCz - ring);
+            if (generated < maxNewChunks) {
+               generated += ensureChunkLoaded(pCx + dx, pCz + ring);
+            }
+         }
+         for (int dz = -ring + 1; dz < ring && generated < maxNewChunks; dz++) {
+            generated += ensureChunkLoaded(pCx - ring, pCz + dz);
+            if (generated < maxNewChunks) {
+               generated += ensureChunkLoaded(pCx + ring, pCz + dz);
             }
          }
       }
+   }
+
+   private int ensureChunkLoaded(int cx, int cz) {
+      PeChunk slot = this.chunkGrid[slotIndex(cx, cz)];
+      if (slot.loaded && slot.cx == cx && slot.cz == cz) return 0;
+      loadOrGenerateChunkIntoSlot(slot, cx, cz);
+      return 1;
    }
 
    private PeChunk getOrLoadChunk(int cx, int cz) {
@@ -1408,6 +1475,9 @@ public final class PeWorld {
 
       byte[] saved = this.savedChunks.get(chunkKey(cx, cz));
       if (saved != null) {
+         Arrays.fill(slot.surfaceY, (short)0);
+         Arrays.fill(slot.biomeMap, (byte)-1);
+         slot.structureType = STRUCTURE_NONE;
          System.arraycopy(saved, 0, slot.blocks, 0, CHUNK_BYTES);
          slot.modified = true;
          slot.recomputeSectionCounts();
@@ -1475,18 +1545,59 @@ public final class PeWorld {
       return (h ^ (h >>> 16)) & 0x7FFFFFFF;
    }
 
+   static int structureSiteChunkX(int regionX, int regionZ, long seed) {
+      int hash = chunkHash(regionX, regionZ, seed + 77L);
+      return regionX * STRUCTURE_REGION_CHUNKS + 1 + (hash & 3);
+   }
+
+   static int structureSiteChunkZ(int regionX, int regionZ, long seed) {
+      int hash = chunkHash(regionX, regionZ, seed + 77L);
+      return regionZ * STRUCTURE_REGION_CHUNKS + 1 + ((hash >>> 4) & 3);
+   }
+
+   private static int floorDivideByStructureRegion(int chunk) {
+      int region = chunk / STRUCTURE_REGION_CHUNKS;
+      return chunk < 0 && chunk % STRUCTURE_REGION_CHUNKS != 0 ? region - 1 : region;
+   }
+
+   private static boolean isStructureSiteChunk(int cx, int cz, long seed) {
+      int regionX = floorDivideByStructureRegion(cx);
+      int regionZ = floorDivideByStructureRegion(cz);
+      return cx == structureSiteChunkX(regionX, regionZ, seed)
+         && cz == structureSiteChunkZ(regionX, regionZ, seed);
+   }
+
+   private static int biomeCellIndex(int localX, int localZ) {
+      return (((localZ & 15) >> 2) << 2) | ((localX & 15) >> 2);
+   }
+
    public int getBiomeAt(int wx, int wz) {
       if (this.worldType == WTYPE_SUPERFLAT) return 0;
+      int cx = wx >> 4;
+      int cz = wz >> 4;
+      int localX = wx & 15;
+      int localZ = wz & 15;
+      int biomeCell = biomeCellIndex(localX, localZ);
+      PeChunk chunk = this.chunkGrid[slotIndex(cx, cz)];
+      boolean cacheOwned = chunk.loaded && chunk.cx == cx && chunk.cz == cz;
+      if (cacheOwned) {
+         int cached = chunk.biomeMap[biomeCell];
+         if (cached >= 0 && cached <= 4) return cached;
+      }
+
+      // Biome boundaries are broad; use globally aligned 4x4-block samples to avoid
+      // evaluating three multi-octave climate fields for every single terrain column.
+      int sampleX = (wx & ~3) + 2;
+      int sampleZ = (wz & ~3) + 2;
       ensureNoiseInitialized();
       double scale = (this.worldType == WTYPE_LARGE_BIOMES) ? 640.0 : 320.0;
-      double temp = this.nTemp.fbm2(wx / scale + 500.0, wz / scale, 2) * 0.5 + 0.5;
-      double hum = this.nHum.fbm2(wx / scale - 300.0, wz / scale + 120.0, 2) * 0.5 + 0.5;
-      double mtn = this.nMount.fbm2(wx / 320.0 + 77.0, wz / 320.0 - 33.0, 2);
-      if (mtn > 0.34) return 3;                  // Mountain Peaks
-      if (temp > 0.62 && hum < 0.45) return 1;   // Golden Desert
-      if (temp < 0.30) return 2;                 // Snowy Taiga
-      if (temp > 0.48 && hum > 0.54) return 4;   // Birch & Flower Meadow
-      return 0;                                  // Emerald Forest
+      double temp = this.nTemp.fbm2(sampleX / scale + 500.0, sampleZ / scale, 2) * 0.5 + 0.5;
+      double hum = this.nHum.fbm2(sampleX / scale - 300.0, sampleZ / scale + 120.0, 2) * 0.5 + 0.5;
+      double mtn = this.nMount.fbm2(sampleX / 320.0 + 77.0, sampleZ / 320.0 - 33.0, 2);
+      int biome = mtn > 0.34 ? 3 : (temp > 0.62 && hum < 0.45 ? 1
+         : (temp < 0.30 ? 2 : (temp > 0.48 && hum > 0.54 ? 4 : 0)));
+      if (cacheOwned) chunk.biomeMap[biomeCell] = (byte)biome;
+      return biome;
    }
 
    public String getBiomeName(int wx, int wz) {
@@ -1571,16 +1682,16 @@ public final class PeWorld {
    private void generateOverworldChunk(PeChunk c, int cx, int cz) {
       int wx0 = cx << 4;
       int wz0 = cz << 4;
-
-      int[][] surfaceY = new int[16][16];
-      int[][] biomeMap = new int[16][16];
+      c.structureType = STRUCTURE_NONE;
 
       for (int lz = 0; lz < 16; lz++) {
          int wz = wz0 + lz;
          for (int lx = 0; lx < 16; lx++) {
             int wx = wx0 + lx;
+            int column = (lz << 4) | lx;
+            int biomeCell = biomeCellIndex(lx, lz);
             int biome = getBiomeAt(wx, wz);
-            biomeMap[lz][lx] = biome;
+            c.biomeMap[biomeCell] = (byte)biome;
 
             double cont = this.nCont.fbm2(wx / 260.0, wz / 260.0, 3);
             double detail = this.nDetail.fbm2(wx / 56.0, wz / 56.0, 3);
@@ -1588,25 +1699,34 @@ public final class PeWorld {
             double hillAmp = (biome == 3) ? 28.0 : (biome == 1 ? 7.0 : 12.0);
             int h = (int)Math.round(62.5 + cont * 7.5 + detail * 4.5 + ridge * hillAmp);
 
-            // Keep spawn village area around (-8..24, -24..12) gently leveled
-            double spawnDist = Math.hypot(wx - 4.0, wz + 6.0);
-            if (spawnDist < 22.0) {
+            // Carve broad, shallow river valleys before flattening the protected spawn area.
+            double river = Math.abs(this.nRiver.noise2(wx / 156.0 + 402.0, wz / 156.0 - 173.0));
+            if (river < 0.027 && h > Y_SEA + 2 && h < 78) {
+               double blend = (0.027 - river) / 0.027;
+               blend = blend * blend * (3.0 - 2.0 * blend);
+               h = (int)Math.round(h + (Y_SEA - 1 - h) * blend);
+            }
+
+            // Avoid a square-root per column except in the small spawn falloff.
+            int spawnDx = wx - 4;
+            int spawnDz = wz + 6;
+            int spawnDistSq = spawnDx * spawnDx + spawnDz * spawnDz;
+            if (spawnDistSq < 22 * 22) {
+               double spawnDist = Math.sqrt(spawnDistSq);
                double blend = Math.max(0.0, (spawnDist - 10.0) / 12.0);
                h = (int)Math.round(64.0 * (1.0 - blend) + h * blend);
             }
             h = Math.max(8, Math.min(112, h));
-            surfaceY[lz][lx] = h;
+            c.surfaceY[column] = (short)h;
 
             setChunkLocal(c, lx, 0, lz, B_BEDROCK);
             for (int y = 1; y <= h; y++) {
-               // Update 3.5 3D Perlin Cave Tunnels (skip near spawn village)
-               if (y > 5 && y < h - 4 && spawnDist > 18.0 && (y & 1) == 0) {
+               // 3D cave noise is costly; keep caves out of the protected spawn area.
+               if (y > 5 && y < h - 4 && spawnDistSq > 18 * 18 && (y & 1) == 0) {
                   double c1 = this.nCave1.noise3(wx * 0.045, y * 0.06, wz * 0.045);
                   if (c1 * c1 < 0.0055) {
                      double c2 = this.nCave2.noise3(wx * 0.045 + 19.3, y * 0.06 + 7.1, wz * 0.045 - 23.7);
-                     if (c1 * c1 + c2 * c2 < 0.0052) {
-                        continue;
-                     }
+                     if (c1 * c1 + c2 * c2 < 0.0052) continue;
                   }
                }
 
@@ -1635,47 +1755,63 @@ public final class PeWorld {
                setChunkLocal(c, lx, y, lz, (biome == 2 && y == Y_SEA) ? B_ICE : B_WATER);
             }
             int clayHash = (wx * 734287) ^ (wz * 439829) ^ (int)this.seed;
-            if (h < Y_SEA && h >= Y_SEA - 5 && spawnDist > 28.0 && (clayHash & 31) == 0) {
+            if (h < Y_SEA && h >= Y_SEA - 5 && spawnDistSq > 28 * 28 && (clayHash & 31) == 0) {
                setChunkLocal(c, lx, h, lz, B_TERRACOTTA);
             }
          }
       }
 
-      // 1. Starter Village around Spawn:
-      //    Chunk (0, -1): Village Cottage + Street Lamp
-      //    Chunk (1, -1): Fenced Wheat & Pumpkin Farm + Hay Bales
-      //    Chunk (-1, -1): Blacksmith Forge + Loot Chest
+      // The fixed spawn village is deliberately stable across seeds and releases.
       if (cx == 0 && cz == -1) {
-         buildVillageCottageInChunk(c, 8, surfaceY[8][8], 8);
+         c.structureType = STRUCTURE_STARTER_COTTAGE;
+         buildVillageCottageInChunk(c, 8, c.surfaceY[(8 << 4) | 8], 8);
          return;
       }
       if (cx == 1 && cz == -1) {
-         buildVillageFarmInChunk(c, 8, surfaceY[8][8], 8);
+         c.structureType = STRUCTURE_STARTER_FARM;
+         buildVillageFarmInChunk(c, 8, c.surfaceY[(8 << 4) | 8], 8);
          return;
       }
       if (cx == -1 && cz == -1) {
-         buildBlacksmithInChunk(c, 8, surfaceY[8][8], 8);
+         c.structureType = STRUCTURE_STARTER_BLACKSMITH;
+         buildBlacksmithInChunk(c, 8, c.surfaceY[(8 << 4) | 8], 8);
          return;
       }
 
-      // 2. Infinite World Structures (Desert Pyramids, Ruined Watchtowers, Explorer Cabins)
-      int structRoll = chunkHash(cx, cz, this.seed + 77L) % 36;
-      if ((Math.abs(cx) > 1 || Math.abs(cz) > 1) && structRoll == 0) {
-         int hy = surfaceY[8][8];
-         int centerBiome = biomeMap[8][8];
-         if (hy > Y_SEA + 1 && hy < 78) {
-            if (centerBiome == 1) {
-               buildDesertPyramidInChunk(c, 8, hy, 8);
-            } else if (centerBiome == 3) {
-               buildWatchtowerInChunk(c, 8, hy, 8);
-            } else {
-               buildVillageCottageInChunk(c, 8, hy, 8);
-            }
+      // One deterministic, biome-selected landmark per 6x6 chunk region. Sites
+      // have bounded flat pads so buildings never spill into a neighbour chunk.
+      if ((Math.abs((long)cx) > 1 || Math.abs((long)cz) > 1)
+            && isStructureSiteChunk(cx, cz, this.seed)) {
+         int oy = c.surfaceY[(8 << 4) | 8];
+         int biome = c.biomeMap[biomeCellIndex(8, 8)] & 0xFF;
+         if (biome == 1 && hasStructurePad(c, 8, 8, 5, 2, 5)) {
+            c.structureType = STRUCTURE_DESERT_PYRAMID;
+            buildDesertPyramidInChunk(c, 8, oy, 8);
+            return;
+         }
+         if (biome == 3 && hasStructurePad(c, 8, 8, 2, 7, 7)) {
+            c.structureType = STRUCTURE_WATCHTOWER;
+            buildWatchtowerInChunk(c, 8, oy, 8);
+            return;
+         }
+         if (biome == 2 && hasStructurePad(c, 8, 8, 4, 3, 6)) {
+            c.structureType = STRUCTURE_SNOWY_CABIN;
+            buildSnowyCabinInChunk(c, 8, oy, 8);
+            return;
+         }
+         if (biome == 4 && hasStructurePad(c, 8, 8, 3, 4, 5)) {
+            c.structureType = STRUCTURE_MEADOW_RUIN;
+            buildMeadowRuinInChunk(c, 8, oy, 8);
+            return;
+         }
+         if (hasStructurePad(c, 8, 8, 4, 3, 6)) {
+            c.structureType = STRUCTURE_EXPLORER_CABIN;
+            buildVillageCottageInChunk(c, 8, oy, 8);
             return;
          }
       }
 
-      // 3. Deterministic Oak, Birch & Spruce Trees + Desert Cacti (lx, lz in 3..12)
+      // Deterministic Oak, Birch & Spruce Trees + Desert Cacti.
       for (int gz = 0; gz < 2; gz++) {
          for (int gx = 0; gx < 2; gx++) {
             int cellH = chunkHash(cx * 2 + gx, cz * 2 + gz, this.seed);
@@ -1685,8 +1821,9 @@ public final class PeWorld {
             int wz = wz0 + lz;
             if (Math.hypot(wx, wz) < 9.0) continue;
 
-            int ty = surfaceY[lz][lx];
-            int biome = biomeMap[lz][lx];
+            int column = (lz << 4) | lx;
+            int ty = c.surfaceY[column];
+            int biome = c.biomeMap[biomeCellIndex(lx, lz)] & 0xFF;
             byte top = c.blocks[(lz << 11) | (lx << 7) | ty];
             if (ty <= Y_SEA + 1 || ty >= 79) continue;
 
@@ -1704,17 +1841,16 @@ public final class PeWorld {
          }
       }
 
-      // 4. Sugar Cane on water shores, Pumpkin/Melon patches, Flowers & Tall Grass
+      // Shoreline reeds and deterministic biome-aware ground cover.
       for (int lz = 1; lz < 15; lz++) {
          for (int lx = 1; lx < 15; lx++) {
-            int ty = surfaceY[lz][lx];
+            int column = (lz << 4) | lx;
+            int ty = c.surfaceY[column];
             int colBase = (lz << 11) | (lx << 7);
             byte ground = c.blocks[colBase | ty];
             if (c.blocks[colBase | (ty + 1)] != B_AIR) continue;
 
             int fh = chunkHash(wx0 + lx, wz0 + lz, this.seed + 313L) & 127;
-
-            // Sugar cane along water level shores (Y_SEA or Y_SEA + 1)
             if ((ty == Y_SEA || ty == Y_SEA + 1) && (ground == B_SAND || ground == B_GRASS) && fh <= 10) {
                boolean nearWater = c.blocks[((lz - 1) << 11) | (lx << 7) | Y_SEA] == B_WATER
                   || c.blocks[((lz + 1) << 11) | (lx << 7) | Y_SEA] == B_WATER
@@ -1729,7 +1865,7 @@ public final class PeWorld {
             }
 
             if (ty <= Y_SEA + 1 || ty >= 77 || ground != B_GRASS) continue;
-            int biome = biomeMap[lz][lx];
+            int biome = c.biomeMap[biomeCellIndex(lx, lz)] & 0xFF;
             if (fh == 0) {
                setChunkLocal(c, lx, ty + 1, lz, (biome == 4) ? B_MELON : B_PUMPKIN);
             } else if (fh <= 2 || (biome == 4 && fh <= 7)) {
@@ -1741,6 +1877,23 @@ public final class PeWorld {
             }
          }
       }
+   }
+
+   private static boolean hasStructurePad(PeChunk c, int ox, int oz, int radius, int maxVariation, int heightClearance) {
+      int minY = Integer.MAX_VALUE;
+      int maxY = Integer.MIN_VALUE;
+      for (int dz = -radius; dz <= radius; dz++) {
+         for (int dx = -radius; dx <= radius; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) return false;
+            int y = c.surfaceY[(lz << 4) | lx];
+            if (y <= Y_SEA + 1 || y + heightClearance >= WORLD_H - 1) return false;
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
+         }
+      }
+      return maxY - minY <= maxVariation;
    }
 
    private static void placeTreeInChunk(PeChunk c, int lx, int y, int lz, byte logId, byte leafId, boolean spruce) {
@@ -1942,6 +2095,79 @@ public final class PeWorld {
       }
       setChunkLocal(c, ox + 1, oy + 1, oz - 1, B_CHEST);
       setChunkLocal(c, ox, oy + 7, oz, B_TORCH);
+   }
+
+   private static void buildSnowyCabinInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int dz = -4; dz <= 4; dz++) {
+         for (int dx = -4; dx <= 4; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+            for (int y = oy - 3; y <= oy; y++) {
+               setChunkLocal(c, lx, y, lz, (Math.abs(dx) == 4 || Math.abs(dz) == 4) ? B_COBBLE : B_PLANKS_SPRUCE);
+            }
+            boolean wall = Math.abs(dx) == 3 || Math.abs(dz) == 3;
+            boolean corner = Math.abs(dx) == 3 && Math.abs(dz) == 3;
+            boolean doorway = dz == 3 && dx == 0;
+            for (int dy = 1; dy <= 4; dy++) {
+               if (doorway && dy <= 2) {
+                  setChunkLocal(c, lx, oy + dy, lz, dy == 1 ? B_DOOR_OAK : B_AIR);
+               } else if (wall) {
+                  boolean window = dy == 2 && ((Math.abs(dx) == 3 && dz == 0) || (Math.abs(dz) == 3 && dx != 0));
+                  setChunkLocal(c, lx, oy + dy, lz,
+                     corner ? B_LOG_SPRUCE : (window ? B_GLASS : B_PLANKS_SPRUCE));
+               } else {
+                  setChunkLocal(c, lx, oy + dy, lz, B_AIR);
+               }
+            }
+         }
+      }
+      // Compact pitched roof, with a snow edge and an exposed ridge.
+      for (int layer = 0; layer <= 3; layer++) {
+         int xRadius = 3 - layer;
+         int y = oy + 5 + layer;
+         for (int dz = -4; dz <= 4; dz++) {
+            for (int dx = -xRadius; dx <= xRadius; dx++) {
+               byte roof = (layer == 0 && (Math.abs(dx) == 3 || Math.abs(dz) == 4)) ? B_SNOW : B_PLANKS_SPRUCE;
+               setChunkLocal(c, ox + dx, y, oz + dz, roof);
+            }
+         }
+      }
+      setChunkLocal(c, ox - 2, oy + 1, oz - 2, B_BED_RED);
+      setChunkLocal(c, ox + 2, oy + 1, oz - 2, B_CHEST);
+      setChunkLocal(c, ox - 2, oy + 1, oz + 1, B_CRAFTING_TABLE);
+      setChunkLocal(c, ox + 2, oy + 1, oz + 1, B_FURNACE);
+      setChunkLocal(c, ox, oy + 3, oz, B_TORCH);
+   }
+
+   private static void buildMeadowRuinInChunk(PeChunk c, int ox, int oy, int oz) {
+      for (int dz = -3; dz <= 3; dz++) {
+         for (int dx = -3; dx <= 3; dx++) {
+            int lx = ox + dx;
+            int lz = oz + dz;
+            if ((lx & ~15) != 0 || (lz & ~15) != 0) continue;
+            for (int y = oy - 3; y <= oy; y++) {
+               setChunkLocal(c, lx, y, lz, B_STONEBRICK);
+            }
+            boolean perimeter = Math.abs(dx) == 3 || Math.abs(dz) == 3;
+            if (!perimeter) continue;
+            int wallHeight = 1 + (Math.abs(dx * 5 + dz * 3) % 4);
+            boolean cornerPillar = Math.abs(dx) == 3 && Math.abs(dz) == 3;
+            if (cornerPillar) wallHeight = 5;
+            for (int dy = 1; dy <= wallHeight; dy++) {
+               int pattern = Math.abs(dx * 17 + dz * 31 + dy * 13) % 7;
+               byte block = pattern == 0 ? B_MOSSY_STONEBRICK
+                  : (pattern <= 2 ? B_CRACKED_STONEBRICK : B_STONEBRICK);
+               setChunkLocal(c, lx, oy + dy, lz, block);
+            }
+         }
+      }
+      // A small broken arch and a weathered marker stone give the ruin a readable silhouette.
+      setChunkLocal(c, ox - 1, oy + 4, oz + 3, B_STONEBRICK);
+      setChunkLocal(c, ox + 1, oy + 4, oz + 3, B_STONEBRICK);
+      setChunkLocal(c, ox, oy + 1, oz, B_MOSSY_STONEBRICK);
+      setChunkLocal(c, ox, oy + 2, oz, B_CHEST);
+      setChunkLocal(c, ox, oy + 1, oz - 1, B_TORCH);
    }
 
    // ====================================================================

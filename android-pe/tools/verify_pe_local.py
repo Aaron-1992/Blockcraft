@@ -373,8 +373,17 @@ public class PeCoreTest {
       if (!cond) throw new AssertionError("FAIL: " + msg);
    }
 
+   private static int loadedChunkCount(PeWorld world) {
+      int count = 0;
+      for (int i = 0; i < PeWorld.ACTIVE_SLOTS; i++) {
+         if (world.chunkGrid[i].loaded) count++;
+      }
+      return count;
+   }
+
    public static void main(String[] args) throws Exception {
       Context ctx = new Context();
+      check("1.11".equals(PeWorld.APP_VERSION), "PE source version must match the world-generation release");
 
       // 1. Verify World of Color block IDs, desktop palette mapping, names, and 16x16 atlased art.
       check(PeColors.ALL_BLOCKS.length == 96, "World of Color catalogue must contain 6 complete 16-block families");
@@ -459,8 +468,101 @@ public class PeCoreTest {
       world.createNewSinglePlayerWorld(ctx, 0, PeWorld.MODE_SURVIVAL, PeWorld.WTYPE_LARGE_BIOMES, 884219551L);
       check(world.screen == PeWorld.SCREEN_PLAY, "New world must enter SCREEN_PLAY");
       check(world.slotExists[0], "World slot 0 must exist on disk after creation");
+      check(loadedChunkCount(world) == 81,
+         "New worlds must synchronously warm only the inner 9x9 chunk area and stream the outer ring in later ticks");
       check(world.invId[6] == PeWorld.B_WOOL_WHITE && world.invCount[6] == 4,
          "Survival must provide a small wool base stack for the new color-crafting path");
+      int riverBankedColumns = 0;
+      for (int ci = 0; ci < PeWorld.ACTIVE_SLOTS; ci++) {
+         PeWorld.PeChunk riverChunk = world.chunkGrid[ci];
+         if (!riverChunk.loaded) continue;
+         for (int lz = 4; lz < 12; lz++) for (int lx = 4; lx < 12; lx++) {
+            int col = (lz << 4) | lx;
+            int h = riverChunk.surfaceY[col];
+            if (h != PeWorld.Y_SEA - 1
+                  || riverChunk.blocks[(lz << 11) | (lx << 7) | PeWorld.Y_SEA] != PeWorld.B_WATER) continue;
+            boolean raisedBank = false;
+            for (int dz = -3; dz <= 3 && !raisedBank; dz++) {
+               for (int dx = -3; dx <= 3; dx++) {
+                  if (dx == 0 && dz == 0) continue;
+                  int bankY = riverChunk.surfaceY[((lz + dz) << 4) | (lx + dx)];
+                  if (bankY >= PeWorld.Y_SEA + 2 && bankY <= PeWorld.Y_SEA + 18) {
+                     raisedBank = true;
+                     break;
+                  }
+               }
+            }
+            if (raisedBank) riverBankedColumns++;
+         }
+      }
+      check(riverBankedColumns > 0,
+         "Fixed-seed overworld generation must include water-filled low channels with raised banks");
+
+      // Worldgen caches are compact, reset with chunk reuse, and deterministic by chunk order.
+      PeWorld.PeChunk originChunk = world.chunkGrid[PeWorld.slotIndex(0, 0)];
+      int spawnBiome = world.getBiomeAt(7, 7);
+      int spawnBiomeCell = ((7 >> 2) << 2) | (7 >> 2);
+      check(originChunk.surfaceY.length == 256 && originChunk.biomeMap.length == 16
+            && originChunk.biomeMap[spawnBiomeCell] == (byte)spawnBiome
+            && originChunk.surfaceY[(7 << 4) | 7] > 0,
+         "Generated chunks must retain a 16x16 heightmap and a populated coarse 4x4 biome cache");
+      check(world.getBiomeAt(4, 4) == spawnBiome,
+         "The same aligned 4x4 climate cell must return one cached biome");
+
+      int negativeSite = PeWorld.structureSiteChunkX(-1, 0, world.seed);
+      int positiveSite = PeWorld.structureSiteChunkX(0, 0, world.seed);
+      check(negativeSite >= -5 && negativeSite <= -2 && positiveSite >= 1 && positiveSite <= 4,
+         "Structure regions must place sites in bounded, deterministic chunks on both sides of zero");
+      int landmarkX = Integer.MIN_VALUE;
+      int landmarkZ = Integer.MIN_VALUE;
+      byte landmarkType = PeWorld.STRUCTURE_NONE;
+      for (int rx = 0; rx < 5 && landmarkType == PeWorld.STRUCTURE_NONE; rx++) {
+         for (int rz = 0; rz < 5 && landmarkType == PeWorld.STRUCTURE_NONE; rz++) {
+            int sx = PeWorld.structureSiteChunkX(rx, rz, world.seed);
+            int sz = PeWorld.structureSiteChunkZ(rx, rz, world.seed);
+            world.topSolidY(sx * 16 + 8, sz * 16 + 8);
+            PeWorld.PeChunk candidate = world.chunkGrid[PeWorld.slotIndex(sx, sz)];
+            if (candidate.cx == sx && candidate.cz == sz && candidate.structureType > PeWorld.STRUCTURE_STARTER_BLACKSMITH) {
+               landmarkX = sx;
+               landmarkZ = sz;
+               landmarkType = candidate.structureType;
+            }
+         }
+      }
+      check(landmarkType != PeWorld.STRUCTURE_NONE,
+         "Fixed-seed world generation must place at least one biome-aware landmark in nearby structure regions");
+      PeWorld varietyWorld = new PeWorld();
+      varietyWorld.seed = world.seed;
+      varietyWorld.worldType = world.worldType;
+      int varietyMask = 0;
+      for (int rx = -10; rx <= 10 && (varietyMask & 0x1F0) != 0x1F0; rx++) {
+         for (int rz = -10; rz <= 10 && (varietyMask & 0x1F0) != 0x1F0; rz++) {
+            int sx = PeWorld.structureSiteChunkX(rx, rz, varietyWorld.seed);
+            int sz = PeWorld.structureSiteChunkZ(rx, rz, varietyWorld.seed);
+            varietyWorld.topSolidY(sx * 16 + 8, sz * 16 + 8);
+            PeWorld.PeChunk candidate = varietyWorld.chunkGrid[PeWorld.slotIndex(sx, sz)];
+            if (candidate.cx == sx && candidate.cz == sz) varietyMask |= 1 << candidate.structureType;
+         }
+      }
+      check((varietyMask & 0x1F0) == 0x1F0,
+         "Fixed-seed structure regions must generate desert, mountain, forest, snowy, and meadow landmark variants");
+      PeWorld reorderedWorld = new PeWorld();
+      reorderedWorld.seed = world.seed;
+      reorderedWorld.worldType = world.worldType;
+      int landmarkSurface = world.topSolidY(landmarkX * 16 + 8, landmarkZ * 16 + 8);
+      int reorderedSurface = reorderedWorld.topSolidY(landmarkX * 16 + 8, landmarkZ * 16 + 8);
+      PeWorld.PeChunk reorderedLandmark = reorderedWorld.chunkGrid[PeWorld.slotIndex(landmarkX, landmarkZ)];
+      check(landmarkSurface == reorderedSurface && reorderedLandmark.structureType == landmarkType,
+         "Biome-aware structures and terrain must be identical when the same chunk is generated first");
+
+      // The streaming budget is strict and repeated calls must not reload an already resident chunk.
+      PeWorld streamWorld = new PeWorld();
+      streamWorld.ensureChunksAroundPlayer(0);
+      check(loadedChunkCount(streamWorld) == 0, "A zero streaming budget must not load chunks");
+      streamWorld.ensureChunksAroundPlayer(1);
+      check(loadedChunkCount(streamWorld) == 1, "Chunk streaming must respect a one-chunk generation budget");
+      streamWorld.ensureChunksAroundPlayer(1);
+      check(loadedChunkCount(streamWorld) == 2, "Each streaming call may add at most one new chunk");
 
       // Place block near spawn AND travel 4,000 blocks away in the infinite world!
       world.setBlock(3, 72, -3, PeWorld.B_GOLD_BLOCK);
@@ -477,6 +579,8 @@ public class PeCoreTest {
       // Wipe in-memory state and reload from disk
       PeWorld loaded = new PeWorld();
       check(loaded.loadWorld(ctx, 0), "loadWorld(0) must succeed");
+      check(loadedChunkCount(loaded) == 81,
+         "Loading a distant save must restore its inner working set and stream outer chunks incrementally");
       check(loaded.getBlock(2405, 82, -3208) == PeWorld.B_DIAMOND_BLOCK, "Saved distant Diamond Block at (2405, 82, -3208) must be restored");
       check(loaded.getBlock(3, 72, -3) == PeWorld.B_GOLD_BLOCK, "Saved spawn Gold Block at (3, 72, -3) must also be restored");
       check(Math.abs(loaded.px - 2405.5) < 0.01 && Math.abs(loaded.pz - (-3208.5)) < 0.01, "Saved distant player position must be restored");
@@ -726,6 +830,16 @@ public class PeCoreTest {
       check(moveWorld.fallingTrees.isEmpty(), "finishAllFallingTrees must land all active falling trees");
 
       float[] scratch = new float[54000 * 9];
+      PeChunkMesher budgetMesher = new PeChunkMesher();
+      PeWorld.PeChunk scheduledChunk = moveWorld.chunkGrid[PeWorld.slotIndex(0, 0)];
+      check(scheduledChunk.sectionDirty[0] && scheduledChunk.sectionDirty[1],
+         "Newly generated chunk sections must start dirty for GPU meshing");
+      budgetMesher.updateDirtySections(moveWorld, 0);
+      check(scheduledChunk.sectionDirty[0], "A zero section-mesh budget must not rebuild or clear dirty sections");
+      budgetMesher.updateDirtySections(moveWorld, 1);
+      check(!scheduledChunk.sectionDirty[0] && scheduledChunk.sectionDirty[1],
+         "The render scheduler must rebuild no more than one non-empty section per call");
+
       PeChunkMesher mesher = new PeChunkMesher();
       check(mesher.buildSectionGeometry(moveWorld, 0, 7, 0, scratch) == 0,
          "Empty sky section (sy=7) must skip meshing in O(1) and emit 0 vertices");
@@ -742,6 +856,8 @@ public class PeCoreTest {
       mesher.addFirstPersonHeld3D(PeWorld.B_GRASS, 0.0F, 70.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
 
       PeGLSurfaceView glView = new PeGLSurfaceView(ctx);
+      check(glView.world.screen == PeWorld.SCREEN_TITLE && loadedChunkCount(glView.world) <= 25,
+         "The title panorama must use a small non-persistent preview instead of synchronously generating a full playable world");
       glView.onSurfaceCreated(null, null);
       glView.onSurfaceChanged(null, 2340, 1080);
       glView.onDrawFrame(null); // Draw Title Screen
@@ -781,7 +897,7 @@ public class PeCoreTest {
          check(nonZero >= 16, "Item id=" + itemId + " (" + PeWorld.getItemName(itemId) + ") tile=" + tile + " has crisp outlined pixel art (" + nonZero + " px)");
       }
 
-      System.out.println("PeCoreTest PASSED: World of Color dyes/recipes, lapis mining support, legacy-save migration, powder physics, mobile UI hitboxes/preferences, pixel-art atlas, infinite worlds, and gameplay controls verified!");
+      System.out.println("PeCoreTest PASSED: World of Color, save migration, infinite-world streaming, cached biome/height generation, river channels, deterministic biome-aware structures, bounded section meshing, gameplay controls, mobile UI, and pixel-art atlas verified!");
    }
 }
 """
