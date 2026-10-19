@@ -5,6 +5,9 @@ import static bc.GameTests.eq;
 import static bc.GameTests.test;
 
 import java.io.File;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -23,6 +26,7 @@ final class TestsPerf {
       sectionOccupancy();
       meshScratchMemory();
       meshCoverage();
+      packedMeshFormat();
       asynchronousLighting();
    }
 
@@ -154,6 +158,27 @@ final class TestsPerf {
             renderer.shutdown();
             world.shutdown();
          }
+      });
+   }
+
+   static void packedMeshFormat() {
+      test("renderer: packed VBO layout preserves float coordinates and quantizes RGBA to normalized bytes", () -> {
+         FloatBuffer source = FloatBuffer.wrap(new float[]{1.0F, 2.0F, 3.0F, 0.125F, 0.875F, 0.0F, 0.5F, 1.0F, 0.25F, 0.3125F, 0.6875F});
+         ByteBuffer packed = ByteBuffer.allocate(Renderer.STRIDE).order(ByteOrder.nativeOrder());
+         Renderer.packMeshVertexData(source, 1, packed);
+         eq(0, source.position(), "packing leaves the public result buffer untouched");
+         eq(Renderer.STRIDE, packed.remaining(), "one vertex occupies the compact stride");
+         near(1.0, packed.getFloat(0), 0.0, "position x");
+         near(2.0, packed.getFloat(4), 0.0, "position y");
+         near(3.0, packed.getFloat(8), 0.0, "position z");
+         near(0.125, packed.getFloat(12), 0.0, "atlas u");
+         near(0.875, packed.getFloat(16), 0.0, "atlas v");
+         eq(0, packed.get(20) & 255, "red byte");
+         eq(128, packed.get(21) & 255, "green byte");
+         eq(255, packed.get(22) & 255, "blue byte");
+         eq(64, packed.get(23) & 255, "alpha byte");
+         near(0.3125, packed.getFloat(24), 0.0, "lightmap u");
+         near(0.6875, packed.getFloat(28), 0.0, "lightmap v");
       });
    }
 

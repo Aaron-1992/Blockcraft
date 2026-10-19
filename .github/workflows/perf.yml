@@ -1,8 +1,8 @@
 name: Perf
 
-# Runs the game's built-in benchmark (-Dbc.bench, tools/perf.py) headless with Mesa's software OpenGL and commits the numbers to
-# ci-results/perf/. A software renderer is no graphics card: the numbers show WHERE a frame's time goes and what a change saves (vertices,
-# draw calls, passes), not the frame rate of a real machine.
+# Builds and benchmarks the V6.16 release, pre-packed V6.17 renderer, and packed-VBO candidate under Mesa llvmpipe; then runs
+# the culling regression and packed-layout visual A/B checks. Reports land in ci-results/perf/. Software-renderer timings are not
+# predictions of a graphics card's FPS; they show same-runner differences and renderer work counts.
 # Trigger: Actions tab -> Perf -> Run workflow, or push a change to ci/perf-trigger.txt.
 on:
   workflow_dispatch:
@@ -20,9 +20,11 @@ concurrency:
 jobs:
   bench:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -38,6 +40,23 @@ jobs:
       - name: Build the game
         run: python3 tools/build.py
 
+      - name: Prepare paired benchmark baselines
+        run: |
+          set -euo pipefail
+          mkdir -p build/paired/v617-source build/paired
+          # The pre-packed renderer is the parent of the packed-layout work. Archive only build inputs, not releases/screenshots.
+          git archive 43518ba src res libs launcher tools/build.py | tar -x -C build/paired/v617-source
+          (cd build/paired/v617-source && python3 tools/build.py)
+          cp build/paired/v617-source/build/blockcraft.jar build/paired/v617.jar
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("releases/Blockcraft-UPDATE6.16-patch.zip") as patch:
+              jar = patch.read("Blockcraft/blockcraft.jar")
+          with open("build/paired/v616.jar", "wb") as out:
+              out.write(jar)
+          print("Prepared V6.16 release jar and pre-packed V6.17 source build for paired measurement.")
+          PY
+
       - name: Benchmark
         continue-on-error: true
         run: |
@@ -51,24 +70,36 @@ jobs:
           case "$FRAMES" in ''|*[!0-9]*) FRAMES=60;; esac
           echo "scenes: $SCENES window: $WIN frames: $FRAMES"
           mkdir -p ci-results/perf
-          if [ "$SCENES" != none ]; then timeout 40m python3 tools/perf.py --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" 2>&1 | tee build/perf.log; fi
+          if [ "$SCENES" != none ]; then timeout 40m python3 tools/paired_perf.py --v616 build/paired/v616.jar --v617 build/paired/v617.jar --packed build/blockcraft.jar --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" --timeout 630 2>&1 | tee build/perf.log; fi
 
-      - name: Culling check (the same scenes with and without the culling of hidden sections must look the same)
+      - name: Culling regression check
         continue-on-error: true
         run: |
           set -o pipefail
-          # line 4 of ci/perf-trigger.txt = scenes for the check (surface, hill, forest, cave1, cave2, cave3), 'all' or 'none'
+          WIN="$(sed -n 2p ci/perf-trigger.txt | tr -d '[:space:]')"
+          case "$WIN" in ''|*[!0-9x]*) WIN=640x360;; esac
+          # line 4 of ci/perf-trigger.txt = scenes to compare with CaveCull disabled, 'all', or 'none'
           CHECK="$(sed -n 4p ci/perf-trigger.txt | tr -d '[:space:]')"
           case "$CHECK" in ''|*[!a-z0-9,-]*) CHECK=none;; esac
-          if [ "$CHECK" != none ]; then timeout 30m python3 tools/cullcheck.py --scenes "$CHECK" 2>&1 | tee build/cullcheck.log; fi
+          if [ "$CHECK" != none ]; then timeout 30m python3 tools/cullcheck.py --scenes "$CHECK" --win "$WIN" 2>&1 | tee build/cullcheck.log; fi
+
+      - name: Packed VBO visual A/B (world only; hand and HUD excluded)
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          WIN="$(sed -n 2p ci/perf-trigger.txt | tr -d '[:space:]')"
+          case "$WIN" in ''|*[!0-9x]*) WIN=640x360;; esac
+          # The pre-pack and packed jars use repeated forest and cave1 screenshots to check visual equivalence.
+          timeout 25m python3 tools/packed_visual.py --reference build/paired/v617.jar --candidate build/blockcraft.jar --scenes forest,cave1 --win "$WIN" 2>&1 | tee build/packed-visual.log
 
       - name: Output (readable through the check-run API)
         if: always()
         run: |
-          python3 tools/ci_annotate.py ci-results/perf/summary.md "perf summary" notice || true
-          python3 tools/ci_annotate.py ci-results/perf/cullcheck.md "culling check" notice || true
+          python3 tools/ci_annotate.py ci-results/perf/summary.md "paired perf comparison" notice || true
+          python3 tools/ci_annotate.py ci-results/perf/cullcheck.md "culling regression check" notice || true
+          python3 tools/ci_annotate.py ci-results/perf/packed-visual.md "packed VBO visual A/B" notice || true
 
-      - name: Upload benchmark and culling diagnostics
+      - name: Upload paired benchmark and visual diagnostics
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v4
@@ -77,9 +108,12 @@ jobs:
           path: |
             build/perf.log
             build/cullcheck.log
+            build/packed-visual.log
             ci-results/perf/summary.md
             ci-results/perf/cullcheck.md
+            ci-results/perf/packed-visual.md
             ci-results/perf/cull/
+            build/paired/visual/
           if-no-files-found: ignore
           retention-days: 7
 

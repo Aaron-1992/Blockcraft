@@ -28,7 +28,7 @@ ROOT = shots.ROOT
 OUT = os.path.join(ROOT, "ci-results", "perf")
 
 # TerraGen world, seed 12345, noon, calm, "Bright" (caves can be seen); view distance 5
-BASE = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=48", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.gamma=1", "-Dbc.ambient=0.85", "-Dbc.frozen=1", "-Dbc.nomobs=1", "-Dbc.shot=260"]
+BASE = ["-Dbc.auto=1", "-Dbc.seed=12345", "-Dbc.gen=1", "-Dbc.mode=1", "-Dbc.rd=5", "-Dbc.lod=48", "-Dbc.time=6000", "-Dbc.weather=calm", "-Dbc.gamma=1", "-Dbc.ambient=0.85", "-Dbc.frozen=1", "-Dbc.nomobs=1", "-Dbc.worldonly=true", "-Dbc.shot=260"]
 CULL = "-Dbc.cavecull=false"
 SHADOW = "-Dbc.shadowuncut=1"
 # name -> (properties, the switch of the second picture: the culling of hidden sections off, or the shadow map drawn without its window test)

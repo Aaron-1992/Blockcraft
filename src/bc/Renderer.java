@@ -6,6 +6,9 @@ import bc.Mesher.Result;
 import bc.World.Falling;
 import bc.World.Hit;
 import bc.World.Item;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -62,7 +65,15 @@ public final class Renderer {
    final float[] skyTmp = new float[8];
    public int visibleSections;
    public int drawCalls;
-   static final int STRIDE = 44;
+   /** The public mesh result stays at 11 floats, but the GPU stores RGBA as four normalized bytes (44 -> 32 bytes per vertex). */
+   static final int STRIDE = 32;
+   static final int POSITION_OFFSET = 0;
+   static final int UV_OFFSET = 12;
+   static final int COLOR_OFFSET = 20;
+   static final int LIGHT_UV_OFFSET = 24;
+   private static final int INITIAL_PACKED_UPLOAD_BYTES = 32768;
+   private static final int MAX_RETAINED_PACKED_UPLOAD_BYTES = 8 * 1024 * 1024;
+   private ByteBuffer packedUpload;
    final ArrayList<Renderer.Cand> cands = new ArrayList();
    static final int[][] RING;
    final ArrayList<long[]> tmp = new ArrayList();
@@ -116,6 +127,10 @@ public final class Renderer {
 
    public void shutdown() {
       this.meshPool.shutdownNow();
+      if (this.packedUpload != null) {
+         MemoryUtil.memFree(this.packedUpload);
+         this.packedUpload = null;
+      }
       this.wfx.dispose();
       if (this.lod != null) {
          this.lod.dispose();
@@ -469,6 +484,34 @@ public final class Renderer {
       }
    }
 
+   private void ensurePackedUploadCapacity(int bytes) {
+      if (this.packedUpload == null || this.packedUpload.capacity() < bytes) {
+         int capacity = INITIAL_PACKED_UPLOAD_BYTES;
+         while (capacity < bytes && capacity <= Integer.MAX_VALUE / 2) {
+            capacity <<= 1;
+         }
+         if (capacity < bytes) {
+            capacity = bytes;
+         }
+         if (this.packedUpload != null) {
+            MemoryUtil.memFree(this.packedUpload);
+         }
+         this.packedUpload = MemoryUtil.memAlloc(capacity).order(ByteOrder.nativeOrder());
+      }
+   }
+
+   private void uploadPackedVbo(int vbo, FloatBuffer vertices, int vertexCount) {
+      int bytes = Math.multiplyExact(vertexCount, STRIDE);
+      this.ensurePackedUploadCapacity(bytes);
+      packMeshVertexData(vertices, vertexCount, this.packedUpload);
+      GL15.glBindBuffer(34962, vbo);
+      GL15.glBufferData(34962, this.packedUpload, 35044);
+      if (this.packedUpload.capacity() > MAX_RETAINED_PACKED_UPLOAD_BYTES) {
+         MemoryUtil.memFree(this.packedUpload);
+         this.packedUpload = null;
+      }
+   }
+
    void upload(Chunk var1, int var2, Result var3) {
       Section var4 = var1.sections[var2];
       if (var4.dirty) {
@@ -495,8 +538,7 @@ public final class Renderer {
             var4.vboO = GL15.glGenBuffers();
          }
 
-         GL15.glBindBuffer(34962, var4.vboO);
-         GL15.glBufferData(34962, var3.opaque, 35044);
+         this.uploadPackedVbo(var4.vboO, var3.opaque, var3.nO);
       } else if (var4.vboO != 0) {
          GL15.glDeleteBuffers(var4.vboO);
          var4.vboO = 0;
@@ -507,8 +549,7 @@ public final class Renderer {
             var4.vboT = GL15.glGenBuffers();
          }
 
-         GL15.glBindBuffer(34962, var4.vboT);
-         GL15.glBufferData(34962, var3.trans, 35044);
+         this.uploadPackedVbo(var4.vboT, var3.trans, var3.nT);
       } else if (var4.vboT != 0) {
          GL15.glDeleteBuffers(var4.vboT);
          var4.vboT = 0;
@@ -812,13 +853,43 @@ public final class Renderer {
 
    static void bindPointers(int var0) {
       GL15.glBindBuffer(34962, var0);
-      GL11.glVertexPointer(3, 5126, 44, 0L);
+      GL11.glVertexPointer(3, 5126, STRIDE, POSITION_OFFSET);
       GL13.glClientActiveTexture(33984);
-      GL11.glTexCoordPointer(2, 5126, 44, 12L);
-      GL11.glColorPointer(4, 5126, 44, 20L);
+      GL11.glTexCoordPointer(2, 5126, STRIDE, UV_OFFSET);
+      GL11.glColorPointer(4, 5121, STRIDE, COLOR_OFFSET);
       GL13.glClientActiveTexture(33985);
-      GL11.glTexCoordPointer(2, 5126, 44, 36L);
+      GL11.glTexCoordPointer(2, 5126, STRIDE, LIGHT_UV_OFFSET);
       GL13.glClientActiveTexture(33984);
+   }
+
+   /** Converts the stable 11-float mesher format to the compact GPU layout without changing positions, UVs, or light coordinates. */
+   static void packMeshVertexData(FloatBuffer source, int vertices, ByteBuffer target) {
+      int floats = Math.multiplyExact(vertices, Mesher.FLOATS);
+      int bytes = Math.multiplyExact(vertices, STRIDE);
+      if (vertices < 0 || source.remaining() < floats || target.capacity() < bytes) {
+         throw new IllegalArgumentException("invalid mesh vertex data size");
+      }
+
+      FloatBuffer src = source.duplicate();
+      target.clear();
+      target.order(ByteOrder.nativeOrder());
+      for (int i = 0; i < vertices; i++) {
+         target.putFloat(src.get()).putFloat(src.get()).putFloat(src.get()); // position
+         target.putFloat(src.get()).putFloat(src.get()); // atlas UV
+         target.put((byte)colorByte(src.get())).put((byte)colorByte(src.get())).put((byte)colorByte(src.get())).put((byte)colorByte(src.get())); // normalized RGBA
+         target.putFloat(src.get()).putFloat(src.get()); // lightmap UV
+      }
+      target.flip();
+   }
+
+   private static int colorByte(float channel) {
+      if (!(channel > 0.0F)) {
+         return 0;
+      }
+      if (channel >= 1.0F) {
+         return 255;
+      }
+      return (int)(channel * 255.0F + 0.5F);
    }
 
    public void renderWorld(float var1, int var2, int var3) {

@@ -1,5 +1,5 @@
 forest
 640x360
-20
+40
 surface,forest,cave1
-# rerun after reducing demand meshing to the immediate 3x3 warm ring; perf.yml reads only lines 1-4
+# benchmark: 32-byte candidate vs 44-byte pre-pack and V6.16; line 4 remains culling scenes
