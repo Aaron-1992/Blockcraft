@@ -1,4 +1,4 @@
-none
+forest
 640x360
-30
-surface,forest,hill,cave1,shadow-forest
+20
+none
