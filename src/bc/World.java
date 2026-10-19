@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
@@ -22,6 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -63,16 +66,23 @@ public final class World {
    private final ExecutorService pool;
    private final ConcurrentLinkedQueue<Chunk> ready = new ConcurrentLinkedQueue();
    private final Set<Long> requested = ConcurrentHashMap.newKeySet();
+   private final ExecutorService lightingPool;
+   private final AtomicInteger lightingPending = new AtomicInteger();
+   private static final int MAX_LIGHTING_PENDING = 8;
+   private Iterator<Chunk> unloadCursor;
+   private Iterator<Chunk> lodCursor;
+   private static final ThreadLocal<LightScratch> LIGHT_SCRATCH = ThreadLocal.withInitial(LightScratch::new);
    private static final int[][] ORDER;
    private static final int OFF = 33554432;
-   private final World.LongQ addQ = new World.LongQ();
-   private final World.LongQ remQ = new World.LongQ();
-   private int bx0;
-   private int by0;
-   private int bz0;
-   private int bx1;
-   private int by1;
-   private int bz1;
+   private final ReentrantLock lightingLock = new ReentrantLock();
+   private static final class LightScratch {
+      final LongQ addQ = new LongQ();
+      final LongQ remQ = new LongQ();
+      int bx0, by0, bz0, bx1, by1, bz1;
+   }
+   private LightScratch scratch() {
+      return LIGHT_SCRATCH.get();
+   }
    static final int[] DX;
    static final int[] DY;
    static final int[] DZ;
@@ -128,8 +138,14 @@ public final class World {
       this.pool = Executors.newFixedThreadPool(genThreads(), var0 -> {
          Thread var1x = new Thread(var0, "chunk-gen");
          var1x.setDaemon(true);
-         var1x.setPriority(4);
+         var1x.setPriority(Thread.NORM_PRIORITY - 1);
          return var1x;
+      });
+      this.lightingPool = Executors.newSingleThreadExecutor(var0 -> {
+         Thread worker = new Thread(var0, "chunk-lighting");
+         worker.setDaemon(true);
+         worker.setPriority(Thread.MIN_PRIORITY);
+         return worker;
       });
    }
 
@@ -245,6 +261,7 @@ public final class World {
                if (this.gen != genSnap || !this.requested.contains(var3)) {
                   return;
                }
+               var5.recomputeSectionOccupancy();
                Net319.applyEditsToChunk(this, var5);
                this.ready.add(var5);
             } catch (Throwable var13) {
@@ -252,6 +269,37 @@ public final class World {
                this.requested.remove(var3);
             }
          });
+      }
+   }
+
+   private boolean reserveLightingSlot() {
+      if (this.lightingPending.incrementAndGet() > MAX_LIGHTING_PENDING) {
+         this.lightingPending.decrementAndGet();
+         return false;
+      }
+      return true;
+   }
+
+   private void submitReservedLighting(Chunk chunk) {
+      try {
+         this.lightingPool.execute(() -> {
+            try {
+               this.lightingLock.lock();
+               try {
+                  if (!chunk.unloaded && this.chunks.get(key(chunk.cx, chunk.cz)) == chunk) {
+                     this.fire.scanChunk(chunk);
+                     this.lightChunkLocked(chunk);
+                  }
+               } finally {
+                  this.lightingLock.unlock();
+               }
+            } finally {
+               this.lightingPending.decrementAndGet();
+            }
+         });
+      } catch (RuntimeException e) {
+         this.lightingPending.decrementAndGet();
+         throw e;
       }
    }
 
@@ -314,12 +362,16 @@ public final class World {
          }
          boolean inArenaBounds = isVoidArena && Math.abs(var22.cx) <= maxVoidCoord && Math.abs(var22.cz) <= maxVoidCoord;
          if (inArenaBounds || Math.max(Math.abs(var22.cx - var1), Math.abs(var22.cz - var2)) <= var3 + 3) {
+            if (!this.reserveLightingSlot()) {
+               this.ready.add(var22);
+               this.requested.add(readyKey);
+               break;
+            }
             this.chunks.put(readyKey, var22);
-            this.fire.scanChunk(var22);
             RedstoneLogic.loaded(this, var22);
             Circuit.loaded(this,var22);Kinetics.loaded(this,var22);
             RasterComputer.loaded(this,var22);
-            this.lightChunk(var22);
+            this.submitReservedLighting(var22);
 
             for (int var24 = -1; var24 <= 1; var24++) {
                for (int var25 = -1; var25 <= 1; var25++) {
@@ -342,24 +394,46 @@ public final class World {
          }
       }
 
-      for (Chunk var23 : this.chunks.values()) {
+      if (this.unloadCursor == null) {
+         this.unloadCursor = this.chunks.values().iterator();
+      }
+      int scanned = 0;
+      int unloaded = 0;
+      while (this.unloadCursor.hasNext() && scanned++ < 128 && unloaded < 2) {
+         Chunk var23 = this.unloadCursor.next();
          if (isVoidArena && Math.abs(var23.cx) <= maxVoidCoord && Math.abs(var23.cz) <= maxVoidCoord) {
             continue; // Never unload active minigame arena chunks (-5..5 x -5..5)
          }
-         if ((isVoidArena && (Math.abs(var23.cx) > maxVoidCoord || Math.abs(var23.cz) > maxVoidCoord))
-            || Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3) {
+         boolean outside = (isVoidArena && (Math.abs(var23.cx) > maxVoidCoord || Math.abs(var23.cz) > maxVoidCoord))
+            || Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3;
+         if (!outside || !this.lightingLock.tryLock()) {
+            continue;
+         }
+         boolean removed = false;
+         try {
+            long chunkKey = key(var23.cx, var23.cz);
+            if (!var23.lighting && this.chunks.get(chunkKey) == var23) {
+               Kinetics.unloaded(this,var23);
+               var23.unloaded = true;
+               this.chunks.remove(chunkKey, var23);
+               this.raster.dirty=true;this.kinetics.dirty=true;
+               removed = true;
+            }
+         } finally {
+            this.lightingLock.unlock();
+         }
+         if (removed) {
+            unloaded++;
             if (var23.modified) {
                this.saveChunk(var23);
             }
-
-            Kinetics.unloaded(this,var23);
-            this.chunks.remove(key(var23.cx, var23.cz));
-            this.raster.dirty=true;this.kinetics.dirty=true;
-            var23.unloaded = true;
             if (this.unloadHook != null) {
                this.unloadHook.accept(var23);
             }
          }
+      }
+      if (!this.unloadCursor.hasNext()) {
+         this.unloadCursor = null;
       }
    }
 
@@ -374,13 +448,25 @@ public final class World {
       Chunk fresh = this.gen.generate(cx, cz);
       fresh.modified = false;
       fresh.unloaded = false;
+      fresh.recomputeSectionOccupancy();
       Net319.applyEditsToChunk(this, fresh);
-      this.chunks.put(k, fresh);
-      this.lightChunk(fresh);
-      Circuit.loaded(this,fresh);Kinetics.loaded(this,fresh);
-      RasterComputer.loaded(this,fresh);
-      for (Section s : fresh.sections) {
-         s.dirty = true;
+
+      this.lightingLock.lock();
+      try {
+         existing = this.chunk(cx, cz);
+         if (existing != null) {
+            return existing;
+         }
+         this.chunks.put(k, fresh);
+         this.fire.scanChunk(fresh);
+         this.lightChunkLocked(fresh);
+         Circuit.loaded(this,fresh);Kinetics.loaded(this,fresh);
+         RasterComputer.loaded(this,fresh);
+         for (Section s : fresh.sections) {
+            s.dirty = true;
+         }
+      } finally {
+         this.lightingLock.unlock();
       }
       return fresh;
    }
@@ -445,14 +531,24 @@ public final class World {
       }
    }
 
-   /** Update 3.11: chunks that were changed more than two seconds ago get a fresh LOD summary (the distant terrain follows a burning forest). */
+   /** Update 3.11: refresh only a small slice per tick to avoid a full-map scan spike. */
    void lodRefresh() {
-      for (Chunk c : this.chunks.values()) {
+      if (this.lodCursor == null) {
+         this.lodCursor = this.chunks.values().iterator();
+      }
+      int scanned = 0;
+      int refreshed = 0;
+      while (this.lodCursor.hasNext() && scanned++ < 512 && refreshed < 4) {
+         Chunk c = this.lodCursor.next();
          long d = c.lodDirty;
          if (d != 0L && this.tickCount - d >= 40L) {
             c.lodDirty = 0L;
             this.lodMap.update(c, this.gen);
+            refreshed++;
          }
+      }
+      if (!this.lodCursor.hasNext()) {
+         this.lodCursor = null;
       }
    }
 
@@ -513,6 +609,7 @@ public final class World {
       RasterAudio.stopWorld(this);
       this.lodMap.stop = true;
       this.pool.shutdownNow();
+      this.lightingPool.shutdownNow();
    }
 
    static long pack(int var0, int var1, int var2) {
@@ -532,47 +629,32 @@ public final class World {
    }
 
    private void resetBounds() {
-      this.bx0 = this.by0 = this.bz0 = Integer.MAX_VALUE;
-      this.bx1 = this.by1 = this.bz1 = Integer.MIN_VALUE;
+      LightScratch work = this.scratch();
+      work.bx0 = work.by0 = work.bz0 = Integer.MAX_VALUE;
+      work.bx1 = work.by1 = work.bz1 = Integer.MIN_VALUE;
    }
 
-   private void touch(int var1, int var2, int var3) {
-      if (var1 < this.bx0) {
-         this.bx0 = var1;
-      }
-
-      if (var1 > this.bx1) {
-         this.bx1 = var1;
-      }
-
-      if (var2 < this.by0) {
-         this.by0 = var2;
-      }
-
-      if (var2 > this.by1) {
-         this.by1 = var2;
-      }
-
-      if (var3 < this.bz0) {
-         this.bz0 = var3;
-      }
-
-      if (var3 > this.bz1) {
-         this.bz1 = var3;
-      }
+   private void touch(int x, int y, int z) {
+      LightScratch work = this.scratch();
+      if (x < work.bx0) work.bx0 = x;
+      if (x > work.bx1) work.bx1 = x;
+      if (y < work.by0) work.by0 = y;
+      if (y > work.by1) work.by1 = y;
+      if (z < work.bz0) work.bz0 = z;
+      if (z > work.bz1) work.bz1 = z;
    }
 
    private void markBounds() {
-      if (this.bx0 != Integer.MAX_VALUE) {
-         for (int var1 = this.bx0 - 1 >> 4; var1 <= this.bx1 + 1 >> 4; var1++) {
-            for (int var2 = this.bz0 - 1 >> 4; var2 <= this.bz1 + 1 >> 4; var2++) {
-               Chunk var3 = this.chunk(var1, var2);
-               if (var3 != null) {
-                  int var4 = Math.max(0, this.by0 - 1 >> 4);
-                  int var5 = Math.min(15, this.by1 + 1 >> 4);
-
-                  for (int var6 = var4; var6 <= var5; var6++) {
-                     var3.sections[var6].dirty = true;
+      LightScratch work = this.scratch();
+      if (work.bx0 != Integer.MAX_VALUE) {
+         for (int cx = (work.bx0 - 1) >> 4; cx <= (work.bx1 + 1) >> 4; cx++) {
+            for (int cz = (work.bz0 - 1) >> 4; cz <= (work.bz1 + 1) >> 4; cz++) {
+               Chunk chunk = this.chunk(cx, cz);
+               if (chunk != null) {
+                  int minSection = Math.max(0, (work.by0 - 1) >> 4);
+                  int maxSection = Math.min(15, (work.by1 + 1) >> 4);
+                  for (int sy = minSection; sy <= maxSection; sy++) {
+                     chunk.sections[sy].dirty = true;
                   }
                }
             }
@@ -585,12 +667,13 @@ public final class World {
    }
 
    private void propagate(boolean var1) {
+      LightScratch work = this.scratch();
       int minLightY = (this.settings != null && this.settings.isVoidMode()) ? 36 : 0;
       Chunk lastC = null;
       int lastCx = Integer.MIN_VALUE;
       int lastCz = Integer.MIN_VALUE;
-      while (!this.addQ.isEmpty()) {
-         long var2 = this.addQ.poll();
+      while (!work.addQ.isEmpty()) {
+         long var2 = work.addQ.poll();
          int var4 = ux(var2);
          int var5 = uy(var2);
          int var6 = uz(var2);
@@ -641,7 +724,7 @@ public final class World {
                               }
 
                               this.touch(var10, var11, var12);
-                              this.addQ.add(pack(var10, var11, var12));
+                              work.addQ.add(pack(var10, var11, var12));
                            }
                         }
                      }
@@ -653,6 +736,7 @@ public final class World {
    }
 
    private void removeLight(boolean var1, int var2, int var3, int var4, int var5) {
+      LightScratch work = this.scratch();
       int minLightY = (this.settings != null && this.settings.isVoidMode()) ? 36 : 0;
       Chunk var6 = this.chunkAt(var2, var4);
       if (var1) {
@@ -664,10 +748,10 @@ public final class World {
       Chunk lastC = var6;
       int lastCx = var6.cx;
       int lastCz = var6.cz;
-      this.remQ.add(pack(var2, var3, var4) | (long)var5 << 60);
+      work.remQ.add(pack(var2, var3, var4) | (long)var5 << 60);
 
-      while (!this.remQ.isEmpty()) {
-         long var7 = this.remQ.poll();
+      while (!work.remQ.isEmpty()) {
+         long var7 = work.remQ.poll();
          int var9 = (int)(var7 >>> 60);
          int var10 = ux(var7 & 1152921504606846975L);
          int var11 = uy(var7);
@@ -699,9 +783,9 @@ public final class World {
                         }
 
                         this.touch(var14, var15, var16);
-                        this.remQ.add(pack(var14, var15, var16) | (long)var20 << 60);
+                        work.remQ.add(pack(var14, var15, var16) | (long)var20 << 60);
                      } else {
-                        this.addQ.add(pack(var14, var15, var16));
+                        work.addQ.add(pack(var14, var15, var16));
                      }
                   }
                }
@@ -710,103 +794,119 @@ public final class World {
       }
    }
 
-   public void lightChunk(Chunk var1) {
-      this.resetBounds();
-      int var2 = var1.cx * 16;
-      int var3 = var1.cz * 16;
-      Chunk[] var4 = new Chunk[]{
-         this.chunk(var1.cx + 1, var1.cz), this.chunk(var1.cx - 1, var1.cz), this.chunk(var1.cx, var1.cz + 1), this.chunk(var1.cx, var1.cz - 1)
-      };
+   public void lightChunk(Chunk chunk) {
+      this.lightingLock.lock();
+      try {
+         this.lightChunkLocked(chunk);
+      } finally {
+         this.lightingLock.unlock();
+      }
+   }
 
-      boolean isVoid = this.settings != null && this.settings.isVoidMode();
-      if (isVoid && this.dim == Dim.OVERWORLD && var1.isChunkEmpty()) {
-         Arrays.fill(var1.light, (byte)0xF0);
+   private void lightChunkLocked(Chunk var1) {
+      var1.lighting = true;
+      try {
+         LightScratch work = this.scratch();
+         this.resetBounds();
+         int var2 = var1.cx * 16;
+         int var3 = var1.cz * 16;
+         Chunk[] var4 = new Chunk[]{
+            this.chunk(var1.cx + 1, var1.cz), this.chunk(var1.cx - 1, var1.cz), this.chunk(var1.cx, var1.cz + 1), this.chunk(var1.cx, var1.cz - 1)
+         };
+
+         boolean isVoid = this.settings != null && this.settings.isVoidMode();
+         if (isVoid && this.dim == Dim.OVERWORLD && var1.isChunkEmpty()) {
+            Arrays.fill(var1.light, (byte)0xF0);
+            this.pullNeighbors(var1, false, var4);
+            this.propagate(false);
+            var1.lit = true;
+            for (Section var25 : var1.sections) {
+               var25.dirty = true;
+            }
+            this.markBounds();
+            return;
+         }
+
+         if (this.dim == Dim.OVERWORLD) {
+            int voidMinY = isVoid ? 36 : 0;
+            int maxHm = 0;
+            for (int i = 0; i < 256; i++) {
+               if (var1.hm[i] > maxHm) {
+                  maxHm = var1.hm[i];
+               }
+            }
+            int bulkStartY = Math.max(voidMinY, maxHm + 1);
+            if (bulkStartY < 256) {
+               Arrays.fill(var1.light, bulkStartY << 8, 65536, (byte)0xF0);
+            }
+            // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
+            for (int var5 = 0; var5 < 16; var5++) {
+               for (int var6 = 0; var6 < 16; var6++) {
+                  int var7 = var1.hm[var5 * 16 + var6];
+                  int colTopY = Math.min(256, bulkStartY);
+                  for (int var8 = Math.max(voidMinY, var7 + 1); var8 < colTopY; var8++) {
+                     var1.setSky(var6, var8, var5, 15);
+                  }
+
+                  int var21 = var7;
+                  int hE = var6 < 15 ? var1.hm[var5 * 16 + var6 + 1] : (var4[0] == null ? var7 : var4[0].hm[var5 * 16]);
+                  if (hE > var21) var21 = hE;
+                  int hW = var6 > 0 ? var1.hm[var5 * 16 + var6 - 1] : (var4[1] == null ? var7 : var4[1].hm[var5 * 16 + 15]);
+                  if (hW > var21) var21 = hW;
+                  int hS = var5 < 15 ? var1.hm[(var5 + 1) * 16 + var6] : (var4[2] == null ? var7 : var4[2].hm[var6]);
+                  if (hS > var21) var21 = hS;
+                  int hN = var5 > 0 ? var1.hm[(var5 - 1) * 16 + var6] : (var4[3] == null ? var7 : var4[3].hm[15 * 16 + var6]);
+                  if (hN > var21) var21 = hN;
+
+                  int var26 = Math.min(255, Math.max(var7 + 1, var21));
+                  int seedStartY = isVoid ? Math.max(36, var7 + 1) : (var7 + 1);
+
+                  for (int var28 = seedStartY; var28 <= var26; var28++) {
+                     work.addQ.add(pack(var2 + var6, var28, var3 + var5));
+                  }
+               }
+            }
+
+            this.pullNeighbors(var1, true, var4);
+            this.propagate(true);
+         }
+
+         short[] var16 = var1.blocks;
+
+         for (int sy = 0; sy < 16; sy++) {
+            if (var1.isSectionEmpty(sy)) {
+               continue;
+            }
+            int baseIdx = sy << 12;
+            int endIdx = baseIdx + 4096;
+            for (int var17 = baseIdx; var17 < endIdx; var17++) {
+               int var19 = Blocks.emit[var16[var17] & BlockState.ID_MASK];
+               if (var19 > 0) {
+                  var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
+                  int var22 = var17 >> 8;
+                  int var24 = var17 >> 4 & 15;
+                  int var27 = var17 & 15;
+                  work.addQ.add(pack(var2 + var27, var22, var3 + var24));
+               }
+            }
+         }
+
          this.pullNeighbors(var1, false, var4);
          this.propagate(false);
          var1.lit = true;
+
          for (Section var25 : var1.sections) {
             var25.dirty = true;
          }
+
          this.markBounds();
-         return;
+      } finally {
+         var1.lighting = false;
       }
-
-      if (this.dim == Dim.OVERWORLD) {
-         int voidMinY = isVoid ? 36 : 0;
-         int maxHm = 0;
-         for (int i = 0; i < 256; i++) {
-            if (var1.hm[i] > maxHm) {
-               maxHm = var1.hm[i];
-            }
-         }
-         int bulkStartY = Math.max(voidMinY, maxHm + 1);
-         if (bulkStartY < 256) {
-            Arrays.fill(var1.light, bulkStartY << 8, 65536, (byte)0xF0);
-         }
-         // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
-         for (int var5 = 0; var5 < 16; var5++) {
-            for (int var6 = 0; var6 < 16; var6++) {
-               int var7 = var1.hm[var5 * 16 + var6];
-               int colTopY = Math.min(256, bulkStartY);
-               for (int var8 = Math.max(voidMinY, var7 + 1); var8 < colTopY; var8++) {
-                  var1.setSky(var6, var8, var5, 15);
-               }
-
-               int var21 = var7;
-               int hE = var6 < 15 ? var1.hm[var5 * 16 + var6 + 1] : (var4[0] == null ? var7 : var4[0].hm[var5 * 16]);
-               if (hE > var21) var21 = hE;
-               int hW = var6 > 0 ? var1.hm[var5 * 16 + var6 - 1] : (var4[1] == null ? var7 : var4[1].hm[var5 * 16 + 15]);
-               if (hW > var21) var21 = hW;
-               int hS = var5 < 15 ? var1.hm[(var5 + 1) * 16 + var6] : (var4[2] == null ? var7 : var4[2].hm[var6]);
-               if (hS > var21) var21 = hS;
-               int hN = var5 > 0 ? var1.hm[(var5 - 1) * 16 + var6] : (var4[3] == null ? var7 : var4[3].hm[15 * 16 + var6]);
-               if (hN > var21) var21 = hN;
-
-               int var26 = Math.min(255, Math.max(var7 + 1, var21));
-               int seedStartY = isVoid ? Math.max(36, var7 + 1) : (var7 + 1);
-
-               for (int var28 = seedStartY; var28 <= var26; var28++) {
-                  this.addQ.add(pack(var2 + var6, var28, var3 + var5));
-               }
-            }
-         }
-
-         this.pullNeighbors(var1, true, var4);
-         this.propagate(true);
-      }
-
-      short[] var16 = var1.blocks;
-
-      for (int sy = 0; sy < 16; sy++) {
-         if (var1.isSectionEmpty(sy)) {
-            continue;
-         }
-         int baseIdx = sy << 12;
-         int endIdx = baseIdx + 4096;
-         for (int var17 = baseIdx; var17 < endIdx; var17++) {
-            int var19 = Blocks.emit[var16[var17] & BlockState.ID_MASK];
-            if (var19 > 0) {
-               var1.light[var17] = (byte)(var1.light[var17] & 240 | var19);
-               int var22 = var17 >> 8;
-               int var24 = var17 >> 4 & 15;
-               int var27 = var17 & 15;
-               this.addQ.add(pack(var2 + var27, var22, var3 + var24));
-            }
-         }
-      }
-
-      this.pullNeighbors(var1, false, var4);
-      this.propagate(false);
-      var1.lit = true;
-
-      for (Section var25 : var1.sections) {
-         var25.dirty = true;
-      }
-
-      this.markBounds();
    }
 
    private void pullNeighbors(Chunk var1, boolean var2, Chunk[] var3) {
+      LightScratch work = this.scratch();
       boolean isVoid = this.settings != null && this.settings.isVoidMode();
       int yLo = isVoid ? 36 : 0;
       int yHi = isVoid ? 148 : 256;
@@ -840,7 +940,7 @@ public final class World {
                   int var10 = this.lightOf(var5, var2, var8, var6, var9);
                   if (var10 > 1) {
                      if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & BlockState.ID_MASK] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
-                        this.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
+                        work.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
                      }
                   }
                }
@@ -860,7 +960,17 @@ public final class World {
    }
 
    public boolean setState(int var1, int var2, int var3, int state) {
+      this.lightingLock.lock();
+      try {
+         return this.setStateLocked(var1, var2, var3, state);
+      } finally {
+         this.lightingLock.unlock();
+      }
+   }
+
+   private boolean setStateLocked(int var1, int var2, int var3, int state) {
       if (state < 0 || state > 65535) return false;
+      LightScratch work = this.scratch();
       int var4 = state & BlockState.ID_MASK;
       if (var2 >= 0 && var2 <= 255) {
          Chunk var5 = this.chunkAt(var1, var3);
@@ -919,13 +1029,13 @@ public final class World {
                   var5.setBlk(var6, var2, var7, var12);
                }
 
-               this.addQ.add(pack(var1, var2, var3));
+               work.addQ.add(pack(var1, var2, var3));
             }
 
             for (int var13 = 0; var13 < 6; var13++) {
                int var14 = var2 + DY[var13];
                if (var14 >= 0 && var14 <= 255) {
-                  this.addQ.add(pack(var1 + DX[var13], var14, var3 + DZ[var13]));
+                  work.addQ.add(pack(var1 + DX[var13], var14, var3 + DZ[var13]));
                }
             }
 
@@ -1003,6 +1113,17 @@ public final class World {
    }
 
    public void resetAllChunks() {
+      this.lightingLock.lock();
+      try {
+         this.resetAllChunksLocked();
+      } finally {
+         this.lightingLock.unlock();
+      }
+   }
+
+   private void resetAllChunksLocked() {
+      this.unloadCursor = null;
+      this.lodCursor = null;
       FastChunkCache.clear();
       this.redstone.clear();
       this.circuit.clear();this.kinetics.clear();
@@ -1016,6 +1137,7 @@ public final class World {
       this.tiles.clear();
       this.ready.clear();
       this.requested.clear();
+      this.fire.cells.clear();
       if (this.lodMap != null) {
          this.lodMap.sums.clear();
       }
@@ -1040,12 +1162,14 @@ public final class World {
          int cx = (int)(k >> 32);
          int cz = (int)k;
          Chunk fresh = this.gen.generate(cx, cz);
+         fresh.recomputeSectionOccupancy();
          fresh.modified = false;
          fresh.unloaded = false;
          this.chunks.put(k, fresh);
          freshList.add(fresh);
       }
       for (Chunk ch : freshList) {
+         this.fire.scanChunk(ch);
          this.lightChunk(ch);
          for (Section s : ch.sections) {
             s.dirty = true;
@@ -1065,7 +1189,7 @@ public final class World {
          this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)
       }
 
-      if (this.tickCount % 20L == 0L && this.dim == Dim.OVERWORLD) {
+      if (this.dim == Dim.OVERWORLD) {
          this.lodRefresh();
       }
 

@@ -3,7 +3,9 @@
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
 In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
 
-Current source version: **V6.15 — native Create project: visible machinery, belts and current-driven wheels (NOT full Create)**.
+Current source version: **V6.16 — PC chunk-handling and performance test build** (retains V6.15 machinery and gameplay).
+
+Chunk lighting now runs on a bounded, low-priority worker; unload and distant-terrain scans are incremental, and per-section occupancy is indexed. No graphics settings were lowered. The build is released so PC players can test it; no measured frame-time gain is claimed yet. Please test with your normal settings and report the machine specs, render distance, and whether chunk-load spikes improved.
 
 Native mechanical parts now include shafts/cogs, a gearbox, motor/water-wheel
 sources, redstone clutch/gearshift, gauges, and visible belt/depot pressing and hand-fed millstone processing.
@@ -19,12 +21,12 @@ Right-click a **MIDI Build Compiler** in Creative, select a MIDI and click
 track or flying alongside it. **Play section** uses Start/Length; **Stop** ends
 listening. Audio is local and stops when closing the menu. **Build circuit**
 still makes independent physical redstone; its default section is five seconds.
-[Download V6.15](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.15) · [MIDI guide](package/MIDI-guide.txt).
+[Download V6.16](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.16) · [MIDI guide](package/MIDI-guide.txt).
 
 Adds temperature/depth-based oceans, reefs/kelp/icebergs, water flow, swimming
 and waterlogging; directional/timed circuits, comparators and slime-piston
 assemblies. See [controls, compatibility limits and tests](docs/gameplay/aquatic-redstone.md).
-Back up worlds before upgrading; use V6.15 on all multiplayer peers.
+Back up worlds before upgrading; use V6.16 on all multiplayer peers.
 
 Retains the Building, Colors/Nature and Utility/Tools review batches, chest and
 utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
@@ -58,7 +60,7 @@ patch). Your worlds and options are stored in `%USERPROFILE%\.blockcraft112`, so
 you extract a new version into a new folder. The player manual with the full changelog is `package/README.txt`
 (also inside the zip).
 
-**Seeing older art?** Check the title says V6.15 and select **Natural Pixel 32 (Default)**
+**Seeing older art?** Check the title says V6.16 and select **Natural Pixel 32 (Default)**
 in Options > Resource Packs. Older/custom packs deliberately keep their own textures.
 
 > Releases are created by the **Release** GitHub Action (Actions tab -> *Release* -> *Run workflow*), which packages the

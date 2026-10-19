@@ -20,6 +20,53 @@ final class TestsPerf {
       gpu();
       frames();
       cull();
+      sectionOccupancy();
+      asynchronousLighting();
+   }
+
+   static void asynchronousLighting() {
+      test("chunks: background lighting completes before a chunk becomes mesh-ready", () -> {
+         World w = new World(482, null);
+         w.saveEnabled = false;
+         try {
+            long deadline = System.nanoTime() + 5_000_000_000L;
+            Chunk center = null;
+            while (System.nanoTime() < deadline) {
+               w.updateChunks(0, 0, 3, 4);
+               center = w.chunk(0, 0);
+               if (center != null && center.lit && !center.lighting) {
+                  break;
+               }
+               Thread.sleep(2L);
+            }
+            check(center != null, "the center chunk is integrated");
+            check(center != null && center.lit, "the background lighting pass completes");
+            check(center != null && !center.lighting, "the chunk leaves the lighting state before meshing");
+         } finally {
+            w.shutdown();
+         }
+      });
+   }
+
+   static void sectionOccupancy() {
+      test("chunks: indexed section occupancy stays correct through bulk generation and block edits", () -> {
+         Chunk c = new Chunk(0, 0);
+         int y = 37;
+         int x = 4;
+         int z = 9;
+         check(c.isSectionEmpty(y >> 4), "an untouched section is empty");
+         c.blocks[Chunk.idx(x, y, z)] = (short)Blocks.STONE; // generators use direct bulk writes
+         check(!c.isSectionEmpty(y >> 4), "unknown occupancy falls back to the block data");
+         c.recomputeSectionOccupancy();
+         eq(1, c.sections[y >> 4].nonAirCount, "bulk indexing counts non-air blocks");
+         check(!c.isSectionEmpty(y >> 4), "indexed occupied section is not empty");
+         c.set(x, y, z, 0);
+         eq(0, c.sections[y >> 4].nonAirCount, "block removal decrements the cache");
+         check(c.isSectionEmpty(y >> 4), "last block removal empties the section");
+         c.set(x + 1, y, z, Blocks.TORCH);
+         eq(1, c.sections[y >> 4].nonAirCount, "block placement increments the cache");
+         check(!c.isSectionEmpty(y >> 4), "newly placed block is visible through the cache");
+      });
    }
 
    // ------------------------------------------------------------------ the culling of hidden sections

@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.15  -  an original Minecraft-style voxel sandbox   (EDITION V6.15)
+BLOCKCRAFT V6.16  -  an original Minecraft-style voxel sandbox   (EDITION V6.16)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,27 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.16 - PC chunk handling and performance test build
+
+  * Chunk generation remains asynchronous; newly integrated chunks now receive
+    lighting on a dedicated, low-priority worker instead of blocking the game
+    update. The lighting backlog is bounded so busy loading requeues work rather
+    than building an unbounded queue.
+  * Block edits and lighting are coordinated safely. Chunks are not offered to
+    the mesher while their lighting pass is in progress.
+  * Chunk eviction and distant-terrain refresh are incremental: at most 128
+    loaded chunks are scanned and two are evicted per update; at most 512 are
+    checked and four LOD summaries refreshed per Overworld tick.
+  * A per-section non-air count avoids rescanning empty block arrays during
+    meshing and void-world checks. Counts are rebuilt after bulk generation or
+    loading and maintained through ordinary block edits.
+  * No graphics settings or render distance were lowered. This is a performance
+    test release: no PC frame-time benchmark has been measured yet. Please try
+    it on your normal settings/world and report CPU, memory, render distance,
+    and whether the original chunk-load spikes improved.
+  * All V6.15 gameplay, Create machinery, textures, saves, worlds and controls
+    are retained; this release changes chunk scheduling and bookkeeping.
 
 WHAT'S NEW IN V6.15 - Visible machines, smooth rotation, belts and water torque
 

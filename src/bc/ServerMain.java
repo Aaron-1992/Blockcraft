@@ -83,6 +83,7 @@ public final class ServerMain {
          for (int cz = -3; cz <= 3; cz++) {
             for (int cx = -3; cx <= 3; cx++) {
                Chunk ch = w.gen.generate(cx, cz);
+               ch.recomputeSectionOccupancy();
                w.chunks.put(World.key(cx, cz), ch);
             }
          }

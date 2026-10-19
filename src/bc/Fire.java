@@ -1,9 +1,9 @@
 package bc;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Fire (Update 3.7), modelled on Minecraft 1.12's BlockFire.
@@ -23,7 +23,7 @@ final class Fire {
    final World w;
    final Random rnd = new Random();
    /** packed position -> {age, tick of the next update} */
-   final HashMap<Long, long[]> cells = new HashMap<>();
+   final ConcurrentHashMap<Long, long[]> cells = new ConcurrentHashMap<>();
    boolean spread = true;
 
    Fire(World w) {

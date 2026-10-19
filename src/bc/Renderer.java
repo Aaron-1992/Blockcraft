@@ -97,7 +97,7 @@ public final class Renderer {
       this.meshPool = Executors.newFixedThreadPool(var2, var0 -> {
          Thread var1x = new Thread(var0, "mesher");
          var1x.setDaemon(true);
-         var1x.setPriority(4);
+         var1x.setPriority(Thread.NORM_PRIORITY - 1);
          return var1x;
       });
       Random var3 = new Random(4242L);
@@ -162,14 +162,14 @@ public final class Renderer {
    }
 
    boolean ready(World var1, Chunk var2) {
-      if (!var2.lit) {
+      if (!var2.lit || var2.lighting) {
          return false;
       }
 
       for (int var3 = -1; var3 <= 1; var3++) {
          for (int var4 = -1; var4 <= 1; var4++) {
             Chunk var5 = var1.chunk(var2.cx + var3, var2.cz + var4);
-            if (var5 == null || !var5.lit) {
+            if (var5 == null || !var5.lit || var5.lighting) {
                return false;
             }
          }
@@ -185,7 +185,7 @@ public final class Renderer {
     */
    public boolean chunkMeshed(int var1, int var2) {
       Chunk var3 = this.g.world.chunk(var1, var2);
-      return var3 != null && var3.lit && var3.everMeshed
+      return var3 != null && var3.lit && !var3.lighting && var3.everMeshed
          && realChunkInRange(var1,var2,this.camX,this.camZ,this.g.opt.renderDistance);
    }
 

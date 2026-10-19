@@ -18,7 +18,8 @@ public final class Chunk {
    public volatile long lodDirty;
    /** Update 3.11: set once the chunk's sections have all been meshed at least once - from then on the LOD under it stays hidden. */
    public volatile boolean everMeshed;
-   public boolean lit;
+   public volatile boolean lit;
+   public volatile boolean lighting;
    public volatile boolean unloaded;
    public final Chunk.Section[] sections = new Chunk.Section[16];
 
@@ -111,7 +112,30 @@ public final class Chunk {
    }
 
    public void set(int var1, int var2, int var3, int var4) {
-      this.blocks[idx(var1, var2, var3)] = (short)var4;
+      int index = idx(var1, var2, var3);
+      short old = this.blocks[index];
+      short next = (short)var4;
+      if (old == next) return;
+      this.blocks[index] = next;
+      int count = this.sections[var2 >> 4].nonAirCount;
+      if (count >= 0) {
+         if (old == 0) count++;
+         if (next == 0) count--;
+         this.sections[var2 >> 4].nonAirCount = count;
+      }
+   }
+
+   /** Rebuilds section occupancy once after a generator, disk load, or direct bulk edit. */
+   public void recomputeSectionOccupancy() {
+      for (int sy = 0; sy < 16; sy++) {
+         int count = 0;
+         int start = sy << 12;
+         int end = start + 4096;
+         for (int i = start; i < end; i++) {
+            if (this.blocks[i] != 0) count++;
+         }
+         this.sections[sy].nonAirCount = count;
+      }
    }
 
    public int sky(int var1, int var2, int var3) {
@@ -133,23 +157,31 @@ public final class Chunk {
    }
 
    public boolean isSectionEmpty(int sy) {
+      int count = this.sections[sy].nonAirCount;
+      if (count >= 0) return count == 0;
       int base = sy << 12;
       int end = base + 4096;
       short[] b = this.blocks;
       for (int i = base; i < end; i++) {
-         if (b[i] != 0) {
-            return false;
-         }
+         if (b[i] != 0) return false;
       }
       return true;
    }
 
    public boolean isChunkEmpty() {
-      short[] b = this.blocks;
-      for (int i = 0; i < b.length; i++) {
-         if (b[i] != 0) {
+      boolean allKnown = true;
+      for (Section section : this.sections) {
+         int count = section.nonAirCount;
+         if (count < 0) {
+            allKnown = false;
+         } else if (count != 0) {
             return false;
          }
+      }
+      if (allKnown) return true;
+      short[] b = this.blocks;
+      for (int i = 0; i < b.length; i++) {
+         if (b[i] != 0) return false;
       }
       return true;
    }
@@ -233,9 +265,11 @@ public final class Chunk {
       public int vboT;
       public int nO;
       public int nT;
-      public boolean dirty = true;
-      public boolean inFlight;
+      public volatile boolean dirty = true;
+      public volatile boolean inFlight;
       public int version;
+      /** Non-air blocks in this section, or -1 until a generated/loaded chunk has been indexed. */
+      public volatile int nonAirCount = -1;
       public boolean empty = true;
       /** Update 3.11: has been meshed (and uploaded) at least once. */
       public boolean meshed;

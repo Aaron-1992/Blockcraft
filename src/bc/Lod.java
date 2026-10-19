@@ -65,12 +65,13 @@ public final class Lod {
          map.listener = this::invalidate;
       }
 
-      int var3 = Math.max(2, Math.min(4, Runtime.getRuntime().availableProcessors() - 1));
-      this.maxInflight = var3 * 10;
+      int cores = Math.max(1, Runtime.getRuntime().availableProcessors());
+      int var3 = Math.max(1, Math.min(2, (cores + 3) / 4));
+      this.maxInflight = var3 * 4;
       this.pool = Executors.newFixedThreadPool(var3, var0 -> {
          Thread var1x = new Thread(var0, "lod-gen");
          var1x.setDaemon(true);
-         var1x.setPriority(4);
+         var1x.setPriority(Thread.NORM_PRIORITY - 2);
          return var1x;
       });
    }

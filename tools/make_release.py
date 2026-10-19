@@ -314,6 +314,14 @@ def main():
             "are host-only. Old press inventories are retained for extraction/finishing, but no new press inputs "
             "enter the old hidden slots. Back up `kinetics.dat`; do not downgrade a belt world to V6.14. "
             "Original 32px component art only; no upstream restricted assets redistributed.\n")
+    if version == "6.16":
+        release_notes += (
+            "\n### How to test the PC performance update\n\n"
+            "This build keeps the V6.15 gameplay and does not lower render distance or graphics quality. "
+            "Back up your world, then try it at the settings where chunk-load lag spikes were noticeable; no world reset is needed. "
+            "Please report your CPU/GPU, memory, render distance and whether the spikes improved. "
+            "The changes are regression-tested, but no measured frame-time improvement is claimed yet.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:
