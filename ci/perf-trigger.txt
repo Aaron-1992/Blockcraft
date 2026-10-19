@@ -1,4 +1,4 @@
 none
 640x360
-22
-surface,forest,cave1
+23
+surface,cave1

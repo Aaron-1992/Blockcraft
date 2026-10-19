@@ -4,7 +4,9 @@ A/B check of the culling of hidden sections (CaveCull): every scene is photograp
 once as it is and once with -Dbc.cavecull=false. The culling only leaves out what cannot be seen, so the two pictures have to be the
 same - up to the speckles along the edges of blocks that two runs of one scene differ by anyway (the software renderer is not exact: the
 control run, the same scene a second time, shows 1 - 8 % of such pixels). A hole where a hill or a cave wall should be is a BLOB: the
-verdict looks at the part of the picture that differs in blobs of at least 5 x 5 pixels (a morphological opening of the difference mask).
+verdict looks at the part of the picture that differs in blobs of at least 5 x 5 pixels (a morphological opening of the difference mask). The test freezes
+natural/spawner-driven mob creation and keeps demand-mesh candidate selection identical when draw culling is disabled; text-only residual maps are
+included in the check-run annotation for failures, even when GitHub Actions artifact storage is full.
 
     python3 tools/cullcheck.py [--scenes surface,cave1] [--jar build/blockcraft.jar] [--win 640x360]
 
@@ -12,6 +14,7 @@ Results: ci-results/perf/cull/<scene>.jpg (side by side: culling on | off) and c
 """
 import argparse
 import os
+import re
 import shutil
 import sys
 import time
@@ -41,10 +44,14 @@ SCENES = {
 }
 
 
+def difference_mask(a, b, mask):
+    shots.im("compare", "-fuzz", "6%", "-compose", "src", "-highlight-color", "white", "-lowlight-color", "black", a, b, mask)
+
+
 def blob_pct(a, b):
     """The part of the picture (percent) where two pictures differ in blobs of at least 5 x 5 pixels: edge noise vanishes, a hole does not."""
     mask = a + ".mask.png"
-    shots.im("compare", "-fuzz", "6%", "-compose", "src", "-highlight-color", "white", "-lowlight-color", "black", a, b, mask)
+    difference_mask(a, b, mask)
     r = shots.im("convert", mask, "-colorspace", "Gray", "-morphology", "Open", "Square:5", "-format", "%[fx:mean*100]", "info:")
     if os.path.exists(mask):
         os.remove(mask)
@@ -52,6 +59,28 @@ def blob_pct(a, b):
         return float(r.stdout.strip())
     except ValueError:
         return None
+
+
+def blob_grid(a, b):
+    """Compact, text-only map of persistent differences for CI logs when image artifacts cannot be uploaded."""
+    mask = a + ".grid.png"
+    difference_mask(a, b, mask)
+    try:
+        r = shots.im("convert", mask, "-colorspace", "Gray", "-morphology", "Open", "Square:5", "-resize", "40x23!", "-threshold", "5%", "-depth", "8", "txt:-")
+        if r.returncode != 0:
+            return None
+        width, height = 40, 23
+        grid = [["."] * width for _ in range(height)]
+        for line in r.stdout.splitlines():
+            match = re.match(r"(\d+),(\d+):\s+\((\d+),", line)
+            if match:
+                x, y, gray = map(int, match.groups())
+                if x < width and y < height and gray >= 128:
+                    grid[y][x] = "#"
+        return "\n".join("".join(row) for row in grid)
+    finally:
+        if os.path.exists(mask):
+            os.remove(mask)
 
 
 BLOB_LIMIT = 0.05  # percent of the picture: 115 solid pixels in a 640 x 360 frame; a missing hill or cave wall is thousands
@@ -121,6 +150,10 @@ def main():
             bad += 1
         fmt = lambda v: "-" if v is None else "%.3f %%" % v
         rows.append("| %s | %s | %s | %s / %s | %s |\n" % (n, fmt(pct), fmt(blob), fmt(noise), fmt(noise_blob), verdict))
+        if verdict == "DIFFERENT" and on and off:
+            grid = blob_grid(on, off)
+            if grid:
+                rows.append("\n#### %s residual difference mask (`#` = persistent differing area; 40x23)\n\n```text\n%s\n```\n" % (n, grid))
         for p in (on, off):
             if p and os.path.exists(p):
                 os.remove(p)

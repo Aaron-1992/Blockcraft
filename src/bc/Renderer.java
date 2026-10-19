@@ -950,11 +950,15 @@ public final class Renderer {
       int var49 = (int)Math.floor(this.camZ) >> 4;
       // Update 3.18: sections that the ground hides are not drawn (CaveCull): the walk from the camera's section through the open faces finds
       // the ones that can be seen. Not for a spectator (who flies through the rock) and not when the camera is inside a solid block.
-      boolean walked = !Perf.noCull && CAVE_CULL && !var4.spectator
+      boolean openCamera = !var4.spectator
          && !Blocks.opaque[var5.getBlock((int)Math.floor(this.camX), (int)Math.floor(this.camY), (int)Math.floor(this.camZ))];
+      boolean walked = !Perf.noCull && openCamera;
+      boolean cullDraw = walked && CAVE_CULL;
       if (walked) {
          int camSy = Math.max(0, Math.min(15, (int)Math.floor(this.camY) >> 4));
          this.walk.run(var5, var48, camSy, var49, var13, this.camX, this.camY, this.camZ, this.frustumTest);
+      }
+      if (cullDraw) {
          for (int i = 0; i < this.walk.count; i++) {
             int idx = this.walk.order[i];
             Chunk var32 = this.walk.chunk(idx);
@@ -973,6 +977,7 @@ public final class Renderer {
             }
          }
       }
+      // Keep demand-mesh candidate selection identical for the visual A/B test: disabling culling changes only what is drawn, not what gets meshed.
       this.rememberMeshVisibility(var5, walked);
 
       this.vis.sort(VIS_NEAR_FIRST);
