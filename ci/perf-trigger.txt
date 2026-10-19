@@ -1,5 +1,5 @@
 forest
 640x360
-40
+20
 surface,forest,cave1
 # benchmark: 32-byte candidate vs 44-byte pre-pack and V6.16; line 4 remains culling scenes

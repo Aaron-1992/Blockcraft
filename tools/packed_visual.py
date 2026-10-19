@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""World-only screenshot comparison of the old float VBO and packed-color VBO layouts."""
+"""Repeated world-only screenshot comparison of the float and packed-color VBO layouts."""
 import argparse
+import itertools
 import os
 import shutil
+import statistics
 import sys
 import time
 
@@ -20,7 +22,13 @@ SCENES = {
     "forest": ["-Dbc.cam=190.5,96,-25.5,90,16"],
     "cave1": ["-Dbc.cam=81.5,22.5,-76.5,0,0"],
 }
+REFERENCE_RUNS = 3
+CANDIDATE_RUNS = 2
 BLOB_LIMIT = 0.05
+
+
+def compare(a, b):
+    return shots.diff_pct(a, b), cullcheck.blob_pct(a, b)
 
 
 def main():
@@ -35,7 +43,6 @@ def main():
     unknown = [name for name in names if name not in SCENES]
     if unknown:
         ap.error("unknown visual scene(s): " + ",".join(unknown))
-
     if not names:
         ap.error("at least one visual scene is required")
 
@@ -48,32 +55,47 @@ def main():
     java = shutil.which("java") or "java"
     rows = [
         "# Packed-VBO visual comparison %s (world only, %s)" % (time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), args.win),
-        "", "Reference and candidate use the same camera, seed, frozen sky, and hidden hand/HUD. A repeat reference run measures renderer noise.",
-        "", "| Scene | Pre-pack repeat noise (pixels / blobs) | Packed difference (pixels / blobs) | Verdict |", "|---|---:|---:|---|",
+        "", "Each scene has %d pre-pack and %d packed screenshots. Repeat noise is the largest within-version difference; packed difference is the median of every cross-version pair." % (REFERENCE_RUNS, CANDIDATE_RUNS),
+        "", "The camera, seed, frozen sky, and hidden hand/HUD are identical across runs.",
+        "", "| Scene | Maximum repeat noise (pixels / blobs) | Median packed difference (pixels / blobs) | Verdict |", "|---|---:|---:|---|",
     ]
     failed = 0
     for name in names:
         props = BASE + ["-Dbc.win=" + args.win] + SCENES[name]
-        ref1 = shots.run_scene(java, "prepack1", args.reference, name, props, args.timeout)
-        ref2 = shots.run_scene(java, "prepack2", args.reference, name, props, args.timeout)
-        candidate = shots.run_scene(java, "packed", args.candidate, name, props, args.timeout)
+        references = [
+            shots.run_scene(java, "prepack%d" % (i + 1), args.reference, name, props, args.timeout)
+            for i in range(REFERENCE_RUNS)
+        ]
+        candidates = [
+            shots.run_scene(java, "packed%d" % (i + 1), args.candidate, name, props, args.timeout)
+            for i in range(CANDIDATE_RUNS)
+        ]
         verdict = "NO PICTURE"
         noise = noise_blob = difference = difference_blob = None
-        if ref1 and ref2 and candidate:
-            noise = shots.diff_pct(ref1, ref2)
-            noise_blob = cullcheck.blob_pct(ref1, ref2)
-            difference = shots.diff_pct(ref1, candidate)
-            difference_blob = cullcheck.blob_pct(ref1, candidate)
-            if difference_blob is not None and difference_blob < BLOB_LIMIT:
-                verdict = "same (no persistent blobs)"
-            elif difference_blob is not None and noise_blob is not None and difference_blob - noise_blob < BLOB_LIMIT:
-                verdict = "same (within repeat noise)"
-            else:
-                verdict = "DIFFERENT"
-            shots.composite([ref1, candidate], ["pre-pack", "packed"], os.path.join(out, name + "-comparison.jpg"))
+        if all(references) and all(candidates):
+            repeat_pairs = list(itertools.combinations(references, 2)) + list(itertools.combinations(candidates, 2))
+            cross_pairs = list(itertools.product(references, candidates))
+            repeat_metrics = [compare(a, b) for a, b in repeat_pairs]
+            cross_metrics = [compare(a, b) for a, b in cross_pairs]
+            if all(p is not None and b is not None for p, b in repeat_metrics + cross_metrics):
+                noise = max(p for p, _ in repeat_metrics)
+                noise_blob = max(b for _, b in repeat_metrics)
+                difference = statistics.median(p for p, _ in cross_metrics)
+                difference_blob = statistics.median(b for _, b in cross_metrics)
+                if difference_blob < BLOB_LIMIT:
+                    verdict = "same (no persistent blobs)"
+                elif difference_blob - noise_blob < BLOB_LIMIT:
+                    verdict = "same (within repeat noise)"
+                else:
+                    verdict = "DIFFERENT"
+
+            shots.composite(
+                [references[0], candidates[0]], ["pre-pack", "packed"],
+                os.path.join(out, name + "-comparison.jpg")
+            )
             if verdict == "DIFFERENT":
-                grid = cullcheck.blob_grid(ref1, candidate)
-                preview = cullcheck.preview_base64(ref1, candidate)
+                grid = cullcheck.blob_grid(references[0], candidates[0])
+                preview = cullcheck.preview_base64(references[0], candidates[0])
                 if grid:
                     rows.append("\n#### %s residual mask (`#` = persistent difference)\n\n```text\n%s\n```\n" % (name, grid))
                 if preview:
@@ -84,7 +106,7 @@ def main():
         ))
         if not verdict.startswith("same"):
             failed += 1
-        for image in (ref1, ref2, candidate):
+        for image in references + candidates:
             if image and os.path.exists(image):
                 os.remove(image)
         with open(report_path, "w", encoding="utf-8") as f:

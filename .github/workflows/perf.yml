@@ -20,7 +20,7 @@ concurrency:
 jobs:
   bench:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,7 +70,7 @@ jobs:
           case "$FRAMES" in ''|*[!0-9]*) FRAMES=60;; esac
           echo "scenes: $SCENES window: $WIN frames: $FRAMES"
           mkdir -p ci-results/perf
-          if [ "$SCENES" != none ]; then timeout 40m python3 tools/paired_perf.py --v616 build/paired/v616.jar --v617 build/paired/v617.jar --packed build/blockcraft.jar --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" --timeout 630 2>&1 | tee build/perf.log; fi
+          if [ "$SCENES" != none ]; then timeout 50m python3 tools/paired_perf.py --v616 build/paired/v616.jar --v617 build/paired/v617.jar --packed build/blockcraft.jar --scenes "$SCENES" --win "$WIN" --frames "$FRAMES" --timeout 900 2>&1 | tee build/perf.log; fi
 
       - name: Culling regression check
         continue-on-error: true
@@ -81,7 +81,21 @@ jobs:
           # line 4 of ci/perf-trigger.txt = scenes to compare with CaveCull disabled, 'all', or 'none'
           CHECK="$(sed -n 4p ci/perf-trigger.txt | tr -d '[:space:]')"
           case "$CHECK" in ''|*[!a-z0-9,-]*) CHECK=none;; esac
-          if [ "$CHECK" != none ]; then timeout 30m python3 tools/cullcheck.py --scenes "$CHECK" --win "$WIN" 2>&1 | tee build/cullcheck.log; fi
+          if [ "$CHECK" != none ]; then
+            timeout 30m python3 tools/cullcheck.py --scenes "$CHECK" --win "$WIN" 2>&1 | tee build/cullcheck.log
+            if [ -f ci-results/perf/cullcheck.md ]; then cp ci-results/perf/cullcheck.md ci-results/perf/cullcheck-candidate.md; fi
+            if [ -d ci-results/perf/cull ]; then mkdir -p build/paired/cull-candidate; cp -a ci-results/perf/cull/. build/paired/cull-candidate/; fi
+          fi
+
+      - name: Pre-pack cave culling diagnostic
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          WIN="$(sed -n 2p ci/perf-trigger.txt | tr -d '[:space:]')"
+          case "$WIN" in ''|*[!0-9x]*) WIN=640x360;; esac
+          # Cave1 was flagged on the packed jar; check the parent build to separate a pre-existing culling result from a new regression.
+          timeout 15m python3 tools/cullcheck.py --jar build/paired/v617.jar --scenes cave1 --win "$WIN" 2>&1 | tee build/cullcheck-prepack.log
+          if [ -f ci-results/perf/cullcheck.md ]; then cp ci-results/perf/cullcheck.md ci-results/perf/cullcheck-v617.md; fi
 
       - name: Packed VBO visual A/B (world only; hand and HUD excluded)
         continue-on-error: true
@@ -96,7 +110,8 @@ jobs:
         if: always()
         run: |
           python3 tools/ci_annotate.py ci-results/perf/summary.md "paired perf comparison" notice || true
-          python3 tools/ci_annotate.py ci-results/perf/cullcheck.md "culling regression check" notice || true
+          python3 tools/ci_annotate.py ci-results/perf/cullcheck-candidate.md "packed candidate culling check" notice || true
+          python3 tools/ci_annotate.py ci-results/perf/cullcheck-v617.md "pre-pack V6.17 culling diagnostic" notice || true
           python3 tools/ci_annotate.py ci-results/perf/packed-visual.md "packed VBO visual A/B" notice || true
 
       - name: Upload paired benchmark and visual diagnostics
@@ -108,11 +123,14 @@ jobs:
           path: |
             build/perf.log
             build/cullcheck.log
+            build/cullcheck-prepack.log
             build/packed-visual.log
             ci-results/perf/summary.md
-            ci-results/perf/cullcheck.md
+            ci-results/perf/cullcheck-candidate.md
+            ci-results/perf/cullcheck-v617.md
             ci-results/perf/packed-visual.md
             ci-results/perf/cull/
+            build/paired/cull-candidate/
             build/paired/visual/
           if-no-files-found: ignore
           retention-days: 7

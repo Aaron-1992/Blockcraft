@@ -18,7 +18,9 @@ import perf  # noqa: E402
 def bench_rows(lines):
     rows = {}
     for line in lines:
-        if not line.startswith("BENCH "):
+        if not line.startswith("BENCH ") or line.startswith("BENCH   "):
+            # The indented detail lines (CPU phases, GPU phases, memory by tile) can contain their own 'avg'; only
+            # the top-level BENCH <preset> avg rows belong in the comparison table.
             continue
         match = re.match(r"BENCH\s+(.+?)\s+avg\s+([0-9]+(?:\.[0-9]+)?)\s+ms", line)
         if match:
@@ -58,7 +60,7 @@ def main():
     ap.add_argument("--scenes", default="forest")
     ap.add_argument("--win", default="640x360")
     ap.add_argument("--frames", type=int, default=20)
-    ap.add_argument("--timeout", type=int, default=630)
+    ap.add_argument("--timeout", type=int, default=900)
     args = ap.parse_args()
     scenes = list(perf.SCENARIOS) if args.scenes == "all" else [name.strip() for name in args.scenes.split(",") if name.strip()]
     unknown = [name for name in scenes if name not in perf.SCENARIOS]
@@ -85,7 +87,7 @@ def main():
     report = [
         "# Paired PC performance comparison",
         "",
-        "All three jars ran on the same GitHub runner with llvmpipe, identical scene/settings, %s, %d frames per setting." % (args.win, args.frames),
+        "All three jars were attempted on the same GitHub runner with llvmpipe, identical scene/settings, %s, %d frames per setting. See run status below for incomplete attempts." % (args.win, args.frames),
         "Deltas are candidate minus the named reference (negative is faster). llvmpipe is a CPU software renderer, not a prediction of a graphics card's FPS.",
         "",
     ]
