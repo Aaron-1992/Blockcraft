@@ -256,13 +256,17 @@ public final class Renderer {
       this.meshViewZ = this.camZ;
    }
 
-   /** A dirty non-empty section is worth building only if the last rendered view could reach it; keep a two-chunk warm ring for turns. */
+   static boolean inWarmMeshRing(int dx, int dz) {
+      return dx * dx + dz * dz <= 2; // one-chunk square, including diagonal neighbors
+   }
+
+   /** A dirty section is worth building when the current view can reach it; keep one neighboring chunk warm for quick turns. */
    boolean meshCandidate(World world, Chunk chunk, int sy) {
       int camCx = (int)Math.floor(this.camX) >> 4;
       int camCz = (int)Math.floor(this.camZ) >> 4;
       int dx = chunk.cx - camCx;
       int dz = chunk.cz - camCz;
-      if (dx * dx + dz * dz <= 4) {
+      if (inWarmMeshRing(dx, dz)) {
          return true;
       }
       if (!this.meshVisibilityReady || this.meshVisibilityWorld != world) {

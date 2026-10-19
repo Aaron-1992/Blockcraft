@@ -103,6 +103,10 @@ final class TestsPerf {
    }
 
    static void meshCoverage() {
+      test("renderer: demand meshing keeps only the immediate 3x3 chunk warm ring", () -> {
+         check(Renderer.inWarmMeshRing(0, 0) && Renderer.inWarmMeshRing(1, 0) && Renderer.inWarmMeshRing(1, 1)
+            && !Renderer.inWarmMeshRing(2, 0) && !Renderer.inWarmMeshRing(2, -1), "the warm ring includes immediate neighbors, not a second ring");
+      });
       test("lod: covered-cache hits require an unchanged view and mesh epoch; stale uncovered results only overdraw", () -> {
          check(Lod.coverageCacheReusable(false, 1L, 2L, 3L, 4L)
             && Lod.coverageCacheReusable(true, 1L, 1L, 3L, 3L)

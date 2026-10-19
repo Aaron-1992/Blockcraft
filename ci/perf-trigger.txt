@@ -2,4 +2,4 @@ forest
 640x360
 20
 surface,forest,cave1
-# repeat the identical workload once to measure runner variance; perf.yml reads only lines 1-4
+# rerun after reducing demand meshing to the immediate 3x3 warm ring; perf.yml reads only lines 1-4
