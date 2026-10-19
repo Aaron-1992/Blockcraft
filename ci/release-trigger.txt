@@ -1,2 +1,2 @@
-6.15
-# Tested dedicated machinery, frame interpolation, visible belts and directional water.
+6.16
+# PC chunk lighting, bounded unloading and incremental LOD performance test.
