@@ -6,13 +6,14 @@ same - up to the speckles along the edges of blocks that two runs of one scene d
 control run, the same scene a second time, shows 1 - 8 % of such pixels). A hole where a hill or a cave wall should be is a BLOB: the
 verdict looks at the part of the picture that differs in blobs of at least 5 x 5 pixels (a morphological opening of the difference mask). The test freezes
 natural/spawner-driven mob creation and keeps demand-mesh candidate selection identical when draw culling is disabled; text-only residual maps are
-included in the check-run annotation for failures, even when GitHub Actions artifact storage is full.
+included in the check-run annotation for failures, with a tiny side-by-side preview encoded as a fallback, even when GitHub Actions artifact storage is full.
 
     python3 tools/cullcheck.py [--scenes surface,cave1] [--jar build/blockcraft.jar] [--win 640x360]
 
 Results: ci-results/perf/cull/<scene>.jpg (side by side: culling on | off) and ci-results/perf/cullcheck.md.
 """
 import argparse
+import base64
 import os
 import re
 import shutil
@@ -81,6 +82,20 @@ def blob_grid(a, b):
     finally:
         if os.path.exists(mask):
             os.remove(mask)
+
+
+def preview_base64(a, b):
+    """Tiny side-by-side JPEG, carried in a run annotation as a fallback when artifact uploads are unavailable."""
+    preview = a + ".preview.jpg"
+    try:
+        r = shots.im("convert", "(", a, "-resize", "112x63!", "-quality", "30", ")", "(", b, "-resize", "112x63!", "-quality", "30", ")", "+append", "-quality", "30", preview)
+        if r.returncode != 0 or not os.path.exists(preview):
+            return None
+        with open(preview, "rb") as f:
+            return base64.b64encode(f.read()).decode("ascii")
+    finally:
+        if os.path.exists(preview):
+            os.remove(preview)
 
 
 BLOB_LIMIT = 0.05  # percent of the picture: 115 solid pixels in a 640 x 360 frame; a missing hill or cave wall is thousands
@@ -154,6 +169,9 @@ def main():
             grid = blob_grid(on, off)
             if grid:
                 rows.append("\n#### %s residual difference mask (`#` = persistent differing area; 40x23)\n\n```text\n%s\n```\n" % (n, grid))
+            preview = preview_base64(on, off)
+            if preview:
+                rows.append("\nDIFF_PREVIEW_JPEG_BASE64:%s\n" % preview)
         for p in (on, off):
             if p and os.path.exists(p):
                 os.remove(p)
