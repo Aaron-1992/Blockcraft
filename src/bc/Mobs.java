@@ -12,6 +12,8 @@ import java.util.HashMap;
 import java.util.Random;
 
 public final class Mobs {
+   /** Deterministic screenshot hook: suppress natural and spawner-driven mob creation in culling A/B runs. */
+   private static final boolean NO_AUTOSPAWN = Boolean.getBoolean("bc.nomobs");
    public static final int PIG = 0;
    public static final int COW = 1;
    public static final int SHEEP = 2;
@@ -264,7 +266,7 @@ public final class Mobs {
 
          this.timer++;
          Mobs312.tickFireballs(this, var1, var2);
-         if (!remoteClientOnly || !Net319.hostHasMobSync) {
+         if (!NO_AUTOSPAWN && (!remoteClientOnly || !Net319.hostHasMobSync)) {
             if (this.timer % 20 == 3) {
                this.tickSpawners(var1, var2);
             }

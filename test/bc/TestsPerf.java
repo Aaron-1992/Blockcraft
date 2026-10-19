@@ -424,14 +424,23 @@ final class TestsPerf {
             w.lightChunk(c);
          }
 
+         int connectivityMismatches = 0;
+         String firstConnectivityMismatch = "";
          for (Chunk c : cs) {
+            c.recomputeSectionOccupancy();
+            CaveCull.computeChunk(c);
             for (int sy = 0; sy < 16; sy++) {
                Mesher.Result r = Mesher.build(w, c, sy, true);
-               c.sections[sy].conn = r.conn;
-               c.sections[sy].connKnown = true;
+               if (r.conn != c.sections[sy].conn) {
+                  connectivityMismatches++;
+                  if (firstConnectivityMismatch.isEmpty()) {
+                     firstConnectivityMismatch = c.cx + "," + c.cz + "," + sy;
+                  }
+               }
                Renderer.free(r);
             }
          }
+         check(connectivityMismatches == 0, "premeshed connectivity matches the mesher for all terrain sections; mismatches " + connectivityMismatches + " (first " + firstConnectivityMismatch + ")");
 
          // cameras: three above the ground, three in caves (an open block that has solid rock above it and a surface well above)
          java.util.List<double[]> cams = new ArrayList<>();
