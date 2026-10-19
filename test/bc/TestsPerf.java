@@ -103,6 +103,12 @@ final class TestsPerf {
    }
 
    static void meshCoverage() {
+      test("lod: covered-cache hits require an unchanged view and mesh epoch; stale uncovered results only overdraw", () -> {
+         check(Lod.coverageCacheReusable(false, 1L, 2L, 3L, 4L)
+            && Lod.coverageCacheReusable(true, 1L, 1L, 3L, 3L)
+            && !Lod.coverageCacheReusable(true, 1L, 2L, 3L, 3L)
+            && !Lod.coverageCacheReusable(true, 1L, 1L, 3L, 4L), "cache validity matches visibility and mesh changes");
+      });
       test("renderer: readiness waits for view candidates but not deferred cave sections", () -> {
          Game game = new Game();
          Renderer renderer = new Renderer(game);

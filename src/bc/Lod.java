@@ -1292,43 +1292,44 @@ public final class Lod {
       return this.coveredBox(var1, var2, 32);
    }
 
+   static boolean coverageCacheReusable(boolean covered, long cachedView, long currentView, long cachedMeshEpoch, long currentMeshEpoch) {
+      return !covered || cachedView == currentView && cachedMeshEpoch == currentMeshEpoch;
+   }
+
    boolean coveredBox(int var1, int var2, int size) {
       Lod.Tile var3 = (Lod.Tile)this.tiles.get(key(size, var1, var2));
+      World world = this.rend.g.world;
+      long meshEpoch = world == null ? 0L : world.meshCoverageEpoch.get();
+      long viewKey = this.rend.meshVisibilityKey;
       if (var3 != null) {
          var3.lastUse = this.frame;
-         if (var3.coverFrame != 0L && var3.coverFrame == this.frame) {
-            return var3.covered;
-         }
-         if ((!var3.covered || var3.coverStable) && var3.coverFrame != 0L && this.frame - var3.coverFrame < 15L) {
+         if (var3.coverFrame != 0L && this.frame - var3.coverFrame < 15L
+            && coverageCacheReusable(var3.covered, var3.coverVisibilityKey, viewKey, var3.coverMeshEpoch, meshEpoch)) {
             return var3.covered;
          }
       }
 
-      boolean var4 = true;
-      boolean stable = true;
+      boolean covered = true;
       int cx0 = var1 >> 4;
       int cx1 = (var1 + size - 1) >> 4;
       int cz0 = var2 >> 4;
       int cz1 = (var2 + size - 1) >> 4;
 
-      for (int var5 = cx0; var5 <= cx1 && (var4 || stable); var5++) {
-         for (int var6 = cz0; var6 <= cz1 && (var4 || stable); var6++) {
-            Chunk chunk = this.rend.g.world == null ? null : this.rend.g.world.chunk(var5, var6);
-            if (chunk != null && !chunk.everMeshed) {
-               stable = false;
-            }
-            if (var4 && !this.rend.chunkMeshed(var5, var6)) {
-               var4 = false;
+      for (int cx = cx0; covered && cx <= cx1; cx++) {
+         for (int cz = cz0; covered && cz <= cz1; cz++) {
+            if (!this.rend.chunkMeshed(cx, cz)) {
+               covered = false;
             }
          }
       }
 
       if (var3 != null) {
          var3.coverFrame = this.frame;
-         var3.covered = var4;
-         var3.coverStable = !var4 || stable;
+         var3.covered = covered;
+         var3.coverVisibilityKey = viewKey;
+         var3.coverMeshEpoch = meshEpoch;
       }
-      return var4;
+      return covered;
    }
 
    /**
@@ -1522,7 +1523,8 @@ public final class Lod {
       long lastDrawFrame;
       long coverFrame;
       boolean covered;
-      boolean coverStable;
+      long coverVisibilityKey;
+      long coverMeshEpoch;
       /** Update 3.11: the epoch (see Lod.invalidate) the tile was built at / last found outdated at, the frame it was uploaded, its replacement. */
       volatile long builtEpoch;
       volatile long dirtyEpoch;

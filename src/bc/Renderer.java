@@ -159,6 +159,9 @@ public final class Renderer {
       this.vis.clear();
       this.meshVisibilityReady = false;
       this.meshVisibilityWorld = null;
+      if (w != null) {
+         w.meshCoverageEpoch.incrementAndGet();
+      }
       this.shadowDirty = true;
       if (this.lod != null) {
          this.lod.invalidateAll();
@@ -225,6 +228,26 @@ public final class Renderer {
    }
 
    void rememberMeshVisibility(World world, boolean walked) {
+      long key = 0xcbf29ce484222325L;
+      key = (key ^ System.identityHashCode(world)) * 0x100000001b3L;
+      key = (key ^ (((int)Math.floor(this.camX) >> 4) & 0xFFFFFFFFL)) * 0x100000001b3L;
+      key = (key ^ (((int)Math.floor(this.camZ) >> 4) & 0xFFFFFFFFL)) * 0x100000001b3L;
+      key = (key ^ (((int)Math.floor(this.camY) >> 4) & 0xFFFFFFFFL)) * 0x100000001b3L;
+      key = (key ^ (this.g.opt == null ? 0 : this.g.opt.renderDistance)) * 0x100000001b3L;
+      key = (key ^ (walked ? 1L : 0L)) * 0x100000001b3L;
+      if (walked) {
+         key = (key ^ this.walk.count) * 0x100000001b3L;
+         for (int i = 0; i < this.walk.count; i++) {
+            key = (key ^ (this.walk.order[i] + 1L)) * 0x100000001b3L;
+         }
+      } else {
+         key = (key ^ Double.doubleToLongBits(this.camX)) * 0x100000001b3L;
+         key = (key ^ Double.doubleToLongBits(this.camY)) * 0x100000001b3L;
+         key = (key ^ Double.doubleToLongBits(this.camZ)) * 0x100000001b3L;
+         key = (key ^ Float.floatToIntBits(this.viewYaw)) * 0x100000001b3L;
+         key = (key ^ Float.floatToIntBits(this.viewPitch)) * 0x100000001b3L;
+      }
+      this.meshVisibilityKey = key;
       this.meshVisibilityWorld = world;
       this.meshVisibilityReady = true;
       this.meshVisibilityWalked = walked;
@@ -308,6 +331,7 @@ public final class Renderer {
                         sec.nO = 0;
                         sec.nT = 0;
                         var14.markMeshed(sy);
+                        var1.meshCoverageEpoch.incrementAndGet();
                         if (sec.vboO != 0) {
                            GL15.glDeleteBuffers(sec.vboO);
                            sec.vboO = 0;
@@ -414,6 +438,8 @@ public final class Renderer {
    private double meshViewX;
    private double meshViewY;
    private double meshViewZ;
+   /** Signature of the exact per-view section set used by meshCandidate; used to guard short-lived LOD cover-cache hits. */
+   long meshVisibilityKey;
    private final CaveCull.Visible frustumTest = (rx, ry, rz) -> this.visible(rx, ry, rz, 14.0F);
    static final boolean CAVE_CULL = !"false".equals(System.getProperty("bc.cavecull"));
    static final java.util.Comparator<Renderer.Vis> VIS_NEAR_FIRST = (a, b) -> Float.compare(a.d, b.d);
@@ -456,6 +482,9 @@ public final class Renderer {
       var4.nO = var3.nO;
       var4.nT = var3.nT;
       var1.markMeshed(var2);
+      if (this.g.world != null) {
+         this.g.world.meshCoverageEpoch.incrementAndGet();
+      }
 
       if (var3.nO > 0) {
          if (var4.vboO == 0) {
@@ -516,6 +545,7 @@ public final class Renderer {
                            var13.nO = 0;
                            var13.nT = 0;
                            var11.markMeshed(var12);
+                           var1.meshCoverageEpoch.incrementAndGet();
                            if (var13.vboO != 0) {
                               GL15.glDeleteBuffers(var13.vboO);
                               var13.vboO = 0;

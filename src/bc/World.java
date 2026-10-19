@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.zip.GZIPInputStream;
@@ -37,6 +38,8 @@ public final class World {
    public final File dir;
    public final ConcurrentHashMap<Long, Chunk> chunks = new ConcurrentHashMap();
    public long tickCount;
+   /** Invalidates LOD coverage caches when chunk residency or mesh-relevant block state changes. */
+   public final AtomicLong meshCoverageEpoch = new AtomicLong();
    final RedstoneLogic.State redstone = new RedstoneLogic.State();
    final Kinetics.State kinetics=new Kinetics.State();
    final Circuit.State circuit = new Circuit.State();
@@ -369,6 +372,7 @@ public final class World {
                break;
             }
             this.chunks.put(readyKey, var22);
+            this.meshCoverageEpoch.incrementAndGet();
             RedstoneLogic.loaded(this, var22);
             Circuit.loaded(this,var22);Kinetics.loaded(this,var22);
             RasterComputer.loaded(this,var22);
@@ -417,6 +421,7 @@ public final class World {
                Kinetics.unloaded(this,var23);
                var23.unloaded = true;
                this.chunks.remove(chunkKey, var23);
+               this.meshCoverageEpoch.incrementAndGet();
                this.raster.dirty=true;this.kinetics.dirty=true;
                removed = true;
             }
@@ -460,6 +465,7 @@ public final class World {
             return existing;
          }
          this.chunks.put(k, fresh);
+         this.meshCoverageEpoch.incrementAndGet();
          this.fire.scanChunk(fresh);
          this.lightChunkLocked(fresh);
          Circuit.loaded(this,fresh);Kinetics.loaded(this,fresh);
@@ -988,6 +994,7 @@ public final class World {
          }
 
          var5.set(var6, var2, var7, state);
+         this.meshCoverageEpoch.incrementAndGet();
          Kinetics.changed(this,var1,var2,var3,var8,var4);RasterComputer.changed(this,var1,var2,var3,var8,var4);NoteBlocks.changed(this,var1,var2,var3,var8,var4);
          var5.modified = true;
          var5.lodDirty = this.tickCount + 1L;
@@ -1159,6 +1166,7 @@ public final class World {
          }
       }
       this.chunks.clear();
+      this.meshCoverageEpoch.incrementAndGet();
       ArrayList<Chunk> freshList = new ArrayList<Chunk>(coords.size());
       for (long k : coords) {
          int cx = (int)(k >> 32);
