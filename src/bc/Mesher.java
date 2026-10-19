@@ -19,6 +19,17 @@ public final class Mesher {
    static final int[][] PLANE = new int[][]{{0, 2}, {0, 2}, {0, 1}, {0, 1}, {1, 2}, {1, 2}};
    static final float[] SHADE = new float[]{1.0F, 0.5F, 0.8F, 0.8F, 0.6F, 0.6F};
    static final float[] AOF = new float[]{1.0F, 0.8F, 0.62F, 0.46F};
+   private static final float[] PLANT_X = {0.0F, 1.0F, 1.0F, 0.0F};
+   private static final float[] PLANT_Y = {0.0F, 0.0F, 1.0F, 1.0F};
+   private static final float[][] PLANT_Z = {{0.0F, 1.0F, 1.0F, 0.0F}, {1.0F, 0.0F, 0.0F, 1.0F}};
+   private static final float[] PLANT_U = {0.0F, 1.0F, 1.0F, 0.0F};
+   private static final float[] PLANT_V = {1.0F, 1.0F, 0.0F, 0.0F};
+   private static final float[][][] CROP_POS = {
+      {{0.0F, 0.0F, 0.25F}, {1.0F, 0.0F, 0.25F}, {1.0F, 1.0F, 0.25F}, {0.0F, 1.0F, 0.25F}},
+      {{0.0F, 0.0F, 0.75F}, {1.0F, 0.0F, 0.75F}, {1.0F, 1.0F, 0.75F}, {0.0F, 1.0F, 0.75F}},
+      {{0.25F, 0.0F, 0.0F}, {0.25F, 0.0F, 1.0F}, {0.25F, 1.0F, 1.0F}, {0.25F, 1.0F, 0.0F}},
+      {{0.75F, 0.0F, 0.0F}, {0.75F, 0.0F, 1.0F}, {0.75F, 1.0F, 1.0F}, {0.75F, 1.0F, 0.0F}}
+   };
    static final float E = 2.0E-4F;
    static final ThreadLocal<float[]> UVT = ThreadLocal.withInitial(() -> new float[2]);
 
@@ -246,6 +257,8 @@ public final class Mesher {
          var27.trans.put(var4.t.a, 0, var4.t.n).flip();
       }
 
+      var4.o.trim();
+      var4.t.trim();
       return var27;
    }
 
@@ -729,16 +742,18 @@ public final class Mesher {
          if (var12) {
             int var29 = var25[var22] * 2 - 1;
             int var30 = var25[var23] * 2 - 1;
-            int[] var31 = new int[]{var18, var19, var20};
-            int[] var32 = new int[]{var18, var19, var20};
-            int[] var33 = new int[]{var18, var19, var20};
-            var31[var22] += var29;
-            var32[var23] += var30;
-            var33[var22] += var29;
-            var33[var23] += var30;
-            int var34 = ci(var31[0], var31[1], var31[2]);
-            int var35 = ci(var32[0], var32[1], var32[2]);
-            int var36 = ci(var33[0], var33[1], var33[2]);
+            int var31x = var18 + (var22 == 0 ? var29 : 0);
+            int var31y = var19 + (var22 == 1 ? var29 : 0);
+            int var31z = var20 + (var22 == 2 ? var29 : 0);
+            int var32x = var18 + (var23 == 0 ? var30 : 0);
+            int var32y = var19 + (var23 == 1 ? var30 : 0);
+            int var32z = var20 + (var23 == 2 ? var30 : 0);
+            int var33x = var31x + (var23 == 0 ? var30 : 0);
+            int var33y = var31y + (var23 == 1 ? var30 : 0);
+            int var33z = var31z + (var23 == 2 ? var30 : 0);
+            int var34 = ci(var31x, var31y, var31z);
+            int var35 = ci(var32x, var32y, var32z);
+            int var36 = ci(var33x, var33y, var33z);
             boolean var37 = Blocks.opaque[var15[var34] & BlockState.ID_MASK];
             boolean var38 = Blocks.opaque[var15[var35] & BlockState.ID_MASK];
             boolean var39 = Blocks.opaque[var15[var36] & BlockState.ID_MASK];
@@ -791,26 +806,20 @@ public final class Mesher {
       float var18 = ((var16 >> 20 & 15) / 15.0F - 0.5F) * 0.3F;
       float var19 = 0.146F;
       float var20 = 0.854F;
-      float[][][] var21 = new float[][][]{
-         {{var19, 0.0F, var19}, {var20, 0.0F, var20}, {var20, 1.0F, var20}, {var19, 1.0F, var19}},
-         {{var19, 0.0F, var20}, {var20, 0.0F, var19}, {var20, 1.0F, var19}, {var19, 1.0F, var20}}
-      };
-      float[] var22 = new float[]{0.0F, 1.0F, 1.0F, 0.0F};
-      float[] var23 = new float[]{1.0F, 1.0F, 0.0F, 0.0F};
-
-      for (float[][] var27 : var21) {
-         for (int var28 = 0; var28 < 4; var28++) {
-            var0.qx[var28] = var2 + var27[var28][0] + var17;
-            var0.qy[var28] = var3 + var27[var28][1];
-            var0.qz[var28] = var4 + var27[var28][2] + var18;
-            var0.qu[var28] = var22[var28];
-            var0.qv[var28] = var23[var28];
-            var0.qr[var28] = 0.95F * var11;
-            var0.qg[var28] = 0.95F * var12;
-            var0.qb[var28] = 0.95F * var13;
-            var0.qa[var28] = 1.0F;
-            var0.qm[var28] = lu(var8);
-            var0.ql[var28] = lu(var9);
+      for (int plane = 0; plane < 2; plane++) {
+         for (int vertex = 0; vertex < 4; vertex++) {
+            float z = PLANT_Z[plane][vertex] == 0.0F ? var19 : var20;
+            var0.qx[vertex] = var2 + (PLANT_X[vertex] == 0.0F ? var19 : var20) + var17;
+            var0.qy[vertex] = var3 + PLANT_Y[vertex];
+            var0.qz[vertex] = var4 + z + var18;
+            var0.qu[vertex] = PLANT_U[vertex];
+            var0.qv[vertex] = PLANT_V[vertex];
+            var0.qr[vertex] = 0.95F * var11;
+            var0.qg[vertex] = 0.95F * var12;
+            var0.qb[vertex] = 0.95F * var13;
+            var0.qa[vertex] = 1.0F;
+            var0.qm[vertex] = lu(var8);
+            var0.ql[vertex] = lu(var9);
          }
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
@@ -910,28 +919,19 @@ public final class Mesher {
       int var7 = var0.L[var6] & 255;
       float var8 = var7 >> 4 & 15;
       float var9 = var7 & 15;
-      float var10 = 0.25F;
-      float var11 = 0.75F;
-      float[][][] var12 = new float[][][]{
-         {{0.0F, 0.0F, var10}, {1.0F, 0.0F, var10}, {1.0F, 1.0F, var10}, {0.0F, 1.0F, var10}},
-         {{0.0F, 0.0F, var11}, {1.0F, 0.0F, var11}, {1.0F, 1.0F, var11}, {0.0F, 1.0F, var11}},
-         {{var10, 0.0F, 0.0F}, {var10, 0.0F, 1.0F}, {var10, 1.0F, 1.0F}, {var10, 1.0F, 0.0F}},
-         {{var11, 0.0F, 0.0F}, {var11, 0.0F, 1.0F}, {var11, 1.0F, 1.0F}, {var11, 1.0F, 0.0F}}
-      };
-      float[] var13 = new float[]{0.0F, 1.0F, 1.0F, 0.0F};
-      float[] var14 = new float[]{1.0F, 1.0F, 0.0F, 0.0F};
-
-      for (float[][] var18 : var12) {
-         for (int var19 = 0; var19 < 4; var19++) {
-            var0.qx[var19] = var2 + var18[var19][0];
-            var0.qy[var19] = var3 + var18[var19][1] - 0.0625F;
-            var0.qz[var19] = var4 + var18[var19][2];
-            var0.qu[var19] = var13[var19];
-            var0.qv[var19] = var14[var19];
-            var0.qr[var19] = var0.qg[var19] = var0.qb[var19] = 0.95F;
-            var0.qa[var19] = 1.0F;
-            var0.qm[var19] = lu(var8);
-            var0.ql[var19] = lu(var9);
+      for (int plane = 0; plane < CROP_POS.length; plane++) {
+         float[][] corners = CROP_POS[plane];
+         for (int vertex = 0; vertex < 4; vertex++) {
+            float[] corner = corners[vertex];
+            var0.qx[vertex] = var2 + corner[0];
+            var0.qy[vertex] = var3 + corner[1] - 0.0625F;
+            var0.qz[vertex] = var4 + corner[2];
+            var0.qu[vertex] = PLANT_U[vertex];
+            var0.qv[vertex] = PLANT_V[vertex];
+            var0.qr[vertex] = var0.qg[vertex] = var0.qb[vertex] = 0.95F;
+            var0.qa[vertex] = 1.0F;
+            var0.qm[vertex] = lu(var8);
+            var0.ql[vertex] = lu(var9);
          }
 
          var0.ao[0] = var0.ao[1] = var0.ao[2] = var0.ao[3] = 1.0F;
@@ -1192,7 +1192,8 @@ public final class Mesher {
       int var10 = var0.L[var9] & 255;
       float var11 = var10 >> 4 & 15;
       float var12 = var10 & 15;
-      float[] uv=new float[2],xyz=new float[3];
+      float[] uv = var0.uvt;
+      float[] xyz = var0.xyz;
       for(double[] part:Shapes.modelBoxes(Blocks.TORCH))for(int face=0;face<6;face++) {
          for(int i=0;i<4;i++) {
             Shapes.corner(part,face,i,xyz,uv);float lean=xyz[1]*.55F;
@@ -1361,13 +1362,10 @@ public final class Mesher {
       Mesher.FB var10 = var9 ? var0.t : var0.o;
       int var11 = ci(var6, var7, var8);
       float[] var12 = (float[])UVT.get();
-      float[][] var13 = new float[2][2];
-
-      for (int var14 = 0; var14 < 2; var14++) {
-         for (int var15 = 0; var15 < 2; var15++) {
-            var13[var14][var15] = cornerHeight(var0, var6, var7, var8, var15, var14, var5);
-         }
-      }
+      float h00 = cornerHeight(var0, var6, var7, var8, 0, 0, var5);
+      float h10 = cornerHeight(var0, var6, var7, var8, 1, 0, var5);
+      float h01 = cornerHeight(var0, var6, var7, var8, 0, 1, var5);
+      float h11 = cornerHeight(var0, var6, var7, var8, 1, 1, var5);
 
       int var26 = var9 ? 23 : 24;
       // Update 3.13: the water of a swamp is greenish, a warm sea turquoise, a frozen one pale (Chunk.waterColor); lava stays as it is
@@ -1394,7 +1392,8 @@ public final class Mesher {
 
             for (int var22 = 0; var22 < 4; var22++) {
                int[] var23 = FC[var27][var22];
-               float var24 = var23[1] == 1 ? Math.min(topSlab?.5F:1, var13[var23[2]][var23[0]]) : slab&&!topSlab?.5F:0.0F;
+               float height = var23[2] == 0 ? (var23[0] == 0 ? h00 : h10) : (var23[0] == 0 ? h01 : h11);
+               float var24 = var23[1] == 1 ? Math.min(topSlab ? 0.5F : 1.0F, height) : (slab && !topSlab ? 0.5F : 0.0F);
                if(slab&&!topSlab)var24=Math.max(.5F,var24);
                uvFor(var27, var23[0], var24, var23[2], var12);
                if (var27 < 2) {
@@ -1426,11 +1425,20 @@ public final class Mesher {
    }
 
    static final class FB {
-      float[] a = new float[32768];
+      private static final int INITIAL_FLOATS = 32768;
+      private static final int MAX_RETAINED_FLOATS = 262144;
+      float[] a = new float[INITIAL_FLOATS];
       int n;
 
       void clear() {
          this.n = 0;
+         this.trim();
+      }
+
+      void trim() {
+         if (this.a.length > MAX_RETAINED_FLOATS) {
+            this.a = new float[INITIAL_FLOATS];
+         }
       }
 
       void v(float var1, float var2, float var3, float var4, float var5, float var6, float var7, float var8, float var9, float var10, float var11) {
@@ -1480,6 +1488,7 @@ public final class Mesher {
       final float[] qm = new float[4];
       final float[] ao = new float[4];
       final float[] uvt = new float[2];
+      final float[] xyz = new float[3];
       final Chunk[] chunks9 = new Chunk[9];
       final int[] fSky = new int[6];
       final int[] fBlk = new int[6];

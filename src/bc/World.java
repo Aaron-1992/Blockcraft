@@ -263,6 +263,7 @@ public final class World {
                }
                var5.recomputeSectionOccupancy();
                Net319.applyEditsToChunk(this, var5);
+               CaveCull.computeChunk(var5);
                this.ready.add(var5);
             } catch (Throwable var13) {
                var13.printStackTrace();
@@ -377,7 +378,7 @@ public final class World {
                for (int var25 = -1; var25 <= 1; var25++) {
                   Chunk var26 = this.chunk(var22.cx + var24, var22.cz + var25);
                   if (var26 != null) {
-                     if (var26 == var22 || !var26.everMeshed) {
+                     if (var26 == var22 || !var26.hasMeshed) {
                         for (Section var19 : var26.sections) {
                            var19.dirty = true;
                         }
@@ -450,6 +451,7 @@ public final class World {
       fresh.unloaded = false;
       fresh.recomputeSectionOccupancy();
       Net319.applyEditsToChunk(this, fresh);
+      CaveCull.computeChunk(fresh);
 
       this.lightingLock.lock();
       try {
@@ -1163,6 +1165,7 @@ public final class World {
          int cz = (int)k;
          Chunk fresh = this.gen.generate(cx, cz);
          fresh.recomputeSectionOccupancy();
+         CaveCull.computeChunk(fresh);
          fresh.modified = false;
          fresh.unloaded = false;
          this.chunks.put(k, fresh);

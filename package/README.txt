@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.16  -  an original Minecraft-style voxel sandbox   (EDITION V6.16)
+BLOCKCRAFT V6.17  -  an original Minecraft-style voxel sandbox   (EDITION V6.17)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,28 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.17 - Demand-driven terrain meshes and bounded mesh memory
+
+  * Section air-connectivity is now computed from chunk block data on a
+    background chunk-generation worker, before terrain reaches the renderer.
+    Mesh jobs no longer have to run for every dirty section merely to learn
+    whether a sealed section is hidden by solid ground.
+  * Dirty non-empty sections are queued only when reached by the last camera
+    visibility/cave-culling walk, with a two-chunk warm ring for nearby turns.
+    Surface terrain is covered first; hidden cave/interior sections are built
+    when they become visible. Render distance and graphics settings are unchanged.
+  * The LOD yields when the real surface is covered, without pretending that
+    deliberately deferred deep sections were meshed. Visible cave work is still
+    required before that chunk is treated as fully covered. World-entry loading
+    uses this same view-aware readiness rule and does not wait for hidden caves.
+  * Mesh staging is bounded to at most two queued/running jobs per worker
+    (four workers maximum). Large per-thread vertex scratch arrays are released
+    after use; common AO, fluid, plant and crop meshing no longer allocates
+    temporary coordinate arrays for every vertex or block.
+  * The built-in benchmark now reports estimated uploaded VBO payload, deferred
+    sections and Java heap use so RAM/VRAM work can be checked explicitly.
+    No visual quality, render distance, or user setting has been lowered.
 
 WHAT'S NEW IN V6.16 - PC chunk handling and performance test build
 

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.16";
+   public static final String VERSION_STR = "6.17";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    public World world;
@@ -3919,15 +3919,9 @@ public final class Game {
                for (int var20 = -1; var20 <= 1 && var19; var20++) {
                   for (int var10 = -1; var10 <= 1 && var19; var10++) {
                      Chunk var11 = this.world.chunk(var3 + var20, var4 + var10);
-                     if (var11 == null) {
+                     if (var11 == null || !this.rend.meshLoadingReady(this.world, var11)) {
                         var19 = false;
                         break;
-                     }
-
-                     for (Section var15 : var11.sections) {
-                        if (var15.dirty || var15.inFlight) {
-                           var19 = false;
-                        }
                      }
                   }
                }

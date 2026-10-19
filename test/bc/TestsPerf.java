@@ -21,6 +21,8 @@ final class TestsPerf {
       frames();
       cull();
       sectionOccupancy();
+      meshScratchMemory();
+      meshCoverage();
       asynchronousLighting();
    }
 
@@ -67,6 +69,82 @@ final class TestsPerf {
          eq(1, c.sections[y >> 4].nonAirCount, "block placement increments the cache");
          check(!c.isSectionEmpty(y >> 4), "newly placed block is visible through the cache");
       });
+      test("chunks: partial mesh coverage remains distinct from all sixteen sections", () -> {
+         Chunk c = new Chunk(0, 0);
+         for (int sy = 4; sy < 16; sy++) {
+            c.markMeshed(sy);
+         }
+         check(c.hasMeshed, "the first uploaded section is remembered");
+         check(!c.everMeshed, "unbuilt deep sections are not reported as meshed");
+         c.markMeshed(3);
+         check(!c.everMeshed, "partial coverage remains partial");
+         c.sections[2].conn = 0L;
+         c.sections[2].connKnown = true;
+         c.set(1, 33, 1, Blocks.STONE);
+         check(!c.sections[2].connKnown && c.sections[2].conn == CaveCull.ALL, "a block edit invalidates cached connectivity conservatively");
+      });
+   }
+
+   static void meshScratchMemory() {
+      test("mesher: worker scratch returns oversized vertex arrays after a large section", () -> {
+         Mesher.FB buffer = new Mesher.FB();
+         buffer.a = new float[300000];
+         buffer.n = 299999;
+         buffer.clear();
+         eq(32768, buffer.a.length, "large retained high-water buffer is released");
+         buffer.a = new float[262144];
+         buffer.trim();
+         eq(262144, buffer.a.length, "normal reusable buffers stay cached below the cap");
+         eq(4, Renderer.MAX_MESH_WORKERS, "worker maximum");
+         eq(4, Renderer.inFlightLimit(2), "two workers have at most four staged results");
+         eq(8, Renderer.inFlightLimit(4), "four workers have at most eight staged results");
+         eq(8, Renderer.inFlightLimit(12), "the staging cap cannot grow with worker count");
+      });
+   }
+
+   static void meshCoverage() {
+      test("renderer: readiness waits for view candidates but not deferred cave sections", () -> {
+         Game game = new Game();
+         Renderer renderer = new Renderer(game);
+         World world = new World(31917, null);
+         world.saveEnabled = false;
+         try {
+            Chunk chunk = new Chunk(0, 0);
+            chunk.set(1, 80, 1, Blocks.STONE);
+            chunk.set(1, 160, 1, Blocks.STONE);
+            chunk.recomputeSectionOccupancy();
+            chunk.lit = true;
+            for (int sy = 0; sy < 16; sy++) {
+               if (sy != 5 && sy != 10) {
+                  chunk.markMeshed(sy);
+                  chunk.sections[sy].dirty = false;
+               }
+            }
+            world.chunks.put(World.key(0, 0), chunk);
+
+            renderer.camX = 8.0;
+            renderer.camZ = 8.0;
+            check(!renderer.meshCoverageReady(world, chunk), "a nearby unmeshed section holds readiness open");
+            chunk.markMeshed(5);
+            chunk.sections[5].dirty = false;
+
+            renderer.camX = 128.0;
+            renderer.rememberMeshVisibility(world, true);
+            check(renderer.meshCoverageReady(world, chunk), "an off-view deep section can remain deferred");
+            check(renderer.meshLoadingReady(world, chunk), "world entry does not wait for that deferred cave section");
+
+            renderer.camX = 8.0;
+            check(!renderer.meshCoverageReady(world, chunk), "the section becomes required again when it enters the warm ring");
+            check(!renderer.meshLoadingReady(world, chunk), "loading waits for an unmeshed section required by the view");
+            chunk.markMeshed(10);
+            check(!renderer.meshLoadingReady(world, chunk), "loading waits for an in-place dirty mesh to finish");
+            chunk.sections[10].dirty = false;
+            check(renderer.meshLoadingReady(world, chunk), "loading completes after the required section is uploaded");
+         } finally {
+            renderer.shutdown();
+            world.shutdown();
+         }
+      });
    }
 
    // ------------------------------------------------------------------ the culling of hidden sections
@@ -79,6 +157,11 @@ final class TestsPerf {
 
    static void put(short[] b, int x, int y, int z, int id) {
       b[((y + 1) * 18 + z + 1) * 18 + x + 1] = (short)id;
+   }
+
+   static void setConn(Chunk c, int sy, long conn) {
+      c.sections[sy].conn = conn;
+      c.sections[sy].connKnown = true;
    }
 
    static void cull() {
@@ -136,6 +219,26 @@ final class TestsPerf {
          check(!Blocks.opaque[Blocks.GLASS] && !Blocks.opaque[Blocks.LEAVES_OAK] && CaveCull.connected(CaveCull.compute(b), 4, 5), "glass and leaves are see-through");
       });
 
+      test("cull: premeshing connectivity from chunk storage matches the mesh connectivity", () -> {
+         Chunk chunk = new Chunk(0, 0);
+         int sy = 5;
+         int base = sy << 12;
+         for (int i = 0; i < 4096; i++) {
+            chunk.blocks[base + i] = (short)Blocks.STONE;
+         }
+         short[] padded = padded(Blocks.STONE);
+         for (int x = 0; x < 16; x++) {
+            chunk.blocks[base + Chunk.idx(x, 5, 7)] = 0;
+            put(padded, x, 5, 7, 0);
+         }
+         eq(CaveCull.compute(padded), CaveCull.compute(chunk, sy), "a tunnel before and after vertex meshing");
+         chunk.recomputeSectionOccupancy();
+         CaveCull.computeChunk(chunk);
+         check(chunk.sections[sy].connKnown, "generated sections have known connectivity before meshing");
+         eq(CaveCull.compute(padded), chunk.sections[sy].conn, "the precomputed tunnel connectivity");
+         eq(CaveCull.ALL, chunk.sections[0].conn, "empty sections remain fully open");
+      });
+
       test("cull: the walk goes through connected faces, not through rock, and never turns back", () -> {
          World w = new World(1, null);
          w.saveEnabled = false;
@@ -159,9 +262,10 @@ final class TestsPerf {
          }
 
          eq(expected, open, "everything inside the ring of 4 chunks is reached when it is all open");
+         check(walk.reached(2, 0, 8) && !walk.reached(6, 0, 8), "the cached visibility query matches the walk bounds");
          // a wall of rock one chunk east of the camera: a whole chunk column of closed sections
          for (int sy = 0; sy < 16; sy++) {
-            w.chunk(1, 0).sections[sy].conn = 0L;
+            setConn(w.chunk(1, 0), sy, 0L);
          }
 
          walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
@@ -190,14 +294,14 @@ final class TestsPerf {
             for (int dx = -1; dx <= 1; dx++) {
                if (dx != 0 || dz != 0) {
                   for (int sy = 0; sy < 16; sy++) {
-                     w.chunk(dx, dz).sections[sy].conn = 0L;
+                     setConn(w.chunk(dx, dz), sy, 0L);
                   }
                }
             }
          }
 
          for (int sy = 0; sy < 16; sy++) {
-            w.chunk(1, 0).sections[sy].conn = 0L;
+            setConn(w.chunk(1, 0), sy, 0L);
          }
 
          walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
@@ -214,19 +318,19 @@ final class TestsPerf {
          for (int cz = -4; cz <= 4; cz++) {
             for (int cx = -4; cx <= 4; cx++) {
                for (int sy = 0; sy < 16; sy++) {
-                  w.chunk(cx, cz).sections[sy].conn = 0L;
+                  setConn(w.chunk(cx, cz), sy, 0L);
                }
             }
          }
 
          for (int sy = 0; sy < 16; sy++) {
-            w.chunk(0, 0).sections[sy].conn = CaveCull.ALL;
+            setConn(w.chunk(0, 0), sy, CaveCull.ALL);
          }
 
          long tunnel = CaveCull.bit(5, 4) | CaveCull.bit(4, 5);
-         w.chunk(1, 0).sections[8].conn = tunnel;
-         w.chunk(2, 0).sections[8].conn = tunnel;
-         w.chunk(3, 0).sections[8].conn = tunnel;
+         setConn(w.chunk(1, 0), 8, tunnel);
+         setConn(w.chunk(2, 0), 8, tunnel);
+         setConn(w.chunk(3, 0), 8, tunnel);
          walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
          boolean east2 = false;
          boolean east3 = false;
@@ -260,9 +364,9 @@ final class TestsPerf {
          check(east2 && east3 && east4, "the tunnel is followed to its end: " + east2 + east3 + east4);
          check(!wrong, "nothing is reached but the tunnel and the camera's 27 sections");
          // a bend: west -> north is connected, west -> east is not: from the west the walk turns north and does not go on east
-         w.chunk(2, 0).sections[8].conn = CaveCull.bit(5, 2) | CaveCull.bit(2, 5);
+         setConn(w.chunk(2, 0), 8, CaveCull.bit(5, 2) | CaveCull.bit(2, 5));
          for (int sy = 0; sy < 16; sy++) {
-            w.chunk(2, -1).sections[sy].conn = sy == 8 ? CaveCull.ALL : 0L;
+            setConn(w.chunk(2, -1), sy, sy == 8 ? CaveCull.ALL : 0L);
          }
 
          walk.run(w, 0, 8, 0, 3, 8, 136, 8, null);
@@ -324,6 +428,7 @@ final class TestsPerf {
             for (int sy = 0; sy < 16; sy++) {
                Mesher.Result r = Mesher.build(w, c, sy, true);
                c.sections[sy].conn = r.conn;
+               c.sections[sy].connKnown = true;
                Renderer.free(r);
             }
          }

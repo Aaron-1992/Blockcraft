@@ -8,14 +8,13 @@ import java.util.Arrays;
  * Standing on a hillside the game drew every section that was inside the camera's pyramid of view - including the caves, tunnels, ore pockets and
  * the stone room under the hill, thousands of faces that are hidden behind the ground. The well-known remedy (it is what Minecraft does since 1.8):
  * <ol>
- * <li>When a section is meshed, find out which of its six faces are connected through air (or glass, water, leaves, anything that is not
- * opaque): a flood fill from every open block on the boundary, which sets the pair (face a, face b) for all faces the fill reached
- * ({@link #compute}). 36 bits in a long.</li>
+ * <li>As soon as chunk block data is available, find out which of each section's six faces are connected through air (or glass, water, leaves,
+ * anything that is not opaque): a compact flood fill sets the pair (face a, face b) for all faces the fill reached ({@link #compute}). 36 bits in a long.</li>
  * <li>Every frame walk outward from the camera's section, one section at a time, through the faces that are connected: a ray that came in through
  * face a can only leave through a face b with (a, b) set, and it never turns back on its way ({@link Walk}). What the walk does not reach cannot
  * be seen.</li>
  * </ol>
- * Sections that have not been meshed yet count as open, chunks that are not loaded count as open (the walk goes through them to what lies behind),
+ * Sections whose connectivity has not been analysed yet count as open, chunks that are not loaded count as open (the walk goes through them to what lies behind),
  * and the 27 sections round the camera are always taken (a camera inside a block, a spectator in the rock) - they are drawn, but the walk does not go on from the 26 that
  * are only neighbours.
  */
@@ -155,6 +154,96 @@ final class CaveCull {
       return conn;
    }
 
+   /** Computes section connectivity directly from chunk storage, without building vertex buffers. */
+   static long compute(Chunk chunk, int sy) {
+      short[] blocks = chunk.blocks;
+      int base = sy << 12;
+      boolean[] opaque = Blocks.opaque;
+      int open = 0;
+      for (int i = 0; i < 4096; i++) {
+         if (!opaque[blocks[base + i] & BlockState.ID_MASK]) {
+            open++;
+         }
+      }
+      if (open == 0) {
+         return 0L;
+      }
+      if (open == 4096) {
+         return ALL;
+      }
+
+      Scratch s = TL.get();
+      long[] seen = s.seen;
+      int[] stack = s.stack;
+      Arrays.fill(seen, 0L);
+      long conn = 0L;
+      for (int y = 0; y < 16; y++) {
+         for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16; x++) {
+               if (x != 0 && x != 15 && y != 0 && y != 15 && z != 0 && z != 15) {
+                  continue;
+               }
+               int v = y << 8 | z << 4 | x;
+               if ((seen[v >> 6] >>> (v & 63) & 1L) != 0L || opaque[blocks[base + v] & BlockState.ID_MASK]) {
+                  continue;
+               }
+
+               int faces = 0;
+               int sp = 0;
+               stack[sp++] = v;
+               seen[v >> 6] |= 1L << (v & 63);
+               while (sp > 0) {
+                  int u = stack[--sp];
+                  int ux = u & 15;
+                  int uz = u >> 4 & 15;
+                  int uy = u >> 8;
+                  if (uy == 15) faces |= 1;
+                  if (uy == 0) faces |= 2;
+                  if (uz == 0) faces |= 4;
+                  if (uz == 15) faces |= 8;
+                  if (ux == 15) faces |= 16;
+                  if (ux == 0) faces |= 32;
+
+                  for (int f = 0; f < 6; f++) {
+                     int nx = ux + DX[f];
+                     int ny = uy + DY[f];
+                     int nz = uz + DZ[f];
+                     if ((nx | ny | nz) < 0 || nx > 15 || ny > 15 || nz > 15) {
+                        continue;
+                     }
+                     int n = ny << 8 | nz << 4 | nx;
+                     if ((seen[n >> 6] >>> (n & 63) & 1L) != 0L || opaque[blocks[base + n] & BlockState.ID_MASK]) {
+                        continue;
+                     }
+                     seen[n >> 6] |= 1L << (n & 63);
+                     stack[sp++] = n;
+                  }
+               }
+
+               for (int a = 0; a < 6; a++) {
+                  if ((faces >> a & 1) != 0) {
+                     for (int c = 0; c < 6; c++) {
+                        if (c != a && (faces >> c & 1) != 0) {
+                           conn |= bit(a, c);
+                        }
+                     }
+                  }
+               }
+            }
+         }
+      }
+      return conn;
+   }
+
+   /** Computes accurate connectivity for every section once, on the chunk-generation worker, before the chunk becomes visible. */
+   static void computeChunk(Chunk chunk) {
+      for (int sy = 0; sy < 16; sy++) {
+         Chunk.Section section = chunk.sections[sy];
+         section.conn = section.nonAirCount == 0 ? ALL : compute(chunk, sy);
+         section.connKnown = true;
+      }
+   }
+
    /** Is a section at this offset from the camera (centre, in blocks) inside the pyramid of view? */
    interface Visible {
       boolean test(float rx, float ry, float rz);
@@ -171,6 +260,24 @@ final class CaveCull {
       int[] order;
       int count;
       int cells;
+      int centerCx;
+      int centerCz;
+      boolean hasRun;
+
+      /** True when this section was reached by the most recent culling walk. */
+      boolean reached(int cx, int cz, int sy) {
+         if (!this.hasRun || sy < 0 || sy > 15) {
+            return false;
+         }
+         int dx = cx - this.centerCx;
+         int dz = cz - this.centerCz;
+         int r = this.radius;
+         if (dx < -r || dx > r || dz < -r || dz > r || dx * dx + dz * dz > r * r) {
+            return false;
+         }
+         int cell = (dz + r) * this.side + dx + r;
+         return this.seen[cell * 16 + sy] != 0;
+      }
 
       private void size(int r) {
          if (r == this.radius) {
@@ -239,7 +346,7 @@ final class CaveCull {
             int dx = column % side - r;
             int dz = column / side - r;
             Chunk c = this.grid[column];
-            long conn = c == null ? ALL : c.sections[y].conn;
+            long conn = c == null || !c.sections[y].connKnown ? ALL : c.sections[y].conn;
             for (int f = 0; f < 6; f++) {
                if (f == entry || entry != 7 && !connected(conn, entry, f) || (dirs >> (f ^ 1) & 1) != 0) {
                   continue;
@@ -289,6 +396,9 @@ final class CaveCull {
                }
             }
          }
+         this.centerCx = cx;
+         this.centerCz = cz;
+         this.hasRun = true;
       }
    }
 }

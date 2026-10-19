@@ -69,8 +69,9 @@ final class PerfBench {
                return false;
             }
 
-            for (Chunk.Section s : c.sections) {
-               if (s.dirty || s.inFlight) {
+            for (int sy = 0; sy < 16; sy++) {
+               Chunk.Section s = c.sections[sy];
+               if (s.inFlight || s.dirty && !c.isSectionEmpty(sy) && g.rend.meshCandidate(w, c, sy)) {
                   return false;
                }
             }
@@ -78,6 +79,30 @@ final class PerfBench {
       }
 
       return g.rend.inflight.get() == 0;
+   }
+
+   private static String meshMemory(Game g) {
+      long gpuBytes = 0L;
+      int vboSections = 0;
+      int deferredSections = 0;
+      for (Chunk c : g.world.chunks.values()) {
+         for (int sy = 0; sy < 16; sy++) {
+            Chunk.Section section = c.sections[sy];
+            if (section.vboO != 0 || section.vboT != 0) {
+               vboSections++;
+               gpuBytes += ((long)section.nO + section.nT) * Renderer.STRIDE;
+            }
+            if (!section.meshed && !c.isSectionEmpty(sy)) {
+               deferredSections++;
+            }
+         }
+      }
+      Runtime runtime = Runtime.getRuntime();
+      long heapUsed = (runtime.totalMemory() - runtime.freeMemory()) >> 20;
+      long heapMax = runtime.maxMemory() >> 20;
+      return "BENCH mesh memory: VBO payload ~" + ((gpuBytes + 524288L) >> 20) + " MiB across " + vboSections
+         + " populated sections; " + deferredSections + " non-empty sections deferred; heap " + heapUsed + "/" + heapMax
+         + " MiB; mesh jobs " + g.rend.inflight.get();
    }
 
    private static void apply(Game g, int preset) {
@@ -168,6 +193,7 @@ final class PerfBench {
          baseY = surf + 3;
          basePitch = Float.parseFloat(System.getProperty("bc.benchpitch", "8"));
          System.out.println("BENCH world ready after " + waited + " frames: " + g.world.chunks.size() + " chunks, camera at " + (int)baseX + "," + (int)baseY + "," + (int)baseZ + " (ground " + surf + ")");
+         System.out.println(meshMemory(g));
          stage = 1;
          settle = 0;
          frame = 0;

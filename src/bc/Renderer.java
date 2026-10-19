@@ -22,9 +22,11 @@ import org.lwjgl.opengl.GL15;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Renderer {
+   static final int MAX_MESH_WORKERS = 4;
+   static final int MAX_IN_FLIGHT_MESHES = 8;
    final Game g;
    final ExecutorService meshPool;
-   int meshThreads = 2;
+   final int meshThreads;
    final ConcurrentLinkedQueue<Renderer.Done> done = new ConcurrentLinkedQueue();
    final AtomicInteger inflight = new AtomicInteger();
    public double camX;
@@ -92,7 +94,7 @@ public final class Renderer {
 
    public Renderer(Game var1) {
       this.g = var1;
-      int var2 = World.genThreads();
+      int var2 = Math.min(MAX_MESH_WORKERS, World.genThreads());
       this.meshThreads = var2;
       this.meshPool = Executors.newFixedThreadPool(var2, var0 -> {
          Thread var1x = new Thread(var0, "mesher");
@@ -155,6 +157,8 @@ public final class Renderer {
          free(d.r);
       }
       this.vis.clear();
+      this.meshVisibilityReady = false;
+      this.meshVisibilityWorld = null;
       this.shadowDirty = true;
       if (this.lod != null) {
          this.lod.invalidateAll();
@@ -179,14 +183,75 @@ public final class Renderer {
    }
 
    /**
-    * Is the chunk on the screen as real terrain, so that the LOD under it can stay hidden? Update 3.11: once every section has been meshed
-    * once, yes - a section that is being re-meshed (a burning tree, a block placed) still shows its old mesh until the new one replaces it,
-    * and the distant terrain, with its generator trees, used to flash up through the real chunk for those moments.
+    * Is the chunk represented by real terrain so the LOD beneath it can stay hidden? Every non-empty section the current view could draw must
+    * be meshed; sealed or off-screen sections may stay deferred without holding the whole LOD tile open.
     */
    public boolean chunkMeshed(int var1, int var2) {
-      Chunk var3 = this.g.world.chunk(var1, var2);
-      return var3 != null && var3.lit && !var3.lighting && var3.everMeshed
-         && realChunkInRange(var1,var2,this.camX,this.camZ,this.g.opt.renderDistance);
+      World world = this.g.world;
+      Chunk chunk = world == null ? null : world.chunk(var1, var2);
+      return chunk != null
+         && realChunkInRange(var1, var2, this.camX, this.camZ, this.g.opt.renderDistance)
+         && this.meshCoverageReady(world, chunk);
+   }
+
+   /** True when every non-empty section that the latest view could draw is already represented by an uploaded mesh. */
+   boolean meshCoverageReady(World world, Chunk chunk) {
+      if (chunk == null || !chunk.lit || chunk.lighting) {
+         return false;
+      }
+      if (!chunk.everMeshed) {
+         for (int sy = 0; sy < 16; sy++) {
+            Chunk.Section section = chunk.sections[sy];
+            if (!section.meshed && !chunk.isSectionEmpty(sy) && this.meshCandidate(world, chunk, sy)) {
+               return false;
+            }
+         }
+      }
+      return true;
+   }
+
+   /** World entry waits for current view meshes, including edits still being rebuilt, but not deferred invisible sections. */
+   boolean meshLoadingReady(World world, Chunk chunk) {
+      if (chunk == null || !chunk.lit || chunk.lighting) {
+         return false;
+      }
+      for (int sy = 0; sy < 16; sy++) {
+         Chunk.Section section = chunk.sections[sy];
+         if ((section.dirty || section.inFlight || !section.meshed) && this.meshCandidate(world, chunk, sy)) {
+            return false;
+         }
+      }
+      return true;
+   }
+
+   void rememberMeshVisibility(World world, boolean walked) {
+      this.meshVisibilityWorld = world;
+      this.meshVisibilityReady = true;
+      this.meshVisibilityWalked = walked;
+      this.meshViewX = this.camX;
+      this.meshViewY = this.camY;
+      this.meshViewZ = this.camZ;
+   }
+
+   /** A dirty non-empty section is worth building only if the last rendered view could reach it; keep a two-chunk warm ring for turns. */
+   boolean meshCandidate(World world, Chunk chunk, int sy) {
+      int camCx = (int)Math.floor(this.camX) >> 4;
+      int camCz = (int)Math.floor(this.camZ) >> 4;
+      int dx = chunk.cx - camCx;
+      int dz = chunk.cz - camCz;
+      if (dx * dx + dz * dz <= 4) {
+         return true;
+      }
+      if (!this.meshVisibilityReady || this.meshVisibilityWorld != world) {
+         return false;
+      }
+      if (this.meshVisibilityWalked) {
+         return this.walk.reached(chunk.cx, chunk.cz, sy);
+      }
+      float rx = (float)(chunk.cx * 16 + 8 - this.meshViewX);
+      float ry = (float)(sy * 16 + 8 - this.meshViewY);
+      float rz = (float)(chunk.cz * 16 + 8 - this.meshViewZ);
+      return this.visible(rx, ry, rz, 14.0F);
    }
 
    /** Old, still-loaded meshes outside the draw ring must NOT hide their distant-terrain replacement.
@@ -196,8 +261,13 @@ public final class Renderer {
       return (long)dx*dx+(long)dz*dz<=(long)r*r;
    }
 
+   static int inFlightLimit(int workers) {
+      return Math.max(2, Math.min(MAX_IN_FLIGHT_MESHES, Math.min(MAX_MESH_WORKERS, workers) * 2));
+   }
+
    public void scheduleMeshes(World var1, int var2) {
-      int var3 = this.meshThreads * 6;
+      // Each task owns a native result buffer until upload. Bound queued + running work to cap transient RAM/VRAM staging use.
+      int var3 = inFlightLimit(this.meshThreads);
       if (this.inflight.get() < var3) {
          int var4 = (int)Math.floor(this.camX) >> 4;
          int var5 = (int)Math.floor(this.camZ) >> 4;
@@ -214,7 +284,9 @@ public final class Renderer {
                if (var14 != null) {
                   boolean hasDirty = false;
                   for (int sy = 0; sy < 16; sy++) {
-                     if (var14.sections[sy].dirty && !var14.sections[sy].inFlight) {
+                     Section section = var14.sections[sy];
+                     if (section.dirty && !section.inFlight
+                        && (var14.isSectionEmpty(sy) || this.meshCandidate(var1, var14, sy))) {
                         hasDirty = true;
                         break;
                      }
@@ -232,6 +304,7 @@ public final class Renderer {
                      if (sec.dirty && !sec.inFlight && var14.isSectionEmpty(sy)) {
                         sec.dirty = false;
                         sec.conn = CaveCull.ALL;
+                        sec.connKnown = true;
                         sec.nO = 0;
                         sec.nT = 0;
                         var14.markMeshed(sy);
@@ -249,7 +322,7 @@ public final class Renderer {
                   int surfSy = Math.max(3, Math.min(14, var14.hm[136] >> 4));
                   for (int var17 : SECTION_ORDER[surfSy]) {
                      Section var18 = var14.sections[var17];
-                     if (var18.dirty && !var18.inFlight) {
+                     if (var18.dirty && !var18.inFlight && this.meshCandidate(var1, var14, var17)) {
                         if (var9 >= var2 || this.inflight.get() >= var3) {
                            return;
                         }
@@ -335,6 +408,12 @@ public final class Renderer {
    private final ArrayList<Renderer.Vis> visPool = new ArrayList<>();
    private int visN;
    private final CaveCull.Walk walk = new CaveCull.Walk();
+   private World meshVisibilityWorld;
+   private boolean meshVisibilityReady;
+   private boolean meshVisibilityWalked;
+   private double meshViewX;
+   private double meshViewY;
+   private double meshViewZ;
    private final CaveCull.Visible frustumTest = (rx, ry, rz) -> this.visible(rx, ry, rz, 14.0F);
    static final boolean CAVE_CULL = !"false".equals(System.getProperty("bc.cavecull"));
    static final java.util.Comparator<Renderer.Vis> VIS_NEAR_FIRST = (a, b) -> Float.compare(a.d, b.d);
@@ -362,7 +441,14 @@ public final class Renderer {
 
    void upload(Chunk var1, int var2, Result var3) {
       Section var4 = var1.sections[var2];
-      var4.conn = var3.conn;
+      if (var4.dirty) {
+         // An edit or border change arrived while this async mesh was building; never publish stale connectivity as culling data.
+         var4.conn = CaveCull.ALL;
+         var4.connKnown = false;
+      } else {
+         var4.conn = var3.conn;
+         var4.connKnown = true;
+      }
       if (Math.abs(var1.cx * 16 + 8 - this.camX) < 110.0 && Math.abs(var1.cz * 16 + 8 - this.camZ) < 110.0 && (var3.nO > 0 || var4.nO > 0)) {
          this.shadowDirty = true;
       }
@@ -887,6 +973,7 @@ public final class Renderer {
             }
          }
       }
+      this.rememberMeshVisibility(var5, walked);
 
       this.vis.sort(VIS_NEAR_FIRST);
       this.visibleSections = this.vis.size();

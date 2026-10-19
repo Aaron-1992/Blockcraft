@@ -16,8 +16,10 @@ public final class Chunk {
    public volatile boolean modified;
    /** Update 3.11: tick of the last block change since the LOD summary was made (0 = the summary is up to date). */
    public volatile long lodDirty;
-   /** Update 3.11: set once the chunk's sections have all been meshed at least once - from then on the LOD under it stays hidden. */
+   /** True once every section has been meshed at least once; demand meshing may intentionally leave sealed sections unbuilt. */
    public volatile boolean everMeshed;
+   /** True after the first section has been processed; lets border updates avoid re-dirtying every hidden section. */
+   public volatile boolean hasMeshed;
    public volatile boolean lit;
    public volatile boolean lighting;
    public volatile boolean unloaded;
@@ -33,9 +35,10 @@ public final class Chunk {
       }
    }
 
-   /** Update 3.11: section sy has been meshed and uploaded; once all 16 have, the chunk counts as covered for the LOD (see Renderer.chunkMeshed). */
+   /** Marks one uploaded section; hasMeshed tracks the first upload and all 16 set everMeshed. */
    public void markMeshed(int sy) {
       this.sections[sy].meshed = true;
+      this.hasMeshed = true;
       if (!this.everMeshed) {
          boolean all = true;
          for (Chunk.Section sec : this.sections) {
@@ -117,6 +120,9 @@ public final class Chunk {
       short next = (short)var4;
       if (old == next) return;
       this.blocks[index] = next;
+      Chunk.Section section = this.sections[var2 >> 4];
+      section.conn = CaveCull.ALL;
+      section.connKnown = false;
       int count = this.sections[var2 >> 4].nonAirCount;
       if (count >= 0) {
          if (old == 0) count++;
@@ -135,6 +141,8 @@ public final class Chunk {
             if (this.blocks[i] != 0) count++;
          }
          this.sections[sy].nonAirCount = count;
+         this.sections[sy].conn = CaveCull.ALL;
+         this.sections[sy].connKnown = false;
       }
    }
 
@@ -273,7 +281,9 @@ public final class Chunk {
       public boolean empty = true;
       /** Update 3.11: has been meshed (and uploaded) at least once. */
       public boolean meshed;
-      /** Update 3.18: which faces of the section are connected through open blocks (see CaveCull); open on every side until the section has been meshed. */
+      /** Update 3.18: which faces of the section are connected through open blocks (see CaveCull). */
       public long conn = CaveCull.ALL;
+      /** Connectivity is computed from block data as soon as a chunk is generated; unknown sections stay conservatively open. */
+      public volatile boolean connKnown;
    }
 }
