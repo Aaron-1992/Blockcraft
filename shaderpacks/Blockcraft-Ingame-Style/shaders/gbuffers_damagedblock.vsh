@@ -11,6 +11,14 @@ varying vec3 vViewPos;
 varying vec3 vViewNormal;
 varying vec4 vShadowPos;
 
+vec3 distortShadowClipPos(vec3 p) {
+    float radius = length(p.xy);
+    float factor = radius + 0.10;
+    p.xy /= factor;
+    p.z *= 0.5;
+    return p;
+}
+
 void main() {
     vec4 viewPos = gl_ModelViewMatrix * gl_Vertex;
     vec4 worldRel = gbufferModelViewInverse * viewPos;
@@ -20,5 +28,6 @@ void main() {
     vViewPos = viewPos.xyz;
     vViewNormal = normalize(gl_NormalMatrix * gl_Normal);
     vShadowPos = shadowProjection * shadowModelView * worldRel;
+    vShadowPos.xyz = distortShadowClipPos(vShadowPos.xyz);
     gl_Position = gl_ProjectionMatrix * viewPos;
 }

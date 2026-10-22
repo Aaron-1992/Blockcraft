@@ -26,7 +26,8 @@ varying vec3 vWorldRel;
 varying vec4 vShadowPos;
 
 const float PI = 3.14159265359;
-const float SHADOW_TEXEL = 1.0 / 2048.0;
+const int shadowMapResolution = 2048;
+const bool shadowtex0Nearest = true;
 
 float dayHeight() {
     return sin(float(worldTime) * (2.0 * PI / 24000.0));
@@ -39,17 +40,28 @@ float linearDepth(float depth) {
 
 float shadowVisibility(vec3 normal, vec3 lightDir) {
     if (vShadowPos.w <= 0.0) return 1.0;
-    vec3 coord = (vShadowPos.xyz / vShadowPos.w) * 0.5 + 0.5;
-    if (coord.x <= 0.001 || coord.x >= 0.999 || coord.y <= 0.001 || coord.y >= 0.999 || coord.z <= 0.0 || coord.z >= 1.0) return 1.0;
-    float bias = 0.0005 + 0.0015 * (1.0 - clamp(dot(normal, lightDir), 0.0, 1.0));
-    float sum = 0.0;
+
+    vec3 shadowNdc = vShadowPos.xyz / vShadowPos.w;
+    vec3 shadowCoord = shadowNdc * 0.5 + 0.5;
+    if (shadowCoord.x <= 0.001 || shadowCoord.x >= 0.999 ||
+        shadowCoord.y <= 0.001 || shadowCoord.y >= 0.999 ||
+        shadowCoord.z <= 0.0 || shadowCoord.z >= 1.0) return 1.0;
+
+    float nDotL = clamp(dot(normal, lightDir), 0.0, 1.0);
+    float bias = 0.00065 + 0.0017 * (1.0 - nDotL);
+    vec2 texelSize = vec2(1.0 / float(shadowMapResolution));
+    vec2 minUV = texelSize * 0.5;
+    vec2 maxUV = vec2(1.0) - minUV;
+    float visibility = 0.0;
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
-            float d = texture2D(shadowtex0, coord.xy + vec2(float(x), float(y)) * SHADOW_TEXEL).r;
-            sum += (coord.z - bias <= d) ? 1.0 : 0.0;
+            vec2 offset = vec2(float(x), float(y)) * texelSize * 1.5;
+            vec2 sampleUV = clamp(shadowCoord.xy + offset, minUV, maxUV);
+            float storedDepth = texture2D(shadowtex0, sampleUV).r;
+            visibility += step(shadowCoord.z - bias, storedDepth);
         }
     }
-    return sum / 9.0;
+    return visibility / 9.0;
 }
 
 float hash21(vec2 p) {
@@ -90,7 +102,7 @@ void main() {
     // This portable shaderpack keeps the same Fresnel, absorption, ripples and sun glints, with a sky reflection fallback.
     vec3 absorb = exp(-thickness * vec3(0.50, 0.16, 0.07));
     vec3 waterBody = vec3(0.035, 0.20, 0.36) * lightAmt * mix(0.55, 1.0, sunUp);
-    vec3 bed = texel.rgb * light * mix(vec3(0.65), vec3(1.0), lit);
+    vec3 bed = texel.rgb * light * mix(vec3(0.48), vec3(1.0), lit);
     vec3 throughWater = bed * absorb + waterBody * (1.0 - absorb);
 
     float cosView = clamp(dot(V, N), 0.0, 1.0);

@@ -7,7 +7,7 @@ A Minecraft Java shaderpack port of Blockcraft's in-game **Vivid** graphics look
 1. Use **Minecraft Java Edition** with OptiFine or Iris (Iris must have its normal OptiFine shaderpack compatibility enabled).
 2. Copy `Blockcraft-Ingame-Style.zip` into `.minecraft/shaderpacks/` without extracting it.
 3. Open **Options → Video Settings → Shaders** and select **Blockcraft Ingame Style**.
-4. For the intended look, leave Minecraft's color settings and shaderpack shadow settings at their defaults. The pack requests 2048px shadows and a 96-block shadow distance.
+4. For the intended look, leave Minecraft's color settings and shaderpack shadow settings at their defaults. The pack uses a 2048px shadow map, a 96-block distance, stabilized 1-block shadow snapping, and a light-space distortion that reserves more map detail near the player.
 
 The sources use GLSL 1.20 and the OptiFine/Iris shaderpack interface. This package was syntax-checked, but was not launched inside a Minecraft client in this workspace; loader/version-specific differences may require small compatibility adjustments.
 

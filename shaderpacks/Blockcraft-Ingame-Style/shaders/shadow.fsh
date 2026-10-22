@@ -1,6 +1,8 @@
 #version 120
 
 uniform sampler2D texture;
+const int shadowMapResolution = 2048;
+
 varying vec2 vTexCoord;
 varying vec4 vColor;
 

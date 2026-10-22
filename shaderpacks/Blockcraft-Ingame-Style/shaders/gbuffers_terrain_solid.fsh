@@ -19,7 +19,8 @@ varying vec3 vWorldRel;
 varying vec4 vShadowPos;
 
 const float PI = 3.14159265359;
-const float SHADOW_TEXEL = 1.0 / 2048.0;
+const int shadowMapResolution = 2048;
+const bool shadowtex0Nearest = true;
 
 float dayHeight() {
     return sin(float(worldTime) * (2.0 * PI / 24000.0));
@@ -34,16 +35,21 @@ float shadowVisibility(vec3 normal, vec3 lightDir) {
         shadowCoord.y <= 0.001 || shadowCoord.y >= 0.999 ||
         shadowCoord.z <= 0.0 || shadowCoord.z >= 1.0) return 1.0;
 
-    float bias = 0.00045 + 0.0014 * (1.0 - clamp(dot(normal, lightDir), 0.0, 1.0));
-    float sum = 0.0;
+    float nDotL = clamp(dot(normal, lightDir), 0.0, 1.0);
+    float bias = 0.00065 + 0.0017 * (1.0 - nDotL);
+    vec2 texelSize = vec2(1.0 / float(shadowMapResolution));
+    vec2 minUV = texelSize * 0.5;
+    vec2 maxUV = vec2(1.0) - minUV;
+    float visibility = 0.0;
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
-            float storedDepth = texture2D(shadowtex0,
-                shadowCoord.xy + vec2(float(x), float(y)) * SHADOW_TEXEL * 1.2).r;
-            sum += (shadowCoord.z - bias <= storedDepth) ? 1.0 : 0.0;
+            vec2 offset = vec2(float(x), float(y)) * texelSize * 1.5;
+            vec2 sampleUV = clamp(shadowCoord.xy + offset, minUV, maxUV);
+            float storedDepth = texture2D(shadowtex0, sampleUV).r;
+            visibility += step(shadowCoord.z - bias, storedDepth);
         }
     }
-    return sum / 9.0;
+    return visibility / 9.0;
 }
 
 float luma(vec3 c) {
