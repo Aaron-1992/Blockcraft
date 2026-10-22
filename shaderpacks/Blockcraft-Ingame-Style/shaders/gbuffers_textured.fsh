@@ -45,7 +45,8 @@ void main() {
     float sunUp = smoothstep(-0.10, 0.15, h);
     float ndl = clamp(dot(N, L), 0.0, 1.0);
     float direct = shadowVisibility(N, L) * mix(0.55, 1.0, smoothstep(0.0, 0.35, ndl));
-    float skyAmt = smoothstep(0.55, 0.97, vLightCoord.x) * sunUp;
+    // Minecraft lightmap coordinates are x=block light and y=sky light.
+    float skyAmt = smoothstep(0.55, 0.97, vLightCoord.y) * sunUp;
 
     vec3 sunTint = mix(vec3(1.0, 0.70, 0.46), vec3(1.0, 0.975, 0.93), clamp(h * 3.0, 0.0, 1.0));
     vec3 shadeTint = vec3(0.45, 0.53, 0.78);
