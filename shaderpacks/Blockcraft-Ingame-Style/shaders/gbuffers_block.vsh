@@ -9,6 +9,7 @@ varying vec2 vLightCoord;
 varying vec4 vColor;
 varying vec3 vViewPos;
 varying vec3 vViewNormal;
+varying vec3 vWorldRel;
 varying vec4 vShadowPos;
 
 vec3 distortShadowClipPos(vec3 p) {
@@ -27,6 +28,7 @@ void main() {
     vColor = gl_Color;
     vViewPos = viewPos.xyz;
     vViewNormal = normalize(gl_NormalMatrix * gl_Normal);
+    vWorldRel = worldRel.xyz;
     vShadowPos = shadowProjection * shadowModelView * worldRel;
     vShadowPos.xyz = distortShadowClipPos(vShadowPos.xyz);
     gl_Position = gl_ProjectionMatrix * viewPos;
