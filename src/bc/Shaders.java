@@ -209,6 +209,10 @@ public final class Shaders {
    public float sunY;
    public float sunZ;
    public float sunUp;
+   /** Update 6.19: the active light is the moon at night. moonF blends the light colour, moonUp is its (dim) strength. */
+   public float moonF, moonUp, lightUp, realSunY;
+   /** Update 6.19: the options of the running game, used by the LOD/entity uniforms (null in headless tools). */
+   public Options opt;
    /** Update 3.16: 0..1, how far under water the camera is (the picture wobbles and has light patterns on it); the game eases it in and out. */
    public float underwater;
    static final String DEPTH_VS = String.join(
@@ -220,7 +224,7 @@ public final class Shaders {
    static final String DEPTH_FS = String.join(
       "\n",
       new CharSequence[]{
-         "#version 120", "uniform sampler2D tex;", "varying vec2 vUv;", "void main(){ if (texture2D(tex, vUv).a < 0.5) discard; gl_FragColor = vec4(1.0); }"
+         "#version 120", "uniform sampler2D tex;", "uniform float solid;", "varying vec2 vUv;", "void main(){ if (solid < 0.5 && texture2D(tex, vUv).a < 0.5) discard; gl_FragColor = vec4(1.0); }"
       }
    );
    static final String QUAD_VS = String.join(
@@ -674,6 +678,37 @@ public final class Shaders {
       this.sunY = var2;
       this.sunZ = var3;
    }
+   /**
+    * Update 6.19: choose the light that throws shadows. During the day it is the sun; once the sun is below
+    * the horizon the moon (the opposite direction) takes over, dimmer and cool blue. {@code sunDir} in the
+    * shaders is therefore always the *active* light, while {@code realSunY} keeps the true time of day for fog glow.
+    */
+   public void setLight(float sunAngle, boolean enabled, Options options) {
+      this.opt = options;
+      float sx = (float)(-Math.sin(sunAngle));
+      float sy = (float)Math.cos(sunAngle);
+      this.realSunY = sy;
+      boolean moon = enabled && options != null && options.moonShadows && sy < -0.02F;
+      float mb = options == null ? 0.45F : options.moonBrightness;
+      this.moonF = moon ? Math.max(0.0F, Math.min(1.0F, (-sy - 0.02F) / 0.25F)) : 0.0F;
+      if (moon) {
+         this.sunX = -sx;
+         this.sunY = -sy;
+         this.sunZ = 0.0F;
+      } else {
+         this.sunX = sx;
+         this.sunY = sy;
+         this.sunZ = 0.0F;
+      }
+      float dayUp = Math.max(0.0F, Math.min(1.0F, (sy - 0.02F) / 0.25F));
+      this.moonUp = moon ? Math.max(0.0F, Math.min(1.0F, (-sy - 0.02F) / 0.25F)) * mb : 0.0F;
+      this.lightUp = (dayUp + this.moonUp) * this.sunAtten;
+   }
+
+   /** Update 6.19: draw solid geometry (entity silhouettes) into the depth-only shadow map. */
+   public void setShadowSolid(float solid) {
+      this.u1f(this.pDepth, "solid", solid);
+   }
 
    public boolean shadowStale(float var1, float var2, float var3, double var4, double var6, double var8) {
       if (!this.mapValid) {
@@ -774,6 +809,7 @@ public final class Shaders {
       GL11.glPolygonOffset(2.0F, 4.0F);
       GL20.glUseProgram(this.pDepth);
       this.u1i(this.pDepth, "tex", 0);
+      this.setShadowSolid(0.0F);
    }
 
    public void endShadow(int var1, int var2, boolean var3) {
@@ -900,10 +936,11 @@ public final class Shaders {
       GL20.glUniform3f(this.loc(prog, "fogColor"), var11[0], var11[1], var11[2]);
       GL20.glUniform2f(this.loc(prog, "fogRange"), var9, var10);
       GL20.glUniform3f(this.loc(prog, "sunDir"), this.sunX, this.sunY, this.sunZ);
-      float var24 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
+      float var24 = this.lightUp;
       this.sunUp = var24;
       this.u1f(prog, "sunUp", var24);
-      this.u1f(prog, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
+      this.u1f(prog, "moonF", this.moonF);
+      this.u1f(prog, "fogGlow", Sky.glowAmount(this.realSunY, this.sunAtten) * (1.0F - this.moonF));
       this.u1f(prog, "dayF", var14);
       this.u1f(prog, "isTrans", var8 ? 1.0F : 0.0F);
       GL20.glUniform3f(this.loc(prog, "skyTop"), var12[0], var12[1], var12[2]);
@@ -952,9 +989,12 @@ public final class Shaders {
       GL20.glUniform3f(this.loc(this.pEntity, "fogColor"), fogCol[0], fogCol[1], fogCol[2]);
       GL20.glUniform2f(this.loc(this.pEntity, "fogRange"), fogNear, fogFar);
       GL20.glUniform3f(this.loc(this.pEntity, "sunDir"), this.sunX, this.sunY, this.sunZ);
-      float up = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
+      float up = this.lightUp;
       this.u1f(this.pEntity, "sunUp", up);
-      this.u1f(this.pEntity, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
+      this.u1f(this.pEntity, "moonF", this.moonF);
+      this.u1f(this.pEntity, "moonUp", this.moonUp);
+      this.u1f(this.pEntity, "handShader", 0.0F);
+      this.u1f(this.pEntity, "fogGlow", Sky.glowAmount(this.realSunY, this.sunAtten) * (1.0F - this.moonF));
       this.u1f(this.pEntity, "shadowOn", shadowOn ? 1.0F : 0.0F);
       GL20.glUniform4fv(this.loc(this.pEntity, "dynL[0]"), this.dynL);
       GL20.glUniform4fv(this.loc(this.pEntity, "dynC[0]"), this.dynC);
@@ -968,8 +1008,11 @@ public final class Shaders {
    /** Viewmodels already have face shading. Sample the player's lightmap once, not a second sun/dynamic pass. */
    public void useHand(float[] mv, double x, double y, double z, float sky, float block) {
       useEntity(mv, x, y, z, 80, 160, new float[]{0, 0, 0}, false, sky, block);
-      int light = HandLighting.withNearby(HandLighting.sample(Tex.lmBuf, sky, block), this.dynL, this.dynC);
+      boolean full = this.opt != null && this.opt.handLighting;
+      int light = full ? HandLighting.sample(Tex.lmBuf, sky, block)
+         : HandLighting.withNearby(HandLighting.sample(Tex.lmBuf, sky, block), this.dynL, this.dynC);
       this.u1f(this.pEntity, "handPass", 1.0F);
+      this.u1f(this.pEntity, "handShader", full ? 1.0F : 0.0F);
       GL20.glUniform3f(this.loc(this.pEntity, "handLight"), (light >> 16 & 255) / 255.0F,
          (light >> 8 & 255) / 255.0F, (light & 255) / 255.0F);
    }
@@ -1351,9 +1394,15 @@ public final class Shaders {
          GL20.glUniform3f(this.loc(lp, "fogColor"), var10[0], var10[1], var10[2]);
          GL20.glUniform2f(this.loc(lp, "fogRange"), var8, var9);
          GL20.glUniform3f(this.loc(lp, "sunDir"), this.sunX, this.sunY, this.sunZ);
-         float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F)) * this.sunAtten;
+         float var14 = this.lightUp;
          this.u1f(lp, "sunUp", var14);
-         this.u1f(lp, "fogGlow", Sky.glowAmount(this.sunY, this.sunAtten));
+         this.u1f(lp, "moonF", this.moonF);
+         this.u1f(lp, "fogGlow", Sky.glowAmount(this.realSunY, this.sunAtten) * (1.0F - this.moonF));
+         Options lo = this.opt;
+         float horizon = (lo == null ? 64 : lo.lodDistance) * 16.0F;
+         this.u1f(lp, "lodFogNear", (lo == null ? 0.35F : lo.lodFogStart) * horizon);
+         this.u1f(lp, "lodFogFar", (lo == null ? 1.0F : lo.lodFogEnd) * horizon);
+         this.u1f(lp, "lodFalloff", lo == null ? 1.0F : lo.lodFalloff);
          this.u1f(lp, "time", (float)Perf.seconds(3600.0));
          GL20.glUniform3f(this.loc(lp, "skyTop"), var11[0], var11[1], var11[2]);
          GL20.glUniform3f(this.loc(lp, "skyHor"), var12[0], var12[1], var12[2]);
@@ -1596,8 +1645,10 @@ public final class Shaders {
    ) {
       if (this.cloudsOk && this.ok && this.sceneActive && fx.snap != null) {
          this.calcView(var2);
-         float var14 = Math.max(0.0F, Math.min(1.0F, (this.sunY - 0.02F) / 0.25F));
-         float var15 = Math.max(0.0F, Math.min(1.0F, this.sunY * 3.0F));
+         // Update 6.19: cloud brightness follows the *active* light (dim moonlight) but the warm/cool
+         // mix follows the real time of day, so clouds are not bright white at midnight.
+         float var14 = this.lightUp;
+         float var15 = Math.max(0.0F, Math.min(1.0F, this.realSunY * 3.0F));
          float var16 = 1.0F + 0.0F * var15;
          float var17 = 0.52F + 0.43F * var15;
          float var18 = 0.28F + 0.57000005F * var15;
@@ -1634,7 +1685,11 @@ public final class Shaders {
          this.u1f(this.pCloud, "time", (float)Perf.seconds(3600.0));
          this.weatherUniforms(this.pCloud, fx, var3, var5, var7);
          GL20.glUniform3f(this.loc(this.pCloud, "sunDir"), this.sunX, this.sunY, this.sunZ);
-         GL20.glUniform3f(this.loc(this.pCloud, "sunCol"), var16 * var14, var17 * var14, var18 * var14);
+         float m = this.moonF;
+         GL20.glUniform3f(this.loc(this.pCloud, "sunCol"),
+            (var16 * (1.0F - m) + 0.55F * m) * var14,
+            (var17 * (1.0F - m) + 0.66F * m) * var14,
+            (var18 * (1.0F - m) + 0.98F * m) * var14);
          GL20.glUniform3f(this.loc(this.pCloud, "ambCol"), var20, var21, var22);
          GL20.glUniform3f(this.loc(this.pCloud, "fogCol"), var11[0], var11[1], var11[2]);
          GL20.glUniform2f(this.loc(this.pCloud, "zNF"), var23, var24);

@@ -230,6 +230,11 @@ public final class WorldSettings {
    /** Selected Console Edition Arena Map (0 = Cove, 1 = Crucible, 2 = Cavern, 3 = Temple). */
    public int mapId = MAP_COVE;
 
+   /** Update 6.19: 1 = the V6.18 terrain, 2 = the bigger cave systems / taller mountains. Old saves stay at 1. */
+   public int terrainVer = 1;
+   /** Update 6.19: only used when terrainVer >= 2. */
+   public float caveScale = 1.0F, caveDensity = 1.0F, mountainScale = 1.0F, ravineScale = 1.0F;
+
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
       s.type = CLASSIC;
@@ -247,6 +252,11 @@ public final class WorldSettings {
       s.flat = this.flat;
       s.structVer = this.structVer;
       s.mapId = this.mapId;
+      s.terrainVer = this.terrainVer;
+      s.caveScale = this.caveScale;
+      s.caveDensity = this.caveDensity;
+      s.mountainScale = this.mountainScale;
+      s.ravineScale = this.ravineScale;
       return s;
    }
 
@@ -283,6 +293,16 @@ public final class WorldSettings {
       p.setProperty("flat", Integer.toString(this.flat));
       p.setProperty("structver", Integer.toString(this.structVer));
       p.setProperty("mapid", Integer.toString(this.mapId));
+      p.setProperty("terrainver", Integer.toString(this.terrainVer));
+      p.setProperty("cavescale", Float.toString(this.caveScale));
+      p.setProperty("cavedensity", Float.toString(this.caveDensity));
+      p.setProperty("mountainscale", Float.toString(this.mountainScale));
+      p.setProperty("ravinescale", Float.toString(this.ravineScale));
+   }
+
+   private static float f(Properties p, String key, float def, float lo, float hi) {
+      float v = Float.parseFloat(p.getProperty(key, Float.toString(def)));
+      return v < lo ? lo : v > hi ? hi : v;
    }
 
    public static WorldSettings load(Properties p) {
@@ -309,6 +329,16 @@ public final class WorldSettings {
 
       s.structures = Boolean.parseBoolean(p.getProperty("structures", "true"));
       s.bonusChest = Boolean.parseBoolean(p.getProperty("bonus", "false"));
+      try {
+         s.terrainVer = Math.max(1, Math.min(2, Integer.parseInt(p.getProperty("terrainver", "1").trim())));
+         s.caveScale = f(p, "cavescale", 1.0F, 0.6F, 3.0F);
+         s.caveDensity = f(p, "cavedensity", 1.0F, 0.4F, 2.5F);
+         s.mountainScale = f(p, "mountainscale", 1.0F, 0.5F, 2.5F);
+         s.ravineScale = f(p, "ravinescale", 1.0F, 0.4F, 2.5F);
+      } catch (NumberFormatException e) {
+         s.terrainVer = 1;
+         s.caveScale = s.caveDensity = s.mountainScale = s.ravineScale = 1.0F;
+      }
       return s;
    }
 

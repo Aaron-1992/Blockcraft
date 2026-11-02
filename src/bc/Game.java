@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.18";
+   public static final String VERSION_STR = "6.19";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -4233,6 +4233,7 @@ public final class Game {
       if (o == null) return;
       World.setThreadTuning(o);
       Shaders sh = this.rend == null ? null : this.rend.sh;
+      if (sh != null) sh.opt = o; // Update 6.19: the LOD/hand uniforms read the live options
       boolean gl = sh != null && sh.ok;
       if (gl) {
          if (this.tunedShadow != o.shadowRes) {
@@ -7137,7 +7138,9 @@ public final class Game {
          + " chunks  -  saves " + (this.world.savePending ? "running" : "idle")
          + "  -  particles " + this.particles.size() + "/" + this.opt.particleBudget
          + "  -  gen " + World.genThreads() + " / mesh " + (this.rend == null ? 0 : this.rend.meshWorkerCount())
-         + "  -  unload " + this.opt.unloadBudget + "/f";
+         + "  -  unload " + this.opt.unloadBudget + "/f"
+         + "  -  LOD " + (this.rend == null || this.rend.lod == null ? "off" : this.rend.lod.drawn + " tiles")
+         + "  -  moon " + (this.opt.moonShadows ? "on" : "off");
    }
 
    void drawDebug() {

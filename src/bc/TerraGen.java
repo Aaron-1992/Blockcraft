@@ -133,14 +133,22 @@ public final class TerraGen extends Gen {
       }
 
       // mountains: where the land is high and rugged, in blobs
-      double mtnBase = smooth(0.12, 0.46, c) * smooth(0.08, -0.42, e);
+      boolean bigTerrain = this.st.terrainVer >= 2;
+      double mtnBase = bigTerrain ? smooth(0.05, 0.42, c) * smooth(0.15, -0.50, e)
+         : smooth(0.12, 0.46, c) * smooth(0.08, -0.42, e);
       double mtn = 0.0;
       if (mtnBase > 0.0) {
          double mm = this.nMt.fbm(x * k / 380.0 + 211.0, z * k / 380.0 + 55.0, 3);
          mtn = mtnBase * smooth(-0.05, 0.30, mm);
          if (mtn > 0.0) {
             double pk = clamp(1.0 - Math.abs(this.nPk.fbm(x * k / 210.0, z * k / 210.0, 4)) * 2.3, 0.0, 1.0);
-            hd += mtn * (12.0 + 118.0 * pk * pk * this.vs);
+            double ms = bigTerrain ? this.st.mountainScale : 1.0;
+            hd += mtn * (12.0 + 118.0 * pk * pk * this.vs) * ms;
+            if (ms > 1.0) {
+               // Update 6.19: sharper ridges on top of the taller peaks
+               double ridge = 1.0 - Math.abs(this.nPk.fbm(x * k / 95.0 + 7.0, z * k / 95.0 - 11.0, 3));
+               hd += mtn * 26.0 * ridge * ridge * ridge * (ms - 1.0);
+            }
          }
       }
       if (hd > 168.0) {
@@ -532,14 +540,44 @@ public final class TerraGen extends Gen {
    // ------------------------------------------------------------------------------------------------ ravines
    /** 0 = no ravine here, up to 1 in the middle of one. */
    double ravine(int x, int z) {
+      boolean big = this.st.terrainVer >= 2;
       double zone = this.nRavZ.noise2(x / 420.0 + 12.0, z / 420.0 - 5.0);
-      if (zone < 0.2) {
+      if (zone < (big ? 0.05 : 0.2)) {
          return 0.0;
       }
 
       double d = Math.abs(this.nRav.fbm(x / 170.0, z / 170.0, 2));
-      double width = 0.011 + 0.010 * (this.nRavW.noise2(x / 33.0, z / 33.0) * 0.5 + 0.5);
+      double width = (0.011 + 0.010 * (this.nRavW.noise2(x / 33.0, z / 33.0) * 0.5 + 0.5))
+         * (big ? this.st.ravineScale : 1.0);
       return d >= width ? 0.0 : 1.0 - d / width;
+   }
+
+   /** Update 6.19: a larger, connected cave system for new worlds. Uses the *existing* noise fields with
+    *  different scales/offsets so old seeds and old saves keep their exact terrain. */
+   boolean carveBig(int x, int y, int z) {
+      float cs = Math.max(0.6F, this.st.caveScale);
+      float dens = Math.max(0.4F, this.st.caveDensity);
+      double k = 1.0 / cs;
+      // 1. wide worm tunnels (the old caves, stretched in all three axes)
+      double a = this.nCave1.noise(x * 0.024 * k, y * 0.030 * k, z * 0.024 * k);
+      double b = this.nCave2.noise(x * 0.024 * k + 31.7, y * 0.030 * k + 11.3, z * 0.024 * k - 47.1);
+      if (a * a + b * b < 0.0055 * dens * (0.8 + 0.6 * cs)) return true;
+      // 2. a second, larger-scale network that joins the first into long systems
+      double c = this.nCave1.noise(x * 0.013 * k + 91.0, y * 0.021 * k - 17.0, z * 0.013 * k + 53.0);
+      double d = this.nCave2.noise(x * 0.013 * k - 29.0, y * 0.021 * k + 7.0, z * 0.013 * k + 13.0);
+      if (c * c + d * d < 0.0038 * dens) return true;
+      // 3. deep cheese caverns
+      if (y < 54) {
+         double e = this.nCavern.noise(x * 0.009 * k, y * 0.016 * k, z * 0.009 * k);
+         if (e > 0.50 - 0.10 * (dens - 1.0F) - 0.06 * (cs - 1.0F)) return true;
+      }
+      return false;
+   }
+
+   /** Update 6.19: more cave mouths so the big systems are actually reachable. */
+   boolean entranceBig(int x, int z) {
+      if (this.st.terrainVer < 2) return this.entrance(x, z);
+      return this.nEntr.noise2(x * 0.010, z * 0.010) > 0.30;
    }
 
    // ------------------------------------------------------------------------------------------------ the chunk
@@ -609,7 +647,7 @@ public final class TerraGen extends Gen {
 
             // caves
             int top2 = h - 3;
-            boolean mouth = h >= 64 && this.entrance(wx, wz) && s.biome != Biomes.MUSHROOM;
+            boolean mouth = h >= 64 && this.entranceBig(wx, wz) && s.biome != Biomes.MUSHROOM;
             if (mouth) {
                top2 = h;
             }
@@ -618,9 +656,10 @@ public final class TerraGen extends Gen {
                top2 = Math.min(top2, h - 6);
             }
 
+            boolean bigCaves = this.st.terrainVer >= 2;
             for (int y = 6; y <= top2; y++) {
                int id = b[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
-               if (id != 6 && !Blocks.isFluid(id) && this.carve(wx, y, wz)) {
+               if (id != 6 && !Blocks.isFluid(id) && (bigCaves ? this.carveBig(wx, y, wz) : this.carve(wx, y, wz))) {
                   b[Chunk.idx(x, y, z)] = (short)(y <= 10 ? 58 : 0);
                }
             }
@@ -632,7 +671,8 @@ public final class TerraGen extends Gen {
                   int floor = 14 + (int)((this.nRavW.noise2(wx / 90.0 + 9.0, wz / 90.0) * 0.5 + 0.5) * 8.0);
                   for (int y = floor; y <= h + 1; y++) {
                      double f = (double)(y - floor) / Math.max(1, h - floor);
-                     double need = 0.85 * (1.0 - Math.pow(Math.min(1.0, f), 0.55));
+                     double need = 0.85 * (1.0 - Math.pow(Math.min(1.0, f), 0.55))
+                        / (this.st.terrainVer >= 2 ? this.st.ravineScale : 1.0);
                      if (rv > need) {
                         int id = b[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
                         if (id != 6 && !Blocks.isFluid(id)) {

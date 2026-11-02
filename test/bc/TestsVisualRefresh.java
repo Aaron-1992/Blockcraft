@@ -326,8 +326,11 @@ final class TestsVisualRefresh {
          check(warm == HandLighting.withNearby(lm[0], new float[]{0, 0, 2, 8}, colors), "turning camera does not flip nearby light");
          check(HandLighting.withNearby(0xFFFFFFFF, lights, colors) == 0xFFFFFFFF, "no double-lighting in daylight");
          String fs = ShaderSrc.ENTITY_FS;
-         check(fs.indexOf("if (handPass > 0.5)") < fs.indexOf("cross(dFdx(vRel)"), "viewmodel bypasses derivative-based world normal lighting");
-         check(fs.contains("t.rgb * vCol.rgb * handLight"), "single sampled lighting factor");
+         // Update 6.19: the viewmodel has its own branch, but it now uses the shader's sun/moon/fog/dynamic
+         // lighting (handShader) instead of a flat constant. The old "no derivative lighting" bypass is gone.
+         check(fs.indexOf("if (handPass > 0.5)") < fs.indexOf("cross(dFdx(vRel)"), "viewmodel has a dedicated lighting branch");
+         check(fs.contains("handShader") && fs.contains("vec3 lit = handLight;"), "hand lighting is switchable and starts from one sampled lightmap colour");
+         check(fs.contains("t.rgb * vCol.rgb * lit"), "the shader-lit factor is applied to the hand");
       });
       test("showcase: extended block IDs in starter kit do not index the item-only stack table", () -> {
          Game g = GameTests.newGame(0);

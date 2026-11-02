@@ -7,6 +7,7 @@ import bc.Structs.Village;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -27,6 +28,17 @@ public final class Lod {
    static final int N = 32;
    static final int MIN = 32;
    static final int MAXS = 1024;
+   /** Update 6.19: LOD detail bias factors, indexed by Options.lodDetail. */
+   static final double[] DETAIL_FACTOR = new double[]{0.70, 1.0, 1.35};
+
+   static double detailFactor(int lodDetail) {
+      return DETAIL_FACTOR[Options.clamp(lodDetail, 0, 2)];
+   }
+
+   /** Update 6.19: tiles beyond this distance are fully fogged and are not visited or drawn. */
+   static int fogFarBlocks(int maxDist, Options lo) {
+      return lo == null ? maxDist : (int)Math.max(64.0F, lo.lodFogEnd * maxDist);
+   }
    static final float LAND_SHIFT = 2.5F;
    static final float WATER_SHIFT = 0.2F;
    final Gen gen;
@@ -52,6 +64,15 @@ public final class Lod {
    final ArrayList<Lod.Tile> pendingVisible = new ArrayList<>();
    final ArrayList<Lod.Tile> pendingBehind = new ArrayList<>();
    final int maxInflight;
+   /** Update 6.19: reused instead of allocating a root-tile list, int[2] per root, a comparator and a colour array every frame. */
+   final ArrayList<int[]> rootTiles = new ArrayList<>();
+   int rootUsed;
+   final float[] texEnvColor = new float[4];
+   final Comparator<int[]> rootOrder = (a, b) -> Double.compare(this.nearest(a[0], a[1], 1024), this.nearest(b[0], b[1], 1024));
+   final Comparator<Lod.Tile> tileOrder = (a, b) -> Double.compare(
+      this.nearest(a.x0, a.z0, a.size), this.nearest(b.x0, b.z0, b.size));
+   /** Update 6.19: LOD tiles beyond this distance are fully faded into fog and are not visited at all. */
+   int fogFarBlocks = Integer.MAX_VALUE;
 
    public Lod(Renderer var1, Gen var2) {
       this(var1, var2, null);
@@ -66,7 +87,8 @@ public final class Lod {
       }
 
       int cores = Math.max(1, Runtime.getRuntime().availableProcessors());
-      int var3 = Math.max(1, Math.min(2, (cores + 3) / 4));
+      Options lo = var1 == null || var1.g == null ? null : var1.g.opt;
+      int var3 = lo != null && lo.lodWorkers > 0 ? Math.min(4, lo.lodWorkers) : Math.max(1, Math.min(2, (cores + 3) / 4));
       this.maxInflight = var3 * 4;
       this.pool = Executors.newFixedThreadPool(var3, var0 -> {
          Thread var1x = new Thread(var0, "lod-gen");
@@ -1105,12 +1127,12 @@ public final class Lod {
       var1[0] += 4;
    }
 
-   void uploadPending() {
+   void uploadPending(int maxUploads) {
       int var1 = 0;
       long start = System.nanoTime();
 
       Lod.Tile var2;
-      while (var1 < 64 && (var1 == 0 || System.nanoTime() - start < 6000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
+      while (var1 < maxUploads && (var1 == 0 || System.nanoTime() - start < 6000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
          var1++;
          if (this.dead) {
             var2.data = null;
@@ -1180,39 +1202,51 @@ public final class Lod {
       this.cy = var3;
       this.maxDist = var7 * 16;
       this.innerHalf = Math.max(0, (var8 - 1) * 16);
-      this.uploadPending();
+      Options lo = this.rend == null || this.rend.g == null ? null : this.rend.g.opt;
+      this.fogFarBlocks = fogFarBlocks(this.maxDist, lo);
+      this.uploadPending(lo == null ? 8 : Math.max(1, lo.lodMaxUploads));
       this.drawList.clear();
       this.pendingVisible.clear();
       this.pendingBehind.clear();
       int var10 = (int)Math.floor(var1);
       int var11 = (int)Math.floor(var5);
-      int var12 = Math.floorDiv(var10 - this.maxDist, 1024);
-      int var13 = Math.floorDiv(var10 + this.maxDist, 1024);
-      int var14 = Math.floorDiv(var11 - this.maxDist, 1024);
-      int var15 = Math.floorDiv(var11 + this.maxDist, 1024);
-      ArrayList<int[]> var16 = new ArrayList<>();
-
+      int var12 = Math.floorDiv(var10 - this.fogFarBlocks, 1024);
+      int var13 = Math.floorDiv(var10 + this.fogFarBlocks, 1024);
+      int var14 = Math.floorDiv(var11 - this.fogFarBlocks, 1024);
+      int var15 = Math.floorDiv(var11 + this.fogFarBlocks, 1024);
+      this.rootUsed = 0;
       for (int var17 = var12; var17 <= var13; var17++) {
          for (int var18 = var14; var18 <= var15; var18++) {
-            var16.add(new int[]{var17 * 1024, var18 * 1024});
+            int[] r;
+            if (this.rootUsed < this.rootTiles.size()) {
+               r = this.rootTiles.get(this.rootUsed);
+            } else {
+               r = new int[2];
+               this.rootTiles.add(r);
+            }
+            r[0] = var17 * 1024;
+            r[1] = var18 * 1024;
+            this.rootUsed++;
          }
       }
 
-      var16.sort((var1x, var2) -> Double.compare(this.nearest(var1x[0], var1x[1], 1024), this.nearest(var2[0], var2[1], 1024)));
-
-      for (int[] var22 : var16) {
-         this.visit(var22[0], var22[1], 1024);
+      this.rootTiles.subList(0, this.rootUsed).sort(this.rootOrder);
+      for (int i = 0; i < this.rootUsed; i++) {
+         int[] r = this.rootTiles.get(i);
+         this.visit(r[0], r[1], 1024);
       }
 
+      int budget = lo == null ? 4 : Math.max(1, lo.lodMaxRequests);
       if (!this.pendingVisible.isEmpty() && this.inflight.get() < this.maxInflight) {
-         this.pendingVisible.sort((a, b) -> Double.compare(this.nearest(a.x0, a.z0, a.size), this.nearest(b.x0, b.z0, b.size)));
-         for (int i = 0; i < this.pendingVisible.size() && this.inflight.get() < this.maxInflight; i++) {
+         this.pendingVisible.sort(this.tileOrder);
+         for (int i = 0; i < this.pendingVisible.size() && i < budget && this.inflight.get() < this.maxInflight; i++) {
             this.request(this.pendingVisible.get(i));
          }
+         budget -= Math.min(budget, this.pendingVisible.size());
       }
-      if (!this.pendingBehind.isEmpty() && this.inflight.get() < this.maxInflight) {
-         this.pendingBehind.sort((a, b) -> Double.compare(this.nearest(a.x0, a.z0, a.size), this.nearest(b.x0, b.z0, b.size)));
-         for (int i = 0; i < this.pendingBehind.size() && this.inflight.get() < this.maxInflight; i++) {
+      if (budget > 0 && !this.pendingBehind.isEmpty() && this.inflight.get() < this.maxInflight) {
+         this.pendingBehind.sort(this.tileOrder);
+         for (int i = 0; i < this.pendingBehind.size() && i < budget && this.inflight.get() < this.maxInflight; i++) {
             this.request(this.pendingBehind.get(i));
          }
       }
@@ -1229,7 +1263,9 @@ public final class Lod {
       // Update 3.8: the same brightness as the real terrain at full sky light (the lightmap's value for sky 15 is skyLightFactor, which
       // also contains the weather's dimming): no seam between near terrain and LOD at night or in the rain
       float var21 = Math.max(0.06F, Math.min(1.0F, var9));
-      GL11.glTexEnvfv(8960, 8705, new float[]{var21, var21, var21, 1.0F});
+      this.texEnvColor[0] = this.texEnvColor[1] = this.texEnvColor[2] = var21;
+      this.texEnvColor[3] = 1.0F;
+      GL11.glTexEnvfv(8960, 8705, this.texEnvColor);
       GL11.glDisable(3008);
       GL11.glDisable(3042);
       GL11.glEnableClientState(32884);
@@ -1243,7 +1279,9 @@ public final class Lod {
 
       this.drawn = 0;
 
+      int drawCap = lo != null && lo.lodMaxDraws > 0 ? lo.lodMaxDraws : Integer.MAX_VALUE;
       for (Lod.Tile var19 : this.drawList) {
+         if (this.drawn >= drawCap) break;
          if (var19.state == 3) {
             GL15.glBindBuffer(34962, var19.vbo);
             GL11.glVertexPointer(3, 5126, 16, 0L);
@@ -1338,23 +1376,25 @@ public final class Lod {
     * high-detail 1x1-block (size 32) and 2x2-block (size 64) LOD rings reach much further out.
     */
    double splitDistance(int tileSize) {
+      Options lo = this.rend == null || this.rend.g == null ? null : this.rend.g.opt;
+      double detail = lo == null ? 1.0 : detailFactor(lo.lodDetail);
       double rdScale = Math.max(1.0, (this.innerHalf + 16.0) / 96.0);
       double lodScale = Math.max(1.0, this.maxDist / 768.0);
       double scale = Math.max(rdScale, rdScale * 0.65 + lodScale * 0.35);
       if (tileSize == 64) {
          // 64 -> 32 (highest-detail 1x1 block LOD): reaches far beyond real chunks and scales with render distance
-         return Math.max(this.innerHalf + Math.max(176.0, this.innerHalf * 1.45), 64.0 * 3.1 * scale);
+         return Math.max(this.innerHalf + Math.max(176.0, this.innerHalf * 1.45), 64.0 * 3.1 * scale) * detail;
       }
       if (tileSize == 128) {
          // 128 -> 64 (high-detail 2x2 block LOD with full trees, trunks, and village roofs)
-         return Math.max(this.innerHalf + Math.max(288.0, this.innerHalf * 2.1), 128.0 * 2.6 * scale);
+         return Math.max(this.innerHalf + Math.max(288.0, this.innerHalf * 2.1), 128.0 * 2.6 * scale) * detail;
       }
-      return Math.max(this.innerHalf + tileSize * 1.2, tileSize * 2.15 * scale);
+      return Math.max(this.innerHalf + tileSize * 1.2, tileSize * 2.15 * scale) * detail;
    }
 
    void visit(int var1, int var2, int var3) {
       double var4 = this.nearest(var1, var2, var3);
-      if (!(var4 > this.maxDist)) {
+      if (!(var4 > this.fogFarBlocks)) {
          if (var3 == 32 && this.coveredBox(var1, var2, 32)) {
             return;
          }

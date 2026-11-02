@@ -375,7 +375,20 @@ final class Screens {
       }
    }
 
+   /** Update 6.19: copy the world-generation knobs of the Advanced tab into the settings of the world about to be created. */
+   static void applyNewWorldSettings(Game g) {
+      if (g.opt == null) return;
+      WorldSettings ws = g.newSettings;
+      ws.terrainVer = g.opt.newTerrain ? 2 : 1;
+      ws.caveScale = g.opt.caveScale;
+      ws.caveDensity = g.opt.caveDensity;
+      ws.mountainScale = g.opt.mountainScale;
+      ws.ravineScale = g.opt.ravineScale;
+   }
+
    static void createWorld(Game g) {
+      // Loading an old save never calls this, so its terrain stays exactly as it was.
+      applyNewWorldSettings(g);
       g.startWorld(true, Long.toString(seedValue(g)), g.newMode);
    }
 
@@ -470,6 +483,7 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
+         + (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : "")
          + (ws.structures ? "  -  villages, temples & ruins" : "")
          + (ws.bonusChest ? "  -  bonus chest" : "");
       gui.text(Game.clipText(content, colW * 2 + gap), x0, recY, 0xFFE8D068, true);
@@ -507,7 +521,7 @@ final class Screens {
    static final int[] FPS_FINE = {0, 30, 60, 75, 90, 120, 144, 165, 240, 360, 500, 1000};
    static final int[] AUTOSAVE = {0, 600, 1200, 3600, 7200};
    /** Number of rows in the Advanced tab (the list scrolls). */
-   static final int ADV_ROWS = 28;
+   static final int ADV_ROWS = 44;
 
    static String[] tabs(Options o) {
       return o.debugVideo ? TABS_DEBUG : TABS;
@@ -925,7 +939,68 @@ final class Screens {
             ui.say("Advanced video settings applied and saved");
          });
       });
-      // 24: section title
+      // ---------------------------------------------------------------- V6.19: light & shadows
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eLIGHT & SHADOWS  -  applied live", x0, y + 3.0F, Ui.GOLD));
+      cells.add(y -> {
+         ui.toggle("Moon Shadows", o.moonShadows, x0, y, colW, 20.0F,
+            "At night the moon takes over the shadow map, so terrain and mobs throw real moonlight shadows.", () -> o.moonShadows = !o.moonShadows);
+         ui.toggle("Entity Shadows", o.entityShadows, x1, y, colW, 20.0F,
+            "Mobs and the third-person player cast shadows into the sun/moon shadow map.", () -> o.entityShadows = !o.entityShadows);
+      });
+      cells.add(y -> {
+         ui.toggle("Hand Lighting", o.handLighting, x0, y, colW, 20.0F,
+            "The held hand/item uses the shader's sun, moon, fog and dynamic lights instead of a flat colour.", () -> o.handLighting = !o.handLighting);
+         ui.slider("Moon Light: " + (int)(o.moonBrightness * 100.0F) + "%", x1, y, colW, 20.0F, (o.moonBrightness - 0.15F) / 0.85F,
+            "How bright moonlit shadows are. Off with Moon Shadows.", v -> o.moonBrightness = 0.15F + v * 0.85F);
+      });
+      // ---------------------------------------------------------------- V6.19: LOD
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eLOD / DISTANT TERRAIN  -  the big frame-spike controls", x0, y + 3.0F, Ui.GOLD));
+      cells.add(y -> {
+         ui.slider("LOD Falloff: " + String.format("%.2f", o.lodFalloff), x0, y, colW, 20.0F, (o.lodFalloff - 0.4F) / 1.6F,
+            "How quickly distant LOD fades into fog. Lower = far tiles disappear sooner = fewer draw calls.", v -> o.lodFalloff = 0.4F + v * 1.6F);
+         ui.slider("LOD Fog Start: " + (int)(o.lodFogStart * 100.0F) + "%", x1, y, colW, 20.0F, o.lodFogStart / 0.95F,
+            "Fraction of the LOD horizon where the fade begins.", v -> o.lodFogStart = Math.min(v * 0.95F, o.lodFogEnd - 0.05F));
+      });
+      cells.add(y -> {
+         ui.slider("LOD Fog End: " + (int)(o.lodFogEnd * 100.0F) + "%", x0, y, colW, 20.0F, (o.lodFogEnd - 0.05F) / 0.95F,
+            "Tiles beyond this fraction of the horizon are fully fogged and are not drawn at all.", v -> o.lodFogEnd = Math.max(0.05F + v * 0.95F, o.lodFogStart + 0.05F));
+         ui.slider("LOD Detail: " + new String[]{"Coarse", "Normal", "Fine"}[Options.clamp(o.lodDetail, 0, 2)], x1, y, colW, 20.0F,
+            Options.clamp(o.lodDetail, 0, 2) / 2.0F, "How far out the LOD quadtree keeps splitting into smaller tiles. Coarse is fastest.", v -> o.lodDetail = Math.round(v * 2.0F));
+      });
+      cells.add(y -> {
+         ui.slider("LOD Builds/Frame: " + o.lodMaxRequests, x0, y, colW, 20.0F, (o.lodMaxRequests - 1) / 31.0F,
+            "Maximum new distant-terrain builds requested in one frame.", v -> o.lodMaxRequests = 1 + Math.round(v * 31.0F));
+         ui.slider("LOD Uploads/Frame: " + o.lodMaxUploads, x1, y, colW, 20.0F, (o.lodMaxUploads - 1) / 63.0F,
+            "Maximum vertex buffers created on the GPU per frame. Low values stop LOD upload spikes.", v -> o.lodMaxUploads = 1 + Math.round(v * 63.0F));
+      });
+      cells.add(y -> {
+         ui.slider("LOD Draw Cap: " + (o.lodMaxDraws == 0 ? "Off" : o.lodMaxDraws + ""), x0, y, colW, 20.0F, o.lodMaxDraws / 4096.0F,
+            "Hard ceiling on LOD draw calls per frame; 0 = draw everything.", v -> o.lodMaxDraws = Math.round(v * 4096.0F));
+         ui.slider("LOD Workers: " + (o.lodWorkers == 0 ? "Auto" : o.lodWorkers + ""), x1, y, colW, 20.0F, o.lodWorkers / 4.0F,
+            "0 = automatic. Applies when a world is loaded.", v -> o.lodWorkers = Math.round(v * 4.0F));
+      });
+      // ---------------------------------------------------------------- V6.19: new-world generation
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eWORLD GENERATION  -  new worlds only, old saves unchanged", x0, y + 3.0F, Ui.GOLD));
+      cells.add(y -> {
+         ui.toggle("V6.19 Terrain", o.newTerrain, x0, y, colW, 20.0F,
+            "Bigger cave systems, deeper caverns, taller sharper mountains and wider ravines for newly created worlds.", () -> o.newTerrain = !o.newTerrain);
+         ui.slider("Cave Size: " + String.format("%.2f", o.caveScale) + "x", x1, y, colW, 20.0F, (o.caveScale - 0.6F) / 2.4F,
+            "Size of the new cave tunnels and caverns (1.0 = the old caves).", v -> o.caveScale = 0.6F + v * 2.4F);
+      });
+      cells.add(y -> {
+         ui.slider("Cave Density: " + String.format("%.2f", o.caveDensity) + "x", x0, y, colW, 20.0F, (o.caveDensity - 0.4F) / 2.1F,
+            "How much of the underground is hollowed out.", v -> o.caveDensity = 0.4F + v * 2.1F);
+         ui.slider("Mountain Scale: " + String.format("%.2f", o.mountainScale) + "x", x1, y, colW, 20.0F, (o.mountainScale - 0.5F) / 2.0F,
+            "Height and sharpness of new mountain ranges.", v -> o.mountainScale = 0.5F + v * 2.0F);
+      });
+      cells.add(y -> {
+         ui.slider("Ravine Scale: " + String.format("%.2f", o.ravineScale) + "x", x0, y, full, 20.0F, (o.ravineScale - 0.4F) / 2.1F,
+            "Width and depth of ravines in new worlds. These four sliders are copied into the world when you press Create New World.", v -> o.ravineScale = 0.4F + v * 2.1F);
+      });
+      // ---------------------------------------------------------------- live diagnostics
       cells.add(header);
       cells.add(y -> ui.label("\u00a7eLIVE DIAGNOSTICS", x0, y + 3.0F, Ui.GOLD));
       // 26: live stats
@@ -935,6 +1010,9 @@ final class Screens {
             x0, y + 3.0F, Ui.DIM);
       });
       cells.add(y -> ui.label("GPU: " + GpuPref.shortName(g.gpuName) + "  -  " + g.shaderStatus(), x0, y + 3.0F, Ui.DIM));
+      cells.add(y -> ui.label("LOD " + (g.rend == null || g.rend.lod == null ? "off" : g.rend.lod.drawn + " tiles")
+         + "  -  falloff " + String.format("%.2f", o.lodFalloff) + "  -  fog " + (int)(o.lodFogStart * 100.0F) + ".." + (int)(o.lodFogEnd * 100.0F) + "%"
+         + "  -  moon " + (o.moonShadows ? "on" : "off"), x0, y + 3.0F, Ui.DIM));
 
       for (int i = 0; i < cells.size(); i++) {
          float y = oy + i * row;
@@ -960,6 +1038,23 @@ final class Screens {
       o.unloadBudget = 2;
       o.autosaveTicks = 1200;
       o.asyncSaves = true;
+      o.moonShadows = true;
+      o.moonBrightness = 0.45F;
+      o.entityShadows = true;
+      o.handLighting = true;
+      o.lodFalloff = 1.0F;
+      o.lodFogStart = 0.35F;
+      o.lodFogEnd = 1.0F;
+      o.lodDetail = 1;
+      o.lodMaxUploads = 8;
+      o.lodMaxRequests = 4;
+      o.lodMaxDraws = 0;
+      o.lodWorkers = 0;
+      o.newTerrain = true;
+      o.caveScale = 1.6F;
+      o.caveDensity = 1.3F;
+      o.mountainScale = 1.5F;
+      o.ravineScale = 1.3F;
    }
 
    static void gameTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {

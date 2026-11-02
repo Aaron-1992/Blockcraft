@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.18  -  an original Minecraft-style voxel sandbox   (EDITION V6.18)
+BLOCKCRAFT V6.19  -  an original Minecraft-style voxel sandbox   (EDITION V6.19)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,30 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.19 - Moonlight, entity shadows, LOD control and bigger caves
+
+  * The moon now casts real shadows. Once the sun is below the horizon the
+    moon (the opposite direction) takes over the shadow map, with dim cool
+    blue moonlight; terrain, water, clouds, LOD and entities all follow it.
+    Moon Shadows and Moon Light are independent settings.
+  * Mobs now cast shadows: a five-quad
+    silhouette goes into the same depth-only shadow map, so the caster needs
+    no extra textures, programs or framebuffers. Entity Shadows toggles it.
+  * The first-person hand/item is lit by the shader now: sun/moon direction,
+    cool moonlight, sunrise fog glow and the twelve dynamic lights all reach
+    the viewmodel instead of a flat lightmap colour. Hand Lighting toggles it.
+  * Distant terrain (LOD) is the big frame-spike control. New settings:
+    LOD Falloff, LOD Fog Start/End (tiles beyond the fog are not drawn at
+    all), LOD Detail, LOD Builds/Frame, LOD Uploads/Frame, LOD Draw Cap and
+    LOD Workers. Per-frame root tiles, comparators and colour arrays are
+    reused instead of allocated every frame.
+  * New worlds get bigger connected cave systems, deep caverns, more cave
+    mouths, taller sharper mountain ranges and wider ravines. Cave Size,
+    Cave Density, Mountain Scale and Ravine Scale are configurable. Existing
+    saves keep their exact old terrain; V6.19 Terrain switches it off.
+  * All of the above are in Options > Video > Debug Video > Advanced, and
+    persist in options.txt. F3 shows the live LOD tile count and moon state.
 
 WHAT'S NEW IN V6.18 - New panoramas, the Advanced Video tab and smoother frames
 

@@ -1,2 +1,2 @@
-6.18
-# V6.18: new panoramas, Advanced Video tab, biome preview and redstone/performance fixes.
+6.19
+# V6.19: moon/entity/hand lighting, LOD falloff & budgets, bigger caves and mountains.

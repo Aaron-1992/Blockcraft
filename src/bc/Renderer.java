@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL20;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Renderer {
@@ -1100,22 +1101,26 @@ public final class Renderer {
       boolean var50 = this.shadersOn();
       boolean var51 = false;
       if (var50) {
-         float var52 = this.sunAngle;
-         float var55 = (float)(-Math.sin(var52));
-         float var58 = (float)Math.cos(var52);
-         this.sh.setSun(var55, var58, 0.0F);
-         var51 = skyOn && var58 > 0.08F && !var7 && this.caveF > 0.08F && this.wfx.sunVis > 0.12F && !Perf.noShadow;
+         // Update 6.19: the active light is the sun by day and the moon by night (Shaders.setLight).
+         // The shadow map, sunDir, fog glow and the entity/hand lighting all follow it.
+         this.sh.setLight(this.sunAngle, true, this.g.opt);
+         float lx = this.sh.sunX;
+         float ly = this.sh.sunY;
+         float lz = this.sh.sunZ;
+         boolean moon = ly > 0.0F && this.sh.moonF > 0.0F;
+         var51 = skyOn && (ly > 0.08F || moon && this.sh.moonUp > 0.05F) && !var7
+            && this.caveF > 0.08F && this.wfx.sunVis > 0.12F && !Perf.noShadow;
          if (var51) {
             // Update 3.18: the map is drawn again when the player has moved 12 m or the sun has turned a third of a degree (as before), when terrain near
             // the player was built or changed (at most every 8 frames) and at the latest after 150 frames; it was every 30 frames whatever had happened
             this.shFrames++;
-            boolean shStale = this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ);
+            boolean shStale = this.sh.shadowStale(lx, ly, lz, this.camX, this.camY, this.camZ);
             int shInterval = this.g.opt == null ? 8 : Math.max(1, this.g.opt.shadowInterval);
             int shMaxAge = this.g.opt == null ? 150 : Math.max(shInterval, this.g.opt.shadowMaxAge);
             if (shStale || Perf.shadowEvery || this.shadowDirty && this.shFrames >= shInterval || this.shFrames >= shMaxAge) {
                this.shFrames = 0;
                this.shadowDirty = false;
-               this.sh.computeShadow(var55, var58, 0.0F, this.camX, this.camY, this.camZ);
+               this.sh.computeShadow(lx, ly, lz, this.camX, this.camY, this.camZ);
                this.renderShadowPass(var2, var3);
             }
          } else {
@@ -1204,9 +1209,13 @@ public final class Renderer {
          if (var29) {
             boolean var30 = this.shadersOn();
             if (var30) {
-               this.sh.setSun((float)(-Math.sin(this.sunAngle)), (float)Math.cos(this.sunAngle), 0.0F);
+               this.sh.setLight(this.sunAngle, true, this.g.opt);
             } else {
                this.sh.setSun(0.0F, 1.0F, 0.0F);
+               this.sh.moonF = 0.0F;
+               this.sh.moonUp = 0.0F;
+               this.sh.lightUp = this.sh.sunAtten;
+               this.sh.realSunY = 1.0F;
             }
 
             this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
@@ -1629,8 +1638,75 @@ public final class Renderer {
          }
       }
 
+      this.renderEntityShadowCasters();
       arrays(false);
       this.sh.endShadow(var1, var2, true);
+   }
+
+   /** Update 6.19: half-width of the simplified silhouette a mob casts into the shadow map. */
+   static float entityShadowWidth(int type) {
+      if (type == Mobs.CHICKEN || type == Mobs.PARROT) return 0.22F;
+      if (type == Mobs.SPIDER) return 0.65F;
+      if (type == Mobs.IRON_GOLEM || type == Mobs.ENDER_DRAGON) return 0.85F;
+      if (type == Mobs.END_CRYSTAL || type == Mobs.GHAST) return 0.55F;
+      return 0.42F;
+   }
+
+   /** Update 6.19: height of that silhouette. */
+   static float entityShadowHeight(int type) {
+      if (type == Mobs.CHICKEN || type == Mobs.PARROT || type == Mobs.SPIDER) return 0.8F;
+      if (type == Mobs.IRON_GOLEM) return 2.7F;
+      if (type == Mobs.ENDER_DRAGON || type == Mobs.GHAST) return 2.2F;
+      if (type == Mobs.END_CRYSTAL) return 1.2F;
+      return 1.8F;
+   }
+
+   private static void shadowQuad(float ax, float ay, float az, float bx, float by, float bz,
+                                  float cx, float cy, float cz, float dx, float dy, float dz) {
+      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
+      GL11.glVertex3f(ax, ay, az);
+      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
+      GL11.glVertex3f(bx, by, bz);
+      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
+      GL11.glVertex3f(cx, cy, cz);
+      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
+      GL11.glVertex3f(dx, dy, dz);
+   }
+
+   /**
+    * Update 6.19: mobs cast real shadows. A crossed box silhouette is drawn into the depth-only shadow map
+    * with the atlas alpha test switched off, so it costs five quads per nearby mob and no extra textures,
+    * programs or framebuffers. The same map is used by the sun and by the moon.
+    */
+   private void renderEntityShadowCasters() {
+      if (this.g.opt == null || !this.g.opt.entityShadows || this.g.mobs.list.isEmpty()) return;
+      int cap = 96;
+      double maxD2 = 48.0 * 48.0;
+      int n = 0;
+      arrays(false);
+      GL20.glUseProgram(this.sh.pDepth);
+      this.sh.setShadowSolid(1.0F);
+      GL11.glBegin(GL11.GL_QUADS);
+      for (Mobs.Mob m : this.g.mobs.list) {
+         if (m == null || m.dead || n >= cap) continue;
+         double ddx = m.x - this.camX;
+         double ddz = m.z - this.camZ;
+         if (ddx * ddx + ddz * ddz > maxD2) continue;
+         float x = (float)ddx;
+         float y = (float)(m.y - this.camY);
+         float z = (float)ddz;
+         float hw = entityShadowWidth(m.type);
+         float h = entityShadowHeight(m.type);
+         shadowQuad(x - hw, y, z - hw, x + hw, y, z - hw, x + hw, y + h, z - hw, x - hw, y + h, z - hw);
+         shadowQuad(x - hw, y, z + hw, x + hw, y, z + hw, x + hw, y + h, z + hw, x - hw, y + h, z + hw);
+         shadowQuad(x - hw, y, z - hw, x - hw, y, z + hw, x - hw, y + h, z + hw, x - hw, y + h, z - hw);
+         shadowQuad(x + hw, y, z - hw, x + hw, y, z + hw, x + hw, y + h, z + hw, x + hw, y + h, z - hw);
+         shadowQuad(x - hw, y + h, z - hw, x + hw, y + h, z - hw, x + hw, y + h, z + hw, x - hw, y + h, z + hw);
+         n++;
+         Perf.shadowDraws++;
+      }
+      GL11.glEnd();
+      this.sh.setShadowSolid(0.0F);
    }
 
    /** Update 3.12: the sky of the End - no sun, no moon: stars on the deep purple, turning very slowly. */

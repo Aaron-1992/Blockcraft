@@ -76,6 +76,40 @@ public final class Options {
    public int autosaveTicks = 1200;
    /** Update 6.18: write chunks on a low-priority thread instead of stopping the render thread. */
    public boolean asyncSaves = true;
+   /** Update 6.19: moonlight casts real terrain/entity shadows at night. */
+   public boolean moonShadows = true;
+   /** Update 6.19: strength of moonlight (0.15..1.0); lower is a darker night with softer shadows. */
+   public float moonBrightness = 0.45F;
+   /** Update 6.19: mobs (and the third-person player) cast shadows into the sun/moon shadow map. */
+   public boolean entityShadows = true;
+   /** Update 6.19: the first-person hand uses the shader's sun/moon/fog/dynamic lighting, not a flat lightmap colour. */
+   public boolean handLighting = true;
+   /** Update 6.19: how quickly distant LOD fades into the fog (0.4 sharp/fast .. 2.0 gentle/slow). */
+   public float lodFalloff = 1.0F;
+   /** Update 6.19: fraction of the LOD horizon where the fade starts. */
+   public float lodFogStart = 0.35F;
+   /** Update 6.19: fraction of the LOD horizon where LOD is fully hidden by fog. */
+   public float lodFogEnd = 1.0F;
+   /** Update 6.19: LOD quadtree detail bias: 0 coarse/fastest, 1 normal, 2 fine. */
+   public int lodDetail = 1;
+   /** Update 6.19: maximum LOD vertex buffers uploaded to the GPU in one frame (spike control). */
+   public int lodMaxUploads = 8;
+   /** Update 6.19: maximum new LOD builds requested in one frame (spike control). */
+   public int lodMaxRequests = 4;
+   /** Update 6.19: maximum LOD tiles drawn in one frame; 0 = unlimited. */
+   public int lodMaxDraws = 0;
+   /** Update 6.19: LOD build threads, 0 = automatic. */
+   public int lodWorkers = 0;
+   /** Update 6.19: new worlds get the bigger cave systems and taller mountains. Existing saves keep their generator. */
+   public boolean newTerrain = true;
+   /** Update 6.19: cave size multiplier for new worlds (1.0 = old caves). */
+   public float caveScale = 1.6F;
+   /** Update 6.19: how much of the underground is hollowed out in new worlds. */
+   public float caveDensity = 1.3F;
+   /** Update 6.19: mountain height multiplier for new worlds. */
+   public float mountainScale = 1.5F;
+   /** Update 6.19: ravine width/depth multiplier for new worlds. */
+   public float ravineScale = 1.3F;
    /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
    public String resourcePack = ResourcePacks.ID_DEFAULT;
    public float soundVolume = 1.0F;
@@ -91,6 +125,11 @@ public final class Options {
 
    /** Keeps a hand-edited or older options.txt value inside a slider's range. */
    public static int clamp(int value, int lo, int hi) {
+      return value < lo ? lo : value > hi ? hi : value;
+   }
+
+   /** Keeps a hand-edited float inside a slider's range. */
+   public static float clampf(float value, float lo, float hi) {
       return value < lo ? lo : value > hi ? hi : value;
    }
 
@@ -142,6 +181,23 @@ public final class Options {
                this.unloadBudget = clamp(Integer.parseInt(var2.getProperty("unloadBudget", "2")), 1, 32);
                this.autosaveTicks = clamp(Integer.parseInt(var2.getProperty("autosaveTicks", "1200")), 0, 7200);
                this.asyncSaves = Boolean.parseBoolean(var2.getProperty("asyncSaves", "true"));
+               this.moonShadows = Boolean.parseBoolean(var2.getProperty("moonShadows", "true"));
+               this.moonBrightness = clampf(Float.parseFloat(var2.getProperty("moonBrightness", "0.45")), 0.15F, 1.0F);
+               this.entityShadows = Boolean.parseBoolean(var2.getProperty("entityShadows", "true"));
+               this.handLighting = Boolean.parseBoolean(var2.getProperty("handLighting", "true"));
+               this.lodFalloff = clampf(Float.parseFloat(var2.getProperty("lodFalloff", "1.0")), 0.4F, 2.0F);
+               this.lodFogStart = clampf(Float.parseFloat(var2.getProperty("lodFogStart", "0.35")), 0.0F, 0.95F);
+               this.lodFogEnd = clampf(Float.parseFloat(var2.getProperty("lodFogEnd", "1.0")), this.lodFogStart + 0.05F, 1.0F);
+               this.lodDetail = clamp(Integer.parseInt(var2.getProperty("lodDetail", "1")), 0, 2);
+               this.lodMaxUploads = clamp(Integer.parseInt(var2.getProperty("lodMaxUploads", "8")), 1, 64);
+               this.lodMaxRequests = clamp(Integer.parseInt(var2.getProperty("lodMaxRequests", "4")), 1, 32);
+               this.lodMaxDraws = clamp(Integer.parseInt(var2.getProperty("lodMaxDraws", "0")), 0, 4096);
+               this.lodWorkers = clamp(Integer.parseInt(var2.getProperty("lodWorkers", "0")), 0, 4);
+               this.newTerrain = Boolean.parseBoolean(var2.getProperty("newTerrain", "true"));
+               this.caveScale = clampf(Float.parseFloat(var2.getProperty("caveScale", "1.6")), 0.6F, 3.0F);
+               this.caveDensity = clampf(Float.parseFloat(var2.getProperty("caveDensity", "1.3")), 0.4F, 2.5F);
+               this.mountainScale = clampf(Float.parseFloat(var2.getProperty("mountainScale", "1.5")), 0.5F, 2.5F);
+               this.ravineScale = clampf(Float.parseFloat(var2.getProperty("ravineScale", "1.3")), 0.4F, 2.5F);
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
@@ -207,6 +263,23 @@ public final class Options {
       var1.setProperty("unloadBudget", this.unloadBudget + "");
       var1.setProperty("autosaveTicks", this.autosaveTicks + "");
       var1.setProperty("asyncSaves", this.asyncSaves + "");
+      var1.setProperty("moonShadows", this.moonShadows + "");
+      var1.setProperty("moonBrightness", this.moonBrightness + "");
+      var1.setProperty("entityShadows", this.entityShadows + "");
+      var1.setProperty("handLighting", this.handLighting + "");
+      var1.setProperty("lodFalloff", this.lodFalloff + "");
+      var1.setProperty("lodFogStart", this.lodFogStart + "");
+      var1.setProperty("lodFogEnd", this.lodFogEnd + "");
+      var1.setProperty("lodDetail", this.lodDetail + "");
+      var1.setProperty("lodMaxUploads", this.lodMaxUploads + "");
+      var1.setProperty("lodMaxRequests", this.lodMaxRequests + "");
+      var1.setProperty("lodMaxDraws", this.lodMaxDraws + "");
+      var1.setProperty("lodWorkers", this.lodWorkers + "");
+      var1.setProperty("newTerrain", this.newTerrain + "");
+      var1.setProperty("caveScale", this.caveScale + "");
+      var1.setProperty("caveDensity", this.caveDensity + "");
+      var1.setProperty("mountainScale", this.mountainScale + "");
+      var1.setProperty("ravineScale", this.ravineScale + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");
