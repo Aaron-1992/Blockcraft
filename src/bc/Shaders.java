@@ -134,9 +134,21 @@ public final class Shaders {
    int ch;
    public final float[] dynL = new float[48];
    public final float[] dynC = new float[48];
+   /** The largest shadow map the driver may be asked for. Update 6.18: the size actually in use is {@link #shadowSize}. */
    public static final int SM = 2048;
    public static final float HALF = 84.0F;
    public static final float ZR = 400.0F;
+   int shadowSize = SM;
+   /** Update 6.18: divisor of the window size for the volumetric cloud target (1 = full, 2 = half, 4 = quarter). */
+   int cloudDiv = 2;
+   /** Update 6.18: raymarch samples in the cloud shader (16..64). */
+   int cloudMarchSteps = 48;
+   /** Update 6.18: 0 = no bloom, 1 = one blur round, 2 = the full two rounds. */
+   int bloomLevel = 2;
+   /** Update 6.18: how many frames may pass before a dirty shadow map / cloud-shadow map is rebuilt. */
+   int shadowInterval = 8;
+   /** Update 6.18: set when a setting changed the size of a render target; beginScene() rebuilds it once. */
+   boolean resizeQueued;
    int shadowFbo;
    int shadowTex;
    int sceneFbo;
@@ -400,32 +412,62 @@ public final class Shaders {
             }
          }
 
-         this.shadowTex = GL11.glGenTextures();
-         GL11.glBindTexture(3553, this.shadowTex);
-         GL11.glTexImage2D(3553, 0, 33190, 2048, 2048, 0, 6402, 5126, (ByteBuffer)null);
-         GL11.glTexParameteri(3553, 10241, 9728);
-         GL11.glTexParameteri(3553, 10240, 9728);
-         GL11.glTexParameteri(3553, 10242, 33069);
-         GL11.glTexParameteri(3553, 10243, 33069);
-         GL11.glTexParameterfv(3553, 4100, new float[]{1.0F, 1.0F, 1.0F, 1.0F});
-         this.shadowFbo = GL30.glGenFramebuffers();
-         GL30.glBindFramebuffer(36160, this.shadowFbo);
-         GL30.glFramebufferTexture2D(36160, 36096, 3553, this.shadowTex, 0);
-         GL11.glDrawBuffer(0);
-         GL11.glReadBuffer(0);
-         int var1 = GL30.glCheckFramebufferStatus(36160);
-         GL30.glBindFramebuffer(36160, 0);
-         GL11.glDrawBuffer(1029);
-         GL11.glReadBuffer(1029);
-         if (var1 != 36053) {
-            throw new RuntimeException("shadow fbo incomplete " + var1);
-         }
-
+         this.createShadowTarget();
          this.ok = true;
       } catch (Throwable var3) {
          this.ok = false;
          this.error = String.valueOf(var3.getMessage());
          System.err.println("Shaders disabled: " + this.error);
+      }
+   }
+
+   /** Creates (or recreates) the depth-only shadow framebuffer at {@link #shadowSize} squared. */
+   private void createShadowTarget() {
+      if (this.shadowTex != 0) {
+         GL11.glDeleteTextures(this.shadowTex);
+         GL30.glDeleteFramebuffers(this.shadowFbo);
+         this.shadowTex = 0;
+         this.shadowFbo = 0;
+      }
+      int size = Math.max(256, Math.min(SM, this.shadowSize));
+      this.shadowSize = size;
+      this.shadowTex = GL11.glGenTextures();
+      GL11.glBindTexture(3553, this.shadowTex);
+      GL11.glTexImage2D(3553, 0, 33190, size, size, 0, 6402, 5126, (ByteBuffer)null);
+      GL11.glTexParameteri(3553, 10241, 9728);
+      GL11.glTexParameteri(3553, 10240, 9728);
+      GL11.glTexParameteri(3553, 10242, 33069);
+      GL11.glTexParameteri(3553, 10243, 33069);
+      GL11.glTexParameterfv(3553, 4100, new float[]{1.0F, 1.0F, 1.0F, 1.0F});
+      this.shadowFbo = GL30.glGenFramebuffers();
+      GL30.glBindFramebuffer(36160, this.shadowFbo);
+      GL30.glFramebufferTexture2D(36160, 36096, 3553, this.shadowTex, 0);
+      GL11.glDrawBuffer(0);
+      GL11.glReadBuffer(0);
+      int status = GL30.glCheckFramebufferStatus(36160);
+      GL30.glBindFramebuffer(36160, 0);
+      GL11.glDrawBuffer(1029);
+      GL11.glReadBuffer(1029);
+      if (status != 36053) {
+         throw new RuntimeException("shadow fbo incomplete " + status);
+      }
+   }
+
+   /** Update 6.18: the Advanced Video shadow-map setting. Called on the render thread while GL is current. */
+   void setShadowSize(int size) {
+      int clamped = Math.max(256, Math.min(SM, size));
+      if (clamped == this.shadowSize && this.shadowFbo != 0) return;
+      this.shadowSize = clamped;
+      this.createShadowTarget();
+      this.mapValid = false;
+   }
+
+   /** Update 6.18: the Advanced Video cloud-resolution setting; the targets are rebuilt on the next frame. */
+   void setCloudDiv(int div) {
+      int clamped = Math.max(1, Math.min(4, div));
+      if (clamped != this.cloudDiv) {
+         this.cloudDiv = clamped;
+         this.resizeQueued = true;
       }
    }
 
@@ -482,7 +524,8 @@ public final class Shaders {
    }
 
    void resize(int var1, int var2) {
-      if (var1 != this.fw || var2 != this.fh || this.sceneFbo == 0) {
+      if (this.resizeQueued || var1 != this.fw || var2 != this.fh || this.sceneFbo == 0) {
+         this.resizeQueued = false;
          if (this.sceneFbo != 0) {
             GL30.glDeleteFramebuffers(this.sceneFbo);
             GL30.glDeleteFramebuffers(this.bloomFbo0);
@@ -574,8 +617,9 @@ public final class Shaders {
             this.aoFbo2 = this.fbo(this.aoTex2);
          }
 
-         this.cw = var4;
-         this.ch = var5;
+         // Update 6.18: the cloud/ray targets follow the Advanced Video cloud resolution (default: half).
+         this.cw = Math.max(1, var1 / this.cloudDiv);
+         this.ch = Math.max(1, var2 / this.cloudDiv);
          this.rayTex = this.tex2d(this.cw, this.ch);
          this.rayFbo = this.fbo(this.rayTex);
          this.cloudTex = this.tex2d(this.cw, this.ch);
@@ -713,7 +757,7 @@ public final class Shaders {
 
    public void beginShadow() {
       GL30.glBindFramebuffer(36160, this.shadowFbo);
-      GL11.glViewport(0, 0, 2048, 2048);
+      GL11.glViewport(0, 0, this.shadowSize, this.shadowSize);
       GL11.glEnable(2929);
       GL11.glDepthMask(true);
       GL11.glDepthFunc(515);
@@ -1180,7 +1224,7 @@ public final class Shaders {
          GL11.glEnable(3553);
          GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
          // Update 3.19: with the glow on (Options.fx >= 1) the alpha channel of the scene marks the light sources; the glow is blurred at three sizes
-         boolean glow = this.glowOn && this.fxOk && this.bloomFbo2 != 0;
+         boolean glow = this.glowOn && this.bloomLevel > 0 && this.fxOk && this.bloomFbo2 != 0;
          GL11.glColorMask(true, true, true, true);
          GL30.glBindFramebuffer(36160, this.bloomFbo0);
          GL11.glViewport(0, 0, var4, var5);
@@ -1190,16 +1234,17 @@ public final class Shaders {
          this.u1f(this.pBright, "emisGain", this.hdrGlow ? 5.0F : 1.0F);
          GL11.glBindTexture(3553, this.sceneTex);
          this.quad();
-         this.blurLevel(this.bloomFbo0, this.bloomTex0, this.bloomFbo1, this.bloomTex1, var4, var5, 2);
+         int rounds = this.bloomLevel >= 2 ? 2 : 1;
+         this.blurLevel(this.bloomFbo0, this.bloomTex0, this.bloomFbo1, this.bloomTex1, var4, var5, rounds);
          if (glow) {
             int q4 = Math.max(1, var4 / 2);
             int q5 = Math.max(1, var5 / 2);
             int e4 = Math.max(1, var4 / 4);
             int e5 = Math.max(1, var5 / 4);
             this.shrink(this.bloomFbo2, this.bloomTex0, q4, q5);
-            this.blurLevel(this.bloomFbo2, this.bloomTex2, this.bloomFbo3, this.bloomTex3, q4, q5, 2);
+            this.blurLevel(this.bloomFbo2, this.bloomTex2, this.bloomFbo3, this.bloomTex3, q4, q5, rounds);
             this.shrink(this.bloomFbo4, this.bloomTex2, e4, e5);
-            this.blurLevel(this.bloomFbo4, this.bloomTex4, this.bloomFbo5, this.bloomTex5, e4, e5, 2);
+            this.blurLevel(this.bloomFbo4, this.bloomTex4, this.bloomFbo5, this.bloomTex5, e4, e5, rounds);
          }
 
          GL30.glBindFramebuffer(36160, 0);
@@ -1492,7 +1537,7 @@ public final class Shaders {
       this.csAmt = Math.max(0.0F, Math.min(1.0F, (sy - 0.15F) / 0.25F)) * 0.92F;
       boolean recentre = !this.csHave || Math.abs(camX - this.csCx) > 64.0 || Math.abs(camZ - this.csCz) > 64.0;
       this.csFrame++;
-      if (!recentre && this.csFrame % 8 != 0) {
+      if (!recentre && this.csFrame % Math.max(1, this.shadowInterval) != 0) {
          return;
       }
 
@@ -1582,6 +1627,7 @@ public final class Shaders {
          GL20.glUseProgram(this.pCloud);
          this.u1i(this.pCloud, "noiseTex", 0);
          this.u1i(this.pCloud, "depthTex", 1);
+         this.u1i(this.pCloud, "steps", this.cloudMarchSteps);
          GL20.glUniformMatrix4fv(this.loc(this.pCloud, "invView"), false, this.invViewM);
          GL20.glUniform2f(this.loc(this.pCloud, "projScale"), var1[0], var1[5]);
          GL20.glUniform3f(this.loc(this.pCloud, "camPos"), (float)mod9000(var3), (float)var5, (float)mod9000(var7));

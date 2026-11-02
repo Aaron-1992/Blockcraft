@@ -12,7 +12,77 @@ public final class Panorama {
    static final double TURN = 0.11;
    static final double PITCH = 7.0;
 
+   /**
+    * Update 6.18: selectable title-screen landscapes. The Classic preset keeps the original seed, scoring,
+    * turning speed and sky exactly; the others find their own best place in a different generated world.
+    * bias: 0 = none, 1 = prefer warm shallow oceans (reef), 2 = prefer high snowy relief (peaks).
+    */
+   static final class Preset {
+      final String name;
+      final long seed;
+      final int type;
+      final boolean aquatic;
+      final double turn, pitch;
+      final long skyShift;
+      final int bias;
+      final int index;
+
+      Preset(int index, String name, long seed, int type, boolean aquatic, double turn, double pitch, long skyShift, int bias) {
+         this.index = index;
+         this.name = name;
+         this.seed = seed;
+         this.type = type;
+         this.aquatic = aquatic;
+         this.turn = turn;
+         this.pitch = pitch;
+         this.skyShift = skyShift;
+         this.bias = bias;
+      }
+
+      WorldSettings settings() {
+         WorldSettings ws = new WorldSettings();
+         ws.type = this.type;
+         ws.aquatic = this.aquatic;
+         return ws;
+      }
+   }
+
+   static final Preset[] PRESETS = {
+      new Preset(0, "Classic", SEED, WorldSettings.DEFAULT, true, TURN, PITCH, 0L, 0),
+      new Preset(1, "Coral Coast", 20261018L, WorldSettings.DEFAULT, true, 0.08, 4.5, 1100L, 1),
+      new Preset(2, "Snowy Peaks", 90210L, WorldSettings.AMPLIFIED, true, 0.14, 9.0, -1300L, 2)
+   };
+   static final int CYCLE = PRESETS.length;
+   static final int COUNT = PRESETS.length + 1;
+   static final java.util.concurrent.ConcurrentHashMap<Integer, double[]> VISTA_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+   static int cycleIndex;
+
+   static String label(int id) {
+      int i = Options.clamp(id, 0, COUNT - 1);
+      return i == CYCLE ? "Cycle" : PRESETS[i].name;
+   }
+
+   static Preset resolve(Game g) {
+      int id = g.opt == null ? 0 : Options.clamp(g.opt.panorama, 0, COUNT - 1);
+      if (id == CYCLE) {
+         cycleIndex++;
+         return PRESETS[Math.floorMod(cycleIndex, PRESETS.length)];
+      }
+      return PRESETS[id];
+   }
+
+   /** Change the landscape now (only while a panorama is actually running), and remember the choice. */
+   static void switchTo(Game g) {
+      if (g.opt != null) g.opt.save();
+      if (g.pano == null) return; // a real world is open: the new choice applies at the next title screen
+      if (g.opt != null && g.opt.panorama == CYCLE) cycleIndex++;
+      stop(g);
+      start(g);
+   }
+
    final Game g;
+   /** Update 6.18: which landscape this running panorama shows. */
+   Preset preset = PRESETS[0];
    World world;
    Player cam;
    Gen gen;
@@ -37,18 +107,20 @@ public final class Panorama {
          return;
       }
 
+      Preset pr = resolve(g);
       Panorama p = new Panorama(g);
+      p.preset = pr;
       g.pano = p;
-      double[] cached = cachedDefaultVista;
+      double[] cached = VISTA_CACHE.get(pr.index);
       if (cached != null) {
          p.vista = cached;
          return;
       }
       Thread t = new Thread(() -> {
-         WorldSettings ws = new WorldSettings();
-         p.gen = Dim.makeGen(Dim.OVERWORLD, SEED, ws);
-         double[] picked = pick(p.gen);
-         cachedDefaultVista = picked;
+         p.gen = Dim.makeGen(Dim.OVERWORLD, pr.seed, pr.settings());
+         double[] picked = pick(p.gen, pr);
+         VISTA_CACHE.put(pr.index, picked);
+         if (pr.index == 0) cachedDefaultVista = picked;
          p.vista = picked;
       }, "panorama-vista");
       t.setDaemon(true);
@@ -84,13 +156,12 @@ public final class Panorama {
    void install() {
       double[] v = this.vista;
       this.spot = v;
-      WorldSettings ws = new WorldSettings();
-      World w = new World(SEED, null, Dim.OVERWORLD, ws);
+      World w = new World(this.preset.seed, null, Dim.OVERWORLD, this.preset.settings());
       w.saveEnabled = false;
       w.weather.enabled = false;
       w.disasters.enabled = false;
       w.game = this.g;
-      w.dayTime = 3000L;
+      w.dayTime = 3000L + this.preset.skyShift;
       w.weather.startFair();
       w.unloadHook = this.g.rend::onUnload;
       this.world = w;
@@ -138,8 +209,8 @@ public final class Panorama {
       this.g.partial = (float)this.acc;
       double t = this.ticks + this.acc;
       Player c = this.cam;
-      c.yaw = (float)(this.yaw0 + t * TURN);
-      c.pitch = (float)(PITCH + 3.0 * Math.sin(t / 310.0));
+      c.yaw = (float)(this.yaw0 + t * this.preset.turn);
+      c.pitch = (float)(this.preset.pitch + 3.0 * Math.sin(t / 310.0));
       double bob = 1.4 * Math.sin(t / 230.0);
       c.setPos(this.spot[1], this.spot[2] - c.eye + bob, this.spot[3]);
       // fade in once the land around is there and has been drawn
@@ -182,7 +253,9 @@ public final class Panorama {
 
    /** The time of day the sky is drawn for: a slow morning that never turns into night. */
    long skyTime() {
-      return 3200L + (long)(1800.0 * Math.sin(this.ticks / 4200.0));
+      long base = 3200L + (long)(1800.0 * Math.sin(this.ticks / 4200.0));
+      long shifted = base + (this.preset == null ? 0L : this.preset.skyShift);
+      return Math.max(1400L, Math.min(5000L, shifted));
    }
 
    // ------------------------------------------------------------------ finding a place
@@ -194,6 +267,16 @@ public final class Panorama {
          return new double[]{0, 0.5, gh + 20, 0.5, 0};
       }
 
+      return all.get(0);
+   }
+
+   /** Update 6.18: pick a place for one of the new landscape presets. */
+   static double[] pick(Gen gen, Preset p) {
+      java.util.List<double[]> all = candidates(gen, p);
+      if (all.isEmpty()) {
+         int gh = gen.column(0, 0).h;
+         return new double[]{0, 0.5, gh + 20, 0.5, 0};
+      }
       return all.get(0);
    }
 
@@ -211,6 +294,47 @@ public final class Panorama {
 
       all.sort((p, q) -> Double.compare(q[0], p[0]));
       return all;
+   }
+
+   /** The same search, with the preset's small bias added to each score. */
+   static java.util.List<double[]> candidates(Gen gen, Preset pr) {
+      java.util.ArrayList<double[]> all = new java.util.ArrayList<>();
+      for (int gz = -1600; gz <= 1600; gz += 160) {
+         for (int gx = -1600; gx <= 1600; gx += 160) {
+            double[] v = score(gen, gx, gz, pr);
+            if (v != null) {
+               all.add(v);
+            }
+         }
+      }
+      all.sort((p, q) -> Double.compare(q[0], p[0]));
+      return all;
+   }
+
+   static double[] score(Gen gen, int x, int z, Preset pr) {
+      double[] v = score(gen, x, z);
+      if (v != null && pr != null && pr.bias != 0) {
+         v[0] += biasScore(gen, x, z, pr.bias);
+      }
+      return v;
+   }
+
+   /** A cheap extra preference over 25 nearby columns; the Classic preset never calls this. */
+   private static double biasScore(Gen gen, int x, int z, int bias) {
+      int ocean = 0, warm = 0, high = 0, snow = 0;
+      for (int dz = -2; dz <= 2; dz++) {
+         for (int dx = -2; dx <= 2; dx++) {
+            Gen.Col c = gen.column(x + dx * 48, z + dz * 48);
+            if (Biomes.ocean(c.biome)) ocean++;
+            if (c.biome == Biomes.WARM_OCEAN || c.biome == Biomes.LUKEWARM_OCEAN || c.biome == Biomes.DEEP_LUKEWARM_OCEAN) warm++;
+            if (c.h > 140) high++;
+            if (Biomes.snowy(c.biome)) snow++;
+         }
+      }
+      if (bias == 1) {
+         return 1.1 * warm / 25.0 + 0.7 * ocean / 25.0;
+      }
+      return 1.3 * high / 25.0 + 0.7 * snow / 25.0;
    }
 
    static double bell(double x, double mu, double sigma) {

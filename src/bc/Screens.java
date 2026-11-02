@@ -2,8 +2,11 @@ package bc;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Random;
+import java.util.function.Consumer;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -407,6 +410,13 @@ final class Screens {
          "Villages, strongholds, ruins, temples and the other buildings that generate on their own. The Nether and the End keep theirs.", () -> ws.structures = !ws.structures);
       ui.toggle("Bonus Chest", ws.bonusChest, x0, ry + 48.0F, colW, 20.0F, "A chest with a few starting supplies next to where you appear.", () -> ws.bonusChest = !ws.bonusChest);
       float leftEnd = ry + 70.0F;
+      // Update 6.18: the aquatic generator (and therefore the five new ocean biomes) is a visible choice here.
+      if (gui.h >= 300.0F) {
+         ui.toggle("New Oceans", ws.aquatic, x0, ry + 72.0F, colW, 20.0F,
+            "ON: the full 33-biome aquatic generator with warm, cold, lukewarm and frozen deep oceans, coral reefs and kelp. OFF: the pre-3.13 generator. The preview changes with this switch.",
+            () -> ws.aquatic = !ws.aquatic);
+         leftEnd = ry + 94.0F;
+      }
 
       // ---- right column: the preview, world type, preset
       float pv = 64.0F + shift;
@@ -417,8 +427,20 @@ final class Screens {
       ui.preview.update(seedValue(g), ws);
       gui.rect(x1 - 1, y - 1, colW + 2, pv + 2, 0xFF000000);
       gui.image(ui.preview.img, x1, y, colW, pv);
+      // Update 6.18: a colour key inside the map. Every biome that appears in this preview has a swatch, so the new
+      // ocean biomes are visible on the Create New World screen instead of being black squares.
+      int[] legend = ui.preview.topBiomes(8);
+      for (int i = 0; i < legend.length; i++) {
+         float sx = x1 + 3.0F + i * 10.0F;
+         float sy = y + pv - 10.0F;
+         gui.rect(sx, sy, 9.0F, 8.0F, 0xFF000000);
+         gui.rect(sx + 1.0F, sy + 1.0F, 7.0F, 6.0F, 0xFF000000 | WorldPreview.color(legend[i]));
+      }
       if (ui.over(x1, y, colW, pv)) {
-         ui.hint = g.seedField.trim().isEmpty() ? "A map of the world you would get. Click it to roll another random world. The red dot is where you start." : "A map of the world this seed makes. The red dot is where you start.";
+         ui.hint = (g.seedField.trim().isEmpty()
+            ? "A map of the world you would get. Click it to roll another random world. The red dot is where you start."
+            : "A map of the world this seed makes. The red dot is where you start.")
+            + " Biomes in view: " + ui.preview.legendText(8) + " (" + ui.preview.distinctBiomes() + " of " + Biomes.N + ").";
       }
 
       if (g.seedField.trim().isEmpty()) {
@@ -444,7 +466,17 @@ final class Screens {
 
       float rightEnd = ui.paragraph(WorldSettings.TYPE_INFO[ws.type], x1, iy, colW, Ui.DIM, 3);
       float recY = Math.max(leftEnd, rightEnd) + 2.0F;
-      gui.text("Large Biomes recommended", x0, recY, 0xFFE8D068, true);
+      // Update 6.18: a plain list of what this world actually contains. The old "Large Biomes recommended" line told
+      // you nothing about the 28..32 biomes that were missing from the preview colour table.
+      String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
+         + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
+         + (ws.structures ? "  -  villages, temples & ruins" : "")
+         + (ws.bonusChest ? "  -  bonus chest" : "");
+      gui.text(Game.clipText(content, colW * 2 + gap), x0, recY, 0xFFE8D068, true);
+      if (gui.h >= 360.0F) {
+         ui.paragraph("Colour key: " + ui.preview.legendText(8) + ". Large Biomes makes every region four times as big.",
+            x0, recY + 12.0F, colW * 2 + gap, Ui.FAINT, 2);
+      }
       float seedInfoY = recY + 12.0F;
       String sd = g.seedField.trim().isEmpty() ? "Random seed: " + ui.randomSeed : "Seed: " + seedValue(g);
       if (seedInfoY + 10.0F < gui.h - 56.0F) {
@@ -464,7 +496,22 @@ final class Screens {
 
    // =================================================================== options
    static final String[] TABS = {"Video", "Graphics", "Gameplay", "Controls"};
+   /** Update 6.18: turning on "Debug Video" reveals the fifth tab with every render, shader and performance setting. */
+   static final String[] TABS_DEBUG = {"Video", "Graphics", "Gameplay", "Controls", "Advanced"};
    static final int[] LOD_STEPS = {0, 32, 64, 128, 256, 384, 512};
+   static final int[] SHADOW_RES = {512, 1024, 2048};
+   static final int[] CLOUD_RES = {1, 2, 4};
+   static final String[] CLOUD_RES_NAME = {"Full", "Half", "Quarter"};
+   static final int[] CLOUD_STEPS = {16, 32, 48, 64};
+   static final String[] BLOOM_NAME = {"OFF", "Low", "Full"};
+   static final int[] FPS_FINE = {0, 30, 60, 75, 90, 120, 144, 165, 240, 360, 500, 1000};
+   static final int[] AUTOSAVE = {0, 600, 1200, 3600, 7200};
+   /** Number of rows in the Advanced tab (the list scrolls). */
+   static final int ADV_ROWS = 28;
+
+   static String[] tabs(Options o) {
+      return o.debugVideo ? TABS_DEBUG : TABS;
+   }
    static final String[][] KEYS = {
       {"W A S D", "Walk"}, {"Space", "Jump / swim"}, {"Space x2", "Fly (Creative)"}, {"Shift", "Sneak"}, {"Ctrl", "Sprint"}, {"Mouse L", "Break / attack"},
       {"Mouse R", "Place / use"}, {"1 - 9", "Choose item"}, {"E", "Inventory"}, {"Q", "Drop item"}, {"T", "Chat"}, {"/", "Command"}, {"L", "Advancements"},
@@ -476,6 +523,7 @@ final class Screens {
       Gui gui = g.gui;
       Options o = g.opt;
       ui.begin();
+      g.applyVideoTuning();
       ui.backdrop(0.5F);
       float cx = gui.w / 2.0F;
       float pw = Math.min(330.0F, gui.w - 16.0F);
@@ -483,7 +531,7 @@ final class Screens {
       float x0 = cx - pw / 2.0F;
       float x1 = x0 + colW + 6.0F;
       ui.title("Options", 7.0F);
-      ui.tabs(TABS, ui.optTab, x0, 20.0F, pw, 16.0F, i -> {
+      ui.tabs(tabs(o), ui.optTab, x0, 20.0F, pw, 16.0F, i -> {
          ui.optTab = i;
          ui.optScroll[0] = 0.0F;
       });
@@ -504,8 +552,14 @@ final class Screens {
          case 2:
             rows = 6;
             break;
-         default:
+         case 4:
+            rows = ADV_ROWS;
+            break;
+         case 3:
             rows = (KEYS.length + 1) / 2;
+            break;
+         default:
+            rows = 5;
       }
 
       float content = ui.optTab == 3 ? rows * 11.0F + 4.0F : rows * row;
@@ -521,16 +575,24 @@ final class Screens {
          case 2:
             gameTab(g, o, x0, x1, colW, oy, row, top, viewH);
             break;
-         default:
+         case 3:
             controlsTab(g, x0, x1, oy);
+            break;
+         case 4:
+            advancedTab(g, o, x0, x1, colW, oy, row, top, viewH);
+            break;
+         default:
+            videoTab(g, o, x0, x1, colW, oy, row, top, viewH);
       }
 
       ui.endScroll(x0, top, pw, viewH, content);
       String[] about = {
          "Resolution, distance and the window.", "Looks: shadows, water, clouds, colours, glow.", "How the game plays and how the mouse feels.",
-         "The keys of the game. They cannot be changed yet."
+         "The keys of the game. They cannot be changed yet.",
+         "Advanced Video: every render, shader and performance setting in one place. Changes are saved with Done."
       };
-      ui.drawHint(x0, hintY, pw, hintH, about[ui.optTab] + (ui.optTab == 3 ? "" : "  Point at a setting to see what it does."));
+      String fallback = about[Math.min(ui.optTab, about.length - 1)];
+      ui.drawHint(x0, hintY, pw, hintH, fallback + (ui.optTab == 3 ? "" : "  Point at a setting to see what it does."));
       ui.button("Done", cx - 100.0F, doneY, 200.0F, 20.0F, true, null, () -> {
          g.opt.save();
          g.setScreen(g.optionsReturn);
@@ -607,6 +669,28 @@ final class Screens {
                o.maxFps = FPS_STEPS[(at + 1) % FPS_STEPS.length];
             });
       }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("Debug Video", o.debugVideo, x0, oy, colW, 20.0F,
+            "Unlocks the Advanced tab: shadow-map size, cloud quality, bloom, particle cap, chunk cache, worker threads, timed saves and every other render setting. Saved with Done.",
+            () -> {
+               o.debugVideo = !o.debugVideo;
+               if (!o.debugVideo && ui.optTab >= TABS.length) {
+                  ui.optTab = 0;
+                  ui.optScroll[0] = 0.0F;
+               }
+               g.applyVideoTuning();
+               o.save();
+            });
+         ui.button("Panorama: " + Panorama.label(o.panorama), x1, oy, colW, 20.0F, true,
+            "The landscape behind the title screen. Coral Coast shows the new ocean biomes, Snowy Peaks an amplified mountain skyline.",
+            () -> {
+               o.panorama = (o.panorama + 1) % Panorama.COUNT;
+               o.save();
+               Panorama.switchTo(g);
+            });
+      }
    }
 
    static final int[] FPS_STEPS = {0, 30, 60, 90, 120, 144, 165, 240};
@@ -664,6 +748,218 @@ final class Screens {
                g.remeshAll();
             });
       }
+   }
+
+   /**
+    * Update 6.18: the Advanced Video tab. Every video/render/shader/performance setting the game has lives here,
+    * including the ones that used to be hardcoded (shadow map size, cloud raymarch steps, worker counts, cache
+    * budget, autosave interval). The rows scroll; the widgets are only drawn (and clickable) while visible.
+    */
+   static void advancedTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
+      Ui ui = g.ui;
+      float full = colW * 2.0F + 6.0F;
+      List<Consumer<Float>> cells = new ArrayList<>();
+      Consumer<Float> header = y -> {
+         ui.label("\u00a7e----------------------------", x0, y + 3.0F, Ui.GOLD);
+      };
+      // 0: section title
+      cells.add(y -> ui.label("\u00a7eDISPLAY  -  every standard video setting", x0, y + 3.0F, Ui.GOLD));
+      // 1: render distance / FOV
+      cells.add(y -> {
+         ui.slider("Render Distance: " + o.renderDistance, x0, y, colW, 20.0F, (o.renderDistance - 2) / 30.0F,
+            "Chunks drawn in full detail. The Advanced tab allows the full 2..32 range.", v -> o.renderDistance = 2 + Math.round(v * 30.0F));
+         ui.slider("FOV: " + o.fov, x1, y, colW, 20.0F, (o.fov - 10) / 140.0F, "Field of view in degrees (10..150 here).", v -> o.fov = 10 + Math.round(v * 140.0F));
+      });
+      // 2: LOD distance / brightness
+      cells.add(y -> {
+         ui.slider("LOD Distance: " + (o.lodDistance == 0 ? "OFF" : o.lodDistance), x0, y, colW, 20.0F, o.lodDistance / 1024.0F,
+            "Simplified land beyond the render distance; 0..1024 blocks in 32-block steps.", v -> o.lodDistance = Math.round(v * 32.0F) * 32);
+         ui.slider("Brightness: " + (int)(o.gamma * 100.0F) + "%", x1, y, colW, 20.0F, o.gamma, "Lifts the dark. Full 0..100% range.", v -> o.gamma = v);
+      });
+      // 3: GUI scale / VSync
+      cells.add(y -> {
+         ui.button("GUI Scale: " + (o.guiScale == 0 ? "Auto" : o.guiScale + ""), x0, y, colW, 20.0F, true,
+            "Menu size. The Advanced tab steps through Auto and 1..8.", () -> o.guiScale = (Options.clamp(o.guiScale, 0, 8) + 1) % 9);
+         ui.toggle("VSync", o.vsync, x1, y, colW, 20.0F, "Wait for the screen's refresh.", () -> {
+            o.vsync = !o.vsync;
+            if (g.window != 0L) GLFW.glfwSwapInterval(o.vsync ? 1 : 0);
+         });
+      });
+      // 4: fullscreen / fast GPU
+      cells.add(y -> {
+         ui.toggle("Fullscreen", o.fullscreen, x0, y, colW, 20.0F, "Use the whole screen (F11).", () -> g.setFullscreen(!o.fullscreen));
+         ui.toggle("Fast GPU", o.gpuHigh, x1, y, colW, 20.0F,
+            "Ask Windows for the real graphics card instead of the processor's iGPU. Drawing with now: " + GpuPref.shortName(g.gpuName), () -> {
+               o.gpuHigh = !o.gpuHigh;
+               GpuPref.apply(o);
+            });
+      });
+      // 5: render scale / max FPS
+      cells.add(y -> {
+         ui.slider("Render Scale: " + o.renderScale + "%", x0, y, colW, 20.0F, (o.renderScale - 25) / 75.0F,
+            "Draw the 3D world at 25..100% of the window. Needs Shaders ON.", v -> o.renderScale = 25 + Math.round(v * 15.0F) * 5);
+         int fpsIdx = 0;
+         for (int i = 0; i < FPS_FINE.length; i++) if (FPS_FINE[i] == o.maxFps) fpsIdx = i;
+         final int at = fpsIdx;
+         ui.slider("Max FPS: " + (o.maxFps == 0 ? "Unlimited" : o.maxFps + ""), x1, y, colW, 20.0F, at / (float)(FPS_FINE.length - 1),
+            "Frame rate limit, 0..1000 in fine steps.", v -> o.maxFps = FPS_FINE[Math.round(v * (FPS_FINE.length - 1))]);
+      });
+      // 6: shaders / smooth lighting
+      cells.add(y -> {
+         ui.toggle("Shaders", o.shaders, x0, y, colW, 20.0F, "The shader pack: shadows, glow, water, clouds.", () -> o.shaders = !o.shaders);
+         ui.toggle("Smooth Lighting", o.smooth, x1, y, colW, 20.0F, "Soft block-corner shading.", () -> {
+            o.smooth = !o.smooth;
+            g.remeshAll();
+         });
+      });
+      // 7: water quality / look
+      cells.add(y -> {
+         ui.button("Water Quality: " + (o.waterQ >= 2 ? "Fancy" : "Simple"), x0, y, colW, 20.0F, true,
+            "Fancy mirrors the land in water; Simple is cheaper.", () -> o.waterQ = o.waterQ >= 2 ? 1 : 2);
+         ui.button("Look: " + Look.label(o.look), x1, y, colW, 20.0F, true, Look.info(o.look), () -> o.look = Look.next(o.look));
+      });
+      // 8: clouds / leaves
+      cells.add(y -> {
+         ui.toggle("Clouds", o.clouds, x0, y, colW, 20.0F, "Draw clouds in the sky.", () -> o.clouds = !o.clouds);
+         ui.button("Leaves: " + new String[]{"Fancy", "Smart", "Fast"}[Options.clamp(o.leaves, 0, 2)], x1, y, colW, 20.0F, true,
+            "Leaf-face detail.", () -> {
+               o.leaves = (o.leaves + 1) % 3;
+               Mesher.leafMode = o.leaves;
+               g.remeshAll();
+            });
+      });
+      // 9: weather / effects
+      cells.add(y -> {
+         ui.toggle("Weather", o.weather, x0, y, colW, 20.0F, "Rain, snow and thunderstorms.", () -> o.weather = !o.weather);
+         ui.button("Effects: " + new String[]{"LOW", "MEDIUM", "HIGH"}[Options.clamp(o.fx, 0, 2)], x1, y, colW, 20.0F, true,
+            "Shader effect level: glow, cloud shadows, wet ground, contact shadows.", () -> o.fx = (o.fx + 1) % 3);
+      });
+      // 10: bushy leaves / animated mipmaps
+      cells.add(y -> {
+         ui.toggle("Bushy Leaves", o.bushyLeaves, x0, y, colW, 20.0F, "3D foliage fronds on tree canopies.", () -> {
+            o.bushyLeaves = !o.bushyLeaves;
+            Mesher.bushyLeaves = o.bushyLeaves;
+            g.remeshAll();
+         });
+         ui.toggle("Animated Mipmaps", o.animatedMips, x1, y, colW, 20.0F,
+            "Rebuild atlas mipmaps as water/lava/fire animate. OFF saves five texture uploads every fourth refresh.", () -> o.animatedMips = !o.animatedMips);
+      });
+      // 11: panorama / debug switch
+      cells.add(y -> {
+         ui.button("Panorama: " + Panorama.label(o.panorama), x0, y, colW, 20.0F, true,
+            "Title-screen landscape: Classic, Coral Coast, Snowy Peaks or Cycle.", () -> {
+               o.panorama = (o.panorama + 1) % Panorama.COUNT;
+               Panorama.switchTo(g);
+            });
+         ui.toggle("Debug Video: " + (o.debugVideo ? "ON" : "OFF"), o.debugVideo, x1, y, colW, 20.0F,
+            "Turning this OFF hides this tab again.", () -> {
+               o.debugVideo = !o.debugVideo;
+               if (!o.debugVideo && ui.optTab >= TABS.length) {
+                  ui.optTab = 0;
+                  ui.optScroll[0] = 0.0F;
+               }
+            });
+      });
+      // 12: section title
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eSHADERS & EFFECTS  -  applied live", x0, y + 3.0F, Ui.GOLD));
+      // 14: shadow map / cloud resolution
+      cells.add(y -> {
+         ui.slider("Shadow Map: " + SHADOW_RES[Options.clamp(o.shadowRes, 0, 2)], x0, y, colW, 20.0F,
+            Options.clamp(o.shadowRes, 0, 2) / 2.0F,
+            "512 / 1024 / 2048 depth texture. Lower = less VRAM and a much cheaper shadow pass.", v -> o.shadowRes = Math.round(v * 2.0F));
+         ui.slider("Cloud Resolution: " + CLOUD_RES_NAME[Options.clamp(o.cloudRes, 0, 2)], x1, y, colW, 20.0F,
+            Options.clamp(o.cloudRes, 0, 2) / 2.0F, "Full / Half / Quarter size of the volumetric cloud target.", v -> o.cloudRes = Math.round(v * 2.0F));
+      });
+      // 15: cloud steps / bloom
+      cells.add(y -> {
+         int si = Options.clamp(o.cloudSteps, 0, 3);
+         ui.slider("Cloud Steps: " + CLOUD_STEPS[si], x0, y, colW, 20.0F, si / 3.0F,
+            "Raymarch samples in the cloud shader. 16 is fastest, 64 smoothest.", v -> o.cloudSteps = Math.round(v * 3.0F));
+         ui.slider("Bloom: " + BLOOM_NAME[Options.clamp(o.bloom, 0, 2)], x1, y, colW, 20.0F,
+            Options.clamp(o.bloom, 0, 2) / 2.0F, "Off / Low (one blur round) / Full (two rounds).", v -> o.bloom = Math.round(v * 2.0F));
+      });
+      // 16: shadow refresh / max age
+      cells.add(y -> {
+         ui.slider("Shadow Refresh: " + o.shadowInterval + "f", x0, y, colW, 20.0F, (o.shadowInterval - 1) / 15.0F,
+            "Minimum frames between shadow-map and cloud-shadow rebuilds after terrain changes.", v -> o.shadowInterval = 1 + Math.round(v * 15.0F));
+         ui.slider("Max Shadow Age: " + o.shadowMaxAge + "f", x1, y, colW, 20.0F, (o.shadowMaxAge - 30) / 570.0F,
+            "Rebuild the shadow map at least this often even when nothing changed.", v -> o.shadowMaxAge = 30 + Math.round(v * 570.0F));
+      });
+      // 17: particle cap (full width)
+      cells.add(y -> ui.slider("Particle Cap: " + o.particleBudget, x0, y, full, 20.0F, o.particleBudget / 2000.0F,
+         "Hard ceiling on live particles. 0 disables particles entirely; 500 is the default.", v -> o.particleBudget = Math.round(v * 2000.0F)));
+      // 18: section title
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7ePERFORMANCE & MEMORY  -  takes effect as you play", x0, y + 3.0F, Ui.GOLD));
+      // 20: worker counts
+      cells.add(y -> {
+         ui.slider("Chunk Gen Threads: " + (o.genThreads == 0 ? "Auto" : o.genThreads + ""), x0, y, colW, 20.0F, o.genThreads / 8.0F,
+            "0 = automatic. Applies when a world is loaded.", v -> o.genThreads = Math.round(v * 8.0F));
+         ui.slider("Mesh Workers: " + (o.meshWorkers == 0 ? "Auto" : o.meshWorkers + ""), x1, y, colW, 20.0F, o.meshWorkers / 4.0F,
+            "0 = automatic. Caps parallel mesh builds; applies when the renderer is created.", v -> o.meshWorkers = Math.round(v * 4.0F));
+      });
+      // 21: cache / unload budget
+      cells.add(y -> {
+         ui.slider("Chunk Cache: " + o.chunkCacheMb + " MB", x0, y, colW, 20.0F, (o.chunkCacheMb - 32) / 2016.0F,
+            "Loaded-chunk memory budget. When exceeded, the unload radius grows one chunk.", v -> o.chunkCacheMb = 32 + Math.round(v * 2016.0F));
+         ui.slider("Unload / Frame: " + o.unloadBudget, x1, y, colW, 20.0F, (o.unloadBudget - 1) / 31.0F,
+            "Maximum chunks unloaded in one frame. Low values avoid spikes.", v -> o.unloadBudget = 1 + Math.round(v * 31.0F));
+      });
+      // 22: autosave / async
+      cells.add(y -> {
+         int ai = 0;
+         for (int i = 0; i < AUTOSAVE.length; i++) if (AUTOSAVE[i] == o.autosaveTicks) ai = i;
+         final int autosaveAt = ai;
+         ui.slider("Autosave: " + (o.autosaveTicks == 0 ? "OFF" : o.autosaveTicks + "t"), x0, y, colW, 20.0F,
+            autosaveAt / (float)(AUTOSAVE.length - 1), "Timed save spread over frames: off, 30s, 1m, 3m, 6m.", v -> o.autosaveTicks = AUTOSAVE[Math.round(v * (AUTOSAVE.length - 1))]);
+         ui.toggle("Async Chunk Saves", o.asyncSaves, x1, y, colW, 20.0F,
+            "Write chunk files on a low-priority thread instead of stopping the render thread.", () -> o.asyncSaves = !o.asyncSaves);
+      });
+      // 23: reset / save
+      cells.add(y -> {
+         ui.button("Reset Advanced", x0, y, colW, 20.0F, true, "Restore the Advanced Video defaults (the standard tabs are untouched).", () -> resetAdvanced(o));
+         ui.button("Apply & Save", x1, y, colW, 20.0F, true, "Write every setting to options.txt and apply it now.", () -> {
+            g.applyVideoTuning();
+            o.save();
+            ui.say("Advanced video settings applied and saved");
+         });
+      });
+      // 24: section title
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eLIVE DIAGNOSTICS", x0, y + 3.0F, Ui.GOLD));
+      // 26: live stats
+      cells.add(y -> {
+         long used = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1048576L;
+         ui.label("Chunks " + (g.world == null ? 0 : g.world.chunks.size()) + "  -  Mob " + g.mobs.count(false) + "  -  Heap " + used + " MB  -  Particles " + g.particles.size(),
+            x0, y + 3.0F, Ui.DIM);
+      });
+      cells.add(y -> ui.label("GPU: " + GpuPref.shortName(g.gpuName) + "  -  " + g.shaderStatus(), x0, y + 3.0F, Ui.DIM));
+
+      for (int i = 0; i < cells.size(); i++) {
+         float y = oy + i * row;
+         if (shows(y, row, top, viewH)) {
+            cells.get(i).accept(y);
+         }
+      }
+   }
+
+   /** Update 6.18: puts only the Advanced Video fields back to their defaults. */
+   static void resetAdvanced(Options o) {
+      o.shadowRes = 2;
+      o.cloudRes = 1;
+      o.cloudSteps = 2;
+      o.bloom = 2;
+      o.shadowInterval = 8;
+      o.shadowMaxAge = 150;
+      o.particleBudget = 500;
+      o.animatedMips = true;
+      o.genThreads = 0;
+      o.meshWorkers = 0;
+      o.chunkCacheMb = 128;
+      o.unloadBudget = 2;
+      o.autosaveTicks = 1200;
+      o.asyncSaves = true;
    }
 
    static void gameTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {

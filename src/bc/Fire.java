@@ -334,7 +334,8 @@ final class Fire {
 
    /** Smoke and sparks above the fires close to the player (client side only, no effect on the world). */
    void particles(Game g) {
-      if (this.cells.isEmpty() || g.player == null || w.tickCount % 3 != 0 || g.particles.size() > 500) {
+      int cap = g.opt == null ? 500 : Math.max(0, g.opt.particleBudget);
+      if (this.cells.isEmpty() || g.player == null || w.tickCount % 3 != 0 || g.particles.size() >= cap) {
          return;
       }
 

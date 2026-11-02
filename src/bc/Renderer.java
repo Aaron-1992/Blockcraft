@@ -105,7 +105,9 @@ public final class Renderer {
 
    public Renderer(Game var1) {
       this.g = var1;
-      int var2 = Math.min(MAX_MESH_WORKERS, World.genThreads());
+      int var2 = var1.opt != null && var1.opt.meshWorkers > 0
+         ? Math.min(MAX_MESH_WORKERS, var1.opt.meshWorkers)
+         : Math.min(MAX_MESH_WORKERS, World.genThreads(var1.opt));
       this.meshThreads = var2;
       this.meshPool = Executors.newFixedThreadPool(var2, var0 -> {
          Thread var1x = new Thread(var0, "mesher");
@@ -307,9 +309,15 @@ public final class Renderer {
       return Math.max(2, Math.min(MAX_IN_FLIGHT_MESHES, Math.min(MAX_MESH_WORKERS, workers) * 2));
    }
 
+   /** Update 6.18: the Advanced Video "mesh workers" setting caps how many meshing tasks may be in flight. */
+   int meshWorkerCount() {
+      int fixed = this.g.opt == null ? 0 : this.g.opt.meshWorkers;
+      return fixed > 0 ? Math.min(MAX_MESH_WORKERS, fixed) : this.meshThreads;
+   }
+
    public void scheduleMeshes(World var1, int var2) {
       // Each task owns a native result buffer until upload. Bound queued + running work to cap transient RAM/VRAM staging use.
-      int var3 = inFlightLimit(this.meshThreads);
+      int var3 = inFlightLimit(this.meshWorkerCount());
       if (this.inflight.get() < var3) {
          int var4 = (int)Math.floor(this.camX) >> 4;
          int var5 = (int)Math.floor(this.camZ) >> 4;
@@ -1102,7 +1110,9 @@ public final class Renderer {
             // the player was built or changed (at most every 8 frames) and at the latest after 150 frames; it was every 30 frames whatever had happened
             this.shFrames++;
             boolean shStale = this.sh.shadowStale(var55, var58, 0.0F, this.camX, this.camY, this.camZ);
-            if (shStale || Perf.shadowEvery || this.shadowDirty && this.shFrames >= 8 || this.shFrames >= 150) {
+            int shInterval = this.g.opt == null ? 8 : Math.max(1, this.g.opt.shadowInterval);
+            int shMaxAge = this.g.opt == null ? 150 : Math.max(shInterval, this.g.opt.shadowMaxAge);
+            if (shStale || Perf.shadowEvery || this.shadowDirty && this.shFrames >= shInterval || this.shFrames >= shMaxAge) {
                this.shFrames = 0;
                this.shadowDirty = false;
                this.sh.computeShadow(var55, var58, 0.0F, this.camX, this.camY, this.camZ);

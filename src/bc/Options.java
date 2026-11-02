@@ -44,6 +44,38 @@ public final class Options {
    public int fx = 1;
    /** Update 3.19: 3D crossed foliage fronds protruding from tree canopy leaf blocks. */
    public boolean bushyLeaves = true;
+   /** Update 6.18: the switch that opens the Advanced Video tab in the in-game options. */
+   public boolean debugVideo = false;
+   /** Update 6.18: title-screen landscape. 0 = Classic, 1 = Coral Coast, 2 = Snowy Peaks, 3 = Cycle. */
+   public int panorama = 0;
+   /** Update 6.18: shadow-map edge length index into Screens.SHADOW_RES = {512, 1024, 2048}. */
+   public int shadowRes = 2;
+   /** Update 6.18: cloud render target divisor index into Screens.CLOUD_RES = {1, 2, 4}. */
+   public int cloudRes = 1;
+   /** Update 6.18: cloud raymarch step index into Screens.CLOUD_STEPS = {16, 32, 48, 64}. */
+   public int cloudSteps = 2;
+   /** Update 6.18: bloom quality: 0 = off, 1 = low (one blur round), 2 = full. */
+   public int bloom = 2;
+   /** Update 6.18: minimum frames between shadow-map / cloud-shadow rebuilds after terrain changed. */
+   public int shadowInterval = 8;
+   /** Update 6.18: rebuild the shadow map at least this often even when nothing changed. */
+   public int shadowMaxAge = 150;
+   /** Update 6.18: hard cap on live particles, so a fire or a huge explosion cannot stall a frame. */
+   public int particleBudget = 500;
+   /** Update 6.18: rebuild the atlas mipmaps while animated tiles change. Off saves a texture upload every fourth tick. */
+   public boolean animatedMips = true;
+   /** Update 6.18: 0 = automatic, otherwise the exact number of chunk generation threads. */
+   public int genThreads = 0;
+   /** Update 6.18: 0 = automatic, otherwise the exact number of mesh build threads. */
+   public int meshWorkers = 0;
+   /** Update 6.18: budget for loaded chunks, in megabytes of raw block data. */
+   public int chunkCacheMb = 128;
+   /** Update 6.18: maximum chunks unloaded in one frame (spikes come from unloading hundreds at once). */
+   public int unloadBudget = 2;
+   /** Update 6.18: 0 = no timed save, otherwise a save every N game ticks, spread over frames. */
+   public int autosaveTicks = 1200;
+   /** Update 6.18: write chunks on a low-priority thread instead of stopping the render thread. */
+   public boolean asyncSaves = true;
    /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
    public String resourcePack = ResourcePacks.ID_DEFAULT;
    public float soundVolume = 1.0F;
@@ -55,6 +87,11 @@ public final class Options {
 
    public Options(File var1) {
       this.file = new File(var1, "options.txt");
+   }
+
+   /** Keeps a hand-edited or older options.txt value inside a slider's range. */
+   public static int clamp(int value, int lo, int hi) {
+      return value < lo ? lo : value > hi ? hi : value;
    }
 
    public void load() {
@@ -89,6 +126,22 @@ public final class Options {
                this.look = Look.clamp(Integer.parseInt(var2.getProperty("look", Look.DEFAULT + "")));
                this.fx = Math.max(0, Math.min(2, Integer.parseInt(var2.getProperty("fx", "1"))));
                this.bushyLeaves = Boolean.parseBoolean(var2.getProperty("bushyLeaves", "true"));
+               this.debugVideo = Boolean.parseBoolean(var2.getProperty("debugVideo", "false"));
+               this.panorama = clamp(Integer.parseInt(var2.getProperty("panorama", "0")), 0, 3);
+               this.shadowRes = clamp(Integer.parseInt(var2.getProperty("shadowRes", "2")), 0, 2);
+               this.cloudRes = clamp(Integer.parseInt(var2.getProperty("cloudRes", "1")), 0, 2);
+               this.cloudSteps = clamp(Integer.parseInt(var2.getProperty("cloudSteps", "2")), 0, 3);
+               this.bloom = clamp(Integer.parseInt(var2.getProperty("bloom", "2")), 0, 2);
+               this.shadowInterval = clamp(Integer.parseInt(var2.getProperty("shadowInterval", "8")), 1, 16);
+               this.shadowMaxAge = clamp(Integer.parseInt(var2.getProperty("shadowMaxAge", "150")), 30, 1200);
+               this.particleBudget = clamp(Integer.parseInt(var2.getProperty("particleBudget", "500")), 0, 2000);
+               this.animatedMips = Boolean.parseBoolean(var2.getProperty("animatedMips", "true"));
+               this.genThreads = clamp(Integer.parseInt(var2.getProperty("genThreads", "0")), 0, 8);
+               this.meshWorkers = clamp(Integer.parseInt(var2.getProperty("meshWorkers", "0")), 0, 4);
+               this.chunkCacheMb = clamp(Integer.parseInt(var2.getProperty("chunkCacheMb", "128")), 32, 2048);
+               this.unloadBudget = clamp(Integer.parseInt(var2.getProperty("unloadBudget", "2")), 1, 32);
+               this.autosaveTicks = clamp(Integer.parseInt(var2.getProperty("autosaveTicks", "1200")), 0, 7200);
+               this.asyncSaves = Boolean.parseBoolean(var2.getProperty("asyncSaves", "true"));
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
@@ -138,6 +191,22 @@ public final class Options {
       var1.setProperty("look", this.look + "");
       var1.setProperty("fx", this.fx + "");
       var1.setProperty("bushyLeaves", this.bushyLeaves + "");
+      var1.setProperty("debugVideo", this.debugVideo + "");
+      var1.setProperty("panorama", this.panorama + "");
+      var1.setProperty("shadowRes", this.shadowRes + "");
+      var1.setProperty("cloudRes", this.cloudRes + "");
+      var1.setProperty("cloudSteps", this.cloudSteps + "");
+      var1.setProperty("bloom", this.bloom + "");
+      var1.setProperty("shadowInterval", this.shadowInterval + "");
+      var1.setProperty("shadowMaxAge", this.shadowMaxAge + "");
+      var1.setProperty("particleBudget", this.particleBudget + "");
+      var1.setProperty("animatedMips", this.animatedMips + "");
+      var1.setProperty("genThreads", this.genThreads + "");
+      var1.setProperty("meshWorkers", this.meshWorkers + "");
+      var1.setProperty("chunkCacheMb", this.chunkCacheMb + "");
+      var1.setProperty("unloadBudget", this.unloadBudget + "");
+      var1.setProperty("autosaveTicks", this.autosaveTicks + "");
+      var1.setProperty("asyncSaves", this.asyncSaves + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");

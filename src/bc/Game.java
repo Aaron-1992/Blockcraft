@@ -34,9 +34,11 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.17";
+   public static final String VERSION_STR = "6.18";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
+   /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
+   private int tunedShadow = -1, tunedCloudRes = -1, tunedCloudSteps = -1, tunedBloom = -1, tunedShadowInterval = -1, tunedMips = -1;
    public World world;
    public Player player;
    public Renderer rend;
@@ -137,6 +139,18 @@ public final class Game {
    final ArrayList<String> chatLog = new ArrayList();
    final ArrayList<Long> chatTimes = new ArrayList();
    final ArrayList<Game.Particle> particles = new ArrayList();
+
+   /**
+    * Update 6.18: a hard ceiling on live particles. Fires, explosions and splash effects used to be able to add
+    * without limit, which made a single frame allocate and draw thousands of sprites after a big blast.
+    */
+   void addParticle(Particle p) {
+      int cap = this.opt == null ? 500 : Math.max(0, this.opt.particleBudget);
+      if (this.particles.size() < cap) {
+         this.particles.add(p);
+      }
+   }
+
    /**
     * Update 3.9: the equip animation. The item in the hand lowers and the new one rises when you switch slots or the item in the slot changes;
     * the hand keeps drawing {@link #shownId} (which lags behind the selected item) until it is out of sight. Rates like Minecraft's: 0.4 per tick.
@@ -1231,11 +1245,13 @@ public final class Game {
       this.worldSettings = ws;
       Net319.clearWorldState();
       this.bonusPending = var1 && ws.bonusChest && startDim == Dim.OVERWORLD && !ephemeralMinigame;
+      this.applyVideoTuning();
       this.world = new World(var6, ephemeralMinigame ? null : Dim.dir(var8, startDim), startDim, ws);
       if (ephemeralMinigame) {
          this.world.saveEnabled = false;
       }
       this.world.game = this;
+      RedstoneLogic.load(this.world, var4);
       if (this.rend != null) {
          this.rend.setLod(this.world);
          this.world.unloadHook = this.rend::onUnload;
@@ -1562,6 +1578,7 @@ public final class Game {
          var1.setProperty("sel", this.sel + "");
          var1.setProperty("inv", stacksToString(this.inv));
          var1.setProperty("armor", stacksToString(this.armor));
+         RedstoneLogic.save(this.world, var1);
 
          try {
             FileOutputStream var2 = new FileOutputStream(new File(this.rootDir != null ? this.rootDir : this.world.dir, "level.properties"));
@@ -1691,7 +1708,7 @@ public final class Game {
       p.r = r;
       p.g = g * (0.8F + this.rnd.nextFloat() * 0.4F);
       p.b = b;
-      this.particles.add(p);
+      this.addParticle(p);
    }
 
    /** Update 3.12: a message in big letters at the top of the screen for a few seconds (the dragon is dead, ...). */
@@ -4206,7 +4223,48 @@ public final class Game {
          : WeaponPose.releaseDraw(this.bowReleaseDraw, this.bowReleaseTicks, partial);
    }
 
+   /**
+    * Update 6.18: pushes the Advanced Video settings into the live renderer. Called once a tick and whenever the
+    * options screen changes a setting; every step is guarded so it costs nothing while nothing changed and never
+    * touches OpenGL on a headless/world-less game.
+    */
+   void applyVideoTuning() {
+      Options o = this.opt;
+      if (o == null) return;
+      World.setThreadTuning(o);
+      Shaders sh = this.rend == null ? null : this.rend.sh;
+      boolean gl = sh != null && sh.ok;
+      if (gl) {
+         if (this.tunedShadow != o.shadowRes) {
+            this.tunedShadow = o.shadowRes;
+            sh.setShadowSize(Screens.SHADOW_RES[Options.clamp(o.shadowRes, 0, 2)]);
+         }
+         if (this.tunedCloudRes != o.cloudRes) {
+            this.tunedCloudRes = o.cloudRes;
+            sh.setCloudDiv(Screens.CLOUD_RES[Options.clamp(o.cloudRes, 0, 2)]);
+         }
+         if (this.tunedCloudSteps != o.cloudSteps) {
+            this.tunedCloudSteps = o.cloudSteps;
+            sh.cloudMarchSteps = Screens.CLOUD_STEPS[Options.clamp(o.cloudSteps, 0, 3)];
+         }
+         if (this.tunedBloom != o.bloom) {
+            this.tunedBloom = o.bloom;
+            sh.bloomLevel = Options.clamp(o.bloom, 0, 2);
+         }
+         if (this.tunedShadowInterval != o.shadowInterval) {
+            this.tunedShadowInterval = o.shadowInterval;
+            sh.shadowInterval = Options.clamp(o.shadowInterval, 1, 16);
+         }
+      }
+      int mips = o.animatedMips ? 1 : 0;
+      if (this.tunedMips != mips) {
+         this.tunedMips = mips;
+         Tex.setAnimatedMips(mips == 1);
+      }
+   }
+
    void tick() {
+      this.applyVideoTuning();
       this.tickCount++;
       if (this.bowReleaseTicks > 0) this.bowReleaseTicks--;
       if (this.heldId() != Items.BOW) {
@@ -4953,7 +5011,7 @@ public final class Game {
          p.b = 1.0F;
       }
 
-      this.particles.add(p);
+      this.addParticle(p);
    }
 
    /** One spark (or a puff of smoke) of a fire or a burning creature. */
@@ -4991,7 +5049,7 @@ public final class Game {
          p.fade = 3;
       }
 
-      this.particles.add(p);
+      this.addParticle(p);
    }
 
    void explosionParticles(double var1, double var3, double var5) {
@@ -5012,7 +5070,7 @@ public final class Game {
          var11.v = (var9 + this.rnd.nextInt(12)) / (float)Tex.PX;
          var11.life = 20 + this.rnd.nextInt(20);
          var11.shade = 1.0F;
-         this.particles.add(var11);
+         this.addParticle(var11);
       }
    }
 
@@ -5321,7 +5379,7 @@ public final class Game {
          var3.r = 1.0F;
          var3.g = 0.25F;
          var3.b = 0.4F;
-         this.particles.add(var3);
+         this.addParticle(var3);
       }
    }
 
@@ -6161,7 +6219,7 @@ public final class Game {
             var11.b = var9[2] / 255.0F;
          }
 
-         this.particles.add(var11);
+         this.addParticle(var11);
       }
    }
 
@@ -7045,6 +7103,43 @@ public final class Game {
       }
    }
 
+   /** Update 6.18: the F3 overlay explains the circuit you are looking at (power, input, delay, queued events). */
+   String redstoneDebug() {
+      if (this.target == null || this.world == null) return "";
+      int x = this.target.x, y = this.target.y, z = this.target.z;
+      int id = this.world.getBlock(x, y, z);
+      boolean part = Redstone319.isWire(id) || Redstone319.isRepeater(id) || RedstoneLogic.comparator(id)
+         || Redstone319.isObserver(id) || id == Redstone319.REDSTONE_TORCH || id == Redstone319.REDSTONE_TORCH_OFF
+         || id == Redstone319.REDSTONE_LAMP || id == Redstone319.REDSTONE_LAMP_LIT || id == Redstone319.REDSTONE_BLOCK
+         || Redstone319.sourcePower(id) > 0 || id == Redstone319.NOTE_BLOCK;
+      if (!part) return "";
+      String s = "Redstone: " + Blocks.name[id] + "  power " + Redstone319.powerAt(this.world, x, y, z)
+         + " / input " + RedstoneLogic.input(this.world, x, y, z, true)
+         + "  events " + this.world.redstone.queue.size()
+         + "  sensors " + this.world.redstone.sensors.size();
+      if (Redstone319.isRepeater(id)) {
+         s += "  delay " + RedstoneLogic.delay(this.world, x, y, z) + "t";
+      }
+      if (RedstoneLogic.comparator(id)) {
+         s += (this.world.getState(x, y, z) & 0x1000) != 0 ? "  subtract" : "  compare";
+      }
+      long until = this.world.redstone.burnout.getOrDefault(World.pack(x, y, z), 0L);
+      if (until > this.world.tickCount) {
+         s += "  burnt " + (until - this.world.tickCount) + "t";
+      }
+      return s;
+   }
+
+   /** Update 6.18: the live effect of the Advanced Video performance settings, visible on F3. */
+   String perfDebug() {
+      if (this.world == null || this.opt == null) return "";
+      return "Cache: " + this.world.chunks.size() + "/" + World.maxLoadedChunks(this.opt.chunkCacheMb)
+         + " chunks  -  saves " + (this.world.savePending ? "running" : "idle")
+         + "  -  particles " + this.particles.size() + "/" + this.opt.particleBudget
+         + "  -  gen " + World.genThreads() + " / mesh " + (this.rend == null ? 0 : this.rend.meshWorkerCount())
+         + "  -  unload " + this.opt.unloadBudget + "/f";
+   }
+
    void drawDebug() {
       int var1 = (int)Math.floor(this.player.x);
       int var2 = (int)Math.floor(this.player.y);
@@ -7091,7 +7186,9 @@ public final class Game {
                + this.target.z
                + " ["
                + Blocks.name[this.world.getBlock(this.target.x, this.target.y, this.target.z)]
-               + "]"
+               + "]",
+         this.redstoneDebug(),
+         this.perfDebug()
       };
       float var11 = 2.0F;
 

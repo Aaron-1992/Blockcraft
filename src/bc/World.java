@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -70,6 +71,14 @@ public final class World {
    private final ConcurrentLinkedQueue<Chunk> ready = new ConcurrentLinkedQueue();
    private final Set<Long> requested = ConcurrentHashMap.newKeySet();
    private final ExecutorService lightingPool;
+   /** Update 6.18: chunk files are written off the render thread (unless "Async chunk saves" is turned off). */
+   private final ExecutorService savePool;
+   /** Update 6.18: the timed save walks the chunks a handful at a time instead of stopping the game. */
+   boolean savePending;
+   private Iterator<Chunk> saveCursor;
+   private long nextAutoSave = 1200L;
+   /** Update 6.18: reused each tick for the tile-entity pass (used to copy the whole map into a new ArrayList). */
+   private final ArrayList<TileEntity> tileSnapshot = new ArrayList();
    private final AtomicInteger lightingPending = new AtomicInteger();
    private static final int MAX_LIGHTING_PENDING = 8;
    private Iterator<Chunk> unloadCursor;
@@ -150,10 +159,37 @@ public final class World {
          worker.setPriority(Thread.MIN_PRIORITY);
          return worker;
       });
+      this.savePool = Executors.newSingleThreadExecutor(var0 -> {
+         Thread worker = new Thread(var0, "chunk-save");
+         worker.setDaemon(true);
+         worker.setPriority(Thread.MIN_PRIORITY);
+         return worker;
+      });
+   }
+
+   /** Update 6.18: the Advanced Video worker count; 0 means "let the CPU decide". Applied when a world/renderer is created. */
+   private static volatile int genThreadsOverride = 0;
+
+   public static void setThreadTuning(Options o) {
+      genThreadsOverride = o == null ? 0 : Options.clamp(o.genThreads, 0, 8);
+   }
+
+   static int autoGenThreads() {
+      return Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors() - 2));
    }
 
    static int genThreads() {
-      return Math.max(2, Math.min(6, Runtime.getRuntime().availableProcessors() - 2));
+      return genThreadsOverride > 0 ? Math.min(8, genThreadsOverride) : autoGenThreads();
+   }
+
+   static int genThreads(Options o) {
+      int fixed = o == null ? 0 : Options.clamp(o.genThreads, 0, 8);
+      return fixed > 0 ? Math.min(8, fixed) : autoGenThreads();
+   }
+
+   /** Roughly 256 KB of primitive arrays per loaded chunk; the Advanced Video cache budget is in MiB. */
+   static int maxLoadedChunks(int megabytes) {
+      return Math.max(64, (int)((long)Options.clamp(megabytes, 32, 2048) * 1024L * 1024L / 262144L));
    }
 
    public static long key(int var0, int var1) {
@@ -404,13 +440,19 @@ public final class World {
       }
       int scanned = 0;
       int unloaded = 0;
-      while (this.unloadCursor.hasNext() && scanned++ < 128 && unloaded < 2) {
+      Options tuning = this.game == null ? null : this.game.opt;
+      int unloadBudget = tuning == null ? 2 : Options.clamp(tuning.unloadBudget, 1, 32);
+      // Update 6.18: a hard chunk-memory budget. When it is exceeded the unload radius grows a little, but the
+      // per-frame work stays bounded so walking away from a huge base cannot produce a single giant frame.
+      boolean pressure = this.chunks.size() > maxLoadedChunks(tuning == null ? 128 : tuning.chunkCacheMb);
+      int unloadMargin = pressure ? 1 : 3;
+      while (this.unloadCursor.hasNext() && scanned++ < 128 && unloaded < unloadBudget) {
          Chunk var23 = this.unloadCursor.next();
          if (isVoidArena && Math.abs(var23.cx) <= maxVoidCoord && Math.abs(var23.cz) <= maxVoidCoord) {
             continue; // Never unload active minigame arena chunks (-5..5 x -5..5)
          }
          boolean outside = (isVoidArena && (Math.abs(var23.cx) > maxVoidCoord || Math.abs(var23.cz) > maxVoidCoord))
-            || Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + 3;
+            || Math.max(Math.abs(var23.cx - var1), Math.abs(var23.cz - var2)) > var3 + unloadMargin;
          if (!outside || !this.lightingLock.tryLock()) {
             continue;
          }
@@ -419,6 +461,7 @@ public final class World {
             long chunkKey = key(var23.cx, var23.cz);
             if (!var23.lighting && this.chunks.get(chunkKey) == var23) {
                Kinetics.unloaded(this,var23);
+               RedstoneLogic.unloaded(this, var23);
                var23.unloaded = true;
                this.chunks.remove(chunkKey, var23);
                this.meshCoverageEpoch.incrementAndGet();
@@ -508,34 +551,58 @@ public final class World {
       return var4;
    }
 
+   /**
+    * Update 6.18: a chunk file is a GZIP write of 128 KB of block data. Doing that on the render thread was one of the
+    * classic "one huge frame" spikes whenever you crossed a chunk border or quit the game. The async path takes a
+    * snapshot, clears the dirty flag and lets a low-priority thread do the I/O; the LOD summary stays on this thread.
+    */
    public void saveChunk(Chunk var1) {
-      if (this.saveEnabled && this.dir != null) {
-         try {
-            DataOutputStream var2 = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(this.chunkFile(var1.cx, var1.cz)))));
-
-            try {
-               Chunk.writeBlocks(var2, var1.blocks);
-               var1.modified = false;
-               var1.lodDirty = 0L;
-            } catch (Throwable var6) {
-               try {
-                  var2.close();
-               } catch (Throwable var5) {
-                  var6.addSuppressed(var5);
-               }
-
-               throw var6;
-            }
-
-            var2.close();
-            // Update 3.11: the distant terrain shows what is really there (a house, a pit, a burnt forest) even after the chunk is gone
-            if (this.dim == Dim.OVERWORLD) {
-               this.lodMap.update(var1, this.gen);
-               this.lodMap.stamp(var1.cx, var1.cz, this.chunkFile(var1.cx, var1.cz).lastModified());
-            }
-         } catch (IOException var7) {
-            System.err.println("Failed to save chunk: " + var7);
+      if (!this.saveEnabled || this.dir == null) return;
+      Options o = this.game == null ? null : this.game.opt;
+      boolean async = o == null || o.asyncSaves;
+      if (!async) {
+         this.writeChunk(var1, var1.blocks);
+         return;
+      }
+      final short[] snapshot = var1.blocks.clone();
+      final int cx = var1.cx, cz = var1.cz;
+      final Chunk owner = var1;
+      owner.modified = false;
+      owner.lodDirty = 0L;
+      if (this.dim == Dim.OVERWORLD) {
+         this.lodMap.update(owner, this.gen);
+         this.lodMap.stamp(cx, cz, System.currentTimeMillis());
+      }
+      Runnable write = () -> {
+         if (!this.writeChunkBytes(cx, cz, snapshot)) {
+            owner.modified = true; // retry at the next save
          }
+      };
+      try {
+         this.savePool.execute(write);
+      } catch (java.util.concurrent.RejectedExecutionException ex) {
+         write.run();
+      }
+   }
+
+   private void writeChunk(Chunk c, short[] blocks) {
+      if (this.writeChunkBytes(c.cx, c.cz, blocks)) {
+         c.modified = false;
+         c.lodDirty = 0L;
+         if (this.dim == Dim.OVERWORLD) {
+            this.lodMap.update(c, this.gen);
+            this.lodMap.stamp(c.cx, c.cz, this.chunkFile(c.cx, c.cz).lastModified());
+         }
+      }
+   }
+
+   private boolean writeChunkBytes(int cx, int cz, short[] blocks) {
+      try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new GZIPOutputStream(new FileOutputStream(this.chunkFile(cx, cz)))))) {
+         Chunk.writeBlocks(out, blocks);
+         return true;
+      } catch (IOException e) {
+         System.err.println("Failed to save chunk: " + e);
+         return false;
       }
    }
 
@@ -560,21 +627,43 @@ public final class World {
       }
    }
 
-   public void saveAll() {
+   /**
+    * Update 6.18: starting a save no longer writes every chunk in a single frame. The timed autosave calls
+    * {@link #saveStep(int)} with a small budget each tick; a shutdown save passes an unlimited budget so the
+    * world is complete before the process exits.
+    */
+   void startSave() {
       this.trees.finishAll(); // a tree in the air is put down first, or its blocks would be lost
-      for (Chunk var2 : this.chunks.values()) {
-         if (var2.modified) {
-            this.saveChunk(var2);
+      this.saveCursor = this.chunks.values().iterator();
+      this.savePending = true;
+   }
+
+   /** Saves at most {@code maxChunks} chunks and, at the end of the walk, everything else that lives on disk. */
+   void saveStep(int maxChunks) {
+      if (!this.savePending) return;
+      int scanned = 0;
+      while (this.saveCursor != null && this.saveCursor.hasNext() && scanned++ < maxChunks) {
+         Chunk c = this.saveCursor.next();
+         if (c.modified) {
+            this.saveChunk(c);
          }
       }
-
-      this.saveTiles();
-      RasterComputer.save(this);KineticMachines.save(this);
-      RasterMedia.save(this);NoteBlocks.save(this);
-      this.savePopulated();
-      if (this.dim == Dim.OVERWORLD) {
-         this.lodMap.save(this.dir);
+      if (this.saveCursor == null || !this.saveCursor.hasNext()) {
+         this.saveCursor = null;
+         this.saveTiles();
+         RasterComputer.save(this);KineticMachines.save(this);
+         RasterMedia.save(this);NoteBlocks.save(this);
+         this.savePopulated();
+         if (this.dim == Dim.OVERWORLD) {
+            this.lodMap.save(this.dir);
+         }
+         this.savePending = false;
       }
+   }
+
+   public void saveAll() {
+      this.startSave();
+      this.saveStep(Integer.MAX_VALUE);
    }
 
    private void loadPopulated() {
@@ -618,6 +707,13 @@ public final class World {
       this.lodMap.stop = true;
       this.pool.shutdownNow();
       this.lightingPool.shutdownNow();
+      // Let queued chunk files reach the disk before the world disappears; the queue is bounded by the save budget.
+      this.savePool.shutdown();
+      try {
+         this.savePool.awaitTermination(5L, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+         Thread.currentThread().interrupt();
+      }
    }
 
    static long pack(int var0, int var1, int var2) {
@@ -1192,6 +1288,16 @@ public final class World {
 
    public void tick() {
       this.tickCount++;
+      // Update 6.18: a timed save spread over frames instead of one huge save on quit/dimension change.
+      Options tuning = this.game == null ? null : this.game.opt;
+      int interval = tuning == null ? 1200 : tuning.autosaveTicks;
+      if (this.saveEnabled && this.dir != null && interval > 0 && !this.savePending && this.tickCount >= this.nextAutoSave) {
+         this.nextAutoSave = this.tickCount + interval;
+         this.startSave();
+      }
+      if (this.savePending) {
+         this.saveStep(6);
+      }
       Kinetics.tick(this);
       Circuit.tick(this);
       RasterComputer.tick(this);
@@ -1272,7 +1378,9 @@ public final class World {
 
          this.items.removeIf(var0 -> var0 == null || var0.dead);
          if (!this.tiles.isEmpty()) {
-            for (TileEntity var14 : new ArrayList<TileEntity>(this.tiles.values())) {
+            this.tileSnapshot.clear();
+            this.tileSnapshot.addAll(this.tiles.values());
+            for (TileEntity var14 : this.tileSnapshot) {
                if (var14.type == 1 && this.isLoaded(var14.x, var14.z)) {
                   int var5 = this.getBlock(var14.x, var14.y, var14.z);
                   if (var5 != 67 && var5 != 68) {

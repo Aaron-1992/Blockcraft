@@ -1033,6 +1033,14 @@ public final class Tex {
 
    /** the last blend that was uploaded: frame * 16 + blend step (-1 = none yet) */
    static int lastBlendKey = -1;
+   /** Update 6.18: the Advanced Video "Animated Mipmaps" switch. False keeps the mipmaps built when the atlas was loaded. */
+   static boolean animatedMips = true;
+
+   public static void setAnimatedMips(boolean on) {
+      animatedMips = on;
+      // The next upload must recreate the mip chain once when it is switched back on.
+      if (on) lastBlendKey = -1;
+   }
 
    /** The animation position for a tick plus the part of the tick that has passed: two ticks per frame, 16 frames, endless loop. */
    static float animPos(int tick, float partial) {
@@ -1056,7 +1064,7 @@ public final class Tex {
          float mix = step / 16.0F;
          int a = f0 & 15;
          int b = a + 1 & 15;
-         boolean mips = (step & 3) == 0;
+         boolean mips = animatedMips && (step & 3) == 0;
          GL11.glBindTexture(3553, atlas);
          if(TexPixel32.enabled())upload(tx(40),ty(40),TexUtility32.furnace(true,a),mips);
          upload(tx(23), ty(23), blendFrames(waterFrames[a], waterFrames[b], mix), mips);

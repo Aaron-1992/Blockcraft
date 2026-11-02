@@ -5,6 +5,27 @@ import java.util.Arrays;
 public final class Phys {
    static final double EPS = 1.0E-7;
 
+   /**
+    * Update 6.18: the collision box list used to be a fresh double[384] on *every* move of the player, every mob and
+    * every dropped item, and it grew with Arrays.copyOf in dense worlds. Reusing one buffer per thread removes that
+    * steady allocation stream (measured as the largest part of the mob-tick garbage).
+    */
+   private static final class Scratch {
+      double[] a = new double[384];
+   }
+
+   private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
+
+   /** Test hook: the capacity of this thread's reused collision buffer. */
+   public static int scratchCapacity() {
+      return SCRATCH.get().a.length;
+   }
+
+   /** Test hook: the very array that will be reused by the next move on this thread. */
+   public static double[] scratchArray() {
+      return SCRATCH.get().a;
+   }
+
    private Phys() {
    }
 
@@ -21,7 +42,8 @@ public final class Phys {
       int var24 = (int)Math.floor(var15);
       int var25 = (int)Math.floor(var17);
       int var26 = (int)Math.floor(var19);
-      double[] var27 = new double[384];
+      Scratch scratch = SCRATCH.get();
+      double[] var27 = scratch.a;
       int var28 = 0;
 
       for (int var29 = var23; var29 <= var24; var29++) {
@@ -39,6 +61,7 @@ public final class Phys {
 
                      if (var28 + 6 > var27.length) {
                         var27 = Arrays.copyOf(var27, var27.length * 2);
+                        scratch.a = var27;
                      }
 
                      var27[var28++] = var31 + var33[0];

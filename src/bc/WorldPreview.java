@@ -38,9 +38,22 @@ final class WorldPreview {
       c[Biomes.SNOWY_BEACH] = 0xF0F0E2;
       c[Biomes.FLOWER_FOREST] = 0x86B85E;
       c[Biomes.WARM_OCEAN] = 0x38AECC;
+      // Update 6.18: the five ocean biomes added with the aquatic update had no colour and rendered black.
+      c[Biomes.COLD_OCEAN] = 0x3B6FC0;
+      c[Biomes.LUKEWARM_OCEAN] = 0x3FC0C8;
+      c[Biomes.DEEP_COLD_OCEAN] = 0x28508F;
+      c[Biomes.DEEP_LUKEWARM_OCEAN] = 0x227F9E;
+      c[Biomes.DEEP_FROZEN_OCEAN] = 0x86AEDD;
+   }
+
+   /** Never black: a biome added later still gets a visible colour on the map. */
+   static int color(int id) {
+      return id >= 0 && id < COL.length && COL[id] != 0 ? COL[id] : 0x6B8F3A;
    }
 
    final Gui.Image img;
+   /** Update 6.18: how many samples of each biome the current preview shows (used for the Create New World legend). */
+   final int[] counts = new int[Biomes.N];
    final int w;
    final int h;
    /** Blocks between two samples. */
@@ -60,7 +73,9 @@ final class WorldPreview {
 
    /** Makes the map again when the seed or the settings are not those of the last call. Returns true when it did. */
    boolean update(long seed, WorldSettings ws) {
-      String k = seed + "/" + ws.type + "/" + ws.flat;
+      // Update 6.18: aquatic generation, structures and the map change what the map shows, so they change the key too.
+      String k = seed + "/" + ws.type + "/" + ws.flat + "/" + ws.aquatic + "/" + ws.structures
+         + "/" + ws.bonusChest + "/" + ws.mapId + "/" + ws.structVer;
       if (k.equals(this.key)) {
          return false;
       }
@@ -87,11 +102,16 @@ final class WorldPreview {
       int effStep = voidMap ? 2 : this.step;
       int[] hs = new int[this.w * this.h];
       int[] bs = new int[this.w * this.h];
+      for (int i = 0; i < this.counts.length; i++) {
+         this.counts[i] = 0;
+      }
       for (int j = 0; j < this.h; j++) {
          for (int i = 0; i < this.w; i++) {
             Gen.Col col = gen.column(cx + (i - this.w / 2) * effStep, cz + (j - this.h / 2) * effStep);
+            int b = col.biome >= 0 && col.biome < Biomes.N ? col.biome : 0;
             hs[j * this.w + i] = col.h;
-            bs[j * this.w + i] = col.biome;
+            bs[j * this.w + i] = b;
+            this.counts[b]++;
          }
       }
 
@@ -104,7 +124,7 @@ final class WorldPreview {
                continue;
             }
             int b = bs[idx];
-            int base = COL[Math.max(0, Math.min(Biomes.N - 1, b))];
+            int base = color(b);
             float shade;
             if (hgt < Gen.SEA) {
                // water: the deeper, the darker
@@ -140,6 +160,52 @@ final class WorldPreview {
       }
 
       this.img.dirty = true;
+   }
+
+   /** Names of the most common biomes in the preview, for the Create New World hint. */
+   String legendText(int max) {
+      int[] ids = this.topBiomes(max);
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < ids.length; i++) {
+         if (i > 0) sb.append(", ");
+         sb.append(Biomes.name(ids[i]));
+      }
+      return sb.length() == 0 ? "no land in view" : sb.toString();
+   }
+
+   /** Number of different biomes visible in the preview map. */
+   int distinctBiomes() {
+      int n = 0;
+      for (int c : this.counts) {
+         if (c > 0) n++;
+      }
+      return n;
+   }
+
+   boolean hasBiome(int id) {
+      return id >= 0 && id < this.counts.length && this.counts[id] > 0;
+   }
+
+   /** Up to {@code max} biome ids, most common first, for a compact legend. */
+   int[] topBiomes(int max) {
+      int[] out = new int[Math.max(0, Math.min(max, Biomes.N))];
+      int filled = 0;
+      for (int slot = 0; slot < out.length; slot++) {
+         int best = -1;
+         for (int id = 0; id < Biomes.N; id++) {
+            if (this.counts[id] <= 0) continue;
+            boolean taken = false;
+            for (int k = 0; k < filled; k++) {
+               if (out[k] == id) taken = true;
+            }
+            if (!taken && (best < 0 || this.counts[id] > this.counts[best])) best = id;
+         }
+         if (best < 0) break;
+         out[filled++] = best;
+      }
+      int[] trimmed = new int[filled];
+      System.arraycopy(out, 0, trimmed, 0, filled);
+      return trimmed;
    }
 
    void put(int x, int y, int argb) {

@@ -3,9 +3,9 @@
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
 In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
 
-Current source version: **V6.16 — PC chunk-handling and performance test build** (retains V6.15 machinery and gameplay).
+Current source version: **V6.18 — panoramas, Advanced Video settings and frame-spike work** (retains V6.17 machinery and gameplay).
 
-Chunk lighting now runs on a bounded, low-priority worker; unload and distant-terrain scans are incremental, and per-section occupancy is indexed. No graphics settings were lowered. The build is released so PC players can test it; no measured frame-time gain is claimed yet. Please test with your normal settings and report the machine specs, render distance, and whether chunk-load spikes improved.
+Chunk lighting runs on a bounded, low-priority worker; unload and distant-terrain scans are incremental, and per-section occupancy is indexed. V6.18 continues that work with background chunk saves, incremental autosaves, bounded unloads, a configurable chunk cache and reused collision scratch buffers. No measured frame-time gain on real GPU hardware is claimed yet; please report machine specs, render distance and whether chunk-load spikes improved.
 
 Native mechanical parts now include shafts/cogs, a gearbox, motor/water-wheel
 sources, redstone clutch/gearshift, gauges, and visible belt/depot pressing and hand-fed millstone processing.
@@ -33,6 +33,13 @@ utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
 bricks, planks and cobblestone remain; the bow stays a flat animated sprite, and
 corrected gun poses and held-item lighting are retained. See the
 [review record](docs/art-review/utility-tools-review.md) and `package/README.txt`.
+
+Update 6.18 adds two new title-screen panoramas (Coral Coast and Snowy Peaks, plus a Cycle
+mode), a fifth **Advanced** options tab unlocked by the **Debug Video** switch, and a colour key
+with a content list on Create New World so the aquatic biomes are visible before you create a
+world. It also cuts frame spikes and retained memory: reused collision buffers, background
+chunk saves, incremental autosaves, bounded unloads, a configurable chunk cache, and
+allocation-free redstone propagation. See [V6.18 notes](docs/releases/v6.18.md).
 
 ## Edit textures in Aseprite
 

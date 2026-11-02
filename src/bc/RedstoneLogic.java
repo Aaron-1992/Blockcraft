@@ -19,7 +19,9 @@ final class RedstoneLogic {
       final Set<Long> opened = new HashSet<>(), plates = new HashSet<>(), sensors = new HashSet<>(), comparators = new HashSet<>();
       final Map<Long, ArrayDeque<Long>> torchChanges = new HashMap<>();
       final Map<Long, Long> burnout = new HashMap<>(), extendedAt = new HashMap<>();
-      void clear() { noteHits.clear();notesSaveBlocked=false; queue.clear(); pending.clear(); buttons.clear(); notes.clear(); opened.clear(); plates.clear(); sensors.clear(); comparators.clear(); torchChanges.clear(); burnout.clear(); extendedAt.clear(); }
+      /** Update 6.18: reused for the periodic sensor/comparator scans (they used to copy both sets every two ticks). */
+      final ArrayList<Long> scan = new ArrayList<>();
+      void clear() { noteHits.clear();notesSaveBlocked=false; queue.clear(); pending.clear(); buttons.clear(); notes.clear(); opened.clear(); plates.clear(); sensors.clear(); comparators.clear(); torchChanges.clear(); burnout.clear(); extendedAt.clear(); scan.clear(); }
    }
    private RedstoneLogic() {}
    static boolean comparator(int id) { return id >= COMPARATOR && id < COMPARATOR + 64; }
@@ -206,9 +208,98 @@ final class RedstoneLogic {
          }
       }
    }
+   /**
+    * Update 6.18: when a chunk is unloaded, every scheduled event and cached component state inside it must go
+    * with it. Otherwise a long exploration leaves thousands of dead timers, ghosts that fire when the chunk is
+    * loaded again and a redstone state that grows for the whole session.
+    */
+   static boolean inChunk(long key, Chunk c) {
+      return (World.ux(key) >> 4) == c.cx && (World.uz(key) >> 4) == c.cz;
+   }
+
+   static void unloaded(World w, Chunk c) {
+      State s = w.redstone;
+      s.queue.removeIf(e -> inChunk(e.pos(), c));
+      s.pending.keySet().removeIf(k -> inChunk(k, c));
+      s.buttons.keySet().removeIf(k -> inChunk(k, c));
+      s.notes.keySet().removeIf(k -> inChunk(k, c));
+      s.noteHits.keySet().removeIf(k -> inChunk(k, c));
+      s.opened.removeIf(k -> inChunk(k, c));
+      s.plates.removeIf(k -> inChunk(k, c));
+      s.sensors.removeIf(k -> inChunk(k, c));
+      s.comparators.removeIf(k -> inChunk(k, c));
+      s.torchChanges.keySet().removeIf(k -> inChunk(k, c));
+      s.burnout.keySet().removeIf(k -> inChunk(k, c));
+      s.extendedAt.keySet().removeIf(k -> inChunk(k, c));
+   }
+
+   /**
+    * Update 6.18: pending repeater/observer/torch deadlines and torch burnout used to vanish on quit, so a
+    * machine could come back in a different state. They are now stored in level.properties as relative times.
+    */
+   static void save(World w, java.util.Properties p) {
+      StringBuilder events = new StringBuilder();
+      int n = 0;
+      for (Event e : w.redstone.pending.values()) {
+         if (n++ >= 2048) break;
+         if (events.length() > 0) events.append(';');
+         events.append(World.ux(e.pos())).append(',').append(World.uy(e.pos())).append(',').append(World.uz(e.pos()))
+            .append(',').append(e.kind()).append(',').append(e.value()).append(',')
+            .append(Math.max(1L, e.due() - w.tickCount)).append(',').append(e.oldId());
+      }
+      StringBuilder burnout = new StringBuilder();
+      n = 0;
+      for (java.util.Map.Entry<Long, Long> e : w.redstone.burnout.entrySet()) {
+         if (n++ >= 2048) break;
+         if (burnout.length() > 0) burnout.append(';');
+         burnout.append(World.ux(e.getKey())).append(',').append(World.uy(e.getKey())).append(',')
+            .append(World.uz(e.getKey())).append(',').append(Math.max(1L, e.getValue() - w.tickCount));
+      }
+      p.setProperty("redstone.events", events.toString());
+      p.setProperty("redstone.burnout", burnout.toString());
+   }
+
+   static void load(World w, java.util.Properties p) {
+      String events = p.getProperty("redstone.events", "");
+      if (!events.isEmpty()) {
+         for (String part : events.split(";")) {
+            String[] f = part.split(",");
+            if (f.length != 7) continue;
+            try {
+               restore(w, Integer.parseInt(f[0]), Integer.parseInt(f[1]), Integer.parseInt(f[2]),
+                  Integer.parseInt(f[3]), Integer.parseInt(f[4]), Integer.parseInt(f[5]), Integer.parseInt(f[6]));
+            } catch (NumberFormatException ignored) {
+               // a hand-edited or older level.properties entry: ignore it, the circuit just starts idle
+            }
+         }
+      }
+      String burnout = p.getProperty("redstone.burnout", "");
+      if (!burnout.isEmpty()) {
+         for (String part : burnout.split(";")) {
+            String[] f = part.split(",");
+            if (f.length != 4) continue;
+            try {
+               long key = World.pack(Integer.parseInt(f[0]), Integer.parseInt(f[1]), Integer.parseInt(f[2]));
+               w.redstone.burnout.put(key, w.tickCount + Math.max(1L, Long.parseLong(f[3])));
+            } catch (NumberFormatException ignored) {
+            }
+         }
+      }
+   }
+
+   private static void restore(World w, int x, int y, int z, int kind, int value, int delay, int oldId) {
+      long key = World.pack(x, y, z);
+      if (w.redstone.pending.containsKey(key)) return;
+      Event e = new Event(w.tickCount + Math.max(1, delay), w.redstone.sequence++, key, oldId, kind, value);
+      w.redstone.pending.put(key, e);
+      w.redstone.queue.add(e);
+   }
+
    static void tick(World w) {
       if(Net319.isClientConnected()&&!Net319.isHosting())return;
-      int budget=65536;
+      // Update 6.18: a bounded number of events per tick. A huge circuit used to be able to run 65536 updates in
+      // one frame; the rest simply wait for the next tick instead of producing a single enormous stutter.
+      int budget=4096;
       while(!w.redstone.queue.isEmpty()&&w.redstone.queue.peek().due()<=w.tickCount&&budget-->0) {
          Event e=w.redstone.queue.remove();
          if(w.redstone.pending.get(e.pos())!=e)continue;
@@ -240,13 +331,23 @@ final class RedstoneLogic {
             schedule(w,x,y,z,TORCH,0,(int)(w.redstone.burnout.get(e.pos())-w.tickCount));
          evaluate(w,x,y,z,w.getBlock(x,y,z));
       }
-      if(w.tickCount%20==0)for(long k:new ArrayList<>(w.redstone.sensors)) {
-         int x=World.ux(k),y=World.uy(k),z=World.uz(k);
-         if(w.isLoaded(x,z)) { w.setBlock(x,y,z,daylight(w,x,y,z)>0?Redstone319.DAYLIGHT_SENSOR_ON:Redstone319.DAYLIGHT_SENSOR);Redstone319.propagate(w,x,y,z); }
+      if(w.tickCount%20==0) {
+         w.redstone.scan.clear();
+         w.redstone.scan.addAll(w.redstone.sensors);
+         for(long k : w.redstone.scan) {
+            int x=World.ux(k),y=World.uy(k),z=World.uz(k);
+            if(w.isLoaded(x,z)) { w.setBlock(x,y,z,daylight(w,x,y,z)>0?Redstone319.DAYLIGHT_SENSOR_ON:Redstone319.DAYLIGHT_SENSOR);Redstone319.propagate(w,x,y,z); }
+            else w.redstone.sensors.remove(k);
+         }
       }
-      if((w.tickCount&1)==0)for(long k:new ArrayList<>(w.redstone.comparators)) {
-         int x=World.ux(k),y=World.uy(k),z=World.uz(k);
-         if(w.isLoaded(x,z))evaluate(w,x,y,z,w.getBlock(x,y,z));
+      if((w.tickCount&1)==0) {
+         w.redstone.scan.clear();
+         w.redstone.scan.addAll(w.redstone.comparators);
+         for(long k : w.redstone.scan) {
+            int x=World.ux(k),y=World.uy(k),z=World.uz(k);
+            if(w.isLoaded(x,z))evaluate(w,x,y,z,w.getBlock(x,y,z));
+            else w.redstone.comparators.remove(k);
+         }
       }
    }
 }

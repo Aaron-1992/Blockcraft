@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.17  -  an original Minecraft-style voxel sandbox   (EDITION V6.17)
+BLOCKCRAFT V6.18  -  an original Minecraft-style voxel sandbox   (EDITION V6.18)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,28 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.18 - New panoramas, the Advanced Video tab and smoother frames
+
+  * Create New World shows every biome: the five aquatic ocean biomes that used
+    to be black now have map colours, a colour key is drawn inside the preview,
+    and the screen lists the biomes and features the world will contain. The
+    "New Oceans" switch chooses the aquatic generator directly.
+  * Three title-screen panoramas: Classic, Coral Coast and Snowy Peaks, plus a
+    Cycle mode. Choose one under Options > Video (or the Advanced tab).
+  * Turn on "Debug Video" in Options > Video to unlock a fifth Advanced tab.
+    It exposes every render, shader and performance setting in game, including
+    shadow-map size, cloud resolution/steps, bloom, shadow refresh, particle
+    cap, worker counts, chunk cache, unload budget and autosave interval. All
+    settings are saved to options.txt.
+  * Redstone states are pruned when a chunk unloads, large circuits use bounded
+    per-tick event budgets and allocation-free primitive tables, pending pulses
+    and burnout now survive a save, and F3 shows the power, input, delay and
+    burnout of the circuit you are looking at.
+  * Frame spikes and retained memory: collision scratch buffers are reused,
+    mob/tile tick allocations are cut, chunk files are written on a low
+    priority worker, autosaves are spread over frames, unloads and saves are
+    budgeted, and loaded chunks honour a configurable memory ceiling.
 
 WHAT'S NEW IN V6.17 - Demand-driven terrain meshes and bounded mesh memory
 

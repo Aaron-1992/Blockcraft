@@ -1098,6 +1098,31 @@ final class Redstone319 {
     * Redstone Torches (NOT-gate inverters), Repeaters, Pistons, Lamps, Doors, Trapdoors, Gates, Note Blocks, and TNT.
     * Batches all chunk section re-meshes to execute once at the end.
     */
+   /** Update 6.18: one scratch bundle per thread. A big circuit no longer allocates boxed Long/Integer tables. */
+   private static final class Scratch {
+      final Packed.Set remesh = new Packed.Set();
+      final Packed.Set visited = new Packed.Set();
+      final Packed.Map idx = new Packed.Map();
+      final Packed.IntQueue bfs = new Packed.IntQueue();
+      final Packed.CoordQueue discover = new Packed.CoordQueue();
+      final Packed.CoordQueue wires = new Packed.CoordQueue();
+
+      void clear() {
+         this.remesh.clear();
+         this.pass();
+      }
+
+      void pass() {
+         this.visited.clear();
+         this.idx.clear();
+         this.bfs.clear();
+         this.discover.clear();
+         this.wires.clear();
+      }
+   }
+
+   private static final ThreadLocal<Scratch> SCRATCH = ThreadLocal.withInitial(Scratch::new);
+
    static void propagate(World w, int cx, int cy, int cz) {
       if (w == null || w.redstone.updating) {
          return;
@@ -1105,19 +1130,23 @@ final class Redstone319 {
 
       w.redstone.updating = true;
       try {
-         HashSet<Long> remesh = new HashSet<>();
+         Scratch s = SCRATCH.get();
+         s.clear();
          for (int pass = 0; pass < 3; pass++) {
-            ArrayList<int[]> wires = new ArrayList<>();
-            boolean stateChanged = relaxWires(w, cx, cy, cz, wires, remesh);
-            stateChanged |= actuateNetwork(w, cx, cy, cz, wires, remesh);
+            s.pass();
+            boolean stateChanged = relaxWires(w, cx, cy, cz, s);
+            stateChanged |= actuateNetwork(w, cx, cy, cz, s);
             if (!stateChanged) {
                break;
             }
          }
 
-         if (w.game != null && !remesh.isEmpty()) {
-            for (long k : remesh) {
-               w.game.meshNow(unpackX(k), unpackY(k), unpackZ(k));
+         if (w.game != null && !s.remesh.isEmpty()) {
+            for (int i = 0; i < s.remesh.slots(); i++) {
+               if (s.remesh.used(i)) {
+                  long k = s.remesh.at(i);
+                  w.game.meshNow(unpackX(k), unpackY(k), unpackZ(k));
+               }
             }
          }
       } finally {
@@ -1125,34 +1154,36 @@ final class Redstone319 {
       }
    }
 
-   private static boolean relaxWires(World w, int cx, int cy, int cz, ArrayList<int[]> wires, HashSet<Long> remesh) {
-      HashMap<Long, Integer> idxMap = new HashMap<>();
-      ArrayDeque<int[]> discover=new ArrayDeque<>();
+   private static boolean relaxWires(World w, int cx, int cy, int cz, Scratch s) {
+      Packed.Map idxMap = s.idx;
+      Packed.CoordQueue discover = s.discover;
+      Packed.CoordQueue wires = s.wires;
       for(int dy=-2;dy<=2;dy++)for(int dz=-2;dz<=2;dz++)for(int dx=-2;dx<=2;dx++)
-         if(isWire(w.getBlock(cx+dx,cy+dy,cz+dz))) discover.add(new int[]{cx+dx,cy+dy,cz+dz});
+         if(isWire(w.getBlock(cx+dx,cy+dy,cz+dz))) discover.add(cx+dx,cy+dy,cz+dz);
       while(!discover.isEmpty()) {
-         int[] p=discover.remove();long key=pack(p[0],p[1],p[2]);
+         int px=discover.x(), py=discover.y(), pz=discover.z();
+         discover.poll();
+         long key=pack(px,py,pz);
          if(idxMap.containsKey(key))continue;
-         idxMap.put(key,wires.size());wires.add(p);
+         idxMap.put(key,wires.size());wires.add(px,py,pz);
          for(int d=0;d<4;d++) {
-            int nx=p[0]+HDX[d],nz=p[2]+HDZ[d],ny=p[1],nb=w.getBlock(nx,ny,nz);
-            if(isWire(nb))discover.add(new int[]{nx,ny,nz});
-            if(Blocks.solid[nb]&&!Blocks.opaque[w.getBlock(p[0],ny+1,p[2])]&&isWire(w.getBlock(nx,ny+1,nz)))discover.add(new int[]{nx,ny+1,nz});
-            if(!Blocks.opaque[nb]&&isWire(w.getBlock(nx,ny-1,nz)))discover.add(new int[]{nx,ny-1,nz});
+            int nx=px+HDX[d],nz=pz+HDZ[d],ny=py,nb=w.getBlock(nx,ny,nz);
+            if(isWire(nb))discover.add(nx,ny,nz);
+            if(Blocks.solid[nb]&&!Blocks.opaque[w.getBlock(px,ny+1,pz)]&&isWire(w.getBlock(nx,ny+1,nz)))discover.add(nx,ny+1,nz);
+            if(!Blocks.opaque[nb]&&isWire(w.getBlock(nx,ny-1,nz)))discover.add(nx,ny-1,nz);
          }
       }
 
-      if (wires.isEmpty()) {
+      if (wires.size() == 0) {
          return false;
       }
 
       int n = wires.size();
       int[] pwr = new int[n];
-      ArrayDeque<Integer> q = new ArrayDeque<>();
+      Packed.IntQueue q = s.bfs;
       int[][] nb6 = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
       for (int i = 0; i < n; i++) {
-         int[] p = wires.get(i);
-         int maxSrc = RedstoneLogic.input(w,p[0],p[1],p[2],false);
+         int maxSrc = RedstoneLogic.input(w,wires.xAt(i),wires.yAt(i),wires.zAt(i),false);
          pwr[i] = maxSrc;
          if (maxSrc > 1) {
             q.add(i);
@@ -1166,10 +1197,9 @@ final class Redstone319 {
             continue;
          }
          int nextP = curP - 1;
-         int[] a = wires.get(idx);
-         int ax = a[0];
-         int ay = a[1];
-         int az = a[2];
+         int ax = wires.xAt(idx);
+         int ay = wires.yAt(idx);
+         int az = wires.zAt(idx);
          boolean upClear = ay < 254 && !Blocks.opaque[w.getBlock(ax, ay + 1, az)];
          for (int d = 0; d < 4; d++) {
             int nx = ax + HDX[d];
@@ -1186,35 +1216,35 @@ final class Redstone319 {
 
       boolean changed = false;
       for (int i = 0; i < n; i++) {
-         int[] p = wires.get(i);
+         int px = wires.xAt(i), py = wires.yAt(i), pz = wires.zAt(i);
          int want = REDSTONE_WIRE0 + pwr[i];
-         if (w.getBlock(p[0], p[1], p[2]) != want) {
-            w.setBlock(p[0], p[1], p[2], want);
-            remesh.add(pack(p[0], p[1], p[2]));
+         if (w.getBlock(px, py, pz) != want) {
+            w.setBlock(px, py, pz, want);
+            s.remesh.add(pack(px, py, pz));
             changed = true;
          }
       }
       return changed;
    }
 
-   private static void offerWireIdx(ArrayDeque<Integer> q, HashMap<Long, Integer> idxMap, int[] pwr, int nx, int ny, int nz, int nextP) {
-      Integer j = idxMap.get(pack(nx, ny, nz));
-      if (j != null && nextP > pwr[j]) {
+   private static void offerWireIdx(Packed.IntQueue q, Packed.Map idxMap, int[] pwr, int nx, int ny, int nz, int nextP) {
+      int j = idxMap.get(pack(nx, ny, nz));
+      if (j >= 0 && nextP > pwr[j]) {
          pwr[j] = nextP;
          q.add(j);
       }
    }
 
-   private static boolean actuateNetwork(World w, int cx, int cy, int cz, ArrayList<int[]> wires, HashSet<Long> remesh) {
-      HashSet<Long> visited = new HashSet<>();
-      boolean changed = actuateAround(w, cx, cy, cz, visited, remesh);
-      for (int[] p : wires) {
-         changed |= actuateAround(w, p[0], p[1], p[2], visited, remesh);
+   private static boolean actuateNetwork(World w, int cx, int cy, int cz, Scratch s) {
+      boolean changed = actuateAround(w, cx, cy, cz, s);
+      Packed.CoordQueue wires = s.wires;
+      for (int i = 0; i < wires.size(); i++) {
+         changed |= actuateAround(w, wires.xAt(i), wires.yAt(i), wires.zAt(i), s);
       }
       return changed;
    }
 
-   private static boolean actuateAround(World w, int cx, int cy, int cz, HashSet<Long> visited, HashSet<Long> remesh) {
+   private static boolean actuateAround(World w, int cx, int cy, int cz, Scratch s) {
       boolean changed = false;
       for (int dy = -1; dy <= 2; dy++) {
          for (int dz = -1; dz <= 1; dz++) {
@@ -1226,7 +1256,7 @@ final class Redstone319 {
                   continue;
                }
                long key = pack(x, y, z);
-               if (!visited.add(key)) {
+               if (!s.visited.add(key)) {
                   continue;
                }
 
@@ -1241,9 +1271,9 @@ final class Redstone319 {
                   boolean ext = isPistonExtended(id);
                   boolean pow = isPistonPowered(w, x, y, z, f);
                   if (pow && !ext) {
-                     changed |= extendPiston(w, x, y, z, f, isStickyPiston(id), remesh);
+                     changed |= extendPiston(w, x, y, z, f, isStickyPiston(id), s);
                   } else if (!pow && ext) {
-                     changed |= retractPiston(w, x, y, z, f, isStickyPiston(id), remesh);
+                     changed |= retractPiston(w, x, y, z, f, isStickyPiston(id), s);
                   }
                   continue;
                }
@@ -1251,7 +1281,7 @@ final class Redstone319 {
                boolean pow = isPowered(w, x, y, z);
                if (id == REDSTONE_LAMP && pow) {
                   w.setBlock(x, y, z, REDSTONE_LAMP_LIT);
-                  remesh.add(key);
+                  s.remesh.add(key);
                   changed = true;
                } else if (id == REDSTONE_LAMP_LIT && !pow) {
                   RedstoneLogic.evaluate(w,x,y,z,id);
@@ -1260,14 +1290,14 @@ final class Redstone319 {
                   if (pow != open) {
                      w.setBlock(x, y, z, Shapes.toggled(id));
                      SoundEngine.play3D(w, pow ? "door_open" : "door_close", x + 0.5, y + 0.5, z + 0.5, 0.8F, 1.0F);
-                     remesh.add(key);
+                     s.remesh.add(key);
                   }
                } else if (Shapes.isGate(id)) {
                   boolean open = Shapes.gateOpen(id);
                   if (pow != open) {
                      w.setBlock(x, y, z, Shapes.toggled(id));
                      SoundEngine.play3D(w, pow ? "gate_open" : "gate_close", x + 0.5, y + 0.5, z + 0.5, 0.85F, 1.0F);
-                     remesh.add(key);
+                     s.remesh.add(key);
                   }
                } else if (Blocks.isDoorLo(id)) {
                   boolean open = Blocks.doorOpen(id);
@@ -1280,15 +1310,15 @@ final class Redstone319 {
                            w.setBlock(x, y, z, id + 4);
                            w.setBlock(x, y + 1, z, hi + 4);
                            SoundEngine.play3D(w, iron ? "iron_door_open" : "door_open", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
-                           remesh.add(key);
-                           remesh.add(pack(x, y + 1, z));
+                           s.remesh.add(key);
+                           s.remesh.add(pack(x, y + 1, z));
                         }
                      } else if (open && w.redstone.opened.remove(key)) {
                         w.setBlock(x, y, z, id - 4);
                         w.setBlock(x, y + 1, z, hi - 4);
                         SoundEngine.play3D(w, iron ? "iron_door_close" : "door_close", x + 0.5, y + 1.0, z + 0.5, 0.85F, 1.0F);
-                        remesh.add(key);
-                        remesh.add(pack(x, y + 1, z));
+                        s.remesh.add(key);
+                        s.remesh.add(pack(x, y + 1, z));
                      }
                   }
                } else if (id == NOTE_BLOCK) {
@@ -1301,7 +1331,7 @@ final class Redstone319 {
                   w.setBlock(x, y, z, 0);
                   w.primeTnt(x, y, z, 80);
                   SoundEngine.play3D(w, "tnt_ignite", x + 0.5, y + 0.5, z + 0.5, 0.9F, 1.0F);
-                  remesh.add(key);
+                  s.remesh.add(key);
                }
             }
          }
@@ -1349,13 +1379,13 @@ final class Redstone319 {
       return !isPistonExtended(id) && !(id >= PISTON_HEAD && id < PISTON_HEAD + 6);
    }
 
-   private static boolean extendPiston(World w, int x, int y, int z, int f, boolean sticky, HashSet<Long> remesh) {
+   private static boolean extendPiston(World w, int x, int y, int z, int f, boolean sticky, Scratch s) {
       int dx = FDX[f];
       int dy = FDY[f];
       int dz = FDZ[f];
       PistonPlan plan=new PistonPlan(w,x,y,z,dx,dy,dz,false);
       if(!plan.collect(x+dx,y+dy,z+dz))return false;
-      plan.apply(remesh);
+      plan.apply(s);
       w.redstone.extendedAt.put(pack(x,y,z),w.tickCount);
 
       int hx = x + dx;
@@ -1364,12 +1394,12 @@ final class Redstone319 {
       w.setBlock(hx, hy, hz, PISTON_HEAD + f);
       w.setBlock(x, y, z, (sticky ? STICKY_PISTON_EXT : PISTON_EXT) + f);
       SoundEngine.play3D(w, "place_metal_1", x + 0.5, y + 0.5, z + 0.5, 0.78F, 0.78F);
-      remesh.add(pack(hx, hy, hz));
-      remesh.add(pack(x, y, z));
+      s.remesh.add(pack(hx, hy, hz));
+      s.remesh.add(pack(x, y, z));
       return true;
    }
 
-   private static boolean retractPiston(World w, int x, int y, int z, int f, boolean sticky, HashSet<Long> remesh) {
+   private static boolean retractPiston(World w, int x, int y, int z, int f, boolean sticky, Scratch s) {
       int dx = FDX[f];
       int dy = FDY[f];
       int dz = FDZ[f];
@@ -1378,10 +1408,10 @@ final class Redstone319 {
       int hz = z + dz;
       w.setBlock(x, y, z, (sticky ? STICKY_PISTON : PISTON) + f);
       SoundEngine.play3D(w, "place_metal_1", x + 0.5, y + 0.5, z + 0.5, 0.72F, 0.68F);
-      remesh.add(pack(x, y, z));
+      s.remesh.add(pack(x, y, z));
       if (w.getBlock(hx, hy, hz) == PISTON_HEAD + f) {
          w.setBlock(hx, hy, hz, 0);
-         remesh.add(pack(hx, hy, hz));
+         s.remesh.add(pack(hx, hy, hz));
       }
       long held=w.tickCount-w.redstone.extendedAt.getOrDefault(pack(x,y,z),w.tickCount-3);
       w.redstone.extendedAt.remove(pack(x,y,z));
@@ -1389,7 +1419,7 @@ final class Redstone319 {
          int px=x+dx*2,py=y+dy*2,pz=z+dz*2,id=w.getBlock(px,py,pz);
          if(id!=0&&Blocks.solid[id]&&canPistonPush(id,py)) {
             PistonPlan plan=new PistonPlan(w,x,y,z,-dx,-dy,-dz,true);
-            if(plan.collect(px,py,pz))plan.apply(remesh);
+            if(plan.collect(px,py,pz))plan.apply(s);
          }
       }
       return true;
@@ -1420,18 +1450,18 @@ final class Redstone319 {
          }
          return true;
       }
-      void apply(HashSet<Long> remesh) {
+      void apply(Scratch s) {
          java.util.Map<Long,Integer> tuning=new java.util.HashMap<>();
          for(long k:blocks.keySet())if((blocks.get(k)&4095)==NOTE_BLOCK)tuning.put(k,NoteBlocks.pitch(w,unpackX(k),unpackY(k),unpackZ(k)));
          for(long k:broken) {
             int x=unpackX(k),y=unpackY(k),z=unpackZ(k),id=w.getBlock(x,y,z);
             if(Blocks.drop[id]>0)w.dropItem(x+.5,y+.3,z+.5,Blocks.drop[id],1);
-            w.setBlock(x,y,z,0);remesh.add(k);
+            w.setBlock(x,y,z,0);s.remesh.add(k);
          }
-         for(long k:blocks.keySet()){w.setBlock(unpackX(k),unpackY(k),unpackZ(k),0);remesh.add(k);}
+         for(long k:blocks.keySet()){w.setBlock(unpackX(k),unpackY(k),unpackZ(k),0);s.remesh.add(k);}
          for(java.util.Map.Entry<Long,Integer> e:blocks.entrySet()) {
             long k=e.getKey();int x=unpackX(k)+dx,y=unpackY(k)+dy,z=unpackZ(k)+dz;
-            w.setState(x,y,z,e.getValue());if(tuning.containsKey(k))NoteBlocks.tune(w,x,y,z,tuning.get(k));remesh.add(pack(x,y,z));
+            w.setState(x,y,z,e.getValue());if(tuning.containsKey(k))NoteBlocks.tune(w,x,y,z,tuning.get(k));s.remesh.add(pack(x,y,z));
          }
       }
    }

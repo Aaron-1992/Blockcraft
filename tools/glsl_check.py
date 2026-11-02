@@ -46,6 +46,16 @@ def extract(path):
             lines.append(java_string(lit.group(1)))
         src = "\n".join(lines)
         found[os.path.basename(path) + ":" + m.group(1)] = src
+    # Some shaders are a shared declaration block plus their own main(), e.g.
+    #   static final String CLOUD_FS = CLOUD_DECL + "\n" + String.join("\n", new CharSequence[]{ ... });
+    # Check those too: a syntax error in the cloud body would otherwise go unnoticed.
+    for m in re.finditer(r"static final String (\w+) = (\w+) \+ \"\\n\" \+ String\.join\(\s*\"\\n\",\s*new CharSequence\[\]\{(.*?)\}\s*\);", text, re.S):
+        name, prefix, body = m.group(1), m.group(2), m.group(3)
+        head = found.get(os.path.basename(path) + ":" + prefix)
+        if head is None:
+            continue
+        lines = [java_string(lit.group(1)) for lit in re.finditer(r'"((?:[^"\\]|\\.)*)"', body)]
+        found[os.path.basename(path) + ":" + name] = head + "\n" + "\n".join(lines)
     return found
 
 

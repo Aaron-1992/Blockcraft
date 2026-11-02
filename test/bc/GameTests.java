@@ -1734,6 +1734,7 @@ public final class GameTests {
       TestsComputer.run();
       TestsRaster.run();
       TestsMedia.run();TestsMidi.run();TestsMidiGui.run();TestsMidiPlayback.run();TestsKinetics.run();
+      Tests618.run();
       System.out.println();
       System.out.println("passed " + passed + ", failed " + failed);
       if (failed > 0) {
