@@ -213,6 +213,8 @@ public final class Shaders {
    public float sunY;
    public float sunZ;
    public float sunUp;
+   /** Update 6.24: soft radial mask for light-facing entity shadow silhouettes. */
+   int shadowBlobTex;
    /** Update 6.19: the active light is the moon at night. moonF blends the light colour, moonUp is its (dim) strength. */
    public float moonF, moonUp, lightUp, realSunY;
    /** Update 6.19: the options of the running game, used by the LOD/entity uniforms (null in headless tools). */
@@ -453,6 +455,31 @@ public final class Shaders {
       this.staticTex = depthTarget(size);
       this.staticFbo = depthFramebuffer(this.staticTex);
       this.staticValid = false;
+      if (this.shadowBlobTex == 0) this.shadowBlobTex = makeShadowBlob();
+   }
+
+   /** A small white ellipse with a feathered alpha edge; the depth shader discards outside it. */
+   private static int makeShadowBlob() {
+      final int n = 32;
+      ByteBuffer px = BufferUtils.createByteBuffer(n * n * 4);
+      for (int y = 0; y < n; y++) {
+         for (int x = 0; x < n; x++) {
+            float u = (x + 0.5F) / n * 2.0F - 1.0F;
+            float v = (y + 0.5F) / n * 2.0F - 1.0F;
+            float d = (float)Math.sqrt(u * u + v * v);
+            float a = d < 0.70F ? 1.0F : (d > 0.99F ? 0.0F : (0.99F - d) / 0.29F);
+            px.put((byte)255).put((byte)255).put((byte)255).put((byte)(int)(a * 255.0F));
+         }
+      }
+      px.flip();
+      int tex = GL11.glGenTextures();
+      GL11.glBindTexture(3553, tex);
+      GL11.glTexImage2D(3553, 0, 6408, n, n, 0, 6408, 5121, px);
+      GL11.glTexParameteri(3553, 10241, 9729);
+      GL11.glTexParameteri(3553, 10240, 9729);
+      GL11.glTexParameteri(3553, 10242, 33071);
+      GL11.glTexParameteri(3553, 10243, 33071);
+      return tex;
    }
 
    private static int depthTarget(int size) {
@@ -525,11 +552,14 @@ public final class Shaders {
       GL11.glPushMatrix();
       GL11.glLoadIdentity();
       GL11.glColorMask(false, false, false, false);
-      GL11.glEnable(32823);
-      GL11.glPolygonOffset(2.0F, 4.0F);
+      // Entity silhouettes are thin billboards: no polygon offset or they detach from the mob.
+      GL11.glDisable(32823);
+      GL13.glActiveTexture(33984);
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, this.shadowBlobTex);
       GL20.glUseProgram(this.pDepth);
       this.u1i(this.pDepth, "tex", 0);
-      this.setShadowSolid(1.0F);
+      this.setShadowSolid(0.0F);
    }
 
    /** Update 6.18: the Advanced Video shadow-map setting. Called on the render thread while GL is current. */

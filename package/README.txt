@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.23  -  an original Minecraft-style voxel sandbox   (EDITION V6.23)
+BLOCKCRAFT V6.24  -  an original Minecraft-style voxel sandbox   (EDITION V6.24)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,38 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.24 - trees that look like trees, LOD that matches them,
+                       and entity shadows that behave
+
+  * TREES WERE REDONE. V6.23 crowns were one-block-thick flat discs with
+    random holes; spruces were isolated rings with air between them. Each
+    crown is now one closed, rounded 3D volume built from a vertical radius
+    profile; conifers are continuous tapered cones; acacia, dark oak and
+    jungle canopies have real thickness. All 34 silhouettes, all three size
+    tiers and all eight species are kept.
+  * NO MORE TRUNCATED GIANTS. Stacking whole domes used to exhaust the hard
+    leaf budget, so the biggest jungle trees were cut off mid-crown. Crowns
+    are hollow shells with solid caps, so even a Giant at Tree Size 1.5x
+    stays well inside the budget (headless worst case 938 of 1200 leaves).
+  * LOD NOW DEPICTS THE ACTUAL TREES. Distant tiles replay the exact chunk
+    dice used by the world generator (same seed, 44 attempts, same tree
+    plan, variant and size tier) and draw silhouettes MEASURED from the real
+    geometry: trunk height, crown bottom/top and a six-band radius profile.
+    Umbrellas stay flat, conifers taper, giants are taller. Distant forests
+    are thinned by a hash instead of a fixed stride, so there are no empty
+    stripes. See docs/screenshots/v6.24-trees-and-lod.png (headless render of
+    the real geometry, NOT a GPU screenshot).
+  * ENTITY SHADOWS LOOK RIGHT. Mobs used to cast five opaque box faces into
+    the shadow map (big rectangular blobs), and they were drawn relative to
+    the live camera while the shadow matrix is built at the last refresh, so
+    shadows drifted up to 12 blocks as you walked. Each mob now casts one
+    soft radial billboard facing the sun, anchored to the shadow-map camera
+    and sun angle. Still re-stamped every frame; with "Live Entity Shadows"
+    off they are stamped once per refresh instead of disappearing.
+  * BUG SWEEP: fixed the lopsided disc loop, hole-riddled crown shells,
+    detached jungle side lobes, clipped birch crowns, gaps at conifer tips,
+    LOD's unrelated decorative forest and the missing static mob shadows.
 
 WHAT'S NEW IN V6.23 - More tree variants and BIGGER trees for every species
 

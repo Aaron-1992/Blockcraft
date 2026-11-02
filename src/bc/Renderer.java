@@ -1668,6 +1668,11 @@ public final class Renderer {
       // Update 6.22: keep a terrain-only copy of the depth. Mobs are re-stamped every frame
       // (see updateEntityShadows), so their shadows track movement instead of lagging behind
       // the 8..150 frame shadow-map refresh.
+      // With "Live Entity Shadows" off the silhouettes are stamped once per shadow
+      // refresh instead of every frame - they must not disappear completely.
+      if (this.g.opt != null && this.g.opt.entityShadows && !this.g.opt.entityShadowMotion) {
+         this.renderEntityShadowCasters();
+      }
       this.sh.saveStaticShadow();
       arrays(false);
       this.sh.endShadow(var1, var2, true);
@@ -1691,16 +1696,9 @@ public final class Renderer {
       return 1.8F;
    }
 
-   private static void shadowQuad(float ax, float ay, float az, float bx, float by, float bz,
-                                  float cx, float cy, float cz, float dx, float dy, float dz) {
-      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
-      GL11.glVertex3f(ax, ay, az);
-      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
-      GL11.glVertex3f(bx, by, bz);
-      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
-      GL11.glVertex3f(cx, cy, cz);
-      GL13.glMultiTexCoord2f(33984, 0.5F, 0.5F);
-      GL11.glVertex3f(dx, dy, dz);
+   private static void shadowVertex(float x, float y, float z, float u, float v) {
+      GL13.glMultiTexCoord2f(33984, u, v);
+      GL11.glVertex3f(x, y, z);
    }
 
    /**
@@ -1708,35 +1706,63 @@ public final class Renderer {
     * with the atlas alpha test switched off, so it costs five quads per nearby mob and no extra textures,
     * programs or framebuffers. The same map is used by the sun and by the moon.
     */
+   /**
+    * Update 6.24: one soft, light-facing elliptical billboard per mob. The old version
+    * stamped five opaque box faces into the depth map, which produced large rectangular
+    * blobs that did not follow the creature's shape and looked detached at low sun angles.
+    * The billboard always faces the sun/moon, so the silhouette is a proper rounded shadow
+    * in the shadow map, redrawn on every frame from the live mob positions.
+    */
    private void renderEntityShadowCasters() {
       if (this.g.opt == null || !this.g.opt.entityShadows || this.g.mobs.list.isEmpty()) return;
+      // clipM/shadowM are built at the LAST shadow refresh. Drawing mobs relative to the
+      // live camera would slide their shadows up to 12 blocks away from them as you walk;
+      // use the camera and sun the shadow map was actually built with.
+      float sx = this.sh.mapSx, sy = this.sh.mapSy, sz = this.sh.mapSz;
+      if (sy < 0.06F) return;                       // no directional light at night
+      // right = normalize(cross(worldUp, sun))
+      float rx = sz, ry = 0.0F, rz = -sx;
+      float rl = (float)Math.sqrt(rx * rx + rz * rz);
+      if (rl < 0.001F) { rx = 1.0F; rz = 0.0F; rl = 1.0F; }
+      rx /= rl; rz /= rl;
+      // up2 = normalize(cross(sun, right))
+      float ux = sy * rz;
+      float uy = sz * rx - sx * rz;
+      float uz = -sy * rx;
+      float ul = (float)Math.sqrt(ux * ux + uy * uy + uz * uz);
+      if (ul < 0.001F) { ux = 0.0F; uy = 1.0F; uz = 0.0F; ul = 1.0F; }
+      ux /= ul; uy /= ul; uz /= ul;
+
       int cap = 96;
       double maxD2 = 48.0 * 48.0;
       int n = 0;
       arrays(false);
+      GL13.glActiveTexture(33984);
+      GL11.glEnable(3553);
+      GL11.glBindTexture(3553, this.sh.shadowBlobTex);
       GL20.glUseProgram(this.sh.pDepth);
-      this.sh.setShadowSolid(1.0F);
+      this.sh.setShadowSolid(0.0F);
       GL11.glBegin(GL11.GL_QUADS);
       for (Mobs.Mob m : this.g.mobs.list) {
          if (m == null || m.dead || n >= cap) continue;
-         double ddx = m.x - this.camX;
-         double ddz = m.z - this.camZ;
+         double ddx = m.x - this.sh.mapX;
+         double ddz = m.z - this.sh.mapZ;
          if (ddx * ddx + ddz * ddz > maxD2) continue;
          float x = (float)ddx;
-         float y = (float)(m.y - this.camY);
+         float y = (float)(m.y - this.sh.mapY);
          float z = (float)ddz;
-         float hw = entityShadowWidth(m.type);
          float h = entityShadowHeight(m.type);
-         shadowQuad(x - hw, y, z - hw, x + hw, y, z - hw, x + hw, y + h, z - hw, x - hw, y + h, z - hw);
-         shadowQuad(x - hw, y, z + hw, x + hw, y, z + hw, x + hw, y + h, z + hw, x - hw, y + h, z + hw);
-         shadowQuad(x - hw, y, z - hw, x - hw, y, z + hw, x - hw, y + h, z + hw, x - hw, y + h, z - hw);
-         shadowQuad(x + hw, y, z - hw, x + hw, y, z + hw, x + hw, y + h, z + hw, x + hw, y + h, z - hw);
-         shadowQuad(x - hw, y + h, z - hw, x + hw, y + h, z - hw, x + hw, y + h, z + hw, x - hw, y + h, z + hw);
+         float hw = entityShadowWidth(m.type) * 1.15F;
+         float hh = h * 0.55F;
+         float cy = y + h * 0.5F;
+         shadowVertex(x - rx * hw - ux * hh, cy - ry * hw - uy * hh, z - rz * hw - uz * hh, 0.0F, 0.0F);
+         shadowVertex(x + rx * hw - ux * hh, cy + ry * hw - uy * hh, z + rz * hw - uz * hh, 1.0F, 0.0F);
+         shadowVertex(x + rx * hw + ux * hh, cy + ry * hw + uy * hh, z + rz * hw + uz * hh, 1.0F, 1.0F);
+         shadowVertex(x - rx * hw + ux * hh, cy - ry * hw + uy * hh, z - rz * hw + uz * hh, 0.0F, 1.0F);
          n++;
          Perf.shadowDraws++;
       }
       GL11.glEnd();
-      this.sh.setShadowSolid(0.0F);
    }
 
    /** Update 3.12: the sky of the End - no sun, no moon: stars on the deep purple, turning very slowly. */

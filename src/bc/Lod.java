@@ -447,18 +447,75 @@ public final class Lod {
       this.trees(var1, var2, var3, var4, null, null, null);
    }
 
+   /** Colours for the shared tree silhouettes (species-consistent with the real blocks). */
+   static int lodLeafColour(int sp, Col col, int cellRgb) {
+      switch (sp) {
+         case TerraTrees.SP_BIRCH: return shade(8431445, 0.72F);
+         case TerraTrees.SP_SPRUCE: return shade(6396257, 0.62F);
+         case TerraTrees.SP_JUNGLE: return shade(0x36A022, 0.72F);
+         case TerraTrees.SP_ACACIA: return shade(0x889232, 0.72F);
+         case TerraTrees.SP_DARK_OAK: return shade(0x3C6E24, 0.72F);
+         case TerraTrees.SP_SWAMP: return shade(0x6A7039, 0.70F);
+         case TerraTrees.SP_BUSH: return shade(0x5AA655, 0.70F);
+         default: return col != null ? Gen.foliageColorFor(col.t, col.hu) : shade(cellRgb, 0.92F);
+      }
+   }
+
+   static int lodTrunkColour(int sp) {
+      switch (sp) {
+         case TerraTrees.SP_BIRCH: return 13816512;
+         case TerraTrees.SP_SPRUCE: return 3877398;
+         case TerraTrees.SP_JUNGLE: return 0x54441B;
+         case TerraTrees.SP_ACACIA: return 0x676056;
+         case TerraTrees.SP_DARK_OAK: return 0x3B2B17;
+         default: return 7034162;
+      }
+   }
+
+   /**
+    * Draw one distant tree from the MEASURED silhouette of the exact species/variant/
+    * size tier the world generator used at this coordinate. Bands follow the real crown
+    * profile, so umbrellas stay flat, conifers taper and giants are actually taller.
+    */
+   static void lodTree(Lod.Mb mb, float x, float gy, float z, TerraTrees.LodShape sh,
+                       float scale, float pad, boolean drawTrunk, int leafCol, int trunkCol,
+                       float jitter, int bands) {
+      float bottom = gy + sh.bottom * scale;
+      float top = gy + sh.top * scale;
+      float hw = sh.wide ? 0.95F : 0.5F;
+      if (drawTrunk) {
+         boxSides(mb, x - hw, gy - 1.0F, z - hw, x + hw, gy + sh.trunk * scale, z + hw, trunkCol, 0.0F);
+      }
+      int n = Math.max(3, Math.min(6, bands));
+      for (int k = 0; k < n; k++) {
+         float f0 = (float)k / n;
+         float f1 = (float)(k + 1) / n;
+         float r = Math.max(0.65F, sh.band((f0 + f1) * 0.5F) * scale + pad);
+         float y0 = bottom + (top - bottom) * f0;
+         float y1 = bottom + (top - bottom) * f1;
+         if (y1 <= y0) y1 = y0 + 0.6F;
+         box(mb, x - r, y0, z - r, x + r, y1, z + r, shade(leafCol, 0.86F + 0.24F * f0), jitter);
+      }
+   }
+
    void trees(Lod.Tile var1, Lod.Mb var2, List<Village> var3, float var4, int[] gridH, int[] gridBiome, int[] gridRgb) {
-      int var5 = Math.floorDiv(var1.x0, 16);
-      int var6 = Math.floorDiv(var1.x0 + var1.size - 1, 16);
-      int var7 = Math.floorDiv(var1.z0, 16);
-      int var8 = Math.floorDiv(var1.z0 + var1.size - 1, 16);
-      boolean var9 = var1.size <= 64;
-      int maxTries = var1.size <= 64 ? 12 : (var1.size == 128 ? 10 : (var1.size == 256 ? 7 : 5));
+      int x0c = Math.floorDiv(var1.x0, 16);
+      int x1c = Math.floorDiv(var1.x0 + var1.size - 1, 16);
+      int z0c = Math.floorDiv(var1.z0, 16);
+      int z1c = Math.floorDiv(var1.z0 + var1.size - 1, 16);
+      // Keep the old LOD work budget, but thin chunks by a hash instead of a fixed stride:
+      // regular strides leave visible empty stripes in distant forests.
       int chunkStep = var1.size >= 1024 ? 4 : (var1.size == 512 ? 2 : 1);
+      float chunkKeep = 1.0F / (chunkStep * chunkStep);
+      int treeCap = var1.size >= 512 ? 260 : (var1.size == 256 ? 220 : 160);
+      int drawn = 0;
+      int bands = var1.size <= 64 ? 6 : (var1.size <= 256 ? 5 : (var1.size <= 512 ? 4 : 3));
       boolean drawTrunk = var1.size <= 128;
-      boolean drawCrownCap = var1.size <= 512;
       float canopyPad = var1.size >= 1024 ? 1.55F : (var1.size == 512 ? 0.95F : (var1.size == 256 ? 0.45F : 0.0F));
       int cs = Math.max(1, var1.size / 32);
+      TerraGen tg = this.gen instanceof TerraGen ? (TerraGen)this.gen : null;
+      float treeScale = tg != null ? tg.treeScale : 1.0F;
+      boolean giants = tg != null ? tg.giantTrees : true;
 
       List<Landmarks319.Site> landmarks = null;
       if (var1.size <= 512 && Gen.extras && this.gen.settings.structVer >= 2 && this.gen.settings.terra()) {
@@ -470,347 +527,139 @@ public final class Lod {
             for (int lrz = lrz0; lrz <= lrz1; lrz++) {
                Landmarks319.Site lsite = Landmarks319.plan(this.gen.structs, lrx, lrz);
                if (lsite != null) {
-                  if (landmarks == null) {
-                     landmarks = new ArrayList<>(4);
-                  }
-
+                  if (landmarks == null) landmarks = new ArrayList<>(4);
                   landmarks.add(lsite);
                }
             }
          }
       }
 
-      for (int var10 = var5; var10 <= var6; var10 += chunkStep) {
-         for (int var11 = var7; var11 <= var8; var11 += chunkStep) {
-            Random var12 = new Random(this.gen.seed * 7919L ^ (var10 * 734287L + var11 * 912931L) * 31L + 17L);
+      for (int cx = x0c; cx <= x1c && drawn < treeCap; cx++) {
+         for (int cz = z0c; cz <= z1c && drawn < treeCap; cz++) {
+            if (chunkKeep < 1.0F && hash(cx, cz) >= chunkKeep) continue;
+            // The very same dice the chunk generator rolls: LOD trees now sit exactly
+            // where the real ones are instead of being an unrelated decorative forest.
+            Random tr = new Random(TerraGen.treeAttemptSeed(this.gen.seed, cx, cz));
+            for (int i = 0; i < TerraGen.TREE_ATTEMPTS; i++) {
+               int lx = tr.nextInt(16);
+               int lz = tr.nextInt(16);
+               float p = tr.nextFloat();
+               int kind = tr.nextInt(1000);
+               long ts = tr.nextLong();
+               int wx = cx * 16 + lx;
+               int wz = cz * 16 + lz;
+               if (p >= 0.63F || wx < var1.x0 || wx >= var1.x0 + var1.size
+                  || wz < var1.z0 || wz >= var1.z0 + var1.size) continue;
 
-            for (int var13 = 0; var13 < maxTries; var13++) {
-               int var14 = var12.nextInt(16);
-               int var15 = var12.nextInt(16);
-               float var16 = var12.nextFloat();
-               int var17 = var12.nextInt(1000);
-               int var18 = var12.nextInt(3);
-               int var19 = var12.nextInt();
-               int var20 = var10 * 16 + var14;
-               int var21 = var11 * 16 + var15;
-               if (var20 >= var1.x0 && var20 < var1.x0 + var1.size && var21 >= var1.z0 && var21 < var1.z0 + var1.size && !(var16 > 0.85F)) {
-                  int ground;
-                  int bm;
-                  int cellRgb = 0x598E34;
-                  Col var22 = null;
-                  if (gridH != null && gridBiome != null) {
-                     int gx = 1 + Math.max(0, Math.min(31, (var20 - var1.x0) / cs));
-                     int gz = 1 + Math.max(0, Math.min(31, (var21 - var1.z0) / cs));
-                     int gi = gz * 34 + gx;
-                     ground = gridH[gi];
-                     bm = gridBiome[gi];
-                     if (gridRgb != null) {
-                        cellRgb = gridRgb[gi];
+               int ground;
+               int bm;
+               int cellRgb = 0x598E34;
+               Col col = null;
+               if (gridH != null && gridBiome != null) {
+                  int gx = 1 + Math.max(0, Math.min(31, (wx - var1.x0) / cs));
+                  int gz = 1 + Math.max(0, Math.min(31, (wz - var1.z0) / cs));
+                  int gi = gz * 34 + gx;
+                  ground = gridH[gi];
+                  bm = gridBiome[gi];
+                  if (gridRgb != null) cellRgb = gridRgb[gi];
+               } else {
+                  col = this.gen.column(wx, wz);
+                  ground = col.h;
+                  bm = col.biome;
+               }
+               if (ground < 64 || ground > 235 || (var1.size < 64 && this.gen.entrance(wx, wz))) continue;
+
+               if (this.map != null && var1.size <= 256) {
+                  // Where the chunk was changed only draw the tree if its trunk is still there.
+                  LodMap.Sum sum = this.map.get(wx >> 4, wz >> 4);
+                  if (sum != null) {
+                     int k = (wz & 15) * 16 + (wx & 15);
+                     if (sum.trunk[k] < 3 || sum.depth[k] > 0) continue;
+                     ground = sum.top[k] - 1;
+                     col = this.gen.column(wx, wz);
+                     bm = col.biome;
+                  }
+               }
+
+               double dens = tg != null ? tg.treeDensityAt(wx, wz) : 1.0;
+               int plan = TerraGen.treePlan(bm, p, kind, dens);
+               if (plan < 0) {
+                  // Deserts have no tree plan; keep their sparse cactus silhouette.
+                  if ((bm == Biomes.DESERT || bm == Biomes.BADLANDS) && p < 0.05 && var1.size <= 256) {
+                     float px = wx - var1.x0 + 0.5F;
+                     float pz = wz - var1.z0 + 0.5F;
+                     float gy = ground + 1.0F;
+                     box(var2, px - 0.45F, gy - 1.0F, pz - 0.45F, px + 0.45F, gy + 3.0F, pz + 0.45F,
+                        0x4A7828, (hash(wx, wz) - 0.5F) * 0.14F);
+                  }
+                  continue;
+               }
+
+               boolean clear = true;
+               for (Village vg : var3 == null ? Collections.<Village>emptyList() : var3) {
+                  if (!vg.placed.isEmpty()) {
+                     for (Village314.Placed pl : vg.placed) {
+                        if (wx >= pl.x0 - 3 && wx <= pl.x0 + pl.fw + 2 && wz >= pl.z0 - 3 && wz <= pl.z0 + pl.fd + 2) {
+                           clear = false; break;
+                        }
+                     }
+                     if (clear) {
+                        for (Village314.Street st : vg.streets) {
+                           if (wx >= st.x0 - 2 && wx <= st.x1 + 2 && wz >= st.z0 - 2 && wz <= st.z1 + 2) {
+                              clear = false; break;
+                           }
+                        }
                      }
                   } else {
-                     var22 = this.gen.column(var20, var21);
-                     ground = var22.h;
-                     bm = var22.biome;
-                  }
-
-                  if (this.map != null && var1.size <= 256) {
-                     // Update 3.11: where the chunk was changed the tree is only drawn if its trunk is still there (burnt, felled, dug away: gone)
-                     LodMap.Sum sum = this.map.get(var20 >> 4, var21 >> 4);
-                     if (sum != null) {
-                        int k = (var21 & 15) * 16 + (var20 & 15);
-                        if (sum.trunk[k] < 3 || sum.depth[k] > 0) {
-                           continue;
+                     for (Bld bld : vg.blds) {
+                        if (wx >= bld.bx0 - 3 && wx <= bld.bx1 + 3 && wz >= bld.bz0 - 3 && wz <= bld.bz1 + 3) {
+                           clear = false; break;
                         }
-
-                        ground = sum.top[k] - 1;
-                        var22 = this.gen.column(var20, var21);
-                        bm = var22.biome;
                      }
                   }
-
-                  if (ground >= 64 && ground <= 235 && (var1.size >= 64 || !this.gen.entrance(var20, var21))) {
-                     int var23;
-                     switch (bm) {
-                        case Biomes.PLAINS:
-                           if (var16 > 0.035F) {
-                              continue;
-                           }
-                           var23 = 0;
-                           break;
-                        case Biomes.MEADOW:
-                           if (var16 > 0.03F) {
-                              continue;
-                           }
-                           var23 = var17 < 400 ? 1 : 0;
-                           break;
-                        case Biomes.FOREST:
-                           if (var16 > 0.85F) {
-                              continue;
-                           }
-                           var23 = var17 < 250 ? 1 : 0;
-                           break;
-                        case Biomes.FLOWER_FOREST:
-                           if (var16 > 0.55F) {
-                              continue;
-                           }
-                           var23 = var17 < 350 ? 1 : 0;
-                           break;
-                        case Biomes.BIRCH_FOREST:
-                           if (var16 > 0.78F) {
-                              continue;
-                           }
-                           var23 = 1;
-                           break;
-                        case Biomes.DARK_FOREST:
-                           if (var16 > 0.85F) {
-                              continue;
-                           }
-                           var23 = var17 < 80 ? 7 : 3;
-                           break;
-                        case Biomes.ICE_PLAINS:
-                           if (var16 > 0.22F) {
-                              continue;
-                           }
-                           var23 = 2;
-                           break;
-                        case Biomes.SNOWY_TAIGA:
-                        case Biomes.TAIGA:
-                           if (var16 > 0.65F) {
-                              continue;
-                           }
-                           var23 = 2;
-                           break;
-                        case Biomes.MEGA_TAIGA:
-                           if (var16 > 0.72F) {
-                              continue;
-                           }
-                           var23 = 2;
-                           break;
-                        case Biomes.MOUNTAINS:
-                           if (ground > 98 || var16 > 0.12F) {
-                              continue;
-                           }
-                           var23 = 2;
-                           break;
-                        case Biomes.SWAMP:
-                           if (var16 > 0.35F) {
-                              continue;
-                           }
-                           var23 = 0;
-                           break;
-                        case Biomes.SAVANNA:
-                           if (var16 > 0.14F) {
-                              continue;
-                           }
-                           var23 = 4;
-                           break;
-                        case Biomes.JUNGLE:
-                           if (var16 > 0.85F) {
-                              continue;
-                           }
-                           var23 = 5;
-                           break;
-                        case Biomes.DESERT:
-                        case Biomes.BADLANDS:
-                           if (var16 > 0.06F) {
-                              continue;
-                           }
-                           var23 = 6;
-                           break;
-                        case Biomes.MUSHROOM:
-                           if (var16 > 0.16F) {
-                              continue;
-                           }
-                           var23 = 7;
-                           break;
-                        case Biomes.ICE_SPIKES:
-                           if (var16 > 0.14F) {
-                              continue;
-                           }
-                           var23 = 8;
-                           break;
-                        default:
-                           continue;
-                     }
-
-                     boolean var24 = false;
-
-                     for (Village var26 : var3 == null ? Collections.<Village>emptyList() : var3) {
-                        if (!var26.placed.isEmpty()) {
-                           for (Village314.Placed p : var26.placed) {
-                              if (var20 >= p.x0 - 3 && var20 <= p.x0 + p.fw + 2 && var21 >= p.z0 - 3 && var21 <= p.z0 + p.fd + 2) {
-                                 var24 = true;
-                                 break;
-                              }
-                           }
-                           if (!var24) {
-                              for (Village314.Street st : var26.streets) {
-                                 if (var20 >= st.x0 - 2 && var20 <= st.x1 + 2 && var21 >= st.z0 - 2 && var21 <= st.z1 + 2) {
-                                    var24 = true;
-                                    break;
-                                 }
-                              }
-                           }
-                        } else {
-                           for (Bld var28 : var26.blds) {
-                              if (var20 >= var28.bx0 - 3 && var20 <= var28.bx1 + 3 && var21 >= var28.bz0 - 3 && var21 <= var28.bz1 + 3) {
-                                 var24 = true;
-                              }
-                           }
-                        }
-                     }
-
-                     if (!var24 && landmarks != null) {
-                        for (int li = 0; li < landmarks.size(); li++) {
-                           Landmarks319.Site lsite = landmarks.get(li);
-                           if (var20 >= lsite.x0 - 3 && var20 <= lsite.x0 + lsite.w + 2 && var21 >= lsite.z0 - 3 && var21 <= lsite.z0 + lsite.d + 2) {
-                              var24 = true;
-                              break;
-                           }
-                        }
-                     }
-
-                     if (!var24) {
-                        float var47 = var20 - var1.x0 + 0.5F;
-                        float var48 = var21 - var1.z0 + 0.5F;
-                        float var49 = ground + 1 - Math.min(2.5F, 0.4F + var1.size / 32 * 0.35F);
-                        float var50 = ground + 1;
-                        float var29 = (hash(var20, var21) - 0.5F) * 0.14F;
-                        Random var32 = new Random(var19);
-                        int var30;
-                        int var31;
-                        if (var23 == 0) {
-                           int var33 = bm == Biomes.SWAMP
-                              ? 0x6A7039
-                              : (var22 != null ? Gen.foliageColorFor(var22.t, var22.hu) : shade(cellRgb, 0.92F));
-                           var30 = shade(var33, 0.66F);
-                           var31 = 7034162;
-                        } else if (var23 == 1) {
-                           var30 = shade(8431445, 0.66F);
-                           var31 = 13816512;
-                        } else if (var23 == 3) {
-                           var30 = shade(0x3C6E24, 0.68F);
-                           var31 = 0x3B2B17;
-                        } else if (var23 == 4) {
-                           var30 = shade(0x889232, 0.68F);
-                           var31 = 0x676056;
-                        } else if (var23 == 5) {
-                           var30 = shade(0x36A022, 0.68F);
-                           var31 = 0x54441B;
-                        } else {
-                           var30 = shade(6396257, 0.58F);
-                           var31 = 3877398;
-                        }
-
-                        if (var23 == 6) {
-                           if (var1.size <= 256) {
-                              int ch = 2 + (var18 & 1);
-                              box(var2, var47 - 0.45F, var49, var48 - 0.45F, var47 + 0.45F, var50 + ch, var48 + 0.45F, 0x4A7828, var29);
-                           }
-                           continue;
-                        }
-                        if (var23 == 7) {
-                           int mh = 5 + (var18 & 1);
-                           int capCol = (var17 & 1) == 0 ? 0xB82824 : 0x8A6444;
-                           if (drawTrunk) {
-                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + mh - 1.0F, var48 + 0.5F, 0xCFC8B8, 0.0F);
-                           }
-                           float mr = 2.5F + canopyPad * 0.6F;
-                           box(var2, var47 - mr, var50 + mh - 1.0F, var48 - mr, var47 + mr, var50 + mh + 1.2F, var48 + mr, capCol, var29);
-                           continue;
-                        }
-                        if (var23 == 8) {
-                           int sh = 8 + var18 * 3;
-                           float sr = 1.5F + canopyPad * 0.4F;
-                           box(var2, var47 - sr, var49, var48 - sr, var47 + sr, var50 + sh * 0.55F, var48 + sr, 0x8EB4E6, var29);
-                           box(var2, var47 - sr * 0.5F, var50 + sh * 0.55F, var48 - sr * 0.5F, var47 + sr * 0.5F, var50 + sh, var48 + sr * 0.5F, 0xA8CEFA, var29);
-                           continue;
-                        }
-                        if (var23 == 4) {
-                           int ah = 5 + var18;
-                           if (drawTrunk) {
-                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + ah - 1.5F, var48 + 0.5F, var31, 0.0F);
-                           }
-                           float ar = 3.5F + canopyPad;
-                           box(var2, var47 - ar, var50 + ah - 1.5F, var48 - ar, var47 + ar, var50 + ah + 0.6F, var48 + ar, var30, var29);
-                           if (drawCrownCap) {
-                              box(var2, var47 - 2.0F - canopyPad * 0.5F, var50 + ah + 0.6F, var48 - 2.0F - canopyPad * 0.5F, var47 + 2.0F + canopyPad * 0.5F, var50 + ah + 1.8F, var48 + 2.0F + canopyPad * 0.5F, shade(var30, 1.08F), var29);
-                           }
-                           continue;
-                        }
-
-                        if (var23 == 2) {
-                           int var53 = 7 + var18 * 2 + var32.nextInt(3) + (bm == Biomes.MEGA_TAIGA ? 5 : 0);
-                           float var55 = var50 + var53;
-                           if (drawTrunk) {
-                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, var50 + 2.0F, var48 + 0.5F, var31, 0.0F);
-                           }
-                           float spBaseR = 2.6F + canopyPad * 0.8F;
-                           float spLowY = var1.size >= 256 ? var49 : var50 + 1.8F;
-                           float spMidY = var50 + var53 * 0.58F;
-                           box(var2, var47 - spBaseR, spLowY, var48 - spBaseR, var47 + spBaseR, spMidY, var48 + spBaseR, shade(var30, 0.86F), var29);
-                           if (drawCrownCap) {
-                              float spTopR = 1.65F + canopyPad * 0.55F;
-                              box(var2, var47 - spTopR, spMidY, var48 - spTopR, var47 + spTopR, var55 + 1.2F, var48 + spTopR, shade(var30, 1.04F), var29);
-                           }
-                        } else if (var23 == 1) {
-                           int var52 = 6 + var18 + var32.nextInt(2);
-                           float var54 = var50 + var52 - 1.0F;
-                           float br = 2.2F + canopyPad * 0.8F;
-                           float bLow = var1.size >= 256 ? var49 + 1.0F : var54 - 2.4F;
-                           if (drawTrunk) {
-                              boxSides(var2, var47 - 0.5F, var49, var48 - 0.5F, var47 + 0.5F, bLow, var48 + 0.5F, var31, 0.0F);
-                           }
-                           box(var2, var47 - br, bLow, var48 - br, var47 + br, var54 + 1.8F, var48 + br, shade(var30, 0.94F), var29);
-                           if (drawCrownCap) {
-                              float bTopR = 1.4F + canopyPad * 0.5F;
-                              box(var2, var47 - bTopR, var54 + 1.8F, var48 - bTopR, var47 + bTopR, var54 + 3.4F, var48 + bTopR, shade(var30, 1.08F), var29);
-                           }
-                        } else {
-                           boolean var51 = var23 == 3 || var23 == 5 || var32.nextInt(7) == 0;
-                           int var34 = 5 + var18 + var32.nextInt(2) + (var51 ? 3 : 0) + (var23 == 5 ? 3 : 0);
-                           float var35 = var50 + var34 - 1.0F;
-                           float var36 = (var51 ? 4.2F : 3.1F) + canopyPad;
-                           float var37 = var51 ? 3.2F : 2.5F;
-                           float cLow = var1.size >= 256 ? var49 + 1.0F : var35 - var37;
-                           if (drawTrunk) {
-                              boxSides(
-                                 var2,
-                                 var47 - 0.5F,
-                                 var49,
-                                 var48 - 0.5F,
-                                 var47 + (var51 ? 1.5F : 0.5F),
-                                 cLow,
-                                 var48 + (var51 ? 1.5F : 0.5F),
-                                 var31,
-                                 0.0F
-                              );
-                           }
-
-                           if (!var9) {
-                              box(
-                                 var2,
-                                 var47 - var36 + 0.5F,
-                                 cLow,
-                                 var48 - var36 + 0.5F,
-                                 var47 + var36 - 0.5F,
-                                 var35 + var37 * 0.75F,
-                                 var48 + var36 - 0.5F,
-                                 shade(var30, 0.92F),
-                                 var29
-                              );
-                              if (drawCrownCap) {
-                                 float capR = Math.max(1.6F, (var36 - 0.5F) * 0.62F);
-                                 box(var2, var47 - capR, var35 + var37 * 0.75F, var48 - capR, var47 + capR, var35 + var37 + 1.6F, var48 + capR, shade(var30, 1.06F), var29);
-                              }
-                           } else {
-                              canopy(var2, var47, var35, var48, var36, var37, var36, var30, var29, 2);
-                              canopy(var2, var47, var35 + (var51 ? 3 : 2), var48, var51 ? 2.4F : 1.7F, 1.4F, var51 ? 2.4F : 1.7F, var30, var29, 2);
-                           }
-                        }
+                  if (!clear) break;
+               }
+               if (clear && landmarks != null) {
+                  for (int li = 0; li < landmarks.size(); li++) {
+                     Landmarks319.Site site = landmarks.get(li);
+                     if (wx >= site.x0 - 3 && wx <= site.x0 + site.w + 2 && wz >= site.z0 - 3 && wz <= site.z0 + site.d + 2) {
+                        clear = false; break;
                      }
                   }
                }
+               if (!clear) continue;
+
+               float px = wx - var1.x0 + 0.5F;
+               float pz = wz - var1.z0 + 0.5F;
+               float gy = ground + 1.0F;
+               float jitter = (hash(wx, wz) - 0.5F) * 0.14F;
+
+               if (plan == TerraGen.P_MUSH_RED || plan == TerraGen.P_MUSH_BROWN) {
+                  int mh = 5 + (int)Math.floorMod(ts >>> 11, 3L);
+                  drawn++;
+                  int capCol = plan == TerraGen.P_MUSH_RED ? 0xB82824 : 0x8A6444;
+                  if (drawTrunk) boxSides(var2, px - 0.5F, gy - 1.0F, pz - 0.5F, px + 0.5F, gy + mh - 1.0F, pz + 0.5F, 0xCFC8B8, 0.0F);
+                  float mr = 2.5F + canopyPad * 0.6F;
+                  box(var2, px - mr, gy + mh - 1.0F, pz - mr, px + mr, gy + mh + 1.2F, pz + mr, capCol, jitter);
+                  continue;
+               }
+               if (plan == TerraGen.P_ICE_SPIKE) {
+                  drawn++;
+                  int sh2 = 8 + (int)Math.floorMod(ts >>> 13, 3L) * 3;
+                  float sr = 1.5F + canopyPad * 0.4F;
+                  box(var2, px - sr, gy - 1.0F, pz - sr, px + sr, gy + sh2 * 0.55F, pz + sr, 0x8EB4E6, jitter);
+                  box(var2, px - sr * 0.5F, gy + sh2 * 0.55F, pz - sr * 0.5F, px + sr * 0.5F, gy + sh2, pz + sr * 0.5F, 0xA8CEFA, jitter);
+                  continue;
+               }
+
+               int sp = TerraGen.treeSpecies(plan);
+               int variant = TerraGen.treeVariant(plan, ts);
+               int tier = TerraGen.treeSizeTier(plan, ts, giants);
+               TerraTrees.LodShape shape = TerraTrees.lodShape(sp, variant, tier);
+               int leafCol = lodLeafColour(sp, col, cellRgb);
+               lodTree(var2, px, gy, pz, shape, treeScale, canopyPad, drawTrunk,
+                       leafCol, lodTrunkColour(sp), jitter, bands);
+               drawn++;
             }
          }
       }

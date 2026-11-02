@@ -54,7 +54,7 @@ final class TerraTrees {
       static final int W = 2 * R + 1;
       static final int SOFT = 0x40000000;
       /** A hard ceiling: no tree, however giant, can become a thousand-leaf mesh spike. */
-      static final int MAX_LEAVES = 900;
+      static final int MAX_LEAVES = 1200;
       final int[] a = new int[W * H * W];
       final int[] touched = new int[W * H * W];
       int nt;
@@ -162,29 +162,79 @@ final class TerraTrees {
    }
 
    // ---------------------------------------------------------------------------------------------------- pieces
-   static void blob(Buf t, int cx, int cy, int cz, double rx, double ry, double rz, int id, Random r) {
-      int ix = (int)Math.ceil(rx);
-      int iy = (int)Math.ceil(ry);
-      int iz = (int)Math.ceil(rz);
+   /**
+    * A closed, gently irregular 3D canopy. Only a shell is generated (the inside of a
+    * voxel crown is never visible) but the top and bottom are capped, so from every
+    * angle it reads as a solid rounded volume instead of a one-block-thick plate.
+    * cx/cy/cz are the crown centre in local cell space (0.5 for 2x2 trunks);
+    * ox/oy/oz are integer offsets added to every block.
+    */
+   static void crown(Buf t, Random r, double cx, double cy, double cz,
+                     double rx, double ry, double rz, int id, float rough,
+                     int ox, int oy, int oz) {
+      int ix = (int)Math.ceil(rx + 0.5);
+      int iz = (int)Math.ceil(rz + 0.5);
+      int iy = Math.max(1, (int)Math.ceil(ry));
       for (int dy = -iy; dy <= iy; dy++) {
+         double f = (dy - cy) / (ry + 0.45);
+         double prof = Math.sqrt(Math.max(0.0, 1.0 - f * f));
+         if (prof < 0.38) prof = 0.38;              // rounded ends, never a one-cell needle
+         double lx = Math.max(0.55, rx * prof);
+         double lz = Math.max(0.55, rz * prof);
+         boolean cap = dy == -iy || dy == iy;        // solid top and bottom
          for (int dx = -ix; dx <= ix; dx++) {
             for (int dz = -iz; dz <= iz; dz++) {
-               double d = dx * dx / (rx * rx) + dy * dy / (ry * ry) + dz * dz / (rz * rz);
-               if (!(d > 1.0) && (!(d > 0.62) || !(r.nextFloat() < 0.38F))) {
-                  t.leaf(cx + dx, cy + dy, cz + dz, id);
-               }
+               double nx = (dx - cx) / lx;
+               double nz = (dz - cz) / lz;
+               double d = Math.sqrt(nx * nx + nz * nz);
+               if (d > 1.02) continue;
+               // Absolute shell thickness: big crowns stay cheap instead of becoming solid balls.
+               double shell = Math.min(0.50, 1.55 / Math.max(1.0, (lx + lz) * 0.5));
+               boolean rim = d > 1.0 - shell;
+               if (!cap && !rim) continue;           // hollow core
+               if (rim && !cap && rough > 0.0F && r.nextFloat() < rough) continue;
+               t.leaf(ox + dx, oy + dy, oz + dz, id);
             }
          }
       }
    }
 
+   static void blob(Buf t, int cx, int cy, int cz, double rx, double ry, double rz, int id, Random r) {
+      crown(t, r, 0.0, 0.0, 0.0, rx, Math.max(1.0, ry), rz, id, 0.02F, cx, cy, cz);
+   }
+
    static void disc(Buf t, int cy, double cx, double cz, double rad, int id, Random r, float skip) {
-      int ir = (int)Math.ceil(rad + 1);
-      for (int dx = -ir; dx <= ir + 1; dx++) {
-         for (int dz = -ir; dz <= ir + 1; dz++) {
-            double d = Math.sqrt((dx - cx) * (dx - cx) + (dz - cz) * (dz - cz));
-            if (d <= rad && (d < rad - 1.0 || r.nextFloat() >= skip)) {
-               t.leaf(dx, cy, dz, id);
+      // A flattened dome with real thickness, not a single layer of floating leaves.
+      double ry = Math.max(1.0, Math.min(2.0, rad * 0.36));
+      crown(t, r, cx, 0.0, cz, rad, ry, rad, id, Math.min(0.035F, skip * 0.10F), 0, cy, 0);
+   }
+
+   /**
+    * One coherent rounded canopy built from a vertical radius profile. A stack of
+    * independent discs produces overlapping half-shells and blows the leaf budget;
+    * this has one closed surface, a real top and bottom, and no duplicate blocks.
+    * roundness 0.3 = flat umbrella, 0.6 = full rounded crown.
+    */
+   static void dome(Buf t, Random r, double cx, double cz, int y0, int layers,
+                    double rad, int id, double roundness, float rough) {
+      // Taller crowns get more layers so a giant oak is a rounded volume, not a thick pancake.
+      int n = Math.max(3, Math.max(layers, (int)Math.min(9, Math.round(rad * 0.85))));
+      for (int k = 0; k < n; k++) {
+         double u = n == 1 ? 0.0 : 2.0 * k / (n - 1) - 1.0;
+         double prof = Math.sqrt(Math.max(0.0, 1.0 - u * u));
+         // Never let a cap shrink to the single trunk cell: t.leaf() is soft, so a
+         // one-cell layer would silently vanish and leave a flat / holed crown.
+         double rr = Math.max(1.75, rad * (1.0 - roundness + roundness * prof));
+         int ir = (int)Math.ceil(rr + 0.5);
+         double shell = Math.min(0.55, 1.6 / Math.max(1.0, rr));
+         boolean cap = k == 0 || k == n - 1;
+         for (int dx = -ir; dx <= ir; dx++) {
+            for (int dz = -ir; dz <= ir; dz++) {
+               double d = Math.sqrt((dx - cx) * (dx - cx) + (dz - cz) * (dz - cz));
+               if (d > rr) continue;
+               if (!cap && d < rr * (1.0 - shell)) continue;
+               if (!cap && rough > 0.0F && r.nextFloat() < rough) continue;
+               t.leaf(dx, y0 + k, dz, id);
             }
          }
       }
@@ -285,6 +335,109 @@ final class TerraTrees {
       return sp == SP_SPRUCE && (v == 3 || v == 4) || sp == SP_JUNGLE && v == 2 || sp == SP_DARK_OAK;
    }
 
+   /**
+    * Measured silhouette of one species/variant/size tier. Distant LOD tiles use this
+    * instead of a hand-drawn stand-in, so the low-detail forest really does depict the
+    * trees the generator places (including giants, umbrellas and conifers).
+    */
+   static final class LodShape {
+      float trunk;      // top of the trunk above the root
+      float bottom;     // lowest foliage above the root
+      float top;        // highest foliage above the root
+      float radius;
+      final float[] bands = new float[6];
+      boolean wide;
+      boolean conifer;
+
+      float band(float f) {
+         float u = (f < 0.0F ? 0.0F : (f > 1.0F ? 1.0F : f)) * (bands.length - 1);
+         int k = (int)u;
+         if (k >= bands.length - 1) return bands[bands.length - 1];
+         return bands[k] + (bands[k + 1] - bands[k]) * (u - k);
+      }
+   }
+
+   private static final LodShape[][][] LOD_SHAPES = measureLodShapes();
+
+   static LodShape lodShape(int sp, int variant, int tier) {
+      int s = Math.floorMod(sp, VARIANTS.length);
+      int v = Math.floorMod(variant, variants(s));
+      int t = tier < 0 ? 0 : (tier > 2 ? 2 : tier);
+      return LOD_SHAPES[s][v][t];
+   }
+
+   private static LodShape[][][] measureLodShapes() {
+      LodShape[][][] out = new LodShape[VARIANTS.length][8][3];
+      for (int sp = 0; sp < VARIANTS.length; sp++) {
+         for (int v = 0; v < variants(sp); v++) {
+            for (int tier = 0; tier < 3; tier++) {
+               LodShape acc = new LodShape();
+               acc.wide = isWide(sp, v);
+               acc.conifer = sp == SP_SPRUCE;
+               float trunk = 0.0F, bottom = 1.0E6F, top = 0.0F;
+               // Two samples smooth out the per-tree random height jitter.
+               for (int sample = 0; sample < 2; sample++) {
+                  Buf b = new Buf();
+                  b.begin(0, 0, 0);
+                  build(b, new Random(0x5EEDL + sp * 977L + v * 131L + tier * 17L + sample * 7919L), sp, v, tier, 1.0F);
+                  int lo = Integer.MAX_VALUE, hi = 0;
+                  for (int k = 0; k < b.nt; k++) {
+                     int i = b.touched[k];
+                     int id = (b.a[i] & ~Buf.SOFT) - 1;
+                     if (!Blocks.isLeaves(id)) continue;
+                     int dy = i / (Buf.W * Buf.W);
+                     if (dy < lo) lo = dy;
+                     if (dy > hi) hi = dy;
+                  }
+                  if (lo == Integer.MAX_VALUE) { lo = 0; hi = 1; }
+                  float bl = (float)lo, th = (float)hi;
+                  bottom = Math.min(bottom, bl);
+                  top = Math.max(top, th);
+                  for (int k = 0; k < b.nt; k++) {
+                     int i = b.touched[k];
+                     int id = (b.a[i] & ~Buf.SOFT) - 1;
+                     int dy = i / (Buf.W * Buf.W);
+                     int dx = i % Buf.W - Buf.R;
+                     int dz = i / Buf.W % Buf.W - Buf.R;
+                     if (!Blocks.isLeaves(id)) {
+                        if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1) trunk = Math.max(trunk, (float)dy);
+                        continue;
+                     }
+                     float f = (dy - bl) / Math.max(1.0F, th - bl);
+                     int bi = Math.max(0, Math.min(5, (int)(f * 5.999F)));
+                     float r = (float)Math.sqrt(dx * dx + dz * dz) + 0.5F;
+                     if (r > acc.bands[bi]) acc.bands[bi] = r;
+                  }
+               }
+               acc.bottom = bottom;
+               acc.top = Math.max(bottom + 1.0F, top);
+               acc.trunk = Math.max(1.0F, Math.min(acc.bottom + 1.0F, trunk));
+               for (int k = 0; k < 6; k++) {
+                  if (acc.bands[k] < 0.75F) acc.bands[k] = 0.75F;
+               }
+               // Smooth isolated gaps: a real crown may have a notch at one height, but a
+               // distant box must not collapse to a needle between two wide tiers.
+               for (int pass = 0; pass < 2; pass++) {
+                  float[] prev = acc.bands.clone();
+                  for (int k = 0; k < 6; k++) {
+                     float lo = k > 0 ? prev[k - 1] : prev[k];
+                     float hi = k < 5 ? prev[k + 1] : prev[k];
+                     float floor = 0.62F * Math.max(lo, hi);
+                     if (acc.bands[k] < floor) acc.bands[k] = floor;
+                     acc.bands[k] = (acc.bands[k] * 2.0F + lo + hi) * 0.25F;
+                  }
+               }
+               for (int k = 0; k < 6; k++) {
+                  if (acc.bands[k] < 0.75F) acc.bands[k] = 0.75F;
+                  acc.radius = Math.max(acc.radius, acc.bands[k]);
+               }
+               out[sp][v][tier] = acc;
+            }
+         }
+      }
+      return out;
+   }
+
    static double heightScale(int size, float worldScale) {
       double s = H_STEP[size < 0 ? 0 : (size > 2 ? 2 : size)] * worldScale;
       return s < 0.60 ? 0.60 : (s > 2.10 ? 2.10 : s);
@@ -350,30 +503,21 @@ final class TerraTrees {
          case 1: { // small squat oak
             int h = sh(4 + r.nextInt(3), hs, 44);
             double rad = sr(2.0, rs, 5.0);
-            for (int y = h - 2; y <= h + 1; y++) {
-               disc(t, y, 0, 0, y <= h - 1 ? rad : rad * 0.6, lf, r, 0.25F);
-            }
+            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.85, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             break;
          }
          case 2: { // columnar oak: tall bare trunk, compact high crown
             int h = sh(11 + r.nextInt(6), hs, 54);
             double rad = sr(2.6, rs, 5.2);
-            disc(t, h - 2, 0, 0, rad * 0.8, lf, r, 0.28F);
-            disc(t, h - 1, 0, 0, rad, lf, r, 0.24F);
-            disc(t, h, 0, 0, rad, lf, r, 0.24F);
-            disc(t, h + 1, 0, 0, rad * 0.72, lf, r, 0.2F);
-            disc(t, h + 2, 0, 0, rad * 0.4, lf, r, 0.15F);
+            dome(t, r, 0, 0, h - 2, 5, rad, lf, 0.95, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             break;
          }
          case 3: { // wide umbrella oak, short trunk and long arms
             int h = sh(5 + r.nextInt(3), hs, 44);
             double rad = sr(5.2, rs, 10.5);
-            disc(t, h, 0, 0, rad, lf, r, 0.34F);
-            disc(t, h + 1, 0, 0, rad * 0.92, lf, r, 0.32F);
-            disc(t, h + 2, 0, 0, rad * 0.62, lf, r, 0.28F);
-            disc(t, h - 1, 0, 0, rad * 0.72, lf, r, 0.42F);
+            dome(t, r, 0, 0, h - 1, 4, rad, lf, 0.62, 0.02F);
             trunk(t, 0, 0, 0, h + 1, lg);
             for (int i = 0; i < 4; i++) {
                double a = (i + 0.25) * Math.PI / 2.0;
@@ -408,10 +552,7 @@ final class TerraTrees {
          case 5: { // weeping oak with drooping branch tips and vines
             int h = sh(7 + r.nextInt(4), hs, 48);
             double rad = sr(3.4, rs, 7.0);
-            disc(t, h - 1, 0, 0, rad * 0.8, lf, r, 0.30F);
-            disc(t, h, 0, 0, rad, lf, r, 0.28F);
-            disc(t, h + 1, 0, 0, rad * 0.86, lf, r, 0.26F);
-            disc(t, h + 2, 0, 0, rad * 0.55, lf, r, 0.22F);
+            dome(t, r, 0, 0, h - 1, 4, rad, lf, 0.85, 0.02F);
             int n = (int)rad;
             for (int i = 0; i < 8; i++) {
                double a = r.nextDouble() * Math.PI * 2.0;
@@ -462,10 +603,7 @@ final class TerraTrees {
          case 1: { // tall pale birch
             int h = sh(9 + r.nextInt(4), hs, 56);
             double rad = sr(2.0, rs, 3.6);
-            for (int y = h - 4; y <= h + 1; y++) {
-               double rr = y >= h ? rad * 0.6 : rad;
-               disc(t, y, 0, 0, rr, lf, r, 0.30F);
-            }
+            dome(t, r, 0, 0, h - 4, 6, rad, lf, 0.90, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             break;
          }
@@ -476,15 +614,13 @@ final class TerraTrees {
                for (int y = 0; y <= h; y++) t.set(q[0], y, q[1], lg);
                blob(t, q[0], h, q[1], sr(1.9, rs, 3.4), sr(2.2, rs, 3.6), sr(1.9, rs, 3.4), lf, r);
             }
-            blob(t, 0, h + 2, 0, sr(1.4, rs, 2.6), 1.4, sr(1.4, rs, 2.6), lf, r);
+            blob(t, 0, h + 1, 0, sr(1.8, rs, 3.0), sr(1.8, rs, 2.8), sr(1.8, rs, 3.0), lf, r);
             break;
          }
          case 3: { // weeping birch
             int h = sh(10 + r.nextInt(4), hs, 56);
             double rad = sr(1.9, rs, 3.4);
-            disc(t, h - 2, 0, 0, rad, lf, r, 0.26F);
-            disc(t, h, 0, 0, rad, lf, r, 0.24F);
-            disc(t, h + 1, 0, 0, rad * 0.6, lf, r, 0.18F);
+            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.90, 0.02F);
             for (int i = 0; i < 8; i++) {
                double a = r.nextDouble() * Math.PI * 2.0;
                int bx = (int)Math.round(Math.cos(a) * rad);
@@ -497,12 +633,8 @@ final class TerraTrees {
          case 4: { // grand birch: two distinct crown tiers
             int h = sh(13 + r.nextInt(5), hs, 58);
             double rad = sr(2.6, rs, 5.0);
-            disc(t, h - 6, 0, 0, rad * 0.85, lf, r, 0.32F);
-            disc(t, h - 5, 0, 0, rad, lf, r, 0.28F);
-            disc(t, h - 2, 0, 0, rad * 0.8, lf, r, 0.28F);
-            disc(t, h - 1, 0, 0, rad * 0.95, lf, r, 0.26F);
-            disc(t, h, 0, 0, rad * 0.7, lf, r, 0.22F);
-            disc(t, h + 1, 0, 0, rad * 0.4, lf, r, 0.18F);
+            dome(t, r, 0, 0, h - 6, 3, rad * 0.9, lf, 0.78, 0.02F);
+            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.90, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             break;
          }
@@ -522,37 +654,42 @@ final class TerraTrees {
       int lg = log(2);
       int lf = leaves(2);
       boolean wide = v == 3 || v == 4;
-      // Giant conifers grow TALL, not fat: tiers are spaced out and the crown stays a hollow shell.
-      int step = size >= 2 ? 3 : 2;
       int h = sh(v == 1 || v == 2 ? 12 + r.nextInt(6) : (wide ? 15 + r.nextInt(9) : 9 + r.nextInt(5)), hs, 56);
-      int maxR = Math.min(6, Math.max(2, (int)Math.round((wide ? 4.6 : 3.3) * rs)));
-      if (v == 2) maxR = Math.max(2, maxR - 2); // columnar
-      if (v == 1) maxR = Math.max(2, maxR - 1); // sparse pine
+      double maxR = sr(v == 1 ? 2.4 : (v == 2 ? 2.0 : (wide ? 4.6 : 3.3)), rs, 7.5);
       double cx = wide ? 0.5 : 0.0;
       double cz = wide ? 0.5 : 0.0;
-      for (int y = h + 1; y >= 3; y -= step) {
-         int f = h + 1 - y;
-         int rad = Math.max(0, maxR - f / (v == 2 ? 7 : 5));
-         if (f % (step * 4) == step * 3) rad = Math.max(0, rad - 1); // gap between tiers
-         if (rad == 0) {
-            t.leaf(0, y, 0, lf);
-            continue;
-         }
-         for (int dx = -rad; dx <= rad; dx++) {
-            for (int dz = -rad; dz <= rad; dz++) {
+      int top = h + (v == 5 ? 0 : 3);
+      int bottom = Math.max(2, h - (size >= 2 ? 19 : 14));
+      // The trunk must go in first: t.set() is hard and would otherwise erase the
+      // single centre leaf of the narrow upper cone layers, leaving empty rings.
+      if (wide) trunk2(t, 0, h + 1, lg);
+      else trunk(t, 0, 0, 0, h, lg);
+      int band = v == 2 ? 2 : (wide ? 4 : 3);
+      // Continuous conical shell: every layer has leaves, so the silhouette is a solid
+      // conifer instead of a stack of isolated one-block rings with gaps between them.
+      for (int y = bottom; y <= top; y++) {
+         double f = (double)(top - y + 1) / (double)(top - bottom + 3);
+         double rad = maxR * Math.max(0.0, Math.min(1.0, f));
+         if ((top - y) % (band * 2) < band) rad *= 1.13;  // soft tiering
+         // The tip must keep a ring of leaves outside the trunk (1x1 or 2x2), but
+         // a fixed large floor turned small pines into cylinders instead of cones.
+         double minR = wide ? 1.70 : 1.05;
+         rad = Math.max(minR, rad);
+         double inner = Math.max(0.0, rad - (size >= 2 ? 1.7 : 1.35));
+         int ir = (int)Math.ceil(rad + 0.4);
+         boolean cap = y >= top - 1;
+         for (int dx = -ir; dx <= ir; dx++) {
+            for (int dz = -ir; dz <= ir; dz++) {
                double d = Math.sqrt((dx - cx) * (dx - cx) + (dz - cz) * (dz - cz));
-               if (d > rad + 0.25) continue;
-               // hollow interior: bigger trees stay cheap to mesh
-               if (d < rad - (size >= 2 ? 1.7 : 1.1) && r.nextInt(3) != 0) continue;
+               if (d > rad) continue;
+               if (!cap && d < inner) continue;      // hollow core, solid tip
+               if (!cap && d > rad - 0.8 && r.nextFloat() < 0.07F) continue;
                t.leaf(dx, y, dz, lf);
-               if (d >= rad - 0.7 && y > 3 && r.nextInt(4) == 0) t.leaf(dx, y - 1, dz, lf);
             }
          }
       }
-      if (wide) trunk2(t, 0, h + 1, lg);
-      else trunk(t, 0, 0, 0, h, lg);
-      if (v == 5) { // candle spruce: a long bare spire above the crown
-         for (int y = h + 2; y <= Math.min(Buf.H - 2, h + 4); y++) t.set(0, y, 0, lg);
+      if (v == 5) { // candle spruce: a bare spire ABOVE the crown, never through it
+         for (int y = top + 1; y <= Math.min(Buf.H - 2, top + 4); y++) t.set(0, y, 0, lg);
       }
    }
 
@@ -564,10 +701,7 @@ final class TerraTrees {
          case 1: { // tall layered jungle tree
             int h = sh(11 + r.nextInt(9), hs, 56);
             double rad = sr(3.8, rs, 7.4);
-            disc(t, h - 2, 0, 0, rad * 0.82, lf, r, 0.40F);
-            disc(t, h - 1, 0, 0, rad, lf, r, 0.34F);
-            disc(t, h, 0, 0, rad * 0.82, lf, r, 0.30F);
-            disc(t, h + 1, 0, 0, rad * 0.5, lf, r, 0.20F);
+            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.81, 0.02F);
             double a = r.nextDouble() * Math.PI * 2.0;
             int bx = (int)Math.round(Math.cos(a) * rad * 0.8);
             int bz = (int)Math.round(Math.sin(a) * rad * 0.8);
@@ -579,15 +713,13 @@ final class TerraTrees {
          case 2: { // giant 2x2 jungle tree
             int h = sh(20 + r.nextInt(12), hs, 58);
             double rad = sr(5.8, rs, 9.0);
-            disc(t, h, 0.5, 0.5, rad, lf, r, 0.38F);
-            disc(t, h + 1, 0.5, 0.5, rad * 0.85, lf, r, 0.34F);
-            disc(t, h + 2, 0.5, 0.5, rad * 0.55, lf, r, 0.28F);
+            dome(t, r, 0.5, 0.5, h, 4, rad, lf, 0.78, 0.02F);
             for (int i = 0; i < 3; i++) {
-               double a = r.nextDouble() * Math.PI * 2.0;
-               int bx = (int)Math.round(Math.cos(a) * rad * 0.85);
-               int bz = (int)Math.round(Math.sin(a) * rad * 0.85);
-               blob(t, bx, h - 5 - r.nextInt(4), bz, sr(2.8, rs, 4.0), 1.8, sr(2.8, rs, 4.0), lf, r);
-               for (int s = 1; s <= 4; s++) t.set(bx * s / 4, h - 6 + (s > 2 ? 1 : 0), bz * s / 4, lg);
+               double a = (i + 0.3) * Math.PI * 2.0 / 3.0;
+               int bx = (int)Math.round(Math.cos(a) * rad * 0.62);
+               int bz = (int)Math.round(Math.sin(a) * rad * 0.62);
+               blob(t, bx, h - 1, bz, sr(2.8, rs, 4.2), sr(1.7, rs, 2.6), sr(2.8, rs, 4.2), lf, r);
+               for (int q = 1; q <= 4; q++) t.set(bx * q / 4, h - 1, bz * q / 4, lg);
             }
             trunk2(t, 0, h, lg);
             vines(t, r, 0.26F, 6);
@@ -596,10 +728,7 @@ final class TerraTrees {
          case 3: { // huge flat rainforest canopy with buttress roots
             int h = sh(16 + r.nextInt(8), hs, 58);
             double rad = sr(6.6, rs, 9.5);
-            disc(t, h - 1, 0, 0, rad * 0.86, lf, r, 0.42F);
-            disc(t, h, 0, 0, rad, lf, r, 0.38F);
-            disc(t, h + 1, 0, 0, rad * 0.94, lf, r, 0.34F);
-            disc(t, h + 2, 0, 0, rad * 0.6, lf, r, 0.28F);
+            dome(t, r, 0, 0, h - 1, 4, rad, lf, 0.53, 0.02F);
             for (int i = 0; i < 4; i++) {
                double a = i * Math.PI / 2.0;
                int bx = (int)Math.round(Math.cos(a) * rad * 0.75);
@@ -614,9 +743,7 @@ final class TerraTrees {
          case 4: { // very tall emergent with a tiny high crown
             int h = sh(24 + r.nextInt(9), hs, 59);
             double rad = sr(2.6, rs, 4.6);
-            disc(t, h - 1, 0, 0, rad, lf, r, 0.34F);
-            disc(t, h, 0, 0, rad * 0.85, lf, r, 0.28F);
-            disc(t, h + 1, 0, 0, rad * 0.5, lf, r, 0.20F);
+            dome(t, r, 0, 0, h - 1, 3, rad, lf, 0.90, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             jungleVines(t, r, h);
             break;
@@ -624,7 +751,7 @@ final class TerraTrees {
          default: { // small jungle tree
             int h = sh(5 + r.nextInt(5), hs, 46);
             double rad = sr(2.0, rs, 3.8);
-            for (int y = h - 2; y <= h + 1; y++) disc(t, y, 0, 0, y <= h - 1 ? rad : rad * 0.6, lf, r, 0.26F);
+            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.85, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             vines(t, r, 0.28F, 3);
             break;
@@ -663,9 +790,7 @@ final class TerraTrees {
          if (s % 2 == 1) y++;
       }
       double rad = sr(v == 2 ? 4.4 : 3.0, rs, 8.0);
-      disc(t, y + 1, x, z, rad, lf, r, 0.34F);
-      disc(t, y + 2, x, z, rad * (v == 2 ? 0.9 : 0.7), lf, r, 0.30F);
-      if (v == 2) disc(t, y + 3, x, z, rad * 0.55, lf, r, 0.26F);
+      dome(t, r, x, z, y + 1, v == 2 ? 5 : 4, rad, lf, 0.68, 0.02F);
       if (v == 3 || r.nextInt(3) != 0) {
          int ax = -dx, az = -dz;
          int py = bend - 1, qx = 0, qz = 0;
@@ -675,7 +800,7 @@ final class TerraTrees {
             t.set(qx, py, qz, lg);
             if (s % 2 == 0) py++;
          }
-         disc(t, py + 1, qx, qz, rad * 0.7, lf, r, 0.32F);
+         dome(t, r, qx, qz, py + 1, 3, rad * 0.7, lf, 0.78, 0.02F);
       }
    }
 
@@ -685,11 +810,7 @@ final class TerraTrees {
       int lg = log(5);
       int h = sh(v == 1 ? 10 + r.nextInt(5) : (v == 2 ? 5 + r.nextInt(3) : 6 + r.nextInt(3)), hs, 52);
       double rad = sr(v == 2 ? 5.2 : 4.0, rs, 9.0);
-      disc(t, h - 1, 0.5, 0.5, rad * 0.78, lf, r, 0.42F);
-      disc(t, h, 0.5, 0.5, rad, lf, r, 0.34F);
-      disc(t, h + 1, 0.5, 0.5, rad * 0.92, lf, r, 0.30F);
-      disc(t, h + 2, 0.5, 0.5, rad * 0.6, lf, r, 0.28F);
-      if (v == 1) { disc(t, h + 3, 0.5, 0.5, rad * 0.38, lf, r, 0.24F); }
+      dome(t, r, 0.5, 0.5, h - 1, v == 1 ? 6 : 5, rad, lf, 0.86, 0.02F);
       int branches = v == 2 ? 5 : 3;
       for (int i = 0; i < branches; i++) {
          double a = r.nextDouble() * Math.PI * 2.0;
@@ -708,7 +829,7 @@ final class TerraTrees {
          case 1: { // swamp cypress with knees
             int h = sh(9 + r.nextInt(5), hs, 52);
             double rad = sr(2.8, rs, 5.0);
-            for (int y = h - 3; y <= h + 1; y++) disc(t, y, 0, 0, rad * (y >= h ? 0.6 : 1.0), lf, r, 0.32F);
+            dome(t, r, 0, 0, h - 3, 5, rad, lf, 0.85, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             for (int i = 0; i < 4; i++) {
                double a = i * Math.PI / 2.0;
@@ -723,9 +844,7 @@ final class TerraTrees {
          case 2: { // wide willow with long hanging curtains
             int h = sh(7 + r.nextInt(4), hs, 50);
             double rad = sr(4.4, rs, 8.4);
-            disc(t, h - 1, 0, 0, rad * 0.8, lf, r, 0.38F);
-            disc(t, h, 0, 0, rad, lf, r, 0.34F);
-            disc(t, h + 1, 0, 0, rad * 0.7, lf, r, 0.30F);
+            dome(t, r, 0, 0, h - 1, 3, rad, lf, 0.65, 0.02F);
             int n = (int)rad;
             for (int i = 0; i < 10; i++) {
                double a = r.nextDouble() * Math.PI * 2.0;
@@ -740,7 +859,7 @@ final class TerraTrees {
          default: { // the old, wide swamp oak
             int h = sh(5 + r.nextInt(3), hs, 46);
             double rad = sr(3.0, rs, 6.0);
-            for (int y = h - 2; y <= h + 1; y++) disc(t, y, 0, 0, y <= h - 1 ? rad : rad * 0.66, lf, r, 0.30F);
+            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.78, 0.02F);
             trunk(t, 0, 0, 0, h, lg);
             vines(t, r, 0.28F, 4);
             break;

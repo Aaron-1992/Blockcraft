@@ -424,6 +424,37 @@ def main():
             "of the real tree geometry - neither is a GPU screenshot, and no real-GPU/Windows playtest "
             "is claimed.\n"
         )
+    if version == "6.24":
+        release_notes += (
+            "\n### Trees, LOD and entity shadows were fixed\n\n"
+            "**V6.23's flat, hole-riddled tree crowns are gone.** Every crown is now one closed, "
+            "rounded 3D volume built from a vertical radius profile; conifers are continuous tapered "
+            "cones instead of isolated rings; acacia, dark oak and jungle canopies have real thickness. "
+            "All 34 silhouettes, three size tiers and eight species are kept. Crowns are hollow shells "
+            "with solid caps, so even a Giant at Tree Size 1.5x stays inside the leaf budget (headless "
+            "worst case 938 of 1200 leaves, zero truncations).\n\n"
+            "**Distant LOD tiles now depict the actual trees.** They replay the exact chunk dice the "
+            "generator uses (same seed, 44 attempts, same plan, variant and size tier) and draw "
+            "silhouettes measured from the real geometry - trunk height, crown bottom/top and a "
+            "six-band radius profile. Umbrellas stay flat, conifers taper, giants are taller. Distant "
+            "forests are thinned by a hash rather than a fixed stride, so there are no empty stripes. "
+            "`docs/screenshots/v6.24-trees-and-lod.png` shows real voxels beside their LOD silhouette "
+            "(headless render, not a GPU screenshot).\n\n"
+            "**Entity shadows are no longer big rectangular boxes.** Each mob casts one soft radial "
+            "billboard facing the sun. The pass is anchored to the camera and sun angle the shadow map "
+            "was built with - previously it used the live camera, so shadows drifted up to 12 blocks "
+            "as you walked. Shadows still re-stamp every frame; with Live Entity Shadows off they are "
+            "stamped once per refresh instead of disappearing.\n\n"
+            "Also fixed: the lopsided disc loop, hole-riddled crown shells, conifer tip gaps, detached "
+            "jungle side lobes, clipped birch crowns, LOD's unrelated decorative forest and missing "
+            "static mob shadows.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with the seven new V6.24 regression groups; strict equivalence "
+            "still matches the original Update 3.5 terrain/world/tick fingerprints; all 21 GLSL "
+            "programs parse; `tools/verify_release.py` now also checks `bc/Lod.class` in the packaged "
+            "jar/exe. The previews are headless renders of the real geometry - no real-GPU/Windows "
+            "playtest is claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

@@ -1101,8 +1101,8 @@ public final class TerraGen extends Gen {
          for (int dz = -1; dz <= 1 && built < cap; dz++) {
             int ncx = ch.cx + dx;
             int ncz = ch.cz + dz;
-            Random tr = new Random(this.seed * 7919L ^ (ncx * 734287L + ncz * 912931L) * 31L + 17L);
-            for (int i = 0; i < 44 && built < cap; i++) {
+            Random tr = new Random(treeAttemptSeed(this.seed, ncx, ncz));
+            for (int i = 0; i < TREE_ATTEMPTS && built < cap; i++) {
                int lx = tr.nextInt(16);
                int lz = tr.nextInt(16);
                float p = tr.nextFloat();
@@ -1119,10 +1119,9 @@ public final class TerraGen extends Gen {
                   continue;
                }
 
-               double dens = 0.35 + 1.3 * clamp(this.nTr.noise2(wx / 70.0, wz / 70.0) * 0.9 + 0.5, 0.0, 1.0);
+               double dens = this.treeDensityAt(wx, wz);
                // Update 6.22: tree lines fade out across a biome border instead of stopping dead.
                if (s.blend > 0.0) dens *= 1.0 - 0.30 * s.blend;
-               dens *= this.treeDensity;
                int treeBiome = s.biome;
                if (s.blend > 0.55 && s.altBiome >= 0
                   && (CaveWorks.mix(this.seed ^ 0x54524545L, wx, 0, wz) & 255) < (s.blend - 0.55) * 400.0) {
@@ -1202,8 +1201,21 @@ public final class TerraGen extends Gen {
    static final int P_ICE_SPIKE = 15;
    static final int P_SPRUCE_PINE = 16;
 
+   /** The exact dice a chunk uses for its trees. LOD tiles replay this sequence so
+    *  distant trees sit where the real ones do. */
+   static long treeAttemptSeed(long seed, int cx, int cz) {
+      return seed * 7919L ^ (cx * 734287L + cz * 912931L) * 31L + 17L;
+   }
+
+   static final int TREE_ATTEMPTS = 44;
+
+   /** Local tree density used by treePlan; shared with the LOD so biome forests match. */
+   double treeDensityAt(int wx, int wz) {
+      return (0.35 + 1.3 * clamp(this.nTr.noise2(wx / 70.0, wz / 70.0) * 0.9 + 0.5, 0.0, 1.0)) * this.treeDensity;
+   }
+
    /** Which plant (a P_ constant) a biome grows at this attempt, or -1. p is the dice (0..1), kind a second die (0..999), dens the local density. */
-   int treePlan(int biome, float p, int kind, double dens) {
+   static int treePlan(int biome, float p, int kind, double dens) {
       switch (biome) {
          case Biomes.PLAINS:
             return p < 0.006 * dens ? (kind < 150 ? P_OAK_CLASSIC : P_OAK_SMALL) : -1;
