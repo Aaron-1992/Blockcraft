@@ -166,7 +166,7 @@ final class Tests621 {
       g.ui.optTab = 4;
       Screens.options(g);
       eq(5, Screens.tabs(g.opt).length, "the debug switch still shows five tabs");
-      eq(57, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
+      eq(60, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
       check(button(g, "V6.21 Caves"), "the layered cave generator is configurable");
       check(button(g, "Cave Richness"), "cave richness is configurable");
       check(button(g, "Cave Structures"), "cave structures are configurable");
@@ -587,7 +587,7 @@ final class Tests621 {
    }
 
    static void shaderAndVersion() {
-      eq("6.21", Game.VERSION_STR, "the game version is 6.21");
+      eq("6.22", Game.VERSION_STR, "the game version is 6.22");
       check(ShaderSrc.CLOUD_FS.contains("uniform float wxBeauty"), "the cloud shader has the beauty uniform");
       check(ShaderSrc.CLOUD_FS.contains("warm sunset rim"), "the cloud shader has a warm sunset rim");
       check(ShaderSrc.CLOUD_FS.contains("silver lining"), "the cloud shader still has silver linings");

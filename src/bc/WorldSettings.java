@@ -239,6 +239,12 @@ public final class WorldSettings {
    public boolean caveLayers = true;
    public boolean caveLakes = true;
    public float caveRichness = 1.0F;
+   /** Update 6.22: 1 = V6.21 layered caves, 2 = Caves & Cliffs carver. Old saves keep 1. */
+   public int caveVer = 1;
+   /** Update 6.22: 0 = sharp legacy biome borders, 1 = smooth, 2 = very smooth. */
+   public int biomeBorders = 0;
+   /** Update 6.22: global tree-density multiplier (0.4..1.4); lower is much cheaper in taiga. */
+   public float treeDensity = 1.0F;
 
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
@@ -266,6 +272,9 @@ public final class WorldSettings {
       s.caveLayers = this.caveLayers;
       s.caveLakes = this.caveLakes;
       s.caveRichness = this.caveRichness;
+      s.caveVer = this.caveVer;
+      s.biomeBorders = this.biomeBorders;
+      s.treeDensity = this.treeDensity;
       return s;
    }
 
@@ -311,6 +320,9 @@ public final class WorldSettings {
       p.setProperty("cavelayers", Boolean.toString(this.caveLayers));
       p.setProperty("cavelakes", Boolean.toString(this.caveLakes));
       p.setProperty("caverichness", Float.toString(this.caveRichness));
+      p.setProperty("cavever", Integer.toString(this.caveVer));
+      p.setProperty("biomeborders", Integer.toString(this.biomeBorders));
+      p.setProperty("treedensity", Float.toString(this.treeDensity));
    }
 
    private static float f(Properties p, String key, float def, float lo, float hi) {
@@ -356,6 +368,16 @@ public final class WorldSettings {
       s.caveStructures = Boolean.parseBoolean(p.getProperty("cavestructures", "true"));
       s.caveLayers = Boolean.parseBoolean(p.getProperty("cavelayers", "true"));
       s.caveLakes = Boolean.parseBoolean(p.getProperty("cavelakes", "true"));
+      try {
+         s.caveVer = Math.max(1, Math.min(2, Integer.parseInt(p.getProperty("cavever", "1").trim())));
+         s.biomeBorders = Math.max(0, Math.min(2, Integer.parseInt(p.getProperty("biomeborders", "0").trim())));
+         s.treeDensity = f(p, "treedensity", 1.0F, 0.4F, 1.4F);
+      } catch (NumberFormatException e) {
+         s.caveVer = 1;
+         s.biomeBorders = 0;
+         s.treeDensity = 1.0F;
+      }
+
       return s;
    }
 

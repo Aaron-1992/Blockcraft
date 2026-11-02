@@ -252,21 +252,29 @@ final class TerraTrees {
       int lg = log(sp);
       int lf = leaves(sp);
       if (sp == 2) {
-         int h = 7 + size * 2 + r.nextInt(3);
-         int top = h;
-         int maxR = h >= 10 ? 4 : 3;
-         for (int y = 2; y <= top + 1; y++) {
-            int f = top + 1 - y;
-            int rad = Math.min(maxR, (f + 1) / 2);
-            if (f % 2 == 0 && f > 1) {
-               rad--;
+         // Update 6.22: a real tiered conifer instead of a nearly solid cone of leaves.
+         // V6.21 filled every cell of every level (up to ~1000 leaves per spruce), which made
+         // taiga - and every biome that grows spruces - the heaviest chunks to mesh in the game.
+         // Tiers every two blocks, a hollow interior, drooping branch tips: 3-4x fewer leaves.
+         int h = 8 + size * 2 + r.nextInt(3);
+         int maxR = h >= 12 ? 4 : 3;
+         for (int y = h + 1; y >= 3; y -= 2) {
+            int f = h + 1 - y;
+            int rad = Math.max(0, maxR - f / 4);
+            if (f % 8 == 6) rad = Math.max(0, rad - 1); // the gap between two tiers
+            if (rad == 0) {
+               t.leaf(0, y, 0, lf);
+               continue;
             }
 
             for (int dx = -rad; dx <= rad; dx++) {
                for (int dz = -rad; dz <= rad; dz++) {
-                  boolean corner = Math.abs(dx) == rad && Math.abs(dz) == rad && rad > 1;
-                  if (!corner && (rad < 3 || Math.abs(dx) + Math.abs(dz) < 2 * rad - 1 || r.nextInt(3) != 0)) {
-                     t.leaf(dx, y, dz, lf);
+                  double d = Math.sqrt(dx * dx + dz * dz);
+                  if (d > rad + 0.25) continue;
+                  if (d < rad - 1.1 && r.nextInt(3) != 0) continue;
+                  t.leaf(dx, y, dz, lf);
+                  if (d >= rad - 0.7 && y > 3 && r.nextInt(4) == 0) {
+                     t.leaf(dx, y - 1, dz, lf); // a drooping needle cluster
                   }
                }
             }
@@ -393,21 +401,16 @@ final class TerraTrees {
 
    /** The 2 x 2 spruce of the giant taiga. */
    static void megaSpruce(Buf t, Random r) {
+      // Update 6.22: tiered 2x2 giant spruce, half the levels of the old solid cone.
       int h = 14 + r.nextInt(12);
       int lf = Blocks.LEAVES_SPRUCE;
       int maxR = 5 + (h > 20 ? 1 : 0);
-      for (int y = h + 2; y >= 4; y--) {
+      for (int y = h + 2; y >= 4; y -= 2) {
          int f = h + 2 - y;
-         double rad = Math.min(maxR, 0.5 + f * 0.42);
-         if (f % 4 == 3) {
-            rad = Math.max(1.0, rad - 1.6);
-         }
-
-         if (y == h + 2) {
-            rad = 0.8;
-         }
-
-         disc(t, y, 0.5, 0.5, rad, lf, r, 0.35F);
+         double rad = Math.min(maxR, 0.9 + f * 0.30);
+         if (f % 8 == 6) rad = Math.max(1.0, rad - 1.5);
+         if (y == h + 2) rad = 0.9;
+         disc(t, y, 0.5, 0.5, rad, lf, r, 0.42F);
       }
 
       trunk2(t, 0, h + 1, Blocks.LOG_SPRUCE);

@@ -17,6 +17,8 @@ public final class TerraGen extends Gen {
    final CaveWorks caves;
    final double bs;
    final double vs;
+   /** Update 6.22: global tree-density multiplier from the world settings. */
+   final double treeDensity;
    final Noise nC;
    final Noise nE;
    final Noise nT;
@@ -36,6 +38,9 @@ public final class TerraGen extends Gen {
    final Noise nRavW;
    final Noise nFl;
    final Noise nBad;
+   /** Update 6.22: low-frequency warps for meandering, smooth biome borders and mountain terraces. */
+   final Noise nBlend;
+   final Noise nTerrace;
    /** The terracotta bands of the badlands, one entry per y. */
    final int[] bands = new int[256];
 
@@ -44,6 +49,7 @@ public final class TerraGen extends Gen {
       this.st = settings;
       this.settings = settings;
       this.caves = new CaveWorks(seed, settings, this, this.nCave1, this.nCave2, this.nCavern, this.nEntr);
+      this.treeDensity = settings.treeDensity < 0.4F ? 0.4F : (settings.treeDensity > 1.4F ? 1.4F : settings.treeDensity);
       this.bs = settings.type == WorldSettings.LARGE ? 4.0 : 1.0;
       this.vs = settings.type == WorldSettings.AMPLIFIED ? 1.7 : 1.0;
       Random r = new Random(seed * 0x2545F4914F6CDD1DL + 0x7E44A6E13L);
@@ -66,6 +72,8 @@ public final class TerraGen extends Gen {
       this.nRavW = new Noise(r.nextLong());
       this.nFl = new Noise(r.nextLong());
       this.nBad = new Noise(r.nextLong());
+      this.nBlend = new Noise(r.nextLong());
+      this.nTerrace = new Noise(r.nextLong());
       int[] pal = new int[]{Blocks.STAINED0 + 1, Blocks.STAINED0, Blocks.STAINED0 + 4, Blocks.STAINED0 + 12, Blocks.STAINED0 + 14, Blocks.STAINED0 + 8, Blocks.TERRACOTTA};
       int y = 0;
       while (y < 256) {
@@ -92,6 +100,9 @@ public final class TerraGen extends Gen {
       double tEff;
       int h;
       int biome;
+      /** Update 6.22: neighbour biome across a climate border and the 0..1 border weight. */
+      int altBiome;
+      double blend;
    }
 
    static final ThreadLocal<Cl[]> GRID = ThreadLocal.withInitial(() -> {
@@ -118,6 +129,17 @@ public final class TerraGen extends Gen {
       return SPLINE_H[SPLINE_H.length - 1];
    }
 
+   /** The climate values at which pick() changes biome; distance to these defines a border band. */
+   private static final double[] T_EDGE = {0.2, 0.4, 0.62};
+   private static final double[] HU_EDGE = {0.3, 0.33, 0.36, 0.44, 0.5, 0.52, 0.62, 0.7};
+
+   static double climateEdge(double t, double hu) {
+      double e = 1.0;
+      for (double v : T_EDGE) e = Math.min(e, Math.abs(t - v));
+      for (double v : HU_EDGE) e = Math.min(e, Math.abs(hu - v));
+      return e;
+   }
+
    // ------------------------------------------------------------------------------------------------ the climate
    void sample(int x, int z, Cl o) {
       double k = 1.0 / this.bs;
@@ -126,6 +148,17 @@ public final class TerraGen extends Gen {
       double t = clamp(this.nT.fbm(x * k / 900.0 + 500.0, z * k / 900.0, 3) * 0.84 + 0.5, 0.0, 1.0);
       double hu = clamp(this.nH.fbm(x * k / 760.0 - 300.0, z * k / 760.0 + 120.0, 3) * 0.88 + 0.5, 0.0, 1.0);
       double v = clamp(this.nVar.fbm(x / 170.0 + 17.0, z / 170.0 - 9.0, 2) * 0.9 + 0.5, 0.0, 1.0);
+      // Update 6.22: warp the climate coordinates with two slow noises so biome boundaries meander
+      // instead of following straight contour lines. Old worlds (biomeBorders = 0) are untouched.
+      final int borders = this.st.biomeBorders;
+      if (borders > 0) {
+         double amp = borders >= 2 ? 0.052 : 0.030;
+         t = clamp(t + amp * this.nBlend.fbm(x / 38.0, z / 38.0, 2)
+            + amp * 0.30 * this.nTerrace.fbm(x / 15.0 + 9.0, z / 15.0 - 4.0, 2), 0.0, 1.0);
+         hu = clamp(hu + amp * this.nBlend.fbm(x / 38.0 + 61.0, z / 38.0 - 27.0, 2)
+            + amp * 0.28 * this.nTerrace.fbm(x / 17.0 - 5.0, z / 17.0 + 13.0, 2), 0.0, 1.0);
+      }
+
       double coast = smooth(-0.03, 0.16, c);
       double rough = (2.0 + 14.0 * smooth(0.40, -0.55, e)) * (0.3 + 0.7 * coast);
       double d1 = this.nD1.fbm(x / 85.0, z / 85.0, 5);
@@ -160,6 +193,15 @@ public final class TerraGen extends Gen {
 
       if (hd > 212.0) {
          hd = 212.0 + (hd - 212.0) * 0.3;
+      }
+
+      // Update 6.22: soft mountain terraces (wide natural shelves instead of a smooth cone).
+      if (borders > 0 && mtn > 0.06 && hd > 76.0) {
+         double stepH = 7.0;
+         double f = hd / stepH;
+         double fl = Math.floor(f);
+         double terr = stepH * (fl + smooth(0.60, 0.97, f - fl));
+         hd += (terr - hd) * 0.30 * Math.min(1.0, mtn * 2.2) * (borders >= 2 ? 1.25 : 1.0);
       }
 
       // badlands: stepped mesas in the hot, dry corners of the map
@@ -208,7 +250,19 @@ public final class TerraGen extends Gen {
                   hd += (bed - hd) * rf;
                }
             }
+
+            // Update 6.22: a broad, smooth valley around the river instead of a knife-edge trench.
+            if (borders > 0) {
+               double valley = (1.0 - smooth(8.0, 44.0, dist)) * 0.26 * smooth(-0.12, 0.03, c) * smooth(104.0, 76.0, hd);
+               hd += (62.0 + d2 * 0.5 - hd) * valley;
+            }
          }
+      }
+
+      // Update 6.22: flatten the shoreline into wider, gentler beaches.
+      if (borders > 0 && c > -0.06 && c < 0.18) {
+         double w = smooth(57.0, 62.0, hd) * (1.0 - smooth(65.0, 71.0, hd));
+         hd += (62.0 - hd) * w * 0.35;
       }
 
       if (st.aquatic && c < -.08 && isle < .2) {
@@ -227,7 +281,29 @@ public final class TerraGen extends Gen {
       o.isle = isle;
       o.h = (int)clamp(Math.floor(hd), 4.0, 245.0);
       o.tEff = t - Math.max(0.0, o.h - 82.0) * 0.0035;
-      o.biome = pick(o);
+      int b0 = pick(o);
+      double bandW = borders > 0 ? (borders >= 2 ? 0.065 : 0.038) : 0.0;
+      double blend = borders > 0 ? clamp(1.0 - climateEdge(t, hu) / bandW, 0.0, 1.0) : 0.0;
+      int alt = -1;
+      if (blend > 0.0 && !Biomes.ocean(b0) && !Biomes.river(b0) && o.h >= 61) {
+         double t0 = o.t, hu0 = o.hu;
+         o.t = clamp(t0 + bandW, 0.0, 1.0);
+         int a1 = pick(o);
+         o.t = clamp(t0 - bandW, 0.0, 1.0);
+         int a2 = pick(o);
+         o.t = t0;
+         o.hu = clamp(hu0 + bandW, 0.0, 1.0);
+         int a3 = pick(o);
+         o.hu = clamp(hu0 - bandW, 0.0, 1.0);
+         int a4 = pick(o);
+         o.hu = hu0;
+         alt = a1 != b0 ? a1 : (a2 != b0 ? a2 : (a3 != b0 ? a3 : (a4 != b0 ? a4 : -1)));
+         if (alt >= 0 && (Biomes.ocean(alt) || Biomes.river(alt))) alt = -1;
+      }
+
+      o.biome = b0;
+      o.altBiome = alt;
+      o.blend = blend;
       if (st.aquatic && Biomes.ocean(o.biome)) o.biome=Aquatic.ocean(t,o.h);
    }
 
@@ -338,6 +414,8 @@ public final class TerraGen extends Gen {
       c.biome = s.biome;
       c.t = s.t;
       c.hu = s.hu;
+      c.altBiome = s.altBiome;
+      c.blend = (float)s.blend;
       return c;
    }
 
@@ -358,12 +436,14 @@ public final class TerraGen extends Gen {
          g = lerpColor(g, 0x90814D, Math.min(1.0, s.bad * 1.4));
       }
 
+      // Update 6.22: fade a biome's special tint out across a border band instead of flipping it.
+      float solid = 1.0F - (float)s.blend * 0.65F;
       if (s.biome == Biomes.DARK_FOREST) {
-         g = lerpColor(g, 0x2F5A22, 0.45);
+         g = lerpColor(g, 0x2F5A22, 0.45F * solid);
       }
 
       if (s.biome == Biomes.MEADOW) {
-         g = lerpColor(g, 0x7BC25A, 0.4);
+         g = lerpColor(g, 0x7BC25A, 0.4F * solid);
       }
 
       return g;
@@ -379,8 +459,9 @@ public final class TerraGen extends Gen {
          g = lerpColor(g, 0x9E814D, 0.7);
       }
 
+      float solid = 1.0F - (float)s.blend * 0.65F;
       if (s.biome == Biomes.DARK_FOREST) {
-         g = lerpColor(g, 0x244E1A, 0.5);
+         g = lerpColor(g, 0x244E1A, 0.5F * solid);
       }
 
       return g;
@@ -391,6 +472,14 @@ public final class TerraGen extends Gen {
    void surface(Cl s, int slope, int wx, int wz, int[] rule) {
       int b = s.biome;
       int h = s.h;
+      // Update 6.22: across a border band the two biomes' surfaces interleave column by column,
+      // so sand turns into grass (or podzol into dirt) gradually instead of at one hard line.
+      if (s.blend > 0.42 && s.altBiome >= 0 && s.altBiome != b && this.st.biomeBorders > 0) {
+         double chance = (s.blend - 0.42) / 0.58 * 0.48;
+         long hsh = CaveWorks.mix(this.seed ^ 0x424F52444552L, wx, 0, wz);
+         if ((hsh & 255) < chance * 256.0) b = s.altBiome;
+      }
+
       double n = this.nSurf.noise2(wx * 0.08, wz * 0.08);
       double n2 = this.nS2.noise2(wx * 0.03 + 40.0, wz * 0.03);
       rule[0] = Blocks.GRASS;
@@ -484,6 +573,11 @@ public final class TerraGen extends Gen {
          case Biomes.MOUNTAINS:
          case Biomes.FROZEN_PEAKS: {
             double snowline = 112.0 + (0.5 - s.t) * 44.0;
+            if (this.st.biomeBorders > 0) {
+               // a broken snow line, not a ruler-straight one
+               snowline += (CaveWorks.mix(this.seed ^ 0x534E4F57L, wx, 0, wz) & 15) - 7;
+            }
+
             if (b == Biomes.FROZEN_PEAKS) {
                snowline = Math.min(snowline, 128.0);
             }
@@ -597,6 +691,7 @@ public final class TerraGen extends Gen {
 
       Random r = new Random(this.seed * 31L + cx * 341873128712L + cz * 132897987541L);
       final boolean ver3 = this.st.terrainVer >= 3;
+      final boolean cc = ver3 && this.st.caveVer >= 2;
       int[] hs = new int[256];
       int[] bm = new int[256];
       int[] rule = new int[5];
@@ -673,9 +768,10 @@ public final class TerraGen extends Gen {
                   if (shaft && y >= 30) {
                      b[Chunk.idx(x, y, z)] = 0;
                   } else {
-                     int cv = this.caves.hollow(wx, y, wz);
+                     int cv = cc ? this.caves.hollowCC(wx, y, wz) : this.caves.hollow(wx, y, wz);
                      if (cv != 0) {
-                        b[Chunk.idx(x, y, z)] = (short)(cv == 2 ? Blocks.LAVA : 0);
+                        b[Chunk.idx(x, y, z)] = (short)(cv == CaveCliffs.LAVA ? Blocks.LAVA
+                           : (cv == CaveCliffs.WATER ? Blocks.WATER : 0));
                      }
                   }
                } else if (bigCaves ? this.carveBig(wx, y, wz) : this.carve(wx, y, wz)) {
@@ -795,6 +891,13 @@ public final class TerraGen extends Gen {
             }
 
             boolean grassy = ground == Blocks.GRASS || ground == Blocks313.PODZOL;
+            // Update 6.22: flowers and grasses of both biomes mix in the border band.
+            if (this.st.biomeBorders > 0 && g[(z + 1) * 18 + x + 1].blend > 0.6
+               && g[(z + 1) * 18 + x + 1].altBiome >= 0
+               && (CaveWorks.mix(this.seed ^ 0x464C4F57L, wx, 0, wz) & 255) < 96) {
+               biome = g[(z + 1) * 18 + x + 1].altBiome;
+            }
+
             switch (biome) {
                case Biomes.PLAINS:
                   if (grassy) {
@@ -986,12 +1089,15 @@ public final class TerraGen extends Gen {
       TerraTrees.Buf buf = BUF.get();
       int[] rule = new int[5];
       Cl s = new Cl();
-      for (int dx = -1; dx <= 1; dx++) {
-         for (int dz = -1; dz <= 1; dz++) {
+      int built = 0;
+      int cap = (int)Math.round(30.0 * this.treeDensity);
+      if (cap < 8) cap = 8;
+      for (int dx = -1; dx <= 1 && built < cap; dx++) {
+         for (int dz = -1; dz <= 1 && built < cap; dz++) {
             int ncx = ch.cx + dx;
             int ncz = ch.cz + dz;
             Random tr = new Random(this.seed * 7919L ^ (ncx * 734287L + ncz * 912931L) * 31L + 17L);
-            for (int i = 0; i < 44; i++) {
+            for (int i = 0; i < 44 && built < cap; i++) {
                int lx = tr.nextInt(16);
                int lz = tr.nextInt(16);
                float p = tr.nextFloat();
@@ -1009,7 +1115,16 @@ public final class TerraGen extends Gen {
                }
 
                double dens = 0.35 + 1.3 * clamp(this.nTr.noise2(wx / 70.0, wz / 70.0) * 0.9 + 0.5, 0.0, 1.0);
-               int plan = this.treePlan(s.biome, p, kind, dens);
+               // Update 6.22: tree lines fade out across a biome border instead of stopping dead.
+               if (s.blend > 0.0) dens *= 1.0 - 0.30 * s.blend;
+               dens *= this.treeDensity;
+               int treeBiome = s.biome;
+               if (s.blend > 0.55 && s.altBiome >= 0
+                  && (CaveWorks.mix(this.seed ^ 0x54524545L, wx, 0, wz) & 255) < (s.blend - 0.55) * 400.0) {
+                  treeBiome = s.altBiome;
+               }
+
+               int plan = this.treePlan(treeBiome, p, kind, dens);
                if (plan < 0) {
                   continue;
                }
@@ -1038,6 +1153,7 @@ public final class TerraGen extends Gen {
                Random rnd = new Random(ts);
                this.buildPlan(buf, rnd, plan);
                buf.commit(ch);
+               built++;
                if (plan == P_MEGA_SPRUCE) {
                   // podzol under the giant spruce
                   for (int px = -2; px <= 3; px++) {
@@ -1086,19 +1202,19 @@ public final class TerraGen extends Gen {
          case Biomes.FLOWER_FOREST:
             return p < 0.07 * dens ? (kind < 500 ? P_BIRCH : P_OAK_CLASSIC) : -1;
          case Biomes.DARK_FOREST:
-            return p < 0.30 * dens ? (kind < 700 ? P_DARK_OAK : (kind < 780 ? P_MUSH_RED : (kind < 850 ? P_MUSH_BROWN : P_OAK_SMALL))) : -1;
+            return p < 0.24 * dens ? (kind < 700 ? P_DARK_OAK : (kind < 780 ? P_MUSH_RED : (kind < 850 ? P_MUSH_BROWN : P_OAK_SMALL))) : -1;
          case Biomes.TAIGA:
-            return p < 0.15 * dens ? (kind < 250 ? P_SPRUCE_PINE : P_SPRUCE) : -1;
+            return p < 0.105 * dens ? (kind < 220 ? P_SPRUCE_PINE : P_SPRUCE) : -1;
          case Biomes.SNOWY_TAIGA:
-            return p < 0.11 * dens ? (kind < 250 ? P_SPRUCE_PINE : P_SPRUCE) : -1;
+            return p < 0.085 * dens ? (kind < 220 ? P_SPRUCE_PINE : P_SPRUCE) : -1;
          case Biomes.MEGA_TAIGA:
-            return p < 0.12 * dens ? (kind < 450 ? P_MEGA_SPRUCE : (kind < 700 ? P_SPRUCE_PINE : P_SPRUCE)) : -1;
+            return p < 0.095 * dens ? (kind < 300 ? P_MEGA_SPRUCE : (kind < 620 ? P_SPRUCE_PINE : P_SPRUCE)) : -1;
          case Biomes.SWAMP:
             return p < 0.055 * dens ? P_SWAMP_OAK : -1;
          case Biomes.SAVANNA:
             return p < 0.028 * dens ? (kind < 800 ? P_ACACIA : P_OAK_SMALL) : -1;
          case Biomes.JUNGLE:
-            return p < 0.38 * dens ? (kind < 500 ? P_JUNGLE_SMALL : (kind < 780 ? P_JUNGLE_TALL : (kind < 880 ? P_MEGA_JUNGLE : P_BUSH))) : -1;
+            return p < 0.31 * dens ? (kind < 500 ? P_JUNGLE_SMALL : (kind < 780 ? P_JUNGLE_TALL : (kind < 880 ? P_MEGA_JUNGLE : P_BUSH))) : -1;
          case Biomes.MEADOW:
             return p < 0.003 ? P_OAK_SMALL : -1;
          case Biomes.ICE_PLAINS:

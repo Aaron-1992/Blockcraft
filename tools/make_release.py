@@ -361,6 +361,40 @@ def main():
             "cross-section and `v6.21-weather.png` is a headless palette preview - neither is a GPU "
             "screenshot, and no real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.22":
+        release_notes += (
+            "\n### Caves & Cliffs, smoother world generation, live shadows and a movable minimap\n\n"
+            "**New worlds only** (Debug Video > Advanced > Caves & Cliffs; old saves keep their exact "
+            "old terrain). The V6.21 tunnel carver is replaced again by an original Caves & Cliffs-style "
+            "engine: noodle / spaghetti / cheese caves, giant halls and vertical wells, hashed local "
+            "aquifers that flood the bottom of a cavern, warped lush / dripstone / ice / amethyst / "
+            "deep-dark cave biomes, and amethyst geodes with crystal buds. The six V6.21 underground "
+            "site types and their loot chests still generate on top of the new carver.\n\n"
+            "**Taiga is no longer the heaviest biome.** Spruce crowns were nearly solid cones of "
+            "roughly a thousand leaves; they are now sparse tiered conifers with hollow interiors "
+            "and drooping tips, mega spruces use half the levels, tree density and a per-chunk cap "
+            "stop mesh spikes, and bushy-leaf meshing no longer allocates per leaf block. "
+            "Headless 3x3 taiga meshing at seed 6120: 593 -> 297 spruce leaves, 199744 -> 165648 "
+            "vertices, 62.9 ms -> 36.2 ms. A Tree Density slider is provided. These are headless "
+            "meshing timings, not FPS claims.\n\n"
+            "**Borders and terrain look better.** Climate coordinates are warped by two slow noises; "
+            "near a biome border the neighbouring biome's surface, plants, trees and map colours "
+            "blend in deterministically instead of flipping on one line. Mountains gain soft "
+            "terraces, rivers broad valleys, shorelines wider beaches and the snow line a broken "
+            "edge. Biome Borders has Sharp / Smooth / Very Smooth.\n\n"
+            "**Mob shadows update every frame.** A terrain-only copy of the shadow depth is "
+            "restored with one depth blit per frame and the current mob silhouettes are stamped "
+            "in, instead of lagging behind the 8..150 frame shadow-map refresh. **The minimap has "
+            "four corners** (Top Right / Top Left / Bottom Right / Bottom Left) and **Move for Toasts** "
+            "slides a top-right minimap down while an advancement toast is showing.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with the ten new V6.22 regression groups (8007440 checks); strict "
+            "equivalence still matches the original Update 3.5 terrain/world/tick fingerprints; all 21 GLSL "
+            "programs parse; the packaged exe and jar are verified by `tools/verify_release.py` including "
+            "the new CaveCliffs class. `docs/screenshots/v6.22-caves.png` and `v6.22-borders.png` are "
+            "headless generator / palette previews - neither is a GPU screenshot, and no real-GPU/Windows "
+            "playtest is claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

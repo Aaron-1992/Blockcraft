@@ -574,16 +574,11 @@ public final class Mesher {
             float sumBlk = maxBlk;
             int cnt = 1;
             int occ = 0;
-            int[] faces = {fy, fz, fx};
-            for (int f : faces) {
-               if (fOpen[f]) {
-                  sumSky += fSky[f];
-                  sumBlk += fBlk[f];
-                  cnt++;
-               } else {
-                  occ++;
-               }
-            }
+            // Update 6.22: no int[] allocation per vertex. A dense taiga crown emits
+            // thousands of fronds; the old array was allocated 12 times per leaf block.
+            if (fOpen[fy]) { sumSky += fSky[fy]; sumBlk += fBlk[fy]; cnt++; } else occ++;
+            if (fOpen[fz]) { sumSky += fSky[fz]; sumBlk += fBlk[fz]; cnt++; } else occ++;
+            if (fOpen[fx]) { sumSky += fSky[fx]; sumBlk += fBlk[fx]; cnt++; } else occ++;
 
             float vSky = Math.max(maxSky * 0.85F, sumSky / cnt);
             float vBlk = Math.max(maxBlk * 0.85F, sumBlk / cnt);

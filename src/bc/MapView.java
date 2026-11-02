@@ -115,6 +115,9 @@ final class MapView {
    /** The colour of one block column, from live chunk data when it is loaded, otherwise from the generator. */
    static int colorAt(World w, Gen gen, int bx, int bz) {
       Chunk c = w == null ? null : w.chunk(bx >> 4, bz >> 4);
+      int unloadedAlt = -1;
+      float unloadedBlend = 0.0F;
+      Gen.Col col = null;
       int h, biome, top = 0;
       float relief = 0.0F;
       if (c != null && c.lit) {
@@ -129,7 +132,6 @@ final class MapView {
          relief = (hE - hS) * 0.02F;
       } else {
          if (gen == null) return UNKNOWN;
-         Gen.Col col;
          try {
             col = gen.column(bx, bz);
          } catch (RuntimeException e) {
@@ -140,6 +142,14 @@ final class MapView {
       }
 
       int base = WorldPreview.color(biome);
+      // Unloaded columns blend toward the neighbouring biome across a border band; loaded
+      // columns already have their real (dithered) surface colour from the chunk.
+      if (c == null || !c.lit) {
+         if (unloadedAlt >= 0 && unloadedBlend > 0.0F) {
+            base = WorldPreview.mix(base, WorldPreview.color(unloadedAlt), unloadedBlend * 0.45F);
+         }
+      }
+
       if (Blocks.isWater(top)) {
          base = 0x2F55B0;
       } else if (top == Blocks.SAND || top == Blocks.SANDSTONE) {
@@ -251,14 +261,42 @@ final class MapView {
    }
 
    // ------------------------------------------------------------------ HUD minimap
+   /** Update 6.22: four corners for the HUD minimap. */
+   static final String[] POS_NAME = {"Top Right", "Top Left", "Bottom Right", "Bottom Left"};
+   /** Height of the advancement toast (Adv312.drawToast draws a 32px box at y=4). */
+   static final float TOAST_H = 38.0F;
+
+   /**
+    * Update 6.22: where the minimap goes, and where it slides to while an advancement toast is
+    * showing. The toast is in the top-right corner, so a top-right minimap moves down below it;
+    * other corners are already clear. Pure so the headless screen tests can assert the behaviour.
+    */
+   static float[] miniOrigin(float gw, float gh, float size, int pos, boolean toast, boolean autoMove, float[] out) {
+      int p = Options.clamp(pos, 0, 3);
+      float x = p == 0 || p == 2 ? gw - size - 6.0F : 6.0F;
+      float y = p == 0 || p == 1 ? 6.0F : gh - size - 24.0F;
+      if (toast && autoMove && p == 0) {
+         y += TOAST_H;
+         if (y + size + 14.0F > gh) {
+            y = Math.max(6.0F, gh - size - 24.0F);
+         }
+      }
+
+      out[0] = x;
+      out[1] = y;
+      return out;
+   }
+
    void drawMini(Game g) {
       Gui gui = g.gui;
       Options o = g.opt;
       if (o == null || !o.minimap || g.hideGui || g.pano != null || g.world == null || g.player == null) return;
       if (g.screen != Game.S.PLAY && g.screen != Game.S.CHAT) return;
       float size = SIZES[Options.clamp(o.minimapSize, 0, SIZES.length - 1)];
-      float x = gui.w - size - 6.0F;
-      float y = 6.0F;
+      boolean toast = g.adv != null && g.adv.shown != null;
+      float[] at = miniOrigin(gui.w, gui.h, size, o.minimapPos, toast, o.minimapAutoMove, new float[2]);
+      float x = at[0];
+      float y = at[1];
       gui.rect(x - 2.0F, y - 2.0F, size + 4.0F, size + 4.0F, 0xD00A0E16);
       gui.rect(x - 1.0F, y - 1.0F, size + 2.0F, size + 2.0F, 0xFF7C8BA8);
       gui.image(mini, x, y, size, size);

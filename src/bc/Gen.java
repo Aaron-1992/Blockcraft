@@ -626,5 +626,8 @@ public class Gen {
       public int biome;
       public double t;
       public double hu;
+      /** Update 6.22: the neighbour biome and the 0..1 border weight, for smooth biome borders. */
+      public int altBiome = -1;
+      public float blend;
    }
 }

@@ -77,7 +77,8 @@ final class WorldPreview {
       String k = seed + "/" + ws.type + "/" + ws.flat + "/" + ws.aquatic + "/" + ws.structures
          + "/" + ws.bonusChest + "/" + ws.mapId + "/" + ws.structVer + "/" + ws.terrainVer
          + "/" + ws.caveScale + "/" + ws.caveDensity + "/" + ws.mountainScale + "/" + ws.ravineScale
-         + "/" + ws.caveStructures + "/" + ws.caveLayers + "/" + ws.caveLakes + "/" + ws.caveRichness;
+         + "/" + ws.caveStructures + "/" + ws.caveLayers + "/" + ws.caveLakes + "/" + ws.caveRichness
+         + "/" + ws.caveVer + "/" + ws.biomeBorders + "/" + ws.treeDensity;
       if (k.equals(this.key)) {
          return false;
       }
@@ -88,6 +89,7 @@ final class WorldPreview {
    }
 
    void render(Gen gen) {
+      boolean softBorders = gen instanceof TerraGen tg && tg.st.biomeBorders > 0;
       int cx = 0;
       int cz = 0;
       boolean voidMap = gen instanceof SkyGen;
@@ -127,6 +129,23 @@ final class WorldPreview {
             }
             int b = bs[idx];
             int base = color(b);
+            if (softBorders) {
+               int sr = 0, sg = 0, sb = 0, n = 0;
+               for (int dz = -1; dz <= 1; dz++) {
+                  int jj = Math.max(0, Math.min(this.h - 1, j + dz));
+                  for (int dx = -1; dx <= 1; dx++) {
+                     int ii = Math.max(0, Math.min(this.w - 1, i + dx));
+                     int col = color(bs[jj * this.w + ii]);
+                     sr += col >> 16 & 255;
+                     sg += col >> 8 & 255;
+                     sb += col & 255;
+                     n++;
+                  }
+               }
+
+               base = mix(base, 0xFF000000 | (sr / n) << 16 | (sg / n) << 8 | sb / n, 0.45F);
+            }
+
             float shade;
             if (hgt < Gen.SEA) {
                // water: the deeper, the darker

@@ -388,6 +388,9 @@ final class Screens {
       ws.caveLayers = g.opt.caveLayers;
       ws.caveLakes = g.opt.caveLakes;
       ws.caveRichness = g.opt.caveRichness;
+      ws.caveVer = g.opt.caveCliffs ? 2 : 1;
+      ws.biomeBorders = g.opt.biomeBorders;
+      ws.treeDensity = g.opt.treeDensity;
    }
 
    static void createWorld(Game g) {
@@ -487,8 +490,9 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
-         + (ws.terrainVer >= 3 ? "  -  layered caves & underground structures"
+         + (ws.terrainVer >= 3 ? (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures")
             : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
+         + (ws.biomeBorders > 0 ? "  -  smooth biome borders" : "")
          + (ws.structures ? "  -  villages, temples & ruins" : "")
          + (ws.bonusChest ? "  -  bonus chest" : "");
       gui.text(Game.clipText(content, colW * 2 + gap), x0, recY, 0xFFE8D068, true);
@@ -526,7 +530,7 @@ final class Screens {
    static final int[] FPS_FINE = {0, 30, 60, 75, 90, 120, 144, 165, 240, 360, 500, 1000};
    static final int[] AUTOSAVE = {0, 600, 1200, 3600, 7200};
    /** Number of rows in the Advanced tab (the list scrolls). */
-   static final int ADV_ROWS = 57;
+   static final int ADV_ROWS = 60;
 
    static String[] tabs(Options o) {
       return o.debugVideo ? TABS_DEBUG : TABS;
@@ -1019,6 +1023,20 @@ final class Screens {
             "Lava springs and quiet water pools on cave floors.", () -> o.caveLakes = !o.caveLakes);
          ui.label("Old saves keep the generator they were created with.", x1, y + 4.0F, Ui.DIM);
       });
+      // ---------------------------------------------------------------- V6.22: world-gen overhaul
+      cells.add(y -> {
+         ui.toggle("Caves & Cliffs", o.caveCliffs, x0, y, colW, 20.0F,
+            "Cheese/spaghetti/noodle caves, aquifers, lush & dripstone biomes and amethyst geodes instead of the V6.21 tunnels.", () -> o.caveCliffs = !o.caveCliffs);
+         ui.slider("Biome Borders: " + new String[]{"Sharp", "Smooth", "Very"}[Options.clamp(o.biomeBorders, 0, 2)], x1, y, colW, 20.0F,
+            Options.clamp(o.biomeBorders, 0, 2) / 2.0F,
+            "Meandering, blended biome edges, mountain terraces, wider river valleys and gentler beaches.", v -> o.biomeBorders = Math.round(v * 2.0F));
+      });
+      cells.add(y -> {
+         ui.slider("Tree Density: " + String.format("%.2f", o.treeDensity) + "x", x0, y, colW, 20.0F, (o.treeDensity - 0.4F),
+            "How many trees grow. Lower values are much cheaper in taiga and jungle. New worlds only.", v -> o.treeDensity = 0.4F + v);
+         ui.toggle("Live Entity Shadows", o.entityShadowMotion, x1, y, colW, 20.0F,
+            "Mob shadows follow every frame instead of only when the terrain shadow map refreshes.", () -> o.entityShadowMotion = !o.entityShadowMotion);
+      });
       // ---------------------------------------------------------------- V6.21: weather & sky
       cells.add(header);
       cells.add(y -> ui.label("\u00a7eWEATHER & SKY  -  prettier storms near and far", x0, y + 3.0F, Ui.GOLD));
@@ -1066,6 +1084,12 @@ final class Screens {
             "Hostile mobs are red dots and passive mobs green dots on both maps.", () -> o.minimapMobs = !o.minimapMobs);
          ui.toggle("Map Grid", o.mapGrid, x1, y, colW, 20.0F,
             "Coordinate grid lines on the big map.", () -> o.mapGrid = !o.mapGrid);
+      });
+      cells.add(y -> {
+         ui.button("Minimap: " + MapView.POS_NAME[Options.clamp(o.minimapPos, 0, 3)], x0, y, colW, 20.0F, true,
+            "Click to move the HUD minimap between the four screen corners.", () -> o.minimapPos = (Options.clamp(o.minimapPos, 0, 3) + 1) % 4);
+         ui.toggle("Move for Toasts", o.minimapAutoMove, x1, y, colW, 20.0F,
+            "Slide a top-right minimap down while an advancement toast is showing.", () -> o.minimapAutoMove = !o.minimapAutoMove);
       });
       // ---------------------------------------------------------------- live diagnostics
       cells.add(header);
@@ -1140,6 +1164,12 @@ final class Screens {
       o.weatherBoltGlow = true;
       o.weatherWind = 1.0F;
       o.weatherReach = 1.0F;
+      o.caveCliffs = true;
+      o.biomeBorders = 1;
+      o.treeDensity = 1.0F;
+      o.minimapPos = 0;
+      o.minimapAutoMove = true;
+      o.entityShadowMotion = true;
    }
 
    static void gameTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {

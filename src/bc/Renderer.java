@@ -1125,7 +1125,12 @@ public final class Renderer {
             }
          } else {
             this.sh.mapValid = false;
+            this.sh.staticValid = false;
          }
+      }
+
+      if (var51) {
+         this.updateEntityShadows(var2, var3);
       }
 
       if (var50 && glow) {
@@ -1561,6 +1566,28 @@ public final class Renderer {
       }
    }
 
+   /** Whether the entity-only shadow pass should run this frame (headless-testable). */
+   static boolean entityShadowsNeedFrame(Options o, boolean mapValid, boolean staticValid) {
+      return o != null && o.entityShadows && o.entityShadowMotion && mapValid && staticValid;
+   }
+
+   /**
+    * Update 6.22: one cheap depth blit restores the terrain-only shadow map, then this frame's
+    * mob silhouettes are drawn on top. No terrain geometry is re-rendered, so shadows follow
+    * every moving entity every frame without the cost of a full shadow refresh each frame.
+    */
+   private void updateEntityShadows(int w, int h) {
+      Options o = this.g.opt;
+      if (!entityShadowsNeedFrame(o, this.sh.mapValid, this.sh.staticValid)) return;
+      if (this.sh.shadowFbo == 0 || this.sh.staticFbo == 0) return;
+      if (this.g.mobs == null || this.g.mobs.list.isEmpty()) return;
+      this.sh.restoreStaticShadow();
+      this.sh.beginShadowEntities();
+      this.renderEntityShadowCasters();
+      arrays(false);
+      this.sh.endShadow(w, h, true);
+   }
+
    void renderShadowPass(int var1, int var2) {
       GL11.glEnable(2929);
       GL11.glDepthMask(true);
@@ -1638,7 +1665,10 @@ public final class Renderer {
          }
       }
 
-      this.renderEntityShadowCasters();
+      // Update 6.22: keep a terrain-only copy of the depth. Mobs are re-stamped every frame
+      // (see updateEntityShadows), so their shadows track movement instead of lagging behind
+      // the 8..150 frame shadow-map refresh.
+      this.sh.saveStaticShadow();
       arrays(false);
       this.sh.endShadow(var1, var2, true);
    }

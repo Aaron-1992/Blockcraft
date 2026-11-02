@@ -41,6 +41,8 @@ final class CaveWorks {
    final Noise b;
    final Noise c;
    final Noise e;
+   /** Update 6.22: the Caves & Cliffs carver, only used when st.caveVer >= 2. */
+   final CaveCliffs cliffs;
    private final ConcurrentHashMap<Long, Plan> plans = new ConcurrentHashMap<>();
 
    CaveWorks(long seed, WorldSettings st, Gen gen, Noise a, Noise b, Noise c, Noise e) {
@@ -51,11 +53,17 @@ final class CaveWorks {
       this.b = b;
       this.c = c;
       this.e = e;
+      this.cliffs = new CaveCliffs(seed, st);
    }
 
    // ------------------------------------------------------------------ instance shortcuts
    int hollow(int x, int y, int z) {
       return hollow(this.a, this.b, this.c, this.seed, x, y, z, this.st.caveScale, this.st.caveDensity);
+   }
+
+   /** Update 6.22: the Caves & Cliffs carver (0 solid, 1 air, 2 lava, 3 aquifer water). */
+   int hollowCC(int x, int y, int z) {
+      return this.cliffs.carve(x, y, z);
    }
 
    boolean mouth(int x, int z) {
@@ -240,7 +248,12 @@ final class CaveWorks {
          strata(ch);
       }
 
-      decorate(ch);
+      if (st.caveVer >= 2) {
+         this.cliffs.finish(ch);
+      } else {
+         decorate(ch);
+      }
+
       if (st.caveStructures) {
          structures(ch);
       }

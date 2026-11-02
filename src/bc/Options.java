@@ -146,6 +146,18 @@ public final class Options {
    public float weatherWind = 1.0F;
    /** Update 6.21: how far distant rain curtains reach (0.5..1.5). */
    public float weatherReach = 1.0F;
+   /** Update 6.22: new worlds use the Caves & Cliffs carver instead of the V6.21 layered caves. */
+   public boolean caveCliffs = true;
+   /** Update 6.22: 0 = sharp legacy biome borders, 1 = smooth, 2 = very smooth. */
+   public int biomeBorders = 1;
+   /** Update 6.22: global tree-density multiplier (0.4..1.4). Lower is much cheaper in taiga. */
+   public float treeDensity = 1.0F;
+   /** Update 6.22: HUD minimap corner, 0 = top right, 1 = top left, 2 = bottom right, 3 = bottom left. */
+   public int minimapPos = 0;
+   /** Update 6.22: slide the minimap out of the way while an advancement toast is showing. */
+   public boolean minimapAutoMove = true;
+   /** Update 6.22: re-stamp mob shadows into the shadow map every frame instead of only on refresh. */
+   public boolean entityShadowMotion = true;
    /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
    public String resourcePack = ResourcePacks.ID_DEFAULT;
    public float soundVolume = 1.0F;
@@ -252,6 +264,12 @@ public final class Options {
                this.weatherBoltGlow = Boolean.parseBoolean(var2.getProperty("weatherBoltGlow", "true"));
                this.weatherWind = clampf(Float.parseFloat(var2.getProperty("weatherWind", "1.0")), 0.2F, 2.0F);
                this.weatherReach = clampf(Float.parseFloat(var2.getProperty("weatherReach", "1.0")), 0.5F, 1.5F);
+               this.caveCliffs = Boolean.parseBoolean(var2.getProperty("caveCliffs", "true"));
+               this.biomeBorders = clamp(Integer.parseInt(var2.getProperty("biomeBorders", "1")), 0, 2);
+               this.treeDensity = clampf(Float.parseFloat(var2.getProperty("treeDensity", "1.0")), 0.4F, 1.4F);
+               this.minimapPos = clamp(Integer.parseInt(var2.getProperty("minimapPos", "0")), 0, 3);
+               this.minimapAutoMove = Boolean.parseBoolean(var2.getProperty("minimapAutoMove", "true"));
+               this.entityShadowMotion = Boolean.parseBoolean(var2.getProperty("entityShadowMotion", "true"));
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
@@ -352,6 +370,12 @@ public final class Options {
       var1.setProperty("weatherBoltGlow", this.weatherBoltGlow + "");
       var1.setProperty("weatherWind", this.weatherWind + "");
       var1.setProperty("weatherReach", this.weatherReach + "");
+      var1.setProperty("caveCliffs", this.caveCliffs + "");
+      var1.setProperty("biomeBorders", this.biomeBorders + "");
+      var1.setProperty("treeDensity", this.treeDensity + "");
+      var1.setProperty("minimapPos", this.minimapPos + "");
+      var1.setProperty("minimapAutoMove", this.minimapAutoMove + "");
+      var1.setProperty("entityShadowMotion", this.entityShadowMotion + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");

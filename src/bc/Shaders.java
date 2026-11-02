@@ -151,6 +151,10 @@ public final class Shaders {
    boolean resizeQueued;
    int shadowFbo;
    int shadowTex;
+   /** Update 6.22: a terrain-only copy of the shadow depth, so mobs can be re-stamped every frame. */
+   int staticFbo;
+   int staticTex;
+   boolean staticValid;
    int sceneFbo;
    int sceneTex;
    int sceneDepth;
@@ -425,7 +429,7 @@ public final class Shaders {
       }
    }
 
-   /** Creates (or recreates) the depth-only shadow framebuffer at {@link #shadowSize} squared. */
+   /** Creates (or recreates) the depth-only shadow framebuffers at {@link #shadowSize} squared. */
    private void createShadowTarget() {
       if (this.shadowTex != 0) {
          GL11.glDeleteTextures(this.shadowTex);
@@ -433,19 +437,40 @@ public final class Shaders {
          this.shadowTex = 0;
          this.shadowFbo = 0;
       }
+
+      if (this.staticTex != 0) {
+         GL11.glDeleteTextures(this.staticTex);
+         GL30.glDeleteFramebuffers(this.staticFbo);
+         this.staticTex = 0;
+         this.staticFbo = 0;
+      }
+
       int size = Math.max(256, Math.min(SM, this.shadowSize));
       this.shadowSize = size;
-      this.shadowTex = GL11.glGenTextures();
-      GL11.glBindTexture(3553, this.shadowTex);
+      this.shadowTex = depthTarget(size);
+      this.shadowFbo = depthFramebuffer(this.shadowTex);
+      // Same format and size, so glBlitFramebuffer can copy just the depth every frame.
+      this.staticTex = depthTarget(size);
+      this.staticFbo = depthFramebuffer(this.staticTex);
+      this.staticValid = false;
+   }
+
+   private static int depthTarget(int size) {
+      int tex = GL11.glGenTextures();
+      GL11.glBindTexture(3553, tex);
       GL11.glTexImage2D(3553, 0, 33190, size, size, 0, 6402, 5126, (ByteBuffer)null);
       GL11.glTexParameteri(3553, 10241, 9728);
       GL11.glTexParameteri(3553, 10240, 9728);
       GL11.glTexParameteri(3553, 10242, 33069);
       GL11.glTexParameteri(3553, 10243, 33069);
       GL11.glTexParameterfv(3553, 4100, new float[]{1.0F, 1.0F, 1.0F, 1.0F});
-      this.shadowFbo = GL30.glGenFramebuffers();
-      GL30.glBindFramebuffer(36160, this.shadowFbo);
-      GL30.glFramebufferTexture2D(36160, 36096, 3553, this.shadowTex, 0);
+      return tex;
+   }
+
+   private static int depthFramebuffer(int tex) {
+      int fbo = GL30.glGenFramebuffers();
+      GL30.glBindFramebuffer(36160, fbo);
+      GL30.glFramebufferTexture2D(36160, 36096, 3553, tex, 0);
       GL11.glDrawBuffer(0);
       GL11.glReadBuffer(0);
       int status = GL30.glCheckFramebufferStatus(36160);
@@ -455,6 +480,56 @@ public final class Shaders {
       if (status != 36053) {
          throw new RuntimeException("shadow fbo incomplete " + status);
       }
+
+      return fbo;
+   }
+
+   /**
+    * Update 6.22: copy one shadow depth buffer to the other. A moving mob must not leave a stale
+    * silhouette behind, so the terrain-only depth is restored before every entity pass. One cheap
+    * depth blit per frame instead of re-rendering all the terrain shadow geometry every frame.
+    */
+   private void blitShadowDepth(int from, int to) {
+      if (from == 0 || to == 0) return;
+      int size = this.shadowSize;
+      GL30.glBindFramebuffer(36008, from); // GL_READ_FRAMEBUFFER
+      GL30.glBindFramebuffer(36009, to);   // GL_DRAW_FRAMEBUFFER
+      GL30.glBlitFramebuffer(0, 0, size, size, 0, 0, size, size, 256, 9728); // depth, nearest
+      GL30.glBindFramebuffer(36008, 0);
+      GL30.glBindFramebuffer(36009, 0);
+   }
+
+   /** Remember the depth right after the terrain pass, before any mob silhouette is added. */
+   public void saveStaticShadow() {
+      this.blitShadowDepth(this.shadowFbo, this.staticFbo);
+      this.staticValid = this.mapValid;
+   }
+
+   /** Put the terrain depth back, then the entity pass can draw this frame's mobs. */
+   public void restoreStaticShadow() {
+      this.blitShadowDepth(this.staticFbo, this.shadowFbo);
+   }
+
+   /** Begin a depth-only pass that adds (not clears) entity silhouettes to the working shadow map. */
+   public void beginShadowEntities() {
+      GL30.glBindFramebuffer(36160, this.shadowFbo);
+      GL11.glViewport(0, 0, this.shadowSize, this.shadowSize);
+      GL11.glEnable(2929);
+      GL11.glDepthMask(true);
+      GL11.glDepthFunc(515);
+      GL11.glDisable(2884);
+      GL11.glMatrixMode(5889);
+      GL11.glPushMatrix();
+      GL11.glLoadMatrixf(this.clipM);
+      GL11.glMatrixMode(5888);
+      GL11.glPushMatrix();
+      GL11.glLoadIdentity();
+      GL11.glColorMask(false, false, false, false);
+      GL11.glEnable(32823);
+      GL11.glPolygonOffset(2.0F, 4.0F);
+      GL20.glUseProgram(this.pDepth);
+      this.u1i(this.pDepth, "tex", 0);
+      this.setShadowSolid(1.0F);
    }
 
    /** Update 6.18: the Advanced Video shadow-map setting. Called on the render thread while GL is current. */

@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.21  -  an original Minecraft-style voxel sandbox   (EDITION V6.21)
+BLOCKCRAFT V6.22  -  an original Minecraft-style voxel sandbox   (EDITION V6.22)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,38 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.22 - Caves & Cliffs carver, cheaper taiga, smooth borders,
+                       live shadows and a movable minimap
+
+  * CAVES WERE REDONE AGAIN for new worlds. An original Caves & Cliffs-style
+    engine (CaveCliffs) replaces the V6.21 tunnels: thin noodle caves, long
+    winding spaghetti tunnels, big irregular cheese caverns, rare giant halls
+    and vertical wells. Local hashed AQUIFERS put a water table at y=22..49 in
+    some regions, so a cavern can be dry above and flooded below. Warped cave
+    biomes add lush vines / glow berries / azalea, dripstone, ice pockets,
+    amethyst GEODES and deep-dark floors. The V6.21 underground sites and loot
+    chests still generate on top of the new carver. Old saves stay untouched.
+  * TAIGA IS NO LONGER THE GAME'S DEATH. Spruce crowns used to be nearly solid
+    cones of ~1000 leaves. They are now tiered, hollow conifers with drooping
+    tips; mega spruces use half the levels. Tree density in taiga / snowy
+    taiga / mega taiga / dark forest / jungle is lower, a per-chunk cap stops
+    mesh spikes, and bushy-leaf meshing no longer allocates per leaf block.
+    A Tree Density slider (0.4x..1.4x) is in Debug Video > Advanced.
+  * WORLD GENERATION has smoother borders. Climate coordinates are warped by
+    two slow noises, biome edges blend by interleaving the neighbouring
+    biome's surface / plants / trees and blending map colours, mountains get
+    soft terraces, rivers get broad valleys, shorelines get wider beaches and
+    the snow line is broken up. Biome Borders: Sharp / Smooth / Very Smooth.
+  * ENTITY SHADOWS UPDATE EVERY FRAME. A terrain-only copy of the shadow depth
+    is restored each frame with one depth blit, then this frame's mob
+    silhouettes are stamped in. No terrain re-render, no 8..150 frame lag.
+    Toggle with "Live Entity Shadows" in Debug Video > Advanced.
+  * THE MINIMAP CAN MOVE. "Minimap Position" cycles Top Right / Top Left /
+    Bottom Right / Bottom Left. "Move for Toasts" slides a top-right minimap
+    down while an advancement toast is showing, so it never covers it.
+  * Headless previews of the real generators: docs/screenshots/v6.22-caves.png
+    (V6.21 vs V6.22 cross-sections) and v6.22-borders.png (biome maps).
 
 WHAT'S NEW IN V6.21 - Rebuilt caves with underground structures, and weather to the horizon
 
