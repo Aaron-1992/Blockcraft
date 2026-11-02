@@ -145,7 +145,7 @@ final class Tests620 {
          }
       }
       eq(0, g.opt.bigMapZoom, "the zoom slider changes the option");
-      eq(50, Screens.ADV_ROWS, "the Advanced tab knows how many rows it has");
+      eq(57, Screens.ADV_ROWS, "the Advanced tab knows how many rows it has");
    }
 
    // ------------------------------------------------------------------ picture data

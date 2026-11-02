@@ -63,6 +63,13 @@ final class WeatherFx {
    float flashAmt;
    Weather.Snap snap;
    final float[] tmp = new float[4];
+   /** Update 6.21: live copies of the weather-beauty options, read on the render thread. */
+   int quality = 2;
+   float windAmt = 1.0F;
+   float reach = 1.0F;
+   boolean mist = true;
+   boolean boltGlow = true;
+   boolean rainbow = true;
 
    // ---------------------------------------------------------------- GL objects
    int texWhite;
@@ -70,10 +77,13 @@ final class WeatherFx {
    int texSnow;
    int texSnowVeil;
    int texShaft;
+   int texMist;
    final int[] vboCloud = new int[2];
    int vboShaft;
+   int vboMist;
    final int[] nCloud = new int[2];
    int nShaft;
+   int nMist;
    final int[] ui0 = new int[2];
    final int[] uj0 = new int[2];
    double builtTs = -1.0E9;
@@ -100,6 +110,15 @@ final class WeatherFx {
    // ================================================================ local values
    void updateLocal(float partial) {
       Game g = this.r.g;
+      if (g.opt != null) {
+         this.quality = Options.clamp(g.opt.weatherQuality, 0, 2);
+         this.windAmt = Options.clampf(g.opt.weatherWind, 0.2F, 2.0F);
+         this.reach = Options.clampf(g.opt.weatherReach, 0.5F, 1.5F);
+         this.mist = g.opt.weatherMist;
+         this.boltGlow = g.opt.weatherBoltGlow;
+         this.rainbow = g.opt.weatherRainbow;
+      }
+
       if (g.world == null || g.player == null) {
          this.cover = this.rain = this.storm = this.flash = 0.0F;
          this.overcast = 0.0F;
@@ -198,6 +217,7 @@ final class WeatherFx {
       this.texShaft = mip(Tex.upload(64, 256, veil(64, 256, 36, 24, 96, 6002L), true, true));
       this.texSnow = mip(Tex.upload(64, 64, flakes(64, 14, 6003L), true, true));
       this.texSnowVeil = mip(Tex.upload(64, 256, snowVeil(64, 256, 6004L), true, true));
+      this.texMist = mip(Tex.upload(64, 64, groundHaze(64, 64, 6005L), true, true));
    }
 
    static int mip(int tex) {
@@ -363,7 +383,7 @@ final class WeatherFx {
 
    static void recycle(Result r) {
       synchronized (POOL) {
-         for (VB v : new VB[]{r.cloud[0], r.cloud[1], r.shaft}) {
+         for (VB v : new VB[]{r.cloud[0], r.cloud[1], r.shaft, r.mist}) {
             if (v != null && POOL.size() < 8) {
                POOL.addFirst(v);
             }
@@ -407,6 +427,8 @@ final class WeatherFx {
       /** cloud blocks per level (0 = fine, 1 = coarse) */
       final VB[] cloud = new VB[2];
       VB shaft;
+      /** Update 6.21: soft low ground haze under the distant rain, drawn with texMist. */
+      VB mist;
       final int[] ui0 = new int[2];
       final int[] uj0 = new int[2];
       double ts;
@@ -422,6 +444,228 @@ final class WeatherFx {
       int ib = Math.max(0, Math.min(255, (int)(b * 255.0F)));
       int ia = Math.max(0, Math.min(255, (int)(a * 255.0F)));
       return ir | ig << 8 | ib << 16 | ia << 24;
+   }
+
+   /** Update 6.21: the settings snapshot handed to the (static, worker-thread) curtain builder. */
+   static final class Fx {
+      int quality = 2;
+      float wind = 1.0F;
+      float reach = 1.0F;
+      boolean mist = true;
+      boolean glow = true;
+      float daylight = 1.0F;
+      float sunVis = 1.0F;
+      float flash;
+      float boltX;
+      float boltZ;
+      float boltAmt;
+   }
+
+   /** A snapshot of the live options and light for one cloud-mesh build. */
+   Fx fx() {
+      Fx f = new Fx();
+      f.quality = this.quality;
+      f.wind = this.windAmt;
+      f.reach = this.reach;
+      f.mist = this.mist;
+      f.glow = this.boltGlow;
+      f.daylight = this.r.daylight;
+      f.sunVis = this.sunVis;
+      f.flash = this.flash;
+      f.boltX = this.flashX;
+      f.boltZ = this.flashZ;
+      f.boltAmt = this.flashAmt;
+      return f;
+   }
+
+   /**
+    * Update 6.21: the colour of one distant rain/snow curtain. Storms are cool and dark, snow is
+    * pale, far curtains pick up blue distance haze, a low sun with a clear line of sight puts a
+    * warm rim on them and lightning lights the ones near the bolt.
+    */
+   static void curtainTint(int kind, float storm, float sunVis, float daylight, float dist, float flash, float[] out) {
+      float dk = 1.0F - 0.42F * Math.max(0.0F, Math.min(1.0F, storm));
+      float r;
+      float g;
+      float b;
+      if (kind == 2) {
+         r = 0.96F * dk;
+         g = 0.98F * dk;
+         b = 1.00F * (1.0F - 0.22F * storm);
+      } else {
+         r = 0.66F * dk;
+         g = 0.76F * dk;
+         b = 0.94F * (1.0F - 0.18F * storm);
+      }
+
+      float far = Weather.smooth(600.0F, 3400.0F, dist);
+      r += far * 0.10F;
+      g += far * 0.09F;
+      b += far * 0.06F;
+      float warm = Math.max(0.0F, 1.0F - daylight * 1.6F) * sunVis * 0.22F;
+      r += warm * 0.34F;
+      g += warm * 0.16F;
+      b -= warm * 0.10F;
+      r += flash * 0.42F;
+      g += flash * 0.52F;
+      b += flash * 0.62F;
+      out[0] = Math.max(0.0F, Math.min(1.0F, r));
+      out[1] = Math.max(0.0F, Math.min(1.0F, g));
+      out[2] = Math.max(0.0F, Math.min(1.0F, b));
+   }
+
+   /** Horizontal lean of the top of a distant curtain, in blocks along x and z. */
+   static void windShear(float windX, float windZ, float gust, float height, float amt, float[] out) {
+      float k = 0.015F * gust * Math.max(0.0F, height) * amt;
+      out[0] = windX * k;
+      out[1] = windZ * k;
+   }
+
+   /** Opacity of the low ground haze under a distant rain curtain. */
+   static float mistAlpha(float rain, float dist, float storm) {
+      return Math.min(1.0F, Math.max(0.0F, rain) * 1.3F) * (0.18F + 0.12F * storm)
+         * (1.0F - Weather.smooth(1800.0F, 4200.0F, dist));
+   }
+
+   /** A rainbow needs wet ground, rain that is clearing, a low sun that the clouds let through and daylight. */
+   static float rainbowStrength(float wet, float rain, float sunVis, float daylight, float sunY, boolean enabled) {
+      if (!enabled || sunY <= 0.03F || sunY > 0.65F || daylight < 0.45F) {
+         return 0.0F;
+      }
+
+      float w = Weather.smooth(0.22F, 0.62F, wet);
+      float clearing = 1.0F - Weather.smooth(0.06F, 0.40F, rain);
+      return Math.max(0.0F, Math.min(1.0F, w * clearing * sunVis * daylight * 1.25F));
+   }
+
+   /** Seven bands, red (outer) to violet (inner), as linear rgb. */
+   private static final float[][] RAINBOW = {
+      {1.00F, 0.28F, 0.24F}, {1.00F, 0.58F, 0.22F}, {1.00F, 0.88F, 0.25F},
+      {0.35F, 0.90F, 0.35F}, {0.28F, 0.66F, 1.00F}, {0.38F, 0.42F, 0.95F},
+      {0.72F, 0.36F, 0.92F}
+   };
+
+   static void rainbowBand(int i, float[] out) {
+      int k = i < 0 ? 0 : (i > 6 ? 6 : i);
+      out[0] = RAINBOW[k][0];
+      out[1] = RAINBOW[k][1];
+      out[2] = RAINBOW[k][2];
+   }
+
+   /** A unit direction on the 40..45 degree ring around the antisolar point. */
+   static void rainbowDir(float[] sun, float phi, float deg, float[] out) {
+      float ax = -sun[0];
+      float ay = -sun[1];
+      float az = -sun[2];
+      float rx = -az;
+      float rz = ax;
+      float rl = (float)Math.sqrt(rx * rx + rz * rz);
+      if (rl < 1.0E-5F) {
+         rx = 1.0F;
+         rz = 0.0F;
+         rl = 1.0F;
+      }
+
+      rx /= rl;
+      rz /= rl;
+      float ux = -rz * ay;
+      float uy = rz * ax - rx * az;
+      float uz = rx * ay;
+      float r = (float)Math.toRadians(deg);
+      float cr = (float)Math.cos(r);
+      float sr = (float)Math.sin(r);
+      float cp = (float)Math.cos(phi);
+      float sp = (float)Math.sin(phi);
+      out[0] = ax * cr + (rx * cp + ux * sp) * sr;
+      out[1] = ay * cr + uy * sp * sr;
+      out[2] = az * cr + (rz * cp + uz * sp) * sr;
+      float l = (float)Math.sqrt(out[0] * out[0] + out[1] * out[1] + out[2] * out[2]);
+      if (l > 1.0E-6F) {
+         out[0] /= l;
+         out[1] /= l;
+         out[2] /= l;
+      }
+   }
+
+   /** A soft round blob of haze used for the ground mist under distant rain. */
+   static int[] groundHaze(int w, int h, long seed) {
+      Random rnd = new Random(seed);
+      float[] low = new float[64];
+      for (int i = 0; i < low.length; i++) {
+         low[i] = rnd.nextFloat();
+      }
+
+      int[] px = new int[w * h];
+      for (int y = 0; y < h; y++) {
+         for (int x = 0; x < w; x++) {
+            float dx = (x + 0.5F) / w * 2.0F - 1.0F;
+            float dy = (y + 0.5F) / h * 2.0F - 1.0F;
+            float d = (float)Math.sqrt(dx * dx + dy * dy);
+            float band = low[(y * 8 / h) * 8 + x * 8 / w];
+            float a = Math.max(0.0F, 1.0F - d) * (0.22F + 0.20F * band);
+            px[y * w + x] = (Math.min(255, (int)(a * 255.0F)) << 24) | 0xFFFFFF;
+         }
+      }
+
+      return px;
+   }
+
+   /** Live rainbow strength at the camera. */
+   float rainbowStrengthNow() {
+      if (!this.rainbow || this.snap == null || this.r.g.world == null || this.r.g.world.weather.suppressed) {
+         return 0.0F;
+      }
+
+      float wet = this.r.g.world.weather.wet;
+      float sunY = (float)Math.cos(this.r.sunAngle);
+      return rainbowStrength(wet, this.rain, this.sunVis, this.r.daylight, sunY, true);
+   }
+
+   /** Draws the seven-band bow as additive quads on the sky dome (called from Sky.draw). */
+   void drawRainbow(float[] sun, float strength) {
+      if (strength < 0.01F) {
+         return;
+      }
+
+      GL11.glDisable(3553);
+      GL11.glEnable(3042);
+      GL11.glBlendFunc(770, 1);
+      float[] col = new float[3];
+      float[] d0 = new float[3];
+      float[] d1 = new float[3];
+      float[] d2 = new float[3];
+      float[] d3 = new float[3];
+      final int segs = 64;
+      final float radius = 195.0F;
+      for (int band = 0; band < 7; band++) {
+         float deg0 = 44.4F - (band + 1) * 0.6F;
+         float deg1 = deg0 + 0.6F;
+         rainbowBand(band, col);
+         float a = strength * 0.22F * (1.0F - band * 0.055F);
+         GL11.glBegin(7);
+         for (int s = 0; s < segs; s++) {
+            float p0 = (float)(s * Math.PI * 2.0 / segs);
+            float p1 = (float)((s + 1) * Math.PI * 2.0 / segs);
+            rainbowDir(sun, p0, deg0, d0);
+            rainbowDir(sun, p0, deg1, d1);
+            rainbowDir(sun, p1, deg0, d2);
+            rainbowDir(sun, p1, deg1, d3);
+            if (d0[1] <= 0.01F || d2[1] <= 0.01F) {
+               continue;
+            }
+
+            GL11.glColor4f(col[0], col[1], col[2], a);
+            GL11.glVertex3f(d0[0] * radius, d0[1] * radius, d0[2] * radius);
+            GL11.glVertex3f(d2[0] * radius, d2[1] * radius, d2[2] * radius);
+            GL11.glVertex3f(d3[0] * radius, d3[1] * radius, d3[2] * radius);
+            GL11.glVertex3f(d1[0] * radius, d1[1] * radius, d1[2] * radius);
+         }
+
+         GL11.glEnd();
+      }
+
+      GL11.glDisable(3042);
+      GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
    }
 
    /** The cloud density at one point, same function as the shader's: n = noise, w = cover/storm; h = height inside the cloud (0..1). */
@@ -459,7 +703,14 @@ final class WeatherFx {
    }
 
    /** Builds the whole cloud + rain-curtain mesh around (camX, camZ) for the weather at {@code sn}. */
+   /** The classic mesh (three curtain planes, no mist): kept for the headless weather tests and tools. */
    static Result build(Weather.Snap sn, World world, double camX, double camZ) {
+      Fx fx = new Fx();
+      fx.mist = false;
+      return build(sn, world, camX, camZ, fx);
+   }
+
+   static Result build(Weather.Snap sn, World world, double camX, double camZ, Fx fx) {
       Result res = new Result();
       res.ts = sn.ts;
       res.camX = camX;
@@ -470,7 +721,8 @@ final class WeatherFx {
          res.cloud[lv] = cloudLevel(sn, camX, camZ, lv, res);
       }
 
-      res.shaft = shafts(sn, world, camX, camZ, res);
+      res.mist = acquire();
+      res.shaft = shafts(sn, world, camX, camZ, res, fx);
       return res;
    }
 
@@ -665,15 +917,23 @@ final class WeatherFx {
     * The rain / snow curtains: three crossing vertical planes per grid point where it rains, soft at the edges. A fine grid
     * (64 blocks) near the camera and a coarse one (192 blocks) out to 3.6 km, so a storm on the horizon has its rain too.
     */
-   static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res) {
+   static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res, Fx fx) {
       VB vb = acquire();
+      VB mist = res.mist == null ? acquire() : res.mist;
+      res.mist = mist;
       float[] o3 = new float[4];
+      float[] shear = new float[2];
+      float[] tint = new float[3];
       Weather wx = world == null ? null : world.weather;
+      // Plain = one plane per cell, Normal = two, Detailed = three plus a lit storm
+      // core and drifting ground haze. The vertex budget is user controlled.
+      final int planes = fx.quality <= 0 ? 1 : (fx.quality == 1 ? 2 : 3);
+      final boolean haze = fx.quality >= 2 && fx.mist;
       for (int level = 0; level < 2; level++) {
          final int G = level == 0 ? 64 : 192;
          final int RG = level == 0 ? 20 : 19;
-         final float inner = level == 0 ? 14.0F : 1180.0F;
-         final float outer = level == 0 ? 1280.0F : 3600.0F;
+         final float inner = level == 0 ? 14.0F : 1180.0F * fx.reach;
+         final float outer = (level == 0 ? 1280.0F : 3600.0F) * fx.reach;
          final float hw = G * 0.97F;
          int gx0 = (int)Math.floor(camX / G);
          int gz0 = (int)Math.floor(camZ / G);
@@ -712,25 +972,45 @@ final class WeatherFx {
                   continue;
                }
 
-               float dk = 1.0F - 0.50F * o3[2];
-               float cr = (kind == 2 ? 0.95F : 0.72F) * dk;
-               float cg = (kind == 2 ? 0.97F : 0.80F) * dk;
-               float cb2 = 1.0F * (1.0F - 0.30F * o3[2]);
                float height = topY - ground;
+               float gust = 1.0F + 0.40F * o3[2] + 0.14F * (float)Math.sin(sn.ts * 1.7 + wx0 * 0.002);
+               windShear(sn.windX, sn.windZ, gust, height, fx.wind, shear);
+               float flashLocal = fx.flash * 0.22F;
+               if (fx.glow && fx.boltAmt > 0.001F) {
+                  double bdx = wx0 - fx.boltX;
+                  double bdz = wz0 - fx.boltZ;
+                  flashLocal = Math.max(flashLocal,
+                     fx.boltAmt * (float)Math.exp(-(bdx * bdx + bdz * bdz) / (900.0 * 900.0)));
+               }
+               curtainTint(kind, o3[2], fx.sunVis, fx.daylight, dist, flashLocal, tint);
+               float cr = tint[0];
+               float cg = tint[1];
+               float cb2 = tint[2];
                float vTop = height / 90.0F;
                float ux = (float)(wx0 - res.offX - (double)res.ui0[0] * CELLS[0]);
                float uz = (float)(wz0 - res.offZ - (double)res.uj0[0] * CELLS[0]);
-               for (int pl = 0; pl < 3; pl++) {
+               for (int pl = 0; pl < planes; pl++) {
                   double ang = pl * Math.PI / 3.0 + ((gx0 + di) * 7 + (gz0 + dj) * 13) % 5 * 0.2;
                   float ax = (float)Math.cos(ang) * hw;
                   float az = (float)Math.sin(ang) * hw;
+                  float lean = 0.65F + 0.35F * pl / Math.max(1, planes - 1);
+                  float leanX = shear[0] * lean;
+                  float leanZ = shear[1] * lean;
                   float ur = hw * 2.0F / 40.0F;
                   float uOff = ((gx0 + di) * 31 + (gz0 + dj) * 17 + pl * 5) % 13 * 0.31F;
-                  // rows: above the cloud base (invisible), cloud base (full), mid, ground (slightly weaker); columns: edge, centre, edge
+                  // rows: above the cloud base (invisible), cloud base (full), mid, ground
                   float[] ys = new float[]{topY + 8.0F, topY - 22.0F, ground + height * 0.35F, ground};
                   float[] al = new float[]{0.0F, 0.95F, 0.85F, 0.55F};
                   float[] vs = new float[]{vTop + 0.1F, vTop - 0.25F, vTop * 0.35F, 0.0F};
+                  // a storm's core is a brighter, narrower curtain in front of the sheet
+                  float core = fx.quality >= 2 && o3[2] > 0.45F && pl == 0 ? 1.12F : 1.0F;
                   for (int row = 0; row < 3; row++) {
+                     float t0 = Math.max(0.0F, (ys[row] - ground) / height);
+                     float t1 = Math.max(0.0F, (ys[row + 1] - ground) / height);
+                     float s0x = leanX * t0;
+                     float s1x = leanX * t1;
+                     float s0z = leanZ * t0;
+                     float s1z = leanZ * t1;
                      for (int half = 0; half < 2; half++) {
                         float xa = half == 0 ? -1.0F : 0.0F;
                         float xb = half == 0 ? 0.0F : 1.0F;
@@ -738,15 +1018,30 @@ final class WeatherFx {
                         float fb = half == 0 ? 1.0F : 0.0F;
                         float ua = uOff + (xa + 1.0F) * 0.5F * ur;
                         float ub = uOff + (xb + 1.0F) * 0.5F * ur;
-                        int c00 = rgba(cr, cg, cb2, al[row] * fa * strength);
-                        int c01 = rgba(cr, cg, cb2, al[row] * fb * strength);
-                        int c10 = rgba(cr, cg, cb2, al[row + 1] * fa * strength);
-                        int c11 = rgba(cr, cg, cb2, al[row + 1] * fb * strength);
-                        vb.vt(ux + ax * xa, ys[row], uz + az * xa, ua, vs[row], c00);
-                        vb.vt(ux + ax * xb, ys[row], uz + az * xb, ub, vs[row], c01);
-                        vb.vt(ux + ax * xb, ys[row + 1], uz + az * xb, ub, vs[row + 1], c11);
-                        vb.vt(ux + ax * xa, ys[row + 1], uz + az * xa, ua, vs[row + 1], c10);
+                        int c00 = rgba(cr, cg, cb2, al[row] * fa * strength * core);
+                        int c01 = rgba(cr, cg, cb2, al[row] * fb * strength * core);
+                        int c10 = rgba(cr, cg, cb2, al[row + 1] * fa * strength * core);
+                        int c11 = rgba(cr, cg, cb2, al[row + 1] * fb * strength * core);
+                        vb.vt(ux + ax * xa + s0x, ys[row], uz + az * xa + s0z, ua, vs[row], c00);
+                        vb.vt(ux + ax * xb + s0x, ys[row], uz + az * xb + s0z, ub, vs[row], c01);
+                        vb.vt(ux + ax * xb + s1x, ys[row + 1], uz + az * xb + s1z, ub, vs[row + 1], c11);
+                        vb.vt(ux + ax * xa + s1x, ys[row + 1], uz + az * xa + s1z, ua, vs[row + 1], c10);
                      }
+                  }
+               }
+
+               // low drifting haze: distant storms now visibly meet the ground
+               if (haze && level == 1) {
+                  float ma = mistAlpha(rain, dist, o3[2]) * strength;
+                  if (ma > 0.01F) {
+                     float mw = G * 1.35F;
+                     float my = ground + 3.0F + 1.5F * (float)Math.sin(sn.ts * 0.6 + wx0 * 0.004);
+                     int c0 = rgba(cr * 0.94F, cg * 0.97F, cb2, ma);
+                     int c1 = rgba(cr * 0.94F, cg * 0.97F, cb2, ma * 0.7F);
+                     mist.vt(ux - mw, my, uz - mw, 0.0F, 0.0F, c0);
+                     mist.vt(ux + mw, my, uz - mw, 1.0F, 0.0F, c0);
+                     mist.vt(ux + mw, my, uz + mw, 1.0F, 1.0F, c1);
+                     mist.vt(ux - mw, my, uz + mw, 0.0F, 1.0F, c1);
                   }
                }
             }
@@ -762,6 +1057,7 @@ final class WeatherFx {
          this.vboCloud[0] = GL15.glGenBuffers();
          this.vboCloud[1] = GL15.glGenBuffers();
          this.vboShaft = GL15.glGenBuffers();
+         this.vboMist = GL15.glGenBuffers();
       }
 
       for (int lv = 0; lv < 2; lv++) {
@@ -777,6 +1073,15 @@ final class WeatherFx {
       GL15.glBindBuffer(34962, this.vboShaft);
       GL15.glBufferData(34962, res.shaft.b, 35044);
       this.nShaft = res.shaft.n;
+      if (res.mist != null) {
+         res.mist.b.flip();
+         GL15.glBindBuffer(34962, this.vboMist);
+         GL15.glBufferData(34962, res.mist.b, 35044);
+         this.nMist = res.mist.n;
+      } else {
+         this.nMist = 0;
+      }
+
       GL15.glBindBuffer(34962, 0);
       this.builtTs = res.ts;
       this.builtCamX = res.camX;
@@ -810,9 +1115,10 @@ final class WeatherFx {
       this.wantRebuild = false;
       this.building = true;
       final World w = this.r.g.world;
+      final Fx fx = this.fx();
       this.worker.execute(() -> {
          try {
-            this.ready.set(build(sn, w, camX, camZ));
+            this.ready.set(build(sn, w, camX, camZ, fx));
          } catch (Throwable t) {
             t.printStackTrace();
          } finally {
@@ -983,7 +1289,7 @@ final class WeatherFx {
       GL11.glMatrixMode(5890);
       GL11.glPushMatrix();
       GL11.glLoadIdentity();
-      GL11.glTranslatef(0.0F, (float)(sn.ts * 1.9 % 1.0), 0.0F);
+      GL11.glTranslatef(0.0F, (float)(sn.ts * (1.4 + 0.8 * this.windAmt) % 1.0), 0.0F);
       GL11.glMatrixMode(5888);
       GL11.glEnableClientState(32884);
       GL11.glEnableClientState(32886);
@@ -994,6 +1300,17 @@ final class WeatherFx {
       GL11.glTexCoordPointer(2, 5126, 24, 12L);
       GL11.glColorPointer(4, 5121, 24, 20L);
       GL11.glDrawArrays(7, 0, this.nShaft);
+      // Update 6.21: the soft ground haze is a second draw with its own texture, still
+      // inside the same fog/tint setup, so a distant storm visibly meets the ground.
+      if (this.nMist > 0 && this.texMist != 0) {
+         GL11.glBindTexture(3553, this.texMist);
+         GL15.glBindBuffer(34962, this.vboMist);
+         GL11.glVertexPointer(3, 5126, 24, 0L);
+         GL11.glTexCoordPointer(2, 5126, 24, 12L);
+         GL11.glColorPointer(4, 5121, 24, 20L);
+         GL11.glDrawArrays(7, 0, this.nMist);
+      }
+
       GL15.glBindBuffer(34962, 0);
       GL11.glDisableClientState(32888);
       GL11.glDisableClientState(32884);

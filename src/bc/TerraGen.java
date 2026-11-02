@@ -13,6 +13,8 @@ public final class TerraGen extends Gen {
    private static final double[] SPLINE_H = new double[]{22.0, 32.0, 44.0, 55.0, 61.0, 64.0, 66.0, 72.0, 86.0, 100.0};
 
    final WorldSettings st;
+   /** Update 6.21: the layered cave generator and the underground structures (only terrainVer >= 3). */
+   final CaveWorks caves;
    final double bs;
    final double vs;
    final Noise nC;
@@ -41,6 +43,7 @@ public final class TerraGen extends Gen {
       super(seed);
       this.st = settings;
       this.settings = settings;
+      this.caves = new CaveWorks(seed, settings, this, this.nCave1, this.nCave2, this.nCavern, this.nEntr);
       this.bs = settings.type == WorldSettings.LARGE ? 4.0 : 1.0;
       this.vs = settings.type == WorldSettings.AMPLIFIED ? 1.7 : 1.0;
       Random r = new Random(seed * 0x2545F4914F6CDD1DL + 0x7E44A6E13L);
@@ -593,6 +596,7 @@ public final class TerraGen extends Gen {
       }
 
       Random r = new Random(this.seed * 31L + cx * 341873128712L + cz * 132897987541L);
+      final boolean ver3 = this.st.terrainVer >= 3;
       int[] hs = new int[256];
       int[] bm = new int[256];
       int[] rule = new int[5];
@@ -647,8 +651,9 @@ public final class TerraGen extends Gen {
 
             // caves
             int top2 = h - 3;
-            boolean mouth = h >= 64 && this.entranceBig(wx, wz) && s.biome != Biomes.MUSHROOM;
-            if (mouth) {
+            boolean mouth = h >= 64 && (ver3 ? this.caves.mouth(wx, wz) : this.entranceBig(wx, wz)) && s.biome != Biomes.MUSHROOM;
+            boolean shaft = ver3 && CaveWorks.shaft(this.seed, wx, wz);
+            if (mouth || shaft) {
                top2 = h;
             }
 
@@ -659,7 +664,21 @@ public final class TerraGen extends Gen {
             boolean bigCaves = this.st.terrainVer >= 2;
             for (int y = 6; y <= top2; y++) {
                int id = b[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
-               if (id != 6 && !Blocks.isFluid(id) && (bigCaves ? this.carveBig(wx, y, wz) : this.carve(wx, y, wz))) {
+               if (id == 6 || Blocks.isFluid(id)) {
+                  continue;
+               }
+
+               if (ver3) {
+                  // a sinkhole cuts a real vertical shaft down to y=30, whatever the noise says
+                  if (shaft && y >= 30) {
+                     b[Chunk.idx(x, y, z)] = 0;
+                  } else {
+                     int cv = this.caves.hollow(wx, y, wz);
+                     if (cv != 0) {
+                        b[Chunk.idx(x, y, z)] = (short)(cv == 2 ? Blocks.LAVA : 0);
+                     }
+                  }
+               } else if (bigCaves ? this.carveBig(wx, y, wz) : this.carve(wx, y, wz)) {
                   b[Chunk.idx(x, y, z)] = (short)(y <= 10 ? 58 : 0);
                }
             }
@@ -717,7 +736,11 @@ public final class TerraGen extends Gen {
 
       this.plantShoreAndPatches(ch, hs, bm);
       if (st.aquatic) Aquatic.decorate(this,ch,hs,bm);
-      ch.computeHeightmap();
+      if (ver3) {
+         this.caves.finish(ch); // strata, cave decorations and underground structures
+      } else {
+         ch.computeHeightmap();
+      }
       return ch;
    }
 

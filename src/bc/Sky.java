@@ -399,6 +399,13 @@ final class Sky {
          GL11.glEnd();
       }
 
+      // Update 6.21: while the rain clears and the sun comes back out, a rainbow appears
+      // opposite the sun. Drawn after the dome (depth test is off) so it sits in the sky.
+      float bow = r.wfx.rainbowStrengthNow();
+      if (bow > 0.01F) {
+         r.wfx.drawRainbow(SUN, bow);
+      }
+
       float over = r.wfx.overcast;
       GL11.glPushMatrix();
       GL11.glRotatef((float)Math.toDegrees(sa), 0.0F, 0.0F, 1.0F);

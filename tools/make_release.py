@@ -336,6 +336,31 @@ def main():
             "checks the packaged exe and jar (including the new map and panorama classes). A real-GPU/Windows playtest "
             "is not claimed here.\n"
         )
+    if version == "6.21":
+        release_notes += (
+            "\n### The caves were rebuilt, and the weather reaches the horizon\n\n"
+            "**New worlds only** (Create New World > Terrain \"V6.21 Caves\"; old saves keep their exact "
+            "old terrain). The old swiss-cheese carving is gone: caves are now layered worm tunnels and "
+            "sparse chambers with real horizontal rock strata, lava provinces, stalactites, glowstone, "
+            "ore pockets, glow-lichen and mushroom growths. Deep down there are six kinds of deterministic "
+            "underground sites - ruined shrine, crystal geode, lava forge, mineshaft hall, mushroom grotto and "
+            "flooded cistern - each with a loot chest, lights, pillars, beams, a pedestal and corridors. Sites are placed below the *real* "
+            "surface height, so they are never left floating in an ocean. Underground structures are "
+            "independent of the surface Structures switch.\n\n"
+            "**Weather is prettier everywhere, including far away.** Rain and snow curtains now extend to the "
+            "horizon in a reach-scaled grid, lean with the actual wind, glow near storm cores and lightning, "
+            "and fade with distance; soft ground haze drifts under distant rain. Clearing rain with a low sun "
+            "produces a seven-band rainbow opposite the sun. Clouds get a stronger silver lining, a warm "
+            "sunset rim and a cold ice halo. Detail level, distance, wind, mist, lightning glow and rainbows "
+            "are all configurable in Options > Video > Debug Video > Advanced and persist in options.txt.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with the ten V6.21 regression groups (7717157 checks); strict "
+            "equivalence still matches the original Update 3.5 terrain/world/tick fingerprints; all 21 GLSL "
+            "programs parse; the packaged exe and jar are verified by `tools/verify_release.py` including the "
+            "new CaveWorks/WeatherFx classes. `docs/screenshots/v6.21-caves.png` is a real generator "
+            "cross-section and `v6.21-weather.png` is a headless palette preview - neither is a GPU "
+            "screenshot, and no real-GPU/Windows playtest is claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

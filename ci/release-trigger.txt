@@ -1,2 +1,1 @@
-6.20
-# V6.20: minimap, big world map and the fixed title panorama (final polished build).
+6.21

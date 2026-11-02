@@ -142,7 +142,7 @@ final class Tests619 {
       check(button(g, "LOD Uploads/Frame"), "LOD upload budget is configurable");
       check(button(g, "LOD Draw Cap"), "LOD draw cap is configurable");
       check(button(g, "LOD Workers"), "LOD workers are configurable");
-      check(button(g, "V6.19 Terrain"), "the new terrain generator is configurable");
+      check(button(g, "V6.21 Caves"), "the layered cave generator is configurable");
       check(button(g, "Cave Size"), "cave size is configurable");
       check(button(g, "Cave Density"), "cave density is configurable");
       check(button(g, "Mountain Scale"), "mountain scale is configurable");
@@ -163,7 +163,7 @@ final class Tests619 {
       eq(true, g.opt.newTerrain, "reset restores new terrain");
 
       Screens.applyNewWorldSettings(g);
-      eq(2, g.newSettings.terrainVer, "a new world gets the V6.19 generator");
+      eq(3, g.newSettings.terrainVer, "a new world gets the V6.21 layered caves");
       eq(1.6F, g.newSettings.caveScale, "the cave size is copied into the new world");
       g.opt.newTerrain = false;
       Screens.applyNewWorldSettings(g);

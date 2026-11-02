@@ -100,7 +100,7 @@ public final class Options {
    public int lodMaxDraws = 0;
    /** Update 6.19: LOD build threads, 0 = automatic. */
    public int lodWorkers = 0;
-   /** Update 6.19: new worlds get the bigger cave systems and taller mountains. Existing saves keep their generator. */
+   /** Update 6.19/6.21: new worlds get the layered V6.21 caves and taller mountains. Existing saves keep their generator. */
    public boolean newTerrain = true;
    /** Update 6.19: cave size multiplier for new worlds (1.0 = old caves). */
    public float caveScale = 1.6F;
@@ -126,6 +126,26 @@ public final class Options {
    public int bigMapZoom = 2;
    /** Update 6.20: draw coordinate grid lines on the full map. */
    public boolean mapGrid = true;
+   /** Update 6.21: underground ruins, geodes, forges, mines, grottos and cisterns in new worlds. */
+   public boolean caveStructures = true;
+   /** Update 6.21: banded deep stone and layered cave walls. */
+   public boolean caveLayers = true;
+   /** Update 6.21: lava springs and water pools on cave floors. */
+   public boolean caveLakes = true;
+   /** Update 6.21: how much "stuff" (stalactites, crystals, ore pockets, glowcaps) the caves get. */
+   public float caveRichness = 1.0F;
+   /** Update 6.21: weather beauty level: 0 = plain, 1 = normal, 2 = detailed distant curtains + mist. */
+   public int weatherQuality = 2;
+   /** Update 6.21: a rainbow opposite the sun when the rain stops and the sun comes out. */
+   public boolean weatherRainbow = true;
+   /** Update 6.21: drifting ground haze beneath distant rain curtains. */
+   public boolean weatherMist = true;
+   /** Update 6.21: lightning lights the rain curtains around it. */
+   public boolean weatherBoltGlow = true;
+   /** Update 6.21: wind strength for slanted distant rain and drifting snow (0.2..2.0). */
+   public float weatherWind = 1.0F;
+   /** Update 6.21: how far distant rain curtains reach (0.5..1.5). */
+   public float weatherReach = 1.0F;
    /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
    public String resourcePack = ResourcePacks.ID_DEFAULT;
    public float soundVolume = 1.0F;
@@ -222,6 +242,16 @@ public final class Options {
                this.mapRefresh = clamp(Integer.parseInt(var2.getProperty("mapRefresh", "3")), 1, 20);
                this.bigMapZoom = clamp(Integer.parseInt(var2.getProperty("bigMapZoom", "2")), 0, 5);
                this.mapGrid = Boolean.parseBoolean(var2.getProperty("mapGrid", "true"));
+               this.caveStructures = Boolean.parseBoolean(var2.getProperty("caveStructures", "true"));
+               this.caveLayers = Boolean.parseBoolean(var2.getProperty("caveLayers", "true"));
+               this.caveLakes = Boolean.parseBoolean(var2.getProperty("caveLakes", "true"));
+               this.caveRichness = clampf(Float.parseFloat(var2.getProperty("caveRichness", "1.0")), 0.4F, 2.0F);
+               this.weatherQuality = clamp(Integer.parseInt(var2.getProperty("weatherQuality", "2")), 0, 2);
+               this.weatherRainbow = Boolean.parseBoolean(var2.getProperty("weatherRainbow", "true"));
+               this.weatherMist = Boolean.parseBoolean(var2.getProperty("weatherMist", "true"));
+               this.weatherBoltGlow = Boolean.parseBoolean(var2.getProperty("weatherBoltGlow", "true"));
+               this.weatherWind = clampf(Float.parseFloat(var2.getProperty("weatherWind", "1.0")), 0.2F, 2.0F);
+               this.weatherReach = clampf(Float.parseFloat(var2.getProperty("weatherReach", "1.0")), 0.5F, 1.5F);
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
@@ -312,6 +342,16 @@ public final class Options {
       var1.setProperty("mapRefresh", this.mapRefresh + "");
       var1.setProperty("bigMapZoom", this.bigMapZoom + "");
       var1.setProperty("mapGrid", this.mapGrid + "");
+      var1.setProperty("caveStructures", this.caveStructures + "");
+      var1.setProperty("caveLayers", this.caveLayers + "");
+      var1.setProperty("caveLakes", this.caveLakes + "");
+      var1.setProperty("caveRichness", this.caveRichness + "");
+      var1.setProperty("weatherQuality", this.weatherQuality + "");
+      var1.setProperty("weatherRainbow", this.weatherRainbow + "");
+      var1.setProperty("weatherMist", this.weatherMist + "");
+      var1.setProperty("weatherBoltGlow", this.weatherBoltGlow + "");
+      var1.setProperty("weatherWind", this.weatherWind + "");
+      var1.setProperty("weatherReach", this.weatherReach + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");

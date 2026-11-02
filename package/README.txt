@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.20  -  an original Minecraft-style voxel sandbox   (EDITION V6.20)
+BLOCKCRAFT V6.21  -  an original Minecraft-style voxel sandbox   (EDITION V6.21)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,40 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.21 - Rebuilt caves with underground structures, and weather to the horizon
+
+  * The caves were COMPLETELY REDONE for new worlds. The V6.19 "swiss cheese"
+    carving is replaced by a new layered cave engine: winding tunnels on
+    several depth bands, sparse chambers and giant halls, lava provinces,
+    sinkholes and rare cave mouths instead of the world being hollow.
+  * Rock is now visibly stratified in horizontal undulating bands (granite,
+    diorite, andesite and dark deepslate-like stone) rather than random
+    speckles. Cave walls are lined, and caves contain stalactites,
+    stalagmites, glowstone, ore pockets, glow-lichen and mushrooms.
+  * There are STRUCTURES AND STUFF underground: six deterministic site
+    types - ruined shrine, crystal geode, lava forge, mineshaft hall,
+    mushroom grotto and flooded cistern - each with a loot chest, lights,
+    pillars, beams, a pedestal and connecting corridors. Sites are placed
+    under the real surface height, so they never float in an ocean, and they
+    do not depend on the surface Structures switch.
+  * Create New World has a new "V6.21 Caves" terrain choice plus Cave
+    Structures, Cave Strata, Cave Lakes and Cave Richness settings. Old saves
+    keep their exact old terrain; nothing is regenerated under your feet.
+  * ALL WEATHER is prettier, including IN THE DISTANCE: rain and snow
+    curtains now reach toward the horizon in a wind-leaning, distance-faded
+    grid; storm cores brighten, lightning lights the nearby curtains, and a
+    soft ground haze drifts under far-off rain. Three detail levels build
+    1, 2 or 3 crossing planes per cell.
+  * A seven-band RAINBOW appears opposite a low sun while rain clears, with
+    the right wet-ground, clearing and sun-visibility conditions. Clouds get
+    a stronger silver lining, a warm sunset rim and a cold ice halo.
+  * Weather Quality, Weather Distance, Weather Wind, Ground Mist, Lightning
+    Glow and Rainbows are all in Options > Video > Debug Video > Advanced
+    (and persist in options.txt). All the earlier V6.20/6.19/6.18 settings,
+    minimap, big map and fixed panorama remain.
+  * Headless previews of the real generator and weather maths:
+    docs/screenshots/v6.21-caves.png and v6.21-weather.png.
 
 WHAT'S NEW IN V6.20 - Minimap, big world map and the fixed panorama
 

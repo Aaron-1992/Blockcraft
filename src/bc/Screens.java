@@ -375,15 +375,19 @@ final class Screens {
       }
    }
 
-   /** Update 6.19: copy the world-generation knobs of the Advanced tab into the settings of the world about to be created. */
+   /** Copy the world-generation knobs of the Advanced tab into the settings of the world about to be created. */
    static void applyNewWorldSettings(Game g) {
       if (g.opt == null) return;
       WorldSettings ws = g.newSettings;
-      ws.terrainVer = g.opt.newTerrain ? 2 : 1;
+      ws.terrainVer = g.opt.newTerrain ? 3 : 1;
       ws.caveScale = g.opt.caveScale;
       ws.caveDensity = g.opt.caveDensity;
       ws.mountainScale = g.opt.mountainScale;
       ws.ravineScale = g.opt.ravineScale;
+      ws.caveStructures = g.opt.caveStructures;
+      ws.caveLayers = g.opt.caveLayers;
+      ws.caveLakes = g.opt.caveLakes;
+      ws.caveRichness = g.opt.caveRichness;
    }
 
    static void createWorld(Game g) {
@@ -483,7 +487,8 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
-         + (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : "")
+         + (ws.terrainVer >= 3 ? "  -  layered caves & underground structures"
+            : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
          + (ws.structures ? "  -  villages, temples & ruins" : "")
          + (ws.bonusChest ? "  -  bonus chest" : "");
       gui.text(Game.clipText(content, colW * 2 + gap), x0, recY, 0xFFE8D068, true);
@@ -521,7 +526,7 @@ final class Screens {
    static final int[] FPS_FINE = {0, 30, 60, 75, 90, 120, 144, 165, 240, 360, 500, 1000};
    static final int[] AUTOSAVE = {0, 600, 1200, 3600, 7200};
    /** Number of rows in the Advanced tab (the list scrolls). */
-   static final int ADV_ROWS = 50;
+   static final int ADV_ROWS = 57;
 
    static String[] tabs(Options o) {
       return o.debugVideo ? TABS_DEBUG : TABS;
@@ -982,14 +987,14 @@ final class Screens {
          ui.slider("LOD Workers: " + (o.lodWorkers == 0 ? "Auto" : o.lodWorkers + ""), x1, y, colW, 20.0F, o.lodWorkers / 4.0F,
             "0 = automatic. Applies when a world is loaded.", v -> o.lodWorkers = Math.round(v * 4.0F));
       });
-      // ---------------------------------------------------------------- V6.19: new-world generation
+      // ---------------------------------------------------------------- V6.21: new-world generation
       cells.add(header);
       cells.add(y -> ui.label("\u00a7eWORLD GENERATION  -  new worlds only, old saves unchanged", x0, y + 3.0F, Ui.GOLD));
       cells.add(y -> {
-         ui.toggle("V6.19 Terrain", o.newTerrain, x0, y, colW, 20.0F,
-            "Bigger cave systems, deeper caverns, taller sharper mountains and wider ravines for newly created worlds.", () -> o.newTerrain = !o.newTerrain);
+         ui.toggle("V6.21 Caves", o.newTerrain, x0, y, colW, 20.0F,
+            "Layered, calmer caves with real underground structures instead of the V6.19 swiss-cheese caverns. New worlds only.", () -> o.newTerrain = !o.newTerrain);
          ui.slider("Cave Size: " + String.format("%.2f", o.caveScale) + "x", x1, y, colW, 20.0F, (o.caveScale - 0.6F) / 2.4F,
-            "Size of the new cave tunnels and caverns (1.0 = the old caves).", v -> o.caveScale = 0.6F + v * 2.4F);
+            "Size of the new cave tunnels and chambers (1.0 = the old caves).", v -> o.caveScale = 0.6F + v * 2.4F);
       });
       cells.add(y -> {
          ui.slider("Cave Density: " + String.format("%.2f", o.caveDensity) + "x", x0, y, colW, 20.0F, (o.caveDensity - 0.4F) / 2.1F,
@@ -998,8 +1003,42 @@ final class Screens {
             "Height and sharpness of new mountain ranges.", v -> o.mountainScale = 0.5F + v * 2.0F);
       });
       cells.add(y -> {
-         ui.slider("Ravine Scale: " + String.format("%.2f", o.ravineScale) + "x", x0, y, full, 20.0F, (o.ravineScale - 0.4F) / 2.1F,
-            "Width and depth of ravines in new worlds. These four sliders are copied into the world when you press Create New World.", v -> o.ravineScale = 0.4F + v * 2.1F);
+         ui.slider("Ravine Scale: " + String.format("%.2f", o.ravineScale) + "x", x0, y, colW, 20.0F, (o.ravineScale - 0.4F) / 2.1F,
+            "Width and depth of ravines in new worlds. Copied into the world when you press Create New World.", v -> o.ravineScale = 0.4F + v * 2.1F);
+         ui.slider("Cave Richness: " + String.format("%.2f", o.caveRichness) + "x", x1, y, colW, 20.0F, (o.caveRichness - 0.4F) / 1.6F,
+            "Stalactites, crystals, ore pockets, mushrooms and glowcaps in the caves.", v -> o.caveRichness = 0.4F + v * 1.6F);
+      });
+      cells.add(y -> {
+         ui.toggle("Cave Structures", o.caveStructures, x0, y, colW, 20.0F,
+            "Ruined shrines, crystal geodes, lava forges, mineshaft halls, mushroom grottos and flooded cisterns underground.", () -> o.caveStructures = !o.caveStructures);
+         ui.toggle("Cave Strata", o.caveLayers, x1, y, colW, 20.0F,
+            "Banded deep stone and layered rock on cave walls.", () -> o.caveLayers = !o.caveLayers);
+      });
+      cells.add(y -> {
+         ui.toggle("Cave Lakes", o.caveLakes, x0, y, colW, 20.0F,
+            "Lava springs and quiet water pools on cave floors.", () -> o.caveLakes = !o.caveLakes);
+         ui.label("Old saves keep the generator they were created with.", x1, y + 4.0F, Ui.DIM);
+      });
+      // ---------------------------------------------------------------- V6.21: weather & sky
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eWEATHER & SKY  -  prettier storms near and far", x0, y + 3.0F, Ui.GOLD));
+      cells.add(y -> {
+         ui.slider("Weather Detail: " + new String[]{"Plain", "Normal", "Detailed"}[Options.clamp(o.weatherQuality, 0, 2)], x0, y, colW, 20.0F,
+            Options.clamp(o.weatherQuality, 0, 2) / 2.0F, "Distant rain/snow curtain layers, silver linings and distance haze. Plain is fastest.", v -> o.weatherQuality = Math.round(v * 2.0F));
+         ui.slider("Weather Distance: " + String.format("%.2f", o.weatherReach) + "x", x1, y, colW, 20.0F, (o.weatherReach - 0.5F),
+            "How far out rain curtains and ground haze are drawn.", v -> o.weatherReach = 0.5F + v);
+      });
+      cells.add(y -> {
+         ui.slider("Wind Strength: " + String.format("%.2f", o.weatherWind) + "x", x0, y, colW, 20.0F, (o.weatherWind - 0.2F) / 1.8F,
+            "Slant of distant rain and drift of snow curtains.", v -> o.weatherWind = 0.2F + v * 1.8F);
+         ui.toggle("Ground Mist", o.weatherMist, x1, y, colW, 20.0F,
+            "Low drifting haze under distant rain, so storms meet the ground.", () -> o.weatherMist = !o.weatherMist);
+      });
+      cells.add(y -> {
+         ui.toggle("Rainbows", o.weatherRainbow, x0, y, colW, 20.0F,
+            "A rainbow opposite the sun while rain clears and the sun comes back out.", () -> o.weatherRainbow = !o.weatherRainbow);
+         ui.toggle("Lightning Glow", o.weatherBoltGlow, x1, y, colW, 20.0F,
+            "Lightning lights the distant rain curtains around the bolt.", () -> o.weatherBoltGlow = !o.weatherBoltGlow);
       });
       // ---------------------------------------------------------------- V6.20: maps
       cells.add(header);
@@ -1091,6 +1130,16 @@ final class Screens {
       o.mapRefresh = 3;
       o.bigMapZoom = 2;
       o.mapGrid = true;
+      o.caveStructures = true;
+      o.caveLayers = true;
+      o.caveLakes = true;
+      o.caveRichness = 1.0F;
+      o.weatherQuality = 2;
+      o.weatherRainbow = true;
+      o.weatherMist = true;
+      o.weatherBoltGlow = true;
+      o.weatherWind = 1.0F;
+      o.weatherReach = 1.0F;
    }
 
    static void gameTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {

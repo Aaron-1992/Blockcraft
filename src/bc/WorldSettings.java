@@ -230,10 +230,15 @@ public final class WorldSettings {
    /** Selected Console Edition Arena Map (0 = Cove, 1 = Crucible, 2 = Cavern, 3 = Temple). */
    public int mapId = MAP_COVE;
 
-   /** Update 6.19: 1 = the V6.18 terrain, 2 = the bigger cave systems / taller mountains. Old saves stay at 1. */
+   /** 1 = V6.18 terrain, 2 = V6.19 bigger caves / mountains, 3 = V6.21 layered caves + underground structures. Old saves keep their own version. */
    public int terrainVer = 1;
    /** Update 6.19: only used when terrainVer >= 2. */
    public float caveScale = 1.0F, caveDensity = 1.0F, mountainScale = 1.0F, ravineScale = 1.0F;
+   /** Update 6.21: only used when terrainVer >= 3. All four are copied into new worlds from Options. */
+   public boolean caveStructures = true;
+   public boolean caveLayers = true;
+   public boolean caveLakes = true;
+   public float caveRichness = 1.0F;
 
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
@@ -257,6 +262,10 @@ public final class WorldSettings {
       s.caveDensity = this.caveDensity;
       s.mountainScale = this.mountainScale;
       s.ravineScale = this.ravineScale;
+      s.caveStructures = this.caveStructures;
+      s.caveLayers = this.caveLayers;
+      s.caveLakes = this.caveLakes;
+      s.caveRichness = this.caveRichness;
       return s;
    }
 
@@ -298,6 +307,10 @@ public final class WorldSettings {
       p.setProperty("cavedensity", Float.toString(this.caveDensity));
       p.setProperty("mountainscale", Float.toString(this.mountainScale));
       p.setProperty("ravinescale", Float.toString(this.ravineScale));
+      p.setProperty("cavestructures", Boolean.toString(this.caveStructures));
+      p.setProperty("cavelayers", Boolean.toString(this.caveLayers));
+      p.setProperty("cavelakes", Boolean.toString(this.caveLakes));
+      p.setProperty("caverichness", Float.toString(this.caveRichness));
    }
 
    private static float f(Properties p, String key, float def, float lo, float hi) {
@@ -330,15 +343,19 @@ public final class WorldSettings {
       s.structures = Boolean.parseBoolean(p.getProperty("structures", "true"));
       s.bonusChest = Boolean.parseBoolean(p.getProperty("bonus", "false"));
       try {
-         s.terrainVer = Math.max(1, Math.min(2, Integer.parseInt(p.getProperty("terrainver", "1").trim())));
+         s.terrainVer = Math.max(1, Math.min(3, Integer.parseInt(p.getProperty("terrainver", "1").trim())));
          s.caveScale = f(p, "cavescale", 1.0F, 0.6F, 3.0F);
          s.caveDensity = f(p, "cavedensity", 1.0F, 0.4F, 2.5F);
          s.mountainScale = f(p, "mountainscale", 1.0F, 0.5F, 2.5F);
          s.ravineScale = f(p, "ravinescale", 1.0F, 0.4F, 2.5F);
+         s.caveRichness = f(p, "caverichness", 1.0F, 0.4F, 2.0F);
       } catch (NumberFormatException e) {
          s.terrainVer = 1;
-         s.caveScale = s.caveDensity = s.mountainScale = s.ravineScale = 1.0F;
+         s.caveScale = s.caveDensity = s.mountainScale = s.ravineScale = s.caveRichness = 1.0F;
       }
+      s.caveStructures = Boolean.parseBoolean(p.getProperty("cavestructures", "true"));
+      s.caveLayers = Boolean.parseBoolean(p.getProperty("cavelayers", "true"));
+      s.caveLakes = Boolean.parseBoolean(p.getProperty("cavelakes", "true"));
       return s;
    }
 

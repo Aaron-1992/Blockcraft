@@ -43,6 +43,8 @@ def required(version):
         extra += ("KineticRender", "KineticTransport", "Gui")
     if tuple(map(int, version.split("."))) >= (6, 20):
         extra += ("Options", "Screens", "Ui", "Panorama", "MapView")
+    if tuple(map(int, version.split("."))) >= (6, 21):
+        extra += ("CaveWorks", "WeatherFx", "TerraGen", "Sky", "WorldSettings", "WorldPreview")
     return REQUIRED + extra
 
 

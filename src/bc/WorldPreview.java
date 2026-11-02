@@ -76,7 +76,8 @@ final class WorldPreview {
       // Update 6.18: aquatic generation, structures and the map change what the map shows, so they change the key too.
       String k = seed + "/" + ws.type + "/" + ws.flat + "/" + ws.aquatic + "/" + ws.structures
          + "/" + ws.bonusChest + "/" + ws.mapId + "/" + ws.structVer + "/" + ws.terrainVer
-         + "/" + ws.caveScale + "/" + ws.caveDensity + "/" + ws.mountainScale + "/" + ws.ravineScale;
+         + "/" + ws.caveScale + "/" + ws.caveDensity + "/" + ws.mountainScale + "/" + ws.ravineScale
+         + "/" + ws.caveStructures + "/" + ws.caveLayers + "/" + ws.caveLakes + "/" + ws.caveRichness;
       if (k.equals(this.key)) {
          return false;
       }

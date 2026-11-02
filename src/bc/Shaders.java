@@ -1676,6 +1676,8 @@ public final class Shaders {
          GL11.glClearColor(0.0F, 0.0F, 0.0F, 0.0F);
          GL11.glClear(16384);
          GL20.glUseProgram(this.pCloud);
+         // Update 6.21: the cloud shader's silver linings, warm rim and ice halo follow the in-game weather detail setting.
+         this.u1f(this.pCloud, "wxBeauty", this.opt == null ? 2.0F : (float)Options.clamp(this.opt.weatherQuality, 0, 2));
          this.u1i(this.pCloud, "noiseTex", 0);
          this.u1i(this.pCloud, "depthTex", 1);
          this.u1i(this.pCloud, "steps", this.cloudMarchSteps);
