@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.19";
+   public static final String VERSION_STR = "6.20";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -47,6 +47,8 @@ public final class Game {
    final Ui ui = new Ui(this);
    /** Update 3.13: the turning world behind the title and the menus (null while a real world is open). */
    Panorama pano;
+   /** Update 6.20: the HUD minimap and the full world map. */
+   final MapView map = new MapView();
    long window;
    int winW = 1280;
    int winH = 720;
@@ -2012,6 +2014,10 @@ public final class Game {
 
    void onScroll(double var1) {
       if(this.screen==Game.S.MIDI){if(midiScreen!=null)midiScreen.scroll(var1);return;}
+      if (this.screen == Game.S.MAP) {
+         if (var1 != 0.0) this.map.zoom(this, var1 > 0.0 ? -1 : 1);
+         return;
+      }
       if (this.ui.onWheel(var1)) {
          return;
       }
@@ -2202,6 +2208,13 @@ public final class Game {
                               return;
                            case 76:
                               this.setScreen(Game.S.ADV); // Update 3.12: the advancements
+                              return;
+                           case 77:
+                              // Update 6.20: M opens the big, pannable world map.
+                              if (this.world != null && this.player != null) {
+                                 this.map.open(this);
+                                 this.setScreen(Game.S.MAP);
+                              }
                               return;
                            case 78:
                               if (this.key(292) || (var3 & 2) != 0) {
@@ -2513,6 +2526,28 @@ public final class Game {
                   }
 
                   return;
+               case MAP: {
+                  // Update 6.20: the map screen pauses the world; these keys move the picture instead.
+                  if (var2 == 1 && (var1 == 77 || var1 == 256)) {
+                     this.opt.save();
+                     this.setScreen(Game.S.PLAY);
+                     return;
+                  }
+                  int pan = MapView.step(this) * 32;
+                  switch (var1) {
+                     case 87: case 265: this.map.pan(this, 0.0, -pan); break;
+                     case 83: case 264: this.map.pan(this, 0.0, pan); break;
+                     case 65: case 263: this.map.pan(this, -pan, 0.0); break;
+                     case 68: case 262: this.map.pan(this, pan, 0.0); break;
+                     case 61: case 334: this.map.zoom(this, -1); break;
+                     case 45: case 333: this.map.zoom(this, 1); break;
+                     case 82: this.map.center(this); break;
+                     case 71: this.opt.mapGrid = !this.opt.mapGrid; break;
+                     case 66: this.opt.minimapMobs = !this.opt.minimapMobs; break;
+                     default: break;
+                  }
+                  return;
+               }
                case DEAD:
             }
          }
@@ -2545,6 +2580,10 @@ public final class Game {
          if (var3) {
             float var4 = (float)(this.mouseX / this.gui.scale);
             float var5 = (float)(this.mouseY / this.gui.scale);
+            if (this.screen == Game.S.MAP && var1 == 0 && this.map.hit(var4, var5)) {
+               this.map.click(this, var4, var5); // Update 6.20: click the picture to centre there
+               return;
+            }
             if (this.screen == Game.S.INV) {
                if (var1 == 0) {
                   for (int var8 = 0; var8 < this.activeBtns.size(); var8++) {
@@ -3890,6 +3929,8 @@ public final class Game {
       if (this.pano != null) {
          this.pano.update(var1); // Update 3.13: the turning world behind the title and the menus
       }
+
+      this.map.update(this); // Update 6.20: budgeted minimap / full-map refreshes
 
       if (this.world == null && Net319.isActive()) {
          Net319.tick(this);
@@ -6345,6 +6386,9 @@ public final class Game {
          case WAITING:
             Screens.waiting(this);
             break;
+         case MAP:
+            MapView.screen(this);
+            break;
          case CHAT:
          case INV:
          case PAUSE:
@@ -6788,6 +6832,7 @@ public final class Game {
          if (ModLoader.isWaystonesHudActive() && !this.debug && this.world != null) {
             this.drawWaystonesHud();
          }
+         this.map.drawMini(this); // Update 6.20: the corner minimap
       }
 
       if (this.debug) {
@@ -7584,6 +7629,7 @@ public final class Game {
       MODS,
       MIDI,
       CREDITS,
+      MAP,
       DEAD;
    }
 

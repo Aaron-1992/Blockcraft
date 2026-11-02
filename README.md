@@ -3,7 +3,7 @@
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
 In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
 
-Current source version: **V6.19 — moon/entity/hand lighting, LOD controls and bigger caves** (retains V6.18 machinery and gameplay).
+Current source version: **V6.20 — minimap, big world map and the fixed title panorama** (retains V6.19 machinery and gameplay).
 
 Chunk lighting runs on a bounded, low-priority worker; unload and distant-terrain scans are incremental, and per-section occupancy is indexed. V6.18 continues that work with background chunk saves, incremental autosaves, bounded unloads, a configurable chunk cache and reused collision scratch buffers. No measured frame-time gain on real GPU hardware is claimed yet; please report machine specs, render distance and whether chunk-load spikes improved.
 
@@ -33,6 +33,8 @@ utility model fixes, and the native 32×32 PNG editing workflow. Accepted stone
 bricks, planks and cobblestone remain; the bow stays a flat animated sprite, and
 corrected gun poses and held-item lighting are retained. See the
 [review record](docs/art-review/utility-tools-review.md) and `package/README.txt`.
+
+Update 6.20 adds a live **minimap** in the HUD corner and a **big world map** on the **M** key: pan with WASD/arrows or a click, zoom with the wheel or +/-, and see mobs, coordinates and biomes. Size, radius, rotation, refresh budget, zoom and grid are configurable under Options (and in Debug Video > Advanced). The title panorama was fixed: its fade-in no longer waits forever for hidden cave meshes, and a generated 2D landscape is always drawn while the 3D world loads. See [V6.20 notes](docs/releases/v6.20.md).
 
 Update 6.19 makes the moon cast real shadows, gives mobs shadow silhouettes, lights the player's
 hand with the shader, and adds the LOD falloff / fog / detail / build-upload-draw budget controls

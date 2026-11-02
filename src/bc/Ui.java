@@ -84,10 +84,13 @@ final class Ui {
    /** The dimmed view behind a menu: the turning world when there is one, else the dirt of the old title screen. */
    void backdrop(float dim) {
       Gui gui = this.g.gui;
-      if (this.g.pano != null && this.g.world != null && this.g.screen != Game.S.LOADING) {
+      if (this.g.pano != null && this.g.screen != Game.S.LOADING) {
+         // Update 6.20: the 2D landscape is always there while the 3D panorama warms up (or if it
+         // cannot start at all). It cross-fades out instead of covering the menu with a solid black rect.
+         this.g.pano.drawFlat(gui);
          float fade = this.g.pano.fade();
          if (fade > 0.0F) {
-            gui.rect(0, 0, gui.w, gui.h, (int)(fade * 255.0F) << 24);
+            gui.rect(0, 0, gui.w, gui.h, (int)(fade * 110.0F) << 24);
          }
 
          if (dim > 0.0F) {

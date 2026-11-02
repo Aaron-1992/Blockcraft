@@ -521,7 +521,7 @@ final class Screens {
    static final int[] FPS_FINE = {0, 30, 60, 75, 90, 120, 144, 165, 240, 360, 500, 1000};
    static final int[] AUTOSAVE = {0, 600, 1200, 3600, 7200};
    /** Number of rows in the Advanced tab (the list scrolls). */
-   static final int ADV_ROWS = 44;
+   static final int ADV_ROWS = 50;
 
    static String[] tabs(Options o) {
       return o.debugVideo ? TABS_DEBUG : TABS;
@@ -529,7 +529,8 @@ final class Screens {
    static final String[][] KEYS = {
       {"W A S D", "Walk"}, {"Space", "Jump / swim"}, {"Space x2", "Fly (Creative)"}, {"Shift", "Sneak"}, {"Ctrl", "Sprint"}, {"Mouse L", "Break / attack"},
       {"Mouse R", "Place / use"}, {"1 - 9", "Choose item"}, {"E", "Inventory"}, {"Q", "Drop item"}, {"T", "Chat"}, {"/", "Command"}, {"L", "Advancements"},
-      {"C", "Zoom"}, {"F5", "3rd person"}, {"F1", "Hide the HUD"}, {"F2", "Screenshot"}, {"F3", "Debug info"}, {"F11", "Fullscreen"}, {"Esc", "Game menu"}
+      {"C", "Zoom"}, {"F5", "3rd person"}, {"F1", "Hide the HUD"}, {"F2", "Screenshot"}, {"F3", "Debug info"}, {"F11", "Fullscreen"}, {"Esc", "Game menu"},
+      {"M", "Big world map"}
    };
 
    static void options(Game g) {
@@ -564,7 +565,7 @@ final class Screens {
             rows = 4;
             break;
          case 2:
-            rows = 6;
+            rows = 7;
             break;
          case 4:
             rows = ADV_ROWS;
@@ -1000,6 +1001,33 @@ final class Screens {
          ui.slider("Ravine Scale: " + String.format("%.2f", o.ravineScale) + "x", x0, y, full, 20.0F, (o.ravineScale - 0.4F) / 2.1F,
             "Width and depth of ravines in new worlds. These four sliders are copied into the world when you press Create New World.", v -> o.ravineScale = 0.4F + v * 2.1F);
       });
+      // ---------------------------------------------------------------- V6.20: maps
+      cells.add(header);
+      cells.add(y -> ui.label("\u00a7eMAPS & MINIMAP  -  M opens the big map", x0, y + 3.0F, Ui.GOLD));
+      cells.add(y -> {
+         ui.toggle("Minimap", o.minimap, x0, y, colW, 20.0F,
+            "The live corner map of the terrain and nearby mobs. Press M in a world for the full map.", () -> o.minimap = !o.minimap);
+         ui.toggle("Rotate Minimap", o.minimapRotate, x1, y, colW, 20.0F,
+            "ON turns the minimap with you; OFF keeps north at the top. Rotating redraws every frame.", () -> o.minimapRotate = !o.minimapRotate);
+      });
+      cells.add(y -> {
+         ui.button("Minimap Size: " + new String[]{"Small", "Normal", "Large"}[Options.clamp(o.minimapSize, 0, 2)], x0, y, colW, 20.0F, true,
+            "64 / 96 / 128 GUI units wide.", () -> o.minimapSize = (Options.clamp(o.minimapSize, 0, 2) + 1) % 3);
+         ui.slider("Minimap Radius: " + o.minimapRadius + "m", x1, y, colW, 20.0F, (o.minimapRadius - 32) / 480.0F,
+            "Blocks from the player to the edge of the minimap.", v -> o.minimapRadius = 32 + Math.round(v * 480.0F));
+      });
+      cells.add(y -> {
+         ui.slider("Map Refresh: " + o.mapRefresh + "f", x0, y, colW, 20.0F, (o.mapRefresh - 1) / 19.0F,
+            "Frames between minimap redraws. Higher values cost less; a rotating map always redraws.", v -> o.mapRefresh = 1 + Math.round(v * 19.0F));
+         ui.slider("Big Map Zoom: " + MapView.BIG_STEPS[Options.clamp(o.bigMapZoom, 0, 5)] + "m/px", x1, y, colW, 20.0F,
+            Options.clamp(o.bigMapZoom, 0, 5) / 5.0F, "Blocks per pixel of the M map, from 2 (close) to 64 (whole region).", v -> o.bigMapZoom = Math.round(v * 5.0F));
+      });
+      cells.add(y -> {
+         ui.toggle("Mob Dots", o.minimapMobs, x0, y, colW, 20.0F,
+            "Hostile mobs are red dots and passive mobs green dots on both maps.", () -> o.minimapMobs = !o.minimapMobs);
+         ui.toggle("Map Grid", o.mapGrid, x1, y, colW, 20.0F,
+            "Coordinate grid lines on the big map.", () -> o.mapGrid = !o.mapGrid);
+      });
       // ---------------------------------------------------------------- live diagnostics
       cells.add(header);
       cells.add(y -> ui.label("\u00a7eLIVE DIAGNOSTICS", x0, y + 3.0F, Ui.GOLD));
@@ -1055,6 +1083,14 @@ final class Screens {
       o.caveDensity = 1.3F;
       o.mountainScale = 1.5F;
       o.ravineScale = 1.3F;
+      o.minimap = true;
+      o.minimapRotate = false;
+      o.minimapMobs = true;
+      o.minimapSize = 1;
+      o.minimapRadius = 128;
+      o.mapRefresh = 3;
+      o.bigMapZoom = 2;
+      o.mapGrid = true;
    }
 
    static void gameTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
@@ -1126,6 +1162,15 @@ final class Screens {
                g.creditsScroll = 0.0F;
                g.setScreen(Game.S.CREDITS);
             });
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("Minimap", o.minimap, x0, oy, colW, 20.0F,
+            "The live corner map. The Advanced tab has its size, radius, rotation and refresh settings.", () -> o.minimap = !o.minimap);
+         ui.button("Big Map: M", x1, oy, colW, 20.0F, true,
+            "Press M while playing to open the pannable, zoomable world map (wheel or +/- zoom, WASD/arrows pan, click to centre).",
+            () -> ui.say("Press M in a world to open the big map"));
       }
    }
 

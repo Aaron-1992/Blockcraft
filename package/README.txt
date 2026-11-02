@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.19  -  an original Minecraft-style voxel sandbox   (EDITION V6.19)
+BLOCKCRAFT V6.20  -  an original Minecraft-style voxel sandbox   (EDITION V6.20)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,33 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.20 - Minimap, big world map and the fixed panorama
+
+  * A live MINIMAP sits in the top-right of the HUD. It uses the real
+    height/biome/top-block data of loaded chunks and fills unexplored land
+    from the world generator, with relief shading, a player arrow, nearby
+    mob dots, coordinates and a north marker.
+  * Press M while playing for the BIG MAP: a pannable, zoomable overview
+    (2..64 blocks per pixel). Pan with WASD or the arrow keys, zoom with
+    the mouse wheel or +/- , click the picture to centre it there, press R
+    to recentre on the player, G for the grid and B for mob dots. Buttons
+    do the same. M or Esc (or Done) closes it.
+  * Both maps share the same colours and are drawn as ordinary GUI pictures,
+    so they work with or without the shader pack. The big map fills itself
+    a thousand pixels per frame instead of in one frame-long burst.
+  * Every map setting is in the game: Minimap, Minimap Size, Minimap
+    Radius, Rotate Minimap, Map Refresh, Big Map Zoom, Mob Dots and Map
+    Grid under Options > Video > Debug Video > Advanced (plus a quick
+    Minimap switch on the Game tab). All persist in options.txt.
+  * FIXED: the title-screen panorama often stayed black. Its fade-in waited
+    for every section of 25 chunks to be meshed, but demand meshing
+    deliberately leaves hidden cave sections dirty forever. It now uses the
+    renderer's view-aware mesh readiness plus a six-second fallback.
+  * The title now also draws a generated 2D landscape immediately, and
+    cross-fades it into the real turning world. If the panorama worker or
+    the 3D world fails, the landscape stays visible instead of a black
+    screen. Preset switching and Cycle were also corrected.
 
 WHAT'S NEW IN V6.19 - Moonlight, entity shadows, LOD control and bigger caves
 

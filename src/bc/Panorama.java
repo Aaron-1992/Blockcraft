@@ -55,6 +55,10 @@ public final class Panorama {
    static final int CYCLE = PRESETS.length;
    static final int COUNT = PRESETS.length + 1;
    static final java.util.concurrent.ConcurrentHashMap<Integer, double[]> VISTA_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+   /** Update 6.20: the 2D landscape behind the menus, cached as plain RGB (alpha is added while fading). */
+   static final java.util.concurrent.ConcurrentHashMap<Integer, int[]> FLAT_RGB = new java.util.concurrent.ConcurrentHashMap<>();
+   static final int FLAT_W = 320;
+   static final int FLAT_H = 180;
    static int cycleIndex;
 
    static String label(int id) {
@@ -75,7 +79,7 @@ public final class Panorama {
    static void switchTo(Game g) {
       if (g.opt != null) g.opt.save();
       if (g.pano == null) return; // a real world is open: the new choice applies at the next title screen
-      if (g.opt != null && g.opt.panorama == CYCLE) cycleIndex++;
+      // Update 6.20: resolve() advances Cycle exactly once, in start(); doing it here skipped a preset.
       stop(g);
       start(g);
    }
@@ -88,12 +92,17 @@ public final class Panorama {
    Gen gen;
    volatile double[] vista;
    boolean installed;
+   /** Update 6.20: the 3D world could not be installed; the 2D landscape stays on screen. */
+   boolean broken;
    double acc;
    double ticks;
    float shown;
    long installedAt;
    double yaw0;
    double[] spot;
+   /** Update 6.20: a real landscape drawn while the 3D world loads (and if it never can). */
+   Gui.Image flat;
+   int flatAlpha = -1;
 
    Panorama(Game g) {
       this.g = g;
@@ -117,11 +126,18 @@ public final class Panorama {
          return;
       }
       Thread t = new Thread(() -> {
-         p.gen = Dim.makeGen(Dim.OVERWORLD, pr.seed, pr.settings());
-         double[] picked = pick(p.gen, pr);
-         VISTA_CACHE.put(pr.index, picked);
-         if (pr.index == 0) cachedDefaultVista = picked;
-         p.vista = picked;
+         // Update 6.20: a failed vista search must not leave vista null forever - that kept install()
+         // from ever running and left the title screen with no landscape at all.
+         try {
+            p.gen = Dim.makeGen(Dim.OVERWORLD, pr.seed, pr.settings());
+            double[] picked = pick(p.gen, pr);
+            VISTA_CACHE.put(pr.index, picked);
+            if (pr.index == 0) cachedDefaultVista = picked;
+            p.vista = picked;
+         } catch (Throwable e) {
+            System.err.println("panorama: vista search failed, using the fallback view: " + e);
+            p.vista = emergency(pr);
+         }
       }, "panorama-vista");
       t.setDaemon(true);
       t.start();
@@ -135,6 +151,10 @@ public final class Panorama {
       }
 
       g.pano = null;
+      if (g.rend != null) {
+         // Update 6.20: do not leave the distant-terrain renderer pointing at the throw-away world.
+         g.rend.setLod(null);
+      }
       if (p.installed && p.world != null) {
          if (g.rend != null) {
             g.rend.clearWorldMeshes(p.world);
@@ -153,6 +173,16 @@ public final class Panorama {
       }
    }
 
+   /** A place to stand when the generator cannot be searched at all. */
+   static double[] emergency(Preset pr) {
+      double y = 100.0;
+      try {
+         y = Dim.makeGen(Dim.OVERWORLD, pr.seed, pr.settings()).column(0, 0).h + 26.0 + 1.62;
+      } catch (Throwable ignored) {
+      }
+      return new double[]{0.0, 0.5, y, 0.5, 0.0};
+   }
+
    void install() {
       double[] v = this.vista;
       this.spot = v;
@@ -163,7 +193,9 @@ public final class Panorama {
       w.game = this.g;
       w.dayTime = 3000L + this.preset.skyShift;
       w.weather.startFair();
-      w.unloadHook = this.g.rend::onUnload;
+      if (this.g.rend != null) {
+         w.unloadHook = this.g.rend::onUnload;
+      }
       this.world = w;
       this.cam = new Player();
       this.cam.setMode(3);
@@ -171,7 +203,9 @@ public final class Panorama {
       this.yaw0 = v[4];
       this.g.world = w;
       this.g.player = this.cam;
-      this.g.rend.setLod(w);
+      if (this.g.rend != null) {
+         this.g.rend.setLod(w);
+      }
       int cx = (int)Math.floor(v[1]) >> 4;
       int cz = (int)Math.floor(v[3]) >> 4;
       w.updateChunks(cx, cz, this.g.opt.renderDistance + 1, 64, 12000000L);
@@ -181,12 +215,26 @@ public final class Panorama {
 
    /** Called every frame while the panorama is the background (the menus). */
    void update(double dt) {
+      if (this.broken) {
+         return; // the 2D landscape stays visible instead of a black screen
+      }
+
       if (!this.installed) {
          if (this.vista == null || this.g.window == 0L) {
             return;
          }
 
-         this.install();
+         try {
+            this.install();
+         } catch (Throwable e) {
+            System.err.println("panorama: could not install the turning world: " + e);
+            this.broken = true;
+            if (this.g.world == this.world) {
+               this.g.world = null;
+               this.g.player = null;
+            }
+            return;
+         }
       }
 
       if (this.g.world != this.world) {
@@ -216,10 +264,20 @@ public final class Panorama {
       // fade in once the land around is there and has been drawn
       int cx = (int)Math.floor(this.spot[1]) >> 4;
       int cz = (int)Math.floor(this.spot[3]) >> 4;
-      boolean ready = this.world.loadedAround(cx, cz, 3) >= 36 && this.meshed(cx, cz, 2);
+      // Update 6.20: demand meshing intentionally leaves hidden cave sections dirty forever, so the old
+      // "every section of 25 chunks is clean" test could never pass and the fade stayed at black. Use the
+      // renderer's view-aware readiness rule and a bounded timeout, and keep a 2D landscape as a fallback.
+      boolean loaded = this.world.loadedAround(cx, cz, 3) >= 36;
+      double elapsed = (System.nanoTime() - this.installedAt) / 1.0E9;
+      boolean ready = readyToFade(loaded, this.meshed(cx, cz, 2), elapsed);
       if (ready || this.shown > 0.0F) {
          this.shown = Math.min(1.0F, this.shown + (float)dt * 0.9F);
       }
+   }
+
+   /** The 3D world may fade in once the land is there and either it is meshed or we have waited long enough. */
+   static boolean readyToFade(boolean loaded, boolean meshed, double elapsedSeconds) {
+      return loaded && (meshed || elapsedSeconds >= 6.0);
    }
 
    /** The landscape is there and fully visible (the screenshot hooks wait for it). */
@@ -235,9 +293,17 @@ public final class Panorama {
                return false;
             }
 
-            for (Chunk.Section s : ch.sections) {
-               if (s.dirty || s.inFlight) {
+            if (this.g.rend != null) {
+               // Demand meshing deliberately defers sealed cave sections. The renderer already knows which
+               // sections the current view actually needs; waiting for all 16 x 25 sections never worked.
+               if (!this.g.rend.meshLoadingReady(this.world, ch)) {
                   return false;
+               }
+            } else {
+               for (Chunk.Section s : ch.sections) {
+                  if (s.dirty || s.inFlight) {
+                     return false;
+                  }
                }
             }
          }
@@ -249,6 +315,119 @@ public final class Panorama {
    /** 1 = black (nothing is there yet), 0 = the world is fully visible. */
    float fade() {
       return 1.0F - this.shown;
+   }
+
+   /**
+    * Update 6.20: a guaranteed landscape behind the menus. The 3D panorama needs a generator, chunk
+    * loading and meshing before it can be shown; this simple picture needs only a handful of generator
+    * columns, so the title screen is never a black rectangle. It fades out as the real world fades in.
+    */
+   void drawFlat(Gui gui) {
+      if (gui == null || this.shown >= 1.0F) return;
+      if (this.flat == null) this.flat = new Gui.Image(FLAT_W, FLAT_H);
+      int a = Math.round((1.0F - this.shown) * 255.0F / 8.0F) * 8;
+      if (a <= 0) return;
+      if (a > 255) a = 255;
+      if (this.flatAlpha != a) {
+         int[] rgb = flatRgb(this.preset == null ? PRESETS[0] : this.preset);
+         for (int i = 0; i < this.flat.px.length; i++) {
+            this.flat.px[i] = a << 24 | (rgb[i] & 0xFFFFFF);
+         }
+         this.flat.dirty = true;
+         this.flatAlpha = a;
+      }
+      gui.image(this.flat, 0.0F, 0.0F, gui.w, gui.h);
+   }
+
+   /** Cached sky-and-ridge picture of one preset (plain RGB, no alpha). */
+   static int[] flatRgb(Preset pr) {
+      int[] cached = FLAT_RGB.get(pr.index);
+      if (cached != null) return cached;
+      int[] px = new int[FLAT_W * FLAT_H];
+      int skyTop = pr.bias == 1 ? 0xFF4E9CD8 : pr.bias == 2 ? 0xFF3A6498 : 0xFF4C86D0;
+      int skyLow = pr.bias == 1 ? 0xFFF3D9A8 : pr.bias == 2 ? 0xFFC9DCEE : 0xFFBFD9F2;
+      for (int y = 0; y < FLAT_H; y++) {
+         float t = y / (float)(FLAT_H - 1);
+         int r = mixByte(skyTop >> 16 & 255, skyLow >> 16 & 255, t);
+         int g = mixByte(skyTop >> 8 & 255, skyLow >> 8 & 255, t);
+         int b = mixByte(skyTop & 255, skyLow & 255, t);
+         int col = 0xFF000000 | r << 16 | g << 8 | b;
+         for (int x = 0; x < FLAT_W; x++) px[y * FLAT_W + x] = col;
+      }
+      // a soft sun, high on the right
+      int sx = FLAT_W * 72 / 100, sy = FLAT_H * 22 / 100;
+      for (int y = Math.max(0, sy - 16); y < Math.min(FLAT_H, sy + 16); y++) {
+         for (int x = Math.max(0, sx - 16); x < Math.min(FLAT_W, sx + 16); x++) {
+            int d2 = (x - sx) * (x - sx) + (y - sy) * (y - sy);
+            if (d2 <= 36) px[y * FLAT_W + x] = 0xFFFFF2C0;
+            else if (d2 <= 196) px[y * FLAT_W + x] = mix(px[y * FLAT_W + x], 0xFFFFE4A0, 0.35F);
+         }
+      }
+      Gen gen = null;
+      try {
+         gen = Dim.makeGen(Dim.OVERWORLD, pr.seed, pr.settings());
+      } catch (Throwable ignored) {
+      }
+      double yaw = Math.toRadians(pr.index * 47.0);
+      for (int layer = 0; layer < 3; layer++) {
+         double dist = 320.0 - layer * 100.0;
+         double scale = 0.32 + layer * 0.18;
+         float haze = layer == 0 ? 0.72F : layer == 1 ? 0.86F : 1.0F;
+         for (int x = 0; x < FLAT_W; x++) {
+            double a = yaw + (x / (double)FLAT_W - 0.5) * 1.9;
+            int wx = (int)(-Math.sin(a) * dist);
+            int wz = (int)(Math.cos(a) * dist);
+            int h = 70, biome = Biomes.PLAINS;
+            if (gen != null) {
+               try {
+                  Gen.Col c = gen.column(wx, wz);
+                  h = c.h;
+                  biome = c.biome;
+               } catch (RuntimeException ignored) {
+               }
+            }
+            boolean water = h < Gen.SEA;
+            int shownH = Math.max(h, Gen.SEA);
+            int base = water ? 0x2F55B0 : WorldPreview.color(biome);
+            if (!water && shownH > 150 && biome != Biomes.DESERT && biome != Biomes.BADLANDS) {
+               base = mix(base, 0xF4F8FA, Math.min(1.0F, (shownH - 150) / 40.0F));
+            }
+            float shade = haze * (0.9F + Math.min(0.2F, (shownH - Gen.SEA) / 400.0F));
+            int col = 0xFF000000
+               | flatByte((base >> 16 & 255) * shade) << 16
+               | flatByte((base >> 8 & 255) * shade) << 8
+               | flatByte((base & 255) * shade);
+            int top = (int)Math.round(FLAT_H * 0.58 - (shownH - 70) * scale - layer * 3.0);
+            top = Math.max(0, Math.min(FLAT_H - 1, top));
+            for (int y = top; y < FLAT_H; y++) px[y * FLAT_W + x] = col;
+            if (water && top < FLAT_H) px[top * FLAT_W + x] = 0xFF8FC6EE;
+         }
+      }
+      // a dark foreground so the picture has a bottom edge
+      for (int y = FLAT_H - 10; y < FLAT_H; y++) {
+         float t = (y - (FLAT_H - 10)) / 10.0F;
+         for (int x = 0; x < FLAT_W; x++) {
+            int i = y * FLAT_W + x;
+            px[i] = mix(px[i], 0xFF16241A, t * 0.55F);
+         }
+      }
+      FLAT_RGB.put(pr.index, px);
+      return px;
+   }
+
+   private static int flatByte(float v) {
+      return v < 0.0F ? 0 : v > 255.0F ? 255 : (int)(v + 0.5F);
+   }
+
+   private static int mixByte(int a, int b, float t) {
+      return Math.max(0, Math.min(255, Math.round(a + (b - a) * t)));
+   }
+
+   private static int mix(int a, int b, float t) {
+      int r = mixByte(a >> 16 & 255, b >> 16 & 255, t);
+      int g = mixByte(a >> 8 & 255, b >> 8 & 255, t);
+      int bl = mixByte(a & 255, b & 255, t);
+      return 0xFF000000 | r << 16 | g << 8 | bl;
    }
 
    /** The time of day the sky is drawn for: a slow morning that never turns into night. */

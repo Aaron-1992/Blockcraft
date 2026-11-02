@@ -322,6 +322,20 @@ def main():
             "Please report your CPU/GPU, memory, render distance and whether the spikes improved. "
             "The changes are regression-tested, but no measured frame-time improvement is claimed yet.\n"
         )
+    if version == "6.20":
+        release_notes += (
+            "\n### Try the maps and the fixed panorama\n\n"
+            "Start a world: the minimap is already in the top-right corner. Press **M** for the big map, "
+            "pan with **WASD** / arrow keys or a click, zoom with the wheel or **+/-**, press **R** to recentre, "
+            "**G** for grid and **B** for mob dots; **M** or **Esc** closes it. Options > Video > Debug Video > Advanced "
+            "exposes every map setting (size, radius, rotation, refresh, zoom, mob dots, grid), and Options > Game has a quick "
+            "Minimap switch. The title screen now shows a landscape immediately instead of a black background.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with the eight new V6.20 regression groups; strict equivalence still matches the "
+            "original Update 3.5 terrain/world/tick fingerprints; all GLSL programs parse; and `tools/verify_release.py` "
+            "checks the packaged exe and jar (including the new map and panorama classes). A real-GPU/Windows playtest "
+            "is not claimed here.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

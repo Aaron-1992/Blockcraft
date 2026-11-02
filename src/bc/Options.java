@@ -110,6 +110,22 @@ public final class Options {
    public float mountainScale = 1.5F;
    /** Update 6.19: ravine width/depth multiplier for new worlds. */
    public float ravineScale = 1.3F;
+   /** Update 6.20: the HUD minimap is drawn while playing. */
+   public boolean minimap = true;
+   /** Update 6.20: the minimap turns with the player instead of staying north-up. */
+   public boolean minimapRotate = false;
+   /** Update 6.20: nearby mobs show as dots on both maps. */
+   public boolean minimapMobs = true;
+   /** Update 6.20: minimap edge length index into MapView.SIZES = {64, 96, 128} GUI units. */
+   public int minimapSize = 1;
+   /** Update 6.20: blocks between the player and the edge of the minimap. */
+   public int minimapRadius = 128;
+   /** Update 6.20: frames between minimap redraws (a rotating map redraws every frame). */
+   public int mapRefresh = 3;
+   /** Update 6.20: index into MapView.BIG_STEPS (blocks per pixel of the full map). */
+   public int bigMapZoom = 2;
+   /** Update 6.20: draw coordinate grid lines on the full map. */
+   public boolean mapGrid = true;
    /** Active resource pack ID ("Default", "Classic", "Vibrant", "Retro8Bit", or a custom pack in resourcepacks/). */
    public String resourcePack = ResourcePacks.ID_DEFAULT;
    public float soundVolume = 1.0F;
@@ -198,6 +214,14 @@ public final class Options {
                this.caveDensity = clampf(Float.parseFloat(var2.getProperty("caveDensity", "1.3")), 0.4F, 2.5F);
                this.mountainScale = clampf(Float.parseFloat(var2.getProperty("mountainScale", "1.5")), 0.5F, 2.5F);
                this.ravineScale = clampf(Float.parseFloat(var2.getProperty("ravineScale", "1.3")), 0.4F, 2.5F);
+               this.minimap = Boolean.parseBoolean(var2.getProperty("minimap", "true"));
+               this.minimapRotate = Boolean.parseBoolean(var2.getProperty("minimapRotate", "false"));
+               this.minimapMobs = Boolean.parseBoolean(var2.getProperty("minimapMobs", "true"));
+               this.minimapSize = clamp(Integer.parseInt(var2.getProperty("minimapSize", "1")), 0, 2);
+               this.minimapRadius = clamp(Integer.parseInt(var2.getProperty("minimapRadius", "128")), 32, 512);
+               this.mapRefresh = clamp(Integer.parseInt(var2.getProperty("mapRefresh", "3")), 1, 20);
+               this.bigMapZoom = clamp(Integer.parseInt(var2.getProperty("bigMapZoom", "2")), 0, 5);
+               this.mapGrid = Boolean.parseBoolean(var2.getProperty("mapGrid", "true"));
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
@@ -280,6 +304,14 @@ public final class Options {
       var1.setProperty("caveDensity", this.caveDensity + "");
       var1.setProperty("mountainScale", this.mountainScale + "");
       var1.setProperty("ravineScale", this.ravineScale + "");
+      var1.setProperty("minimap", this.minimap + "");
+      var1.setProperty("minimapRotate", this.minimapRotate + "");
+      var1.setProperty("minimapMobs", this.minimapMobs + "");
+      var1.setProperty("minimapSize", this.minimapSize + "");
+      var1.setProperty("minimapRadius", this.minimapRadius + "");
+      var1.setProperty("mapRefresh", this.mapRefresh + "");
+      var1.setProperty("bigMapZoom", this.bigMapZoom + "");
+      var1.setProperty("mapGrid", this.mapGrid + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");
