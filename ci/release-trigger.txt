@@ -1,2 +1,2 @@
-6.16
-# PC chunk lighting, bounded unloading and incremental LOD performance test.
+6.18
+# V6.18: new panoramas, Advanced Video tab, biome preview and redstone/performance fixes.
