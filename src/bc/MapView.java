@@ -314,7 +314,7 @@ final class MapView {
       float b2 = hintY - 22.0F;
       float b1 = b2 - 22.0F;
       float mapTop = py + 28.0F;
-      float mapSize = Math.max(48.0F, Math.min(panelW - 20.0F, b1 - mapTop - 4.0F));
+      float mapSize = Math.max(48.0F, Math.min(panelW - 20.0F, b1 - mapTop - 16.0F));
       float mx = (gui.w - mapSize) * 0.5F;
       float my = mapTop;
       map.lastX = mx;

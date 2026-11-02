@@ -363,16 +363,25 @@ public final class Panorama {
             else if (d2 <= 196) px[y * FLAT_W + x] = mix(px[y * FLAT_W + x], 0xFFFFE4A0, 0.35F);
          }
       }
+      // a few soft cloud streaks high in the sky
+      for (int y = FLAT_H * 18 / 100; y < FLAT_H * 42 / 100; y++) {
+         for (int x = 0; x < FLAT_W; x++) {
+            double band = Math.sin(x * 0.021 + y * 0.11) + 0.45 * Math.sin(x * 0.057 - y * 0.23);
+            if (band > 0.72) px[y * FLAT_W + x] = mix(px[y * FLAT_W + x], 0xFFE8F0FA, 0.16F);
+         }
+      }
       Gen gen = null;
       try {
          gen = Dim.makeGen(Dim.OVERWORLD, pr.seed, pr.settings());
       } catch (Throwable ignored) {
       }
       double yaw = Math.toRadians(pr.index * 47.0);
-      for (int layer = 0; layer < 3; layer++) {
-         double dist = 320.0 - layer * 100.0;
-         double scale = 0.32 + layer * 0.18;
-         float haze = layer == 0 ? 0.72F : layer == 1 ? 0.86F : 1.0F;
+      // Four overlapping ridge layers. The generator gives the broad land/sea shapes; a little
+      // higher-frequency relief keeps the skyline from becoming one flat colour band per biome.
+      for (int layer = 0; layer < 4; layer++) {
+         double dist = 340.0 - layer * 80.0;
+         double scale = 0.28 + layer * 0.14;
+         float haze = 0.68F + layer * 0.10F;
          for (int x = 0; x < FLAT_W; x++) {
             double a = yaw + (x / (double)FLAT_W - 0.5) * 1.9;
             int wx = (int)(-Math.sin(a) * dist);
@@ -387,7 +396,10 @@ public final class Panorama {
                }
             }
             boolean water = h < Gen.SEA;
-            int shownH = Math.max(h, Gen.SEA);
+            double relief = 9.0 * Math.sin(x * 0.11 + layer * 1.7)
+               + 4.5 * Math.sin(x * 0.29 + layer * 0.6)
+               + 1.8 * Math.sin(x * 0.73 - layer);
+            int shownH = (int)Math.max(h + relief, Gen.SEA);
             int base = water ? 0x2F55B0 : WorldPreview.color(biome);
             if (!water && shownH > 150 && biome != Biomes.DESERT && biome != Biomes.BADLANDS) {
                base = mix(base, 0xF4F8FA, Math.min(1.0F, (shownH - 150) / 40.0F));
