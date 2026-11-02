@@ -391,6 +391,8 @@ final class Screens {
       ws.caveVer = g.opt.caveCliffs ? 2 : 1;
       ws.biomeBorders = g.opt.biomeBorders;
       ws.treeDensity = g.opt.treeDensity;
+      ws.treeScale = g.opt.treeScale;
+      ws.giantTrees = g.opt.giantTrees;
    }
 
    static void createWorld(Game g) {
@@ -493,6 +495,7 @@ final class Screens {
          + (ws.terrainVer >= 3 ? (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures")
             : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
          + (ws.biomeBorders > 0 ? "  -  smooth biome borders" : "")
+         + (ws.giantTrees ? "  -  giant trees" : "")
          + (ws.structures ? "  -  villages, temples & ruins" : "")
          + (ws.bonusChest ? "  -  bonus chest" : "");
       gui.text(Game.clipText(content, colW * 2 + gap), x0, recY, 0xFFE8D068, true);
@@ -530,7 +533,7 @@ final class Screens {
    static final int[] FPS_FINE = {0, 30, 60, 75, 90, 120, 144, 165, 240, 360, 500, 1000};
    static final int[] AUTOSAVE = {0, 600, 1200, 3600, 7200};
    /** Number of rows in the Advanced tab (the list scrolls). */
-   static final int ADV_ROWS = 60;
+   static final int ADV_ROWS = 61;
 
    static String[] tabs(Options o) {
       return o.debugVideo ? TABS_DEBUG : TABS;
@@ -1037,6 +1040,13 @@ final class Screens {
          ui.toggle("Live Entity Shadows", o.entityShadowMotion, x1, y, colW, 20.0F,
             "Mob shadows follow every frame instead of only when the terrain shadow map refreshes.", () -> o.entityShadowMotion = !o.entityShadowMotion);
       });
+      // ---------------------------------------------------------------- V6.23: tree variants and sizes
+      cells.add(y -> {
+         ui.slider("Tree Size: " + String.format("%.2f", o.treeScale) + "x", x0, y, colW, 20.0F, (o.treeScale - 0.7F) / 0.8F,
+            "Height and crown size of EVERY tree species. All species get six silhouettes and three size tiers; this scales all of them.", v -> o.treeScale = 0.7F + v * 0.8F);
+         ui.toggle("Giant Trees", o.giantTrees, x1, y, colW, 20.0F,
+            "Allow the rare Giant tier. Off keeps Normal and Large only - cheaper on slower machines.", () -> o.giantTrees = !o.giantTrees);
+      });
       // ---------------------------------------------------------------- V6.21: weather & sky
       cells.add(header);
       cells.add(y -> ui.label("\u00a7eWEATHER & SKY  -  prettier storms near and far", x0, y + 3.0F, Ui.GOLD));
@@ -1170,6 +1180,8 @@ final class Screens {
       o.minimapPos = 0;
       o.minimapAutoMove = true;
       o.entityShadowMotion = true;
+      o.treeScale = 1.0F;
+      o.giantTrees = true;
    }
 
    static void gameTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {

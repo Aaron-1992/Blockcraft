@@ -245,6 +245,10 @@ public final class WorldSettings {
    public int biomeBorders = 0;
    /** Update 6.22: global tree-density multiplier (0.4..1.4); lower is much cheaper in taiga. */
    public float treeDensity = 1.0F;
+   /** Update 6.23: height/radius multiplier of every tree (0.7..1.5). */
+   public float treeScale = 1.0F;
+   /** Update 6.23: allow the rare Giant size tier in new worlds. */
+   public boolean giantTrees = true;
 
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
@@ -275,6 +279,8 @@ public final class WorldSettings {
       s.caveVer = this.caveVer;
       s.biomeBorders = this.biomeBorders;
       s.treeDensity = this.treeDensity;
+      s.treeScale = this.treeScale;
+      s.giantTrees = this.giantTrees;
       return s;
    }
 
@@ -323,6 +329,8 @@ public final class WorldSettings {
       p.setProperty("cavever", Integer.toString(this.caveVer));
       p.setProperty("biomeborders", Integer.toString(this.biomeBorders));
       p.setProperty("treedensity", Float.toString(this.treeDensity));
+      p.setProperty("treescale", Float.toString(this.treeScale));
+      p.setProperty("gianttrees", Boolean.toString(this.giantTrees));
    }
 
    private static float f(Properties p, String key, float def, float lo, float hi) {
@@ -372,10 +380,14 @@ public final class WorldSettings {
          s.caveVer = Math.max(1, Math.min(2, Integer.parseInt(p.getProperty("cavever", "1").trim())));
          s.biomeBorders = Math.max(0, Math.min(2, Integer.parseInt(p.getProperty("biomeborders", "0").trim())));
          s.treeDensity = f(p, "treedensity", 1.0F, 0.4F, 1.4F);
+         s.treeScale = f(p, "treescale", 1.0F, 0.7F, 1.5F);
+         s.giantTrees = Boolean.parseBoolean(p.getProperty("gianttrees", "true"));
       } catch (NumberFormatException e) {
          s.caveVer = 1;
          s.biomeBorders = 0;
          s.treeDensity = 1.0F;
+         s.treeScale = 1.0F;
+         s.giantTrees = true;
       }
 
       return s;

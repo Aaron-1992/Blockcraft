@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.22  -  an original Minecraft-style voxel sandbox   (EDITION V6.22)
+BLOCKCRAFT V6.23  -  an original Minecraft-style voxel sandbox   (EDITION V6.23)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,35 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.23 - More tree variants and BIGGER trees for every species
+
+  * EVERY tree species now has several different silhouettes and three
+    size tiers (Normal / Large / Giant): 8 species, 34 shapes in total.
+    Oak: lobed, squat, columnar, umbrella, forked twin-trunk, weeping.
+    Birch: narrow, tall, three-stem clump, weeping, grand two-tier.
+    Spruce: tiered, sparse pine, columnar, 2x2 giant, 2x2 grand, candle.
+    Jungle: small, tall layered, 2x2 giant, huge buttressed canopy,
+    very tall emergent. Acacia: bent, double-bend, wide plate, forked.
+    Dark oak: classic, grand, spreading. Swamp: oak, cypress, willow.
+    Bushes: round and tall. Giant mushrooms and ice spikes scale too.
+  * The silhouette and size of each tree come from its seed-derived hash,
+    so a tree crossing a chunk border is identical in both chunks. About
+    58% Normal, 30% Large and 12% Giant; the biome's original plan still
+    biases which variant you see, but all of them really appear.
+  * BIGGER DOES NOT MEAN LAGGY. Giant conifers grow tall with spaced-out
+    hollow tiers rather than solid crowns, the per-chunk tree cap remains,
+    and a hard 900-leaf budget bounds every single tree. Headless 3x3
+    taiga meshing is slightly FASTER than V6.22 (34.3 ms / 162548 verts
+    vs 36.2 ms / 165648 verts) even with the bigger trees.
+  * Two new settings in Options > Video > Debug Video > Advanced:
+      Tree Size   0.70x .. 1.50x  (height and crown of every species)
+      Giant Trees ON / OFF       (off removes the rare Giant tier)
+    Both persist in options.txt, are saved with the world and appear in
+    the Create New World preview. Old saves keep their old trees.
+  * Headless renders of the REAL tree geometry:
+    docs/screenshots/v6.23-tree-variants.png  (all 34 silhouettes)
+    docs/screenshots/v6.23-tree-sizes.png     (Normal / Large / Giant)
 
 WHAT'S NEW IN V6.22 - Caves & Cliffs carver, cheaper taiga, smooth borders,
                        live shadows and a movable minimap

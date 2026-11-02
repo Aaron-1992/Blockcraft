@@ -152,6 +152,10 @@ public final class Options {
    public int biomeBorders = 1;
    /** Update 6.22: global tree-density multiplier (0.4..1.4). Lower is much cheaper in taiga. */
    public float treeDensity = 1.0F;
+   /** Update 6.23: height/radius multiplier of every tree (0.7..1.5). */
+   public float treeScale = 1.0F;
+   /** Update 6.23: allow the rare Giant size tier in new worlds. */
+   public boolean giantTrees = true;
    /** Update 6.22: HUD minimap corner, 0 = top right, 1 = top left, 2 = bottom right, 3 = bottom left. */
    public int minimapPos = 0;
    /** Update 6.22: slide the minimap out of the way while an advancement toast is showing. */
@@ -270,6 +274,8 @@ public final class Options {
                this.minimapPos = clamp(Integer.parseInt(var2.getProperty("minimapPos", "0")), 0, 3);
                this.minimapAutoMove = Boolean.parseBoolean(var2.getProperty("minimapAutoMove", "true"));
                this.entityShadowMotion = Boolean.parseBoolean(var2.getProperty("entityShadowMotion", "true"));
+               this.treeScale = clampf(Float.parseFloat(var2.getProperty("treeScale", "1.0")), 0.7F, 1.5F);
+               this.giantTrees = Boolean.parseBoolean(var2.getProperty("giantTrees", "true"));
                this.resourcePack = var2.getProperty("resourcePack", ResourcePacks.ID_DEFAULT);
                this.soundVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("soundVolume", "1.0"))));
                this.musicVolume = Math.max(0.0F, Math.min(1.0F, Float.parseFloat(var2.getProperty("musicVolume", "0.75"))));
@@ -376,6 +382,8 @@ public final class Options {
       var1.setProperty("minimapPos", this.minimapPos + "");
       var1.setProperty("minimapAutoMove", this.minimapAutoMove + "");
       var1.setProperty("entityShadowMotion", this.entityShadowMotion + "");
+      var1.setProperty("treeScale", this.treeScale + "");
+      var1.setProperty("giantTrees", this.giantTrees + "");
       var1.setProperty("resourcePack", this.resourcePack != null ? this.resourcePack : ResourcePacks.ID_DEFAULT);
       var1.setProperty("soundVolume", this.soundVolume + "");
       var1.setProperty("musicVolume", this.musicVolume + "");

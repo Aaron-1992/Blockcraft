@@ -78,7 +78,8 @@ final class WorldPreview {
          + "/" + ws.bonusChest + "/" + ws.mapId + "/" + ws.structVer + "/" + ws.terrainVer
          + "/" + ws.caveScale + "/" + ws.caveDensity + "/" + ws.mountainScale + "/" + ws.ravineScale
          + "/" + ws.caveStructures + "/" + ws.caveLayers + "/" + ws.caveLakes + "/" + ws.caveRichness
-         + "/" + ws.caveVer + "/" + ws.biomeBorders + "/" + ws.treeDensity;
+         + "/" + ws.caveVer + "/" + ws.biomeBorders + "/" + ws.treeDensity
+         + "/" + ws.treeScale + "/" + ws.giantTrees;
       if (k.equals(this.key)) {
          return false;
       }

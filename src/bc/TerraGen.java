@@ -19,6 +19,9 @@ public final class TerraGen extends Gen {
    final double vs;
    /** Update 6.22: global tree-density multiplier from the world settings. */
    final double treeDensity;
+   /** Update 6.23: height/radius scale and the Giant-tier switch. */
+   final float treeScale;
+   final boolean giantTrees;
    final Noise nC;
    final Noise nE;
    final Noise nT;
@@ -50,6 +53,8 @@ public final class TerraGen extends Gen {
       this.settings = settings;
       this.caves = new CaveWorks(seed, settings, this, this.nCave1, this.nCave2, this.nCavern, this.nEntr);
       this.treeDensity = settings.treeDensity < 0.4F ? 0.4F : (settings.treeDensity > 1.4F ? 1.4F : settings.treeDensity);
+      this.treeScale = settings.treeScale < 0.7F ? 0.7F : (settings.treeScale > 1.5F ? 1.5F : settings.treeScale);
+      this.giantTrees = settings.giantTrees;
       this.bs = settings.type == WorldSettings.LARGE ? 4.0 : 1.0;
       this.vs = settings.type == WorldSettings.AMPLIFIED ? 1.7 : 1.0;
       Random r = new Random(seed * 0x2545F4914F6CDD1DL + 0x7E44A6E13L);
@@ -1129,6 +1134,12 @@ public final class TerraGen extends Gen {
                   continue;
                }
 
+               // Update 6.23: every plan is one of several silhouettes at one of three size tiers.
+               // Both come from the tree's seed-derived hash, so chunk seams still agree.
+               int species = treeSpecies(plan);
+               int variant = treeVariant(plan, ts);
+               int tier = treeSizeTier(plan, ts, this.giantTrees);
+
                if (this.entrance(wx, wz) || this.ravine(wx, wz) > 0.0) {
                   continue;
                }
@@ -1142,8 +1153,9 @@ public final class TerraGen extends Gen {
                   continue;
                }
 
-               int mega = plan == P_MEGA_SPRUCE || plan == P_DARK_OAK || plan == P_MEGA_JUNGLE ? 1 : 0;
-               if (mega == 1) {
+               boolean wide = TerraTrees.isWide(species, variant)
+                  || plan == P_MEGA_SPRUCE || plan == P_DARK_OAK || plan == P_MEGA_JUNGLE;
+               if (wide) {
                   if (this.heightAt(wx + 1, wz) != s.h || this.heightAt(wx, wz + 1) != s.h || this.heightAt(wx + 1, wz + 1) != s.h) {
                      continue;
                   }
@@ -1151,7 +1163,7 @@ public final class TerraGen extends Gen {
 
                buf.begin(wx, s.h + 1, wz);
                Random rnd = new Random(ts);
-               this.buildPlan(buf, rnd, plan);
+               this.buildPlan(buf, rnd, plan, variant, tier);
                buf.commit(ch);
                built++;
                if (plan == P_MEGA_SPRUCE) {
@@ -1230,58 +1242,94 @@ public final class TerraGen extends Gen {
       }
    }
 
-   void buildPlan(TerraTrees.Buf t, Random r, int plan) {
+   /** Update 6.23: which tree species a plant plan belongs to (-1 for mushrooms / ice spikes). */
+   static int treeSpecies(int plan) {
       switch (plan) {
          case P_OAK_SMALL:
-            TerraTrees.smallOak(t, r, 0);
-            break;
          case P_OAK_CLASSIC:
-            TerraTrees.classic(t, r, 0, r.nextInt(3));
-            break;
+            return TerraTrees.SP_OAK;
          case P_BIRCH:
-            TerraTrees.classic(t, r, 1, r.nextInt(3));
-            break;
          case P_BIRCH_TALL:
-            TerraTrees.tallBirch(t, r);
-            break;
+            return TerraTrees.SP_BIRCH;
          case P_SPRUCE:
-            TerraTrees.classic(t, r, 2, r.nextInt(2));
-            break;
          case P_SPRUCE_PINE:
-            TerraTrees.classic(t, r, 2, 2);
-            break;
          case P_MEGA_SPRUCE:
-            TerraTrees.megaSpruce(t, r);
-            break;
-         case P_DARK_OAK:
-            TerraTrees.darkOak(t, r);
-            break;
+            return TerraTrees.SP_SPRUCE;
          case P_JUNGLE_SMALL:
-            TerraTrees.jungleSmall(t, r);
-            break;
          case P_JUNGLE_TALL:
-            TerraTrees.jungleTall(t, r);
-            break;
          case P_MEGA_JUNGLE:
-            TerraTrees.megaJungle(t, r);
-            break;
          case P_BUSH:
-            TerraTrees.bush(t, r, 3);
-            break;
+            return plan == P_BUSH ? TerraTrees.SP_BUSH : TerraTrees.SP_JUNGLE;
          case P_ACACIA:
-            TerraTrees.acacia(t, r);
-            break;
+            return TerraTrees.SP_ACACIA;
+         case P_DARK_OAK:
+            return TerraTrees.SP_DARK_OAK;
          case P_SWAMP_OAK:
-            TerraTrees.swampOak(t, r);
-            break;
+            return TerraTrees.SP_SWAMP;
+         default:
+            return -1;
+      }
+   }
+
+   /** The silhouette the biome originally asked for; the hash rotates the rest of the catalogue in. */
+   static int baseVariant(int plan) {
+      switch (plan) {
+         case P_OAK_SMALL: return 1;
+         case P_BIRCH_TALL: return 1;
+         case P_SPRUCE_PINE: return 1;
+         case P_MEGA_SPRUCE: return 3;
+         case P_JUNGLE_TALL: return 1;
+         case P_MEGA_JUNGLE: return 2;
+         case P_BUSH: return 0;
+         default: return 0;
+      }
+   }
+
+   /** All silhouettes of a species really appear, but the biome's preferred one is the most likely. */
+   static int treeVariant(int plan, long hash) {
+      int sp = treeSpecies(plan);
+      if (sp < 0) return 0;
+      int n = TerraTrees.variants(sp);
+      int jitter = (int)Math.floorMod(hash >>> 17, n);
+      return (baseVariant(plan) + jitter) % n;
+   }
+
+   /** 58% normal, 30% large, 12% giant. Giant becomes large when the switch is off. */
+   static int treeSizeTier(int plan, long hash, boolean giants) {
+      long roll = Math.floorMod(hash >>> 41, 100L);
+      int tier = roll < 58 ? 0 : (roll < 88 ? 1 : 2);
+      if (tier == 2 && !giants) tier = 1;
+      if (plan == P_MEGA_SPRUCE || plan == P_MEGA_JUNGLE || plan == P_DARK_OAK) {
+         tier = Math.max(1, tier);
+      }
+      return tier;
+   }
+
+   void buildPlan(TerraTrees.Buf t, Random r, int plan) {
+      buildPlan(t, r, plan, baseVariant(plan), 0, 1.0F);
+   }
+
+   /** Update 6.23: build a plant with a chosen silhouette and size tier. */
+   void buildPlan(TerraTrees.Buf t, Random r, int plan, int variant, int tier) {
+      buildPlan(t, r, plan, variant, tier, this.treeScale);
+   }
+
+   void buildPlan(TerraTrees.Buf t, Random r, int plan, int variant, int tier, float scale) {
+      int sp = treeSpecies(plan);
+      if (sp >= 0) {
+         TerraTrees.build(t, r, sp, variant, tier, scale);
+         return;
+      }
+
+      switch (plan) {
          case P_MUSH_RED:
-            TerraTrees.giantMushroom(t, r, 0);
+            TerraTrees.giantMushroom(t, r, 0, tier, scale);
             break;
          case P_MUSH_BROWN:
-            TerraTrees.giantMushroom(t, r, 1);
+            TerraTrees.giantMushroom(t, r, 1, tier, scale);
             break;
          case P_ICE_SPIKE:
-            TerraTrees.iceSpike(t, r);
+            TerraTrees.iceSpike(t, r, tier, scale);
             break;
          default:
             break;

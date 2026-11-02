@@ -152,7 +152,7 @@ final class Tests622 {
       g.opt.debugVideo = true;
       g.ui.optTab = 4;
       Screens.options(g);
-      eq(60, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
+      eq(61, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
       check(button(g, "Caves & Cliffs"), "the Caves & Cliffs carver is configurable");
       check(button(g, "Biome Borders"), "biome border smoothing is configurable");
       check(button(g, "Tree Density"), "tree density is configurable");

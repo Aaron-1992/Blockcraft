@@ -395,6 +395,35 @@ def main():
             "headless generator / palette previews - neither is a GPU screenshot, and no real-GPU/Windows "
             "playtest is claimed.\n"
         )
+    if version == "6.23":
+        release_notes += (
+            "\n### More tree variants and bigger trees for EVERY species\n\n"
+            "**New worlds only** (old saves keep their exact old trees). All eight tree species now "
+            "have several distinct silhouettes and three size tiers - 34 shapes in total: lobed, "
+            "columnar, umbrella, forked and weeping oaks; clump, weeping and grand birches; tiered, "
+            "pine, columnar, 2x2 giant, 2x2 grand and candle spruces; layered, buttressed and emergent "
+            "jungle trees; bent, double-bend, wide and forked acacias; grand and spreading dark oaks; "
+            "cypress and willow swamps; two bushes. Giant mushrooms and ice spikes scale too. Roughly "
+            "58% Normal, 30% Large and 12% Giant, all derived from the seed-based tree hash so chunk "
+            "seams still agree.\n\n"
+            "**Bigger does not mean laggy.** Giant conifers grow tall with spaced-out hollow tiers "
+            "rather than solid crowns, the per-chunk tree cap remains, and a hard 900-leaf budget "
+            "bounds every single tree. Headless 3x3 taiga meshing at seed 6120: V6.22 = 297 spruce "
+            "leaves / 165648 vertices / 36.2 ms, V6.23 = 229 leaves / 162548 vertices / 34.3 ms - "
+            "more variety and bigger trees at slightly less cost. These are headless meshing timings, "
+            "not FPS claims.\n\n"
+            "**Two new settings** in Options > Video > Debug Video > Advanced: **Tree Size** "
+            "(0.70x-1.50x, height and crown of every species) and **Giant Trees** (on/off, removing "
+            "the rare Giant tier). Both persist in options.txt, are saved with the world and are part "
+            "of the Create New World preview cache key.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with the nine new V6.23 regression groups (8065834 checks); strict "
+            "equivalence still matches the original Update 3.5 terrain/world/tick fingerprints; all 21 GLSL "
+            "programs parse; the packaged exe and jar are verified by `tools/verify_release.py`. "
+            "`docs/screenshots/v6.23-tree-variants.png` and `v6.23-tree-sizes.png` are headless renders "
+            "of the real tree geometry - neither is a GPU screenshot, and no real-GPU/Windows playtest "
+            "is claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:
