@@ -1,5 +1,6 @@
 package bc;
 
+import java.util.ArrayList;
 import java.util.Random;
 
 /**
@@ -461,423 +462,293 @@ final class TerraTrees {
 
    static void build(Buf t, Random r, int sp, int variant, int size, float worldScale) {
       int v = Math.floorMod(variant, variants(sp));
-      double hs = heightScale(size, worldScale);
-      double rs = radiusScale(size, worldScale);
-      switch (sp) {
-         case SP_BIRCH:
-            birchShape(t, r, v, hs, rs);
-            break;
-         case SP_SPRUCE:
-            spruceShape(t, r, v, hs, rs, size);
-            break;
-         case SP_JUNGLE:
-            jungleShape(t, r, v, hs, rs);
-            break;
-         case SP_ACACIA:
-            acaciaShape(t, r, v, hs, rs);
-            break;
-         case SP_DARK_OAK:
-            darkOakShape(t, r, v, hs, rs);
-            break;
-         case SP_SWAMP:
-            swampShape(t, r, v, hs, rs);
-            break;
-         case SP_BUSH:
-            bushShape(t, r, v, hs, rs);
-            break;
-         default:
-            oakShape(t, r, v, hs, rs);
-            break;
-      }
+      grow(t, r, sp, v, heightScale(size, worldScale), radiusScale(size, worldScale), size);
    }
 
    static void build(Buf t, Random r, int sp, int variant, int size) {
       build(t, r, sp, variant, size, 1.0F);
    }
 
-   // ------------------------------------------------------------------ oak: round, small, columnar, umbrella, forked, weeping
-   private static void oakShape(Buf t, Random r, int v, double hs, double rs) {
-      int lg = log(0);
-      int lf = leaves(0);
-      switch (v) {
-         case 1: { // small squat oak
-            int h = sh(4 + r.nextInt(3), hs, 44);
-            double rad = sr(2.0, rs, 5.0);
-            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.85, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
+   // ------------------------------------------------------------------ V6.25: branch-skeleton trees
+   //
+   // A tree is no longer a geometric dome. It is a 6-connected skeleton of logs (a trunk
+   // that may lean, primary branches that reach out and twigs at their tips) with separate
+   // irregular leaf clusters hanging on those tips. That gives visible branches, real
+   // negative space and a lumpy, asymmetric silhouette - and it puts every leaf within a
+   // few steps of a log, which is exactly what the falling-tree planner needs to topple
+   // the whole plant instead of leaving a floating canopy behind.
+
+   private static final class Spec {
+      int h = 8;
+      double bandLo = 0.45, bandHi = 0.96;
+      int branches = 9;
+      double len = 4.2, rise = 0.30, cr = 2.3;
+      int perBranch = 1;
+      boolean whorls = false, flat = false, top = true;
+      int whorlStep = 2;
+      int strands = 0;
+      int lean = 0;
+      boolean fork = false, clump = false, knees = false, candle = false;
+   }
+
+   /** Architecture of one species and silhouette, before the size tier scales it. */
+   private static Spec spec(int sp, int v, double hs, double rs, int size) {
+      Spec s = new Spec();
+      switch (sp) {
+         case SP_OAK:
+            s.h = 9; s.branches = 9; s.len = 4.3; s.rise = 0.34; s.cr = 2.30;
+            s.bandLo = 0.67; s.perBranch = 2; s.lean = 1;
+            if (v == 1) { s.h = 6; s.branches = 7; s.len = 3.1; s.cr = 2.0; s.bandLo = 0.58; }
+            else if (v == 2) { s.h = 13; s.branches = 6; s.len = 2.9; s.cr = 2.1; s.bandLo = 0.76; s.bandHi = 1.0; s.lean = 0; }
+            else if (v == 3) { s.h = 7; s.branches = 9; s.len = 6.3; s.rise = 0.10; s.cr = 2.8; s.flat = true; s.top = false; s.bandLo = 0.80; s.lean = 0; }
+            else if (v == 4) { s.fork = true; s.branches = 7; s.len = 4.1; }
+            else if (v == 5) { s.strands = 10; s.rise = 0.18; s.bandLo = 0.70; }
             break;
-         }
-         case 2: { // columnar oak: tall bare trunk, compact high crown
-            int h = sh(11 + r.nextInt(6), hs, 54);
-            double rad = sr(2.6, rs, 5.2);
-            dome(t, r, 0, 0, h - 2, 5, rad, lf, 0.95, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
+         case SP_BIRCH:
+            s.h = 11; s.branches = 6; s.len = 2.8; s.rise = 0.48; s.cr = 1.95;
+            s.bandLo = 0.68; s.bandHi = 0.98; s.perBranch = 2; s.lean = 1;
+            if (v == 1) { s.h = 14; s.branches = 5; s.len = 2.5; s.bandLo = 0.72; s.lean = 0; }
+            else if (v == 2) { s.clump = true; s.h = 8; s.branches = 6; s.len = 2.6; s.cr = 1.9; s.bandLo = 0.68; }
+            else if (v == 3) { s.strands = 8; s.rise = 0.28; s.bandLo = 0.60; }
+            else if (v == 4) { s.h = 15; s.branches = 8; s.len = 3.0; s.cr = 2.1; s.bandLo = 0.54; s.perBranch = 2; }
             break;
-         }
-         case 3: { // wide umbrella oak, short trunk and long arms
-            int h = sh(5 + r.nextInt(3), hs, 44);
-            double rad = sr(5.2, rs, 10.5);
-            dome(t, r, 0, 0, h - 1, 4, rad, lf, 0.62, 0.02F);
-            trunk(t, 0, 0, 0, h + 1, lg);
-            for (int i = 0; i < 4; i++) {
-               double a = (i + 0.25) * Math.PI / 2.0;
-               int bx = (int)Math.round(Math.cos(a) * rad * 0.7);
-               int bz = (int)Math.round(Math.sin(a) * rad * 0.7);
-               for (int s = 1; s <= 3; s++) {
-                  t.set(bx * s / 3, h - 1 + (s > 2 ? 1 : 0), bz * s / 3, lg);
-               }
-               blob(t, bx, h, bz, sr(2.0, rs, 3.6), 1.5, sr(2.0, rs, 3.6), lf, r);
+         case SP_SPRUCE:
+            s.h = 13; s.branches = 5; s.len = 3.3; s.rise = -0.14; s.cr = 1.60;
+            s.whorls = true; s.whorlStep = 2; s.bandLo = 0.32; s.top = true;
+            if (v == 1) { s.h = 14; s.branches = 4; s.len = 2.5; s.cr = 1.45; s.whorlStep = 3; }
+            else if (v == 2) { s.h = 15; s.branches = 4; s.len = 1.8; s.cr = 1.40; s.bandLo = 0.26; }
+            else if (v == 5) { s.candle = true; s.h = 12; s.branches = 4; s.len = 2.6; }
+            break;
+         case SP_JUNGLE:
+            s.h = 17; s.branches = 7; s.len = 5.6; s.rise = 0.24; s.cr = 2.8;
+            s.bandLo = 0.78; s.bandHi = 1.0; s.perBranch = 2; s.lean = 1;
+            if (v == 0) { s.h = 8; s.branches = 5; s.len = 2.8; s.cr = 2.0; s.bandLo = 0.66; }
+            else if (v == 1) { s.h = 14; s.branches = 7; s.len = 4.4; s.cr = 2.5; s.bandLo = 0.72; }
+            else if (v == 3) { s.h = 15; s.branches = 9; s.len = 7.0; s.rise = 0.12; s.cr = 2.9; s.flat = true; s.top = false; s.bandLo = 0.78; }
+            else if (v == 4) { s.h = 27; s.branches = 5; s.len = 3.0; s.cr = 2.0; s.bandLo = 0.88; s.lean = 0; }
+            break;
+         case SP_ACACIA:
+            s.h = 6; s.branches = 5; s.len = 6.2; s.rise = 0.10; s.cr = 2.8;
+            s.bandLo = 0.78; s.bandHi = 1.0; s.flat = true; s.top = false; s.perBranch = 2; s.lean = 2;
+            if (v == 1) { s.h = 9; s.len = 5.4; s.lean = 3; }
+            else if (v == 2) { s.branches = 7; s.len = 7.0; s.cr = 3.0; s.top = true; }
+            else if (v == 3) { s.fork = true; s.branches = 6; s.len = 5.0; }
+            break;
+         case SP_DARK_OAK:
+            s.h = 8; s.branches = 10; s.len = 4.1; s.rise = 0.30; s.cr = 2.30;
+            s.bandLo = 0.63; s.perBranch = 2; s.lean = 1;
+            if (v == 1) { s.h = 11; s.branches = 11; s.len = 4.6; }
+            else if (v == 2) { s.h = 7; s.branches = 12; s.len = 5.0; s.rise = 0.16; s.cr = 2.6; s.bandLo = 0.56; }
+            break;
+         case SP_SWAMP:
+            s.h = 10; s.branches = 8; s.len = 4.2; s.rise = 0.22; s.cr = 2.40;
+            s.bandLo = 0.68; s.perBranch = 2; s.strands = 7; s.lean = 1;
+            if (v == 1) { s.h = 11; s.knees = true; s.len = 3.6; s.cr = 2.1; s.strands = 4; }
+            else if (v == 2) { s.h = 9; s.branches = 10; s.len = 5.0; s.rise = 0.14; s.strands = 14; s.cr = 2.6; s.bandLo = 0.66; }
+            break;
+         default: // bushes
+            s.h = 2; s.branches = 5; s.len = 1.7; s.rise = 0.18; s.cr = 1.8;
+            s.bandLo = 0.50; s.bandHi = 1.0; s.perBranch = 1; s.top = true;
+            if (v == 1) { s.h = 4; s.branches = 6; s.len = 2.2; s.cr = 2.0; }
+            break;
+      }
+
+      s.h = sh(s.h, hs, 56);
+      s.len = Math.min(8.0, s.len * rs);
+      s.cr = Math.min(2.75, s.cr * rs);
+      // Bigger trees carry more branches, but not so many that the falling planner chokes.
+      s.branches += size >= 1 ? 2 : 0;
+      s.branches += size >= 2 ? 2 : 0;
+      if (s.whorls) s.whorlStep = Math.max(2, s.whorlStep + (size >= 2 ? 2 : (size >= 1 ? 1 : 0)));
+      return s;
+   }
+
+   /** One leaf bunch: an irregular, slightly hollow blob with a ragged edge. */
+   private static void leafCluster(Buf t, Random r, int cx, int cy, int cz, double rad, int id, boolean flat) {
+      double cr = Math.max(1.25, Math.min(2.85, rad));
+      double ry = Math.max(1.0, flat ? cr * 0.42 : cr * 0.62);
+      int ix = (int)Math.ceil(cr + 0.6);
+      int iy = Math.max(1, (int)Math.ceil(ry));
+      double phase = r.nextDouble() * 6.2831853;
+      for (int dy = -iy; dy <= iy; dy++) {
+         double f = dy / (ry + 0.45);
+         double prof = Math.sqrt(Math.max(0.0, 1.0 - f * f));
+         if (prof < 0.44) prof = 0.44;
+         double lx = Math.max(0.9, cr * prof), lz = Math.max(0.9, cr * prof);
+         boolean cap = dy == -iy || dy == iy;
+         for (int dx = -ix; dx <= ix; dx++) {
+            for (int dz = -ix; dz <= ix; dz++) {
+               double ang = Math.atan2(dz, dx);
+               double edge = 1.0 + 0.15 * Math.sin(3.0 * ang + phase) + 0.08 * Math.sin(5.0 * ang - phase);
+               double d = Math.sqrt(dx * dx / (lx * lx) + dz * dz / (lz * lz));
+               if (d > edge) continue;
+               // Keep an airy middle but always leave a cross of leaves touching the twig,
+               // so the falling-tree leaf flood-fill can reach the whole cluster.
+               boolean bridge = Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && (dx == 0 || dz == 0);
+               if (!cap && !bridge && d < 0.58) continue;
+               if (d > 0.80 && !cap && !bridge && r.nextFloat() < 0.11) continue;
+               t.leaf(cx + dx, cy + dy, cz + dz, id);
             }
-            break;
-         }
-         case 4: { // forked twin-trunk oak
-            int h = sh(6 + r.nextInt(4), hs, 48);
-            int lean = 2 + r.nextInt(2);
-            for (int y = 0; y <= h; y++) {
-               t.set(0, y, 0, lg);
-               if (y > h / 3) {
-                  t.set(lean * (y - h / 3) / (h - h / 3 + 1), y, 0, lg);
-                  t.set(-lean * (y - h / 3) / (h - h / 3 + 1), y, 0, lg);
-               }
-            }
-            double rad = sr(2.6, rs, 5.0);
-            for (int side = -1; side <= 1; side += 2) {
-               int cx = side * lean;
-               blob(t, cx, h + 1, 0, rad, sr(2.4, rs, 4.2), rad, lf, r);
-               blob(t, cx, h + 3, 0, rad * 0.6, 1.4, rad * 0.6, lf, r);
-            }
-            blob(t, 0, h, 0, rad, sr(2.0, rs, 3.6), rad, lf, r);
-            break;
-         }
-         case 5: { // weeping oak with drooping branch tips and vines
-            int h = sh(7 + r.nextInt(4), hs, 48);
-            double rad = sr(3.4, rs, 7.0);
-            dome(t, r, 0, 0, h - 1, 4, rad, lf, 0.85, 0.02F);
-            int n = (int)rad;
-            for (int i = 0; i < 8; i++) {
-               double a = r.nextDouble() * Math.PI * 2.0;
-               int bx = (int)Math.round(Math.cos(a) * n);
-               int bz = (int)Math.round(Math.sin(a) * n);
-               int len = 1 + r.nextInt(3);
-               for (int d = 0; d < len; d++) t.leaf(bx, h - 2 - d, bz, lf);
-            }
-            trunk(t, 0, 0, 0, h, lg);
-            vines(t, r, 0.20F, 4);
-            break;
-         }
-         default: { // 0: the classic round, lobed oak
-            int h = sh(5 + r.nextInt(3), hs, 46);
-            int cy = h - 1;
-            double rad = sr(3.1, rs, 6.2);
-            double ry = sr(2.5, rs * 0.9, 4.2);
-            blob(t, 0, cy, 0, rad, ry, rad, lf, r);
-            int lobes = 2 + r.nextInt(3);
-            for (int i = 0; i < lobes; i++) {
-               double a = r.nextDouble() * Math.PI * 2.0;
-               double dist = rad * 0.86;
-               int lx = (int)Math.round(Math.cos(a) * dist);
-               int lz = (int)Math.round(Math.sin(a) * dist);
-               int ly = cy - r.nextInt(3);
-               blob(t, lx, ly, lz, sr(2.1, rs, 3.8), sr(1.8, rs, 3.0), sr(2.1, rs, 3.8), lf, r);
-               int sx = Integer.signum(lx);
-               int sz = Integer.signum(lz);
-               int px = 0, pz = 0;
-               for (int s = 0; s < 3 && !(px == lx && pz == lz); s++) {
-                  if (Math.abs(lx - px) >= Math.abs(lz - pz)) px += sx;
-                  else pz += sz;
-                  t.set(px, ly - 1, pz, lg);
-               }
-            }
-            blob(t, 0, cy + 2, 0, rad * 0.55, 1.4, rad * 0.55, lf, r);
-            trunk(t, 0, 0, 0, h, lg);
-            break;
          }
       }
    }
 
-   // ------------------------------------------------------------------ birch: classic, tall, clump, weeping, grand
-   private static void birchShape(Buf t, Random r, int v, double hs, double rs) {
-      int lg = log(1);
-      int lf = leaves(1);
-      switch (v) {
-         case 1: { // tall pale birch
-            int h = sh(9 + r.nextInt(4), hs, 56);
-            double rad = sr(2.0, rs, 3.6);
-            dome(t, r, 0, 0, h - 4, 6, rad, lf, 0.90, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
-            break;
-         }
-         case 2: { // a clump of three thin stems from one root
-            int h = sh(7 + r.nextInt(4), hs, 50);
-            int[][] stems = {{0, 0}, {2, 1}, {-2, -1}};
-            for (int[] q : stems) {
-               for (int y = 0; y <= h; y++) t.set(q[0], y, q[1], lg);
-               blob(t, q[0], h, q[1], sr(1.9, rs, 3.4), sr(2.2, rs, 3.6), sr(1.9, rs, 3.4), lf, r);
-            }
-            blob(t, 0, h + 1, 0, sr(1.8, rs, 3.0), sr(1.8, rs, 2.8), sr(1.8, rs, 3.0), lf, r);
-            break;
-         }
-         case 3: { // weeping birch
-            int h = sh(10 + r.nextInt(4), hs, 56);
-            double rad = sr(1.9, rs, 3.4);
-            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.90, 0.02F);
-            for (int i = 0; i < 8; i++) {
-               double a = r.nextDouble() * Math.PI * 2.0;
-               int bx = (int)Math.round(Math.cos(a) * rad);
-               int bz = (int)Math.round(Math.sin(a) * rad);
-               for (int d = 0; d < 2 + r.nextInt(3); d++) t.leaf(bx, h - 3 - d, bz, lf);
-            }
-            trunk(t, 0, 0, 0, h, lg);
-            break;
-         }
-         case 4: { // grand birch: two distinct crown tiers
-            int h = sh(13 + r.nextInt(5), hs, 58);
-            double rad = sr(2.6, rs, 5.0);
-            dome(t, r, 0, 0, h - 6, 3, rad * 0.9, lf, 0.78, 0.02F);
-            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.90, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
-            break;
-         }
-         default: { // classic narrow birch
-            int h = sh(6 + r.nextInt(3), hs, 46);
-            int cy = h - 1;
-            blob(t, 0, cy, 0, sr(2.3, rs, 4.2), sr(3.0, rs, 4.6), sr(2.3, rs, 4.2), lf, r);
-            blob(t, 0, cy + 2, 0, sr(1.4, rs, 2.6), 1.6, sr(1.4, rs, 2.6), lf, r);
-            trunk(t, 0, 0, 0, h, lg);
-            break;
-         }
-      }
-   }
-
-   // ------------------------------------------------------------------ spruce: tiered, pine, columnar, mega, grand, candle
-   private static void spruceShape(Buf t, Random r, int v, double hs, double rs, int size) {
-      int lg = log(2);
-      int lf = leaves(2);
-      boolean wide = v == 3 || v == 4;
-      int h = sh(v == 1 || v == 2 ? 12 + r.nextInt(6) : (wide ? 15 + r.nextInt(9) : 9 + r.nextInt(5)), hs, 56);
-      double maxR = sr(v == 1 ? 2.4 : (v == 2 ? 2.0 : (wide ? 4.6 : 3.3)), rs, 7.5);
-      double cx = wide ? 0.5 : 0.0;
-      double cz = wide ? 0.5 : 0.0;
-      int top = h + (v == 5 ? 0 : 3);
-      int bottom = Math.max(2, h - (size >= 2 ? 19 : 14));
-      // The trunk must go in first: t.set() is hard and would otherwise erase the
-      // single centre leaf of the narrow upper cone layers, leaving empty rings.
-      if (wide) trunk2(t, 0, h + 1, lg);
-      else trunk(t, 0, 0, 0, h, lg);
-      int band = v == 2 ? 2 : (wide ? 4 : 3);
-      // Continuous conical shell: every layer has leaves, so the silhouette is a solid
-      // conifer instead of a stack of isolated one-block rings with gaps between them.
-      for (int y = bottom; y <= top; y++) {
-         double f = (double)(top - y + 1) / (double)(top - bottom + 3);
-         double rad = maxR * Math.max(0.0, Math.min(1.0, f));
-         if ((top - y) % (band * 2) < band) rad *= 1.13;  // soft tiering
-         // The tip must keep a ring of leaves outside the trunk (1x1 or 2x2), but
-         // a fixed large floor turned small pines into cylinders instead of cones.
-         double minR = wide ? 1.70 : 1.05;
-         rad = Math.max(minR, rad);
-         double inner = Math.max(0.0, rad - (size >= 2 ? 1.7 : 1.35));
-         int ir = (int)Math.ceil(rad + 0.4);
-         boolean cap = y >= top - 1;
-         for (int dx = -ir; dx <= ir; dx++) {
-            for (int dz = -ir; dz <= ir; dz++) {
-               double d = Math.sqrt((dx - cx) * (dx - cx) + (dz - cz) * (dz - cz));
-               if (d > rad) continue;
-               if (!cap && d < inner) continue;      // hollow core, solid tip
-               if (!cap && d > rad - 0.8 && r.nextFloat() < 0.07F) continue;
-               t.leaf(dx, y, dz, lf);
+   /** A 6-connected log branch. Returns {tipX, tipY, tipZ, logsPlaced}. */
+   private static int[] branch(Buf t, Random r, int x0, int y0, int z0, double a, int len, double rise, int lg) {
+      int x = x0, y = y0, z = z0, n = 0;
+      // Anchor the branch: without this a whorl one block above the trunk top would
+      // be diagonally detached from the trunk and would stay standing after a fall.
+      t.set(x0, y0, z0, lg);
+      n++;
+      for (int s = 1; s <= len; s++) {
+         int nx = x0 + (int)Math.round(Math.cos(a) * s);
+         int nz = z0 + (int)Math.round(Math.sin(a) * s);
+         int ny = y0 + (int)Math.round(rise * s);
+         int guard = 0;
+         while ((x != nx || y != ny || z != nz) && guard++ < 48) {
+            if (x != nx) x += Integer.signum(nx - x);
+            else if (z != nz) z += Integer.signum(nz - z);
+            else y += Integer.signum(ny - y);
+            if (y >= 0 && y < Buf.H && Math.abs(x) <= Buf.R && Math.abs(z) <= Buf.R) {
+               t.set(x, y, z, lg);
+               n++;
             }
          }
       }
-      if (v == 5) { // candle spruce: a bare spire ABOVE the crown, never through it
-         for (int y = top + 1; y <= Math.min(Buf.H - 2, top + 4); y++) t.set(0, y, 0, lg);
-      }
+      if (y + 1 < Buf.H && r.nextBoolean()) { t.set(x, y + 1, z, lg); n++; }
+      return new int[]{x, y, z, n};
    }
 
-   // ------------------------------------------------------------------ jungle: small, tall, mega, canopy, tower
-   private static void jungleShape(Buf t, Random r, int v, double hs, double rs) {
-      int lg = log(3);
-      int lf = leaves(3);
-      switch (v) {
-         case 1: { // tall layered jungle tree
-            int h = sh(11 + r.nextInt(9), hs, 56);
-            double rad = sr(3.8, rs, 7.4);
-            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.81, 0.02F);
-            double a = r.nextDouble() * Math.PI * 2.0;
-            int bx = (int)Math.round(Math.cos(a) * rad * 0.8);
-            int bz = (int)Math.round(Math.sin(a) * rad * 0.8);
-            blob(t, bx, h - 4, bz, sr(2.2, rs, 4.0), 1.6, sr(2.2, rs, 4.0), lf, r);
-            trunk(t, 0, 0, 0, h, lg);
-            jungleVines(t, r, h);
-            break;
+   /** Grow the whole plant: trunk, branch skeleton, then leaf bunches on the twigs. */
+   private static void grow(Buf t, Random r, int sp, int v, double hs, double rs, int size) {
+      Spec s = spec(sp, v, hs, rs, size);
+      int lg = log(sp), lf = leaves(sp);
+      boolean wide = isWide(sp, v);
+      int logs = 0;
+      int budget = 420;
+
+      int[] px = new int[Buf.H], pz = new int[Buf.H];
+      int x = 0, z = 0;
+      int driftEvery = s.lean > 0 ? Math.max(2, s.h / (s.lean + 1)) : Integer.MAX_VALUE;
+      for (int y = 0; y <= s.h && y < Buf.H; y++) {
+         if (y > 0 && y % driftEvery == 0) {
+            int ox = x, oz = z;
+            if (r.nextBoolean()) x += r.nextBoolean() ? 1 : -1;
+            else z += r.nextBoolean() ? 1 : -1;
+            x = Math.max(-3, Math.min(3, x));
+            z = Math.max(-3, Math.min(3, z));
+            // A lean must not jump diagonally: keep an elbow log at the old column
+            // on this same layer, or the trunk above is disconnected and the whole
+            // crown can no longer be picked up by the falling-tree planner.
+            if (x != ox || z != oz) { t.set(ox, y, oz, lg); logs++; }
          }
-         case 2: { // giant 2x2 jungle tree
-            int h = sh(20 + r.nextInt(12), hs, 58);
-            double rad = sr(5.8, rs, 9.0);
-            dome(t, r, 0.5, 0.5, h, 4, rad, lf, 0.78, 0.02F);
-            for (int i = 0; i < 3; i++) {
-               double a = (i + 0.3) * Math.PI * 2.0 / 3.0;
-               int bx = (int)Math.round(Math.cos(a) * rad * 0.62);
-               int bz = (int)Math.round(Math.sin(a) * rad * 0.62);
-               blob(t, bx, h - 1, bz, sr(2.8, rs, 4.2), sr(1.7, rs, 2.6), sr(2.8, rs, 4.2), lf, r);
-               for (int q = 1; q <= 4; q++) t.set(bx * q / 4, h - 1, bz * q / 4, lg);
+         px[y] = x;
+         pz[y] = z;
+         // Thick base tapering to a single trunk is both cheaper and more natural than
+         // a 2x2 column all the way to the top.
+         boolean thick = wide && y <= s.h / 3;
+         if (thick) {
+            t.set(x, y, z, lg); t.set(x + 1, y, z, lg);
+            t.set(x, y, z + 1, lg); t.set(x + 1, y, z + 1, lg);
+            logs += 4;
+         } else {
+            t.set(x, y, z, lg);
+            logs++;
+         }
+      }
+
+      // Forked / clumped stems are joined to the trunk by a horizontal log run, so the
+      // falling-tree connectivity scan sees one plant rather than several loose sticks.
+      if (s.fork || s.clump) {
+         for (int k = 0; k < 2; k++) {
+            int sx = k == 0 ? -2 : 2;
+            int sz = k == 0 ? -1 : 1;
+            int y0 = s.h / 3;
+            int cx = px[y0], cz = pz[y0];
+            while (cx != sx || cz != sz) {
+               if (cx != sx) cx += Integer.signum(sx - cx);
+               else cz += Integer.signum(sz - cz);
+               t.set(cx, y0, cz, lg);
+               logs++;
             }
-            trunk2(t, 0, h, lg);
-            vines(t, r, 0.26F, 6);
-            break;
-         }
-         case 3: { // huge flat rainforest canopy with buttress roots
-            int h = sh(16 + r.nextInt(8), hs, 58);
-            double rad = sr(6.6, rs, 9.5);
-            dome(t, r, 0, 0, h - 1, 4, rad, lf, 0.53, 0.02F);
-            for (int i = 0; i < 4; i++) {
-               double a = i * Math.PI / 2.0;
-               int bx = (int)Math.round(Math.cos(a) * rad * 0.75);
-               int bz = (int)Math.round(Math.sin(a) * rad * 0.75);
-               blob(t, bx, h, bz, sr(2.2, rs, 3.2), 1.4, sr(2.2, rs, 3.2), lf, r);
-               for (int y = 0; y < 3; y++) t.set(bx * (3 - y) / 3, y, bz * (3 - y) / 3, lg);
+            for (int y = y0; y <= s.h + 2 && y < Buf.H; y++) {
+               t.set(cx, y, cz, lg);
+               logs++;
             }
-            trunk(t, 0, 0, 0, h, lg);
-            vines(t, r, 0.24F, 7);
-            break;
-         }
-         case 4: { // very tall emergent with a tiny high crown
-            int h = sh(24 + r.nextInt(9), hs, 59);
-            double rad = sr(2.6, rs, 4.6);
-            dome(t, r, 0, 0, h - 1, 3, rad, lf, 0.90, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
-            jungleVines(t, r, h);
-            break;
-         }
-         default: { // small jungle tree
-            int h = sh(5 + r.nextInt(5), hs, 46);
-            double rad = sr(2.0, rs, 3.8);
-            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.85, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
-            vines(t, r, 0.28F, 3);
-            break;
          }
       }
-   }
 
-   private static void jungleVines(Buf t, Random r, int h) {
-      for (int d = 0; d < 4; d++) {
-         if (r.nextInt(2) != 0) continue;
-         int vx = new int[]{0, 1, 0, -1}[d];
-         int vz = new int[]{-1, 0, 1, 0}[d];
-         int bit = 1 << (d + 2 & 3);
-         for (int y = 2; y < h - 1; y++) t.leaf(vx, y, vz, Blocks313.VINE0 + bit);
-      }
-      vines(t, r, 0.20F, 5);
-   }
-
-   // ------------------------------------------------------------------ acacia: bent, tall double-bend, wide plate, forked
-   private static void acaciaShape(Buf t, Random r, int v, double hs, double rs) {
-      int lg = log(4);
-      int lf = leaves(4);
-      int h = sh(v == 1 ? 8 + r.nextInt(4) : (v == 2 ? 5 + r.nextInt(3) : 6 + r.nextInt(3)), hs, 50);
-      int dir = r.nextInt(4);
-      int dx = new int[]{0, 1, 0, -1}[dir];
-      int dz = new int[]{-1, 0, 1, 0}[dir];
-      int bend = h - 2 - r.nextInt(2);
-      int x = 0, z = 0, y = 0;
-      for (; y <= bend; y++) t.set(x, y, z, lg);
-      int steps = h - bend + 1 + (v == 1 ? 3 : 0);
-      for (int s = 0; s < steps; s++) {
-         x += dx;
-         z += dz;
-         if (v == 1 && s == steps / 2) { dx = -dx; dz = -dz; } // a second bend
-         t.set(x, y, z, lg);
-         if (s % 2 == 1) y++;
-      }
-      double rad = sr(v == 2 ? 4.4 : 3.0, rs, 8.0);
-      dome(t, r, x, z, y + 1, v == 2 ? 5 : 4, rad, lf, 0.68, 0.02F);
-      if (v == 3 || r.nextInt(3) != 0) {
-         int ax = -dx, az = -dz;
-         int py = bend - 1, qx = 0, qz = 0;
-         for (int s = 0; s < 3; s++) {
-            qx += ax;
-            qz += az;
-            t.set(qx, py, qz, lg);
-            if (s % 2 == 0) py++;
-         }
-         dome(t, r, qx, qz, py + 1, 3, rad * 0.7, lf, 0.78, 0.02F);
-      }
-   }
-
-   // ------------------------------------------------------------------ dark oak, swamp and bush
-   private static void darkOakShape(Buf t, Random r, int v, double hs, double rs) {
-      int lf = leaves(5);
-      int lg = log(5);
-      int h = sh(v == 1 ? 10 + r.nextInt(5) : (v == 2 ? 5 + r.nextInt(3) : 6 + r.nextInt(3)), hs, 52);
-      double rad = sr(v == 2 ? 5.2 : 4.0, rs, 9.0);
-      dome(t, r, 0.5, 0.5, h - 1, v == 1 ? 6 : 5, rad, lf, 0.86, 0.02F);
-      int branches = v == 2 ? 5 : 3;
-      for (int i = 0; i < branches; i++) {
-         double a = r.nextDouble() * Math.PI * 2.0;
-         int bx = (int)Math.round(0.5 + Math.cos(a) * rad * 0.72);
-         int bz = (int)Math.round(0.5 + Math.sin(a) * rad * 0.72);
-         blob(t, bx, h - 1 - r.nextInt(2), bz, sr(2.0, rs, 3.4), 1.6, sr(2.0, rs, 3.4), lf, r);
-         for (int s = 1; s <= 2; s++) t.set(bx * s / 2, h - 1, bz * s / 2, lg);
-      }
-      trunk2(t, 0, h, lg);
-   }
-
-   private static void swampShape(Buf t, Random r, int v, double hs, double rs) {
-      int lf = leaves(0);
-      int lg = log(0);
-      switch (v) {
-         case 1: { // swamp cypress with knees
-            int h = sh(9 + r.nextInt(5), hs, 52);
-            double rad = sr(2.8, rs, 5.0);
-            dome(t, r, 0, 0, h - 3, 5, rad, lf, 0.85, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
-            for (int i = 0; i < 4; i++) {
-               double a = i * Math.PI / 2.0;
-               int kx = (int)Math.round(Math.cos(a) * 2.0);
-               int kz = (int)Math.round(Math.sin(a) * 2.0);
-               t.set(kx, 0, kz, lg);
-               t.set(kx, 1, kz, lg);
+      ArrayList<int[]> clusters = new ArrayList<>();
+      if (s.whorls) {
+         int start = Math.max(2, (int)(s.h * s.bandLo));
+         for (int y = start; y <= s.h && logs < budget && y < Buf.H; y += s.whorlStep) {
+            double f = (double)(y - start) / Math.max(1.0, s.h - start);
+            int n = Math.max(3, s.branches - (int)(f * 2.0));
+            double bl = Math.max(1.0, s.len * (1.0 - 0.90 * f));
+            int by = Math.min(y, s.h);
+            for (int k = 0; k < n && logs < budget; k++) {
+               double a = k * (6.2831853 / n) + y * 0.61 + r.nextDouble() * 0.35;
+               int[] tip = branch(t, r, px[by], y, pz[by], a,
+                  Math.max(2, (int)Math.round(bl * (0.8 + 0.4 * r.nextDouble()))), s.rise, lg);
+               logs += tip[3];
+               clusters.add(new int[]{tip[0], tip[1], tip[2], (int)Math.round(s.cr * (1.0 - 0.65 * f) * 100), 0});
             }
-            vines(t, r, 0.24F, 5);
-            break;
+            // A small bunch around the leader closes the cone between whorls.
+            clusters.add(new int[]{px[by], y, pz[by], (int)Math.round(s.cr * 0.55 * 100), 0});
          }
-         case 2: { // wide willow with long hanging curtains
-            int h = sh(7 + r.nextInt(4), hs, 50);
-            double rad = sr(4.4, rs, 8.4);
-            dome(t, r, 0, 0, h - 1, 3, rad, lf, 0.65, 0.02F);
-            int n = (int)rad;
-            for (int i = 0; i < 10; i++) {
-               double a = r.nextDouble() * Math.PI * 2.0;
-               int bx = (int)Math.round(Math.cos(a) * n);
-               int bz = (int)Math.round(Math.sin(a) * n);
-               for (int d = 0; d < 2 + r.nextInt(4); d++) t.leaf(bx, h - 2 - d, bz, lf);
+      } else {
+         for (int k = 0; k < s.branches && logs < budget; k++) {
+            double f = (k + 0.5) / s.branches;
+            int y = (int)Math.round(s.h * (s.bandLo + (s.bandHi - s.bandLo) * f)) + r.nextInt(3) - 1;
+            y = Math.max(2, Math.min(s.h, y));
+            double taper = 1.0 - 0.28 * f;
+            int len = Math.max(2, (int)Math.round(s.len * taper * (0.78 + 0.44 * r.nextDouble())));
+            double a = k * 2.399963229728653 + r.nextDouble() * 0.55;
+            int[] tip = branch(t, r, px[y], y, pz[y], a, len, s.rise, lg);
+            logs += tip[3];
+            clusters.add(new int[]{tip[0], tip[1], tip[2], (int)Math.round(s.cr * 100), s.flat ? 1 : 0});
+            if (s.perBranch > 1 && r.nextBoolean()) {
+               int mx = px[y] + (tip[0] - px[y]) * 3 / 5;
+               int mz = pz[y] + (tip[2] - pz[y]) * 3 / 5;
+               int my = y + (tip[1] - y) * 3 / 5;
+               clusters.add(new int[]{mx, my, mz, (int)Math.round(s.cr * 0.82 * 100), s.flat ? 1 : 0});
             }
-            trunk(t, 0, 0, 0, h, lg);
-            vines(t, r, 0.36F, 7);
-            break;
-         }
-         default: { // the old, wide swamp oak
-            int h = sh(5 + r.nextInt(3), hs, 46);
-            double rad = sr(3.0, rs, 6.0);
-            dome(t, r, 0, 0, h - 2, 4, rad, lf, 0.78, 0.02F);
-            trunk(t, 0, 0, 0, h, lg);
-            vines(t, r, 0.28F, 4);
-            break;
          }
       }
-   }
+      if ((s.top || s.candle) && s.h + 1 < Buf.H) t.set(px[s.h], s.h + 1, pz[s.h], lg);
+      if (s.top) clusters.add(new int[]{px[s.h], s.h + 1, pz[s.h], (int)Math.round(s.cr * 0.92 * 100), s.flat ? 1 : 0});
+      if (s.candle && s.h + 4 < Buf.H) {
+         for (int y = s.h + 2; y <= s.h + 4; y++) t.set(px[s.h], y, pz[s.h], lg);
+      }
 
-   private static void bushShape(Buf t, Random r, int v, double hs, double rs) {
-      int sp = 3;
-      int lg = log(sp);
-      int lf = leaves(sp);
-      double rad = sr(v == 1 ? 3.0 : 2.2, rs, 5.2);
-      int h = sh(v == 1 ? 3 : 1, hs, 6);
-      t.set(0, 0, 0, lg);
-      for (int y = 1; y <= h; y++) t.set(0, y, 0, lg);
-      blob(t, 0, h + 1, 0, rad, sr(1.5, rs, 2.8), rad, lf, r);
-      t.leaf(0, h + 2, 0, lf);
-      if (v == 1) vines(t, r, 0.20F, 2);
+      // Leaves go in last: t.leaf() is soft, so the branch skeleton stays visible.
+      for (int[] c : clusters) {
+         if (t.leafCount > Buf.MAX_LEAVES - 130) break;
+         leafCluster(t, r, c[0], c[1], c[2], c[3] / 100.0, lf, c[4] == 1);
+      }
+
+      // Weeping strands are leaves (not vines) so they travel with the falling crown.
+      if (s.strands > 0) {
+         int n = t.nt;
+         for (int k = 0; k < s.strands && k < n; k++) {
+            int i = t.touched[r.nextInt(n)];
+            int id = (t.a[i] & ~Buf.SOFT) - 1;
+            if (!Blocks.isLeaves(id)) continue;
+            int dx = i % Buf.W - Buf.R;
+            int dz = i / Buf.W % Buf.W - Buf.R;
+            int dy = i / (Buf.W * Buf.W);
+            int len = 1 + r.nextInt(3);
+            for (int s2 = 1; s2 <= len; s2++) t.leaf(dx, dy - s2, dz, lf);
+         }
+      }
+      if (s.knees) {
+         for (int d = 0; d < 4; d++) {
+            int kx = new int[]{0, 2, 0, -2}[d];
+            int kz = new int[]{-2, 0, 2, 0}[d];
+            t.leaf(kx, 1, kz, lf);
+            t.leaf(kx, 2, kz, lf);
+         }
+      }
    }
 
    // ---------------------------------------------------------------------------------------------------- legacy entry points

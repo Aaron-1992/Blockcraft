@@ -326,6 +326,7 @@ public final class ResourcePacks {
    }
 
    public static synchronized void reload(Game g) {
+      Tilesheet.invalidate();   // V6.25: pick up a newly saved tilesheet.png
       String selected = activeId();
       refresh();
       select(selected, g);

@@ -1,0 +1,28 @@
+BLOCKCRAFT - ONE TILESHEET FOR EVERY TEXTURE
+============================================
+
+tilesheet.png (next to this file) is a 1024x1024 PNG holding ALL 1024 of the
+game's 32x32 textures in one grid. Cell (row, col) is atlas tile row*32+col.
+
+EDIT IT
+  1. Open tilesheet.png in Aseprite / Photoshop / any pixel editor.
+  2. Keep the canvas at exactly 1024x1024 and keep the alpha channel.
+  3. Save/export as PNG over the SAME file (or give the edited PNG to the
+     developer, who runs: python3 tools/tilesheet.py import your-sheet.png).
+  4. In game: type  /tilesheet   OR  Options > Resource Packs > Tilesheet.
+     Your changes appear immediately - no restart, no compiling, no Java needed.
+     /tilesheet export writes a fresh copy plus the index into textures/.
+
+FIND A TILE
+  textures/TILESHEET.tsv          tile id, row, col, name, type, pixel rect
+  textures/tilesheet-index.html   searchable picture index (open in a browser)
+  textures/tilesheet-map.png      2x reference map with the tile ids printed on it
+  res/texture-names.tsv           the built-in tile-name table
+
+NOTES
+  * An untouched sheet changes nothing: only cells that differ from the
+    built-in art are applied, at full 32x32 resolution.
+  * Animated cells (water, lava, portal, fire, ...) are marked in the index
+    and are deliberately NOT overridden, so the animations keep working.
+    Edit those through resourcepacks/MyTextures/animations/ instead.
+  * This is an ORIGINAL texture set. Do not paste Mojang/Minecraft assets.

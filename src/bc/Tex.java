@@ -886,6 +886,8 @@ public final class Tex {
       renderTileSize = TexPixel32.enabled() ? TexPixel32.SIZE : 16;
       renderMaxLevel = renderTileSize == TexPixel32.SIZE ? 4 : 3;
       int[] pixels = renderTileSize == TexPixel32.SIZE ? TexPixel32.atlas(atlasPixels) : atlasPixels;
+      // V6.25: overlay only the cells the player actually changed in tilesheet.png.
+      if (renderTileSize == TexPixel32.SIZE) Tilesheet.apply(pixels);
       int width = COLS * renderTileSize;
       GL11.glBindTexture(3553, atlas);
       // Nearest sampling preserves the 32px palette and never blurs adjacent atlas cells.
@@ -1007,6 +1009,7 @@ public final class Tex {
       TexExtra.blocks();
       Aquatic.initPixels();KineticArt.low();
       ResourcePacks.applyPostProcess(atlasPixels);
+   Tilesheet.applyLow(atlasPixels);
    }
 
    static int[] dirt() {

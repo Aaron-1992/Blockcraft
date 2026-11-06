@@ -490,7 +490,9 @@ public final class Lod {
       for (int k = 0; k < n; k++) {
          float f0 = (float)k / n;
          float f1 = (float)(k + 1) / n;
-         float r = Math.max(0.65F, sh.band((f0 + f1) * 0.5F) * scale + pad);
+         // A square LOD box of half-width r projects ~1.4x wider than a round crown
+         // of radius r; trim the measured radius so the distant outline matches.
+         float r = Math.max(0.65F, sh.band((f0 + f1) * 0.5F) * scale * 0.82F + pad);
          float y0 = bottom + (top - bottom) * f0;
          float y1 = bottom + (top - bottom) * f1;
          if (y1 <= y0) y1 = y0 + 0.6F;

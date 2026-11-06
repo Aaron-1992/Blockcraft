@@ -27,13 +27,15 @@ import java.util.Random;
  */
 public final class Trees {
    /** More logs than this: not a normal tree, it stays. */
-   static final int MAX_LOGS = 160;
-   static final int MAX_LEAVES = 700;
+   /** V6.25: branch-skeleton trees have real branch networks, so the old 160-log cap made
+    *  them refuse to topple at all. */
+   static final int MAX_LOGS = 480;
+   static final int MAX_LEAVES = 1400;
    /** How far a leaf may be from a log (in steps through leaves, diagonals included) and still hang on it. */
-   static final int LEAF_REACH = 4;
+   static final int LEAF_REACH = 6;
    static final int MIN_LEAVES = 4;
    static final int MAX_DROP = 24;
-   static final int MAX_SPAN = 14;
+   static final int MAX_SPAN = 18;
    /** Damage of a log that lands on a mob or the player (half hearts). */
    static final int HIT = 7;
    static final int[][] DIRS = new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
@@ -219,7 +221,26 @@ public final class Trees {
 
          int b = w.getBlock(c[0], c[1] - 1, c[2]);
          if (b != 0 && Blocks.solid[b] && !Blocks.isLeaves(b)) {
-            return null;
+            // A 2x2 trunk base legitimately rests on the ground right next to the cut.
+            // Those logs are part of the stump, not a cabin propping the tree up.
+            boolean thickBase = false;
+            if (c[1] <= py + 1 && Math.abs(c[0] - px) <= 1 && Math.abs(c[2] - pz) <= 1) {
+               int around = 0;
+               for (int ax = px - 1; ax <= px + 1; ax++) {
+                  for (int az = pz - 1; az <= pz + 1; az++) {
+                     if (logSet.contains(World.pack(ax, c[1], az))) around++;
+                  }
+               }
+               // Only a real 2x2 trunk base (three or four logs on one layer) is
+               // allowed to rest on the ground. A single log on a stone still props
+               // a player-built structure up.
+               // On the cut layer the pivot itself is already gone, so two neighbouring
+               // base logs are enough; one layer up a real 2x2 needs three or four.
+               thickBase = around >= (c[1] == py ? 2 : 3);
+            }
+            if (!thickBase) {
+               return null;
+            }
          }
       }
 

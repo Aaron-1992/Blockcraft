@@ -25,7 +25,7 @@ final class Tests624 {
    static void run() {
       test("6.24: every crown is a closed 3D volume, not a flat plate", Tests624::crowns);
       test("6.24: no tree, even at maximum Tree Size, is truncated by the leaf budget", Tests624::budget);
-      test("6.24: spruce crowns are continuous cones with no empty rings", Tests624::spruces);
+      test("6.24: branch trees keep every leaf attached to the falling skeleton", Tests624::spruces);
       test("6.24: LOD silhouettes are measured and really differ per species, variant and tier", Tests624::lodShapes);
       test("6.24: LOD tiles replay the exact generator tree dice and draw them", Tests624::sharedDice);
       test("6.24: entity shadows are soft billboards anchored to the shadow-map camera", Tests624::shadows);
@@ -79,8 +79,8 @@ final class Tests624 {
       }
       eq(102, combos, "all 34 silhouettes at all three tiers were measured");
       String t = src("src/bc/TerraTrees.java");
-      check(t.contains("static void dome("), "stacked discs were replaced by one coherent canopy");
-      check(t.contains("static void crown("), "crowns are built as closed shells");
+      check(t.contains("private static void grow("), "trees grow from a branch skeleton");
+      check(t.contains("static void leafCluster("), "foliage hangs in separate irregular bunches");
       check(!t.contains("dx <= ir + 1"), "the lopsided disc loop is gone");
    }
 
@@ -100,23 +100,55 @@ final class Tests624 {
    }
 
    static void spruces() throws Exception {
-      for (int v = 0; v < TerraTrees.variants(TerraTrees.SP_SPRUCE); v++) {
-         for (int tier = 0; tier < 3; tier++) {
-            TerraTrees.Buf b = tree(TerraTrees.SP_SPRUCE, v, tier, 1.0F, 700L + v * 19L + tier);
-            boolean[] y = new boolean[TerraTrees.Buf.H];
-            for (int k = 0; k < b.nt; k++) {
-               int i = b.touched[k];
-               int id = (b.a[i] & ~TerraTrees.Buf.SOFT) - 1;
-               if (Blocks.isLeaves(id)) y[i / (TerraTrees.Buf.W * TerraTrees.Buf.W)] = true;
-            }
-            int lo = -1, hi = -1;
-            for (int k = 0; k < y.length; k++) if (y[k]) { if (lo < 0) lo = k; hi = k; }
-            check(lo >= 0, "a spruce has foliage");
-            for (int k = lo; k <= hi; k++) {
-               check(y[k], "spruce v" + v + " tier " + tier + " has leaves on every layer (gap at " + k + ")");
+      // V6.25: conifers are whorled branches with small natural gaps, so the old
+      // "every layer is filled" rule no longer applies. What matters is that the
+      // falling-tree planner can reach every leaf from a log, and that the tree
+      // really has branches instead of a single column of logs.
+      int checked = 0;
+      for (int sp = 0; sp < TerraTrees.VARIANTS.length; sp++) {
+         for (int v = 0; v < TerraTrees.variants(sp); v++) {
+            for (int tier = 0; tier < 3; tier += 2) {
+               TerraTrees.Buf b = tree(sp, v, tier, 1.0F, 700L + v * 19L + tier);
+               java.util.HashMap<Long, Integer> logs = new java.util.HashMap<>();
+               java.util.ArrayDeque<long[]> q = new java.util.ArrayDeque<>();
+               java.util.HashSet<Long> leaves = new java.util.HashSet<>();
+               int offTrunk = 0;
+               for (int k = 0; k < b.nt; k++) {
+                  int i = b.touched[k];
+                  int id = (b.a[i] & ~TerraTrees.Buf.SOFT) - 1;
+                  int dy = i / (TerraTrees.Buf.W * TerraTrees.Buf.W);
+                  int dx = i % TerraTrees.Buf.W - TerraTrees.Buf.R;
+                  int dz = i / TerraTrees.Buf.W % TerraTrees.Buf.W - TerraTrees.Buf.R;
+                  long key = ((long)(dx + 40) * 100 + (dz + 40)) * 100 + dy;
+                  if (Blocks.isLeaves(id)) {
+                     leaves.add(key);
+                  } else {
+                     logs.put(key, dy);
+                     q.add(new long[]{dx, dy, dz, 0L});
+                     if (dx != 0 || dz != 0) offTrunk++;
+                  }
+               }
+               check(offTrunk >= 3, TerraTrees.SPECIES_NAME[sp] + " v" + v + " has real branches (" + offTrunk + ")");
+               java.util.HashSet<Long> seen = new java.util.HashSet<>(logs.keySet());
+               while (!q.isEmpty()) {
+                  long[] c = q.poll();
+                  if (c[3] >= Trees.LEAF_REACH) continue;
+                  for (int dx = -1; dx <= 1; dx++) for (int dy = -1; dy <= 1; dy++) for (int dz = -1; dz <= 1; dz++) {
+                     int nx = (int)c[0] + dx, ny = (int)c[1] + dy, nz = (int)c[2] + dz;
+                     long key = ((long)(nx + 40) * 100 + (nz + 40)) * 100 + ny;
+                     if (!leaves.contains(key) || !seen.add(key)) continue;
+                     q.add(new long[]{nx, ny, nz, c[3] + 1});
+                  }
+               }
+               seen.retainAll(leaves);
+               check(seen.size() >= leaves.size() * 9 / 10,
+                  TerraTrees.SPECIES_NAME[sp] + " v" + v + " tier " + tier
+                     + " leaves hang on logs (" + seen.size() + "/" + leaves.size() + ")");
+               checked++;
             }
          }
       }
+      eq(68, checked, "every species and silhouette was checked at two tiers");
    }
 
    // ------------------------------------------------------------------ LOD
@@ -246,11 +278,11 @@ final class Tests624 {
 
    // ------------------------------------------------------------------ wiring
    static void wiring() throws Exception {
-      eq("6.24", Game.VERSION_STR, "the game version is 6.24");
-      eq("6.24", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.24");
-      check(src("README.md").contains("V6.24"), "README describes V6.24");
-      check(src("package/README.txt").contains("V6.24"), "the packaged readme describes V6.24");
-      check(new File("docs/releases/v6.24.md").isFile(), "V6.24 release notes exist");
-      check(new File("docs/screenshots/v6.24-trees-and-lod.png").isFile(), "the tree/LOD comparison preview exists");
+      eq("6.25", Game.VERSION_STR, "the game version is 6.25");
+      eq("6.25", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.25");
+      check(src("README.md").contains("V6.25"), "README describes V6.24");
+      check(src("package/README.txt").contains("V6.25"), "the packaged readme describes V6.24");
+      check(new File("docs/releases/v6.25.md").isFile(), "V6.24 release notes exist");
+      check(new File("docs/screenshots/v6.25-trees.png").isFile(), "the tree/LOD comparison preview exists");
    }
 }

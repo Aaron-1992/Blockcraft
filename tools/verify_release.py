@@ -49,6 +49,8 @@ def required(version):
         extra += ("CaveCliffs", "TerraTrees", "MapView", "Adv312", "Gen")
     if tuple(map(int, version.split("."))) >= (6, 24):
         extra += ("Lod",)
+    if tuple(map(int, version.split("."))) >= (6, 25):
+        extra += ("Tilesheet", "Trees")
     return REQUIRED + extra
 
 

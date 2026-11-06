@@ -561,8 +561,12 @@ final class TestsFall {
                   boolean bigBase = Blocks.isLog(w.getBlock(25, GROUND + 1, 24)) || Blocks.isLog(w.getBlock(24, GROUND + 1, 25));
                   cut(g, 24, GROUND + 1, 24, 18.5, 24.5);
                   if (bigBase) {
+                     // V6.25: a 2x2 trunk base is now part of the falling tree instead
+                     // of pinning the whole plant upright.
                      rooted++;
-                     eq(0, w.trees.falling().size(), "a tree with a thick base stands on its other trunk logs: " + name);
+                     eq(1, w.trees.falling().size(), "a tree with a thick base topples too: " + name);
+                     settle(w);
+                     eq(0, count(w, id -> Blocks.isLog(id)), "no log left standing: " + name);
                      continue;
                   }
 

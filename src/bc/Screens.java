@@ -1386,16 +1386,22 @@ final class Screens {
       ui.endScroll(px, py, pw, ph, content);
 
       float by = gui.h - 24.0F;
-      float third = (pw - 8.0F) / 3.0F;
-      ui.button("Reload PNGs", px, by, third, 20.0F, true, "Reload edited PNGs and scan resourcepacks/. Refreshes the active pack immediately.", () -> {
+      float quarter = (pw - 12.0F) / 4.0F;
+      ui.button("PNG", px, by, quarter, 20.0F, true, "Reload edited PNGs and scan resourcepacks/. Refreshes the active pack immediately.", () -> {
          ResourcePacks.reload(g);
          ui.say("Reloaded PNGs: " + ResourcePacks.active().title);
       });
-      ui.button("Mods...", px + third + 4.0F, by, third, 20.0F, true, "Open the Modrinth-style Mods manager.", () -> {
+      ui.button("Tilesheet", px + quarter + 4.0F, by, quarter, 20.0F, true,
+         "Re-read the single editable tilesheet.png (all 1024 textures in one 1024x1024 PNG) and apply your edits immediately.", () -> {
+            Tilesheet.invalidate();
+            ResourcePacks.reload(g);
+            ui.say("Tilesheet: " + Tilesheet.changedTiles() + " edited tiles active");
+         });
+      ui.button("Mods", px + 2.0F * (quarter + 4.0F), by, quarter, 20.0F, true, "Open the Modrinth-style Mods manager.", () -> {
          g.modsReturn = g.packsReturn != null ? g.packsReturn : Game.S.TITLE;
          g.setScreen(Game.S.MODS);
       });
-      ui.button("Done", px + 2.0F * (third + 4.0F), by, third, 20.0F, true, null,
+      ui.button("Done", px + 3.0F * (quarter + 4.0F), by, quarter, 20.0F, true, null,
          () -> g.setScreen(g.packsReturn != null ? g.packsReturn : Game.S.TITLE));
       ui.drawToast();
    }

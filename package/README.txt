@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.24  -  an original Minecraft-style voxel sandbox   (EDITION V6.24)
+BLOCKCRAFT V6.25  -  an original Minecraft-style voxel sandbox   (EDITION V6.25)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,37 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.25 - trees rebuilt as real trees, they fall, and ONE editable
+                       tilesheet holds every texture
+
+  * TREES WERE REDONE AGAIN, FROM SCRATCH. No more geometric domes. Each
+    tree now grows a connected skeleton of logs: a trunk that may lean,
+    primary branches that reach out, and twigs, with separate irregular
+    leaf bunches hanging on the twigs. Visible trunks, real branch gaps,
+    lumpy asymmetric crowns, whorled conifers, flat acacia umbrellas and
+    tall clean jungle boles. All 34 silhouettes, 3 size tiers, 8 species.
+    See docs/screenshots/v6.25-trees.png (headless, not a GPU shot).
+  * TREES REALLY FALL OVER WITH /treefall. The old planner refused most of
+    the new trees: leaning trunks were diagonally disconnected, a whorl
+    above the trunk top floated, 2x2 bases pinned the whole tree upright,
+    and the 160-log / 700-leaf caps were far too small. Every species now
+    topples at Normal AND Giant size in the headless chop tests; the caps
+    are 480 logs / 1400 leaves with a 6-step leaf reach, and a real 2x2
+    base is treated as part of the falling tree (a lone log on a stone
+    still does NOT fall, so player-built cabins are safe).
+  * ONE TILESHEET FOR ALL 1024 TEXTURES. tilesheet.png beside the exe is
+    a 1024x1024 PNG: cell (row,col) = atlas tile row*32+col. Edit it in
+    Aseprite keeping the canvas size and alpha, then type /tilesheet or
+    press Options > Resource Packs > Tilesheet. Changes apply at
+    full 32x32 immediately; an untouched sheet is a complete no-op.
+    Animated cells are marked and left to the animation strips.
+    Indexes: textures/TILESHEET.tsv, textures/tilesheet-index.html,
+    textures/tilesheet-map.png. Full guide: TILESHEET.txt in this folder.
+    Developer import: python3 tools/tilesheet.py import <your-sheet.png>.
+  * Bug sweep: disconnected leaning trunks, floating top whorls, thick
+    bases that never fell, oversized crowns left hanging in mid-air,
+    oversized fall limits, and a reload path that ignored the new sheet.
 
 WHAT'S NEW IN V6.24 - trees that look like trees, LOD that matches them,
                        and entity shadows that behave

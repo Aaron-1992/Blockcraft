@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.24";
+   public static final String VERSION_STR = "6.25";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -3033,6 +3033,21 @@ public final class Game {
                case "disasters":
                   this.world.disasters.command(this, var2);
                   break;
+               case "tilesheet":
+                  try {
+                     if (var2.length > 1 && var2[1].equalsIgnoreCase("export")) {
+                        Tilesheet.export(new File("textures"));
+                        this.say("Wrote textures/Blockcraft-tilesheet.png and its index.");
+                     } else {
+                        Tilesheet.invalidate();
+                        ResourcePacks.reload(this);
+                        this.say("Tilesheet reloaded from " + Tilesheet.file().getName()
+                           + " (" + Tilesheet.changedTiles() + " edited tiles active).");
+                     }
+                  } catch (Exception ex) {
+                     this.say("§cTilesheet: " + ex.getMessage());
+                  }
+                  break;
                case "treefall":
                   if (var2.length > 1 && (var2[1].equalsIgnoreCase("on") || var2[1].equalsIgnoreCase("off"))) {
                      this.world.trees.enabled = var2[1].equalsIgnoreCase("on");
@@ -3113,7 +3128,7 @@ public final class Game {
                   SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
                   break;
                case "help":
-                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
+                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
                   if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
