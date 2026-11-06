@@ -1226,7 +1226,14 @@ public final class Renderer {
             this.sh.useLod(this.mv, this.camX, this.camY, this.camZ, var11, var12, var26, var27, var28, var30);
          }
 
-         this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
+         try {
+            this.lod.render(this.camX, this.camY, this.camZ, var15, var13, this.skyLightFactor);
+         } catch (Throwable lodError) {
+            // V6.26: a bad LOD tile / driver state must never take the whole game
+            // down. Drop every cached tile and let them rebuild next frame.
+            System.err.println("[lod] render failed, rebuilding LOD: " + lodError);
+            try { this.lod.invalidateAll(); } catch (Throwable ignored) { }
+         }
          if (var29) {
             this.sh.stopLod();
          }
@@ -1702,11 +1709,6 @@ public final class Renderer {
    }
 
    /**
-    * Update 6.19: mobs cast real shadows. A crossed box silhouette is drawn into the depth-only shadow map
-    * with the atlas alpha test switched off, so it costs five quads per nearby mob and no extra textures,
-    * programs or framebuffers. The same map is used by the sun and by the moon.
-    */
-   /**
     * Update 6.24: one soft, light-facing elliptical billboard per mob. The old version
     * stamped five opaque box faces into the depth map, which produced large rectangular
     * blobs that did not follow the creature's shape and looked detached at low sun angles.
@@ -1714,7 +1716,16 @@ public final class Renderer {
     * in the shadow map, redrawn on every frame from the live mob positions.
     */
    private void renderEntityShadowCasters() {
-      if (this.g.opt == null || !this.g.opt.entityShadows || this.g.mobs.list.isEmpty()) return;
+      if (this.g.opt == null || !this.g.opt.entityShadows || this.g.mobs == null || this.g.mobs.list.isEmpty()) return;
+      // V6.26: the network / mod threads can add or remove mobs while this frame is
+      // being built. Snapshot FIRST (before glBegin) so a concurrent change cannot
+      // leave OpenGL stuck inside a begin/end pair or abort the shadow pass.
+      java.util.List<Mobs.Mob> snapshot;
+      try {
+         snapshot = new java.util.ArrayList<>(this.g.mobs.list);
+      } catch (RuntimeException concurrent) {
+         return;
+      }
       // clipM/shadowM are built at the LAST shadow refresh. Drawing mobs relative to the
       // live camera would slide their shadows up to 12 blocks away from them as you walk;
       // use the camera and sun the shadow map was actually built with.
@@ -1743,7 +1754,7 @@ public final class Renderer {
       GL20.glUseProgram(this.sh.pDepth);
       this.sh.setShadowSolid(0.0F);
       GL11.glBegin(GL11.GL_QUADS);
-      for (Mobs.Mob m : this.g.mobs.list) {
+      for (Mobs.Mob m : snapshot) {
          if (m == null || m.dead || n >= cap) continue;
          double ddx = m.x - this.sh.mapX;
          double ddz = m.z - this.sh.mapZ;

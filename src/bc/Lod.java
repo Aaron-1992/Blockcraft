@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
+import org.lwjgl.opengl.GL14;
 import org.lwjgl.opengl.GL15;
 
 public final class Lod {
@@ -39,6 +40,8 @@ public final class Lod {
    static int fogFarBlocks(int maxDist, Options lo) {
       return lo == null ? maxDist : (int)Math.max(64.0F, lo.lodFogEnd * maxDist);
    }
+   /** V6.26: frames over which a freshly built LOD tile fades in instead of popping. */
+   static final int FADE_FRAMES = 18;
    static final float LAND_SHIFT = 2.5F;
    static final float WATER_SHIFT = 0.2F;
    final Gen gen;
@@ -132,22 +135,30 @@ public final class Lod {
       if (var1.state == 0 && this.inflight.get() < this.maxInflight) {
          var1.state = 1;
          this.inflight.incrementAndGet();
-         this.pool.execute(() -> {
-            try {
-               if (!this.dead) {
-                  if (this.maxDist > 0 && this.nearest(var1.x0, var1.z0, var1.size) > this.maxDist + 512.0) {
-                     var1.state = 0;
-                     return;
+         try {
+            this.pool.execute(() -> {
+               try {
+                  if (!this.dead && !var1.retired) {
+                     if (this.maxDist > 0 && this.nearest(var1.x0, var1.z0, var1.size) > this.maxDist + 512.0) {
+                        var1.state = 0;
+                        return;
+                     }
+                     this.build(var1);
                   }
-                  this.build(var1);
+               } catch (Throwable var6) {
+                  System.err.println("[lod] build failed at " + var1.x0 + "," + var1.z0 + " / " + var1.size + ": " + var6);
+                  var6.printStackTrace();
+                  var1.state = 4;
+               } finally {
+                  this.inflight.decrementAndGet();
                }
-            } catch (Throwable var6) {
-               var6.printStackTrace();
-               var1.state = 4;
-            } finally {
-               this.inflight.decrementAndGet();
-            }
-         });
+            });
+         } catch (RuntimeException rejected) {
+            // The pool was shut down (world change / quit). Do not leave the tile stuck
+            // in state 1 with a leaked inflight slot, or all LOD requests stop forever.
+            var1.state = 0;
+            this.inflight.decrementAndGet();
+         }
       }
    }
 
@@ -358,14 +369,18 @@ public final class Lod {
       }
 
       bb = mb.bb;
-      n[0] = mb.n;
       bb.flip();
-      ByteBuffer compact = ByteBuffer.allocateDirect(Math.max(16, n[0] * 16)).order(ByteOrder.nativeOrder());
+      int bytes = bb.limit();
+      // Each vertex is 3 floats + 1 packed int = 16 bytes. Use the buffer's real
+      // length, not the counter: if a builder ever wrote more bytes than it counted,
+      // allocating from the counter would throw BufferOverflowException.
+      int verts = bytes / 16;
+      ByteBuffer compact = ByteBuffer.allocateDirect(Math.max(16, bytes)).order(ByteOrder.nativeOrder());
       compact.put(bb).flip();
       t.data = compact;
-      t.vcount = n[0];
+      t.vcount = verts;
       t.state = 2;
-      this.uploads.add(t);
+      if (!t.retired) this.uploads.add(t);
    }
 
    List<Village> villagesFor(int var1, int var2, int var3, int var4) {
@@ -985,20 +1000,30 @@ public final class Lod {
       Lod.Tile var2;
       while (var1 < maxUploads && (var1 == 0 || System.nanoTime() - start < 6000000L) && (var2 = (Lod.Tile)this.uploads.poll()) != null) {
          var1++;
-         if (this.dead) {
-            var2.data = null;
-         } else if (var2.vcount == 0) {
+         ByteBuffer data = var2.data;
+         var2.data = null;
+         if (this.dead || var2.retired) {
+            continue;                 // a tile evicted while its build was in flight
+         } else if (var2.vcount == 0 || data == null) {
             var2.state = 4;
          } else {
-            var2.vbo = GL15.glGenBuffers();
-            GL15.glBindBuffer(34962, var2.vbo);
-            GL15.glBufferData(34962, var2.data, 35044);
-            GL15.glBindBuffer(34962, 0);
-            var2.count = var2.vcount;
-            var2.data = null;
-            var2.state = 3;
-            var2.builtFrame = this.frame;
-            this.built++;
+            try {
+               int vbo = GL15.glGenBuffers();
+               GL15.glBindBuffer(34962, vbo);
+               GL15.glBufferData(34962, data, 35044);
+               GL15.glBindBuffer(34962, 0);
+               var2.vbo = vbo;
+               var2.count = var2.vcount;
+               var2.state = 3;
+               var2.readyFrame = this.frame;   // V6.26: start the fade-in clock
+               var2.builtFrame = this.frame;
+               this.built++;
+            } catch (Throwable glError) {
+               // One bad VBO must not take the whole frame (and the game) down.
+               GL15.glBindBuffer(34962, 0);
+               System.err.println("[lod] upload failed at " + var2.x0 + "," + var2.z0 + ": " + glError);
+               var2.state = 4;
+            }
          }
       }
    }
@@ -1008,14 +1033,39 @@ public final class Lod {
    }
 
    void addDrawOnce(Lod.Tile t) {
+      this.addDrawOnce(t, 1.0F);
+   }
+
+   void addDrawOnce(Lod.Tile t, float fade) {
       Lod.Tile d = this.refresh(t);
       if (d.lastDrawFrame != this.frame) {
          d.lastDrawFrame = this.frame;
+         d.fade = fade;
          this.drawList.add(d);
+      } else if (fade > d.fade) {
+         d.fade = fade;
       }
    }
 
-   void drawFallback(int x0, int z0, int size) {
+   /** V6.26: smooth 0..1 opacity for a tile that has just finished uploading. */
+   static float fadeIn(long frame, long readyFrame) {
+      if (readyFrame <= 0L) return 1.0F;
+      float f = (frame - readyFrame) / (float)FADE_FRAMES;
+      if (f >= 1.0F) return 1.0F;
+      if (f <= 0.0F) return 0.0F;
+      return f * f * (3.0F - 2.0F * f);
+   }
+
+   /** V6.26: fade the outermost ring out so culling at the horizon never shows a hard edge. */
+   static float distanceFade(double dist, double far) {
+      // Full opacity everywhere except the outermost 10% of the LOD horizon: a short
+      // render distance must not dim nearby tiles.
+      double start = far * 0.90;
+      if (dist <= start) return 1.0F;
+      return (float)Math.max(0.0, Math.min(1.0, (far - dist) / Math.max(1.0, far - start)));
+   }
+
+   void drawFallback(int x0, int z0, int size, float fade) {
       if (size > 32) {
          int half = size >> 1;
          boolean anyChild = false;
@@ -1024,7 +1074,7 @@ public final class Lod {
                Lod.Tile ch = (Lod.Tile)this.tiles.get(key(half, x0 + dx, z0 + dz));
                if (ch != null && ready(ch)) {
                   ch.lastUse = this.frame;
-                  this.addDrawOnce(ch);
+                  this.addDrawOnce(ch, fade);
                   anyChild = true;
                }
             }
@@ -1039,7 +1089,7 @@ public final class Lod {
          Lod.Tile anc = (Lod.Tile)this.tiles.get(key(pSize, px0, pz0));
          if (anc != null && ready(anc) && this.nearest(px0, pz0, pSize) >= this.innerHalf * 0.7) {
             anc.lastUse = this.frame;
-            this.addDrawOnce(anc);
+            this.addDrawOnce(anc, fade);
             return;
          }
       }
@@ -1118,7 +1168,12 @@ public final class Lod {
       this.texEnvColor[3] = 1.0F;
       GL11.glTexEnvfv(8960, 8705, this.texEnvColor);
       GL11.glDisable(3008);
-      GL11.glDisable(3042);
+      // V6.26: constant-alpha blending gives each tile its own fade-in opacity without
+      // touching the vertex colours (works with and without the LOD shader). At fade=1
+      // the result is byte-for-byte the old opaque rendering.
+      GL11.glEnable(3042);
+      GL11.glBlendFunc(32771, 32772); // GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA
+      GL14.glBlendColor(0.0F, 0.0F, 0.0F, 1.0F);
       GL11.glEnableClientState(32884);
       GL11.glEnableClientState(32886);
       GL11.glEnable(32823);
@@ -1133,19 +1188,38 @@ public final class Lod {
       int drawCap = lo != null && lo.lodMaxDraws > 0 ? lo.lodMaxDraws : Integer.MAX_VALUE;
       for (Lod.Tile var19 : this.drawList) {
          if (this.drawn >= drawCap) break;
-         if (var19.state == 3) {
+         if (var19.retired || var19.state != 3 || var19.vbo == 0 || var19.count <= 0) continue;
+         float fade = var19.fade;
+         if (fade <= 0.002F) continue;
+         boolean pushed = false;
+         try {
+            GL14.glBlendColor(0.0F, 0.0F, 0.0F, Math.min(1.0F, fade));
+            // A semi-transparent tile must not write depth and hide the tiles behind it.
+            boolean fading = fade < 0.998F;
+            if (fading) GL11.glDepthMask(false);
             GL15.glBindBuffer(34962, var19.vbo);
             GL11.glVertexPointer(3, 5126, 16, 0L);
             GL11.glColorPointer(4, 5121, 16, 12L);
             GL11.glPushMatrix();
+            pushed = true;
             GL11.glTranslated(var19.x0 - var1, -var3, var19.z0 - var5);
             GL11.glDrawArrays(7, 0, var19.count);
             GL11.glPopMatrix();
+            pushed = false;
+            if (fading) GL11.glDepthMask(true);
             this.drawn++;
             Perf.lodVerts += var19.count;
             int lvl = Math.min(7, Integer.numberOfTrailingZeros(Math.max(32, var19.size) >> 5));
             Perf.lodSizeVerts[lvl] += var19.count;
             Perf.lodSizeTiles[lvl]++;
+         } catch (Throwable tileError) {
+            // A stale/deleted VBO or a driver error must not kill the whole game:
+            // retire just this tile and let it rebuild on a later frame.
+            System.err.println("[lod] draw failed at " + var19.x0 + "," + var19.z0 + ": " + tileError);
+            if (pushed) { try { GL11.glPopMatrix(); } catch (Throwable ignored) { } }
+            GL11.glDepthMask(true);
+            var19.state = 4;
+            var19.vbo = 0;
          }
       }
 
@@ -1153,6 +1227,9 @@ public final class Lod {
          GL11.glDisable(2884);
       }
 
+      GL11.glBlendFunc(770, 771);   // restore the game's normal blending
+      GL11.glDisable(3042);
+      GL14.glBlendColor(0.0F, 0.0F, 0.0F, 1.0F);
       GL11.glDisable(32823);
       GL15.glBindBuffer(34962, 0);
       GL11.glDisableClientState(32886);
@@ -1187,9 +1264,9 @@ public final class Lod {
 
    boolean coveredBox(int var1, int var2, int size) {
       Lod.Tile var3 = (Lod.Tile)this.tiles.get(key(size, var1, var2));
-      World world = this.rend.g.world;
+      World world = this.rend == null || this.rend.g == null ? null : this.rend.g.world;
       long meshEpoch = world == null ? 0L : world.meshCoverageEpoch.get();
-      long viewKey = this.rend.meshVisibilityKey;
+      long viewKey = this.rend == null ? 0L : this.rend.meshVisibilityKey;
       if (var3 != null) {
          var3.lastUse = this.frame;
          if (var3.coverFrame != 0L && this.frame - var3.coverFrame < 15L
@@ -1206,7 +1283,7 @@ public final class Lod {
 
       for (int cx = cx0; covered && cx <= cx1; cx++) {
          for (int cz = cz0; covered && cz <= cz1; cz++) {
-            if (!this.rend.chunkMeshed(cx, cz)) {
+            if (this.rend != null && !this.rend.chunkMeshed(cx, cz)) {
                covered = false;
             }
          }
@@ -1258,17 +1335,31 @@ public final class Lod {
             (float)(var2 + var3 / 2 - this.cz),
             var3 * 0.75F + 40.0F
          );
-         boolean var6 = var3 > 32 && var4 < this.splitDistance(var3);
+         // V6.26: a 6% hysteresis band around the split distance stops a tile from
+         // flipping between its own mesh and its four children on every small camera
+         // movement (a classic source of LOD "pops").
+         boolean var6 = false;
+         if (var3 > 32) {
+            double sd = this.splitDistance(var3);
+            Lod.Tile node = (Lod.Tile)this.tiles.get(key(var3, var1, var2));
+            boolean wasSplit = node != null && node.lastSplit && this.frame - node.splitFrame < 30L;
+            var6 = var4 < sd * (wasSplit ? 1.06 : 0.94);
+            if (node != null) {
+               node.lastSplit = var6;
+               node.splitFrame = this.frame;
+            }
+         }
          if (!var6) {
             Lod.Tile var16 = this.tile(var3, var1, var2);
             var16.lastUse = this.frame;
             if (ready(var16)) {
                if (inFrustum) {
-                  this.addDrawOnce(var16);
+                  float fi = fadeIn(this.frame, var16.readyFrame) * distanceFade(var4, this.fogFarBlocks);
+                  this.addDrawOnce(var16, fi);
                }
             } else if (inFrustum) {
                this.pendingVisible.add(var16);
-               this.drawFallback(var1, var2, var3);
+               this.drawFallback(var1, var2, var3, 1.0F);
             } else {
                this.pendingBehind.add(var16);
             }
@@ -1303,6 +1394,8 @@ public final class Lod {
                GL15.glDeleteBuffers(var2.replacement.vbo);
             }
 
+            var2.retired = true;
+            if (var2.replacement != null) var2.replacement.retired = true;
             var1.remove();
          }
       }
@@ -1331,7 +1424,9 @@ public final class Lod {
          }
       }
 
+      for (Lod.Tile t : this.tiles.values()) t.retired = true;
       this.tiles.clear();
+      this.uploads.clear();
       if (this.map != null && this.map.listener != null) {
          this.map.listener = null;
       }
@@ -1375,6 +1470,7 @@ public final class Lod {
             }
 
             t.state = 5;
+            t.retired = true;
             r.lastUse = this.frame;
             return r;
          }
@@ -1421,6 +1517,12 @@ public final class Lod {
       volatile long dirtyEpoch;
       long builtFrame;
       volatile Lod.Tile replacement;
+      /** V6.26: frame the tile finished uploading, its per-frame opacity, and split hysteresis. */
+      long readyFrame;
+      float fade = 1.0F;
+      volatile boolean retired;
+      boolean lastSplit;
+      long splitFrame;
 
       Tile(int var1, int var2, int var3) {
          this.size = var1;

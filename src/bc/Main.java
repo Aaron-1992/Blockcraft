@@ -4,7 +4,26 @@ import java.io.File;
 import java.io.PrintWriter;
 
 public final class Main {
+   /** V6.26: worker-thread exceptions used to vanish into stderr (or kill the game
+    *  with no useful trace). Log every uncaught exception with its thread name. */
+   static void installCrashLogger() {
+      Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+         try {
+            File dir = new File(System.getProperty("user.home"), ".blockcraft112");
+            dir.mkdirs();
+            try (PrintWriter out = new PrintWriter(new java.io.FileWriter(new File(dir, "crash.log"), true))) {
+               out.println("=== uncaught exception in thread '" + thread.getName() + "' at " + new java.util.Date() + " ===");
+               error.printStackTrace(out);
+               out.println();
+            }
+         } catch (Throwable ignored) {
+         }
+         error.printStackTrace();
+      });
+   }
+
    public static void main(String[] var0) {
+      installCrashLogger();
       try {
          if (var0.length == 1 && "--build-info".equals(var0[0])) {
             java.util.Properties receipt = new java.util.Properties();

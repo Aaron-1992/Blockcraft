@@ -51,6 +51,8 @@ def required(version):
         extra += ("Lod",)
     if tuple(map(int, version.split("."))) >= (6, 25):
         extra += ("Tilesheet", "Trees")
+    if tuple(map(int, version.split("."))) >= (6, 26):
+        extra += ("Main",)
     return REQUIRED + extra
 
 

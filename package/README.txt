@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.25  -  an original Minecraft-style voxel sandbox   (EDITION V6.25)
+BLOCKCRAFT V6.26  -  an original Minecraft-style voxel sandbox   (EDITION V6.26)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,40 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.26 - no more LOD pops and no more random crashes
+
+  * LOD TILES NOW FADE IN. A tile used to appear the instant its mesh
+    finished uploading, so walking or turning produced hard "pops" as
+    each distant chunk snapped into view. New tiles now blend in over
+    18 frames (~0.3 s) using per-tile constant-alpha blending, which
+    works with AND without the LOD shader. At full opacity the result is
+    byte-for-byte the old rendering.
+  * THE OUTERMOST 10% OF THE LOD HORIZON also fades out, so CPU culling
+    never cuts off a still-visible tile. Nearby tiles are never dimmed,
+    even at a very short render distance.
+  * SPLIT HYSTERESIS: a 6% band around each split distance stops a tile
+    flipping between its own mesh and its four children on every tiny
+    camera movement - another classic source of flicker/pops.
+  * RANDOM CRASHES HARDENED:
+      - LOD mesh uploads now derive the vertex count from the REAL byte
+        length of the buffer, so a partial mesh can no longer overflow
+        the compacted buffer and kill a worker.
+      - A rejected worker task no longer leaks an inflight slot (which
+        silently froze all further LOD requests).
+      - Evicted / rebuilt tiles are marked retired, so a late worker can
+        never queue a dead VBO for upload or draw.
+      - Failed VBO uploads, failed per-tile draws and a failed LOD render
+        are now contained: the bad tile is skipped/rebuilt instead of
+        taking the whole game down. Normal blending state is restored.
+      - Entity-shadow mob iteration uses a snapshot taken BEFORE glBegin,
+        so a concurrent mob change (network/mods) cannot throw a
+        ConcurrentModificationException or leave GL in a broken state.
+      - Every uncaught exception from ANY thread is now written to
+        %USERPROFILE%\.blockcraft112\crash.log with the thread name and
+        full stack trace, so any remaining crash is diagnosable.
+  * V6.25 trees, /treefall, the all-texture tilesheet and all earlier
+    features are unchanged.
 
 WHAT'S NEW IN V6.25 - trees rebuilt as real trees, they fall, and ONE editable
                        tilesheet holds every texture

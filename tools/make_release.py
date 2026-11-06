@@ -493,6 +493,32 @@ def main():
             "now also checks `bc/Tilesheet.class` and `bc/Trees.class`. No real-GPU/Windows "
             "playtest is claimed.\n"
         )
+    if version == "6.26":
+        release_notes += (
+            "\n### LOD pops and random crashes\n\n"
+            "**LOD tiles now fade in.** A tile used to appear the instant its mesh finished "
+            "uploading, so walking or turning produced hard pops as distant chunks snapped "
+            "into view. New tiles blend in over 18 frames using per-tile constant-alpha "
+            "blending (works with and without the LOD shader; at full opacity the output "
+            "is unchanged). The outermost 10% of the LOD horizon also fades out, so CPU "
+            "culling never cuts off a visible tile, and a 6% hysteresis band around every "
+            "split distance stops tiles flickering between detail levels.\n\n"
+            "**Random crashes hardened.** LOD upload buffers are sized from their real byte "
+            "length (no more BufferOverflowException on a partial mesh); a rejected worker "
+            "task can no longer leak an inflight slot and freeze all LOD requests; evicted "
+            "tiles are marked retired so a late worker cannot queue or draw a deleted VBO; "
+            "failed uploads, failed per-tile draws and a failed LOD render are contained and "
+            "self-heal instead of killing the game; entity-shadow mob iteration uses a "
+            "snapshot taken BEFORE glBegin so a concurrent mob change cannot throw; and "
+            "every uncaught exception from ANY thread is now written to "
+            "`%USERPROFILE%\\.blockcraft112\\crash.log` with the thread name and full "
+            "stack trace so any remaining crash is diagnosable.\n\n"
+            "V6.25 branch-skeleton trees, falling trees and the single editable tilesheet "
+            "are unchanged. Headless verification: six new V6.26 regression groups "
+            "including a four-thread LOD build stress test, strict equivalence, all 21 "
+            "GLSL programs, and the packaged exe/jar check. No real-GPU/Windows playtest "
+            "is claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:
