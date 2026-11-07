@@ -545,6 +545,36 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.32":
+        release_notes += (
+            "\n### Caves rebuilt to Minecraft density\n\n"
+            "The V6.31 carver hollowed out **19% of the ground within 20 blocks of the "
+            "surface** and opened 10% of all surface columns, so the world was basically "
+            "non-existent. `caveVer = 6` (new worlds only) is a new original carver that "
+            "matches Minecraft 1.18/1.20 **density and shape**: an intact 12-block surface "
+            "crust, thin spaghetti/noodle worm tunnels, sparse clustered cheese chambers, "
+            "rare giant halls, local aquifers and lava lakes. Only a strict noise gate may "
+            "break through the crust, producing rare, differently shaped entrances whose "
+            "funnel always connects to a real cave below. Headless 96x96 land sample: "
+            "**5.0% carved overall, 1.2% near the surface, 40 surface-open columns "
+            "(0.43%) and 40/40 entrances connected** - versus 16.1% / 19.3% / 930 for V6.31. "
+            "No Mojang code or assets are used.\n\n"
+            "### Structures rebuilt like Minecraft\n\n"
+            "V6.31's huge rotundas and 20-block corridors are gone. `CaveStructures6` builds "
+            "six small, recognisable structures on a 128-block grid: **mineshaft** (3-wide "
+            "plank corridors, oak supports, torches, iron track, loot chest), **dungeon** "
+            "(small cobble/mossy room, spawner, chests), **stronghold** (stone-brick rooms, "
+            "bookshelf library, obsidian portal frame), **amethyst geode** (spherical "
+            "obsidian/purpur shell with a hollow crystal interior), **ancient city** "
+            "(dark-prismarine floor, sea lantern) and **ruined portal** (obsidian frame, "
+            "cracked-brick rubble). Each is deterministic across chunk seams and gets a "
+            "short tunnel into a real cave.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite with four new V6.32 regression groups (density, entrances, "
+            "structures and release wiring), strict equivalence, all 21 GLSL programs and "
+            "`tools/verify_release.py`. `docs/screenshots/v6.32-caves.png` is a headless "
+            "generated preview, not a GPU screenshot. No real-GPU/Windows playtest is claimed.\n"
+        )
     if version == "6.31":
         release_notes += (
             "\n### LOD popping fixed at the root\n\n"

@@ -404,7 +404,7 @@ final class Screens {
       ws.caveLayers = g.opt.caveLayers;
       ws.caveLakes = g.opt.caveLakes;
       ws.caveRichness = g.opt.caveRichness;
-      ws.caveVer = g.opt.caveCliffs ? 5 : 1;
+      ws.caveVer = g.opt.caveCliffs ? 6 : 1;
       ws.biomeBorders = g.opt.biomeBorders;
       ws.treeDensity = g.opt.treeDensity;
       ws.treeScale = g.opt.treeScale;
@@ -508,7 +508,7 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
-         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  1.20 caves breaking the surface, aquifers & geodes" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
+         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  Minecraft-density caves, natural entrances, aquifers & structures" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
             : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
          + (ws.biomeBorders > 0 ? "  -  smooth biome borders" : "")
          + (ws.giantTrees ? "  -  giant trees" : "")
@@ -1057,7 +1057,7 @@ final class Screens {
       // ---------------------------------------------------------------- V6.22: world-gen overhaul
       cells.add(y -> {
          ui.toggle("Caves & Cliffs", o.caveCliffs, x0, y, colW, 20.0F,
-            "1.20-style cheese/spaghetti caverns that break through the ground naturally, new underground structures, aquifers, lush & dripstone biomes and amethyst geodes instead of the V6.21 tunnels.", () -> o.caveCliffs = !o.caveCliffs);
+            "Minecraft 1.18/1.20-style cheese, spaghetti and noodle caves at proper density: a solid surface crust, rare noise-shaped entrances that break through the ground naturally, local aquifers, and Minecraft-style mineshafts, dungeons, strongholds, geodes, ancient cities and ruined portals. Old saves keep their caves.", () -> o.caveCliffs = !o.caveCliffs);
          ui.slider("Biome Borders: " + new String[]{"Sharp", "Smooth", "Very"}[Options.clamp(o.biomeBorders, 0, 2)], x1, y, colW, 20.0F,
             Options.clamp(o.biomeBorders, 0, 2) / 2.0F,
             "Meandering, blended biome edges, mountain terraces, wider river valleys and gentler beaches.", v -> o.biomeBorders = Math.round(v * 2.0F));

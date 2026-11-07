@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.31  -  an original Minecraft-style voxel sandbox   (EDITION V6.31)
+BLOCKCRAFT V6.32  -  an original Minecraft-style voxel sandbox   (EDITION V6.32)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,36 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.32 - THE WORLD IS SOLID AGAIN
+
+  * THE CAVES WERE HOLLOWING OUT THE WHOLE WORLD. V6.31 carved 19%
+    of the ground within 20 blocks of the surface and opened 10% of
+    all surface columns. caveVer 6 (NEW WORLDS ONLY) is a completely
+    new original carver at Minecraft 1.18/1.20 density:
+      - an intact 12-block surface crust
+      - thin spaghetti / noodle worm tunnels between y=20 and y=60
+      - sparse clustered cheese chambers, rare giant halls
+      - local aquifers and lava lakes at the bottom
+      - only a strict noise gate may break through the crust, giving
+        rare, differently shaped entrances whose funnel always joins a
+        real cave below
+    Headless 96x96 land sample: 5.0% carved overall, 1.2% near the
+    surface, 40 surface-open columns (0.43%), 40/40 connected.
+    V6.31 was 16.1% / 19.3% / 930 columns. See the headless preview
+    docs/screenshots/v6.32-caves.png (NOT a GPU screenshot).
+  * STRUCTURES COMPLETELY REDONE, Minecraft-style instead of huge
+    rotundas: Mineshaft (plank corridors, oak supports, torches, iron
+    track, loot), Dungeon (small cobble room, spawner, chests),
+    Stronghold (stone brick rooms, bookshelf library, obsidian portal
+    frame), Amethyst Geode (spherical obsidian/purpur shell with a
+    hollow crystal interior), Ancient City (dark-prismarine floor,
+    sea lantern) and Ruined Portal (obsidian frame, cracked rubble).
+    All are small, deterministic across chunk seams, and get a short
+    tunnel into a real cave.
+  * V6.31 LOD cross-fades, 24-shot trailer, borderless fullscreen,
+    clean menus and everything earlier remain. Old saves keep their
+    old caves. No Mojang code or assets are used.
 
 WHAT'S NEW IN V6.31 - NO POPS, A REAL TRAILER, BORDERLESS, CLEAN MENUS, NEW CAVES
 

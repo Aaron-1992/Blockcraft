@@ -240,7 +240,8 @@ public final class WorldSettings {
    public boolean caveLakes = true;
    public float caveRichness = 1.0F;
    /** Update 6.29: 1 = V6.21 layered caves, 2 = Caves &amp; Cliffs carver, 3 = V6.28 sloped mouths,
-    * 4 = V6.29 walk-in cave entrances, 5 = V6.31 natural surface-breaking caves.
+    * 4 = V6.29 walk-in cave entrances, 5 = V6.31 natural surface-breaking caves,
+    * 6 = V6.32 Minecraft-density caves and Minecraft-style structures.
     * Old saves keep the version they were created with. */
    public int caveVer = 1;
    /** Update 6.22: 0 = sharp legacy biome borders, 1 = smooth, 2 = very smooth. */
@@ -379,7 +380,7 @@ public final class WorldSettings {
       s.caveLayers = Boolean.parseBoolean(p.getProperty("cavelayers", "true"));
       s.caveLakes = Boolean.parseBoolean(p.getProperty("cavelakes", "true"));
       try {
-         s.caveVer = Math.max(1, Math.min(5, Integer.parseInt(p.getProperty("cavever", "1").trim())));
+         s.caveVer = Math.max(1, Math.min(6, Integer.parseInt(p.getProperty("cavever", "1").trim())));
          s.biomeBorders = Math.max(0, Math.min(2, Integer.parseInt(p.getProperty("biomeborders", "0").trim())));
          s.treeDensity = f(p, "treedensity", 1.0F, 0.4F, 1.4F);
          s.treeScale = f(p, "treescale", 1.0F, 0.7F, 1.5F);

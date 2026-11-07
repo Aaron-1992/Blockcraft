@@ -587,7 +587,7 @@ final class Tests621 {
    }
 
    static void shaderAndVersion() {
-      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
+      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
       check(ShaderSrc.CLOUD_FS.contains("uniform float wxBeauty"), "the cloud shader has the beauty uniform");
       check(ShaderSrc.CLOUD_FS.contains("warm sunset rim"), "the cloud shader has a warm sunset rim");
       check(ShaderSrc.CLOUD_FS.contains("silver lining"), "the cloud shader still has silver linings");

@@ -119,8 +119,8 @@ final class Tests626 {
    }
 
    static void wiring() throws Exception {
-      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
-      eq("6.31", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.31");
+      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
+      eq("6.32", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.32");
       check(src("README.md").contains("V6.28"), "README describes V6.26");
       check(src("package/README.txt").contains("V6.28"), "the packaged readme describes V6.26");
       check(new File("docs/releases/v6.26.md").isFile(), "V6.26 release notes exist");

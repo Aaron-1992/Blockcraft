@@ -42,7 +42,7 @@ final class Tests629 {
       settings(4).save(p);
       eq(4, WorldSettings.load(p).caveVer, "cave version 4 round-trips");
       p.setProperty("cavever", "99");
-      eq(5, WorldSettings.load(p).caveVer, "future cave versions clamp to 5");
+      eq(6, WorldSettings.load(p).caveVer, "future cave versions clamp to 6");
       Properties v628 = new Properties();
       v628.setProperty("gentype", "1");
       v628.setProperty("cavever", "3");
@@ -51,7 +51,7 @@ final class Tests629 {
       legacy.setProperty("gentype", "0");
       eq(1, WorldSettings.load(legacy).caveVer, "an old save keeps the V6.21 caves");
       String s = src("src/bc/Screens.java");
-      check(s.contains("g.opt.caveCliffs ? 5 : 1"), "Create New World selects the walk-in carver");
+      check(s.contains("g.opt.caveCliffs ? 6 : 1"), "Create New World selects the walk-in carver");
       check(s.contains("break through the ground naturally"), "the option describes the new entrances");
       String cg = src("src/bc/CaveCliffs.java");
       check(cg.contains("MOUTH4_CELL = 64") && cg.contains("int ver = 3"),
@@ -173,7 +173,7 @@ final class Tests629 {
       eq(found.size(), linked, "every entrance tunnels into a real carved cave");
       String t = src("src/bc/TerraGen.java");
       check(t.contains("mm.floorAt(wx, wz)"), "the generator protects the ramp floor");
-      check(t.contains("ver3 && !cc4 && !cc5 && CaveWorks.shaft"), "old sinkhole shafts are off for new worlds");
+      check(t.contains("ver3 && !cc4 && !cc5 && !cc6 && CaveWorks.shaft"), "old sinkhole shafts are off for new worlds");
    }
 
    static void sounds() throws Exception {
@@ -209,8 +209,8 @@ final class Tests629 {
    }
 
    static void wiring() throws Exception {
-      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
-      eq("6.31", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.31");
+      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
+      eq("6.32", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.32");
       check(src("README.md").contains("V6.29"), "README describes V6.29");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.29"), "the packaged readme describes V6.29");
       check(new File("docs/releases/v6.29.md").isFile(), "V6.29 release notes exist");

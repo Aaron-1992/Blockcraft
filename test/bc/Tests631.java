@@ -189,7 +189,7 @@ final class Tests631 {
       settings(5).save(p);
       eq(5, WorldSettings.load(p).caveVer, "cave version 5 round-trips");
       p.setProperty("cavever", "99");
-      eq(5, WorldSettings.load(p).caveVer, "future cave versions clamp to 5");
+      eq(6, WorldSettings.load(p).caveVer, "future cave versions clamp to 6");
       Properties old = new Properties();
       old.setProperty("gentype", "0");
       eq(1, WorldSettings.load(old).caveVer, "an old save keeps its caves");
@@ -228,7 +228,7 @@ final class Tests631 {
       String c = src("src/bc/Caves5.java");
       check(c.contains("NO built cave mouths") && c.contains("aperture.noise2"),
          "openings are noise-shaped, not a repeated template");
-      check(src("src/bc/Screens.java").contains("g.opt.caveCliffs ? 5 : 1"),
+      check(src("src/bc/Screens.java").contains("g.opt.caveCliffs ? 6 : 1"),
          "new worlds use the V6.31 carver");
    }
 
@@ -276,8 +276,8 @@ final class Tests631 {
    }
 
    static void wiring() throws Exception {
-      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
-      eq("6.31", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.31");
+      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
+      eq("6.32", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.32");
       check(src("README.md").contains("V6.31"), "README describes V6.31");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.31"), "the packaged readme describes V6.31");
       check(new File("docs/releases/v6.31.md").isFile(), "V6.31 release notes exist");

@@ -40,12 +40,12 @@ final class Tests628 {
       settings(3).save(p);
       eq(3, WorldSettings.load(p).caveVer, "cave version 3 round-trips");
       p.setProperty("cavever", "99");
-      eq(5, WorldSettings.load(p).caveVer, "future cave versions clamp to 5");
+      eq(6, WorldSettings.load(p).caveVer, "future cave versions clamp to 6");
       Properties legacy = new Properties();
       legacy.setProperty("gentype", "0");
       eq(1, WorldSettings.load(legacy).caveVer, "an old save keeps the V6.21 caves");
       String s = src("src/bc/Screens.java");
-      check(s.contains("g.opt.caveCliffs ? 5 : 1"), "Create New World selects the 1.20 carver");
+      check(s.contains("g.opt.caveCliffs ? 6 : 1"), "Create New World selects the 1.20 carver");
       check(s.contains("break through the ground naturally"), "the option describes the new entrances");
    }
 
@@ -132,8 +132,8 @@ final class Tests628 {
    }
 
    static void wiring() throws Exception {
-      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
-      eq("6.31", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.31");
+      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
+      eq("6.32", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.32");
       check(src("README.md").contains("V6.28"), "README describes V6.28");
       check(src("package/README.txt").contains("V6.28"), "the packaged readme describes V6.28");
       check(new File("docs/releases/v6.28.md").isFile(), "V6.28 release notes exist");

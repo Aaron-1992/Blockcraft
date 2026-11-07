@@ -59,6 +59,8 @@ def required(version):
         extra += ("Trailer",)
     if tuple(map(int, version.split("."))) >= (6, 31):
         extra += ("Caves5", "CaveStructures5")
+    if tuple(map(int, version.split("."))) >= (6, 32):
+        extra += ("Caves6", "CaveStructures6")
     return REQUIRED + extra
 
 

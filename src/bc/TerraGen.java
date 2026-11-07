@@ -646,7 +646,7 @@ public final class TerraGen extends Gen {
       double zone = this.nRavZ.noise2(x / 420.0 + 12.0, z / 420.0 - 5.0);
       // V6.28: with real cave entrances available, the endless surface cracks
       // no longer need to be everywhere.
-      double need = big ? (this.st.caveVer >= 5 ? 0.36 : (this.st.caveVer >= 4 ? 0.30 : (this.st.caveVer >= 3 ? 0.16 : 0.05))) : 0.2;
+      double need = big ? (this.st.caveVer >= 6 ? 0.40 : (this.st.caveVer >= 5 ? 0.36 : (this.st.caveVer >= 4 ? 0.30 : (this.st.caveVer >= 3 ? 0.16 : 0.05)))) : 0.2;
       if (zone < need) {
          return 0.0;
       }
@@ -703,6 +703,7 @@ public final class TerraGen extends Gen {
       final boolean cc3 = ver3 && this.st.caveVer >= 3;   // V6.28 entrances + larger caverns
       final boolean cc4 = ver3 && this.st.caveVer >= 4;   // V6.29 walk-in entrances
       final boolean cc5 = ver3 && this.st.caveVer >= 5;   // V6.31: caves break through the ground
+      final boolean cc6 = ver3 && this.st.caveVer >= 6;   // V6.32: Minecraft-density caves
       int[] hs = new int[256];
       int[] bm = new int[256];
       int[] rule = new int[5];
@@ -758,8 +759,9 @@ public final class TerraGen extends Gen {
             // caves
             // V6.31 has NO built cave mouths: the noise caves themselves are
             // allowed to reach the surface, so openings are all different.
-            CaveCliffs.Mouth[] ms = cc3 && !cc5 && (cc4 || h >= 64) ? this.caves.mouths(wx, wz) : null;
-            boolean allowSurface = cc5 && Caves5.landBiome(s.biome, h);
+            CaveCliffs.Mouth[] ms = cc3 && !cc5 && !cc6 && (cc4 || h >= 64) ? this.caves.mouths(wx, wz) : null;
+            boolean allowSurface = cc6 ? Caves6.landBiome(s.biome, h)
+               : (cc5 && Caves5.landBiome(s.biome, h));
             boolean inMouth = false;
             if (ms != null) {
                for (CaveCliffs.Mouth m : ms) if (m.surfaceHole(wx, wz)) { inMouth = true; break; }
@@ -767,8 +769,8 @@ public final class TerraGen extends Gen {
             int top2 = h - 3;
             // V6.29: with real walk-in cave mouths, the old noise sinkholes and
             // vertical shafts (the endless cracks in the ground) are switched off.
-            boolean mouth = !cc4 && !cc5 && h >= 64 && (ver3 ? this.caves.mouth(wx, wz) : this.entranceBig(wx, wz)) && s.biome != Biomes.MUSHROOM;
-            boolean shaft = ver3 && !cc4 && !cc5 && CaveWorks.shaft(this.seed, wx, wz);
+            boolean mouth = !cc4 && !cc5 && !cc6 && h >= 64 && (ver3 ? this.caves.mouth(wx, wz) : this.entranceBig(wx, wz)) && s.biome != Biomes.MUSHROOM;
+            boolean shaft = ver3 && !cc4 && !cc5 && !cc6 && CaveWorks.shaft(this.seed, wx, wz);
             if (mouth || shaft || inMouth || allowSurface) {
                top2 = h;
             }
@@ -784,7 +786,15 @@ public final class TerraGen extends Gen {
                   continue;
                }
 
-               if (cc5) {
+               if (cc6) {
+                  // V6.32: a calm Minecraft-density carver. The top 12 blocks
+                  // stay solid; only rare noise-shaped entrances open them.
+                  int cv = this.caves.carve6(wx, y, wz, h, allowSurface);
+                  if (cv != 0) {
+                     b[Chunk.idx(x, y, z)] = (short)(cv == CaveCliffs.LAVA ? Blocks.LAVA
+                        : (cv == CaveCliffs.WATER ? Blocks.WATER : 0));
+                  }
+               } else if (cc5) {
                   // V6.31: one pure carver, from bedrock to the grass. Wherever
                   // the noise reaches the surface on dry land it opens a hole,
                   // with a shape that is different every time.
@@ -832,7 +842,7 @@ public final class TerraGen extends Gen {
 
             // A stone lip makes the mouth read as a cave entrance rather than
             // a random hole, and stops grass/trees growing on its edge.
-            if (ms != null && !cc5 && h >= 64) {
+            if (ms != null && !cc5 && !cc6 && h >= 64) {
                for (CaveCliffs.Mouth m : ms) {
                   if (m.rim(wx, wz)) {
                      b[Chunk.idx(x, h, z)] = (short)Blocks.STONE;

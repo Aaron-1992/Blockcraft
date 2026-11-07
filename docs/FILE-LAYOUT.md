@@ -9,7 +9,7 @@ everything now lives, so the checkout is ~156 MB instead of ~1.3 GB.
 
 | Path | What it is |
 | --- | --- |
-| `src/bc/` | All game Java sources. `Trailer.java` (montage), `Caves5.java` (new carver), `CaveStructures5.java` (new structures), `Lod.java` (cross-fades). |
+| `src/bc/` | All game Java sources. `Trailer.java` (montage), `Caves6.java` / `CaveStructures6.java` (V6.32 Minecraft-density caves & structures), `Caves5.java` / `CaveStructures5.java` (V6.31, kept for those saves), `Lod.java` (cross-fades). |
 | `test/bc/` | Headless regression suites, one `Tests6xx.java` per milestone. |
 | `tools/` | `build.py`, `runtests.py`, `glsl_check.py`, `make_release.py`, `verify_release.py`, `tilesheet.py`. |
 | `res/` | Resources copied into `blockcraft.jar`. `res/sounds/soundbank.bin` is the big music bank; `res/sounds/foley/` holds the ten real CC0 WAV recordings + `CREDITS.txt`. |
