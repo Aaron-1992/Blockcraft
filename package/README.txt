@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.28  -  an original Minecraft-style voxel sandbox   (EDITION V6.28)
+BLOCKCRAFT V6.29  -  an original Minecraft-style voxel sandbox   (EDITION V6.29)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,33 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.29 - NORMAL CAVE ENTRANCES AND REAL RECORDED SOUNDS
+
+  * ACTUAL WALK-IN CAVE ENTRANCES. V6.28's mouths were long diagonal
+    cracks; the ones you see now are wide, irregular round openings in
+    the ground with a stone lip and a SLOPED SOLID FLOOR you can walk
+    down from the grass into a chamber. The deep end keeps a rock roof
+    (a cave arch), and a horizontal gallery plus a straight tunnel
+    always join a real carved cave - verified headlessly for every
+    sampled entrance, 47/47 linked to the cave network.
+  * NEW WORLDS ONLY (caveVer 4). The nine 64-block cells around spawn
+    always get a mouth, so one is a short walk away; the old noise
+    sinkholes, vertical shafts and most ravines are switched off so
+    entrances are entrances rather than infinite cracks. V6.28 worlds
+    keep caveVer 3 and are never rewritten. See the headless generated
+    cross-section docs/screenshots/v6.29-caves.png (not a GPU shot).
+  * REAL SOUNDS, NOT GENERATED ONES. All eight V6.28 procedural tones
+    were removed. tree_fall, tree_crash, tree_creak, leaf_rustle,
+    wind_gust, cave_drip, cave_wind, cave_rumble, geode_chime and
+    stone_crumble are now REAL CC0 FIELD / FOLEY RECORDINGS, shipped as
+    22050 Hz mono 16-bit WAVs in sounds/foley/ next to the exe and
+    inside blockcraft.jar. Replace any WAV with your own recording and
+    restart - loose files win. Type /sounds in game to see how many
+    are active and /sounds tree_crash to audition one. Sources, authors
+    and CC0 1.0 links are in sounds/foley/CREDITS.txt. No Mojang audio.
+  * V6.28 caverns, V6.27 resource-pack fixes, V6.26 LOD fading and
+    all earlier work are unchanged.
 
 WHAT'S NEW IN V6.28 - 1.20-style CAVES, REAL ENTRANCES, MORE SOUNDS
 

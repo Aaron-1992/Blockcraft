@@ -1,0 +1,50 @@
+BLOCKCRAFT V6.29 - REAL RECORDED FOLEY
+====================================
+
+The WAV files in this folder are REAL AUDIO RECORDINGS, not tones generated at
+run time. They are mono, 22,050 Hz, 16-bit PCM, cut/trimmed, loudness matched
+and soft-limited for the game's mixer. Every one is Creative Commons CC0 1.0
+(public domain): free for any use, no attribution legally required. No Mojang
+code or assets, and no Minecraft audio, is used anywhere in these files.
+
+The files were fetched from two public GitHub mirrors that document each
+source recording, its recordist and its CC0 licence. The original recordings
+are hosted on Freesound; the mirrors ship the CC0 preview cuts.
+
+  * cyberced21/project-serotonin - audio/gathering/SOURCES.md,
+    audio/mine/SOURCES.md, audio/forge/SOURCES.md
+    https://github.com/cyberced21/project-serotonin
+  * RyanSaxe/gaia - app/renderer/sound/assets/CREDITS.md
+    https://github.com/RyanSaxe/gaia
+
+KEY             RECORDING                                    RECORDIST      SOURCE (CC0 1.0)
+--------------  -------------------------------------------  -------------  ------------------------------------------------------------
+tree_fall.wav   "timber tree falling 1"                      matt_beer      https://freesound.org/people/matt_beer/sounds/515313/
+                mirrored as audio/gathering/wood/fall_01.wav
+tree_crash.wav  "timber tree falling 1" (landing half)       matt_beer      https://freesound.org/people/matt_beer/sounds/515313/
+                mirrored as audio/gathering/wood/land_01.wav
+tree_creak.wav  "knakande trad 1 (creaking tree)"            Ryding         https://freesound.org/people/Ryding/sounds/94359/
+                mirrored as audio/gathering/wood/creak_01.wav
+leaf_rustle.wav "Forest, close up of trees rustling in       Anya_Media     https://freesound.org/people/Anya_Media/sounds/523389/
+                 the wind.wav" (field recording)
+                mirrored as app/renderer/sound/assets/leaves.ogg
+wind_gust.wav   "Wind gusts grass"                           fran_marenco   https://freesound.org/people/fran_marenco/sounds/853991/
+                mirrored as app/renderer/sound/assets/gusts.ogg
+cave_drip.wav   "Water Dripping (Large Echo)"                editor_adp     https://freesound.org/people/editor_adp/sounds/162116/
+                mirrored as audio/mine/drip_1.wav
+cave_wind.wav   "archi_soundscape_cavern3.wav" (cavern       ElanHickler    https://freesound.org/people/ElanHickler/sounds/38963/
+                 atmosphere field recording)
+                mirrored as audio/mine/air.mp3
+cave_rumble.wav "Cinematic Deep Bass Rumble"                 mmasonghi      https://freesound.org/people/mmasonghi/sounds/321812/
+                mirrored as audio/forge/drone.wav
+geode_chime.wav "Crystal glass (pitch E) 2 long sustains"    esoonchia      https://freesound.org/people/esoonchia/sounds/839945/
+                mirrored as audio/mine/crystal.mp3
+stone_crumble.wav "RockFall1b.wav"                           AlanCat         https://freesound.org/people/AlanCat/sounds/381645/
+                mirrored as audio/mine/rockfall_1.wav
+
+Licence: https://creativecommons.org/publicdomain/zero/1.0/
+
+To use your own recordings: replace any WAV in this folder (or in the game's
+sounds/foley/ folder next to Blockcraft.exe) with a mono/stereo 16-bit PCM WAV
+of the same name, then restart the game or press Reload PNGs. The game reads
+the loose WAVs first and falls back to the copies inside blockcraft.jar.

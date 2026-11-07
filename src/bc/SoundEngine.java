@@ -154,6 +154,14 @@ public final class SoundEngine {
          "Combat, Tool Break & Eating - sonictechtonic (#241872), HerbertBoland (#33206), Jordan 'AntumDeluge' Irwin"
       },
       {
+         "REAL RECORDED WORLD FOLEY (V6.29, CC0 1.0)",
+         "Tree fall / crash - matt_beer; tree creak - Ryding (Freesound, CC0 1.0)",
+         "Leaf rustle - Anya_Media; wind gusts - fran_marenco (Freesound, CC0 1.0)",
+         "Cave drips - editor_adp; cavern air - ElanHickler; deep rumble - mmasonghi",
+         "Crystal glass - esoonchia; rockfall - AlanCat (Freesound, CC0 1.0)",
+         "Real field/foley recordings as WAV files; full provenance in sounds/foley/CREDITS.txt"
+      },
+      {
          "3D REAL-LIFE PHYSICAL ACOUSTICS ENGINE",
          "Binaural Spatialization (Interaural Time & Level Difference + Head Shadowing)",
          "Voxel Ray-Cast Sound Occlusion, Wall Transmission Loss & Doorway Diffraction",
@@ -161,6 +169,22 @@ public final class SoundEngine {
          "Speed-of-Sound Wave Propagation (343 m/s), Doppler Pitch Shift & Underwater Low-Pass Filter"
       }
    };
+
+   /**
+    * V6.29: real recorded foley. These are WAV files of CC0 field / foley
+    * recordings (see res/sounds/foley/CREDITS.txt), NOT tones generated at run
+    * time. Loose WAVs next to the exe win, then the copies inside the jar, so a
+    * player can replace any recording without rebuilding the game. No Mojang
+    * audio is used.
+    */
+   private static final String[][] RECORDED_FOLEY = {
+      {"tree_fall", "tree_fall.wav"}, {"tree_crash", "tree_crash.wav"},
+      {"tree_creak", "tree_creak.wav"}, {"leaf_rustle", "leaf_rustle.wav"},
+      {"wind_gust", "wind_gust.wav"}, {"cave_drip", "cave_drip.wav"},
+      {"cave_wind", "cave_wind.wav"}, {"cave_rumble", "cave_rumble.wav"},
+      {"geode_chime", "geode_chime.wav"}, {"stone_crumble", "stone_crumble.wav"}
+   };
+   private static volatile int recordedFoleyCount = 0;
 
    private static final Map<String, Sample> BANK = new HashMap<>();
    private static final ConcurrentLinkedQueue<Voice> ACTIVE_VOICES = new ConcurrentLinkedQueue<>();
@@ -330,8 +354,9 @@ public final class SoundEngine {
          System.err.println("[SoundEngine] Failed to read soundbank.bin: " + t);
       }
 
-      // Synthesize crisp acoustic supplements (UI click, bow twang, arrow whoosh, thunder clap, rain patter, note instruments)
+      // UI / instrument fallbacks only; V6.29 world foley comes from real recordings.
       synthesizeAcousticSupplements();
+      loadRecordedFoley();
       aliasSample("eat_1", "eat_bite");
       aliasSample("bow", "bow_shoot");
       aliasSample("tnt_prime", "tnt_ignite");
@@ -455,112 +480,6 @@ public final class SoundEngine {
          String key="note_"+NoteBlocks.NAMES[instrument];BANK.put(key,new Sample(key,sr,NoteBlocks.samples(instrument,sr)));
       }
 
-      // 7. V6.28 procedural world foley - trees falling and cave ambience.
-      // Everything here is synthesized locally: no Mojang or third-party audio.
-      Random fr = new Random(0x46364C4559L);
-
-      // tree_fall: a long wooden creak bending downward, plus a rising canopy whoosh.
-      short[] tf = new short[(int)(sr * 1.6)];
-      double phase = 0.0, lpF = 0.0;
-      for (int i = 0; i < tf.length; i++) {
-         double t = i / (double)sr;
-         double f = 112.0 - 58.0 * Math.min(1.0, t / 1.35);
-         phase += 2.0 * Math.PI * f / sr;
-         double creak = (Math.sin(phase) + 0.45 * Math.sin(2.0 * phase) + 0.25 * Math.sin(3.0 * phase))
-            * (0.55 + 0.45 * Math.sin(2.0 * Math.PI * 7.0 * t)) * Math.exp(-t * 1.45);
-         lpF += 0.055 * ((fr.nextDouble() * 2.0 - 1.0) - lpF);
-         double whoosh = lpF * 3.2 * Math.min(1.0, t / 0.85) * Math.exp(-Math.max(0.0, t - 0.85) * 2.3);
-         tf[i] = (short)(Math.max(-1.0, Math.min(1.0, creak * 0.42 + whoosh * 0.55)) * 26000.0);
-      }
-      BANK.put("tree_fall", new Sample("tree_fall", sr, tf));
-
-      // tree_crash: a heavy low thud, a wood crack and a settling leaf rustle.
-      short[] tc = new short[(int)(sr * 1.3)];
-      double lpC = 0.0;
-      for (int i = 0; i < tc.length; i++) {
-         double t = i / (double)sr;
-         double thud = Math.sin(2.0 * Math.PI * 62.0 * t) * Math.exp(-t * 7.0) * 0.85
-            + Math.sin(2.0 * Math.PI * 37.0 * t) * Math.exp(-t * 4.2) * 0.55;
-         double n = fr.nextDouble() * 2.0 - 1.0;
-         lpC += 0.11 * (n - lpC);
-         double crack = n * Math.exp(-t * 19.0) * 0.55 + lpC * 2.1 * Math.exp(-t * 3.6);
-         double leaf = lpC * 1.4 * Math.exp(-Math.pow((t - 0.20) * 5.0, 2.0));
-         tc[i] = (short)(Math.max(-1.0, Math.min(1.0, thud + crack + leaf)) * 29000.0);
-      }
-      BANK.put("tree_crash", new Sample("tree_crash", sr, tc));
-
-      // leaf_rustle: two short bandpassed noise swells.
-      short[] lr = new short[(int)(sr * 0.42)];
-      double lpL = 0.0;
-      for (int i = 0; i < lr.length; i++) {
-         double t = i / (double)sr;
-         double n = fr.nextDouble() * 2.0 - 1.0;
-         lpL += 0.32 * (n - lpL);
-         double env = Math.exp(-t * 7.0) * (0.6 + 0.4 * Math.sin(2.0 * Math.PI * 11.0 * t));
-         lr[i] = (short)(Math.max(-1.0, Math.min(1.0, (n - lpL) * 0.55 * env)) * 15000.0);
-      }
-      BANK.put("leaf_rustle", new Sample("leaf_rustle", sr, lr));
-
-      // cave_drip: two resonant water droplets with a short echo tail.
-      short[] cd = new short[(int)(sr * 0.75)];
-      for (int i = 0; i < cd.length; i++) {
-         double t = i / (double)sr;
-         double a = drop(t, 1180.0, 28.0);
-         double b = 0.55 * drop(t - 0.235, 1430.0, 34.0);
-         double echo = 0.20 * drop(t - 0.41, 980.0, 30.0);
-         cd[i] = (short)(Math.max(-1.0, Math.min(1.0, a + b + echo)) * 21000.0);
-      }
-      BANK.put("cave_drip", new Sample("cave_drip", sr, cd));
-
-      // cave_wind: slow, low-passed air swells for big empty caverns.
-      short[] cw = new short[(int)(sr * 2.4)];
-      double lpW = 0.0;
-      for (int i = 0; i < cw.length; i++) {
-         double t = i / (double)sr;
-         double n = fr.nextDouble() * 2.0 - 1.0;
-         lpW += 0.015 * (n - lpW);
-         double env = Math.sin(Math.PI * i / (double)cw.length) * (0.55 + 0.45 * Math.sin(2.0 * Math.PI * 0.7 * t));
-         cw[i] = (short)(Math.max(-1.0, Math.min(1.0, lpW * 7.0 * env)) * 17000.0);
-      }
-      BANK.put("cave_wind", new Sample("cave_wind", sr, cw));
-
-      // cave_rumble: a deep subterranean swell under the whole cave layer.
-      short[] cr = new short[(int)(sr * 2.8)];
-      double lpR = 0.0;
-      for (int i = 0; i < cr.length; i++) {
-         double t = i / (double)sr;
-         double n = fr.nextDouble() * 2.0 - 1.0;
-         lpR += 0.008 * (n - lpR);
-         double env = Math.sin(Math.PI * i / (double)cr.length);
-         double sub = Math.sin(2.0 * Math.PI * 34.0 * t) * 0.28 * env;
-         cr[i] = (short)(Math.max(-1.0, Math.min(1.0, lpR * 9.0 * env + sub)) * 23000.0);
-      }
-      BANK.put("cave_rumble", new Sample("cave_rumble", sr, cr));
-
-      // geode_chime: a soft amethyst bell for crystal chambers.
-      short[] gc = new short[(int)(sr * 1.5)];
-      for (int i = 0; i < gc.length; i++) {
-         double t = i / (double)sr;
-         double env = Math.exp(-t * 3.1);
-         double v = Math.sin(2.0 * Math.PI * 880.0 * t) * 0.55
-            + Math.sin(2.0 * Math.PI * 1320.0 * t) * 0.28
-            + Math.sin(2.0 * Math.PI * 1760.0 * t) * 0.17;
-         gc[i] = (short)(Math.max(-1.0, Math.min(1.0, v * env)) * 19000.0);
-      }
-      BANK.put("geode_chime", new Sample("geode_chime", sr, gc));
-
-      // stone_crumble: gravel grains tumbling down a cave wall.
-      short[] sc = new short[(int)(sr * 0.7)];
-      double lpS = 0.0;
-      for (int i = 0; i < sc.length; i++) {
-         double t = i / (double)sr;
-         double n = fr.nextDouble() * 2.0 - 1.0;
-         if (fr.nextInt(70) == 0) n += (fr.nextDouble() * 2.0 - 1.0) * 1.6;
-         lpS += 0.28 * (n - lpS);
-         sc[i] = (short)(Math.max(-1.0, Math.min(1.0, lpS * Math.exp(-t * 5.5))) * 18000.0);
-      }
-      BANK.put("stone_crumble", new Sample("stone_crumble", sr, sc));
-
       // 6. Item Pickup Pop fallback (if not loaded from soundbank.bin)
       if (!BANK.containsKey("item_pop")) {
          short[] pop = new short[sr / 12];
@@ -574,11 +493,121 @@ public final class SoundEngine {
       }
    }
 
-   /** A resonant water droplet: a fast downward pitch sweep under an exponential decay. */
-   private static double drop(double t, double freq, double decay) {
-      if (t < 0.0) return 0.0;
-      return Math.sin(2.0 * Math.PI * (freq * t + 240.0 * Math.exp(-t * 24.0) / 24.0))
-         * Math.exp(-t * decay);
+   /** Reads a loose or packaged RIFF/WAVE PCM recording; never synthesizes audio. */
+   private static byte[] foleyBytes(String file) {
+      String[] rel = {"sounds/foley/" + file, "res/sounds/foley/" + file};
+      for (String p : rel) {
+         try {
+            java.io.File f = new java.io.File(p);
+            if (f.isFile()) return java.nio.file.Files.readAllBytes(f.toPath());
+         } catch (Throwable ignored) {
+         }
+      }
+      try {
+         java.io.File code = new java.io.File(SoundEngine.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+         java.io.File base = code.isFile() ? code.getParentFile() : code;
+         if (base != null) {
+            java.io.File f = new java.io.File(base, "sounds/foley/" + file);
+            if (f.isFile()) return java.nio.file.Files.readAllBytes(f.toPath());
+         }
+      } catch (Throwable ignored) {
+      }
+      try (InputStream in = SoundEngine.class.getResourceAsStream("/sounds/foley/" + file)) {
+         return in == null ? null : in.readAllBytes();
+      } catch (Throwable ignored) {
+         return null;
+      }
+   }
+
+   private static int le16(byte[] b, int o) {
+      return (b[o] & 0xFF) | ((b[o + 1] & 0xFF) << 8);
+   }
+
+   private static int le32(byte[] b, int o) {
+      return (b[o] & 0xFF) | ((b[o + 1] & 0xFF) << 8) | ((b[o + 2] & 0xFF) << 16) | ((b[o + 3] & 0xFF) << 24);
+   }
+
+   /** Minimal dependency-free PCM WAV decoder (8/16/24/32-bit, mono or stereo, linear resample). */
+   private static Sample decodeWav(String key, byte[] b) {
+      if (b == null || b.length < 44 || b[0] != 'R' || b[1] != 'I' || b[2] != 'F' || b[3] != 'F'
+         || b[8] != 'W' || b[9] != 'A' || b[10] != 'V' || b[11] != 'E') return null;
+      int pos = 12, format = 0, channels = 0, rate = 0, bits = 0, dataOff = -1, dataLen = 0;
+      while (pos + 8 <= b.length) {
+         String id = new String(b, pos, 4, java.nio.charset.StandardCharsets.ISO_8859_1);
+         int len = le32(b, pos + 4);
+         if (len < 0 || pos + 8 + len > b.length) break;
+         if (id.equals("fmt ") && len >= 16) {
+            format = le16(b, pos + 8);
+            channels = le16(b, pos + 10);
+            rate = le32(b, pos + 12);
+            bits = le16(b, pos + 22);
+         } else if (id.equals("data")) {
+            dataOff = pos + 8;
+            dataLen = len;
+            break;
+         }
+         pos += 8 + len + (len & 1);
+      }
+      if (format != 1 || dataOff < 0 || channels < 1 || channels > 2 || rate < 8000 || rate > 192000
+         || (bits != 8 && bits != 16 && bits != 24 && bits != 32)) return null;
+      int bytesPer = bits / 8;
+      int frames = Math.min(dataLen / (bytesPer * channels), rate * 12);
+      if (frames < 256) return null;
+      short[] mono = new short[frames];
+      for (int i = 0; i < frames; i++) {
+         long sum = 0L;
+         for (int c = 0; c < channels; c++) {
+            int o = dataOff + (i * channels + c) * bytesPer;
+            int v;
+            if (bits == 8) v = (b[o] & 0xFF) - 128;
+            else if (bits == 16) v = (short)le16(b, o);
+            else if (bits == 24) v = (b[o] & 0xFF) | ((b[o + 1] & 0xFF) << 8) | (b[o + 2] << 16);
+            else v = le32(b, o);
+            sum += v;
+         }
+         double avg = (double)sum / channels;
+         double scaled = bits == 8 ? avg * 256.0 : bits == 16 ? avg : bits == 24 ? avg / 256.0 : avg / 65536.0;
+         mono[i] = (short)Math.max(-32768, Math.min(32767, Math.round(scaled)));
+      }
+      // The mixer already scales Voice.step by sample.rate / MIX_RATE, so the
+      // original recording is kept untouched (no interpolation artefacts).
+      return new Sample(key, rate, mono);
+   }
+
+   /** V6.29: installs the real CC0 recordings into the sample bank. */
+   private static void loadRecordedFoley() {
+      int loaded = 0;
+      for (String[] e : RECORDED_FOLEY) {
+         try {
+            Sample s = decodeWav(e[0], foleyBytes(e[1]));
+            if (s != null) {
+               BANK.put(e[0], s);
+               loaded++;
+            }
+         } catch (Throwable t) {
+            System.err.println("[SoundEngine] recorded foley " + e[1] + ": " + t);
+         }
+      }
+      recordedFoleyCount = loaded;
+      System.out.println("[SoundEngine] " + loaded + "/" + RECORDED_FOLEY.length
+         + " real CC0 foley WAVs loaded from sounds/foley/");
+      if (loaded < RECORDED_FOLEY.length) {
+         System.err.println("[SoundEngine] only " + loaded + "/" + RECORDED_FOLEY.length + " recorded foley WAVs were found");
+      }
+   }
+
+   /** How many real WAV recordings are active (10 when the full foley folder is present). */
+   public static int recordedFoleyCount() {
+      ensureLoaded();
+      return recordedFoleyCount;
+   }
+
+   /** True when this key is backed by a real recording rather than a synthesized fallback. */
+   public static boolean isRecordedFoley(String key) {
+      ensureLoaded();
+      if (!BANK.containsKey(key)) return false;
+      for (String[] e : RECORDED_FOLEY) if (e[0].equals(key)) return true;
+      return false;
    }
 
    public static Sample getSample(String key) {

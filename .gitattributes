@@ -7,3 +7,4 @@ package/*   -text
 *.dll       binary
 *.so        binary
 *.png       binary
+*.wav    binary

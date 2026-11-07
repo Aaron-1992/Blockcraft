@@ -53,7 +53,7 @@ final class CaveWorks {
       this.b = b;
       this.c = c;
       this.e = e;
-      this.cliffs = new CaveCliffs(seed, st);
+      this.cliffs = new CaveCliffs(seed, st, gen);
    }
 
    // ------------------------------------------------------------------ instance shortcuts
@@ -77,7 +77,8 @@ final class CaveWorks {
 
    /** True when the surface here is the opening of a real cave entrance. */
    boolean mouthSurface(int x, int z, int surfaceH) {
-      if (surfaceH < 66 || this.st.caveVer < 3) return false;
+      if (this.st.caveVer < 3) return false;
+      if (surfaceH < (this.st.caveVer >= 4 ? 64 : 66)) return false;
       CaveCliffs.Mouth[] ms = this.cliffs.mouths(x, z);
       if (ms == null) return false;
       for (CaveCliffs.Mouth m : ms) if (m.surfaceHole(x, z)) return true;

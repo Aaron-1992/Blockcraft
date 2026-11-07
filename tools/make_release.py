@@ -545,6 +545,37 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.29":
+        release_notes += (
+            "\n### Normal walk-in cave entrances (new worlds only)\n\n"
+            "V6.28's entrances were long diagonal cracks. `caveVer = 4` now grows **wide, "
+            "irregular round cave mouths** with a stone lip and a **solid sloped floor** you "
+            "walk down from the grass into a chamber; the deep end keeps a rock roof so it "
+            "reads as an arch. Every mouth has a horizontal gallery, a shaft and a straight "
+            "tunnel that is placed on a block the noise carver really hollowed: a headless "
+            "scan of 47 entrances near spawn found **47/47 linked** to the cave network. "
+            "The nine 64-block cells around world spawn always get an entrance, and the old "
+            "noise sinkholes, vertical shafts and most ravines are switched off so the "
+            "surface no longer looks like endless cracks. V6.28 worlds keep `caveVer = 3` "
+            "and are never rewritten. `docs/screenshots/v6.29-caves.png` is a headless "
+            "generated cross-section, not a GPU screenshot.\n\n"
+            "### Real recorded sounds instead of generated tones\n\n"
+            "All eight procedural V6.28 tones were **removed**. Ten world cues are now real "
+            "CC0 1.0 field/foley recordings: **tree_fall, tree_crash, tree_creak, "
+            "leaf_rustle, wind_gust, cave_drip, cave_wind, cave_rumble, geode_chime, "
+            "stone_crumble**. They ship as 22,050 Hz mono 16-bit WAVs in `sounds/foley/` "
+            "next to the exe AND inside `blockcraft.jar`; the game reads loose WAVs first, "
+            "so you can replace any recording with your own. `sounds/foley/CREDITS.txt` "
+            "lists every recordist, Freesound link and the CC0 licence. No Mojang audio "
+            "is used. Tree falls/crashes still fire from `Trees`, leaves still rustle on "
+            "break, and cave ambience now also picks wind gusts.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite with five new V6.29 regression groups (cave version, walk-in "
+            "geometry, cave-network links, real WAV decoding and release wiring), strict "
+            "equivalence, all 21 GLSL programs, and `tools/verify_release.py` now checks "
+            "that every foley WAV is identical loose and inside the jar. No real-GPU/Windows "
+            "playtest is claimed.\n"
+        )
     if version == "6.28":
         release_notes += (
             "\n### 1.20-style caves with real entrances\n\n"

@@ -39,38 +39,122 @@ final class CaveCliffs {
    static final int GEODE = 56;
    /** V6.28: hashed grid of real cave entrances (not ravines or sinkhole pits). */
    static final int MOUTH_CELL = 96;
+   /** V6.29: walk-in cave mouths are closer together, so a player actually finds one. */
+   static final int MOUTH4_CELL = 64;
+   /** Sentinel for a hashed cell that has no entrance (ConcurrentHashMap cannot hold nulls). */
+   private static final Mouth NO_MOUTH = new Mouth();
 
    /**
-    * A 1.20-style cave mouth: a visible opening in the surface that slopes down
-    * through the rock and opens into a chamber joined to the underground carver.
-    * All values are pure functions of the seed and the world coordinate.
+    * A cave mouth. {@code ver = 3} is the V6.28 sloped crack (kept byte-for-byte
+    * for worlds created with V6.28). {@code ver = 4} is the V6.29 walk-in
+    * entrance: a wide irregular surface opening whose floor slopes gently from
+    * the downhill lip down into a chamber, with a rock arch over the deep end
+    * and a horizontal gallery that joins the natural cave network. It is a
+    * normal cave entrance, not an endless diagonal crack in the ground.
     */
    static final class Mouth {
+      int ver = 3;
       int x, z;
       int radius;
       double dirX, dirZ;
+      // V6.29 only ----------------------------------------------------------
+      int siteH;          // surface height at the mouth centre
+      int depth;          // how far the walk-in ramp descends
+      int chamberY;       // floor of the bottom chamber
+      int gallery;        // length of the horizontal tunnel out of the chamber
+      int linkAt;         // distance along the gallery where a natural cave was found
+      int wellBottom;     // bottom of the shaft under the chamber
+      int linkX, linkY, linkZ;   // a real carved cave block the tunnel reaches
+      boolean linkFound;
+      double phase;       // hashed irregularity of the rim
+
+      boolean v4() {
+         return ver >= 4;
+      }
 
       /** True when this column is part of the stone lip around the opening. */
       boolean rim(int wx, int wz) {
+         return v4() ? rim4(wx, wz) : rim3(wx, wz);
+      }
+
+      private boolean rim3(int wx, int wz) {
          double d = Math.sqrt((double)(wx - x) * (wx - x) + (double)(wz - z) * (wz - z));
          double r = radius * 1.35;
          return d > r + 0.5 && d < r + 2.4;
       }
 
+      private boolean rim4(int wx, int wz) {
+         double dx = wx - (x + dirX * radius * 0.25);
+         double dz = wz - (z + dirZ * radius * 0.25);
+         double ax = dx * dirX + dz * dirZ;
+         double bz = -dx * dirZ + dz * dirX;
+         double rx = radius * 1.05, rz = radius * 0.88;
+         double q = Math.sqrt((ax / rx) * (ax / rx) + (bz / rz) * (bz / rz));
+         double wob = 1.0 + 0.10 * Math.sin(ax * 0.33 + bz * 0.19 + phase)
+            + 0.05 * Math.sin(bz * 0.41 - ax * 0.11 - phase);
+         return q > wob && q < wob + 0.30;
+      }
+
       /** True when this column's surface is inside the opening (used to keep trees out). */
       boolean surfaceHole(int wx, int wz) {
+         return v4() ? surfaceHole4(wx, wz) : surfaceHole3(wx, wz);
+      }
+
+      private boolean surfaceHole3(int wx, int wz) {
          double d = Math.sqrt((double)(wx - x) * (wx - x) + (double)(wz - z) * (wz - z));
          return d <= radius * 1.35 + 0.9 * Math.sin((wx - x) * 0.6 + (wz - z) * 0.8);
       }
 
+      /**
+       * V6.29: the y of the solid walk-in ramp at this column, or -1 outside the
+       * opening. TerraGen keeps these blocks solid so the noise caves cannot
+       * hollow the floor out from under the player's feet.
+       */
+      int floorAt(int wx, int wz) {
+         if (!v4()) return -1;
+         double dx = wx - (x + dirX * radius * 0.25);
+         double dz = wz - (z + dirZ * radius * 0.25);
+         double ax = dx * dirX + dz * dirZ;
+         double bz = -dx * dirZ + dz * dirX;
+         if (Math.abs(ax) > radius * 1.4 || Math.abs(bz) > radius * 1.2) return -1;
+         double rx = radius * 1.05, rz = radius * 0.88;
+         double q = Math.sqrt((ax / rx) * (ax / rx) + (bz / rz) * (bz / rz));
+         double wob = 1.0 + 0.10 * Math.sin(ax * 0.33 + bz * 0.19 + phase)
+            + 0.05 * Math.sin(bz * 0.41 - ax * 0.11 - phase);
+         if (q > wob) return -1;
+         double u = Math.max(0.0, Math.min(1.0, (ax / rx + 1.0) * 0.5));
+         return (int)Math.round(siteH - 1.0 - depth * u * Math.sqrt(Math.max(0.0, u)));
+      }
+
+      private boolean surfaceHole4(int wx, int wz) {
+         double dx = wx - (x + dirX * radius * 0.25);
+         double dz = wz - (z + dirZ * radius * 0.25);
+         double ax = dx * dirX + dz * dirZ;
+         double bz = -dx * dirZ + dz * dirX;
+         if (Math.abs(ax) > radius * 1.4 || Math.abs(bz) > radius * 1.2) return false;
+         double rx = radius * 1.05, rz = radius * 0.88;
+         double q = Math.sqrt((ax / rx) * (ax / rx) + (bz / rz) * (bz / rz));
+         double wob = 1.0 + 0.10 * Math.sin(ax * 0.33 + bz * 0.19 + phase)
+            + 0.05 * Math.sin(bz * 0.41 - ax * 0.11 - phase);
+         if (q > wob) return false;
+         // the deep (uphill) end keeps a rock roof, so it is an arch, not a pit
+         double u = Math.max(0.0, Math.min(1.0, (ax / rx + 1.0) * 0.5));
+         return u <= 0.70;
+      }
+
       /** Carve the opening, the sloped descent and the bottom chamber. */
       boolean air(int wx, int y, int wz, int surfaceH) {
+         return v4() ? air4(wx, y, wz, surfaceH) : air3(wx, y, wz, surfaceH);
+      }
+
+      /** V6.28's sloped crack, preserved exactly for worlds saved on caveVer 3. */
+      private boolean air3(int wx, int y, int wz, int surfaceH) {
          if (surfaceH < 66 || y > surfaceH || y < 20) return false;
          int bottom = Math.max(26, surfaceH - 46);
          if (y < bottom - 6) return false;
 
          // 1. the visible opening through the topsoil
-         if (y >= surfaceH - 3) return surfaceHole(wx, wz);
+         if (y >= surfaceH - 3) return surfaceHole3(wx, wz);
 
          // 2. a diagonal, walkable-looking tunnel (not a vertical crack)
          int top = surfaceH - 3;
@@ -97,10 +181,81 @@ final class CaveCliffs {
          return along >= -1.0 && along <= radius * 4.5
             && Math.abs(side) <= radius * 0.85 && Math.abs(y - bottom) <= 2;
       }
+
+      /**
+       * V6.29 walk-in entrance. {@code y} is only ever asked for blocks that
+       * already exist (the generator loops up to the local surface), so every
+       * answer is a pure function of seed + coordinates and chunk seams agree.
+       */
+      private boolean air4(int wx, int y, int wz, int surfaceH) {
+         if (siteH < 64 || y > surfaceH || y < 6) return false;
+         boolean drySurface = surfaceH >= 64;
+         double dx = wx - (x + dirX * radius * 0.25);
+         double dz = wz - (z + dirZ * radius * 0.25);
+         double ax = dx * dirX + dz * dirZ;
+         double bz = -dx * dirZ + dz * dirX;
+         double rx = radius * 1.05, rz = radius * 0.88;
+
+         // 1. The wide, irregular opening with a gently sloping solid floor:
+         //    at the downhill lip the floor is one block under the grass, and
+         //    it descends to `depth` blocks at the uphill end. Walk in, don't
+         //    fall down a 45-block diagonal crack.
+         if (drySurface && Math.abs(ax) < rx * 1.3 && Math.abs(bz) < rz * 1.3) {
+            double q = Math.sqrt((ax / rx) * (ax / rx) + (bz / rz) * (bz / rz));
+            double wob = 1.0 + 0.10 * Math.sin(ax * 0.33 + bz * 0.19 + phase)
+               + 0.05 * Math.sin(bz * 0.41 - ax * 0.11 - phase);
+            if (q <= wob) {
+               double u = Math.max(0.0, Math.min(1.0, (ax / rx + 1.0) * 0.5));
+               int floorY = (int)Math.round(siteH - 1.0 - depth * u * Math.sqrt(Math.max(0.0, u)));
+               // the last third has a rock roof: a real cave arch you walk under
+               int ceilY = u > 0.70 ? siteH - 3 : surfaceH;
+               if (y > floorY && y <= Math.min(surfaceH, ceilY)) return true;
+            }
+         }
+
+         // Coordinates relative to the chamber at the deep end.
+         double chx = x + dirX * radius * 1.05;
+         double chz = z + dirZ * radius * 1.05;
+         double cdx = wx - chx, cdz = wz - chz;
+         double ca = cdx * dirX + cdz * dirZ;
+         double cb = -cdx * dirZ + cdz * dirX;
+
+         // 2. A straight 2.8-block tunnel from the chamber to a hashed block
+         //    that the real cave carver has already hollowed. This is the
+         //    guarantee that the entrance is a way INTO the cave network.
+         double vx = linkX - chx, vy = linkY - (chamberY + 1), vz = linkZ - chz;
+         double px = wx - chx, py = y - (chamberY + 1), pz = wz - chz;
+         double vv = vx * vx + vy * vy + vz * vz;
+         double tt = vv > 0.0 ? Math.max(0.0, Math.min(1.0, (px * vx + py * vy + pz * vz) / vv)) : 0.0;
+         double tx = px - tt * vx, ty = py - tt * vy, tz = pz - tt * vz;
+         if (tx * tx + ty * ty + tz * tz <= 7.9 && y <= surfaceH) return true;
+
+         if (Math.abs(ca) > radius * 1.7 + gallery || Math.abs(cb) > radius * 1.4) return false;
+
+         // 3. A rounded chamber under the arch, so the ramp opens into a room.
+         double ex = ca / (radius * 1.6), ez = cb / (radius * 1.25);
+         double ey = (y - chamberY) / 4.5;
+         if (ex * ex + ez * ez + ey * ey <= 1.0) return true;
+
+         // 4. A horizontal gallery from that room out to the natural cave
+         //    network (its hashed length ends inside a carved noise cave).
+         if (ca >= -2.0 && ca <= gallery && Math.abs(cb) <= 3.4
+            && y >= chamberY - 1 && y <= chamberY + 4) return true;
+
+         // 5. A well under the chamber down into the deeper cave layers,
+         //    so every entrance really joins the underground system.
+         return Math.abs(ca) <= 3.0 && Math.abs(cb) <= 3.0
+            && y >= wellBottom && y < chamberY;
+      }
    }
 
-   /** Candidate entrances whose centre is near this column (at most 9). */
+   /** V6.29: candidate entrances near this column. V6.28 worlds keep their old mouths. */
    Mouth[] mouths(int x, int z) {
+      return st.caveVer >= 4 ? mouths4(x, z) : mouths3(x, z);
+   }
+
+   /** V6.28's 96-block hashed entrances, untouched for old V6.28 saves. */
+   private Mouth[] mouths3(int x, int z) {
       int cx = Math.floorDiv(x, MOUTH_CELL);
       int cz = Math.floorDiv(z, MOUTH_CELL);
       Mouth[] out = null;
@@ -128,16 +283,174 @@ final class CaveCliffs {
       return java.util.Arrays.copyOf(out, n);
    }
 
+   /** V6.29: cached per-80-block cell so the expensive site scan happens once. */
+   private final java.util.concurrent.ConcurrentHashMap<Long, Mouth> CELLS =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+   private Mouth cell(int cx, int cz) {
+      long key = ((long)cx << 32) ^ (cz & 0xFFFFFFFFL);
+      Mouth m = CELLS.get(key);
+      if (m != null) return m == NO_MOUTH ? null : m;
+      Mouth built = buildCell(cx, cz);
+      CELLS.put(key, built == null ? NO_MOUTH : built);
+      return built;
+   }
+
+   private Mouth buildCell(int cx, int cz) {
+      long h = CaveWorks.mix(seed ^ 0x4D4F555434L, cx, 0, cz);
+      // A guaranteed entrance in the spawn cell, plus ~70% of the other cells.
+      // The nine cells around the world spawn always get a mouth, so a new
+      // world has a visible cave entrance within a short walk.
+      boolean force = cx >= -1 && cx <= 1 && cz >= -1 && cz <= 1;
+      if (!force && (h >>> 58) >= 46) return null;
+      int bx = cx * MOUTH4_CELL + 10 + CaveWorks.bits(h, 8, 44);
+      int bz = cz * MOUTH4_CELL + 10 + CaveWorks.bits(h, 20, 44);
+      int px = bx, pz = bz, ph = -1;
+      // Oceans, rivers, beaches and mushroom islands must not get a hole that
+      // immediately fills with water. A handful of hashed alternatives finds land.
+      for (int k = 0; k < 5; k++) {
+         int sx = bx, sz = bz;
+         if (k > 0) {
+            long q = CaveWorks.mix(seed ^ 0x4D4F555435L, cx, k, cz);
+            sx += CaveWorks.bits(q, 4, 46) - 23;
+            sz += CaveWorks.bits(q, 16, 46) - 23;
+         }
+         Gen.Col c = gen == null ? null : gen.column(sx, sz);
+         int hh = c == null ? 72 : c.h;
+         int biome = c == null ? -1 : c.biome;
+         boolean water = biome >= 0 && (Biomes.ocean(biome) || Biomes.river(biome)
+            || biome == Biomes.BEACH || biome == Biomes.SNOWY_BEACH || biome == Biomes.MUSHROOM);
+         int rad = 6 + CaveWorks.bits(h, 30, 5);
+         boolean rimOk = true;
+         if (!water && gen != null) {
+            // the whole opening must sit on dry land, not half in a lake
+            for (int t = 0; t < 12; t++) {
+               double ang = t * Math.PI / 6.0;
+               Gen.Col r = gen.column(sx + (int)Math.round(Math.cos(ang) * rad * 1.3),
+                  sz + (int)Math.round(Math.sin(ang) * rad * 1.3));
+               if (r.h < 64 || r.h > 150 || Biomes.ocean(r.biome) || Biomes.river(r.biome)
+                  || r.biome == Biomes.BEACH || r.biome == Biomes.SNOWY_BEACH) { rimOk = false; break; }
+            }
+         }
+         if (!water && rimOk && hh >= 64 && hh <= 130) {
+            px = sx; pz = sz; ph = hh;
+            break;
+         }
+      }
+      if (ph < 0) return null;
+      Mouth m = new Mouth();
+      m.ver = 4;
+      m.x = px;
+      m.z = pz;
+      m.siteH = ph;
+      m.radius = 6 + CaveWorks.bits(h, 30, 5);        // 6..10: a wide real opening
+      m.depth = 14 + CaveWorks.bits(h, 38, 7);        // 14..20 block descent
+      m.chamberY = Math.max(18, ph - m.depth - 1);
+      m.phase = CaveWorks.bits(h, 48, 628) * 0.01;
+      double ang = CaveWorks.bits(h, 54, 360) * Math.PI / 180.0;
+      m.dirX = Math.cos(ang);
+      m.dirZ = Math.sin(ang);
+      m.gallery = galleryLength(m);
+      m.wellBottom = Math.max(10, m.chamberY - 12);
+      findLink(m);
+      return m;
+   }
+
+   /** Find a block the noise carver already hollowed near the chamber. */
+   private void findLink(Mouth m) {
+      int chx = (int)Math.round(m.x + m.dirX * m.radius * 1.05);
+      int chz = (int)Math.round(m.z + m.dirZ * m.radius * 1.05);
+      int cy = m.chamberY + 1;
+      int best = Integer.MAX_VALUE;
+      boolean found = false;
+      int bx = chx, by = cy, bz = chz;
+      for (int dy = 6; dy >= -46; dy -= 4) {
+         int y = cy + dy;
+         if (y < 10 || y > 230) continue;
+         for (int a = 8; a <= 36; a += 7) {
+            for (int side = -14; side <= 14; side += 7) {
+               int px = (int)Math.round(chx + m.dirX * a - m.dirZ * side);
+               int pz = (int)Math.round(chz + m.dirZ * a + m.dirX * side);
+               if (carve(px, y, pz) == SOLID) continue;
+               if (gen != null && gen.column(px, pz).h < y + 3) continue;
+               int d2 = a * a + side * side + dy * dy;
+               if (d2 < best) {
+                  best = d2;
+                  bx = px; by = y; bz = pz;
+                  found = true;
+               }
+            }
+         }
+      }
+      if (!found) {
+         bx = (int)Math.round(chx + m.dirX * 24);
+         by = Math.max(12, cy - 20);
+         bz = (int)Math.round(chz + m.dirZ * 24);
+      }
+      m.linkX = bx; m.linkY = by; m.linkZ = bz;
+      m.linkFound = found;
+   }
+
+   /** End the horizontal gallery inside a real noise cave, not in blank rock. */
+   private int galleryLength(Mouth m) {
+      int base = (int)(m.radius * 1.05);
+      int[] levels = {2, 0, 4, -1};
+      int[] sides = {0, -3, 3};
+      for (int d = 8; d <= 120; d += 3) {
+         for (int side : sides) {
+            int px0 = (int)Math.round(m.x + m.dirX * (base + d) - m.dirZ * side);
+            int pz0 = (int)Math.round(m.z + m.dirZ * (base + d) + m.dirX * side);
+            for (int dy : levels) {
+               int y = m.chamberY + dy;
+               if (carve(px0, y, pz0) == SOLID) continue;
+               if (gen != null && gen.column(px0, pz0).h < y + 3) continue;  // rock over the tunnel
+               m.linkAt = d;
+               return d + 8;
+            }
+         }
+      }
+      m.linkAt = 118;
+      return 126;
+   }
+
+   private Mouth[] mouths4(int x, int z) {
+      int cx = Math.floorDiv(x, MOUTH4_CELL);
+      int cz = Math.floorDiv(z, MOUTH4_CELL);
+      Mouth[] out = null;
+      int n = 0;
+      for (int i = -1; i <= 1; i++) {
+         for (int j = -1; j <= 1; j++) {
+            Mouth m = cell(cx + i, cz + j);
+            if (m == null) continue;
+            double dx = x - m.x, dz = z - m.z;
+            // a gallery can reach up to ~80 blocks past its mouth
+            if (dx * dx + dz * dz > 210.0 * 210.0) continue;
+            if (out == null) out = new Mouth[9];
+            out[n++] = m;
+         }
+      }
+      if (n == 0) return null;
+      return java.util.Arrays.copyOf(out, n);
+   }
+
    final long seed;
    final WorldSettings st;
+   /** V6.29: the terrain sampler, used once per entrance cell to place it on land. */
+   final Gen gen;
    final Noise sp;
    final Noise nd;
    final Noise cheese;
    final Noise province;
 
+   /** Standalone carver (headless probes/tests): no terrain sampler available. */
    CaveCliffs(long seed, WorldSettings st) {
+      this(seed, st, null);
+   }
+
+   CaveCliffs(long seed, WorldSettings st, Gen gen) {
       this.seed = seed;
       this.st = st;
+      this.gen = gen;
       this.sp = new Noise(seed ^ 0x5350414748455454L);
       this.nd = new Noise(seed ^ 0x4E4F4F444C45L);
       this.cheese = new Noise(seed ^ 0x434845455345L);

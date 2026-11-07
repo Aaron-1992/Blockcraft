@@ -172,6 +172,17 @@ def package_files():
     return {n: open(os.path.join(pkg, n), "rb").read() for n in sorted(os.listdir(pkg))}
 
 
+def foley_files():
+    """V6.29: real recorded CC0 WAVs, shipped loose so players can replace them."""
+    d = os.path.join(ROOT, "res", "sounds", "foley")
+    out = {}
+    if os.path.isdir(d):
+        for n in sorted(os.listdir(d)):
+            if n.lower().endswith((".wav", ".txt")):
+                out["sounds/foley/" + n] = open(os.path.join(d, n), "rb").read()
+    return out
+
+
 def build_infdev_mod_jar(classes_dir):
     """Packages the external Minecraft Infdev (2010) total-conversion mod into mods/infdev-2010.jar."""
     mod_jar = os.path.join(ROOT, "mods", "infdev-2010.jar")
@@ -241,6 +252,8 @@ def build_patch_zip(ver, exe_path, jar_path, mod_jar_path=None):
         sb_bin = os.path.join(ROOT, "res", "sounds", "soundbank.bin")
         if os.path.isfile(sb_bin):
             add(z, "Blockcraft/sounds/soundbank.bin", open(sb_bin, "rb").read())
+        for n, data in foley_files().items():
+            add(z, "Blockcraft/" + n, data)
     print("[build] %s  (%.2f MB)" % (os.path.relpath(out, ROOT), os.path.getsize(out) / 1e6))
     return out
 
@@ -289,6 +302,8 @@ def build_full_zip(ver, exe_path, jar_path, mod_jar_path=None):
     sb_bin = os.path.join(ROOT, "res", "sounds", "soundbank.bin")
     if os.path.isfile(sb_bin):
         rep["Blockcraft/sounds/soundbank.bin"] = (open(sb_bin, "rb").read(), 0o644)
+    for n, data in foley_files().items():
+        rep["Blockcraft/" + n] = (data, 0o644)
     return compose_full_zip(out, rep)
 
 

@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.28";
+   public static final String VERSION_STR = "6.29";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -3049,6 +3049,20 @@ public final class Game {
                      this.say("§cTilesheet: " + ex.getMessage());
                   }
                   break;
+               case "sounds":
+                  this.say("Foley: " + SoundEngine.recordedFoleyCount()
+                     + "/10 real CC0 WAV recordings loaded (sounds/foley/, see CREDITS.txt).");
+                  if (var2.length > 1) {
+                     String key = var2[1].toLowerCase();
+                     if (SoundEngine.isRecordedFoley(key)) {
+                        SoundEngine.play3D(this.world, key, this.player.x, this.player.y + 1.0,
+                           this.player.z, 0.9F, 1.0F);
+                        this.say("Playing recorded " + key + ".wav");
+                     } else {
+                        this.say("§cThat is not a recorded foley key.");
+                     }
+                  }
+                  break;
                case "treefall":
                   if (var2.length > 1 && (var2[1].equalsIgnoreCase("on") || var2[1].equalsIgnoreCase("off"))) {
                      this.world.trees.enabled = var2[1].equalsIgnoreCase("on");
@@ -3129,7 +3143,7 @@ public final class Game {
                   SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
                   break;
                case "help":
-                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
+                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /sounds /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
                   if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
@@ -4338,8 +4352,10 @@ public final class Game {
       double x = this.player.x + Math.cos(ang) * dist;
       double z = this.player.z + Math.sin(ang) * dist;
       int roll = this.rnd.nextInt(100);
-      String key = roll < 34 ? "cave_drip" : (roll < 58 ? "cave_wind"
-         : (roll < 76 ? "cave_rumble" : (roll < 90 ? "stone_crumble" : "geode_chime")));
+      // V6.29: all of these are real CC0 WAV recordings, not synthesized tones.
+      String key = roll < 30 ? "cave_drip" : (roll < 48 ? "cave_wind"
+         : (roll < 60 ? "wind_gust" : (roll < 76 ? "cave_rumble"
+            : (roll < 90 ? "stone_crumble" : "geode_chime"))));
       SoundEngine.play3D(this.world, key, x, py + 1.0, z,
          0.42F, 0.85F + this.rnd.nextFloat() * 0.32F);
    }
