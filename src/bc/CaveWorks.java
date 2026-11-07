@@ -43,6 +43,9 @@ final class CaveWorks {
    final Noise e;
    /** Update 6.22: the Caves & Cliffs carver, only used when st.caveVer >= 2. */
    final CaveCliffs cliffs;
+   /** V6.31: the completely new carver and structure set for caveVer >= 5. */
+   final Caves5 deep;
+   final CaveStructures5 structures5;
    private final ConcurrentHashMap<Long, Plan> plans = new ConcurrentHashMap<>();
 
    CaveWorks(long seed, WorldSettings st, Gen gen, Noise a, Noise b, Noise c, Noise e) {
@@ -54,6 +57,8 @@ final class CaveWorks {
       this.c = c;
       this.e = e;
       this.cliffs = new CaveCliffs(seed, st, gen);
+      this.deep = new Caves5(seed, st, gen);
+      this.structures5 = new CaveStructures5(seed, gen, this.deep);
    }
 
    // ------------------------------------------------------------------ instance shortcuts
@@ -64,6 +69,11 @@ final class CaveWorks {
    /** Update 6.22: the Caves & Cliffs carver (0 solid, 1 air, 2 lava, 3 aquifer water). */
    int hollowCC(int x, int y, int z) {
       return this.cliffs.carve(x, y, z);
+   }
+
+   /** V6.31: the new carver, which is allowed to break through the surface. */
+   int carve5(int x, int y, int z, int surfaceH, boolean allowSurface) {
+      return this.deep.carve(x, y, z, surfaceH, allowSurface);
    }
 
    boolean mouth(int x, int z) {
@@ -77,6 +87,11 @@ final class CaveWorks {
 
    /** True when the surface here is the opening of a real cave entrance. */
    boolean mouthSurface(int x, int z, int surfaceH) {
+      if (this.st.caveVer >= 5) {
+         // V6.31: no built mouths - a column is an opening only when a real
+         // noise cave reaches the surface here.
+         return this.deep.surfaceOpen(x, z, surfaceH);
+      }
       if (this.st.caveVer < 3) return false;
       if (surfaceH < (this.st.caveVer >= 4 ? 64 : 66)) return false;
       CaveCliffs.Mouth[] ms = this.cliffs.mouths(x, z);
@@ -263,14 +278,17 @@ final class CaveWorks {
          strata(ch);
       }
 
-      if (st.caveVer >= 2) {
+      if (st.caveVer >= 5) {
+         this.deep.finish(ch);       // strata-like decorations for the new caves
+      } else if (st.caveVer >= 2) {
          this.cliffs.finish(ch);
       } else {
          decorate(ch);
       }
 
       if (st.caveStructures) {
-         structures(ch);
+         if (st.caveVer >= 5) this.structures5.apply(ch);   // the V6.31 structure set
+         else structures(ch);
       }
 
       ch.computeHeightmap();

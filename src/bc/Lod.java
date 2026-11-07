@@ -42,6 +42,17 @@ public final class Lod {
    }
    /** V6.26: frames over which a freshly built LOD tile fades in instead of popping. */
    static final int FADE_FRAMES = 18;
+   /** V6.31: an old tile is kept at full opacity while its replacement fades in on top. */
+   static final class Cross {
+      final Tile old;
+      final Tile neu;
+      final long start;
+      boolean done;
+      Cross(Tile old, Tile neu, long start) {
+         this.old = old; this.neu = neu; this.start = start;
+      }
+   }
+   final java.util.ArrayList<Cross> crosses = new java.util.ArrayList<>();
    static final float LAND_SHIFT = 2.5F;
    static final float WATER_SHIFT = 0.2F;
    final Gen gen;
@@ -1038,6 +1049,19 @@ public final class Lod {
 
    void addDrawOnce(Lod.Tile t, float fade) {
       Lod.Tile d = this.refresh(t);
+      // V6.31: a rebuilt tile used to replace the old one in a single frame -
+      // that is the "pop" the fade-in alone could never hide. Keep the old mesh
+      // fully opaque underneath and blend the new one in over FADE_FRAMES.
+      Cross c = d.activeCross;
+      if (c != null && !c.done) {
+         float f = fadeIn(this.frame, c.start);
+         this.addRaw(c.old, fade);       // opaque base, drawn first
+         fade = fade * f;                // new tile fades in on top
+      }
+      this.addRaw(d, fade);
+   }
+
+   private void addRaw(Lod.Tile d, float fade) {
       if (d.lastDrawFrame != this.frame) {
          d.lastDrawFrame = this.frame;
          d.fade = fade;
@@ -1054,6 +1078,17 @@ public final class Lod {
       if (f >= 1.0F) return 1.0F;
       if (f <= 0.0F) return 0.0F;
       return f * f * (3.0F - 2.0F * f);
+   }
+
+   /** V6.31: continuous 0..1 split weight. 1 = four children, 0 = this tile.
+    * A wide smooth band replaces the old one-frame split decision, so walking
+    * towards a LOD boundary no longer swaps two different meshes instantly. */
+   static float splitWeight(double dist, double sd) {
+      double lo = sd * 0.86, hi = sd * 1.14;
+      if (dist <= lo) return 1.0F;
+      if (dist >= hi) return 0.0F;
+      double t = (hi - dist) / (hi - lo);
+      return (float)(t * t * (3.0 - 2.0 * t));
    }
 
    /** V6.26: fade the outermost ring out so culling at the horizon never shows a hard edge. */
@@ -1321,58 +1356,99 @@ public final class Lod {
    }
 
    void visit(int var1, int var2, int var3) {
-      double var4 = this.nearest(var1, var2, var3);
-      if (!(var4 > this.fogFarBlocks)) {
-         if (var3 == 32 && this.coveredBox(var1, var2, 32)) {
-            return;
+      this.visit(var1, var2, var3, 1.0F);
+   }
+
+   /** V6.31: a continuous LOD split band. Both representations are drawn in
+    * the transition band, so no mesh ever appears or disappears in one frame. */
+   void visit(int var1, int var2, int var3, float alpha) {
+      double dist = this.nearest(var1, var2, var3);
+      if (dist > this.fogFarBlocks) return;
+      if (var3 == 32 && this.coveredBox(var1, var2, 32)) return;
+      if (var3 <= 128 && this.insideInner(var1, var2, var3) && this.coveredBox(var1, var2, var3)) return;
+      float a = alpha * distanceFade(dist, this.fogFarBlocks);
+      if (a <= 0.002F) return;
+
+      boolean inFrustum = this.rend.visible(
+         (float)(var1 + var3 / 2 - this.cx),
+         (float)(100.0 - this.cy),
+         (float)(var2 + var3 / 2 - this.cz),
+         var3 * 0.75F + 40.0F
+      );
+      float split = 0.0F;
+      if (var3 > 32) {
+         double sd = this.splitDistance(var3);
+         split = splitWeight(dist, sd);
+         Lod.Tile node = this.tiles.get(key(var3, var1, var2));
+         // Do not start exposing children until every one of them has a mesh.
+         // This removes the classic "children pop in one by one" hole.
+         if (split > 0.0F && !this.childrenReady(var1, var2, var3)) {
+            split = 0.0F;
+            this.requestChildren(var1, var2, var3);
          }
-         if (var3 <= 128 && this.insideInner(var1, var2, var3) && this.coveredBox(var1, var2, var3)) {
-            return;
-         }
-         boolean inFrustum = this.rend.visible(
-            (float)(var1 + var3 / 2 - this.cx),
-            (float)(100.0 - this.cy),
-            (float)(var2 + var3 / 2 - this.cz),
-            var3 * 0.75F + 40.0F
-         );
-         // V6.26: a 6% hysteresis band around the split distance stops a tile from
-         // flipping between its own mesh and its four children on every small camera
-         // movement (a classic source of LOD "pops").
-         boolean var6 = false;
-         if (var3 > 32) {
-            double sd = this.splitDistance(var3);
-            Lod.Tile node = (Lod.Tile)this.tiles.get(key(var3, var1, var2));
-            boolean wasSplit = node != null && node.lastSplit && this.frame - node.splitFrame < 30L;
-            var6 = var4 < sd * (wasSplit ? 1.06 : 0.94);
-            if (node != null) {
-               node.lastSplit = var6;
-               node.splitFrame = this.frame;
-            }
-         }
-         if (!var6) {
-            Lod.Tile var16 = this.tile(var3, var1, var2);
-            var16.lastUse = this.frame;
-            if (ready(var16)) {
-               if (inFrustum) {
-                  float fi = fadeIn(this.frame, var16.readyFrame) * distanceFade(var4, this.fogFarBlocks);
-                  this.addDrawOnce(var16, fi);
-               }
-            } else if (inFrustum) {
-               this.pendingVisible.add(var16);
-               this.drawFallback(var1, var2, var3, 1.0F);
-            } else {
-               this.pendingBehind.add(var16);
-            }
-         } else {
-            int var7 = var3 >> 1;
-            int sx = this.cx >= var1 + var7 ? var7 : 0;
-            int sz = this.cz >= var2 + var7 ? var7 : 0;
-            this.visit(var1 + sx, var2 + sz, var7);
-            this.visit(var1 + (var7 - sx), var2 + sz, var7);
-            this.visit(var1 + sx, var2 + (var7 - sz), var7);
-            this.visit(var1 + (var7 - sx), var2 + (var7 - sz), var7);
+         if (node != null) {
+            node.lastSplit = split > 0.5F;
+            node.splitFrame = this.frame;
          }
       }
+
+      if (split <= 0.001F) {
+         this.drawNode(var1, var2, var3, a, inFrustum);
+      } else if (split >= 0.999F) {
+         this.visitChildren(var1, var2, var3, a, inFrustum);
+      } else {
+         // Cross-fade: coarse parent fully opaque, finer children blended on top.
+         this.drawNode(var1, var2, var3, a, inFrustum);
+         this.visitChildren(var1, var2, var3, a * split, inFrustum);
+      }
+   }
+
+   private void drawNode(int x, int z, int size, float a, boolean inFrustum) {
+      Lod.Tile t = this.tile(size, x, z);
+      t.lastUse = this.frame;
+      float fi = ready(t) ? fadeIn(this.frame, t.readyFrame) : 0.0F;
+      // V6.31: keep a coarse representation visible for the WHOLE fade-in,
+      // instead of dropping it the instant the new mesh arrives.
+      if (fi < 0.999F) this.drawFallback(x, z, size, a);
+      if (ready(t)) {
+         if (inFrustum) this.addDrawOnce(t, a * fi);
+      } else if (inFrustum) {
+         this.pendingVisible.add(t);
+      } else {
+         this.pendingBehind.add(t);
+      }
+   }
+
+   private boolean childrenReady(int x, int z, int size) {
+      int half = size >> 1;
+      for (int dx = 0; dx <= half; dx += half) {
+         for (int dz = 0; dz <= half; dz += half) {
+            Lod.Tile c = this.tiles.get(key(half, x + dx, z + dz));
+            if (c == null || !ready(c)) return false;
+         }
+      }
+      return true;
+   }
+
+   private void requestChildren(int x, int z, int size) {
+      int half = size >> 1;
+      for (int dx = 0; dx <= half; dx += half) {
+         for (int dz = 0; dz <= half; dz += half) {
+            Lod.Tile c = this.tile(half, x + dx, z + dz);
+            c.lastUse = this.frame;
+            if (!ready(c)) this.pendingVisible.add(c);
+         }
+      }
+   }
+
+   private void visitChildren(int x, int z, int size, float a, boolean inFrustum) {
+      int half = size >> 1;
+      int sx = this.cx >= x + half ? half : 0;
+      int sz = this.cz >= z + half ? half : 0;
+      this.visit(x + sx, z + sz, half, a);
+      this.visit(x + (half - sx), z + sz, half, a);
+      this.visit(x + sx, z + (half - sz), half, a);
+      this.visit(x + (half - sx), z + (half - sz), half, a);
    }
 
    void evict() {
@@ -1380,6 +1456,7 @@ public final class Lod {
 
       while (var1.hasNext()) {
          Lod.Tile var2 = (Lod.Tile)((Entry)var1.next()).getValue();
+         if (var2.activeCross != null && !var2.activeCross.done) continue; // keep the cross-fade base alive
          boolean replIdle = var2.replacement == null || var2.replacement.state == 0 || var2.replacement.state == 3 || var2.replacement.state == 4;
          double dist = this.nearest(var2.x0, var2.z0, var2.size);
          long idle = this.frame - var2.lastUse;
@@ -1462,15 +1539,28 @@ public final class Lod {
       Lod.Tile r = t.replacement;
       if (r != null) {
          if (ready(r)) {
-            this.tiles.put(key(t.size, t.x0, t.z0), r);
-            t.replacement = null;
-            if (t.vbo != 0) {
-               GL15.glDeleteBuffers(t.vbo);
-               t.vbo = 0;
+            Cross c = t.activeCross;
+            if (c == null) {
+               c = new Cross(t, r, Math.max(this.frame, r.readyFrame));
+               t.activeCross = c;
+               r.activeCross = c;
+               this.crosses.add(c);
             }
-
-            t.state = 5;
-            t.retired = true;
+            if (fadeIn(this.frame, c.start) >= 1.0F) {
+               // The new tile is fully opaque now; retire the old VBO safely.
+               c.done = true;
+               t.activeCross = null;
+               r.activeCross = null;
+               this.crosses.remove(c);
+               this.tiles.put(key(t.size, t.x0, t.z0), r);
+               t.replacement = null;
+               if (t.vbo != 0) {
+                  GL15.glDeleteBuffers(t.vbo);
+                  t.vbo = 0;
+               }
+               t.state = 5;
+               t.retired = true;
+            }
             r.lastUse = this.frame;
             return r;
          }
@@ -1520,6 +1610,7 @@ public final class Lod {
       /** V6.26: frame the tile finished uploading, its per-frame opacity, and split hysteresis. */
       long readyFrame;
       float fade = 1.0F;
+      volatile Lod.Cross activeCross;   // V6.31: cross-fade with a replacement mesh
       volatile boolean retired;
       boolean lastSplit;
       long splitFrame;

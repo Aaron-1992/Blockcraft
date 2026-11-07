@@ -1,0 +1,27 @@
+BLOCKCRAFT V6.31 - CINEMATIC TRAILER MONTAGE
+length=60.0s  shots=24  camera moves=8  locations=8  seed=20261108
+
+01    0.0s -   2.5s   2.5s  Glide     loc 0  sky  1000  clear  act 0  wind_gust  CARD: A WORLD
+02    2.5s -   4.5s   2.0s  Dolly     loc 1  sky  2400  clear  act 0  leaf_rustle
+03    4.5s -   7.0s   2.5s  Orbit     loc 2  sky  5200  clear  act 0  geode_chime
+04    7.0s -   9.0s   2.0s  Crane     loc 3  sky  7600  clear  act 0  cave_wind
+05    9.0s -  12.0s   3.0s  Dive      loc 4  sky  6000  clear  act 0  tree_crash  CARD: EXPLORE
+06   12.0s -  14.0s   2.0s  Static    loc 5  sky  9000  clear  act 0  wind_gust
+07   14.0s -  16.5s   2.5s  Top-down  loc 6  sky 12000  STORM  act 1  cave_rumble
+08   16.5s -  18.5s   2.0s  Chase     loc 7  sky 13500  STORM  act 1  stone_crumble
+09   18.5s -  21.5s   3.0s  Glide     loc 2  sky 11000  clear  act 1  cave_drip  CARD: BUILD
+10   21.5s -  23.5s   2.0s  Chase     loc 0  sky  8000  clear  act 1  leaf_rustle
+11   23.5s -  26.0s   2.5s  Orbit     loc 5  sky  6000  clear  act 1  geode_chime
+12   26.0s -  28.0s   2.0s  Dolly     loc 3  sky  4000  clear  act 1  cave_wind
+13   28.0s -  31.0s   3.0s  Crane     loc 7  sky 12500  clear  act 2  tree_crash  CARD: DIG DEEPER
+14   31.0s -  33.0s   2.0s  Top-down  loc 1  sky 14500  clear  act 2  wind_gust
+15   33.0s -  35.5s   2.5s  Dive      loc 6  sky 16500  clear  act 2  cave_rumble
+16   35.5s -  37.5s   2.0s  Static    loc 4  sky 18500  clear  act 2  stone_crumble
+17   37.5s -  40.5s   3.0s  Dolly     loc 3  sky  7500  STORM  act 2  cave_rumble  CARD: SURVIVE
+18   40.5s -  42.5s   2.0s  Glide     loc 5  sky  9500  STORM  act 2  wind_gust
+19   42.5s -  45.0s   2.5s  Orbit     loc 0  sky 11500  clear  act 3  cave_drip
+20   45.0s -  47.0s   2.0s  Chase     loc 2  sky 13500  clear  act 3  leaf_rustle
+21   47.0s -  50.0s   3.0s  Static    loc 6  sky 18000  clear  act 3  geode_chime  CARD: TOGETHER
+22   50.0s -  52.0s   2.0s  Crane     loc 4  sky 20500  clear  act 3  cave_wind
+23   52.0s -  54.5s   2.5s  Top-down  loc 1  sky 22500  clear  act 3  tree_crash
+24   54.5s -  60.0s   5.5s  Glide     loc 7  sky  1000  clear  act 3  geode_chime  CARD: BLOCKCRAFT

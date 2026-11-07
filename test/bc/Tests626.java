@@ -53,7 +53,7 @@ final class Tests626 {
    static void hysteresis() throws Exception {
       String l = src("src/bc/Lod.java");
       check(l.contains("lastSplit") && l.contains("splitFrame"), "the split decision is remembered per tile");
-      check(l.contains("1.06") && l.contains("0.94"), "there is a 6% hysteresis band around splitDistance");
+      check(l.contains("splitWeight") && l.contains("0.86") && l.contains("1.14"), "V6.31 uses a continuous split band instead of a one-frame decision");
    }
 
    static void buildStress() throws Exception {
@@ -119,8 +119,8 @@ final class Tests626 {
    }
 
    static void wiring() throws Exception {
-      eq("6.30", Game.VERSION_STR, "the game version is 6.30");
-      eq("6.30", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.30");
+      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
+      eq("6.31", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.31");
       check(src("README.md").contains("V6.28"), "README describes V6.26");
       check(src("package/README.txt").contains("V6.28"), "the packaged readme describes V6.26");
       check(new File("docs/releases/v6.26.md").isFile(), "V6.26 release notes exist");

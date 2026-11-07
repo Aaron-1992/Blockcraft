@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.30  -  an original Minecraft-style voxel sandbox   (EDITION V6.30)
+BLOCKCRAFT V6.31  -  an original Minecraft-style voxel sandbox   (EDITION V6.31)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,37 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.31 - NO POPS, A REAL TRAILER, BORDERLESS, CLEAN MENUS, NEW CAVES
+
+  * LOD POPPING FIXED AT THE ROOT. New/rebuilt meshes now CROSS-FADE:
+    the old tile stays fully opaque while the new one blends in over
+    18 frames, a coarse fallback is kept for the whole fade, and LOD
+    level changes use a continuous 28% split band that only exposes
+    children once all four are ready. No more one-frame swaps.
+  * THE TRAILER IS A MONTAGE, not one camera flying through the world:
+    24 hard cuts in exactly 60 seconds, 8 different camera moves
+    (glide, dolly, orbit, crane, dive, static pan, top-down, chase),
+    8 different locations, word cards, storms, night and a logo finale.
+    Watch Trailer (1:00) on the title screen or /trailer in game.
+  * BORDERLESS FULLSCREEN: Options > Video > Borderless, or /borderless.
+    An undecorated desktop-sized window - Alt-Tab and overlays keep
+    working. Saved in options.txt and applied at startup.
+  * CLEANER MENUS: the title screen is five clear buttons; Mini Games,
+    Skins, Resource Packs, Mods, All Blocks and Credits live behind
+    More... The Video settings are tidied up too.
+  * CAVES COMPLETELY REDONE (caveVer 5, NEW WORLDS ONLY). There are
+    NO built cave entrances any more: the cave noise runs right up to
+    the surface and breaks through wherever two 2D noise fields allow,
+    so every opening is a different irregular crater or ragged slit
+    that leads into a real cave. New cheese/spaghetti/noodle carver,
+    aquifers, lava and giant halls. Eight brand-new underground
+    structures (mineshaft, geode cathedral, ancient hall, lava foundry,
+    mushroom grotto, flooded cistern, crystal vault, dungeon) with
+    corridors, pillars, lights, loot and a tunnel into the cave net.
+    Old saves keep their old caves. See docs/screenshots/v6.31-caves.png
+    (headless preview, not a GPU screenshot).
+  * V6.30 trailer, V6.29 real CC0 sounds and all earlier work remain.
 
 WHAT'S NEW IN V6.30 - A ONE-MINUTE CINEMATIC TRAILER, IN GAME
 

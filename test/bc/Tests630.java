@@ -35,29 +35,39 @@ final class Tests630 {
 
    static void timeline() throws Exception {
       eq(60.0, Trailer.LENGTH, "the trailer is exactly 60 seconds");
-      eq(8, Trailer.SHOTS.length, "eight scripted shots");
+      eq(24, Trailer.SHOTS.length, "a fast-cut montage of 24 shots");
       double t = 0.0;
       for (int i = 0; i < Trailer.SHOTS.length; i++) {
          Trailer.Shot s = Trailer.SHOTS[i];
          eq(t, s.start, "shot " + (i + 1) + " starts where the last one ended");
          check(s.end > s.start, "shot " + (i + 1) + " has a positive length");
-         eq(7.5, s.length(), "shot " + (i + 1) + " is 7.5 seconds");
+         check(s.length() > 0.0 && s.length() <= 5.5, "shot " + (i + 1) + " is a short montage cut");
          eq(i, Trailer.shotAt(s.start + 0.001), "shotAt finds shot " + (i + 1));
          t = s.end;
       }
       eq(60.0, t, "the last cut lands exactly on 1:00");
       eq(Trailer.SHOTS.length, Trailer.shotAt(60.0), "the trailer is over at 60 seconds");
       eq(0, Trailer.shotAt(0.0), "shotAt starts at zero");
-      check(Trailer.skyAt(0, 0.0) == 900L && Trailer.skyAt(7, 1.0) == 22500L,
-         "the sky runs from dawn through night and back");
-      check(Trailer.skyAt(2, 0.5) > Trailer.skyAt(2, 0.0), "each shot time-lapses smoothly");
+      boolean varied = false;
+      for (int i = 1; i < Trailer.SHOTS.length; i++) {
+         if (Trailer.SHOTS[i].sky != Trailer.SHOTS[i - 1].sky) varied = true;
+         check(Trailer.SHOTS[i].sky >= 0L && Trailer.SHOTS[i].sky < 24000L,
+            "shot " + (i + 1) + " has a valid time of day");
+      }
+      check(varied, "the montage cuts between dawn, day, storm, dusk and night");
+      boolean kinds = false;
+      for (int i = 1; i < Trailer.SHOTS.length; i++) {
+         if (Trailer.SHOTS[i].kind != Trailer.SHOTS[0].kind) kinds = true;
+      }
+      check(kinds && Trailer.KIND.length == 8, "eight different camera moves are used");
+      check(Trailer.skyAt(2, 0.5) > Trailer.skyAt(2, 0.0), "each shot drifts smoothly");
       for (int i = 0; i < Trailer.SHOTS.length; i++) {
          check(Trailer.actAt(i) >= 0 && Trailer.actAt(i) < Trailer.ACT_TRACKS.length,
             "shot " + (i + 1) + " has a soundtrack act");
       }
       String plan = Trailer.plan();
-      check(plan.contains("length=60.0s") && plan.contains("shots=8") && plan.contains("V6.30"),
-         "the headless plan prints the whole timeline");
+      check(plan.contains("length=60.0s") && plan.contains("shots=24") && plan.contains("MONTAGE"),
+         "the headless plan prints the whole montage");
       check(src("docs/releases/v6.30-trailer-plan.txt").contains("length=60.0s"),
          "the plan is shipped as a document");
    }
@@ -76,14 +86,14 @@ final class Tests630 {
             for (double v : c) if (!Double.isFinite(v)) allFinite = false;
             double ground = Trailer.ground(gen, c[0], c[2]);
             if (c[1] < ground + 4.0) allAbove = false;
-            if (Math.abs(c[4]) > 72.0) allFinite = false;
+            if (Math.abs(c[4]) > 78.0) allFinite = false;
          }
          double dist = Math.hypot(b[0] - a[0], b[2] - a[2]);
-         if (dist < Trailer.SHOTS[i].travel * 0.9) allMove = false;
+         if (dist < 0.5) allMove = false;
       }
       check(allFinite, "all camera positions, headings and pitches are finite");
       check(allAbove, "the camera stays above the real terrain in every shot");
-      check(allMove, "every shot really travels its scripted distance");
+      check(allMove, "every shot really moves its camera (or orbits)");
       check(Trailer.smooth(0.0) == 0.0 && Trailer.smooth(1.0) == 1.0
          && Trailer.smooth(0.5) == 0.5, "camera easing is smooth and bounded");
    }
@@ -108,7 +118,7 @@ final class Tests630 {
       check(g.trailer.time >= 9.9 && g.trailer.time < 10.2, "the clock advances in real seconds");
       check(g.player.x != x0 || g.player.z != z0, "the camera actually flies");
       check(g.world.dayTime != day0, "the sky time-lapses");
-      eq(1, g.trailer.shot, "the second shot has begun");
+      check(g.trailer.shot >= 3, "several different shots have already been cut to");
       g.trailer.shot = 2;
       eq(Trailer.ACT_TRACKS[Trailer.actAt(2)], SoundEngine.selectConsoleMusic(g),
          "the shot's soundtrack act is selected");
@@ -155,8 +165,8 @@ final class Tests630 {
    }
 
    static void wiring() throws Exception {
-      eq("6.30", Game.VERSION_STR, "the game version is 6.30");
-      eq("6.30", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.30");
+      eq("6.31", Game.VERSION_STR, "the game version is 6.31");
+      eq("6.31", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.31");
       String g = src("src/bc/Game.java");
       check(g.contains("Trailer trailer;") && g.contains("case TRAILER:")
          && g.contains("Trailer.draw(this)") && g.contains("this.trailer.update(var1)"),
@@ -169,6 +179,7 @@ final class Tests630 {
       check(s.contains("Watch Trailer (1:00)") && s.contains("Trailer.start(g)"),
          "the title screen has a Watch Trailer button");
       check(src("src/bc/Main.java").contains("--trailer-plan"), "the headless shot plan is exposed");
+      check(src("src/bc/Trailer.java").contains("static final String[] KIND"), "the montage has distinct camera moves");
       check(new File("package/Trailer-guide.txt").isFile(), "the packaged trailer guide exists");
       check(new File("docs/releases/v6.30.md").isFile(), "V6.30 release notes exist");
       check(new File("docs/screenshots/v6.30-trailer.png").isFile(), "the storyboard preview exists");

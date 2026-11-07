@@ -36,6 +36,8 @@ final class Screens {
    };
 
    // =================================================================== title
+   /** V6.31: a clean five-button title screen. Secondary screens live behind
+    * "More..." so the menu is not a wall of small buttons any more. */
    static void title(Game g) {
       Ui ui = g.ui;
       Gui gui = g.gui;
@@ -53,14 +55,7 @@ final class Screens {
       float stW = Gui.textWidth(subTitle) + 16.0F;
       gui.gradient(cx - stW * 0.5F, bottom + 8.0F, stW, 11.0F, 0x90121826, 0x900A0D16);
       gui.rect(cx - stW * 0.5F, bottom + 19.0F, stW, 1.0F, infdev ? 0x8063D43E : 0x80FFD84A);
-      gui.centered(
-         subTitle,
-         cx,
-         bottom + 10.0F,
-         infdev ? 0xFF63D43E : 0xFFFFF4C8,
-         true,
-         1.0F
-      );
+      gui.centered(subTitle, cx, bottom + 10.0F, infdev ? 0xFF63D43E : 0xFFFFF4C8, true, 1.0F);
       String splashText = infdev ? "Infdev 2010!" : g.splash;
       if (splashText != null) {
          float sw = Gui.textWidth(splashText);
@@ -74,52 +69,70 @@ final class Screens {
          gui.pop();
       }
 
-      float bw = Math.min(200.0F, gui.w - 40.0F);
-      float half = (bw - 4.0F) / 2.0F;
-      float third = (bw - 8.0F) / 3.0F;
-      float row = 24.0F;
-      float by = Math.max(bottom + 26.0F, gui.h * 0.45F);
-      by = Math.min(by, gui.h - 40.0F - row * 4.0F - 20.0F); // V6.30: room for the trailer row
+      float bw = Math.min(220.0F, gui.w - 40.0F);
       float bx = cx - bw / 2.0F;
-      ui.button("Singleplayer", bx, by, half, 20.0F, true, null, () -> openWorlds(g));
-      ui.button("Mini Games", bx + half + 4.0F, by, half, 20.0F, true, null, () -> openMinigames(g, Game.S.TITLE));
-      ui.button("Multiplayer", bx, by + row, half, 20.0F, true, null, () -> {
+      float row = 24.0F;
+      float by = Math.max(bottom + 26.0F, gui.h * 0.42F);
+      by = Math.min(by, gui.h - 40.0F - row * 5.0F);
+      ui.button("Singleplayer", bx, by, bw, 20.0F, true, "Play a saved world or create a new one.", () -> openWorlds(g));
+      ui.button("Multiplayer", bx, by + row, bw, 20.0F, true, "Join a LAN world.", () -> {
          g.mpReturn = Game.S.TITLE;
          openMultiplayer(g);
       });
-      ui.button("Mods...", bx + half + 4.0F, by + row, half, 20.0F, true, null, () -> {
-         g.modsReturn = Game.S.TITLE;
-         g.setScreen(Game.S.MODS);
-      });
-      float wSmall = 58.0F;
-      float wOpt = bw - 2.0F * (wSmall + 4.0F);
-      ui.button("Skins", bx, by + row * 2, wSmall, 20.0F, true, null, () -> {
-         g.skinReturn = Game.S.TITLE;
-         g.setScreen(Game.S.SKINS);
-      });
-      ui.button("Packs", bx + wSmall + 4.0F, by + row * 2, wSmall, 20.0F, true, null, () -> {
-         g.packsReturn = Game.S.TITLE;
-         g.setScreen(Game.S.PACKS);
-      });
-      ui.button("Options...", bx + 2.0F * (wSmall + 4.0F), by + row * 2, wOpt, 20.0F, true, null, () -> {
+      ui.button("Watch Trailer (1:00)", bx, by + row * 2, bw, 20.0F, true,
+         "A one-minute in-game cinematic montage. ESC or click to skip.", () -> Trailer.start(g));
+      ui.button("Options...", bx, by + row * 3, bw, 20.0F, true, "Video, sound, controls and debug settings.", () -> {
          g.optionsReturn = Game.S.TITLE;
          g.setScreen(Game.S.OPTIONS);
       });
-      ui.button("All Blocks", bx, by + row * 3, half, 20.0F, true,
-         "Open the All Blocks & Items Showcase Gallery with every block & item laid out!", () -> {
-            g.ensureAllBlocksShowcaseWorld();
-            g.worldName = "All_Blocks_Showcase";
-            g.startWorld(false, null, 1);
-         });
-      ui.button("Quit Game", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
-      ui.button("Watch Trailer (1:00)", bx, by + row * 4, bw, 20.0F, true,
-         "Play the one-minute in-game cinematic: 8 shots, letterboxed, with a soundtrack. ESC or click to skip.",
-         () -> Trailer.start(g));
+      ui.button("Quit Game", bx, by + row * 4, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
+      ui.button("More...", gui.w - 74.0F, 6.0F, 68.0F, 18.0F, true,
+         "Mini Games, Skins, Resource Packs, Mods, the All Blocks gallery and Credits.", () -> g.setScreen(Game.S.MORE));
       gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
       gui.text("Textures: " + ResourcePacks.activeId() + (TexPixel32.enabled() ? " 32px" : " 16px"),
          4.0F, gui.h - 22.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
       gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
+   }
+
+   /** V6.31: everything that used to clutter the title screen, in one tidy list. */
+   static void more(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      ui.title("More", 7.0F);
+      float bw = Math.min(220.0F, gui.w - 40.0F);
+      float bx = (gui.w - bw) / 2.0F;
+      float row = 24.0F;
+      float by = Math.max(46.0F, gui.h * 0.22F);
+      by = Math.min(by, gui.h - 40.0F - row * 7.0F);
+      ui.button("Mini Games", bx, by, bw, 20.0F, true,
+         "Console Edition Battle, Tumble, Bedwars and the other mini games.", () -> openMinigames(g, Game.S.MORE));
+      ui.button("Skins", bx, by + row, bw, 20.0F, true, "Choose, import or create a player skin.", () -> {
+         g.skinReturn = Game.S.MORE;
+         g.setScreen(Game.S.SKINS);
+      });
+      ui.button("Resource Packs", bx, by + row * 2, bw, 20.0F, true, "Reload PNGs, the tilesheet and installed packs.", () -> {
+         g.packsReturn = Game.S.MORE;
+         g.setScreen(Game.S.PACKS);
+      });
+      ui.button("Mods...", bx, by + row * 3, bw, 20.0F, true, "Enable or disable installed mods.", () -> {
+         g.modsReturn = Game.S.MORE;
+         g.setScreen(Game.S.MODS);
+      });
+      ui.button("All Blocks Gallery", bx, by + row * 4, bw, 20.0F, true,
+         "A world with every block and item laid out to inspect.", () -> {
+            g.ensureAllBlocksShowcaseWorld();
+            g.worldName = "All_Blocks_Showcase";
+            g.startWorld(false, null, 1);
+         });
+      ui.button("Credits", bx, by + row * 5, bw, 20.0F, true, "Music, art and sound attributions.", () -> {
+         g.creditsReturn = Game.S.MORE;
+         g.creditsScroll = 0.0F;
+         g.setScreen(Game.S.CREDITS);
+      });
+      ui.button("Back", bx, by + row * 6, bw, 20.0F, true, null, () -> g.setScreen(Game.S.TITLE));
    }
 
    static void openMultiplayer(Game g) {
@@ -391,7 +404,7 @@ final class Screens {
       ws.caveLayers = g.opt.caveLayers;
       ws.caveLakes = g.opt.caveLakes;
       ws.caveRichness = g.opt.caveRichness;
-      ws.caveVer = g.opt.caveCliffs ? 4 : 1;
+      ws.caveVer = g.opt.caveCliffs ? 5 : 1;
       ws.biomeBorders = g.opt.biomeBorders;
       ws.treeDensity = g.opt.treeDensity;
       ws.treeScale = g.opt.treeScale;
@@ -495,7 +508,7 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
-         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  1.20 caves, walk-in entrances, aquifers & geodes" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
+         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  1.20 caves breaking the surface, aquifers & geodes" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
             : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
          + (ws.biomeBorders > 0 ? "  -  smooth biome borders" : "")
          + (ws.giantTrees ? "  -  giant trees" : "")
@@ -672,7 +685,14 @@ final class Screens {
       oy += row;
       if (shows(oy, row, top, viewH)) {
          ui.toggle("Fullscreen", o.fullscreen, x0, oy, colW, 20.0F, "Uses your whole screen. F11 does the same at any time.", () -> g.setFullscreen(!o.fullscreen));
-         ui.toggle("Fast GPU", o.gpuHigh, x1, oy, colW, 20.0F,
+         ui.toggle("Borderless", o.borderless, x1, oy, colW, 20.0F,
+            "An undecorated window exactly the size of the desktop: looks fullscreen, but Alt-Tab and overlays keep working. /borderless also toggles it.",
+            () -> g.setBorderless(!o.borderless));
+      }
+
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("Fast GPU", o.gpuHigh, x0, oy, colW, 20.0F,
             "A laptop often has two graphics chips: a weak one inside the processor and a real graphics card. ON asks Windows to draw the game with the real one (takes effect at the next start). Drawing with now: "
                + GpuPref.shortName(g.gpuName),
             () -> {
@@ -815,10 +835,15 @@ final class Screens {
             if (g.window != 0L) GLFW.glfwSwapInterval(o.vsync ? 1 : 0);
          });
       });
-      // 4: fullscreen / fast GPU
+      // 4: fullscreen / borderless fullscreen
       cells.add(y -> {
          ui.toggle("Fullscreen", o.fullscreen, x0, y, colW, 20.0F, "Use the whole screen (F11).", () -> g.setFullscreen(!o.fullscreen));
-         ui.toggle("Fast GPU", o.gpuHigh, x1, y, colW, 20.0F,
+         ui.toggle("Borderless", o.borderless, x1, y, colW, 20.0F,
+            "Undecorated desktop-sized window; Alt-Tab friendly. /borderless toggles it.", () -> g.setBorderless(!o.borderless));
+      });
+      // 4b: fast GPU
+      cells.add(y -> {
+         ui.toggle("Fast GPU", o.gpuHigh, x0, y, colW, 20.0F,
             "Ask Windows for the real graphics card instead of the processor's iGPU. Drawing with now: " + GpuPref.shortName(g.gpuName), () -> {
                o.gpuHigh = !o.gpuHigh;
                GpuPref.apply(o);
@@ -1032,7 +1057,7 @@ final class Screens {
       // ---------------------------------------------------------------- V6.22: world-gen overhaul
       cells.add(y -> {
          ui.toggle("Caves & Cliffs", o.caveCliffs, x0, y, colW, 20.0F,
-            "1.20-style cheese/spaghetti caverns, real walk-in cave entrances, aquifers, lush & dripstone biomes and amethyst geodes instead of the V6.21 tunnels.", () -> o.caveCliffs = !o.caveCliffs);
+            "1.20-style cheese/spaghetti caverns that break through the ground naturally, new underground structures, aquifers, lush & dripstone biomes and amethyst geodes instead of the V6.21 tunnels.", () -> o.caveCliffs = !o.caveCliffs);
          ui.slider("Biome Borders: " + new String[]{"Sharp", "Smooth", "Very"}[Options.clamp(o.biomeBorders, 0, 2)], x1, y, colW, 20.0F,
             Options.clamp(o.biomeBorders, 0, 2) / 2.0F,
             "Meandering, blended biome edges, mountain terraces, wider river valleys and gentler beaches.", v -> o.biomeBorders = Math.round(v * 2.0F));

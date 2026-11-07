@@ -701,7 +701,9 @@ final class Tests311 {
             check(lod.refresh(a) == a, "built but not uploaded: the old tile is still the one that is drawn");
             Lod.Tile r = a.replacement;
             r.state = 3; // (the upload needs OpenGL)
-            check(lod.refresh(a) == r, "uploaded: the new tile replaces it");
+            check(lod.refresh(a) == r, "uploaded: the new tile starts a cross-fade");
+            lod.frame = 10000 + Lod.FADE_FRAMES + 1;   // V6.31: the swap waits for the fade
+            check(lod.refresh(a) == r, "cross-fade finished, the new tile remains");
             check(lod.tiles.get(Lod.key(32, 0, 0)) == r, "and sits in the tile map");
             check(r.builtEpoch >= a.dirtyEpoch, "it was built after the change");
             check(lod.refresh(r) == r && r.replacement == null, "and is not outdated");

@@ -1,90 +1,82 @@
 package bc;
 
 /**
- * V6.30: a one-minute cinematic trailer that plays INSIDE the game.
+ * V6.31: a one-minute cinematic trailer that plays INSIDE the game.
  *
- * <p>This is not a video file. It is eight scripted camera moves through a real,
- * freshly generated world, with letterbox bars, hard cuts, title cards, a
- * time-of-day arc, a forced storm, a four-act soundtrack and foley stings from
- * the real CC0 recordings shipped in V6.29. It runs for exactly 60 seconds, is
- * skippable with any key or mouse click, and restores the game exactly where it
- * was (title panorama or a live world) when it ends.</p>
+ * <p>V6.30 was one continuous camera flying through the world. This is a real
+ * trailer montage: 24 short shots with hard cuts, eight different camera moves
+ * (glide, dolly, orbit, crane, dive, static pan, top-down and chase), eight
+ * different locations, a cut-up dawn/noon/storm/sunset/night arc, big word
+ * cards between bursts of fast cuts, a four-act soundtrack and foley stings
+ * from the real CC0 WAV recordings. It runs exactly 60 seconds, is skippable
+ * with any key or click, and restores the game exactly where it was.</p>
  *
- * <p>Everything is deterministic: the seed, the shot table and the camera path
- * are fixed, so the same trailer plays every time and the pure helpers can be
- * verified headlessly. No Mojang code or assets are used; the logo, music and
- * sounds are the ones already in this game.</p>
+ * <p>No video file, no Mojang assets: the logo, music and sounds are the ones
+ * already in this game and every frame is rendered by the normal renderer.</p>
  */
 final class Trailer {
    /** Exact running time, in seconds. */
    static final double LENGTH = 60.0;
-   /** A fixed seed so the landscape is always the same. */
    static final long SEED = 20261108L;
 
-   /** One scripted camera move. Angles are degrees, distances/heights are blocks. */
-   static final class Shot {
-      final double start, end;
-      final String title, sub;
-      final double angle, radius, travel, heading;
-      final double h0, h1;
-      final long sky0, sky1;
-      final int weather;     // 0 = clear, 3 = thunderstorm
-      final String cue;      // real recorded foley played on the cut
-      final int act;         // soundtrack act 0..3
-
-      Shot(double start, double end, String title, String sub, double angle, double radius,
-         double travel, double heading, double h0, double h1, long sky0, long sky1,
-         int weather, String cue, int act) {
-         this.start = start;
-         this.end = end;
-         this.title = title;
-         this.sub = sub;
-         this.angle = angle;
-         this.radius = radius;
-         this.travel = travel;
-         this.heading = heading;
-         this.h0 = h0;
-         this.h1 = h1;
-         this.sky0 = sky0;
-         this.sky1 = sky1;
-         this.weather = weather;
-         this.cue = cue;
-         this.act = act;
-      }
-
-      double length() {
-         return this.end - this.start;
-      }
-   }
-
-   /** Eight 7.5-second shots = exactly one minute. */
-   static final Shot[] SHOTS = {
-      new Shot(0.0, 7.5, "A WORLD OF YOUR OWN", "Every block is yours",
-         20.0, 18.0, 64.0, 35.0, 38.0, 26.0, 900L, 3200L, 0, "wind_gust", 0),
-      new Shot(7.5, 15.0, "FORESTS, MOUNTAINS, OCEANS", "28 biomes in one seed",
-         105.0, 46.0, 72.0, 120.0, 16.0, 11.0, 3200L, 6000L, 0, "leaf_rustle", 0),
-      new Shot(15.0, 22.5, "WEATHER WITH A HORIZON", "Storms you can see coming",
-         195.0, 30.0, 58.0, 200.0, 24.0, 15.0, 6000L, 7600L, 3, "cave_rumble", 1),
-      new Shot(22.5, 30.0, "BENEATH THE SURFACE", "1.20 caves with real entrances",
-         270.0, 60.0, 66.0, 285.0, 11.0, 6.0, 7600L, 10500L, 0, "cave_wind", 1),
-      new Shot(30.0, 37.5, "BUILD ANYTHING", "Redstone, machines, note blocks",
-         330.0, 24.0, 84.0, 15.0, 18.0, 30.0, 10500L, 12800L, 0, "geode_chime", 2),
-      new Shot(37.5, 45.0, "PLAY TOGETHER", "Mini games, maps and multiplayer",
-         60.0, 52.0, 88.0, 75.0, 26.0, 14.0, 12800L, 15200L, 0, "wind_gust", 2),
-      new Shot(45.0, 52.5, "AND WHEN NIGHT FALLS", "Moonlight, shadows and survival",
-         150.0, 36.0, 62.0, 165.0, 18.0, 10.0, 15200L, 18500L, 0, "cave_drip", 3),
-      new Shot(52.5, 60.0, "BLOCKCRAFT", "V6.30  -  PLAY IT NOW",
-         240.0, 20.0, 44.0, 250.0, 24.0, 34.0, 18500L, 22500L, 0, "geode_chime", 3)
+   /** Eight distinct camera moves, so no two shots feel like the same flythrough. */
+   static final String[] KIND = {
+      "Glide", "Dolly", "Orbit", "Crane", "Dive", "Static", "Top-down", "Chase"
    };
 
-   /** The four soundtrack acts, all tracks already in the game's soundbank. */
+   static final class Shot {
+      final double start, end;
+      final int kind;
+      final String title, sub;   // empty = no card (a fast montage cut)
+      final int anchor;
+      final long sky;
+      final int weather;         // 0 clear, 3 thunderstorm
+      final String cue;
+      final int act;
+
+      Shot(double start, double end, int kind, String title, String sub, int anchor,
+         long sky, int weather, String cue, int act) {
+         this.start = start; this.end = end; this.kind = kind;
+         this.title = title; this.sub = sub; this.anchor = anchor;
+         this.sky = sky; this.weather = weather; this.cue = cue; this.act = act;
+      }
+
+      double length() { return this.end - this.start; }
+   }
+
+   /** 24 shots, hard cuts, exactly 60 seconds. */
+   static final Shot[] SHOTS = {
+      new Shot(0.0, 2.5, 0, "A WORLD", "of your own", 0, 1000L, 0, "wind_gust", 0),
+      new Shot(2.5, 4.5, 1, "", "", 1, 2400L, 0, "leaf_rustle", 0),
+      new Shot(4.5, 7.0, 2, "", "", 2, 5200L, 0, "geode_chime", 0),
+      new Shot(7.0, 9.0, 3, "", "", 3, 7600L, 0, "cave_wind", 0),
+      new Shot(9.0, 12.0, 4, "EXPLORE", "28 biomes, one seed", 4, 6000L, 0, "tree_crash", 0),
+      new Shot(12.0, 14.0, 5, "", "", 5, 9000L, 0, "wind_gust", 0),
+      new Shot(14.0, 16.5, 6, "", "", 6, 12000L, 3, "cave_rumble", 1),
+      new Shot(16.5, 18.5, 7, "", "", 7, 13500L, 3, "stone_crumble", 1),
+      new Shot(18.5, 21.5, 0, "BUILD", "blocks, redstone, machines", 2, 11000L, 0, "cave_drip", 1),
+      new Shot(21.5, 23.5, 7, "", "", 0, 8000L, 0, "leaf_rustle", 1),
+      new Shot(23.5, 26.0, 2, "", "", 5, 6000L, 0, "geode_chime", 1),
+      new Shot(26.0, 28.0, 1, "", "", 3, 4000L, 0, "cave_wind", 1),
+      new Shot(28.0, 31.0, 3, "DIG DEEPER", "caves that reach daylight", 7, 12500L, 0, "tree_crash", 2),
+      new Shot(31.0, 33.0, 6, "", "", 1, 14500L, 0, "wind_gust", 2),
+      new Shot(33.0, 35.5, 4, "", "", 6, 16500L, 0, "cave_rumble", 2),
+      new Shot(35.5, 37.5, 5, "", "", 4, 18500L, 0, "stone_crumble", 2),
+      new Shot(37.5, 40.5, 1, "SURVIVE", "weather, night, mobs", 3, 7500L, 3, "cave_rumble", 2),
+      new Shot(40.5, 42.5, 0, "", "", 5, 9500L, 3, "wind_gust", 2),
+      new Shot(42.5, 45.0, 2, "", "", 0, 11500L, 0, "cave_drip", 3),
+      new Shot(45.0, 47.0, 7, "", "", 2, 13500L, 0, "leaf_rustle", 3),
+      new Shot(47.0, 50.0, 5, "TOGETHER", "mini games & multiplayer", 6, 18000L, 0, "geode_chime", 3),
+      new Shot(50.0, 52.0, 3, "", "", 4, 20500L, 0, "cave_wind", 3),
+      new Shot(52.0, 54.5, 6, "", "", 1, 22500L, 0, "tree_crash", 3),
+      new Shot(54.5, 60.0, 0, "BLOCKCRAFT", "V6.31  -  PLAY IT NOW", 7, 1000L, 0, "geode_chime", 3),
+   };
+
    static final String[] ACT_TRACKS = {
       "lce_menu_2", "lce_battle_city_1", "lce_battle_4", "lce_credits"
    };
 
-   private Trailer(Game g) {
-      this.g = g;
-   }
+   private Trailer(Game g) { this.g = g; }
 
    // ------------------------------------------------------------------ pure, testable helpers
    static double smooth(double t) {
@@ -92,30 +84,23 @@ final class Trailer {
       return p * p * (3.0 - 2.0 * p);
    }
 
-   static double lerp(double a, double b, double t) {
-      return a + (b - a) * t;
-   }
+   static double lerp(double a, double b, double t) { return a + (b - a) * t; }
 
-   /** Shot index for a time in seconds, or SHOTS.length when the trailer is over. */
    static int shotAt(double t) {
       if (t <= 0.0) return 0;
-      for (int i = 0; i < SHOTS.length; i++) {
-         if (t < SHOTS[i].end) return i;
-      }
+      for (int i = 0; i < SHOTS.length; i++) if (t < SHOTS[i].end) return i;
       return SHOTS.length;
    }
 
-   /** Interpolated time of day for a shot (a continuous 60-second time-lapse). */
    static long skyAt(int shot, double local) {
       Shot s = SHOTS[Math.max(0, Math.min(SHOTS.length - 1, shot))];
-      return Math.round(lerp(s.sky0, s.sky1, smooth(local)));
+      return s.sky + Math.round(local * 300.0);
    }
 
    static int actAt(int shot) {
       return SHOTS[Math.max(0, Math.min(SHOTS.length - 1, shot))].act;
    }
 
-   /** Terrain height at a world column, never below sea level. */
    static double ground(Gen gen, double x, double z) {
       if (gen == null) return 70.0;
       try {
@@ -126,41 +111,98 @@ final class Trailer {
       }
    }
 
+   /** Eight scattered scenic locations: the montage does NOT stay in one place. */
+   static double[] anchor(Gen gen, double baseX, double baseZ, int index) {
+      int k = Math.floorMod(index, 8);
+      double a = k * 2.399963229728653;
+      double r = 90.0 + k * 62.0;
+      return new double[]{baseX + Math.cos(a) * r, baseZ + Math.sin(a) * r};
+   }
+
+   static double[] anchor(Gen gen) { return anchor(gen, 0.0, 0.0, 0); }
+
    /**
-    * Camera for a shot at local progress 0..1.
-    * Returns {x, eyeY, z, yaw, pitch}; the player's feet are eyeY - Player.eye.
+    * Camera for a shot. Returns {x, eyeY, z, yaw, pitch}. The look target is
+    * always real terrain, so every frame contains the generated world.
     */
    static double[] cameraAt(Gen gen, double baseX, double baseZ, int shot, double local) {
       Shot s = SHOTS[Math.max(0, Math.min(SHOTS.length - 1, shot))];
+      double[] anc = anchor(gen, baseX, baseZ, s.anchor);
       double p = smooth(local);
-      double a = Math.toRadians(s.angle);
-      double hd = Math.toRadians(s.heading);
-      double x = baseX + Math.cos(a) * s.radius + Math.cos(hd) * s.travel * p;
-      double z = baseZ + Math.sin(a) * s.radius + Math.sin(hd) * s.travel * p;
-      double eyeY = ground(gen, x, z) + lerp(s.h0, s.h1, p);
-      // Look at a point on the ground ahead: the camera always sees real terrain.
-      double tx = x + Math.cos(hd) * 26.0;
-      double tz = z + Math.sin(hd) * 26.0;
-      double ty = ground(gen, tx, tz) + 5.0;
-      double dx = tx - x, dy = ty - eyeY, dz = tz - z;
+      double ang = s.anchor * 0.83 + 0.4;
+      double x = anc[0], z = anc[1], eye, tx, ty, tz;
+      switch (s.kind) {
+         case 0: // Glide: slow lateral establishing shot
+            x += Math.cos(ang) * 46.0 * p; z += Math.sin(ang) * 46.0 * p;
+            eye = ground(gen, x, z) + lerp(30.0, 24.0, p);
+            tx = x + Math.cos(ang) * 38.0; tz = z + Math.sin(ang) * 38.0;
+            ty = ground(gen, tx, tz) + 6.0;
+            break;
+         case 1: // Dolly: fast low forward move
+            x += Math.cos(ang) * 78.0 * p; z += Math.sin(ang) * 78.0 * p;
+            eye = ground(gen, x, z) + lerp(11.0, 6.0, p);
+            tx = x + Math.cos(ang) * 30.0; tz = z + Math.sin(ang) * 30.0;
+            ty = ground(gen, tx, tz) + 10.0;
+            break;
+         case 2: // Orbit: circle a point, always looking at it
+            {
+               double oa = ang + p * Math.PI * 1.15;
+               double rr = 24.0;
+               x += Math.cos(oa) * rr; z += Math.sin(oa) * rr;
+               eye = ground(gen, x, z) + 17.0;
+               tx = anc[0]; tz = anc[1]; ty = ground(gen, tx, tz) + 8.0;
+            }
+            break;
+         case 3: // Crane: rise straight up while panning
+            x += Math.cos(ang) * 12.0 * p; z += Math.sin(ang) * 12.0 * p;
+            eye = ground(gen, x, z) + lerp(8.0, 46.0, p);
+            tx = anc[0] + Math.cos(ang) * 22.0; tz = anc[1] + Math.sin(ang) * 22.0;
+            ty = ground(gen, tx, tz) + 4.0;
+            break;
+         case 4: // Dive: descend towards the ground
+            x += Math.cos(ang) * 34.0 * p; z += Math.sin(ang) * 34.0 * p;
+            eye = ground(gen, x, z) + lerp(36.0, 9.0, p);
+            tx = x + Math.cos(ang) * 15.0; tz = z + Math.sin(ang) * 15.0;
+            ty = ground(gen, tx, tz) + 2.0;
+            break;
+         case 5: // Static: a held wide with a slow pan
+            x += Math.cos(ang) * 4.0 * p; z += Math.sin(ang) * 4.0 * p;
+            eye = ground(gen, x, z) + 21.0;
+            tx = x + Math.cos(ang + 0.7 * p) * 44.0;
+            tz = z + Math.sin(ang + 0.7 * p) * 44.0;
+            ty = ground(gen, tx, tz) + 7.0;
+            break;
+         case 6: // Top-down: steep look at the terrain below
+            x += Math.cos(ang) * 26.0 * p; z += Math.sin(ang) * 26.0 * p;
+            eye = ground(gen, x, z) + 58.0;
+            tx = x + Math.cos(ang) * 7.0; tz = z + Math.sin(ang) * 7.0;
+            ty = ground(gen, tx, tz);
+            break;
+         default: // Chase: very fast, very low
+            x += Math.cos(ang) * 96.0 * p; z += Math.sin(ang) * 96.0 * p;
+            eye = ground(gen, x, z) + lerp(5.0, 8.0, p);
+            tx = x + Math.cos(ang) * 34.0; tz = z + Math.sin(ang) * 34.0;
+            ty = ground(gen, tx, tz) + 12.0;
+            break;
+      }
+      double dx = tx - x, dy = ty - eye, dz = tz - z;
       double horiz = Math.sqrt(dx * dx + dz * dz);
       double yaw = Math.toDegrees(Math.atan2(-dx, dz));
       double pitch = -Math.toDegrees(Math.atan2(dy, horiz));
-      return new double[]{x, eyeY, z, yaw, Math.max(-72.0, Math.min(72.0, pitch))};
+      return new double[]{x, eye, z, yaw, Math.max(-78.0, Math.min(78.0, pitch))};
    }
 
-   /** Human-readable shot list, also used by --trailer-plan and the release notes. */
    static String plan() {
       StringBuilder b = new StringBuilder();
-      b.append("BLOCKCRAFT V").append(Game.VERSION_STR).append(" - CINEMATIC TRAILER\n");
+      b.append("BLOCKCRAFT V").append(Game.VERSION_STR).append(" - CINEMATIC TRAILER MONTAGE\n");
       b.append("length=").append(LENGTH).append("s  shots=").append(SHOTS.length)
-         .append("  seed=").append(SEED).append("  letterbox + title cards + 4-act soundtrack\n\n");
+         .append("  camera moves=").append(KIND.length).append("  locations=8  seed=").append(SEED).append("\n\n");
       for (int i = 0; i < SHOTS.length; i++) {
          Shot s = SHOTS[i];
-         b.append(String.format("%02d  %5.1fs - %5.1fs  %-28s %s%n", i + 1, s.start, s.end,
-            s.title, s.sub));
-         b.append(String.format("      sky %5d -> %5d  weather=%d  height %.0f -> %.0f  travel %.0f  act=%d  foley=%s%n",
-            s.sky0, s.sky1, s.weather, s.h0, s.h1, s.travel, s.act, s.cue));
+         b.append(String.format("%02d  %5.1fs - %5.1fs  %4.1fs  %-8s  loc %d  sky %5d  %s  act %d  %s%s%n",
+            i + 1, s.start, s.end, s.length(), KIND[s.kind], s.anchor, s.sky,
+            s.weather == 3 ? "STORM" : "clear", s.act, s.cue,
+            s.title.isEmpty() ? "" : "  CARD: " + s.title));
       }
       return b.toString();
    }
@@ -171,7 +213,7 @@ final class Trailer {
    double tickAcc;
    int shot = -1;
    double baseX, baseZ;
-   World ownWorld;         // dedicated throw-away world when started from the menus
+   World ownWorld;
    Player ownCam;
    World savedWorld;
    Player savedPlayer;
@@ -234,34 +276,8 @@ final class Trailer {
       w.dayTime = this.savedDayTime;
    }
 
-   /** A dry, varied place near the origin: a quick deterministic search, not a long worker job. */
-   static double[] anchor(Gen gen) {
-      double best = -1.0;
-      double bx = 0.0, bz = 0.0;
-      for (int i = 0; i < 64; i++) {
-         double a = i * 2.399963229728653;   // golden angle
-         double r = 20.0 + i * 6.0;
-         double x = Math.cos(a) * r, z = Math.sin(a) * r;
-         double h = ground(gen, x, z);
-         int lo = (int)h, hi = (int)h;
-         for (int k = 0; k < 4; k++) {
-            double d = k * Math.PI / 2.0;
-            int hh = (int)ground(gen, x + Math.cos(d) * 24.0, z + Math.sin(d) * 24.0);
-            lo = Math.min(lo, hh);
-            hi = Math.max(hi, hh);
-         }
-         double score = (hi - lo) + 0.12 * Math.min(60.0, Math.abs(h - 88.0));
-         if (score > best) {
-            best = score;
-            bx = x;
-            bz = z;
-         }
-      }
-      return new double[]{bx, bz};
-   }
-
    private void findAnchor(Gen gen) {
-      double[] a = anchor(gen);
+      double[] a = anchor(gen, 0.0, 0.0, 0);
       this.baseX = a[0];
       this.baseZ = a[1];
    }
@@ -271,7 +287,7 @@ final class Trailer {
       ws.type = WorldSettings.DEFAULT;
       ws.aquatic = true;
       ws.terrainVer = 3;
-      ws.caveVer = 4;
+      ws.caveVer = 5;
       ws.biomeBorders = 1;
       World w = new World(SEED, null, Dim.OVERWORLD, ws);
       w.saveEnabled = false;
@@ -279,10 +295,8 @@ final class Trailer {
       w.weather.startFair();
       w.disasters.enabled = false;
       w.game = this.g;
-      w.dayTime = SHOTS[0].sky0;
-      if (this.g.rend != null) {
-         w.unloadHook = this.g.rend::onUnload;
-      }
+      w.dayTime = SHOTS[0].sky;
+      if (this.g.rend != null) w.unloadHook = this.g.rend::onUnload;
       this.findAnchor(w.gen);
       Player cam = new Player();
       cam.setMode(1);
@@ -291,15 +305,12 @@ final class Trailer {
       this.ownCam = cam;
       this.g.world = w;
       this.g.player = cam;
-      if (this.g.rend != null) {
-         this.g.rend.setLod(w);
-      }
+      if (this.g.rend != null) this.g.rend.setLod(w);
       int cx = (int)Math.floor(this.baseX) >> 4;
       int cz = (int)Math.floor(this.baseZ) >> 4;
       w.updateChunks(cx, cz, this.g.opt.renderDistance + 1, 64, 12000000L);
    }
 
-   /** Starts the 60-second trailer. Works from the title screen and from a live world. */
    static void start(Game g) {
       if (g.trailer != null) return;
       Trailer t = new Trailer(g);
@@ -313,17 +324,17 @@ final class Trailer {
       if (g.opt != null) {
          t.savedLook = g.opt.look;
          t.savedOptWeather = g.opt.weather;
-         g.opt.look = Look.CINEMATIC;   // cinematic colour grading while the trailer runs
-         g.opt.weather = true;          // the storm shot must be visible
+         g.opt.look = Look.CINEMATIC;
+         g.opt.weather = true;
       }
       boolean inGame = g.screen == Game.S.PLAY && g.world != null && g.player != null;
       if (inGame) {
          t.savePlayer(g.player);
          t.baseX = g.player.x;
          t.baseZ = g.player.z;
-         g.world.weather.enabled = true;   // let the storm shot render in a live world too
+         g.world.weather.enabled = true;
       } else {
-         Panorama.stop(g);             // the turning menu world is replaced by the trailer world
+         Panorama.stop(g);
          t.installWorld();
       }
       g.view = 0;
@@ -331,7 +342,6 @@ final class Trailer {
       g.setScreen(Game.S.TRAILER);
    }
 
-   /** Ends the trailer (or skips it) and restores the previous game state. */
    static void stop(Game g) {
       Trailer t = g.trailer;
       if (t == null) return;
@@ -347,20 +357,15 @@ final class Trailer {
             g.rend.setLod(null);
             g.rend.clearWorldMeshes(t.ownWorld);
          }
-         for (Chunk c : t.ownWorld.chunks.values()) {
-            c.unloaded = true;
-         }
+         for (Chunk c : t.ownWorld.chunks.values()) c.unloaded = true;
          t.ownWorld.chunks.clear();
          t.ownWorld.shutdown();
          if (g.world == t.ownWorld) {
             g.world = t.savedWorld;
             g.player = t.savedPlayer;
          }
-         if (t.savedWorld == null) {
-            Panorama.start(g);        // back to the turning landscape behind the menus
-         } else if (g.rend != null) {
-            g.rend.setLod(t.savedWorld);
-         }
+         if (t.savedWorld == null) Panorama.start(g);
+         else if (g.rend != null) g.rend.setLod(t.savedWorld);
       } else {
          if (t.savedPlayer != null) t.restorePlayer(t.savedPlayer);
          t.restoreWeather(t.savedWorld);
@@ -368,13 +373,9 @@ final class Trailer {
       g.setScreen(t.returnScreen);
    }
 
-   /** Called every frame from Game.update(), after the panorama (if any). dt is seconds. */
    void update(double dt) {
       this.time += dt;
-      if (this.time >= LENGTH) {
-         stop(this.g);
-         return;
-      }
+      if (this.time >= LENGTH) { stop(this.g); return; }
       this.tickAcc += dt * 20.0;
       for (int n = 0; this.tickAcc >= 1.0 && n < 6; n++) {
          this.tickAcc -= 1.0;
@@ -385,7 +386,7 @@ final class Trailer {
       if (s != this.shot) {
          this.shot = s;
          Shot sh = SHOTS[s];
-         if (sh.cue != null) SoundEngine.playUi(sh.cue, 0.55F, 1.0F);
+         if (sh.cue != null) SoundEngine.playUi(sh.cue, 0.5F, 1.0F);
          if (this.g.world != null) {
             this.g.world.weather.force(sh.weather == 3 ? 3 : 1, 30L);
             this.g.world.weather.instant();
@@ -403,7 +404,6 @@ final class Trailer {
       this.g.partial = (float)this.tickAcc;
    }
 
-   /** True while the trailer is on screen (used by the music selector). */
    static boolean active(Game g) {
       return g != null && g.trailer != null && g.screen == Game.S.TRAILER;
    }
@@ -420,86 +420,78 @@ final class Trailer {
    }
 
    private static float cardAlpha(double sec, double len) {
-      float in = (float)Math.min(1.0, Math.max(0.0, sec / 0.65));
-      float out = (float)Math.min(1.0, Math.max(0.0, (len - sec - 1.0) / 0.85));
+      float in = (float)Math.min(1.0, Math.max(0.0, sec / 0.28));
+      float out = (float)Math.min(1.0, Math.max(0.0, (Math.min(len, 2.0) - sec) / 0.35));
       return Math.min(in, out);
    }
 
-   /** Drawn from Game.render() after the world, inside gui.begin(). */
    static void draw(Game g) {
       Trailer t = g.trailer;
       Gui gui = g.gui;
       float w = gui.w, h = gui.h;
       double time = t == null ? 0.0 : t.time;
       int shot = shotAt(time);
-      double local = 0.0;
+      double sec = 0.0;
+      Shot sh = null;
       if (shot < SHOTS.length) {
-         Shot sh = SHOTS[shot];
-         local = (time - sh.start) / sh.length();
+         sh = SHOTS[shot];
+         sec = time - sh.start;
       }
 
-      // 2.39:1 letterbox + a thin gold rule at each edge.
       float bar = Math.max(8.0F, h * 0.115F);
       gui.rect(0.0F, 0.0F, w, bar, 0xE6000000);
       gui.rect(0.0F, h - bar, w, bar, 0xE6000000);
       gui.rect(0.0F, bar - 1.0F, w, 1.0F, 0x50FFD84A);
       gui.rect(0.0F, h - bar, w, 1.0F, 0x50FFD84A);
 
-      // Slate: shot number, running timecode, skip hint and a 60-second progress line.
       gui.text("CINEMATIC TRAILER", 8.0F, bar + 6.0F, 0xFFB9C4D8, true);
-      if (shot < SHOTS.length) {
-         String chapter = String.format("%02d / %02d", shot + 1, SHOTS.length);
-         gui.text(chapter, 8.0F, bar + 17.0F, 0xFFFFDF58, true);
+      if (sh != null) {
+         gui.text(String.format("CUT %02d / %02d  %s", shot + 1, SHOTS.length, KIND[sh.kind]),
+            8.0F, bar + 17.0F, 0xFFFFDF58, true);
       }
-      int sec = (int)Math.floor(time);
-      String tc = String.format("0:%02d / 1:00", Math.min(59, sec));
+      int secI = (int)Math.floor(time);
+      String tc = String.format("0:%02d / 1:00", Math.min(59, secI));
       gui.text(tc, w - Gui.textWidth(tc) - 8.0F, bar + 6.0F, 0xFFB9C4D8, true);
       gui.centered("ESC or click to skip", w / 2.0F, h - bar - 15.0F, 0x80FFFFFF, true, 1.0F);
       float frac = (float)Math.max(0.0, Math.min(1.0, time / LENGTH));
       gui.rect(0.0F, h - bar - 3.0F, w, 2.0F, 0x40000000);
       gui.rect(0.0F, h - bar - 3.0F, w * frac, 2.0F, 0xC0FFD84A);
 
-      // Title cards (in over 0.65 s, out before the cut).
-      if (shot < SHOTS.length) {
-         Shot sh = SHOTS[shot];
-         float a = cardAlpha(local * sh.length(), sh.length());
+      // Big word cards between bursts of quick cuts, like a real trailer.
+      if (sh != null && !sh.title.isEmpty()) {
+         float a = cardAlpha(sec, sh.length());
          if (a > 0.01F) {
-            gui.centered(sh.title, w / 2.0F, h * 0.37F, argb(a, 255, 246, 205), true, 2.0F);
-            gui.centered(sh.sub, w / 2.0F, h * 0.37F + 24.0F, argb(a * 0.92F, 200, 214, 235), true, 1.0F);
-            float lw = Math.min(180.0F, w * 0.25F);
-            gui.rect(w / 2.0F - lw / 2.0F, h * 0.37F + 38.0F, lw, 1.0F, argb(a * 0.6F, 255, 216, 74));
+            gui.centered(sh.title, w / 2.0F, h * 0.40F, argb(a, 255, 246, 205), true, 2.6F);
+            gui.centered(sh.sub, w / 2.0F, h * 0.40F + 28.0F, argb(a * 0.92F, 205, 216, 235), true, 1.0F);
+            float lw = Math.min(150.0F, w * 0.22F);
+            gui.rect(w / 2.0F - lw / 2.0F, h * 0.40F + 44.0F, lw, 1.0F, argb(a * 0.6F, 255, 216, 74));
          }
       }
 
-      // Hard cuts: a brief flash of black at the start of every shot.
-      if (shot > 0 && shot < SHOTS.length) {
-         double flash = local * SHOTS[shot].length();
-         if (flash < 0.22) {
-            gui.rect(0.0F, 0.0F, w, h, argb((float)(1.0 - flash / 0.22), 0, 0, 0));
-         }
+      // A 0.14 s black flash on every hard cut.
+      if (shot > 0 && sh != null && sec < 0.14) {
+         gui.rect(0.0F, 0.0F, w, h, argb((float)(1.0 - sec / 0.14), 0, 0, 0));
+      }
+      if (time < 0.8) {
+         gui.rect(0.0F, 0.0F, w, h, argb((float)(1.0 - time / 0.8), 0, 0, 0));
       }
 
-      // Opening fade from black and the final fade into the title card.
-      if (time < 1.1) {
-         gui.rect(0.0F, 0.0F, w, h, argb((float)(1.0 - time / 1.1), 0, 0, 0));
-      }
-      if (shot == SHOTS.length - 1 && time > 55.6) {
-         float fa = (float)Math.min(1.0, Math.max(0.0, (time - 55.6) / 1.6));
-         gui.rect(0.0F, 0.0F, w, h, argb(fa * 0.94F, 0, 0, 0));
+      // Finale: fade to black, the block-built logo, then the tagline.
+      if (time > 55.6) {
+         float fa = (float)Math.min(1.0, Math.max(0.0, (time - 55.6) / 1.4));
+         gui.rect(0.0F, 0.0F, w, h, argb(fa * 0.95F, 0, 0, 0));
          if (fa > 0.02F) {
             float cell = Logo.fit(w - 36.0F, 6.0F);
             float top = h * 0.30F;
             Logo.draw(gui, w / 2.0F, top, cell, time);
-            gui.centered("A ONE-MINUTE IN-GAME TRAILER", w / 2.0F, top + Logo.height(cell) + 14.0F,
-               argb(fa, 255, 223, 88), true, 1.0F);
-            gui.centered("V" + Game.VERSION_STR + "  -  PLAY IT NOW", w / 2.0F, top + Logo.height(cell) + 28.0F,
-               argb(fa, 220, 230, 245), true, 1.0F);
-            gui.centered("Original game. No Mojang code or assets.", w / 2.0F, h - bar - 34.0F,
-               argb(fa * 0.8F, 170, 182, 200), true, 1.0F);
+            gui.centered("V" + Game.VERSION_STR + "  -  AVAILABLE NOW", w / 2.0F,
+               top + Logo.height(cell) + 16.0F, argb(fa, 255, 223, 88), true, 1.0F);
+            gui.centered("Original game. No Mojang code or assets.", w / 2.0F,
+               top + Logo.height(cell) + 30.0F, argb(fa * 0.8F, 180, 190, 208), true, 1.0F);
          }
       }
-      if (time > LENGTH - 0.7) {
-         gui.rect(0.0F, 0.0F, w, h, argb((float)((time - (LENGTH - 0.7)) / 0.7), 0, 0, 0));
+      if (time > LENGTH - 0.6) {
+         gui.rect(0.0F, 0.0F, w, h, argb((float)((time - (LENGTH - 0.6)) / 0.6), 0, 0, 0));
       }
    }
 }

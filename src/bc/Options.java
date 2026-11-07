@@ -18,6 +18,8 @@ public final class Options {
    public boolean vsync = true;
    public int guiScale = 0;
    public boolean fullscreen = false;
+   /** V6.31: a borderless window that covers the whole monitor (no exclusive fullscreen). */
+   public boolean borderless = false;
    public int lodDistance = 64;
    /** Update 3.11: the first-person hand bobs with every step (Minecraft's view bobbing); /bobbing on|off. */
    public boolean bobbing = true;
@@ -203,6 +205,7 @@ public final class Options {
                this.vsync = Boolean.parseBoolean(var2.getProperty("vsync", "true"));
                this.guiScale = Integer.parseInt(var2.getProperty("guiScale", "0"));
                this.fullscreen = Boolean.parseBoolean(var2.getProperty("fullscreen", "false"));
+               this.borderless = Boolean.parseBoolean(var2.getProperty("borderless", "false"));
                this.lodDistance = Integer.parseInt(var2.getProperty("lodDistance", "64"));
                this.bobbing = Boolean.parseBoolean(var2.getProperty("bobbing", "true"));
                this.invertY = Boolean.parseBoolean(var2.getProperty("invertY", "false"));
@@ -311,6 +314,7 @@ public final class Options {
       var1.setProperty("vsync", this.vsync + "");
       var1.setProperty("guiScale", this.guiScale + "");
       var1.setProperty("fullscreen", this.fullscreen + "");
+      var1.setProperty("borderless", this.borderless + "");
       var1.setProperty("lodDistance", this.lodDistance + "");
       var1.setProperty("bobbing", this.bobbing + "");
       var1.setProperty("invertY", this.invertY + "");

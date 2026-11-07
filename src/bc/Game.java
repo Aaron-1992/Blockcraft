@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.30";
+   public static final String VERSION_STR = "6.31";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -345,6 +345,7 @@ public final class Game {
       }
 
       this.init();
+      this.applyDisplayMode();   // V6.31: honour the saved fullscreen / borderless setting
 
       try {
          this.loop();
@@ -956,15 +957,48 @@ public final class Game {
 
    void setFullscreen(boolean var1) {
       this.opt.fullscreen = var1;
+      if (var1) this.opt.borderless = false;
+      if (this.window == 0L) return;
       long var2 = GLFW.glfwGetPrimaryMonitor();
       GLFWVidMode var4 = GLFW.glfwGetVideoMode(var2);
       if (var1) {
          GLFW.glfwSetWindowMonitor(this.window, var2, 0, 0, var4.width(), var4.height(), var4.refreshRate());
       } else {
          GLFW.glfwSetWindowMonitor(this.window, 0L, (var4.width() - 1280) / 2, (var4.height() - 720) / 2, 1280, 720, 0);
+         GLFW.glfwSetWindowAttrib(this.window, GLFW.GLFW_DECORATED, GLFW.GLFW_TRUE);
       }
 
       GLFW.glfwSwapInterval(this.opt.vsync ? 1 : 0);
+   }
+
+   /** V6.31: borderless fullscreen - an undecorated window exactly the size of the
+    * desktop. Alt-Tab and overlays keep working (unlike exclusive fullscreen). */
+   void setBorderless(boolean var1) {
+      this.opt.borderless = var1;
+      if (var1) this.opt.fullscreen = false;
+      if (this.window == 0L) return;
+      long mon = GLFW.glfwGetPrimaryMonitor();
+      GLFWVidMode mode = GLFW.glfwGetVideoMode(mon);
+      int w = mode == null ? 1280 : mode.width();
+      int h = mode == null ? 720 : mode.height();
+      if (var1) {
+         GLFW.glfwSetWindowMonitor(this.window, 0L, 0, 0, w, h, GLFW.GLFW_DONT_CARE);
+         GLFW.glfwSetWindowAttrib(this.window, GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
+         GLFW.glfwSetWindowPos(this.window, 0, 0);
+         GLFW.glfwSetWindowSize(this.window, w, h);
+      } else {
+         GLFW.glfwSetWindowAttrib(this.window, GLFW.GLFW_DECORATED, GLFW.GLFW_TRUE);
+         GLFW.glfwSetWindowMonitor(this.window, 0L, Math.max(0, (w - 1280) / 2), Math.max(0, (h - 720) / 2), 1280, 720, 0);
+         GLFW.glfwSetWindowSize(this.window, 1280, 720);
+      }
+      GLFW.glfwSwapInterval(this.opt.vsync ? 1 : 0);
+   }
+
+   /** Applies the saved display mode once, right after the window exists. */
+   void applyDisplayMode() {
+      if (this.window == 0L) return;
+      if (this.opt.fullscreen) this.setFullscreen(true);
+      else if (this.opt.borderless) this.setBorderless(true);
    }
 
    File worldDir() {
@@ -2300,6 +2334,12 @@ public final class Game {
                   }
 
                   return;
+               case MORE:
+                  if (var1 == 256 && var2 == 1) {
+                     this.setScreen(Game.S.TITLE);
+                  }
+
+                  return;
                case MULTIPLAYER: {
                   boolean ctrl = (var3 & 10) != 0;
                   if (ctrl && var1 == 67 && var2 == 1) {
@@ -3059,6 +3099,10 @@ public final class Game {
                      this.say("§cTilesheet: " + ex.getMessage());
                   }
                   break;
+               case "borderless":
+                  this.setBorderless(!this.opt.borderless);
+                  this.say("Borderless fullscreen is " + (this.opt.borderless ? "on" : "off"));
+                  break;
                case "trailer":
                   Trailer.start(this);
                   this.say("Cinematic trailer: 1:00, 8 shots. ESC or click to skip.");
@@ -3157,7 +3201,7 @@ public final class Game {
                   SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
                   break;
                case "help":
-                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /sounds /trailer /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
+                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /sounds /trailer /borderless /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
                   if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
@@ -3909,7 +3953,7 @@ public final class Game {
       int cap = this.opt.maxFps;
       boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
          || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE || this.screen == Game.S.CREDITS
-         || this.screen == Game.S.TRAILER;
+         || this.screen == Game.S.TRAILER || this.screen == Game.S.MORE;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -6481,6 +6525,9 @@ public final class Game {
          case TRAILER:
             Trailer.draw(this);   // V6.30: letterbox + title cards over the real world
             break;
+         case MORE:
+            Screens.more(this);
+            break;
          case MIDI:
             if(this.midiScreen!=null)this.midiScreen.draw();
             break;
@@ -7708,7 +7755,8 @@ public final class Game {
       CREDITS,
       MAP,
       DEAD,
-      TRAILER;
+      TRAILER,
+      MORE;
    }
 
    static final class WInfo {
