@@ -278,10 +278,10 @@ final class Tests624 {
 
    // ------------------------------------------------------------------ wiring
    static void wiring() throws Exception {
-      eq("6.26", Game.VERSION_STR, "the game version is 6.26");
-      eq("6.26", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.26");
-      check(src("README.md").contains("V6.26"), "README describes V6.24");
-      check(src("package/README.txt").contains("V6.26"), "the packaged readme describes V6.24");
+      eq("6.27", Game.VERSION_STR, "the game version is 6.27");
+      eq("6.27", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.27");
+      check(src("README.md").contains("V6.27"), "README describes V6.24");
+      check(src("package/README.txt").contains("V6.27"), "the packaged readme describes V6.24");
       check(new File("docs/releases/v6.25.md").isFile(), "V6.24 release notes exist");
       check(new File("docs/screenshots/v6.25-trees.png").isFile(), "the tree/LOD comparison preview exists");
    }

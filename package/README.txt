@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.26  -  an original Minecraft-style voxel sandbox   (EDITION V6.26)
+BLOCKCRAFT V6.27  -  an original Minecraft-style voxel sandbox   (EDITION V6.27)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,27 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.27 - the old Aseprite / resource-pack editing WORKS AGAIN
+
+  * BUG FOUND AND FIXED. In V6.25 I added the single editable tilesheet.
+    It compared each sheet cell against the CURRENT render atlas, so an
+    UNTOUCHED tilesheet.png looked "different" wherever a resource pack
+    had changed a texture - and quietly overwrote your edit with the
+    default art. That is why Edit-textures.bat / tiles/0003_stone.png /
+    Reload PNGs appeared to do nothing.
+  * The game now ships a PRISTINE reference (tilesheet-default.png)
+    next to tilesheet.png. Only cells that differ from THAT reference
+    are applied. An untouched sheet is a true no-op, so any resource
+    pack (per-tile PNGs, atlas.png, animation strips) works exactly as
+    documented. A cell you actually edit in the tilesheet still wins.
+  * PNG overrides now also apply to the built-in Vibrant / Retro grades
+    and to classic-base packs, not just plain custom packs.
+  * Diagnostics: "Reload PNGs" now says how many tile overrides were
+    loaded, and /tilesheet reports edited cells + pack overrides +
+    the active pack id, so a mis-selected pack is obvious.
+  * V6.26 LOD fading, V6.25 trees / /treefall / tilesheet and all
+    earlier features are unchanged.
 
 WHAT'S NEW IN V6.26 - no more LOD pops and no more random crashes
 

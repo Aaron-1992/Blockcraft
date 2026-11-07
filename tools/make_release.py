@@ -519,6 +519,32 @@ def main():
             "GLSL programs, and the packaged exe/jar check. No real-GPU/Windows playtest "
             "is claimed.\n"
         )
+    if version == "6.27":
+        release_notes += (
+            "\n### The old resource-pack texture editing works again\n\n"
+            "**Root cause found and fixed.** V6.25 added the single editable tilesheet, but "
+            "it compared each sheet cell against the CURRENT render atlas. With a resource "
+            "pack active, the atlas holds your edited art while `tilesheet.png` holds the "
+            "default art, so an UNTOUCHED sheet silently overwrote every pack edit. That is "
+            "why `Edit-textures.bat` / `tiles/0003_stone.png` / Reload PNGs appeared to do "
+            "nothing. Reproduced headlessly: tile 3 was `FFFF00FF` (pack edit) before the "
+            "overlay and `FF878984` (default stone) after it.\n\n"
+            "The game now ships a **pristine reference** `tilesheet-default.png` beside "
+            "`tilesheet.png`. Only cells that differ from that reference are applied, so an "
+            "untouched sheet is a true no-op and per-tile PNGs, `atlas.png` and animation "
+            "strips all work again. A cell you actually edit in the tilesheet still wins. "
+            "Priority: built-in art -> resource pack -> your edited tilesheet cells. "
+            "`import` never overwrites the reference.\n\n"
+            "Also: PNG overrides now apply to every pack kind (including Vibrant / Retro / "
+            "classic base), **Reload PNGs** prints how many overrides were loaded, and "
+            "`/tilesheet` reports edited cells + pack overrides + the active pack id, so a "
+            "mis-selected pack is obvious.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with five new V6.27 regression groups (including the "
+            "exact reproduction and its inverse), strict equivalence, all 21 GLSL programs, "
+            "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
+            "real-GPU/Windows playtest is claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

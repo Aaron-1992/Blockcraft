@@ -27,8 +27,10 @@ import javax.imageio.ImageIO;
  * canvas 1024x1024 and the alpha, save as PNG, then type {@code /tilesheet} in game (or
  * Options > Resource Packs > Reload Tilesheet). No Java, Python or compiling needed.
  *
- * <p>Only cells that DIFFER from the built-in art are applied, so an untouched sheet is a
- * complete no-op and cannot change the default game. Animated tiles (water, lava, portal,
+ * <p>Only cells that DIFFER from the shipped pristine reference (tilesheet-default.png)
+ * are applied. V6.27: the comparison MUST be against that reference, never against the
+ * current render atlas - comparing against the atlas made an untouched sheet overwrite
+ * resource-pack PNG edits with the default art. Animated tiles (water, lava, portal,
  * fire, ... ) are listed in the index but intentionally left alone so the animations keep
  * running; edit those through the animation strips instead.
  */
@@ -38,10 +40,15 @@ public final class Tilesheet {
    public static final int SIZE = CELL * COLS;   // 1024
    public static final int TILES = COLS * COLS;  // 1024
    public static final String FILE = "tilesheet.png";
+   /** Pristine copy of the same atlas; never edited, used only to detect edits. */
+   public static final String DEFAULT_FILE = "tilesheet-default.png";
+   static final String MASTER_DEFAULT = "textures/Blockcraft-tilesheet-default.png";
 
    private static int[] sheet;
    private static long stamp = Long.MIN_VALUE;
    private static long length = -1L;
+   private static int[] baseline;
+   private static long baseStamp = Long.MIN_VALUE;
    private static boolean suppress;
 
    private Tilesheet() {
@@ -52,10 +59,20 @@ public final class Tilesheet {
       return new File(FILE);
    }
 
+   /** The shipped game keeps the reference next to the sheet; a source checkout falls
+    *  back to the master copy in textures/. */
+   public static File defaultFile() {
+      File shipped = new File(DEFAULT_FILE);
+      if (shipped.isFile()) return shipped;
+      return new File(MASTER_DEFAULT);
+   }
+
    public static synchronized void invalidate() {
       sheet = null;
       stamp = Long.MIN_VALUE;
       length = -1L;
+      baseline = null;
+      baseStamp = Long.MIN_VALUE;
    }
 
    /** Returns the ARGB pixels of a valid sheet, or null when there is none / it is malformed. */
@@ -85,29 +102,58 @@ public final class Tilesheet {
       }
    }
 
-   private static boolean editable(int t) {
-      return !TextureEditor.animated(t) && t != Tex.WHITE;
+   /** The pristine default atlas, or null when the reference is unavailable. */
+   static synchronized int[] loadDefault() {
+      File f = defaultFile();
+      if (!f.isFile()) {
+         baseline = null;
+         return null;
+      }
+      long lm = f.lastModified();
+      if (baseline != null && lm == baseStamp) return baseline;
+      try {
+         BufferedImage img = ImageIO.read(f);
+         if (img == null || img.getWidth() != SIZE || img.getHeight() != SIZE) {
+            baseline = null;
+            return null;
+         }
+         baseline = img.getRGB(0, 0, SIZE, SIZE, null, 0, SIZE);
+         baseStamp = lm;
+         return baseline;
+      } catch (IOException e) {
+         baseline = null;
+         return null;
+      }
    }
 
-   private static boolean differs(int[] s, int[] ref, int tx, int ty) {
+   /** A cell counts as "edited by the player" only when it differs from the pristine
+    *  reference. Without the reference nothing is applied, which is always safe. */
+   private static boolean editedCell(int[] s, int[] def, int tx, int ty) {
       for (int y = 0; y < CELL; y++) {
          int row = (ty + y) * SIZE + tx;
          for (int x = 0; x < CELL; x++) {
-            if (s[row + x] != ref[row + x]) return true;
+            if (s[row + x] != def[row + x]) return true;
          }
       }
       return false;
    }
 
-   /** Overlay the edited cells onto the final 32px render atlas, at full resolution. */
+   private static boolean editable(int t) {
+      return !TextureEditor.animated(t) && t != Tex.WHITE;
+   }
+
+   /** Overlay ONLY the player's edited cells onto the final 32px render atlas.
+    *  Cells that still match the pristine reference are left exactly as the active
+    *  resource pack produced them. */
    public static synchronized void apply(int[] render) {
       int[] s = load();
-      if (s == null || render == null || render.length != SIZE * SIZE) return;
+      int[] def = loadDefault();
+      if (s == null || def == null || render == null || render.length != SIZE * SIZE) return;
       for (int t = 0; t < TILES; t++) {
          if (!editable(t)) continue;
          int tx = t % COLS * CELL;
          int ty = t / COLS * CELL;
-         if (!differs(s, render, tx, ty)) continue;
+         if (!editedCell(s, def, tx, ty)) continue;
          for (int y = 0; y < CELL; y++) {
             System.arraycopy(s, (ty + y) * SIZE + tx, render, (ty + y) * SIZE + tx, CELL);
          }
@@ -117,13 +163,13 @@ public final class Tilesheet {
    /** Keep the CPU-side 16px atlas (LOD colours, held items) in sync with edited art. */
    public static synchronized void applyLow(int[] low) {
       int[] s = load();
-      if (s == null || low == null) return;
-      int[] ref = TexPixel32.atlas(low);
+      int[] def = loadDefault();
+      if (s == null || def == null || low == null) return;
       int px = Tex.PX;
       for (int t = 0; t < TILES; t++) {
          if (!editable(t)) continue;
          int sx = t % COLS * CELL, sy = t / COLS * CELL;
-         if (!differs(s, ref, sx, sy)) continue;
+         if (!editedCell(s, def, sx, sy)) continue;
          int dx = t % COLS * 16, dy = t / COLS * 16;
          for (int y = 0; y < 16; y++) {
             for (int x = 0; x < 16; x++) {
@@ -145,13 +191,13 @@ public final class Tilesheet {
       return true;
    }
 
-   public static int changedTiles() {
+   public static synchronized int changedTiles() {
       int[] s = load();
-      if (s == null) return 0;
-      int[] ref = TexPixel32.atlas(Tex.atlasPixels);
+      int[] def = loadDefault();
+      if (s == null || def == null) return 0;
       int n = 0;
       for (int t = 0; t < TILES; t++) {
-         if (editable(t) && differs(s, ref, t % COLS * CELL, t / COLS * CELL)) n++;
+         if (editable(t) && editedCell(s, def, t % COLS * CELL, t / COLS * CELL)) n++;
       }
       return n;
    }
@@ -192,6 +238,9 @@ public final class Tilesheet {
       img.setRGB(0, 0, SIZE, SIZE, atlas, 0, SIZE);
       if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Cannot create " + dir);
       ImageIO.write(img, "png", new File(dir, "Blockcraft-tilesheet.png"));
+      // A pristine reference is what makes an untouched sheet a no-op and, crucially,
+      // stops the sheet from overwriting resource-pack PNG edits (V6.27).
+      ImageIO.write(img, "png", new File(dir, "Blockcraft-tilesheet-default.png"));
       Map<Integer, String> names = names();
 
       StringBuilder tsv = new StringBuilder("tile\trow\tcol\tname\ttype\tcell_pixels\n");
@@ -249,7 +298,7 @@ public final class Tilesheet {
       g.dispose();
       ImageIO.write(map, "png", new File(dir, "tilesheet-map.png"));
       System.out.println("[tilesheet] wrote " + new File(dir, "Blockcraft-tilesheet.png").getAbsolutePath()
-         + " (" + TILES + " tiles) + TILESHEET.tsv + tilesheet-index.html + tilesheet-map.png");
+         + " (" + TILES + " tiles) + indexes + pristine reference");
    }
 
    private static String esc(String s) {

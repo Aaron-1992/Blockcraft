@@ -334,16 +334,20 @@ public final class ResourcePacks {
 
    /** Called at the end of {@link Tex#initPixels()} to apply pack-specific colour grading and PNG tile overrides. */
    public static synchronized void applyPostProcess(int[] pix) {
-      if (ID_DEFAULT.equals(activeId) || ID_CLASSIC.equalsIgnoreCase(activeId)) {
+      if (ID_DEFAULT.equals(activeId)) {
          return;
       }
       Pack p = active();
+      // V6.27: PNG overrides must be applied for EVERY pack (including the built-in
+      // colour grades and classic-base packs), not just plain custom packs.
       if (ID_VIBRANT.equalsIgnoreCase(p.id)) {
          gradePixels(pix, 1.24F, 1.07F, 1.03F, 1.01F, 0.96F, false);
+         applyTileOverrides(pix);
          return;
       }
       if (ID_RETRO.equalsIgnoreCase(p.id)) {
          gradePixels(pix, 1.15F, 1.12F, 1.0F, 1.0F, 1.0F, true);
+         applyTileOverrides(pix);
          return;
       }
 
@@ -357,10 +361,22 @@ public final class ResourcePacks {
          gradePixels(pix, sat, con, rMul, gMul, bMul, retro);
       }
 
+      applyTileOverrides(pix);
+   }
+
+   /** Copies every PNG tile override of the active pack into the CPU 16px atlas. */
+   private static void applyTileOverrides(int[] pix) {
       for (int tile = 0; tile < Tex.COLS * Tex.COLS; tile++) {
          int[] px = overridePixels(tile, 0, 16);
          if (px != null) writeTile(pix, tile, px);
       }
+   }
+
+   /** Diagnostic: how many PNG tiles / animation strips the active pack actually loaded. */
+   public static synchronized int overrideCount() {
+      if (ID_DEFAULT.equals(activeId)) return 0;
+      Pack p = active();
+      return p == null ? 0 : p.tileOverrides.size() + p.animations.size();
    }
 
    /** Opt-in: old packs keep their original 16px rendering. Missing native cells inherit Default. */

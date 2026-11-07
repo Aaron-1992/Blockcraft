@@ -24,6 +24,8 @@ ROOT = B.ROOT
 JAR = os.path.join(B.BUILD, "blockcraft.jar")
 MASTER = os.path.join(ROOT, "textures", "Blockcraft-tilesheet.png")
 SHIPPED = os.path.join(ROOT, "package", "tilesheet.png")
+MASTER_DEFAULT = os.path.join(ROOT, "textures", "Blockcraft-tilesheet-default.png")
+SHIPPED_DEFAULT = os.path.join(ROOT, "package", "tilesheet-default.png")
 
 
 def check(path):
@@ -44,8 +46,12 @@ def export(out="textures"):
                     "--export-tilesheet", out], check=True, cwd=ROOT)
     src = os.path.join(ROOT, out, "Blockcraft-tilesheet.png")
     check(src)
+    ref = os.path.join(ROOT, out, "Blockcraft-tilesheet-default.png")
+    check(ref)
     shutil.copyfile(src, SHIPPED)
+    shutil.copyfile(ref, SHIPPED_DEFAULT)
     print("[tilesheet] %s -> %s" % (src, SHIPPED))
+    print("[tilesheet] %s -> %s (pristine reference, never overwritten by import)" % (ref, SHIPPED_DEFAULT))
 
 
 def install(path):
@@ -54,6 +60,7 @@ def install(path):
     os.makedirs(os.path.dirname(MASTER), exist_ok=True)
     shutil.copyfile(path, MASTER)
     shutil.copyfile(path, SHIPPED)
+    # NOTE: the pristine reference is deliberately NOT touched by import.
     print("[tilesheet] installed %s" % path)
     print("[tilesheet]   master : %s" % MASTER)
     print("[tilesheet]   shipped: %s  (run build.py --patch + make_release.py to publish)" % SHIPPED)

@@ -53,6 +53,8 @@ def required(version):
         extra += ("Tilesheet", "Trees")
     if tuple(map(int, version.split("."))) >= (6, 26):
         extra += ("Main",)
+    if tuple(map(int, version.split("."))) >= (6, 27):
+        extra += ("ResourcePacks",)
     return REQUIRED + extra
 
 

@@ -1389,7 +1389,8 @@ final class Screens {
       float quarter = (pw - 12.0F) / 4.0F;
       ui.button("PNG", px, by, quarter, 20.0F, true, "Reload edited PNGs and scan resourcepacks/. Refreshes the active pack immediately.", () -> {
          ResourcePacks.reload(g);
-         ui.say("Reloaded PNGs: " + ResourcePacks.active().title);
+         ui.say("Reloaded PNGs: " + ResourcePacks.active().title + " ("
+            + ResourcePacks.overrideCount() + " tile overrides active)");
       });
       ui.button("Tilesheet", px + quarter + 4.0F, by, quarter, 20.0F, true,
          "Re-read the single editable tilesheet.png (all 1024 textures in one 1024x1024 PNG) and apply your edits immediately.", () -> {

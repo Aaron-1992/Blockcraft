@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.26";
+   public static final String VERSION_STR = "6.27";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -3041,8 +3041,9 @@ public final class Game {
                      } else {
                         Tilesheet.invalidate();
                         ResourcePacks.reload(this);
-                        this.say("Tilesheet reloaded from " + Tilesheet.file().getName()
-                           + " (" + Tilesheet.changedTiles() + " edited tiles active).");
+                        this.say("Tilesheet: " + Tilesheet.changedTiles() + " edited cells, "
+                           + ResourcePacks.overrideCount() + " pack overrides (active: "
+                           + ResourcePacks.activeId() + ").");
                      }
                   } catch (Exception ex) {
                      this.say("§cTilesheet: " + ex.getMessage());

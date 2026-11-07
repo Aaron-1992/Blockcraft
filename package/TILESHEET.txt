@@ -26,3 +26,20 @@ NOTES
     and are deliberately NOT overridden, so the animations keep working.
     Edit those through resourcepacks/MyTextures/animations/ instead.
   * This is an ORIGINAL texture set. Do not paste Mojang/Minecraft assets.
+
+PRIORITY AND THE OLD RESOURCE PACKS (V6.27)
+------------------------------------------
+tilesheet-default.png is a pristine reference copy shipped next to
+tilesheet.png. NEVER edit or delete it. The game applies only the cells
+of tilesheet.png that differ from that reference, so an untouched sheet
+cannot overwrite your resource pack.
+
+Order: built-in art -> resource pack (resourcepacks/*, Edit-textures.bat,
+atlas.png, per-tile PNGs, animation strips) -> tilesheet cells you edited.
+
+If the old Aseprite workflow shows default art:
+  1. Options > Resource Packs > Reload PNGs. The toast now prints the
+     number of tile overrides that were actually loaded (0 = wrong folder
+     or the pack is not selected).
+  2. Scroll down and Select 'My Aseprite Textures'. The selection is saved.
+  3. Type /tilesheet to see "N edited cells, M pack overrides (active: id)".
