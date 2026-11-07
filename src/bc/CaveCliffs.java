@@ -37,6 +37,96 @@ final class CaveCliffs {
    static final int PROVINCE = 128;
    static final int AQUIFER = 64;
    static final int GEODE = 56;
+   /** V6.28: hashed grid of real cave entrances (not ravines or sinkhole pits). */
+   static final int MOUTH_CELL = 96;
+
+   /**
+    * A 1.20-style cave mouth: a visible opening in the surface that slopes down
+    * through the rock and opens into a chamber joined to the underground carver.
+    * All values are pure functions of the seed and the world coordinate.
+    */
+   static final class Mouth {
+      int x, z;
+      int radius;
+      double dirX, dirZ;
+
+      /** True when this column is part of the stone lip around the opening. */
+      boolean rim(int wx, int wz) {
+         double d = Math.sqrt((double)(wx - x) * (wx - x) + (double)(wz - z) * (wz - z));
+         double r = radius * 1.35;
+         return d > r + 0.5 && d < r + 2.4;
+      }
+
+      /** True when this column's surface is inside the opening (used to keep trees out). */
+      boolean surfaceHole(int wx, int wz) {
+         double d = Math.sqrt((double)(wx - x) * (wx - x) + (double)(wz - z) * (wz - z));
+         return d <= radius * 1.35 + 0.9 * Math.sin((wx - x) * 0.6 + (wz - z) * 0.8);
+      }
+
+      /** Carve the opening, the sloped descent and the bottom chamber. */
+      boolean air(int wx, int y, int wz, int surfaceH) {
+         if (surfaceH < 66 || y > surfaceH || y < 20) return false;
+         int bottom = Math.max(26, surfaceH - 46);
+         if (y < bottom - 6) return false;
+
+         // 1. the visible opening through the topsoil
+         if (y >= surfaceH - 3) return surfaceHole(wx, wz);
+
+         // 2. a diagonal, walkable-looking tunnel (not a vertical crack)
+         int top = surfaceH - 3;
+         double t = (double)(top - y) / Math.max(1, top - bottom);
+         if (t < -0.02 || t > 1.08) return false;
+         double drift = (top - bottom) * 1.05;   // a shallow ramp, not a vertical crack
+         double cx = x + dirX * t * drift;
+         double cz = z + dirZ * t * drift;
+         double rr = radius * (1.0 - 0.28 * Math.max(0.0, Math.min(1.0, t)));
+         double dx = wx - cx, dz = wz - cz;
+         if (dx * dx + dz * dz <= rr * rr) return true;
+
+         // 3. a rounded chamber at the bottom that definitely joins the cave system
+         double bx = wx - (x + dirX * drift), bz = wz - (z + dirZ * drift);
+         double dy = (y - bottom) * 1.25;
+         if (y >= bottom - 5 && y <= bottom + 4
+            && bx * bx + bz * bz + dy * dy <= (radius * 2.4) * (radius * 2.4)) return true;
+
+         // 4. a low gallery running out of the chamber into the surrounding cave
+         // system, so the entrance is never a dead-end pit.
+         if (y < bottom - 2 || y > bottom + 3) return false;
+         double along = bx * dirX + bz * dirZ;
+         double side = -bx * dirZ + bz * dirX;
+         return along >= -1.0 && along <= radius * 4.5
+            && Math.abs(side) <= radius * 0.85 && Math.abs(y - bottom) <= 2;
+      }
+   }
+
+   /** Candidate entrances whose centre is near this column (at most 9). */
+   Mouth[] mouths(int x, int z) {
+      int cx = Math.floorDiv(x, MOUTH_CELL);
+      int cz = Math.floorDiv(z, MOUTH_CELL);
+      Mouth[] out = null;
+      int n = 0;
+      for (int i = -1; i <= 1; i++) {
+         for (int j = -1; j <= 1; j++) {
+            long h = CaveWorks.mix(seed ^ 0x4D4F555448L, cx + i, 0, cz + j);
+            if ((h >>> 58) >= 34) continue;   // ~53% of cells get an entrance
+            int px = (cx + i) * MOUTH_CELL + 24 + CaveWorks.bits(h, 8, 48);
+            int pz = (cz + j) * MOUTH_CELL + 24 + CaveWorks.bits(h, 20, 48);
+            int dx = x - px, dz = z - pz;
+            if (dx * dx + dz * dz > MOUTH_CELL * MOUTH_CELL * 2) continue;
+            if (out == null) out = new Mouth[9];
+            Mouth m = new Mouth();
+            m.x = px;
+            m.z = pz;
+            m.radius = 4 + CaveWorks.bits(h, 30, 5);   // 4..8 block half-width
+            double ang = CaveWorks.bits(h, 40, 360) * Math.PI / 180.0;
+            m.dirX = Math.cos(ang);
+            m.dirZ = Math.sin(ang);
+            out[n++] = m;
+         }
+      }
+      if (n == 0) return null;
+      return java.util.Arrays.copyOf(out, n);
+   }
 
    final long seed;
    final WorldSettings st;
@@ -118,6 +208,7 @@ final class CaveCliffs {
    /** 0 = solid rock, 1 = air, 2 = lava, 3 = aquifer water. Pure in (seed, x, y, z). */
    int carve(int x, int y, int z) {
       if (y < 5 || y > 230) return SOLID;
+      boolean v3 = st.caveVer >= 3;   // V6.28: larger, better-connected 1.20-style caverns
       float cs = st.caveScale < 0.6F ? 0.6F : (st.caveScale > 3.0F ? 3.0F : st.caveScale);
       float dens = st.caveDensity < 0.4F ? 0.4F : (st.caveDensity > 2.5F ? 2.5F : st.caveDensity);
       double k = 1.0 / cs;
@@ -133,15 +224,30 @@ final class CaveCliffs {
          double mid = 0.35 + 0.65 * band(y, 8.0, 62.0);
          double ax = sp.noise(x * 0.016 * k, y * 0.023 * k, z * 0.016 * k);
          double bx = nd.noise(x * 0.016 * k + 31.7, y * 0.023 * k + 11.3, z * 0.016 * k - 47.1);
-         air = ax * ax + bx * bx < 0.0038 * dens * mid;
+         air = ax * ax + bx * bx < 0.0038 * dens * mid * (v3 ? 1.35 : 1.0);
       }
 
-      // 3. Cheese caves: large irregular caverns, deep only and clustered by a slow province.
-      if (!air && y >= 8 && y <= 46) {
+      // 2b. V6.28: a third, very long tunnel scale joins the separate cave pockets
+      // into continuous systems (1.18 "spaghetti" caves run for hundreds of blocks).
+      if (!air && v3) {
+         double cx = sp.noise(x * 0.008 * k - 71.0, y * 0.012 * k + 5.0, z * 0.008 * k + 19.0);
+         double cz = nd.noise(x * 0.008 * k + 43.0, y * 0.012 * k - 29.0, z * 0.008 * k - 61.0);
+         air = cx * cx + cz * cz < 0.0030 * dens * (0.45 + 0.55 * band(y, 6.0, 78.0));
+      }
+
+      // 3. Cheese caves: large irregular caverns, clustered by a slow province.
+      // V6.28 reaches much higher and uses two overlapping fields, like the big
+      // multi-room cheese caverns of 1.18/1.20 rather than one sealed pocket.
+      if (!air && y >= 8 && y <= (v3 ? 72 : 46)) {
          double q = cheese.noise(x * 0.010 * k + 91.0, y * 0.015 * k - 17.0, z * 0.010 * k + 53.0);
-         double gate = 0.42 - 0.06 * (dens - 1.0F) + 0.055 * province.noise2(x * 0.003 * k, z * 0.003 * k);
-         double depth = band(y, 6.0, 52.0);
+         double gate = (v3 ? 0.36 : 0.42) - 0.06 * (dens - 1.0F)
+            + 0.055 * province.noise2(x * 0.003 * k, z * 0.003 * k);
+         double depth = band(y, 6.0, v3 ? 80.0 : 52.0);
          air = q > gate && depth > 0.16;
+         if (!air && v3) {
+            double q2 = cheese.noise(x * 0.014 * k - 33.0, y * 0.019 * k + 7.0, z * 0.014 * k - 91.0);
+            air = q2 > gate + 0.09 && depth > 0.22;
+         }
       }
 
       // 4. Sparse giant halls, vertical wells and geode interiors.

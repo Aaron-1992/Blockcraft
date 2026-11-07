@@ -388,7 +388,7 @@ final class Screens {
       ws.caveLayers = g.opt.caveLayers;
       ws.caveLakes = g.opt.caveLakes;
       ws.caveRichness = g.opt.caveRichness;
-      ws.caveVer = g.opt.caveCliffs ? 2 : 1;
+      ws.caveVer = g.opt.caveCliffs ? 3 : 1;
       ws.biomeBorders = g.opt.biomeBorders;
       ws.treeDensity = g.opt.treeDensity;
       ws.treeScale = g.opt.treeScale;
@@ -492,7 +492,7 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
-         + (ws.terrainVer >= 3 ? (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures")
+         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  1.20 caves, real entrances, aquifers & geodes" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
             : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
          + (ws.biomeBorders > 0 ? "  -  smooth biome borders" : "")
          + (ws.giantTrees ? "  -  giant trees" : "")
@@ -1029,7 +1029,7 @@ final class Screens {
       // ---------------------------------------------------------------- V6.22: world-gen overhaul
       cells.add(y -> {
          ui.toggle("Caves & Cliffs", o.caveCliffs, x0, y, colW, 20.0F,
-            "Cheese/spaghetti/noodle caves, aquifers, lush & dripstone biomes and amethyst geodes instead of the V6.21 tunnels.", () -> o.caveCliffs = !o.caveCliffs);
+            "1.20-style cheese/spaghetti caverns, real sloped cave entrances, aquifers, lush & dripstone biomes and amethyst geodes instead of the V6.21 tunnels.", () -> o.caveCliffs = !o.caveCliffs);
          ui.slider("Biome Borders: " + new String[]{"Sharp", "Smooth", "Very"}[Options.clamp(o.biomeBorders, 0, 2)], x1, y, colW, 20.0F,
             Options.clamp(o.biomeBorders, 0, 2) / 2.0F,
             "Meandering, blended biome edges, mountain terraces, wider river valleys and gentler beaches.", v -> o.biomeBorders = Math.round(v * 2.0F));

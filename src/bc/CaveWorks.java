@@ -70,6 +70,20 @@ final class CaveWorks {
       return mouth(this.e, this.seed, x, z);
    }
 
+   /** V6.28: the real hashed cave entrances near this column (caveVer >= 3 only). */
+   CaveCliffs.Mouth[] mouths(int x, int z) {
+      return this.cliffs.mouths(x, z);
+   }
+
+   /** True when the surface here is the opening of a real cave entrance. */
+   boolean mouthSurface(int x, int z, int surfaceH) {
+      if (surfaceH < 66 || this.st.caveVer < 3) return false;
+      CaveCliffs.Mouth[] ms = this.cliffs.mouths(x, z);
+      if (ms == null) return false;
+      for (CaveCliffs.Mouth m : ms) if (m.surfaceHole(x, z)) return true;
+      return false;
+   }
+
    // ------------------------------------------------------------------ deterministic mixing
    /** A 64-bit mixer: the same (seed, x, y, z) always gives the same bits, on every thread. */
    static long mix(long seed, int x, int y, int z) {

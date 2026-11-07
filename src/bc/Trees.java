@@ -539,6 +539,9 @@ public final class Trees {
 
       this.falls.add(f);
       this.felled++;
+      // V6.28: a creak and a rush of leaves when the trunk lets go.
+      SoundEngine.play3D(this.w, "tree_fall", p.px + 0.5, p.py + 1.0, p.pz + 0.5,
+         0.88F, 0.90F + this.rnd.nextFloat() * 0.18F);
    }
 
    /** Called every world tick. */
@@ -585,6 +588,9 @@ public final class Trees {
       Plan p = f.plan;
       World w = this.w;
       Game g = w.game;
+      // V6.28: the heavy thud as the crown lands.
+      SoundEngine.play3D(w, "tree_crash", p.px + 0.5, p.py + 0.5, p.pz + 0.5,
+         1.0F, 0.88F + this.rnd.nextFloat() * 0.20F);
       int axis = f.dx != 0 ? 0 : 1;
       HashSet<Long> used = new HashSet<>();
       int[] r = new int[3];

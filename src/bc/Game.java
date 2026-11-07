@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.27";
+   public static final String VERSION_STR = "6.28";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -4321,6 +4321,29 @@ public final class Game {
       }
    }
 
+   /** V6.28: occasional positional cave ambience - drips, wind, deep rumble,
+    *  crystal chimes and gravel slides - only when there is rock overhead. */
+   void caveAmbience() {
+      if (this.world == null || this.player == null || this.player.dead) return;
+      if (this.tickCount % 137L != 0L || this.rnd.nextInt(3) != 0) return;
+      double py = this.player.y;
+      if (py < 8.0 || py > 54.0) return;
+      int bx = (int)Math.floor(this.player.x);
+      int by = (int)Math.floor(py);
+      int bz = (int)Math.floor(this.player.z);
+      int above = this.world.getBlock(bx, Math.min(254, by + 3), bz);
+      if (above == 0 || Blocks.isLeaves(above) || Blocks.isFluid(above)) return;
+      double ang = this.rnd.nextDouble() * Math.PI * 2.0;
+      double dist = 3.0 + this.rnd.nextDouble() * 10.0;
+      double x = this.player.x + Math.cos(ang) * dist;
+      double z = this.player.z + Math.sin(ang) * dist;
+      int roll = this.rnd.nextInt(100);
+      String key = roll < 34 ? "cave_drip" : (roll < 58 ? "cave_wind"
+         : (roll < 76 ? "cave_rumble" : (roll < 90 ? "stone_crumble" : "geode_chime")));
+      SoundEngine.play3D(this.world, key, x, py + 1.0, z,
+         0.42F, 0.85F + this.rnd.nextFloat() * 0.32F);
+   }
+
    void tick() {
       this.applyVideoTuning();
       this.tickCount++;
@@ -4383,6 +4406,7 @@ public final class Game {
       SkyGen.tickMode(this, this.world);
       ModLoader.onGameTick(this);
       SoundEngine.tick(this);
+      this.caveAmbience();
       this.adv.tick();
       if (this.tickCount % 10 == 0) {
          this.adv.poll(this);

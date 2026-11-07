@@ -545,6 +545,33 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.28":
+        release_notes += (
+            "\n### 1.20-style caves with real entrances\n\n"
+            "**New worlds only** (`caveVer = 3`; old saves are untouched). Cheese caverns now "
+            "reach y=8..72 and use two overlapping large-scale noise fields for multi-room "
+            "chambers, plus a third very long spaghetti tunnel scale that joins separate "
+            "pockets into continuous systems. In a headless 6x6-chunk scan the carved volume "
+            "went from 32,490 to 52,790 blocks (+62%), with more aquifer water and lava "
+            "lakes. Lush / dripstone / ice / amethyst / deep-dark biomes and geodes remain.\n\n"
+            "**Actual cave entrances**, not just the endless ravine cracks or tiny sinkholes: "
+            "hashed 96-block regions grow a wide irregular surface mouth with a stone lip, a "
+            "shallow sloped ramp down through the rock, a rounded bottom chamber and a low "
+            "gallery that joins the underground network. Trees and the world spawn are kept "
+            "out of the openings. `docs/screenshots/v6.28-caves.png` is a headless generated "
+            "cross-section (old carver above, new entrance below); it is not a GPU screenshot.\n\n"
+            "### More sounds\n\n"
+            "Eight original procedural samples (no Mojang audio): **tree_fall** (creak + canopy "
+            "whoosh when a tree topples, audible to 48 blocks), **tree_crash** (thud, wood crack, "
+            "settling leaves), **leaf_rustle** when breaking leaves, and positional cave "
+            "ambience - **cave_drip, cave_wind, cave_rumble, geode_chime, stone_crumble** - "
+            "while under a rock ceiling. Aliases: tree_creak, water_drip, cave_ambience.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite passes with five new V6.28 regression groups (entrance "
+            "continuity, cavern volume, new samples and hooks), strict equivalence, all 21 "
+            "GLSL programs, and the packaged exe/jar check. No real-GPU/Windows playtest is "
+            "claimed.\n"
+        )
     with open(os.path.join(OUT, "release-notes.md"), "w", encoding="utf-8") as f:
         f.write(release_notes)
     with open(os.path.join(OUT, "SHA256SUMS.txt"), "w", encoding="utf-8") as f:

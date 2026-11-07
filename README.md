@@ -3,7 +3,7 @@
 An original Minecraft-Java-1.12-style voxel sandbox for Windows (Java 21 + LWJGL/OpenGL).
 In Creative, type `/computer` to build the physical 4-bit example machine. Right-click its orange clock to Run/Stop; empty-hand sneak/right-click to Step. [Computer guide](package/Computer-guide.txt).
 
-Current source version: **V6.27 — resource-pack texture editing works again** (retains V6.26 LOD fade-in and crash hardening, V6.25 branch-skeleton trees, falling trees and the single editable tilesheet, plus V6.24 entity-shadow/LOD fixes and V6.22 Caves & Cliffs). [Download the playable Windows build](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.27).
+Current source version: **V6.28 — Minecraft 1.20-style caves with real entrances, and new tree/cave sounds** (retains V6.27 resource-pack texture editing, V6.26 LOD fade-in and crash hardening, V6.25 branch-skeleton trees, falling trees and the single editable tilesheet). [Download the playable Windows build](https://github.com/Aaron-1992/Blockcraft/releases/tag/v6.28).
 
 Chunk lighting runs on a bounded, low-priority worker; unload and distant-terrain scans are incremental, and per-section occupancy is indexed. V6.18 continues that work with background chunk saves, incremental autosaves, bounded unloads, a configurable chunk cache and reused collision scratch buffers. No measured frame-time gain on real GPU hardware is claimed yet; please report machine specs, render distance and whether chunk-load spikes improved.
 

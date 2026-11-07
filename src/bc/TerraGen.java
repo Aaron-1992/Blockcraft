@@ -644,7 +644,10 @@ public final class TerraGen extends Gen {
    double ravine(int x, int z) {
       boolean big = this.st.terrainVer >= 2;
       double zone = this.nRavZ.noise2(x / 420.0 + 12.0, z / 420.0 - 5.0);
-      if (zone < (big ? 0.05 : 0.2)) {
+      // V6.28: with real cave entrances available, the endless surface cracks
+      // no longer need to be everywhere.
+      double need = big ? (this.st.caveVer >= 3 ? 0.16 : 0.05) : 0.2;
+      if (zone < need) {
          return 0.0;
       }
 
@@ -697,6 +700,7 @@ public final class TerraGen extends Gen {
       Random r = new Random(this.seed * 31L + cx * 341873128712L + cz * 132897987541L);
       final boolean ver3 = this.st.terrainVer >= 3;
       final boolean cc = ver3 && this.st.caveVer >= 2;
+      final boolean cc3 = ver3 && this.st.caveVer >= 3;   // V6.28 entrances + larger caverns
       int[] hs = new int[256];
       int[] bm = new int[256];
       int[] rule = new int[5];
@@ -750,10 +754,15 @@ public final class TerraGen extends Gen {
             }
 
             // caves
+            CaveCliffs.Mouth[] ms = cc3 && h >= 66 ? this.caves.mouths(wx, wz) : null;
+            boolean inMouth = false;
+            if (ms != null) {
+               for (CaveCliffs.Mouth m : ms) if (m.surfaceHole(wx, wz)) { inMouth = true; break; }
+            }
             int top2 = h - 3;
             boolean mouth = h >= 64 && (ver3 ? this.caves.mouth(wx, wz) : this.entranceBig(wx, wz)) && s.biome != Biomes.MUSHROOM;
             boolean shaft = ver3 && CaveWorks.shaft(this.seed, wx, wz);
-            if (mouth || shaft) {
+            if (mouth || shaft || inMouth) {
                top2 = h;
             }
 
@@ -769,8 +778,18 @@ public final class TerraGen extends Gen {
                }
 
                if (ver3) {
+                  // V6.28: a real cave mouth cuts a sloped entrance from the surface
+                  // down into a chamber that joins the underground system.
+                  boolean entranceAir = false;
+                  if (ms != null) {
+                     for (CaveCliffs.Mouth m : ms) {
+                        if (m.air(wx, y, wz, h)) { entranceAir = true; break; }
+                     }
+                  }
                   // a sinkhole cuts a real vertical shaft down to y=30, whatever the noise says
                   if (shaft && y >= 30) {
+                     b[Chunk.idx(x, y, z)] = 0;
+                  } else if (entranceAir) {
                      b[Chunk.idx(x, y, z)] = 0;
                   } else {
                      int cv = cc ? this.caves.hollowCC(wx, y, wz) : this.caves.hollow(wx, y, wz);
@@ -781,6 +800,17 @@ public final class TerraGen extends Gen {
                   }
                } else if (bigCaves ? this.carveBig(wx, y, wz) : this.carve(wx, y, wz)) {
                   b[Chunk.idx(x, y, z)] = (short)(y <= 10 ? 58 : 0);
+               }
+            }
+
+            // V6.28: a stone lip makes the mouth read as a cave entrance rather than
+            // a random hole, and stops grass/trees growing on its edge.
+            if (ms != null && h >= 66) {
+               for (CaveCliffs.Mouth m : ms) {
+                  if (m.rim(wx, wz)) {
+                     b[Chunk.idx(x, h, z)] = (short)Blocks.STONE;
+                     break;
+                  }
                }
             }
 
@@ -1139,7 +1169,8 @@ public final class TerraGen extends Gen {
                int variant = treeVariant(plan, ts);
                int tier = treeSizeTier(plan, ts, this.giantTrees);
 
-               if (this.entrance(wx, wz) || this.ravine(wx, wz) > 0.0) {
+               if (this.entrance(wx, wz) || this.ravine(wx, wz) > 0.0
+                  || this.caves.mouthSurface(wx, wz, s.h)) {
                   continue;
                }
 
@@ -1359,7 +1390,8 @@ public final class TerraGen extends Gen {
             int x = (int)(Math.cos(a) * ring);
             int z = (int)(Math.sin(a) * ring);
             Gen.Col c = this.column(x, z);
-            if (c.h >= 65 && c.h <= 100 && Biomes.spawnable(c.biome) && !this.entrance(x, z) && this.ravine(x, z) <= 0.0) {
+            if (c.h >= 65 && c.h <= 100 && Biomes.spawnable(c.biome) && !this.entrance(x, z)
+               && this.ravine(x, z) <= 0.0 && !this.caves.mouthSurface(x, z, c.h)) {
                return new int[]{x, c.h + 1, z};
             }
          }

@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.27  -  an original Minecraft-style voxel sandbox   (EDITION V6.27)
+BLOCKCRAFT V6.28  -  an original Minecraft-style voxel sandbox   (EDITION V6.28)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,36 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.28 - 1.20-style CAVES, REAL ENTRANCES, MORE SOUNDS
+
+  * CAVES REDONE TOWARD MINECRAFT 1.20 (caveVer 3, new worlds only).
+    Cheese caverns now reach from y=8 to y=72, use two overlapping
+    large-scale noise fields so they form multi-room chambers, and a
+    third very long "spaghetti" tunnel scale connects the separate
+    pockets into continuous systems. In a headless 6x6-chunk scan the
+    carved volume went from 32,490 to 52,790 blocks (+62%) with more
+    aquifer water and lava lakes.
+  * ACTUAL CAVE ENTRANCES, not just those endless cracks (ravines) or
+    tiny sinkhole pits. Every ~96-block hashed region can now grow a
+    wide, irregular mouth in the surface with a stone lip, a SHALLOW
+    SLOPED RAMP down through the rock, a rounded chamber at the bottom
+    and a low gallery that joins the underground cave network. Trees
+    and the world spawn no longer land inside the openings.
+    See docs/screenshots/v6.28-caves.png (headless cross-section:
+    old carver above, new entrance below). Old saves are untouched.
+  * MORE SOUNDS (all original procedural synthesis, no Mojang audio):
+      tree_fall   - wooden creak + rising canopy whoosh when a tree
+                    starts toppling (audible from 48 blocks)
+      tree_crash  - heavy thud, wood crack and settling leaves on landing
+      leaf_rustle - extra foley when breaking leaves
+      cave_drip / cave_wind / cave_rumble / geode_chime / stone_crumble
+                  - positional ambience while you are under a rock
+                    ceiling underground (drips, air swells, deep rumble,
+                    crystal chimes, gravel slides)
+      aliases: tree_creak, water_drip, cave_ambience
+  * V6.27 texture-pack fixes, V6.26 LOD fading and all earlier work
+    remain unchanged.
 
 WHAT'S NEW IN V6.27 - the old Aseprite / resource-pack editing WORKS AGAIN
 

@@ -337,6 +337,9 @@ public final class SoundEngine {
       aliasSample("tnt_prime", "tnt_ignite");
       aliasSample("explode", "tnt_explode");
       aliasSample("item_pickup", "item_pop");
+      aliasSample("tree_creak", "tree_fall");
+      aliasSample("water_drip", "cave_drip");
+      aliasSample("cave_ambience", "cave_wind");
       aliasSample("pop", "item_pop");
 
       if (System.getProperty("bc.test") == null && !Boolean.getBoolean("java.awt.headless")) {
@@ -452,6 +455,112 @@ public final class SoundEngine {
          String key="note_"+NoteBlocks.NAMES[instrument];BANK.put(key,new Sample(key,sr,NoteBlocks.samples(instrument,sr)));
       }
 
+      // 7. V6.28 procedural world foley - trees falling and cave ambience.
+      // Everything here is synthesized locally: no Mojang or third-party audio.
+      Random fr = new Random(0x46364C4559L);
+
+      // tree_fall: a long wooden creak bending downward, plus a rising canopy whoosh.
+      short[] tf = new short[(int)(sr * 1.6)];
+      double phase = 0.0, lpF = 0.0;
+      for (int i = 0; i < tf.length; i++) {
+         double t = i / (double)sr;
+         double f = 112.0 - 58.0 * Math.min(1.0, t / 1.35);
+         phase += 2.0 * Math.PI * f / sr;
+         double creak = (Math.sin(phase) + 0.45 * Math.sin(2.0 * phase) + 0.25 * Math.sin(3.0 * phase))
+            * (0.55 + 0.45 * Math.sin(2.0 * Math.PI * 7.0 * t)) * Math.exp(-t * 1.45);
+         lpF += 0.055 * ((fr.nextDouble() * 2.0 - 1.0) - lpF);
+         double whoosh = lpF * 3.2 * Math.min(1.0, t / 0.85) * Math.exp(-Math.max(0.0, t - 0.85) * 2.3);
+         tf[i] = (short)(Math.max(-1.0, Math.min(1.0, creak * 0.42 + whoosh * 0.55)) * 26000.0);
+      }
+      BANK.put("tree_fall", new Sample("tree_fall", sr, tf));
+
+      // tree_crash: a heavy low thud, a wood crack and a settling leaf rustle.
+      short[] tc = new short[(int)(sr * 1.3)];
+      double lpC = 0.0;
+      for (int i = 0; i < tc.length; i++) {
+         double t = i / (double)sr;
+         double thud = Math.sin(2.0 * Math.PI * 62.0 * t) * Math.exp(-t * 7.0) * 0.85
+            + Math.sin(2.0 * Math.PI * 37.0 * t) * Math.exp(-t * 4.2) * 0.55;
+         double n = fr.nextDouble() * 2.0 - 1.0;
+         lpC += 0.11 * (n - lpC);
+         double crack = n * Math.exp(-t * 19.0) * 0.55 + lpC * 2.1 * Math.exp(-t * 3.6);
+         double leaf = lpC * 1.4 * Math.exp(-Math.pow((t - 0.20) * 5.0, 2.0));
+         tc[i] = (short)(Math.max(-1.0, Math.min(1.0, thud + crack + leaf)) * 29000.0);
+      }
+      BANK.put("tree_crash", new Sample("tree_crash", sr, tc));
+
+      // leaf_rustle: two short bandpassed noise swells.
+      short[] lr = new short[(int)(sr * 0.42)];
+      double lpL = 0.0;
+      for (int i = 0; i < lr.length; i++) {
+         double t = i / (double)sr;
+         double n = fr.nextDouble() * 2.0 - 1.0;
+         lpL += 0.32 * (n - lpL);
+         double env = Math.exp(-t * 7.0) * (0.6 + 0.4 * Math.sin(2.0 * Math.PI * 11.0 * t));
+         lr[i] = (short)(Math.max(-1.0, Math.min(1.0, (n - lpL) * 0.55 * env)) * 15000.0);
+      }
+      BANK.put("leaf_rustle", new Sample("leaf_rustle", sr, lr));
+
+      // cave_drip: two resonant water droplets with a short echo tail.
+      short[] cd = new short[(int)(sr * 0.75)];
+      for (int i = 0; i < cd.length; i++) {
+         double t = i / (double)sr;
+         double a = drop(t, 1180.0, 28.0);
+         double b = 0.55 * drop(t - 0.235, 1430.0, 34.0);
+         double echo = 0.20 * drop(t - 0.41, 980.0, 30.0);
+         cd[i] = (short)(Math.max(-1.0, Math.min(1.0, a + b + echo)) * 21000.0);
+      }
+      BANK.put("cave_drip", new Sample("cave_drip", sr, cd));
+
+      // cave_wind: slow, low-passed air swells for big empty caverns.
+      short[] cw = new short[(int)(sr * 2.4)];
+      double lpW = 0.0;
+      for (int i = 0; i < cw.length; i++) {
+         double t = i / (double)sr;
+         double n = fr.nextDouble() * 2.0 - 1.0;
+         lpW += 0.015 * (n - lpW);
+         double env = Math.sin(Math.PI * i / (double)cw.length) * (0.55 + 0.45 * Math.sin(2.0 * Math.PI * 0.7 * t));
+         cw[i] = (short)(Math.max(-1.0, Math.min(1.0, lpW * 7.0 * env)) * 17000.0);
+      }
+      BANK.put("cave_wind", new Sample("cave_wind", sr, cw));
+
+      // cave_rumble: a deep subterranean swell under the whole cave layer.
+      short[] cr = new short[(int)(sr * 2.8)];
+      double lpR = 0.0;
+      for (int i = 0; i < cr.length; i++) {
+         double t = i / (double)sr;
+         double n = fr.nextDouble() * 2.0 - 1.0;
+         lpR += 0.008 * (n - lpR);
+         double env = Math.sin(Math.PI * i / (double)cr.length);
+         double sub = Math.sin(2.0 * Math.PI * 34.0 * t) * 0.28 * env;
+         cr[i] = (short)(Math.max(-1.0, Math.min(1.0, lpR * 9.0 * env + sub)) * 23000.0);
+      }
+      BANK.put("cave_rumble", new Sample("cave_rumble", sr, cr));
+
+      // geode_chime: a soft amethyst bell for crystal chambers.
+      short[] gc = new short[(int)(sr * 1.5)];
+      for (int i = 0; i < gc.length; i++) {
+         double t = i / (double)sr;
+         double env = Math.exp(-t * 3.1);
+         double v = Math.sin(2.0 * Math.PI * 880.0 * t) * 0.55
+            + Math.sin(2.0 * Math.PI * 1320.0 * t) * 0.28
+            + Math.sin(2.0 * Math.PI * 1760.0 * t) * 0.17;
+         gc[i] = (short)(Math.max(-1.0, Math.min(1.0, v * env)) * 19000.0);
+      }
+      BANK.put("geode_chime", new Sample("geode_chime", sr, gc));
+
+      // stone_crumble: gravel grains tumbling down a cave wall.
+      short[] sc = new short[(int)(sr * 0.7)];
+      double lpS = 0.0;
+      for (int i = 0; i < sc.length; i++) {
+         double t = i / (double)sr;
+         double n = fr.nextDouble() * 2.0 - 1.0;
+         if (fr.nextInt(70) == 0) n += (fr.nextDouble() * 2.0 - 1.0) * 1.6;
+         lpS += 0.28 * (n - lpS);
+         sc[i] = (short)(Math.max(-1.0, Math.min(1.0, lpS * Math.exp(-t * 5.5))) * 18000.0);
+      }
+      BANK.put("stone_crumble", new Sample("stone_crumble", sr, sc));
+
       // 6. Item Pickup Pop fallback (if not loaded from soundbank.bin)
       if (!BANK.containsKey("item_pop")) {
          short[] pop = new short[sr / 12];
@@ -463,6 +572,13 @@ public final class SoundEngine {
          }
          BANK.put("item_pop", new Sample("item_pop", sr, pop));
       }
+   }
+
+   /** A resonant water droplet: a fast downward pitch sweep under an exponential decay. */
+   private static double drop(double t, double freq, double decay) {
+      if (t < 0.0) return 0.0;
+      return Math.sin(2.0 * Math.PI * (freq * t + 240.0 * Math.exp(-t * 24.0) / 24.0))
+         * Math.exp(-t * decay);
    }
 
    public static Sample getSample(String key) {
@@ -583,7 +699,8 @@ public final class SoundEngine {
       double dy = y - listenerY;
       double dz = z - listenerZ;
       double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      float maxDist = key.equals("tnt_explode") || key.equals("thunder") ? 96.0F : 28.0F;
+      float maxDist = key.equals("tnt_explode") || key.equals("thunder") ? 96.0F
+         : (key.equals("tree_fall") || key.equals("tree_crash") ? 48.0F : 28.0F);
       if (dist >= maxDist) {
          return null;
       }
@@ -990,7 +1107,8 @@ public final class SoundEngine {
       String mat = blockMaterialCategory(blockId);
       String key = switch (mat) {
          case "wood" -> "dig_wood_" + (1 + RND.nextInt(2));
-         case "leaves" -> (hasSample("step_leaves_1") ? "step_leaves_" + (1 + RND.nextInt(2)) : "dig_foliage_1");
+         case "leaves" -> (RND.nextInt(4) == 0 ? "leaf_rustle"
+            : (hasSample("step_leaves_1") ? "step_leaves_" + (1 + RND.nextInt(2)) : "dig_foliage_1"));
          case "grass" -> "step_grass_" + (1 + RND.nextInt(3));
          case "dirt" -> "dig_dirt_1";
          case "sand" -> "step_sand_" + (1 + RND.nextInt(2));
