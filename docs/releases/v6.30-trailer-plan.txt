@@ -1,0 +1,19 @@
+BLOCKCRAFT V6.30 - CINEMATIC TRAILER
+length=60.0s  shots=8  seed=20261108  letterbox + title cards + 4-act soundtrack
+
+01    0.0s -   7.5s  A WORLD OF YOUR OWN          Every block is yours
+      sky   900 ->  3200  weather=0  height 38 -> 26  travel 64  act=0  foley=wind_gust
+02    7.5s -  15.0s  FORESTS, MOUNTAINS, OCEANS   28 biomes in one seed
+      sky  3200 ->  6000  weather=0  height 16 -> 11  travel 72  act=0  foley=leaf_rustle
+03   15.0s -  22.5s  WEATHER WITH A HORIZON       Storms you can see coming
+      sky  6000 ->  7600  weather=3  height 24 -> 15  travel 58  act=1  foley=cave_rumble
+04   22.5s -  30.0s  BENEATH THE SURFACE          1.20 caves with real entrances
+      sky  7600 -> 10500  weather=0  height 11 -> 6  travel 66  act=1  foley=cave_wind
+05   30.0s -  37.5s  BUILD ANYTHING               Redstone, machines, note blocks
+      sky 10500 -> 12800  weather=0  height 18 -> 30  travel 84  act=2  foley=geode_chime
+06   37.5s -  45.0s  PLAY TOGETHER                Mini games, maps and multiplayer
+      sky 12800 -> 15200  weather=0  height 26 -> 14  travel 88  act=2  foley=wind_gust
+07   45.0s -  52.5s  AND WHEN NIGHT FALLS         Moonlight, shadows and survival
+      sky 15200 -> 18500  weather=0  height 18 -> 10  travel 62  act=3  foley=cave_drip
+08   52.5s -  60.0s  BLOCKCRAFT                   V6.30  -  PLAY IT NOW
+      sky 18500 -> 22500  weather=0  height 24 -> 34  travel 44  act=3  foley=geode_chime

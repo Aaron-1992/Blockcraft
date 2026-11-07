@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.29";
+   public static final String VERSION_STR = "6.30";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -47,6 +47,8 @@ public final class Game {
    final Ui ui = new Ui(this);
    /** Update 3.13: the turning world behind the title and the menus (null while a real world is open). */
    Panorama pano;
+   /** V6.30: the one-minute cinematic trailer, null when it is not running. */
+   Trailer trailer;
    /** Update 6.20: the HUD minimap and the full world map. */
    final MapView map = new MapView();
    long window;
@@ -2159,6 +2161,10 @@ public final class Game {
 
    void onKey(int var1, int var2, int var3) {
       if(this.screen==Game.S.MIDI){if(midiScreen!=null)midiScreen.key(var1,var2);return;}
+      if (this.screen == Game.S.TRAILER) {
+         if (var2 == 1) Trailer.stop(this);   // any key skips the trailer
+         return;
+      }
       if(RasterComputer.onKey(this,var1,var2))return;
       if (var2 != 0) {
          if (var1 == 300 && var2 == 1) {
@@ -2555,6 +2561,10 @@ public final class Game {
    }
 
    void onMouse(int var1, int var2) {
+      if (this.screen == Game.S.TRAILER) {
+         if (var2 == 1) Trailer.stop(this);   // a click skips the trailer
+         return;
+      }
       if(RasterComputer.captured(this)) {leftDown=rightDown=leftPressed=rightPressed=false;return;}
       boolean var3 = var2 == 1;
       if (this.screen == Game.S.PLAY) {
@@ -3049,6 +3059,10 @@ public final class Game {
                      this.say("§cTilesheet: " + ex.getMessage());
                   }
                   break;
+               case "trailer":
+                  Trailer.start(this);
+                  this.say("Cinematic trailer: 1:00, 8 shots. ESC or click to skip.");
+                  break;
                case "sounds":
                   this.say("Foley: " + SoundEngine.recordedFoleyCount()
                      + "/10 real CC0 WAV recordings loaded (sounds/foley/, see CREDITS.txt).");
@@ -3143,7 +3157,7 @@ public final class Game {
                   SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2);
                   break;
                case "help":
-                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /sounds /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
+                  this.say("Commands: /computer /gamemode /time set /tp /locate /seed /dim /give /clear /setblock /fill /spawn /spawnpoint /top /kill /butcher /heal /fly /summon /firespread /weather /treefall /tilesheet /sounds /trailer /disaster /bobbing /pack /mods /credits /music /sb /sw /bw /shop /host /join /disconnect");
                   break;
                default:
                   if (!SkyGen.onModeCommand(this, "/" + var2[0].toLowerCase(), var2) && !ModLoader.onCommand(this, "/" + var2[0].toLowerCase(), var2)) {
@@ -3894,7 +3908,8 @@ public final class Game {
 
       int cap = this.opt.maxFps;
       boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
-         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE || this.screen == Game.S.CREDITS;
+         || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE || this.screen == Game.S.CREDITS
+         || this.screen == Game.S.TRAILER;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -3958,6 +3973,9 @@ public final class Game {
 
       if (this.pano != null) {
          this.pano.update(var1); // Update 3.13: the turning world behind the title and the menus
+      }
+      if (this.trailer != null) {
+         this.trailer.update(var1); // V6.30: scripted 60-second cinematic camera
       }
 
       this.map.update(this); // Update 6.20: budgeted minimap / full-map refreshes
@@ -6460,6 +6478,9 @@ public final class Game {
                this.drawDead();
             }
             break;
+         case TRAILER:
+            Trailer.draw(this);   // V6.30: letterbox + title cards over the real world
+            break;
          case MIDI:
             if(this.midiScreen!=null)this.midiScreen.draw();
             break;
@@ -7686,7 +7707,8 @@ public final class Game {
       MIDI,
       CREDITS,
       MAP,
-      DEAD;
+      DEAD,
+      TRAILER;
    }
 
    static final class WInfo {

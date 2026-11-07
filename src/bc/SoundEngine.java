@@ -1410,6 +1410,9 @@ public final class SoundEngine {
       if (g == null) {
          return "lce_menu";
       }
+      if (g.screen == Game.S.TRAILER) {
+         return Trailer.music(g); // V6.30: four-act cinematic soundtrack
+      }
       if (g.screen == Game.S.CREDITS) {
          return "lce_credits"; // C418 - Alpha (End Poem & Credits)
       }

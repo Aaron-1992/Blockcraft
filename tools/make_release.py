@@ -545,6 +545,25 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.30":
+        release_notes += (
+            "\n### One-minute cinematic trailer, in game\n\n"
+            "**Watch Trailer (1:00)** on the title screen, or **`/trailer`** while playing. "
+            "This is not a video file: eight scripted camera moves fly through a real freshly "
+            "generated world (fixed seed) with 2.39:1 letterboxing, hard cuts, title cards, a "
+            "dawn-to-night-to-dawn time-lapse, a forced thunderstorm, a four-act soundtrack and "
+            "foley stings from the real CC0 WAV recordings. It runs **exactly 60 seconds**, is "
+            "skippable with any key or click, and restores the screen, camera, daylight, weather, "
+            "colour grading and options afterwards - including from inside a live world. "
+            "`java -jar blockcraft.jar --trailer-plan` prints the deterministic shot list with no "
+            "window or GPU; `docs/screenshots/v6.30-trailer.png` is a headless storyboard, not a "
+            "GPU screenshot. No Mojang assets are used.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite with five new V6.30 regression groups (exact 60-second shot table, "
+            "camera/terrain maths, in-game start/update/skip/restore, wiring and release files), "
+            "strict equivalence, all 21 GLSL programs, `--trailer-plan` smoke test and "
+            "`tools/verify_release.py`. No real-GPU/Windows playtest is claimed.\n"
+        )
     if version == "6.29":
         release_notes += (
             "\n### Normal walk-in cave entrances (new worlds only)\n\n"

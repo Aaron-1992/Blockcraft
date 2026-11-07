@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.29  -  an original Minecraft-style voxel sandbox   (EDITION V6.29)
+BLOCKCRAFT V6.30  -  an original Minecraft-style voxel sandbox   (EDITION V6.30)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,26 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.30 - A ONE-MINUTE CINEMATIC TRAILER, IN GAME
+
+  * WATCH TRAILER (1:00) on the title screen, or type /trailer while
+    playing. This is NOT a video file: it is eight scripted camera
+    moves through a real freshly generated world (fixed seed), with
+    2.39:1 letterboxing, hard cuts, title cards, a dawn -> noon ->
+    storm -> sunset -> night -> dawn time-lapse, a forced thunderstorm,
+    a four-act soundtrack and foley stings from the real CC0 WAVs.
+  * EXACTLY 60 SECONDS (8 shots x 7.5 s), then it ends by itself.
+    ANY KEY or a mouse click skips it. The game restores your screen,
+    camera position, view mode, daylight, weather, colour grading and
+    options exactly as they were - in a live world too.
+  * The shot table is deterministic and print-able without a window:
+    java -jar blockcraft.jar --trailer-plan
+    See docs/releases/v6.30-trailer-plan.txt, the storyboard
+    docs/screenshots/v6.30-trailer.png (headless preview) and
+    Trailer-guide.txt in this folder.
+  * V6.29 walk-in cave entrances, real recorded sounds and all earlier
+    work are unchanged. No Mojang code or assets are used.
 
 WHAT'S NEW IN V6.29 - NORMAL CAVE ENTRANCES AND REAL RECORDED SOUNDS
 

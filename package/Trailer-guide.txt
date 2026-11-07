@@ -1,0 +1,39 @@
+BLOCKCRAFT V6.30 - THE ONE-MINUTE IN-GAME CINEMATIC TRAILER
+===========================================================
+
+HOW TO WATCH
+  * Title screen: press "Watch Trailer (1:00)" (the bottom button).
+  * While playing: type /trailer in chat.
+  * It runs for exactly 60 seconds and then returns automatically.
+  * ANY KEY or a mouse click skips it immediately.
+  * Everything is restored afterwards: your screen, camera position,
+    view mode, daylight, weather, colour grading and options.
+
+THIS IS NOT A VIDEO
+  No movie file is shipped. The trailer is eight scripted camera moves
+  through a real, freshly generated world (fixed seed 20261108), drawn
+  by the game's own renderer with the same chunks, trees, caves, sky,
+  weather and shaders as normal play. It has 2.39:1 letterboxing, hard
+  cuts, title cards, a dawn-to-night-to-dawn time-lapse, a forced
+  thunderstorm, a four-act soundtrack and foley stings from the real
+  CC0 WAV recordings in sounds/foley/. The logo is built from the
+  game's own block textures.
+
+SHOT LIST (each 7.5 s)
+  01  0:00-0:07  A WORLD OF YOUR OWN          dawn, high aerial glide
+  02  0:07-0:15  FORESTS, MOUNTAINS, OCEANS   low dolly through terrain
+  03  0:15-0:22  WEATHER WITH A HORIZON       thunderstorm, dark skies
+  04  0:22-0:30  BENEATH THE SURFACE          low flight over cave country
+  05  0:30-0:37  BUILD ANYTHING               climbing sunset shot
+  06  0:37-0:45  PLAY TOGETHER                fast dusk flyover
+  07  0:45-0:52  AND WHEN NIGHT FALLS         moonlight descent
+  08  0:52-1:00  BLOCKCRAFT                   fade to black and the logo
+
+  Print the exact deterministic plan (no window or GPU needed):
+      java -jar blockcraft.jar --trailer-plan
+
+  Source: src/bc/Trailer.java. Full notes: docs/releases/v6.30.md.
+  Storyboard: docs/screenshots/v6.30-trailer.png (headless preview,
+  not a GPU screenshot).
+
+No Mojang code or assets are used anywhere in Blockcraft.

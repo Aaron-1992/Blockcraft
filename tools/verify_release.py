@@ -55,6 +55,8 @@ def required(version):
         extra += ("Main",)
     if tuple(map(int, version.split("."))) >= (6, 27):
         extra += ("ResourcePacks",)
+    if tuple(map(int, version.split("."))) >= (6, 30):
+        extra += ("Trailer",)
     return REQUIRED + extra
 
 
@@ -116,6 +118,7 @@ def verify(archive, version):
                         if game.read(name) != data:
                             raise ValueError("Recorded foley missing from jar: " + name)
             if tuple(map(int, version.split("."))) >= (6, 14): guides += ("Create-foundation.txt", "Create-code-license.txt")
+            if tuple(map(int, version.split("."))) >= (6, 30): guides += ("Trailer-guide.txt",)
             for name in guides:
                 with open(os.path.join(B.ROOT, "package", name), "rb") as f:
                     if z.read("Blockcraft/" + name) != f.read():

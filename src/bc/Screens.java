@@ -79,7 +79,7 @@ final class Screens {
       float third = (bw - 8.0F) / 3.0F;
       float row = 24.0F;
       float by = Math.max(bottom + 26.0F, gui.h * 0.45F);
-      by = Math.min(by, gui.h - 16.0F - row * 3.0F - 20.0F);
+      by = Math.min(by, gui.h - 40.0F - row * 4.0F - 20.0F); // V6.30: room for the trailer row
       float bx = cx - bw / 2.0F;
       ui.button("Singleplayer", bx, by, half, 20.0F, true, null, () -> openWorlds(g));
       ui.button("Mini Games", bx + half + 4.0F, by, half, 20.0F, true, null, () -> openMinigames(g, Game.S.TITLE));
@@ -112,6 +112,9 @@ final class Screens {
             g.startWorld(false, null, 1);
          });
       ui.button("Quit Game", bx + half + 4.0F, by + row * 3, half, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
+      ui.button("Watch Trailer (1:00)", bx, by + row * 4, bw, 20.0F, true,
+         "Play the one-minute in-game cinematic: 8 shots, letterboxed, with a soundtrack. ESC or click to skip.",
+         () -> Trailer.start(g));
       gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
       gui.text("Textures: " + ResourcePacks.activeId() + (TexPixel32.enabled() ? " 32px" : " 16px"),
          4.0F, gui.h - 22.0F, 0xFFC4C4CE, true);

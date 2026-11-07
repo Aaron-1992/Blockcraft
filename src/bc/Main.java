@@ -42,6 +42,11 @@ public final class Main {
             System.out.println("hand.lighting=single-lightmap");
             return; // No window, GPU, native libraries, options or saved-world writes.
          }
+         if (var0.length >= 1 && "--trailer-plan".equals(var0[0])) {
+            // V6.30: print the deterministic 60-second shot list without a window or GPU.
+            System.out.print(Trailer.plan());
+            return;
+         }
          if (var0.length >= 1 && "--export-tilesheet".equals(var0[0])) {
             if (var0.length > 2) throw new IllegalArgumentException("Usage: --export-tilesheet [new-folder]");
             Tilesheet.export(new java.io.File(var0.length == 2 ? var0[1] : "textures"));
