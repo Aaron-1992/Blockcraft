@@ -23,7 +23,8 @@ final class TestsUi {
       "inv-search", "inv-search-none", "inv-tip-tool", "inv-tip-ore", "inv-tip-food", "inv-tip-tab",
       "atlas-title", "atlas-sp", "atlas-mp", "atlas-mpcreate", "atlas-newworld", "atlas-worlds",
       "atlas-minigames", "atlas-options", "atlas-advanced", "atlas-pause", "atlas-more",
-      "atlas-packs", "atlas-mods", "atlas-credits", "atlas-loading", "atlas-waiting", "atlas-multiplayer"
+      "atlas-packs", "atlas-mods", "atlas-credits", "atlas-loading", "atlas-waiting", "atlas-multiplayer",
+      "plain-video", "plain-world", "plain-gameplay", "plain-advanced"
    };
    static File tmp;
 

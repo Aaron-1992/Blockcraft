@@ -165,8 +165,8 @@ final class Tests630 {
    }
 
    static void wiring() throws Exception {
-      eq("6.35", Game.VERSION_STR, "the game version is 6.35");
-      eq("6.35", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.35");
+      eq("6.36", Game.VERSION_STR, "the game version is 6.36");
+      eq("6.36", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.36");
       String g = src("src/bc/Game.java");
       check(g.contains("Trailer trailer;") && g.contains("case TRAILER:")
          && g.contains("Trailer.draw(this)") && g.contains("this.trailer.update(var1)"),

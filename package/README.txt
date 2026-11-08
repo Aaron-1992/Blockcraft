@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.35  -  an original Minecraft-style voxel sandbox   (EDITION V6.35)
+BLOCKCRAFT V6.36  -  an original Minecraft-style voxel sandbox   (EDITION V6.36)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,30 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.36 - PLAIN MENUS AND NUMBERS IN SETTINGS
+
+  * THE V6.35 "ATLAS" UI IS GONE. No nav rail, numbered cards,
+    cyan kickers, duplicated titles or clipped abbreviations.
+    Every menu is one ordinary centred panel with a plain title,
+    clearly labelled buttons and a Back button.
+  * SETTINGS SHOW THEIR ACTUAL VALUES. Stepped settings print the
+    number and its unit, for example "Render Distance: 8 chunks",
+    "Max FPS: 0 fps (0 = unlimited)", "World Depth: 384 blocks".
+    Sliders print the number in gold at the right of the row AND
+    inside the bar ("70 degrees"). Toggles say ON/OFF. Choices
+    spell out the current option ("Minimap Corner: Top right").
+  * LABELS THAT MAKE SENSE. Mini game tabs are full words
+    (Battle, Tumble, Bedwars, CS2, Murder, Ender, Siege) instead of
+    Brawl/Tumbl/Beds/Murdr. "Dodge Toasts" became "Move Minimap For
+    Pop-ups". "Reset" is now "Reset to defaults" and says exactly
+    what it resets. The footer is just the version line.
+  * THE WORLD MAP PREVIEW ON CREATE NEW WORLD IS KEPT, in a plain
+    two-column form, with a biome count and the seed as numbers.
+  * Debug Advanced still has all 61 video / shader / LOD / performance
+    settings. Every new screen is validated at seven window sizes.
+  * V6.35 deep worlds (384 blocks), depth-scaled caves and twelve
+    integrated structures are unchanged. No Mojang code or assets.
 
 WHAT'S NEW IN V6.35 - DEEP WORLDS, CRAZIER CAVES, ALL-NEW MENUS
 

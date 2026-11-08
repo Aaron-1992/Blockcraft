@@ -7,382 +7,290 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * V6.35: every menu rebuilt from scratch as the "Atlas" interface.
+ * V6.36: the plain menu UI.
  *
- * <p>None of the V6.33/V6.34 screens are drawn any more: {@link Game} now routes
- * all menu states here. The look is a dark left navigation rail, a numbered
- * header with a cyan rule, large cards with coloured top strips, and a common
- * footer with the hint and the version. The one thing deliberately carried over
- * is the <b>live world-map preview</b> on Create New World / Create Multiplayer
- * World - the user asked to keep the map, not the old menu around it. It is the
- * same {@link WorldPreview} widget, redrawn in a new frame.</p>
+ * <p>The V6.35 "Atlas" look (nav rail, numbered cards, cryptic kickers) was
+ * rejected, so every screen here is deliberately ordinary: one centred panel,
+ * a plain title, a list of clearly labelled buttons and a Back button. No
+ * decorative numbering, no duplicated card titles, no clipped abbreviations and
+ * no nonsense footer.</p>
+ *
+ * <p><b>Every setting shows its actual value as a number</b> - sliders print the
+ * number in gold at the right of the row and in the bar label, toggles print
+ * ON/OFF, and stepped settings print the current value and the unit. The Debug
+ * Advanced tab still calls {@link Screens#advancedTab} so all 61 render,
+ * shader and performance settings remain configurable in game.</p>
+ *
+ * <p>The <b>live world-map preview</b> on Create New World / Create Multiplayer
+ * World is kept (the user liked the map, not the old menu around it): it is the
+ * same {@link WorldPreview} widget in a plain two-column form.</p>
  *
  * <p>All buttons still go through {@link Ui}, so clicks, keyboard focus,
- * scrolling, hints and toasts behave exactly as before. The old {@link Screens}
- * methods remain as a compatibility/regression surface and are no longer drawn.</p>
+ * scrolling, hints and toasts behave exactly as before.</p>
  */
 final class Menus635 {
    private Menus635() {
    }
 
    // ------------------------------------------------------------------ palette
-   static final int CYAN = 0xFF54D8E8;
-   static final int GOLD = 0xFFFFD35A;
-   static final int TEXT = 0xFFEFF5FF;
-   static final int DIM = 0xFFA4B1C8;
-   static final int FAINT = 0xFF6E7B93;
-   static final int GOOD = 0xFF8CE0A0;
-   static final int CARD = 0xEA121A28;
-   static final int CARD_LO = 0xEA080C14;
+   static final int GOLD = 0xFFFFD86A;
+   static final int TEXT = 0xFFF0F4FA;
+   static final int DIM = 0xFFB4BEC8;
+   static final int FAINT = 0xFF8490A4;
+   static final int GOOD = 0xFF98E0A8;
+   static final int BAD = 0xFFF09090;
+   static final int PANEL = 0xE8101520;
+   static final int PANEL_LO = 0xEE0A0E16;
    static final int EDGE = 0xFF05080E;
-   static final int RULE = 0x704FD8E8;
+   static final int RULE = 0x60FFFFFF;
+   static final int ROW = 0xFF161D2A;
 
-   static final String[] NAV = {"Play", "Worlds", "Online", "Games", "Settings", "More"};
-   static final String[] NAV_SUB = {"01", "02", "03", "04", "05", "06"};
+   static final String[] MG_TABS = {"Battle", "Tumble", "Bedwars", "CS2", "Murder", "Ender", "Siege"};
+   static final String[] TABS = {"Video", "World", "Controls", "Sound", "Gameplay", "Content"};
+   static final String[] TABS_DEBUG = {"Video", "World", "Controls", "Sound", "Gameplay", "Content", "Advanced"};
+   static final int ADV_TAB = 6;
+
+   static String[] tabs(Options o) { return o.debugVideo ? TABS_DEBUG : TABS; }
 
    /** The rectangle the current screen may draw in. */
    static final class Box {
       float x, y, w, h, foot;
    }
 
-   static float railW(float W) {
-      return Math.max(88.0F, Math.min(112.0F, W * 0.24F));
-   }
-
-   /** The shared shell: dim the world, draw the rail, numbered header and footer. */
-   static Box frame(Game g, String kicker, String heading, String sub, int nav) {
+   /** One centred panel with a plain title, a rule and a footer. */
+   static Box shell(Game g, String title, String sub) {
       Ui ui = g.ui;
       Gui gui = g.gui;
       ui.begin();
       ui.backdrop(0.62F);
       float W = gui.w, H = gui.h;
-      float rw = railW(W);
+      float pw = Math.max(120.0F, Math.min(340.0F, W - 12.0F));
+      float px = (W - pw) / 2.0F;
+      float py = 5.0F;
+      float ph = H - 10.0F;
 
-      // ---- left navigation rail
-      gui.gradient(0.0F, 0.0F, rw, H, 0xF4141D2C, 0xF0060910);
-      gui.rect(rw - 1.0F, 0.0F, 1.0F, H, 0x30FFFFFF);
-      gui.rect(0.0F, 0.0F, 2.0F, H, CYAN);
-      gui.rect(0.0F, 0.0F, rw, 22.0F, 0xFF1A2536);
-      gui.rect(0.0F, 21.0F, rw, 1.0F, RULE);
-      gui.gradient(rw, 0.0F, W - rw, 50.0F, 0xC0080D16, 0x50080D16);
-      gui.text(Game.clipText("BLOCKCRAFT", rw - 8.0F), 6.0F, 7.0F, TEXT, true, 1.0F);
-      gui.text(Game.clipText("V" + Game.VERSION_STR, rw - 8.0F), 6.0F, 28.0F, CYAN, true, 1.0F);
-      gui.text(Game.clipText("ATLAS UI", rw - 8.0F), 6.0F, 39.0F, FAINT, true, 1.0F);
-
-      float ny = Math.max(52.0F, H * 0.22F);
-      float nh = Math.min(22.0F, (H - ny - 18.0F) / 6.0F);
-      for (int i = 0; i < NAV.length; i++) {
-         float y = ny + i * (nh + 2.0F);
-         boolean on = i == nav;
-         if (on) {
-            gui.rect(0.0F, y, 3.0F, nh, CYAN);
-            gui.rect(3.0F, y, rw - 4.0F, nh, 0xA0203044);
-         }
-         gui.text(Game.clipText(NAV_SUB[i] + "  " + NAV[i], rw - 10.0F), 6.0F,
-            y + (nh - 8.0F) / 2.0F, on ? TEXT : DIM, false, 1.0F);
-         if (on) gui.rect(6.0F, y + nh - 2.0F, rw - 12.0F, 1.0F, CYAN);
-      }
-
-      // ---- header
-      float cx = rw + 10.0F;
-      float cw = W - rw - 20.0F;
-      gui.text(Game.clipText(kicker.toUpperCase(), cw), cx, 7.0F, CYAN, true, 1.0F);
-      gui.text(Game.clipText(heading, cw), cx, 19.0F, TEXT, true, 1.3F);
-      gui.rect(cx, 35.0F, cw, 1.0F, RULE);
-      gui.rect(cx, 35.0F, Math.min(48.0F, cw), 2.0F, CYAN);
+      gui.rect(px - 1.0F, py - 1.0F, pw + 2.0F, ph + 2.0F, EDGE);
+      gui.gradient(px, py, pw, ph, PANEL, PANEL_LO);
+      gui.rect(px, py, pw, 1.0F, 0x40FFFFFF);
+      gui.rect(px, py + ph - 1.0F, pw, 1.0F, 0x40000000);
+      gui.centered(Game.clipText(title, pw - 12.0F), W / 2.0F, py + 7.0F, TEXT, true, 1.25F);
+      gui.rect(px + 10.0F, py + 24.0F, pw - 20.0F, 1.0F, RULE);
       if (sub != null) {
-         gui.text(Game.clipText(sub, cw), cx, 40.0F, DIM, false, 1.0F);
+         gui.centered(Game.clipText(sub, pw - 12.0F), W / 2.0F, py + 28.0F, DIM, true, 1.0F);
       }
-
-      // ---- footer
-      gui.rect(rw, H - 26.0F, W - rw, 26.0F, 0xE0070A11);
-      gui.rect(rw, H - 26.0F, W - rw, 1.0F, 0x30FFFFFF);
-      gui.text(Game.clipText("384-BLOCK WORLDS  /  ESC = BACK", Math.max(40.0F, W - rw - 60.0F)),
-         rw + 6.0F, H - 18.0F, FAINT, false, 1.0F);
-      String ver = "V" + Game.VERSION_STR;
-      gui.text(ver, Math.max(rw + 4.0F, W - Gui.textWidth(ver) - 6.0F), H - 18.0F, CYAN, false, 1.0F);
 
       Box b = new Box();
-      b.x = cx;
-      b.y = 52.0F;
-      b.w = cw;
-      b.h = Math.max(20.0F, H - 52.0F - 32.0F);
-      b.foot = H - 26.0F;
-      railActions(g, nav);
+      b.x = px + 8.0F;
+      b.y = py + 42.0F;
+      b.w = pw - 16.0F;
+      b.foot = py + ph - 46.0F;
+      b.h = Math.max(20.0F, b.foot - b.y - 24.0F);
       return b;
    }
 
-   /** A clickable navigation rail item drawn as a real button (no visible label clash). */
-   static void railActions(Game g, int nav) {
-      Ui ui = g.ui;
-      float W = g.gui.w, H = g.gui.h;
-      float rw = railW(W);
-      float ny = Math.max(52.0F, H * 0.22F);
-      float nh = Math.min(22.0F, (H - ny - 18.0F) / 6.0F);
-      for (int i = 0; i < NAV.length; i++) {
-         if (i == nav) continue;
-         float y = ny + i * (nh + 2.0F);
-         final int idx = i;
-         // hitbox only: the labels are already drawn by frame(), so no extra widget label
-         g.hitbox(2.0F, y, rw - 4.0F, nh, () -> go(g, idx));
-      }
+   static void footer(Game g, Box b) {
+      Gui gui = g.gui;
+      gui.centered(Game.clipText("Blockcraft V" + Game.VERSION_STR + "  -  original, not Mojang",
+         gui.w - 10.0F), gui.w / 2.0F, b.foot + 22.0F, FAINT, true, 1.0F);
    }
 
-   static void go(Game g, int nav) {
-      switch (nav) {
-         case 0: g.setScreen(Game.S.TITLE); break;
-         case 1: Screens.openWorlds(g); break;
-         case 2: Screens.openMpHub(g); break;
-         case 3: Screens.openMinigames(g, Game.S.TITLE); break;
-         case 4: g.optionsReturn = Game.S.TITLE; g.setScreen(Game.S.OPTIONS); break;
-         default: g.setScreen(Game.S.MORE); break;
-      }
+   static void hint(Game g, Box b, String fallback) {
+      g.ui.drawHint(b.x, b.foot - 22.0F, b.w, 18.0F, fallback);
    }
 
-   /** A toggle whose label always fits (Ui.toggle does not clip long names). */
-   static void toggle(Game g, String name, boolean on, float x, float y, float w, float h, String hint, Runnable action) {
-      String label = name + ": " + (on ? "\u00a7aON" : "\u00a7cOFF");
-      g.ui.button(Game.clipText(label, w - 6.0F), x, y, w, h, true, hint, action);
-   }
-
-   static void button(Game g, String label, float x, float y, float w, float h, String hint, Runnable action) {
-      g.ui.button(Game.clipText(label, w - 6.0F), x, y, w, h, true, hint, action);
+   /** A plain full-width button; the label is clipped so it always fits. */
+   static void button(Game g, String label, float x, float y, float w, float h, String tip, Runnable action) {
+      g.ui.button(Game.clipText(label, w - 6.0F), x, y, w, h, true, tip, action);
    }
 
    static void label(Game g, String s, float x, float y, float w, int color) {
       g.gui.text(Game.clipText(s, w), x, y, color, true);
    }
 
-   /** A numbered glass card with a title, a wrapped description and one action. */
-   static void card(Game g, String no, String title, String desc, String actionLabel,
-      float x, float y, float w, float h, int strip, String hint, Runnable action) {
-      Ui ui = g.ui;
+   static void section(Game g, String s, float x, float y, float w) {
       Gui gui = g.gui;
-      boolean hov = ui.over(x, y, w, h);
-      gui.rect(x + 1.0F, y + 2.0F, w, h, 0x60000000);
-      gui.rect(x - 1.0F, y - 1.0F, w + 2.0F, h + 2.0F, hov ? 0xFF6AC8DC : EDGE);
-      gui.gradient(x, y, w, h, CARD, CARD_LO);
-      gui.rect(x, y, w, 3.0F, strip);
-      gui.rect(x, y + 3.0F, 2.0F, h - 4.0F, strip);
-      gui.text(no, x + 7.0F, y + 5.0F, CYAN, true, 1.0F);
-      gui.text(Game.clipText(title, w - 14.0F), x + 7.0F, y + 16.0F, TEXT, true, 1.05F);
-      if (h > 66.0F && desc != null) {
-         ui.paragraph(desc, x + 7.0F, y + 30.0F, w - 14.0F, DIM, h > 90.0F ? 3 : 2);
-      }
-      float bw = Math.min(w - 14.0F, 128.0F);
-      String btn = title.equals(actionLabel) ? "OPEN" : actionLabel;
-      ui.button(Game.clipText(btn, bw - 6.0F), x + 7.0F, y + h - 19.0F, bw, 16.0F, true, hint, action);
-      if (hov && ui.hint == null) ui.hint = hint;
+      gui.text(Game.clipText(s, w), x, y, GOLD, true);
+      gui.rect(x, y + 10.0F, w, 1.0F, 0x28FFFFFF);
    }
 
-   /** A compact labelled section divider. */
-   static void divider(Game g, String s, float x, float y, float w) {
-      Gui gui = g.gui;
-      gui.text(Game.clipText(s.toUpperCase(), w), x, y, CYAN, true, 1.0F);
-      gui.rect(x, y + 10.0F, w, 1.0F, 0x304FD8E8);
-   }
-
-   /** Common bottom action strip. */
-   static void actions(Game g, Box b, String[] labels, Runnable[] acts, String[] hints) {
-      Ui ui = g.ui;
+   /** Bottom action strip: labels are short and obvious. */
+   static void actions(Game g, Box b, String[] labels, Runnable[] acts, String[] tips) {
       float gap = 4.0F;
       float bw = (b.w - gap * (labels.length - 1)) / labels.length;
-      bw = Math.min(bw, 150.0F);
       for (int i = 0; i < labels.length; i++) {
          final int k = i;
-         ui.button(Game.clipText(labels[i], bw - 6.0F), b.x + i * (bw + gap), b.foot - 22.0F,
-            bw, 18.0F, true, hints == null ? null : hints[k], acts[k]);
+         button(g, labels[i], b.x + i * (bw + gap), b.foot, bw, 19.0F,
+            tips == null ? null : tips[k], acts[k]);
       }
-   }
-
-   static void hint(Game g, Box b, String fallback) {
-      g.ui.drawHint(b.x, b.foot - 46.0F, b.w, 20.0F, fallback);
    }
 
    // ==================================================================== TITLE
    static void title(Game g) {
-      Box b = frame(g, "main menu", "Blockcraft", "A voxel sandbox - 384 blocks deep", 0);
+      Box b = shell(g, "Blockcraft", "An original voxel sandbox");
       Ui ui = g.ui;
-      Gui gui = g.gui;
-      float cardW = Math.min(210.0F, b.w - 6.0F);
-      float cx = b.x + (b.w - cardW) / 2.0F;
-      float ch = Math.max(34.0F, Math.min(58.0F, (b.foot - 24.0F - b.y - 8.0F) / 3.0F));
-      float y = b.y;
-
-      gui.gradient(cx, y - 2.0F, cardW, 3.0F * ch + 12.0F, 0x101A2B3A, 0x060A111A);
-      card(g, "01", "Singleplayer", "Open a saved world or build a new one.", "Singleplayer",
-         cx, y, cardW, ch, CYAN, "Your worlds, mini games and the gallery.", () -> {
-            g.newSettings = new WorldSettings();
-            g.setScreen(Game.S.SP_HUB);
-         });
-      card(g, "02", "Multiplayer", "Join a friend or host your own world.", "Multiplayer",
-         cx, y + ch + 4.0F, cardW, ch, 0xFF7C8CF0, "LAN, Share Codes, worldwide tunnels and named worlds.",
-         () -> Screens.openMpHub(g));
-      card(g, "03", "Settings", "Video, world generation, sound, controls.", "Settings",
-         cx, y + 2.0F * (ch + 4.0F), cardW, ch, GOLD, "Every setting, including Debug Advanced.", () -> {
-            g.optionsReturn = Game.S.TITLE;
-            g.setScreen(Game.S.OPTIONS);
-         });
-
-      float fw = Math.min(64.0F, (b.w - 12.0F) / 3.0F);
-      float fy = b.foot - 22.0F;
-      ui.button("Trailer", b.x, fy, fw, 18.0F, true, "The 60-second in-game montage.", () -> Trailer.start(g));
-      ui.button("Credits", b.x + fw + 4.0F, fy, fw, 18.0F, true, "Music, art and sound credits.", () -> {
+      float y = b.y + 2.0F;
+      float step = Math.min(28.0F, Math.max(22.0F, (b.h - 46.0F) / 5.0F));
+      button(g, "Singleplayer", b.x, y, b.w, 20.0F, "Play your saved worlds or make a new one.", () -> {
+         g.newSettings = new WorldSettings();
+         g.setScreen(Game.S.SP_HUB);
+      });
+      button(g, "Multiplayer", b.x, y + step, b.w, 20.0F, "Join a friend or host your own world.", () -> Screens.openMpHub(g));
+      button(g, "Settings", b.x, y + 2.0F * step, b.w, 20.0F, "Video, world, sound and controls. Every value is shown.", () -> {
+         g.optionsReturn = Game.S.TITLE;
+         g.setScreen(Game.S.OPTIONS);
+      });
+      float fy = b.foot - 44.0F;
+      float fw = (b.w - 8.0F) / 3.0F;
+      button(g, "Mini Games", b.x, fy, fw, 19.0F, "Console Edition mini games.", () -> Screens.openMinigames(g, Game.S.TITLE));
+      button(g, "Credits", b.x + fw + 4.0F, fy, fw, 19.0F, "Music, art and sound credits.", () -> {
          g.creditsReturn = Game.S.TITLE;
          g.creditsScroll = 0.0F;
          g.setScreen(Game.S.CREDITS);
       });
-      ui.button("Quit", b.x + 2.0F * (fw + 4.0F), fy, fw, 18.0F, true, null, () -> org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose(g.window, true));
-      if (b.foot - 24.0F - (y + 3.0F * (ch + 4.0F)) > 18.0F) {
-         label(g, "Deep worlds: ~190 blocks of caves below sea level", b.x, b.foot - 42.0F, b.w, DIM);
-      }
+      button(g, "Quit Game", b.x + 2.0F * (fw + 4.0F), fy, fw, 19.0F, null,
+         () -> org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose(g.window, true));
+      hint(g, b, "New worlds are 384 blocks deep. Old saves keep their own height.");
+      footer(g, b);
       ui.drawToast();
    }
 
    // ==================================================================== HUBS
    static void singleplayer(Game g) {
-      Box b = frame(g, "singleplayer", "Choose a mode", "Everything you can play on your own", 0);
+      Box b = shell(g, "Singleplayer", "Choose what to play");
       Ui ui = g.ui;
-      float gap = 5.0F;
-      float cw = Math.min(200.0F, (b.w - gap) / 2.0F);
-      float ch = Math.min(84.0F, Math.max(54.0F, b.h - 34.0F));
-      card(g, "01", "Open World", "Survival, creative, huge deep caves and structures.", "Open World",
-         b.x, b.y, cw, ch, CYAN, "Your saved worlds and Create New World.", () -> Screens.openWorlds(g));
-      card(g, "02", "Mini Games", "Battle, Tumble, Bedwars, CS2 and more.", "Mini Games",
-         b.x + cw + gap, b.y, cw, ch, GOLD, "Console Edition arenas.", () -> Screens.openMinigames(g, Game.S.SP_HUB));
-      actions(g, b, new String[]{"All Blocks", "Back"}, new Runnable[]{
-         () -> { g.ensureAllBlocksShowcaseWorld(); g.worldName = "All_Blocks_Showcase"; g.startWorld(false, null, 1); },
-         () -> g.setScreen(Game.S.TITLE)}, new String[]{"A world with every block laid out.", null});
-      hint(g, b, "Old saves keep their own cave version; new worlds are 384 blocks tall.");
+      float y = b.y, step = 26.0F;
+      button(g, "Open World", b.x, y, b.w, 20.0F, "Your saved worlds and Create New World.", () -> Screens.openWorlds(g));
+      button(g, "Mini Games", b.x, y + step, b.w, 20.0F, "Battle, Tumble, Bedwars and more.", () -> Screens.openMinigames(g, Game.S.SP_HUB));
+      button(g, "All Blocks Gallery", b.x, y + 2 * step, b.w, 20.0F, "A world with every block laid out.", () -> {
+         g.ensureAllBlocksShowcaseWorld();
+         g.worldName = "All_Blocks_Showcase";
+         g.startWorld(false, null, 1);
+      });
+      actions(g, b, new String[]{"Back"}, new Runnable[]{() -> g.setScreen(Game.S.TITLE)}, null);
+      hint(g, b, "Create a NEW world to get the 384-block-deep caves.");
+      footer(g, b);
       ui.drawToast();
    }
 
    static void mpHub(Game g) {
-      Box b = frame(g, "multiplayer", "Play together", "Host, join or pick a mini game", 2);
+      Box b = shell(g, "Multiplayer", "Play with other people");
       Ui ui = g.ui;
-      float gap = 5.0F;
-      float cw = Math.min(200.0F, (b.w - gap) / 2.0F);
-      float ch = Math.min(70.0F, Math.max(48.0F, (b.h - 44.0F) / 2.0F));
-      card(g, "01", "Open World", "Full join / host / Share Code screen.", "Open World",
-         b.x, b.y, cw, ch, CYAN, "Server address, LAN, Share Code, host.", () -> Screens.openMultiplayer(g));
-      card(g, "02", "Mini Games", "Battle, Tumble, Bedwars with friends.", "Mini Games",
-         b.x + cw + gap, b.y, cw, ch, GOLD, "Console Edition arenas.", () -> Screens.openMinigames(g, Game.S.MP_HUB));
-      card(g, "03", "Create & Host World", "A named world with a real seed and player name.", "Create & Host",
-         b.x, b.y + ch + 4.0F, cw, ch, 0xFF7C8CF0, "Create Multiplayer World", () -> {
-            g.newName = "";
-            g.seedField = "";
-            g.focusField = 0;
-            g.ui.randomSeed = new Random().nextLong();
-            g.setScreen(Game.S.MP_CREATE);
-         });
-      label(g, "SERVER ADDRESS / SHARE CODE", b.x + cw + gap, b.y + ch + 10.0F, cw, DIM);
-      ui.field(b.x + cw + gap, b.y + ch + 21.0F, cw, 17.0F, Net319.serverAddr, "127.0.0.1:25565",
+      float y = b.y, step = 25.0F;
+      button(g, "Open World", b.x, y, b.w, 20.0F, "Server address, LAN, Share Code and hosting.", () -> Screens.openMultiplayer(g));
+      button(g, "Mini Games", b.x, y + step, b.w, 20.0F, "Console Edition mini games with friends.", () -> Screens.openMinigames(g, Game.S.MP_HUB));
+      button(g, "Create & Host World", b.x, y + 2 * step, b.w, 20.0F, "A named world with a seed and a live map preview.", () -> {
+         g.newName = "";
+         g.seedField = "";
+         g.focusField = 0;
+         g.ui.randomSeed = new Random().nextLong();
+         g.setScreen(Game.S.MP_CREATE);
+      });
+      float fy = y + 3 * step + 2.0F;
+      label(g, "Server address or Share Code", b.x, fy, b.w, DIM);
+      ui.field(b.x, fy + 11.0F, b.w, 17.0F, Net319.serverAddr, "127.0.0.1:25565",
          g.focusField == 0, () -> g.focusField = 0);
       actions(g, b, new String[]{"Join", "Back"}, new Runnable[]{
          () -> Net319.joinFromMenu(g, Net319.serverAddr),
-         () -> g.setScreen(Game.S.TITLE)}, new String[]{"Connect to the address or code above.", null});
-      hint(g, b, "Multiplayer world creation now uses the same live world-map preview as singleplayer.");
+         () -> g.setScreen(Game.S.TITLE)}, new String[]{"Connect to the address above.", null});
+      hint(g, b, "Paste a BC-... Share Code or an IP:port and press Join.");
+      footer(g, b);
       ui.drawToast();
    }
 
    // ==================================================================== CREATE A WORLD (map preview kept)
    static void create(Game g, boolean mp) {
-      Box b = frame(g, mp ? "multiplayer / create" : "singleplayer / create",
-         mp ? "Create Multiplayer World" : "Create New World",
-         "The map on the right is the world you will get", mp ? 2 : 1);
+      Box b = shell(g, mp ? "Create Multiplayer World" : "Create New World",
+         "The map shows the world this seed makes");
       Ui ui = g.ui;
       Gui gui = g.gui;
       WorldSettings ws = g.newSettings;
-      boolean compact = gui.h < 300.0F;
       float gap = 6.0F;
-      float lw = Math.min(160.0F, (b.w - gap) * 0.48F);
+      float lw = Math.min(158.0F, (b.w - gap) * 0.50F);
       float rw = b.w - lw - gap;
       float lx = b.x, rx = b.x + lw + gap;
       float y = b.y;
-      float limit = b.foot - 50.0F;      // above the hint strip and the bottom actions
+      float limit = b.foot - 26.0F;
 
-      divider(g, "01  /  WORLD", lx, y, lw);
-      float fy = y + (compact ? 13.0F : 25.0F);
-      float fh = compact ? 15.0F : 17.0F;
-      if (!compact) label(g, "World Name", lx, y + 15.0F, lw, DIM);
-      ui.field(lx, fy, lw, fh, g.newName, mp ? "Friends' World" : "New World",
+      section(g, "WORLD", lx, y, lw);
+      float fy = y + 14.0F;
+      ui.field(lx, fy, lw, 16.0F, g.newName, mp ? "Friends' World" : "New World",
          g.focusField == 0, () -> g.focusField = 0);
-      float fy2 = fy + (compact ? 18.0F : 30.0F);
-      if (!compact) label(g, "Seed", lx, y + 45.0F, lw, DIM);
-      ui.field(lx, fy2, lw, fh, g.seedField, "Random", g.focusField == 1, () -> g.focusField = 1);
-      float fy3 = fy2 + (compact ? 18.0F : 30.0F);
+      ui.field(lx, fy + 19.0F, lw, 16.0F, g.seedField, "Seed (blank = random)",
+         g.focusField == 1, () -> g.focusField = 1);
       if (mp) {
-         if (!compact) label(g, "Player Name", lx, y + 75.0F, lw, DIM);
-         ui.field(lx, fy3, lw, fh, Net319.customNick, "Steve", g.focusField == 2, () -> g.focusField = 2);
+         ui.field(lx, fy + 38.0F, lw, 16.0F, Net319.customNick, "Player name",
+            g.focusField == 2, () -> g.focusField = 2);
       }
 
-      float ry = (mp ? fy3 : fy2) + 20.0F;
-      float step = compact ? 19.0F : 21.0F;
-      String[] rows = {"mode", "type", "preset", "deep", "structures", "bonus"};
+      float ry = fy + (mp ? 59.0F : 40.0F);
+      String[] rows = {"mode", "type", "preset", "depth", "structures", "bonus"};
       for (String row : rows) {
          if (row.equals("preset") && ws.type != WorldSettings.FLAT) continue;
          if (ry + 18.0F > limit) break;
          switch (row) {
             case "mode":
-               button(g, "Game Mode: " + Screens.MODE_NAME[g.newMode % Screens.MODE_NAME.length], lx, ry, lw, 18.0F,
-                  "Survival, Creative, Adventure, Spectator or Hardcore.",
+               button(g, "Game Mode: " + Screens.MODE_NAME[g.newMode % Screens.MODE_NAME.length], lx, ry, lw, 17.0F,
+                  "Survival, Creative, Adventure, Spectator or Hardcore. Click to change.",
                   () -> g.newMode = (g.newMode + 1) % Screens.MODE_NAME.length);
                break;
             case "type":
-               button(g, "Type: " + ws.typeName(), lx, ry, lw, 18.0F, WorldSettings.TYPE_INFO[ws.type], () -> {
+               button(g, "World Type: " + ws.typeName(), lx, ry, lw, 17.0F, WorldSettings.TYPE_INFO[ws.type], () -> {
                   ws.type = WorldSettings.TYPE_ORDER[(ws.typeIndex() + 1) % WorldSettings.TYPE_ORDER.length];
                   if (ws.isVoidMode()) g.newMode = 0;
                   else if (ws.type == WorldSettings.ALL_BLOCKS) g.newMode = 1;
                });
                break;
             case "preset":
-               button(g, "Preset: " + WorldSettings.FLAT_NAME[ws.flat], lx, ry, lw, 18.0F,
+               button(g, "Flat Preset: " + WorldSettings.FLAT_NAME[ws.flat], lx, ry, lw, 17.0F,
                   "What the flat world is made of.", () -> ws.flat = (ws.flat + 1) % WorldSettings.FLAT_PRESETS);
                break;
-            case "structures":
-               toggle(g, "Structures", ws.structures, lx, ry, lw, 18.0F,
-                  "Villages, strongholds, ruins and the underground structures.", () -> ws.structures = !ws.structures);
-               break;
-            case "bonus":
-               toggle(g, "Bonus Chest", ws.bonusChest, lx, ry, lw, 18.0F,
-                  "A chest with starting supplies.", () -> ws.bonusChest = !ws.bonusChest);
-               break;
-            default:
-               toggle(g, "Deep World", g.opt.deepWorld, lx, ry, lw, 18.0F,
-                  "V6.35: 384-block worlds with ~190 blocks of caves below sea level. OFF = classic height.",
+            case "depth": {
+               String value = g.opt.deepWorld ? "384 blocks" : "256 blocks";
+               button(g, "World Depth: " + value, lx, ry, lw, 17.0F,
+                  "384 blocks gives ~190 blocks of caves below sea level. 256 is the old world height.",
                   () -> g.opt.deepWorld = !g.opt.deepWorld);
                break;
+            }
+            case "structures":
+               button(g, "Structures: " + (ws.structures ? "ON" : "OFF"), lx, ry, lw, 17.0F,
+                  "Villages, temples, ruins and the underground structures.", () -> ws.structures = !ws.structures);
+               break;
+            default:
+               button(g, "Bonus Chest: " + (ws.bonusChest ? "ON" : "OFF"), lx, ry, lw, 17.0F,
+                  "A chest with a few starting supplies.", () -> ws.bonusChest = !ws.bonusChest);
+               break;
          }
-         ry += step;
+         ry += 19.0F;
       }
 
-      // ---- the world-map preview: kept from the old menu, in a new frame
-      divider(g, "02  /  LIVE WORLD MAP", rx, y, rw);
+      // ---- the world-map preview: kept, in a plain frame
+      section(g, "WORLD MAP", rx, y, rw);
       if (ui.preview == null) ui.preview = new WorldPreview(96, 60, 20, true);
-      // Preview the world that will actually be created, including its depth.
       ws.depth = g.opt.deepWorld && g.opt.caveCliffs && ws.terra() ? 128 : 0;
       ui.preview.update(Screens.seedValue(g), ws);
-      float ph = Math.max(28.0F, Math.min(96.0F, limit - y - 16.0F));
-      gui.rect(rx - 1.0F, y + 12.0F, rw + 2.0F, ph + 2.0F, 0xFF000000);
-      gui.rect(rx - 2.0F, y + 11.0F, rw + 4.0F, 1.0F, CYAN);
-      gui.image(ui.preview.img, rx, y + 13.0F, rw, ph);
+      float ph = Math.max(28.0F, Math.min(80.0F, limit - y - 16.0F));
+      gui.rect(rx - 1.0F, y + 13.0F, rw + 2.0F, ph + 2.0F, 0xFF000000);
+      gui.image(ui.preview.img, rx, y + 14.0F, rw, ph);
       int[] legend = ui.preview.topBiomes(8);
       for (int i = 0; i < legend.length; i++) {
          float sx = rx + 3.0F + i * 10.0F;
-         float sy = y + 13.0F + ph - 10.0F;
+         float sy = y + 14.0F + ph - 10.0F;
          gui.rect(sx, sy, 9.0F, 8.0F, 0xFF000000);
          gui.rect(sx + 1.0F, sy + 1.0F, 7.0F, 6.0F, 0xFF000000 | WorldPreview.color(legend[i]));
       }
       if (g.seedField.trim().isEmpty()) {
-         g.hitbox(rx, y + 13.0F, rw, ph, () -> ui.randomSeed = new Random().nextLong());
+         g.hitbox(rx, y + 14.0F, rw, ph, () -> ui.randomSeed = new Random().nextLong());
       }
-      if (ui.over(rx, y + 13.0F, rw, ph)) {
-         ui.hint = "A real map of this seed: " + ui.preview.legendText(8)
-            + " (" + ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes).";
+      if (ui.over(rx, y + 14.0F, rw, ph)) {
+         ui.hint = "Biomes in view: " + ui.preview.legendText(8) + " (" + ui.preview.distinctBiomes()
+            + " of " + Biomes.N + ").";
       }
-      float iy = y + 18.0F + ph;
+      float iy = y + 19.0F + ph;
       if (iy + 10.0F < limit) {
-         label(g, ui.preview.distinctBiomes() + " biomes  /  " + ws.typeName(), rx, iy, rw, GOLD);
+         label(g, "Biomes: " + ui.preview.distinctBiomes() + " of " + Biomes.N, rx, iy, rw, GOLD);
+      }
+      if (iy + 21.0F < limit) {
+         label(g, "Seed: " + Screens.seedValue(g), rx, iy + 11.0F, rw, FAINT);
       }
 
       String[] labels = mp ? new String[]{"Create & Host", "Cancel"} : new String[]{"Create New World", "Cancel"};
@@ -391,8 +299,10 @@ final class Menus635 {
          () -> { g.scanWorlds(); g.setScreen(g.worldList.isEmpty() ? Game.S.TITLE : Game.S.WORLDS); }
       };
       actions(g, b, labels, acts, new String[]{"Generate the world shown in the map.", null});
-      hint(g, b, g.seedField.trim().isEmpty() ? "Leave the seed empty for a random world. Click the map to reroll."
-         : "Seed: " + Screens.seedValue(g));
+      hint(g, b, g.seedField.trim().isEmpty()
+         ? "Leave the seed blank for a random world. Click the map to reroll it."
+         : "The same seed and world type always make the same world.");
+      footer(g, b);
       ui.drawToast();
    }
 
@@ -401,17 +311,17 @@ final class Menus635 {
 
    // ==================================================================== WORLD LIST
    static void worlds(Game g) {
-      Box b = frame(g, "singleplayer", "Your worlds", g.worldList.size() + " saved", 1);
+      Box b = shell(g, "Your Worlds", g.worldList.size() + " saved worlds");
       Ui ui = g.ui;
       Gui gui = g.gui;
       int n = g.worldList.size();
-      float rowH = 30.0F;
-      float listH = Math.max(24.0F, b.foot - b.y - 50.0F);
-      divider(g, "SAVED WORLDS", b.x, b.y, b.w);
-      gui.gradient(b.x, b.y + 13.0F, b.w, listH - 13.0F, CARD, CARD_LO);
+      float listH = Math.max(24.0F, b.foot - b.y - 48.0F);
+      section(g, "SAVED WORLDS", b.x, b.y, b.w);
+      gui.gradient(b.x, b.y + 13.0F, b.w, listH - 13.0F, PANEL_LO, PANEL_LO);
       if (n == 0) {
-         gui.centered("No worlds yet - create one!", b.x + b.w / 2.0F, b.y + 30.0F, DIM, true, 1.0F);
+         gui.centered("No worlds yet. Create a new one.", b.x + b.w / 2.0F, b.y + 30.0F, DIM, true, 1.0F);
       } else {
+         float rowH = 30.0F;
          float content = n * rowH + 4.0F;
          ui.beginScroll(b.x, b.y + 13.0F, b.w, listH - 13.0F, ui.worldScroll, content, rowH);
          int thumbs = 0;
@@ -425,16 +335,13 @@ final class Menus635 {
                wi.thumb.update(wi.seed, wi.settings);
             }
             boolean sel = wi.dir.equals(g.worldName);
-            boolean hov = ui.over(b.x + 2.0F, ry, b.w - 4.0F, rowH - 2.0F);
-            gui.rect(b.x + 2.0F, ry, b.w - 4.0F, rowH - 2.0F, sel ? CYAN : (hov ? 0xFF3A4A62 : 0xFF222A38));
-            gui.gradient(b.x + 3.0F, ry + 1.0F, b.w - 6.0F, rowH - 4.0F,
-               sel ? 0xFF203244 : 0xFF121924, 0xFF0B1019);
-            if (sel) gui.rect(b.x + 3.0F, ry + 1.0F, 2.0F, rowH - 4.0F, CYAN);
-            if (wi.thumb != null) gui.image(wi.thumb.img, b.x + 7.0F, ry + 3.0F, rowH - 8.0F, rowH - 8.0F);
+            gui.rect(b.x + 2.0F, ry, b.w - 4.0F, rowH - 2.0F, sel ? 0xFF4C5C74 : 0xFF222A38);
+            if (sel) gui.rect(b.x + 2.0F, ry, 2.0F, rowH - 2.0F, GOLD);
+            if (wi.thumb != null) gui.image(wi.thumb.img, b.x + 6.0F, ry + 3.0F, rowH - 8.0F, rowH - 8.0F);
             float tx = b.x + rowH + 2.0F;
-            gui.text(Game.clipText(wi.name, b.w - rowH - 20.0F), tx, ry + 4.0F, sel ? TEXT : DIM, true);
-            gui.text(Game.clipText(Screens.MODE_NAME[Math.max(0, Math.min(4, wi.mode))] + "  -  " + wi.settings.typeName()
-               + "  -  seed " + wi.seed, b.w - rowH - 20.0F), tx, ry + 15.0F, FAINT, true);
+            label(g, wi.name, tx, ry + 4.0F, b.w - rowH - 16.0F, sel ? TEXT : DIM);
+            label(g, Screens.MODE_NAME[Math.max(0, Math.min(4, wi.mode))] + "  -  " + wi.settings.typeName()
+               + "  -  seed " + wi.seed, tx, ry + 15.0F, b.w - rowH - 16.0F, FAINT);
             final String dir = wi.dir;
             g.hitbox(b.x + 2.0F, ry, b.w - 4.0F, rowH - 2.0F, () -> {
                long now = System.currentTimeMillis();
@@ -446,7 +353,7 @@ final class Menus635 {
          }
          ui.endScroll(b.x, b.y + 13.0F, b.w, listH - 13.0F, content);
       }
-      actions(g, b, new String[]{"Play", "New", "Delete", "Cancel"}, new Runnable[]{
+      actions(g, b, new String[]{"Play World", "New World", "Delete", "Back"}, new Runnable[]{
          () -> g.startWorld(false, null, 1),
          () -> Screens.openNewWorld(g),
          () -> {
@@ -459,118 +366,175 @@ final class Menus635 {
             }
          },
          () -> g.setScreen(Game.S.TITLE)
-      }, new String[]{"Open the selected world.", "Create New World.", "Click twice to delete.", null});
-      hint(g, b, g.confirmDelete ? "Click Delete again to permanently remove the world." : "Double-click a world to open it.");
+      }, new String[]{"Open the selected world (double-click also works).", "Create New World.",
+         g.confirmDelete ? "Click again to permanently delete." : "Click twice to delete.", null});
+      hint(g, b, g.confirmDelete ? "Click Delete again to permanently remove the world." : "Select a world, then Play World.");
+      footer(g, b);
       ui.drawToast();
    }
 
    // ==================================================================== MULTIPLAYER
    static void multiplayer(Game g) {
-      Box b = frame(g, "multiplayer", "Connect", Net319.statusText, 2);
+      Box b = shell(g, "Multiplayer", Net319.statusText);
       Ui ui = g.ui;
       Gui gui = g.gui;
       float cw = (b.w - 6.0F) / 2.0F;
       float x1 = b.x + cw + 6.0F;
-      divider(g, "SERVER ADDRESS / SHARE CODE", b.x, b.y, b.w);
-      ui.field(b.x, b.y + 13.0F, b.w, 17.0F, Net319.serverAddr, "127.0.0.1:25565",
+      label(g, "Server address or Share Code", b.x, b.y, b.w, DIM);
+      ui.field(b.x, b.y + 11.0F, b.w, 17.0F, Net319.serverAddr, "127.0.0.1:25565",
          g.focusField == 0, () -> g.focusField = 0);
       String state = Net319.isHosting()
          ? "Hosting " + WorldSettings.TYPE_NAME[Net319.mpWorldType] + " | Code: " + Net319.shareCode
          : (Net319.isConnected() ? "Connected (" + Net319.peerCount() + " online)" : Net319.statusText);
-      gui.text(Game.clipText(state, b.w), b.x, b.y + 33.0F, Net319.isActive() ? GOOD : FAINT, true);
-      float y = b.y + 46.0F;
-      button(g, "Join Server", b.x, y, cw, 18.0F, "Connect to the address or Share Code above.",
-         () -> Net319.joinFromMenu(g, Net319.serverAddr));
-      button(g, "Join LAN", x1, y, cw, 18.0F, "Auto-discover a LAN world.", () -> Net319.joinFromMenu(g, "lan"));
-      button(g, "Host World", b.x, y + 21.0F, cw, 18.0F, "Host a world directly and make a Share Code.",
-         () -> Net319.hostFromMenu(g));
-      button(g, "Start Server.bat", x1, y + 21.0F, cw, 18.0F, "Launch the standalone server and join it.",
-         () -> Net319.launchServerAndJoin(g));
-      button(g, "Type: " + WorldSettings.TYPE_NAME[Net319.mpWorldType], b.x, y + 42.0F, cw, 18.0F,
+      label(g, state, b.x, b.y + 31.0F, b.w, Net319.isActive() ? GOOD : FAINT);
+      float y = b.y + 44.0F;
+      button(g, "Join Server", b.x, y, cw, 18.0F, "Connect to the address above.", () -> Net319.joinFromMenu(g, Net319.serverAddr));
+      button(g, "Join LAN", x1, y, cw, 18.0F, "Find a world on your network.", () -> Net319.joinFromMenu(g, "lan"));
+      button(g, "Host World", b.x, y + 21.0F, cw, 18.0F, "Host a world and make a Share Code.", () -> Net319.hostFromMenu(g));
+      button(g, "Start Server.bat", x1, y + 21.0F, cw, 18.0F, "Launch the standalone server.", () -> Net319.launchServerAndJoin(g));
+      button(g, "World Type: " + WorldSettings.TYPE_NAME[Net319.mpWorldType], b.x, y + 42.0F, cw, 18.0F,
          WorldSettings.TYPE_INFO[Net319.mpWorldType], Net319::cycleMpWorldType);
-      button(g, "Mode: " + Net319.mpModeName(), x1, y + 42.0F, cw, 18.0F,
+      button(g, "Game Mode: " + Net319.mpModeName(), x1, y + 42.0F, cw, 18.0F,
          "Game mode for hosted worlds.", Net319::cycleMpGameMode);
-      button(g, Net319.mpWorldwide ? "Access: Worldwide" : "Access: LAN Only", b.x, y + 63.0F, cw, 18.0F,
+      button(g, Net319.mpWorldwide ? "Access: Worldwide" : "Access: LAN only", b.x, y + 63.0F, cw, 18.0F,
          "Worldwide opens UPnP and the public tunnel.", Net319::toggleMpWorldwide);
-      button(g, "Copy Share Code", x1, y + 63.0F, cw, 18.0F, "Copy a BC-... code for friends.",
-         () -> Net319.copyShareCode(g));
-      if (y + 84.0F + 18.0F < b.foot - 48.0F) {
+      button(g, "Copy Share Code", x1, y + 63.0F, cw, 18.0F, "Copy a code for friends.", () -> Net319.copyShareCode(g));
+      if (y + 84.0F + 18.0F < b.foot - 24.0F) {
          button(g, "Disconnect", b.x, y + 84.0F, cw, 18.0F, null, () -> {
-            Net319.disconnect(g); Net319.statusText = "Disconnected.";
+            Net319.disconnect(g);
+            Net319.statusText = "Disconnected.";
          });
-         button(g, "Nick: " + Net319.displayNick(), x1, y + 84.0F, cw, 18.0F, null, Net319::cyclePresetNick);
+         button(g, "Nickname: " + Net319.displayNick(), x1, y + 84.0F, cw, 18.0F, null, Net319::cyclePresetNick);
       }
       actions(g, b, new String[]{"Back"}, new Runnable[]{() -> g.setScreen(g.mpReturn != null ? g.mpReturn : Game.S.TITLE)}, null);
-      hint(g, b, "Use Create & Host World on the Multiplayer hub for a named world with a live map preview.");
+      hint(g, b, "Use Create & Host World for a named world with a live map preview.");
+      footer(g, b);
       ui.drawToast();
    }
 
    // ==================================================================== MINI GAMES
    static void minigames(Game g) {
-      Box b = frame(g, "mini games", "Arenas", "Console Edition modes", 3);
+      Box b = shell(g, "Mini Games", "Console Edition modes");
       Ui ui = g.ui;
       Gui gui = g.gui;
       WorldSettings ws = g.newSettings;
       if (!ws.isMinigame()) ws.type = WorldSettings.MINIGAME_ORDER[Math.max(0, Math.min(WorldSettings.MINIGAME_ORDER.length - 1, g.mgTab))];
-      float tabW = b.w / Screens.MINIGAME_TABS.length;
-      for (int i = 0; i < Screens.MINIGAME_TABS.length; i++) {
-         float tx = b.x + i * tabW;
-         boolean on = i == g.mgTab;
-         gui.rect(tx, b.y, tabW, 16.0F, on ? 0xFF1E3648 : 0xFF101620);
-         if (on) gui.rect(tx, b.y + 14.0F, tabW, 2.0F, CYAN);
+      int cols = 3;
+      int tabRows = (MG_TABS.length + cols - 1) / cols;
+      float tw = b.w / cols;
+      for (int i = 0; i < MG_TABS.length; i++) {
+         float tx = b.x + (i % cols) * tw;
+         float ty = b.y + (i / cols) * 19.0F;
          final int idx = i;
-         ui.button(Game.clipText(Screens.MINIGAME_TABS[i], tabW - 6.0F), tx + 1.0F, b.y, tabW - 2.0F, 16.0F, true,
-            "Switch to " + Screens.MINIGAME_TABS[idx] + ".", () -> {
+         button(g, (i == g.mgTab ? "> " : "") + MG_TABS[i], tx + 1.0F, ty, tw - 2.0F, 16.0F,
+            "Switch to " + MG_TABS[idx] + ".", () -> {
                g.mgTab = idx;
                ws.type = WorldSettings.MINIGAME_ORDER[idx];
                g.newMode = 0;
             });
       }
-      float y = b.y + 21.0F;
+      float y = b.y + tabRows * 19.0F + 2.0F;
       float cw = Math.min(180.0F, b.w * 0.55F);
       float mw = (cw - 4.0F) / 2.0F;
-      divider(g, "ARENA MAPS  /  " + ws.typeName(), b.x, y, cw);
+      section(g, "ARENA MAPS  -  " + ws.typeName(), b.x, y, cw);
       for (int m = 0; m < WorldSettings.MAP_COUNT; m++) {
          final int mi = m;
          float mx = b.x + (m % 2) * (mw + 4.0F);
          float my = y + 13.0F + (m / 2) * 17.0F;
+         if (my + 15.0F > b.foot - 24.0F) break;
          boolean sel = ws.mapId == m;
-         if (sel) gui.rect(mx - 1.0F, my - 1.0F, mw + 2.0F, 17.0F, CYAN);
-         ui.button(Game.clipText((sel ? "[ " : "") + WorldSettings.mapNameFor(ws.type, m) + (sel ? " ]" : ""), mw - 6.0F),
-            mx, my, mw, 15.0F, true, WorldSettings.mapInfoFor(ws.type, m), () -> {
+         if (sel) gui.rect(mx - 1.0F, my - 1.0F, mw + 2.0F, 17.0F, GOLD);
+         button(g, (sel ? "> " : "") + WorldSettings.mapNameFor(ws.type, m), mx, my, mw, 15.0F,
+            WorldSettings.mapInfoFor(ws.type, m), () -> {
                ws.mapId = mi;
-               ui.say("Map: " + WorldSettings.mapNameFor(ws.type, mi));
+               ui.say("Arena: " + WorldSettings.mapNameFor(ws.type, mi));
             });
       }
       float rx = b.x + cw + 8.0F;
       float rw = b.x + b.w - rx;
       if (rw > 30.0F) {
-         divider(g, "SELECTED ARENA", rx, y, rw);
+         section(g, "SELECTED ARENA", rx, y, rw);
          if (ui.preview == null) ui.preview = new WorldPreview(64, 48, 16, false);
          ui.preview.update(Screens.seedValue(g), ws);
-         float ph = Math.min(56.0F, Math.max(24.0F, b.foot - y - 76.0F));
+         float ph = Math.min(52.0F, Math.max(22.0F, b.foot - y - 80.0F));
          gui.rect(rx - 1.0F, y + 12.0F, rw + 2.0F, ph + 2.0F, 0xFF000000);
          gui.image(ui.preview.img, rx, y + 13.0F, rw, ph);
-         gui.text(Game.clipText(ws.mapName() + "  -  " + ws.mapTheme(), rw), rx, y + 18.0F + ph, GOLD, true);
-         if (y + 30.0F + ph < b.foot - 48.0F) {
-            ui.paragraph(WorldSettings.mapInfoFor(ws.type, ws.mapId), rx, y + 30.0F + ph, rw, DIM, 2);
-         }
+         label(g, ws.mapName() + "  -  " + ws.mapTheme(), rx, y + 18.0F + ph, rw, GOLD);
       }
       actions(g, b, new String[]{"Play Now", "Open Lobby", "Back"}, new Runnable[]{
          () -> { g.newMode = 0; g.startWorld(true, Long.toString(ui.randomSeed), 0); SkyGen.startMatch(g, false); },
          () -> { g.newMode = 0; SkyGen.matchState = SkyGen.STATE_WAITING; g.startWorld(true, Long.toString(ui.randomSeed), 0); },
          () -> g.setScreen(g.mgReturn != null ? g.mgReturn : Game.S.TITLE)
-      }, new String[]{"Jump straight into a match.", "Open the waiting lobby.", null});
-      hint(g, b, "Pick an arena on the left; the map on the right is a live world preview.");
+      }, new String[]{"Start a match on the selected arena.", "Open the waiting lobby.", null});
+      hint(g, b, "Pick an arena on the left, then Play Now.");
+      footer(g, b);
       ui.drawToast();
    }
 
    // ==================================================================== SETTINGS
-   static final String[] TABS = {"Display", "Graphics", "Gameplay", "Controls", "Sound", "World", "Content"};
-   static final String[] TABS_DEBUG = {"Display", "Graphics", "Gameplay", "Controls", "Sound", "World", "Content", "Advanced"};
-   static final int ADV_TAB = 7;
+   /** A cursor for the settings list; rows outside the scroll area are skipped. */
+   static final class Rows {
+      final Game g;
+      final Ui ui;
+      final float x, w, top, bottom;
+      float y;
 
-   static String[] tabs(Options o) { return o.debugVideo ? TABS_DEBUG : TABS; }
+      Rows(Game g, float x, float y, float w, float top, float bottom) {
+         this.g = g; this.ui = g.ui; this.x = x; this.y = y; this.w = w;
+         this.top = top; this.bottom = bottom;
+      }
+
+      boolean visible(float h) { return y + h > top && y < bottom; }
+   }
+
+   /** A plain ON/OFF button that always spells out its value. */
+   static void toggleRow(Rows r, String name, boolean on, String tip, Runnable action) {
+      if (r.visible(19.0F)) {
+         button(r.g, name + ": " + (on ? "ON" : "OFF"), r.x, r.y, r.w, 17.0F, tip, action);
+      }
+      r.y += 20.0F;
+   }
+
+   /** A stepped numeric setting. The current value AND its unit are in the label. */
+   static void numberRow(Rows r, String name, int value, int lo, int hi, int step,
+      String unit, String tip, Consumer<Integer> set) {
+      if (r.visible(19.0F)) {
+         String text = name + ": " + value + (unit.isEmpty() ? "" : " " + unit);
+         final int[] cur = {value};
+         button(r.g, text, r.x, r.y, r.w, 17.0F, tip + " Click to change.", () -> {
+            cur[0] = cur[0] + step > hi ? lo : cur[0] + step;
+            set.accept(cur[0]);
+         });
+      }
+      r.y += 20.0F;
+   }
+
+   /** A named choice. The current option is printed in full, never abbreviated. */
+   static void choiceRow(Rows r, String name, String[] names, int idx, String tip, Consumer<Integer> set) {
+      if (r.visible(19.0F)) {
+         final int[] cur = {Math.max(0, Math.min(names.length - 1, idx))};
+         button(r.g, name + ": " + names[cur[0]], r.x, r.y, r.w, 17.0F, tip + " Click to change.", () -> {
+            cur[0] = (cur[0] + 1) % names.length;
+            set.accept(cur[0]);
+         });
+      }
+      r.y += 20.0F;
+   }
+
+   /** A slider that PRINTS its number: gold value at the right and in the bar label. */
+   static void sliderRow(Rows r, String name, float value, float lo, float hi,
+      String unit, boolean integer, String tip, Consumer<Float> set) {
+      if (r.visible(30.0F)) {
+         String num = integer ? Integer.toString(Math.round(value)) : String.format("%.2f", value);
+         String valueText = num + (unit.isEmpty() ? "" : " " + unit);
+         label(r.g, name, r.x, r.y, r.w - 86.0F, TEXT);
+         String clipped = Game.clipText(valueText, 82.0F);
+         r.g.gui.text(clipped, r.x + r.w - Gui.textWidth(clipped), r.y, GOLD, true);
+         r.ui.slider(Game.clipText(valueText, r.w - 6.0F), r.x, r.y + 11.0F, r.w, 14.0F,
+            Math.max(0.0F, Math.min(1.0F, (value - lo) / (hi - lo))), tip, f -> set.accept(lo + f * (hi - lo)));
+      }
+      r.y += 30.0F;
+   }
 
    static void options(Game g) {
       Ui ui = g.ui;
@@ -578,250 +542,177 @@ final class Menus635 {
       Options o = g.opt;
       String[] names = tabs(o);
       int tab = Math.max(0, Math.min(names.length - 1, ui.optTab));
-      Box b = frame(g, "settings", "Settings", "Everything in one place", 4);
+      Box b = shell(g, "Settings", "Every setting shows its current value");
 
-      // three columns of wide segmented tabs so every name fits at 320px too
-      final int cols = 3;
+      int cols = 4;
       int tabRows = (names.length + cols - 1) / cols;
       float tw = b.w / cols;
       for (int i = 0; i < names.length; i++) {
-         int row = i / cols, col = i % cols;
-         float tx = b.x + col * tw, ty = b.y + row * 19.0F;
-         boolean on = i == tab;
-         gui.rect(tx, ty, tw, 16.0F, on ? 0xFF1C3446 : 0xFF101722);
-         if (on) gui.rect(tx, ty + 14.0F, tw, 2.0F, CYAN);
+         float tx = b.x + (i % cols) * tw;
+         float ty = b.y + (i / cols) * 19.0F;
          final int idx = i;
-         ui.button(Game.clipText(names[i], tw - 6.0F), tx + 1.0F, ty, tw - 2.0F, 16.0F, true,
+         button(g, (i == tab ? "> " : "") + names[i], tx + 1.0F, ty, tw - 2.0F, 16.0F,
             "Open the " + names[i] + " settings.", () -> ui.optTab = idx);
       }
       float rowsY = b.y + tabRows * 19.0F + 2.0F;
-      float rowsH = Math.max(20.0F, b.foot - rowsY - 48.0F);
-      gui.gradient(b.x, rowsY, b.w, rowsH, CARD, CARD_LO);
+      float rowsH = Math.max(20.0F, b.foot - rowsY - 26.0F);
+      gui.gradient(b.x, rowsY, b.w, rowsH, PANEL_LO, PANEL_LO);
       gui.rect(b.x, rowsY, b.w, 1.0F, RULE);
 
       if (tab == ADV_TAB) {
-         // Debug Advanced: keep EVERY render/shader/performance switch available.
+         // Debug Advanced: every render/shader/performance switch, with its value.
          float colW = Math.min(150.0F, (b.w - 10.0F) / 2.0F);
          ui.beginScroll(b.x, rowsY, b.w, rowsH, ui.optScroll, 62.0F * 20.0F, 20.0F);
          int before = g.btns.size();
          Screens.advancedTab(g, o, b.x + 3.0F, b.x + colW + 7.0F, colW, rowsY - ui.optScroll[0], 20.0F,
             rowsY, rowsH);
-         // the advanced tab was written for a wider two-column panel: clip its
-         // labels so they still fit inside the Atlas rail layout.
          for (int i = before; i < g.btns.size(); i++) {
             Game.Btn btn = g.btns.get(i);
             if (btn.label != null) btn.label = Game.clipText(btn.label, btn.w - 6.0F);
          }
          ui.endScroll(b.x, rowsY, b.w, rowsH, 62.0F * 20.0F);
       } else {
-         ui.beginScroll(b.x, rowsY, b.w, rowsH, ui.optScroll, 22.0F * 20.0F, 20.0F);
-         Rows r = new Rows(g, b.x + 4.0F, rowsY + 2.0F - ui.optScroll[0], b.w - 10.0F);
-         r.top = rowsY;
-         r.bottom = rowsY + rowsH;
-         fill(g, r, tab);
-         ui.endScroll(b.x, rowsY, b.w, rowsH, 22.0F * 20.0F);
+         ui.beginScroll(b.x, rowsY, b.w, rowsH, ui.optScroll, 26.0F * 24.0F, 24.0F);
+         Rows r = new Rows(g, b.x + 4.0F, rowsY + 2.0F - ui.optScroll[0], b.w - 10.0F, rowsY, rowsY + rowsH);
+         fillSettings(g, r, tab);
+         ui.endScroll(b.x, rowsY, b.w, rowsH, 26.0F * 24.0F);
       }
 
-      actions(g, b, new String[]{"Reset", "Back"}, new Runnable[]{
-         () -> { Screens.resetAdvanced(o); ui.say("Settings reset to defaults."); },
+      actions(g, b, new String[]{"Reset to defaults", "Back"}, new Runnable[]{
+         () -> { Screens.resetAdvanced(o); ui.say("All settings reset to their defaults."); },
          () -> g.setScreen(g.optionsReturn != null ? g.optionsReturn : Game.S.TITLE)
-      }, new String[]{"Reset these settings to their defaults.", null});
-      hint(g, b, "Enable Debug Video to unlock the Advanced tab with every shader and LOD control.");
+      }, new String[]{"Reset EVERY setting (video, world, sound, controls) to its default.", null});
+      hint(g, b, "Turn on Debug Video to unlock the Advanced tab with all 61 video and performance controls.");
+      footer(g, b);
       ui.drawToast();
    }
 
-   /** Small helper that lays out labelled rows in two columns and returns the y after each. */
-   static final class Rows {
-      final Game g;
-      final Ui ui;
-      final float x, w;
-      float y, top, bottom;
-      float colW;
-      int count;
-
-      Rows(Game g, float x, float y, float w) {
-         this.g = g; this.ui = g.ui; this.x = x; this.y = y; this.w = w;
-         this.colW = Math.max(80.0F, (w - 6.0F) / 2.0F);
-         this.top = y; this.bottom = Float.MAX_VALUE;
-      }
-
-      boolean visible(float py) { return py + 17.0F > top && py < bottom; }
-
-      float next(int span) {
-         float px = x + (span == 1 ? colW + 6.0F : 0.0F);
-         float pw = span == 0 ? colW : (span == 1 ? colW : w);
-         float py = y;
-         if (span != 1) y += 20.0F;
-         count++;
-         return py;
-      }
-
-      float px(int span) { return span == 1 ? x + colW + 6.0F : x; }
-      float pw(int span) { return span == 2 ? w : colW; }
-   }
-
-   /** span 0 = left column (wait for its partner), 1 = right column, 2 = full width. */
-   static void advance(Rows r, int span) {
-      if (span != 0) r.y += 20.0F;
-      r.count++;
-   }
-
-   static void toggleRow(Game g, Rows r, String label, String hint, Supplier<Boolean> get, Consumer<Boolean> set, int span) {
-      float px = r.px(span), pw = r.pw(span), py = r.y;
-      if (r.visible(py)) toggle(g, label, get.get(), px, py, pw, 17.0F, hint, () -> set.accept(!get.get()));
-      advance(r, span);
-   }
-
-   static void cycleRow(Game g, Rows r, String label, String[] names, int idx, String hint, Consumer<Integer> set, int span) {
-      float px = r.px(span), pw = r.pw(span), py = r.y;
-      final int[] cur = {idx};
-      if (r.visible(py)) button(g, label + ": " + names[cur[0]], px, py, pw, 17.0F, hint,
-         () -> { cur[0] = (cur[0] + 1) % names.length; set.accept(cur[0]); });
-      advance(r, span);
-   }
-
-   static void sliderRow(Game g, Rows r, String label, String hint, float v, float lo, float hi,
-      Consumer<Float> set, int span) {
-      float px = r.px(span), pw = r.pw(span), py = r.y;
-      if (r.visible(py)) {
-         r.ui.slider(Game.clipText(label, pw - 6.0F), px, py, pw, 17.0F,
-            Math.max(0.0F, Math.min(1.0F, (v - lo) / (hi - lo))), hint, f -> set.accept(lo + f * (hi - lo)));
-      }
-      advance(r, span);
-   }
-
-   static void fill(Game g, Rows r, int tab) {
+   static void fillSettings(Game g, Rows r, int tab) {
       Ui ui = g.ui;
       Options o = g.opt;
       switch (tab) {
-         case 0: // Display
-            sliderRow(g, r, "Render Distance", "How many chunks are drawn.", o.renderDistance, 2, 32, f -> o.renderDistance = Math.round(f), 0);
-            sliderRow(g, r, "FOV", "Field of view in degrees.", o.fov, 50, 110, f -> o.fov = Math.round(f), 1);
-            toggleRow(g, r, "VSync", "Sync frames to the display.", () -> o.vsync, v -> o.vsync = v, 0);
-            toggleRow(g, r, "Fullscreen", "Use the whole display.", () -> o.fullscreen, v -> { o.fullscreen = v; g.applyDisplayMode(); }, 1);
-            toggleRow(g, r, "Borderless", "Borderless fullscreen window.", () -> o.borderless, v -> { o.borderless = v; g.applyDisplayMode(); }, 0);
-            sliderRow(g, r, "GUI Scale", "Menu size (0 = automatic).", o.guiScale, 0, 3, f -> o.guiScale = Math.round(f), 1);
-            sliderRow(g, r, "Max FPS", "0 = unlimited.", o.maxFps, 0, 240, f -> o.maxFps = Math.round(f), 0);
-            sliderRow(g, r, "Gamma", "Brightness.", o.gamma, -0.5F, 0.5F, f -> o.gamma = f, 1);
-            toggleRow(g, r, "Smooth Lighting", "Softer light on blocks.", () -> o.smooth, v -> o.smooth = v, 0);
-            toggleRow(g, r, "Panorama", "Animated world behind menus.", () -> o.panorama > 0, v -> o.panorama = v ? 1 : 0, 1);
+         case 0: // Video
+            numberRow(r, "Render Distance", o.renderDistance, 2, 32, 1, "chunks", "How many chunks are drawn around you.", v -> o.renderDistance = v);
+            sliderRow(r, "Field of View", o.fov, 50, 110, "degrees", true, "Camera field of view in degrees.", v -> o.fov = Math.round(v));
+            toggleRow(r, "VSync", o.vsync, "Sync frames to the monitor refresh rate.", () -> o.vsync = !o.vsync);
+            toggleRow(r, "Fullscreen", o.fullscreen, "Use the whole display.", () -> { o.fullscreen = !o.fullscreen; g.applyDisplayMode(); });
+            toggleRow(r, "Borderless Fullscreen", o.borderless, "Fullscreen without a window border.", () -> { o.borderless = !o.borderless; g.applyDisplayMode(); });
+            numberRow(r, "Max FPS", o.maxFps, 0, 240, 30, "fps (0 = unlimited)", "Frame rate cap. 0 means no limit.", v -> o.maxFps = v);
+            numberRow(r, "GUI Scale", o.guiScale, 0, 3, 1, "(0 = automatic)", "Menu size. 0 picks a size for your window.", v -> o.guiScale = v);
+            sliderRow(r, "Brightness", o.gamma, -0.5F, 0.5F, "", false, "Extra brightness.", v -> o.gamma = v);
+            toggleRow(r, "Smooth Lighting", o.smooth, "Softer light on block faces.", () -> o.smooth = !o.smooth);
+            toggleRow(r, "Shaders", o.shaders, "The built-in shader pack.", () -> o.shaders = !o.shaders);
+            toggleRow(r, "Clouds", o.clouds, "Draw clouds in the sky.", () -> o.clouds = !o.clouds);
+            choiceRow(r, "Leaves Quality", new String[]{"Fast", "Fancy"}, Math.max(0, Math.min(1, o.leaves)),
+               "Leaf rendering quality.", v -> o.leaves = v);
+            choiceRow(r, "Bloom", Screens.BLOOM_NAME, Math.max(0, Math.min(2, o.bloom)),
+               "Bloom strength.", v -> o.bloom = v);
+            toggleRow(r, "Debug Video", o.debugVideo, "Unlock the Advanced tab with every video setting.", () -> o.debugVideo = !o.debugVideo);
             break;
-         case 1: // Graphics
-            toggleRow(g, r, "Shaders", "The built-in shader pack.", () -> o.shaders, v -> o.shaders = v, 0);
-            toggleRow(g, r, "Clouds", "Draw clouds.", () -> o.clouds, v -> o.clouds = v, 1);
-            cycleRow(g, r, "Leaves", new String[]{"Fast", "Fancy"}, Math.max(0, Math.min(1, o.leaves)), "Leaf quality.", v -> o.leaves = v, 0);
-            cycleRow(g, r, "Bloom", Screens.BLOOM_NAME, o.bloom, "Bloom strength.", v -> o.bloom = v, 1);
-            toggleRow(g, r, "Moon Shadows", "The moon casts shadows too.", () -> o.moonShadows, v -> o.moonShadows = v, 0);
-            toggleRow(g, r, "Entity Shadows", "Mobs and players cast shadows.", () -> o.entityShadows, v -> o.entityShadows = v, 1);
-            toggleRow(g, r, "Hand Lighting", "Your hand follows the lighting.", () -> o.handLighting, v -> o.handLighting = v, 0);
-            toggleRow(g, r, "Weather", "Rain, snow and thunder.", () -> o.weather, v -> o.weather = v, 1);
-            sliderRow(g, r, "LOD Falloff", "How fast distant LOD fades.", o.lodFalloff, 0.2F, 2.0F, f -> o.lodFalloff = f, 0);
-            sliderRow(g, r, "LOD Distance", "Where LOD chunks start.", o.lodDistance, 16, 256, f -> o.lodDistance = Math.round(f), 1);
-            toggleRow(g, r, "Debug Video", "Unlock the Advanced tab.", () -> o.debugVideo, v -> o.debugVideo = v, 2);
+         case 1: // World
+            toggleRow(r, "3D Cave Volumes", o.caveCliffs, "Minecraft-style cave volumes with natural entrances.", () -> o.caveCliffs = !o.caveCliffs);
+            choiceRow(r, "World Depth", new String[]{"256 blocks (classic)", "384 blocks (deep)"}, o.deepWorld ? 1 : 0,
+               "Deep worlds have ~190 blocks of caves below sea level.", v -> o.deepWorld = v == 1);
+            toggleRow(r, "Cave Structures", o.caveStructures, "Mineshafts, dungeons, geodes and more inside the cave air.", () -> o.caveStructures = !o.caveStructures);
+            toggleRow(r, "Smooth Biome Borders", o.biomeBorders > 0, "Gradual transitions between biomes.", () -> o.biomeBorders = o.biomeBorders > 0 ? 0 : 1);
+            sliderRow(r, "Cave Scale", o.caveScale, 0.6F, 3.0F, "x", false, "Size of cave shapes.", v -> o.caveScale = v);
+            sliderRow(r, "Cave Density", o.caveDensity, 0.4F, 2.5F, "x", false, "How much of the deep world is carved.", v -> o.caveDensity = v);
+            sliderRow(r, "Tree Density", o.treeDensity, 0.4F, 1.4F, "x", false, "Number of trees. Lower is faster in taiga.", v -> o.treeDensity = v);
+            sliderRow(r, "Tree Size", o.treeScale, 0.7F, 1.5F, "x", false, "Height and width of every tree.", v -> o.treeScale = v);
+            toggleRow(r, "Giant Trees", o.giantTrees, "Allow the rare Giant tree size.", () -> o.giantTrees = !o.giantTrees);
+            toggleRow(r, "Weather", o.weather, "Rain, snow and thunder.", () -> o.weather = !o.weather);
             break;
-         case 2: // Gameplay
-            toggleRow(g, r, "Invert Mouse", "Flip vertical look.", () -> o.invertY, v -> o.invertY = v, 0);
-            sliderRow(g, r, "Sensitivity", "Mouse sensitivity.", o.sensitivity, 0.1F, 1.5F, f -> o.sensitivity = f, 1);
-            toggleRow(g, r, "Bobbing", "View bobbing while walking.", () -> o.bobbing, v -> o.bobbing = v, 0);
-            toggleRow(g, r, "Minimap", "Show the minimap.", () -> o.minimap, v -> o.minimap = v, 1);
-            toggleRow(g, r, "Rotate Minimap", "Minimap follows your heading.", () -> o.minimapRotate, v -> o.minimapRotate = v, 0);
-            cycleRow(g, r, "Minimap Pos", new String[]{"TR", "TL", "BR", "BL"}, Math.max(0, Math.min(3, o.minimapPos)),
-               "Which corner holds the minimap.", v -> o.minimapPos = v, 1);
-            toggleRow(g, r, "Dodge Toasts", "Move the minimap for achievement toasts.", () -> o.minimapAutoMove, v -> o.minimapAutoMove = v, 0);
-            toggleRow(g, r, "Disasters", "Enable world disasters.", () -> o.disasters, v -> o.disasters = v, 1);
-            break;
-         case 3: // Controls
-            for (int i = 0; i < Screens.KEYS.length && i < 12; i++) {
-               float y = r.y;
-               g.gui.text(Game.clipText(Screens.KEYS[i][0], r.colW - 4.0F), r.x, y + 2.0F, CYAN, true);
-               g.gui.text(Game.clipText(Screens.KEYS[i][1], r.colW - 4.0F), r.x + r.colW + 6.0F, y + 2.0F, DIM, true);
-               r.y += 15.0F;
+         case 2: // Controls
+            for (int i = 0; i < Screens.KEYS.length; i++) {
+               if (!r.visible(16.0F)) { r.y += 16.0F; continue; }
+               label(r.g, Screens.KEYS[i][0], r.x, r.y, r.w * 0.42F, GOLD);
+               label(r.g, Screens.KEYS[i][1], r.x + r.w * 0.45F, r.y, r.w * 0.55F, DIM);
+               r.y += 16.0F;
             }
             break;
-         case 4: // Sound
-            sliderRow(g, r, "Volume", "Master sound volume.", o.soundVolume, 0.0F, 1.0F, f -> o.soundVolume = f, 0);
-            sliderRow(g, r, "Music", "Music volume.", o.musicVolume, 0.0F, 1.0F, f -> o.musicVolume = f, 1);
-            toggleRow(g, r, "3D Acoustics", "Positional cave and world sound.", () -> o.realAcoustics, v -> o.realAcoustics = v, 0);
-            toggleRow(g, r, "Constant Music", "Never stop the music.", () -> o.constantMusic, v -> o.constantMusic = v, 1);
+         case 3: // Sound
+            sliderRow(r, "Sound Volume", o.soundVolume, 0.0F, 1.0F, "", false, "Master sound volume.", v -> o.soundVolume = v);
+            sliderRow(r, "Music Volume", o.musicVolume, 0.0F, 1.0F, "", false, "Music volume.", v -> o.musicVolume = v);
+            toggleRow(r, "3D Sound", o.realAcoustics, "Positional cave and world sound.", () -> o.realAcoustics = !o.realAcoustics);
+            toggleRow(r, "Always Play Music", o.constantMusic, "Never stop the music.", () -> o.constantMusic = !o.constantMusic);
             break;
-         case 5: // World
-            toggleRow(g, r, "Caves & Cliffs", "Minecraft-style 3D cave volumes.", () -> o.caveCliffs, v -> o.caveCliffs = v, 0);
-            toggleRow(g, r, "Deep World", "384-block worlds with ~190 blocks of caves below sea level.",
-               () -> o.deepWorld, v -> o.deepWorld = v, 1);
-            toggleRow(g, r, "Cave Structures", "Mineshafts, dungeons, geodes and more in the cave air.",
-               () -> o.caveStructures, v -> o.caveStructures = v, 0);
-            toggleRow(g, r, "New Terrain", "Smooth biome borders and layered generation.", () -> o.newTerrain, v -> o.newTerrain = v, 1);
-            sliderRow(g, r, "Cave Scale", "Size of cave shapes.", o.caveScale, 0.6F, 3.0F, f -> o.caveScale = f, 0);
-            sliderRow(g, r, "Cave Density", "How much of the deep world is carved.", o.caveDensity, 0.4F, 2.5F, f -> o.caveDensity = f, 1);
-            sliderRow(g, r, "Biome Borders", "0 sharp, 2 very smooth.", o.biomeBorders, 0, 2, f -> o.biomeBorders = Math.round(f), 0);
-            sliderRow(g, r, "Tree Density", "Fewer trees in taiga = better performance.", o.treeDensity, 0.4F, 1.4F, f -> o.treeDensity = f, 1);
+         case 4: // Gameplay
+            toggleRow(r, "Invert Mouse", o.invertY, "Flip the vertical look direction.", () -> o.invertY = !o.invertY);
+            sliderRow(r, "Mouse Sensitivity", o.sensitivity, 0.1F, 1.5F, "x", false, "Mouse speed.", v -> o.sensitivity = v);
+            toggleRow(r, "View Bobbing", o.bobbing, "Camera movement while walking.", () -> o.bobbing = !o.bobbing);
+            toggleRow(r, "Minimap", o.minimap, "Show the minimap in the corner.", () -> o.minimap = !o.minimap);
+            choiceRow(r, "Minimap Corner", new String[]{"Top right", "Top left", "Bottom right", "Bottom left"},
+               Math.max(0, Math.min(3, o.minimapPos)), "Which corner holds the minimap.", v -> o.minimapPos = v);
+            toggleRow(r, "Move Minimap For Pop-ups", o.minimapAutoMove,
+               "Move the minimap when an achievement appears.", () -> o.minimapAutoMove = !o.minimapAutoMove);
+            toggleRow(r, "Disasters", o.disasters, "Enable world disasters.", () -> o.disasters = !o.disasters);
             break;
          default: // Content
-            ui.button("Skins", r.px(0), r.y, r.pw(0), 17.0F, true, "Choose or import a skin.", () -> {
-               g.skinReturn = Game.S.OPTIONS; g.setScreen(Game.S.SKINS);
-            });
-            ui.button("Resource Packs", r.px(1), r.y, r.pw(1), 17.0F, true, "Reload PNGs and packs.", () -> {
-               g.packsReturn = Game.S.OPTIONS; g.setScreen(Game.S.PACKS);
-            });
+            if (r.visible(19.0F)) {
+               button(g, "Skins", r.x, r.y, r.w, 17.0F, "Choose or import a player skin.", () -> {
+                  g.skinReturn = Game.S.OPTIONS; g.setScreen(Game.S.SKINS);
+               });
+            }
             r.y += 20.0F;
-            ui.button("Mods", r.px(0), r.y, r.pw(0), 17.0F, true, "Enable or disable mods.", () -> {
-               g.modsReturn = Game.S.OPTIONS; g.setScreen(Game.S.MODS);
-            });
-            ui.button("Credits", r.px(1), r.y, r.pw(1), 17.0F, true, "Music and sound credits.", () -> {
-               g.creditsReturn = Game.S.OPTIONS; g.setScreen(Game.S.CREDITS);
-            });
+            if (r.visible(19.0F)) {
+               button(g, "Resource Packs", r.x, r.y, r.w, 17.0F, "Reload PNGs and installed packs.", () -> {
+                  g.packsReturn = Game.S.OPTIONS; g.setScreen(Game.S.PACKS);
+               });
+            }
             r.y += 20.0F;
-            ui.button("Watch Trailer", r.px(0), r.y, r.pw(0), 17.0F, true, "The 60-second montage.", () -> Trailer.start(g));
-            ui.button("All Blocks", r.px(1), r.y, r.pw(1), 17.0F, true, "A gallery world with every block.", () -> {
-               g.ensureAllBlocksShowcaseWorld(); g.worldName = "All_Blocks_Showcase"; g.startWorld(false, null, 1);
-            });
+            if (r.visible(19.0F)) {
+               button(g, "Mods", r.x, r.y, r.w, 17.0F, "Enable or disable installed mods.", () -> {
+                  g.modsReturn = Game.S.OPTIONS; g.setScreen(Game.S.MODS);
+               });
+            }
             r.y += 20.0F;
-            ui.button("Tilesheet", r.px(2), r.y, r.pw(2), 17.0F, true, "The editable one-sheet texture atlas.",
-               () -> {
-               Tilesheet.invalidate();
-               g.ui.say("Tilesheet: " + Tilesheet.changedTiles() + " edited tiles active");
-            });
+            if (r.visible(19.0F)) {
+               button(g, "Credits", r.x, r.y, r.w, 17.0F, "Music, art and sound credits.", () -> {
+                  g.creditsReturn = Game.S.OPTIONS; g.setScreen(Game.S.CREDITS);
+               });
+            }
+            r.y += 20.0F;
+            if (r.visible(19.0F)) {
+               button(g, "Watch Trailer (1:00)", r.x, r.y, r.w, 17.0F, "The in-game montage.", () -> Trailer.start(g));
+            }
+            r.y += 20.0F;
             break;
       }
    }
 
    // ==================================================================== PAUSE / MORE / UTILITY
    static void pause(Game g) {
-      Box b = frame(g, "in game", "Game Menu", g.worldDisplayName, -1);
+      Box b = shell(g, "Game Menu", g.worldDisplayName);
       Ui ui = g.ui;
-      float cw = Math.min(180.0F, (b.w - 6.0F) / 2.0F);
+      float cw = (b.w - 6.0F) / 2.0F;
       float y = b.y;
-      ui.button("Back to Game", b.x, y, cw, 18.0F, true, null, () -> g.setScreen(Game.S.PLAY));
-      ui.button("Advancements", b.x + cw + 6.0F, y, cw, 18.0F, true, null, () -> g.setScreen(Game.S.ADV));
-      ui.button("Options", b.x, y + 21.0F, cw, 18.0F, true, null, () -> {
+      button(g, "Back to Game", b.x, y, b.w, 19.0F, null, () -> g.setScreen(Game.S.PLAY));
+      button(g, "Advancements", b.x, y + 22.0F, cw, 18.0F, null, () -> g.setScreen(Game.S.ADV));
+      button(g, "Options", b.x + cw + 6.0F, y + 22.0F, cw, 18.0F, null, () -> {
          g.optionsReturn = Game.S.PAUSE; g.setScreen(Game.S.OPTIONS);
       });
-      ui.button("Skins", b.x + cw + 6.0F, y + 21.0F, cw, 18.0F, true, null, () -> {
+      button(g, "Skins", b.x, y + 43.0F, cw, 18.0F, null, () -> {
          g.skinReturn = Game.S.PAUSE; g.setScreen(Game.S.SKINS);
       });
-      ui.button("Packs", b.x, y + 42.0F, cw, 18.0F, true, null, () -> {
+      button(g, "Packs", b.x + cw + 6.0F, y + 43.0F, cw, 18.0F, null, () -> {
          g.packsReturn = Game.S.PAUSE; g.setScreen(Game.S.PACKS);
       });
-      ui.button("Mods", b.x + cw + 6.0F, y + 42.0F, cw, 18.0F, true, null, () -> {
+      button(g, "Mods", b.x, y + 64.0F, cw, 18.0F, null, () -> {
          g.modsReturn = Game.S.PAUSE; g.setScreen(Game.S.MODS);
       });
-      ui.button(Net319.hostLabel(), b.x, y + 63.0F, cw, 18.0F, true, null, () -> Net319.toggleHost(g));
-      ui.button(Net319.joinLabel(), b.x + cw + 6.0F, y + 63.0F, cw, 18.0F, true, null, () -> Net319.toggleJoin(g));
-      boolean mg = g.world != null && g.world.settings != null && g.world.settings.isMinigame();
-      if (mg && !Net319.isClientConnected()) {
-         ui.button("New Round", b.x, y + 84.0F, cw, 18.0F, true, null, () -> SkyGen.startMatch(g, true));
-         ui.button("Save and Quit to Title", b.x + cw + 6.0F, y + 84.0F, cw, 18.0F, true, null, g::quitToTitle);
-      } else {
-         ui.button("Save and Quit to Title", b.x, y + 84.0F, b.w, 18.0F, true, null, g::quitToTitle);
-      }
-      hint(g, b, "Escape closes the menu. The world keeps running while you are here.");
+      button(g, "Save and Quit to Title", b.x + cw + 6.0F, y + 64.0F, cw, 18.0F, null, g::quitToTitle);
+      button(g, Net319.hostLabel(), b.x, y + 85.0F, cw, 18.0F, null, () -> Net319.toggleHost(g));
+      button(g, Net319.joinLabel(), b.x + cw + 6.0F, y + 85.0F, cw, 18.0F, null, () -> Net319.toggleJoin(g));
+      actions(g, b, new String[]{"Back"}, new Runnable[]{() -> g.setScreen(Game.S.PLAY)}, null);
+      hint(g, b, "Escape closes this menu.");
+      footer(g, b);
       ui.drawToast();
    }
 
    static void more(Game g) {
-      Box b = frame(g, "extras", "More", "Everything that did not fit on the main screen", 5);
+      Box b = shell(g, "More", "Everything else");
       Ui ui = g.ui;
-      String[] labels = {"Skins", "Resource Packs", "Mods", "All Blocks", "Credits", "Trailer"};
+      String[] labels = {"Skins", "Resource Packs", "Mods", "All Blocks Gallery", "Credits", "Watch Trailer (1:00)"};
       Runnable[] acts = {
          () -> { g.skinReturn = Game.S.MORE; g.setScreen(Game.S.SKINS); },
          () -> { g.packsReturn = Game.S.MORE; g.setScreen(Game.S.PACKS); },
@@ -830,96 +721,86 @@ final class Menus635 {
          () -> { g.creditsReturn = Game.S.MORE; g.creditsScroll = 0.0F; g.setScreen(Game.S.CREDITS); },
          () -> Trailer.start(g)
       };
-      float cw = (b.w - 6.0F) / 2.0F;
       for (int i = 0; i < labels.length; i++) {
-         float x = b.x + (i % 2) * (cw + 6.0F);
-         float y = b.y + (i / 2) * 22.0F;
-         ui.button(labels[i], x, y, cw, 18.0F, true, null, acts[i]);
+         button(g, labels[i], b.x, b.y + i * 22.0F, b.w, 18.0F, null, acts[i]);
       }
       actions(g, b, new String[]{"Back"}, new Runnable[]{() -> g.setScreen(Game.S.TITLE)}, null);
-      hint(g, b, "The Debug Advanced tab holds every shader and performance setting.");
+      hint(g, b, "The Debug Advanced tab in Settings has every video and performance control.");
+      footer(g, b);
       ui.drawToast();
    }
 
    static void loading(Game g) {
-      Box b = frame(g, "loading", "Building world", g.worldDisplayName, -1);
+      Box b = shell(g, "Loading World", g.worldDisplayName);
       Gui gui = g.gui;
-      divider(g, "PROGRESS", b.x, b.y, b.w);
-      float w = b.w;
-      gui.rect(b.x, b.y + 16.0F, w, 10.0F, 0xFF05080E);
-      gui.rect(b.x + 1.0F, b.y + 17.0F, Math.max(0.0F, (w - 2.0F) * g.loadFrac), 8.0F, CYAN);
-      gui.text(Game.clipText(g.loadingMsg, w), b.x, b.y + 30.0F, DIM, true);
-      uiHint(g, b, "Generating a 384-block-deep world. Large caves take a moment on the first visit.");
+      section(g, "PROGRESS", b.x, b.y, b.w);
+      gui.rect(b.x, b.y + 15.0F, b.w, 10.0F, EDGE);
+      gui.rect(b.x + 1.0F, b.y + 16.0F, Math.max(0.0F, (b.w - 2.0F) * g.loadFrac), 8.0F, GOLD);
+      label(g, g.loadingMsg, b.x, b.y + 29.0F, b.w, DIM);
+      hint(g, b, "Generating a 384-block-deep world. Large caves take a moment on the first visit.");
+      footer(g, b);
    }
 
    static void waiting(Game g) {
-      Box b = frame(g, "lobby", "Waiting Lobby", "Invite friends before the match starts", 3);
+      Box b = shell(g, "Waiting Lobby", "Invite friends before the match starts");
       Ui ui = g.ui;
-      divider(g, "LOBBY", b.x, b.y, b.w);
-      guiText(g, b, "Share Code: " + Net319.shareCode, b.y + 15.0F, GOLD);
-      ui.button("Start Match", b.x, b.y + 32.0F, Math.min(140.0F, b.w), 18.0F, true,
-         "Start the match now.", () -> SkyGen.startMatch(g, false));
-      ui.button("Leave", b.x, b.y + 54.0F, Math.min(140.0F, b.w), 18.0F, true, null, g::quitToTitle);
+      section(g, "LOBBY", b.x, b.y, b.w);
+      label(g, "Share Code: " + Net319.shareCode, b.x, b.y + 15.0F, b.w, GOLD);
+      button(g, "Start Match", b.x, b.y + 32.0F, Math.min(160.0F, b.w), 18.0F, "Start the match now.", () -> SkyGen.startMatch(g, false));
+      button(g, "Leave Lobby", b.x, b.y + 54.0F, Math.min(160.0F, b.w), 18.0F, null, g::quitToTitle);
       hint(g, b, "Players on LAN or with the Share Code appear here.");
+      footer(g, b);
       ui.drawToast();
    }
 
    static void resourcePacks(Game g) {
-      Box b = frame(g, "content", "Resource Packs", "PNG overrides and the editable tilesheet", 5);
+      Box b = shell(g, "Resource Packs", "PNG overrides and the editable tilesheet");
       Ui ui = g.ui;
-      ui.button("Reload PNGs", b.x, b.y, Math.min(160.0F, b.w), 18.0F, true,
-         "Re-read the loose PNG overrides.", () -> ResourcePacks.reload(g));
-      ui.button("Tilesheet", b.x, b.y + 21.0F, Math.min(160.0F, b.w), 18.0F, true,
-         "Open the one-sheet editable atlas.", () -> {
-               Tilesheet.invalidate();
-               g.ui.say("Tilesheet: " + Tilesheet.changedTiles() + " edited tiles active");
-            });
+      button(g, "Reload PNGs", b.x, b.y, Math.min(180.0F, b.w), 18.0F, "Re-read the loose PNG overrides.", () -> ResourcePacks.reload(g));
+      button(g, "Reload Tilesheet", b.x, b.y + 22.0F, Math.min(180.0F, b.w), 18.0F, "Apply edited tilesheet cells.", () -> {
+         Tilesheet.invalidate();
+         ui.say("Tilesheet: " + Tilesheet.changedTiles() + " edited tiles active");
+      });
       actions(g, b, new String[]{"Back"}, new Runnable[]{
          () -> g.setScreen(g.packsReturn != null ? g.packsReturn : Game.S.MORE)}, null);
-      hint(g, b, "PNG overrides still work with every pack kind, including Vibrant and Retro.");
+      hint(g, b, "PNG overrides work with every pack kind, including Vibrant and Retro.");
+      footer(g, b);
       ui.drawToast();
    }
 
    static void mods(Game g) {
-      Box b = frame(g, "content", "Mods", "Installed mods and the catalog", 5);
+      Box b = shell(g, "Mods", "Installed mods");
       Ui ui = g.ui;
-      ui.button("Browse Catalog", b.x, b.y, Math.min(160.0F, b.w), 18.0F, true, null, () -> g.ui.modTab = 0);
-      ui.button("Installed Mods", b.x, b.y + 21.0F, Math.min(160.0F, b.w), 18.0F, true, null, () -> g.ui.modTab = 1);
       java.util.List<ModLoader.ModEntry> mods = ModLoader.allMods();
-      float y = b.y + 46.0F;
+      float y = b.y;
       for (int i = 0; i < Math.min(6, mods.size()); i++) {
-         if (y + 18.0F > b.foot - 48.0F) break;
+         if (y + 18.0F > b.foot - 24.0F) break;
          ModLoader.ModEntry m = mods.get(i);
          final String id = m.id;
-         ui.button(Game.clipText((m.enabled ? "ON  " : "OFF ") + m.name, Math.min(160.0F, b.w) - 6.0F), b.x, y,
-            Math.min(160.0F, b.w), 17.0F, true, "Toggle this mod.", () -> {
-               ModLoader.toggleEnabled(id);
-               ui.say("Mod " + id + " toggled");
-            });
+         button(g, m.name + ": " + (m.enabled ? "ON" : "OFF"), b.x, y, b.w, 17.0F, "Enable or disable this mod.", () -> {
+            ModLoader.toggleEnabled(id);
+            ui.say("Mod " + id + " toggled");
+         });
          y += 20.0F;
       }
       actions(g, b, new String[]{"Back"}, new Runnable[]{
          () -> g.setScreen(g.modsReturn != null ? g.modsReturn : Game.S.MORE)}, null);
       hint(g, b, "Mods are loaded from the mods folder.");
+      footer(g, b);
       ui.drawToast();
    }
 
    static void credits(Game g) {
-      Box b = frame(g, "credits", "Credits", "Original code, art, music and CC0 field recordings", 5);
+      Box b = shell(g, "Credits", "Original code, art, music and CC0 field recordings");
       Ui ui = g.ui;
-      divider(g, "THANK YOU", b.x, b.y, b.w);
       ui.paragraph("All world generation, textures, sounds, UI and shaders in Blockcraft are original. "
          + "The ten real CC0 WAV field recordings are credited in res/sounds/foley/CREDITS.txt. "
          + "This is NOT Minecraft and contains no Mojang code or assets.",
-         b.x, b.y + 15.0F, b.w, DIM, 6);
+         b.x, b.y, b.w, DIM, 6);
       actions(g, b, new String[]{"Back"}, new Runnable[]{
          () -> g.setScreen(g.creditsReturn != null ? g.creditsReturn : Game.S.MORE)}, null);
-      hint(g, b, "V6.35: deep worlds, crazier caves with depth, and the Atlas menus.");
+      hint(g, b, "V6.36: plain menus, every setting shows its value.");
+      footer(g, b);
       ui.drawToast();
-   }
-
-   static void uiHint(Game g, Box b, String s) { g.ui.drawHint(b.x, b.foot - 46.0F, b.w, 20.0F, s); }
-   static void guiText(Game g, Box b, String s, float y, int color) {
-      g.gui.text(Game.clipText(s, b.w), b.x, y, color, true);
    }
 }

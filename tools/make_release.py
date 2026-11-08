@@ -545,6 +545,29 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.36":
+        release_notes += (
+            "\n### Plain menus, and settings that show their numbers\n\n"
+            "The V6.35 Atlas UI (nav rail, numbered cards, cryptic labels) was rejected. "
+            "Every menu is now one ordinary centred panel with a plain title, clearly labelled "
+            "buttons and an obvious Back button - no clipped abbreviations, no duplicated card "
+            "titles, no nonsense footer.\n\n"
+            "**Every setting prints its real value**: `Render Distance: 8 chunks`, "
+            "`Max FPS: 0 fps (0 = unlimited)`, `World Depth: 384 blocks`, `70 degrees` in gold "
+            "beside a slider and inside its bar, `VSync: ON`, `Minimap Corner: Top right`. "
+            "Debug Advanced still exposes all 61 video / shader / LOD / performance settings. "
+            "Mini game tabs are full words (Battle, Tumble, Bedwars, CS2, Murder, Ender, Siege); "
+            "Dodge Toasts became Move Minimap For Pop-ups; Reset is now Reset to defaults.\n\n"
+            "**The live world-map preview on Create New World is kept**, in a plain two-column "
+            "form with the biome count and seed shown as numbers. V6.35 deep worlds, "
+            "depth-scaled caves and twelve structures are unchanged. Headless software board: "
+            "`docs/screenshots/v6.36-menus.png` (NOT a GPU screenshot). All screens pass the "
+            "layout suite at seven window sizes. No Mojang code or assets.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite with five new V6.36 regression groups, strict equivalence, all "
+            "21 GLSL programs, `tools/verify_release.py`, and the distributed V6.10 sound-world "
+            "reload checks. No real-GPU/Windows playtest is claimed.\n"
+        )
     if version == "6.35":
         release_notes += (
             "\n### Worlds 384 blocks deep\n\n"

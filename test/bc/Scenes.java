@@ -31,6 +31,10 @@ final class Scenes {
       g.ui.randomSeed = 7311L;
       switch (name) {
          // ---- V6.35 Atlas UI: the screens the game actually draws now
+         case "plain-video": g.screen = Game.S.OPTIONS; g.ui.optTab = 0; Menus635.options(g); return;
+         case "plain-world": g.screen = Game.S.OPTIONS; g.newSettings = new WorldSettings(); g.ui.optTab = 1; Menus635.options(g); return;
+         case "plain-gameplay": g.screen = Game.S.OPTIONS; g.ui.optTab = 4; Menus635.options(g); return;
+         case "plain-advanced": g.screen = Game.S.OPTIONS; g.opt.debugVideo = true; g.ui.optTab = Menus635.ADV_TAB; Menus635.options(g); return;
          case "atlas-title": g.screen = Game.S.TITLE; Menus635.title(g); return;
          case "atlas-sp": g.screen = Game.S.SP_HUB; Menus635.singleplayer(g); return;
          case "atlas-mp": g.screen = Game.S.MP_HUB; g.focusField = 0; Menus635.mpHub(g); return;

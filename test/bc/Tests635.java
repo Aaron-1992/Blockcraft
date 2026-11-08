@@ -257,9 +257,10 @@ final class Tests635 {
          "the live world-map preview is kept on Create New World");
       check(m.contains("gui.image(ui.preview.img"), "the preview image is actually drawn");
       check(m.contains("ws.depth = g.opt.deepWorld"), "the preview matches the world that will be created");
-      check(m.contains("NAV") && m.contains("card(") && m.contains("TABS"),
-         "the new design has a nav rail, cards and its own tab set");
+      check(m.contains("TABS") && m.contains("numberRow") && m.contains("sliderRow")
+         && m.contains("shell("), "the V6.36 UI has plain panels, tab rows and numeric setting rows");
       check(m.contains("Screens.advancedTab"), "Debug Advanced still exposes every video setting");
+      check(m.contains("Every setting shows its current value"), "the settings screen promises visible values");
       String scenes = src("test/bc/Scenes.java");
       check(scenes.contains("Menus635.title(g)") && scenes.contains("Menus635.options(g)"),
          "the headless layout suite draws the new menus");
@@ -288,8 +289,8 @@ final class Tests635 {
    }
 
    static void wiring() throws Exception {
-      eq("6.35", Game.VERSION_STR, "the game version is 6.35");
-      eq("6.35", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.35");
+      eq("6.36", Game.VERSION_STR, "the game version is 6.36");
+      eq("6.36", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.36");
       check(src("README.md").contains("V6.35"), "README describes V6.35");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.35"), "the packaged readme describes V6.35");
       check(new File("docs/releases/v6.35.md").isFile(), "V6.35 release notes exist");
