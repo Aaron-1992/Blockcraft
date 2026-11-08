@@ -169,7 +169,7 @@ public final class InfdevGen extends Gen {
       for (int z = 0; z < 16; z++) {
          for (int x = 0; x < 16; x++) {
             int top = 0;
-            for (int y = 255; y >= 0; y--) {
+            for (int y = Chunk.H - 1; y >= 0; y--) {
                int id = ch.blocks[Chunk.idx(x, y, z)] & BlockState.ID_MASK;
                if (Blocks.opacity[id] > 0) {
                   top = y;

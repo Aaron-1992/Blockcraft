@@ -201,7 +201,8 @@ public final class Shaders {
    int csFrame;
    static final int CS_N = 128;
    static final float CS_SIZE = 1024.0F;
-   static final float CS_Y = 64.0F;
+   /** V6.37: the cloud-shadow map lies on the lifted sea plane (64 in a classic world). */
+   static float csY() { return Gen.SEA + 1.0F; }
    float[] emT;
    static final float[] NO_EMIT = new float[32];
    int fw;
@@ -300,6 +301,81 @@ public final class Shaders {
       } else {
          return var3;
       }
+   }
+
+   /** V6.37: signature of the shader-related options, so ANY change (menus,
+    * Advanced tab, commands, config file) invalidates the auxiliary buffers. */
+   private long optionKey = Long.MIN_VALUE;
+
+   private static long optionSignature(Options o) {
+      long k = 17L;
+      k = k * 31 + (o.shaders ? 1 : 0);
+      k = k * 31 + o.fx;
+      k = k * 31 + o.waterQ;
+      k = k * 31 + o.bloom;
+      k = k * 31 + o.renderScale;
+      k = k * 31 + o.shadowRes;
+      k = k * 31 + o.cloudRes;
+      k = k * 31 + o.cloudSteps;
+      k = k * 31 + (o.smooth ? 1 : 0);
+      k = k * 31 + o.leaves;
+      k = k * 31 + (o.entityShadows ? 1 : 0);
+      k = k * 31 + (o.moonShadows ? 1 : 0);
+      return k;
+   }
+
+   /** Called once per frame on the render thread before the scene is begun. */
+   public void syncOptions(Options o) {
+      if (o == null) return;
+      long k = optionSignature(o);
+      if (k != this.optionKey) {
+         this.optionKey = k;
+         this.invalidate();
+      }
+   }
+
+   /**
+    * V6.37: switching the shader pack on, or changing the effects / water /
+    * bloom / shadow / cloud quality, used to leave stale pixels in the glow,
+    * AO, ray, cloud-shadow and scene buffers. Those textures are allocated
+    * with undefined contents and were composited for a frame or two, showing
+    * a ghost ("burn in") until a pass happened to overwrite them. Clear every
+    * target and force a fresh shadow map on any such change.
+    */
+   public void invalidate() {
+      this.sceneActive = false;
+      this.mapValid = false;
+      this.staticValid = false;
+      this.resizeQueued = true;
+      this.underwater = 0.0F;
+      this.rayAmt = 0.0F;
+      this.csFrame = 0;
+      this.clearTargets();
+   }
+
+   private void clearTargets() {
+      int[] colour = {this.sceneFbo, this.bloomFbo0, this.bloomFbo1, this.bloomFbo2,
+         this.bloomFbo3, this.bloomFbo4, this.bloomFbo5, this.aoFbo, this.aoFbo2,
+         this.rayFbo, this.cloudFbo, this.copyFbo, this.csFbo};
+      int[] depth = {this.shadowFbo, this.staticFbo};
+      GL11.glColorMask(true, true, true, true);
+      GL11.glDepthMask(true);
+      GL11.glClearColor(0.0F, 0.0F, 0.0F, 0.0F);
+      for (int f : colour) {
+         if (f != 0) {
+            GL30.glBindFramebuffer(36160, f);
+            // 16384 = COLOR, 256 = DEPTH: the scene FBO has a depth attachment too,
+            // and a stale depth buffer is just as much of a burn-in as a stale colour.
+            GL11.glClear(16384 | 256);
+         }
+      }
+      for (int f : depth) {
+         if (f != 0) {
+            GL30.glBindFramebuffer(36160, f);
+            GL11.glClear(256);
+         }
+      }
+      GL30.glBindFramebuffer(36160, 0);
    }
 
    public void init() {
@@ -751,7 +827,9 @@ public final class Shaders {
             }
          }
 
-         GL30.glBindFramebuffer(36160, 0);
+         // V6.37: the new textures have undefined contents; clear them so the
+         // first shader frame never composites a ghost of uninitialised memory.
+         this.clearTargets();
          if (var3 != 36053) {
             System.err.println("Scene FBO incomplete; shaders disabled");
             this.ok = false;
@@ -1059,7 +1137,7 @@ public final class Shaders {
          GL20.glUniform4f(this.loc(prog, "csP"), (float)(this.csCx - var2), (float)(this.csCz - var6), 1.0F / CS_SIZE, this.csHave ? this.csAmt : 0.0F);
          float csy = Math.max(this.sunY, 0.15F);
          GL20.glUniform2f(this.loc(prog, "csSunXZ"), this.sunX / csy, this.sunZ / csy);
-         this.u1f(prog, "csY", CS_Y);
+         this.u1f(prog, "csY", csY());
          this.u1f(prog, "wet", this.glowOn ? this.wet : 0.0F);
          GL13.glActiveTexture(33989);
          GL11.glBindTexture(3553, this.csHave ? this.csTex : 0);
@@ -1517,7 +1595,7 @@ public final class Shaders {
             GL20.glUniform4f(this.loc(lp, "csP"), (float)(this.csCx - var2), (float)(this.csCz - var6), 1.0F / CS_SIZE, this.csHave ? this.csAmt : 0.0F);
             float csy = Math.max(this.sunY, 0.15F);
             GL20.glUniform2f(this.loc(lp, "csSunXZ"), this.sunX / csy, this.sunZ / csy);
-            this.u1f(lp, "csY", CS_Y);
+            this.u1f(lp, "csY", csY());
             GL13.glActiveTexture(33989);
             GL11.glBindTexture(3553, this.csHave ? this.csTex : 0);
          }
@@ -1674,6 +1752,8 @@ public final class Shaders {
       GL20.glUniform4fv(this.loc(prog, "wCells[0]"), cells);
       GL20.glUniform4f(this.loc(prog, "wFlash"), fx.flashX - (float)camX, fx.flashY - (float)camY, fx.flashZ - (float)camZ, fx.flashAmt);
       GL20.glUniform4f(this.loc(prog, "wOnCap"), sn.on ? 1.0F : 0.0F, Weather.FAIR, sn.calmAmt, Weather.FAIR_LO);
+      // V6.37: the shader's cloud altitudes must follow the lifted sea level.
+      this.u1f(prog, "cloudLift", fx.lift);
    }
 
    /**
@@ -1725,7 +1805,7 @@ public final class Shaders {
       GL20.glUniform2f(this.loc(this.pCShadow, "csCenter"), (float)(this.csCx - camX), (float)(this.csCz - camZ));
       this.u1f(this.pCShadow, "csSize", CS_SIZE);
       GL20.glUniform2f(this.loc(this.pCShadow, "csSun"), this.sunX / sy, this.sunZ / sy);
-      this.u1f(this.pCShadow, "csY", CS_Y);
+      this.u1f(this.pCShadow, "csY", csY());
       GL13.glActiveTexture(33986);
       GL11.glBindTexture(3553, this.wnoiseTex);
       GL13.glActiveTexture(33984);

@@ -54,6 +54,8 @@ final class WeatherFx {
    /** 0..1: how grey/dark the sky is overall */
    float overcast;
    /** the slab the cloud shader marches: thin in fair weather (like before 3.8), tall only while a thunderhead is within reach */
+   /** V6.37: cloud/rain heights are lifted with the world's sea level. */
+   float lift = 0.0F;
    float slabLo = 140.0F;
    float slabHi = 252.0F;
    /** the strongest bolt for the cloud glow: world position of its top and the strength 0..1 */
@@ -110,6 +112,7 @@ final class WeatherFx {
    // ================================================================ local values
    void updateLocal(float partial) {
       Game g = this.r.g;
+      this.lift = (float)Gen.depth();
       if (g.opt != null) {
          this.quality = Options.clamp(g.opt.weatherQuality, 0, 2);
          this.windAmt = Options.clampf(g.opt.weatherWind, 0.2F, 2.0F);
@@ -139,8 +142,9 @@ final class WeatherFx {
       int kind = wx.precipKind((int)Math.floor(x), (int)Math.floor(z));
       float target = kind == 2 ? 1.0F : 0.0F;
       this.snowy += (target - this.snowy) * 0.05F;
-      this.slabLo = 164.0F - 27.0F * wx.maxStorm;
-      this.slabHi = 250.0F + 134.0F * wx.maxCore;
+      this.lift = (float)Gen.depth();
+      this.slabLo = this.lift + 164.0F - 27.0F * wx.maxStorm;
+      this.slabHi = this.lift + 250.0F + 134.0F * wx.maxCore;
       this.flash = wx.suppressed ? 0.0F : wx.flashAt(x, z, partial);
       this.flashAmt = 0.0F;
       if (!wx.suppressed) {
@@ -163,7 +167,7 @@ final class WeatherFx {
       double sx = -Math.sin(sa);
       double sy = Math.cos(sa);
       if (sy > 0.04) {
-         double d = Math.min(3000.0, Math.max(0.0, (Weather.BASE_FAIR - this.r.camY)) / sy);
+         double d = Math.min(3000.0, Math.max(0.0, (Weather.BASE_FAIR + this.lift - this.r.camY)) / sy);
          float c = this.snap.cover(x + sx * d, z);
          this.sunVis = 1.0F - 0.92F * Weather.smooth(0.35F, 1.0F, c);
       } else {
@@ -182,7 +186,7 @@ final class WeatherFx {
       dy /= len;
       dz /= len;
       double up = Math.max(dy, 0.035);
-      double h = Math.max(40.0, Weather.BASE_FAIR - this.r.camY);
+      double h = Math.max(40.0, Weather.BASE_FAIR + this.lift - this.r.camY);
       double sc = h / up;
       double hd = Math.sqrt(dx * dx + dz * dz) * sc;
       if (hd > 2600.0) {
@@ -711,6 +715,9 @@ final class WeatherFx {
    }
 
    static Result build(Weather.Snap sn, World world, double camX, double camZ, Fx fx) {
+      // V6.37: a deep world lifts sea level (and therefore the clouds) by settings.depth.
+      // Use the world, not the global Gen.SEA, so a headless build is deterministic.
+      final float lift = world == null || world.settings == null ? 0.0F : (float)world.settings.depth;
       Result res = new Result();
       res.ts = sn.ts;
       res.camX = camX;
@@ -718,16 +725,16 @@ final class WeatherFx {
       res.offX = sn.oax;
       res.offZ = sn.oaz;
       for (int lv = 0; lv < 2; lv++) {
-         res.cloud[lv] = cloudLevel(sn, camX, camZ, lv, res);
+         res.cloud[lv] = cloudLevel(sn, camX, camZ, lv, res, lift);
       }
 
       res.mist = acquire();
-      res.shaft = shafts(sn, world, camX, camZ, res, fx);
+      res.shaft = shafts(sn, world, camX, camZ, res, fx, lift);
       return res;
    }
 
    /** One level of blocky clouds: a column per cell with a bottom and a top, faces only where a neighbour does not cover them. */
-   static VB cloudLevel(Weather.Snap sn, double camX, double camZ, int lv, Result res) {
+   static VB cloudLevel(Weather.Snap sn, double camX, double camZ, int lv, Result res, float lift) {
       final int cell = CELLS[lv];
       final float layer = LAYERS[lv];
       final int rad = RADS[lv];
@@ -769,7 +776,7 @@ final class WeatherFx {
                continue;
             }
 
-            float base = Weather.baseAlt(storm);
+            float base = Weather.baseAlt(storm, (int)lift);
             float thick = thickness(cover, o3[3], u, v);
             int first = -1;
             int last = -1;
@@ -917,7 +924,7 @@ final class WeatherFx {
     * The rain / snow curtains: three crossing vertical planes per grid point where it rains, soft at the edges. A fine grid
     * (64 blocks) near the camera and a coarse one (192 blocks) out to 3.6 km, so a storm on the horizon has its rain too.
     */
-   static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res, Fx fx) {
+   static VB shafts(Weather.Snap sn, World world, double camX, double camZ, Result res, Fx fx, float lift) {
       VB vb = acquire();
       VB mist = res.mist == null ? acquire() : res.mist;
       res.mist = mist;
@@ -960,7 +967,7 @@ final class WeatherFx {
                }
 
                float ground = groundAt(world, (int)Math.floor(wx0), (int)Math.floor(wz0));
-               float topY = Weather.baseAlt(o3[2]) + 6.0F;
+               float topY = Weather.baseAlt(o3[2], (int)lift) + 6.0F;
                if (topY - ground < 20.0F) {
                   continue;
                }

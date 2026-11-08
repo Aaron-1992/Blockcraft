@@ -184,7 +184,9 @@ public final class LodMap {
       for (int z = 0; z < 16; z++) {
          for (int x = 0; x < 16; x++) {
             int i = z * 16 + x;
-            int y = 255;
+            // V6.37: start at the top of the array we were given (255 for a classic
+            // cached chunk, 383 for a deep live chunk), never below the real surface.
+            int y = Math.min(Chunk.H - 1, blocks.length / 256 - 1);
             boolean leaves = false;
             int logs = 0;
             int id = 0;

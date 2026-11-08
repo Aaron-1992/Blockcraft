@@ -724,7 +724,7 @@ final class Shapes {
          z += nz;
       }
 
-      if (y < 0 || y > 255 || !Blocks.replaceable[w.getBlock(x, y, z)]) {
+      if (y < 0 || y >= Chunk.H || !Blocks.replaceable[w.getBlock(x, y, z)]) {
          return false;
       }
 

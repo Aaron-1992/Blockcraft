@@ -1070,7 +1070,7 @@ public final class Renderer {
       boolean walked = !Perf.noCull && openCamera;
       boolean cullDraw = walked && CAVE_CULL;
       if (walked) {
-         int camSy = Math.max(0, Math.min(15, (int)Math.floor(this.camY) >> 4));
+         int camSy = Math.max(0, Math.min(Chunk.SECTIONS - 1, (int)Math.floor(this.camY) >> 4));
          this.walk.run(var5, var48, camSy, var49, var13, this.camX, this.camY, this.camZ, this.frustumTest);
       }
       if (cullDraw) {
@@ -1086,7 +1086,7 @@ public final class Renderer {
             int var33 = var32.cx - var48;
             int var34 = var32.cz - var49;
             if (var33 * var33 + var34 * var34 <= (var13 + 1) * (var13 + 1)) {
-               for (int var35 = 0; var35 < 16; var35++) {
+               for (int var35 = 0; var35 < Chunk.SECTIONS; var35++) {
                   this.addVisible(var32, var35);
                }
             }
@@ -1624,7 +1624,7 @@ public final class Renderer {
             Chunk lc = this.g.world.chunk(var3 + var7, var4 + var6);
             int m = 0;
             if (lc != null) {
-               m = 255;
+               m = Chunk.H - 1;
                for (int i = 0; i < 256; i++) {
                   m = Math.min(m, lc.hm[i]);
                }
@@ -1639,7 +1639,7 @@ public final class Renderer {
             Chunk var8 = this.g.world.chunk(var3 + var7, var4 + var6);
             if (var8 != null) {
                // sections that lie below the surface of the chunk and all eight round it can neither be seen nor throw a shadow on anything that is seen
-               int buried = 255;
+               int buried = Chunk.H - 1;
                for (int dz = -1; dz <= 1; dz++) {
                   for (int dx = -1; dx <= 1; dx++) {
                      buried = Math.min(buried, low[(var6 + dz + var5 + 1) * span + var7 + dx + var5 + 1]);
@@ -1647,7 +1647,7 @@ public final class Renderer {
                }
 
                buried -= 4;
-               for (int var9 = 0; var9 < 16; var9++) {
+               for (int var9 = 0; var9 < Chunk.SECTIONS; var9++) {
                   Section var10 = var8.sections[var9];
                   if (var10.nO != 0 && var10.vboO != 0 && (Perf.noShadowCull || var9 * 16 + 15 >= buried)) {
                      float rx = (float)(var8.cx * 16 + 8 - this.camX);
@@ -1924,7 +1924,8 @@ public final class Renderer {
 
    void drawClouds(float var1, float var2, float var3, float var4) {
       boolean infdev = ModLoader.isInfdevActive();
-      double baseAlt = infdev ? 108.0 : 130.0;
+      // V6.37: clouds follow the lifted sea level, so they are never below it.
+      double baseAlt = (infdev ? 108.0 : 130.0) + Gen.depth();
       double var5 = baseAlt - this.camY;
       float var7 = Math.max(250.0F, this.g.opt.renderDistance * 16.0F * 1.4F);
       double var8 = ((float)this.g.world.dayTime + var1) * 0.03;

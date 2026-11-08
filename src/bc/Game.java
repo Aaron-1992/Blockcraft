@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.36";
+   public static final String VERSION_STR = "6.37";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -6486,6 +6486,11 @@ public final class Game {
       this.activeBtnsSwap();
       boolean var2 = this.world != null && this.screen != Game.S.LOADING;
       if (var2) {
+         // V6.37: any shader/effects option change clears the auxiliary buffers
+         // before the first frame is composited (no burn-in on toggle).
+         if (this.rend != null && this.rend.sh != null) {
+            this.rend.sh.syncOptions(this.opt);
+         }
          this.rend.computeSky(this.pano != null ? this.pano.skyTime() : this.world.dayTime, this.partial);
          GL13.glActiveTexture(33984);
          Tex.animate(this.tickCount, this.partial);

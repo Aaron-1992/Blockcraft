@@ -169,7 +169,7 @@ public class BackroomsGen extends Gen {
    }
 
    private static void setBlk(Chunk c, int lx, int y, int lz, int id) {
-      if (y >= 0 && y < 256) {
+      if (y >= 0 && y < Chunk.H) {
          c.blocks[Chunk.idx(lx, y, lz)] = (short)id;
       }
    }

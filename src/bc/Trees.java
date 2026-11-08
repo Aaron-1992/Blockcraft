@@ -352,7 +352,7 @@ public final class Trees {
                   int y = c[1] + dy;
                   int z = c[2] + dz;
                   long k = World.pack(x, y, z);
-                  if (y < 0 || y > 255 || dist.containsKey(k) || !Blocks.isLeaves(this.w.getBlock(x, y, z))) {
+                  if (y < 0 || y >= Chunk.H || dist.containsKey(k) || !Blocks.isLeaves(this.w.getBlock(x, y, z))) {
                      continue;
                   }
 

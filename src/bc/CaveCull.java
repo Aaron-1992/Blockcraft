@@ -249,6 +249,9 @@ final class CaveCull {
       boolean test(float rx, float ry, float rz);
    }
 
+   /** V6.37: the number of vertical sections the walk can reach (24 in a deep world). */
+   static final int S = Chunk.SECTIONS;
+
    /** The walk of every frame. The arrays are kept between frames; they are made again when the view distance changes. */
    static final class Walk {
       private int radius = -1;
@@ -256,7 +259,7 @@ final class CaveCull {
       private Chunk[] grid;
       private byte[] seen;
       private int[] queue;
-      /** The sections the walk reached, in the order it found them: index (cell * 16 + section). */
+      /** The sections the walk reached, in the order it found them: index (cell * S + section). */
       int[] order;
       int count;
       int cells;
@@ -266,7 +269,7 @@ final class CaveCull {
 
       /** True when this section was reached by the most recent culling walk. */
       boolean reached(int cx, int cz, int sy) {
-         if (!this.hasRun || sy < 0 || sy > 15) {
+         if (!this.hasRun || sy < 0 || sy >= S) {
             return false;
          }
          int dx = cx - this.centerCx;
@@ -276,7 +279,7 @@ final class CaveCull {
             return false;
          }
          int cell = (dz + r) * this.side + dx + r;
-         return this.seen[cell * 16 + sy] != 0;
+         return this.seen[cell * S + sy] != 0;
       }
 
       private void size(int r) {
@@ -286,7 +289,7 @@ final class CaveCull {
 
          this.radius = r;
          this.side = 2 * r + 1;
-         this.cells = this.side * this.side * 16;
+         this.cells = this.side * this.side * S;
          this.grid = new Chunk[this.side * this.side];
          this.seen = new byte[this.cells];
          this.queue = new int[this.cells * 6 + 64];
@@ -295,20 +298,20 @@ final class CaveCull {
 
       /** The chunk of the section {@code idx} of the last walk (null: not loaded). */
       Chunk chunk(int idx) {
-         return this.grid[idx >> 4];
+         return this.grid[idx / S];
       }
 
       /** Chunk x of the section {@code idx} of the last walk, relative to the centre. */
       int dx(int idx) {
-         return idx / 16 % this.side - this.radius;
+         return idx / S % this.side - this.radius;
       }
 
       int dz(int idx) {
-         return idx / 16 / this.side - this.radius;
+         return idx / S / this.side - this.radius;
       }
 
       int sy(int idx) {
-         return idx & 15;
+         return idx % S;
       }
 
       /**
@@ -331,7 +334,7 @@ final class CaveCull {
          int tail = 0;
          int[] q = this.queue;
          // the walk starts in the camera's section, which is open to every side
-         int start = (r * side + r) * 16 + sy;
+         int start = (r * side + r) * S + sy;
          this.seen[start] = (byte)0x40;
          this.order[this.count++] = start;
          q[tail++] = start | 7 << 20;
@@ -341,12 +344,12 @@ final class CaveCull {
             int cell = st & 0xFFFFF;
             int entry = st >> 20 & 7;
             int dirs = st >> 23 & 63;
-            int y = cell & 15;
-            int column = cell >> 4;
+            int y = cell % S;
+            int column = cell / S;
             int dx = column % side - r;
             int dz = column / side - r;
             Chunk c = this.grid[column];
-            long conn = c == null || !c.sections[y].connKnown ? ALL : c.sections[y].conn;
+            long conn = c == null || y >= S || !c.sections[y].connKnown ? ALL : c.sections[y].conn;
             for (int f = 0; f < 6; f++) {
                if (f == entry || entry != 7 && !connected(conn, entry, f) || (dirs >> (f ^ 1) & 1) != 0) {
                   continue;
@@ -355,11 +358,11 @@ final class CaveCull {
                int ny = y + DY[f];
                int ndx = dx + DX[f];
                int ndz = dz + DZ[f];
-               if (ny < 0 || ny > 15 || ndx * ndx + ndz * ndz > limit) {
+               if (ny < 0 || ny >= S || ndx * ndx + ndz * ndz > limit) {
                   continue;
                }
 
-               int ncell = ((ndz + r) * side + ndx + r) * 16 + ny;
+               int ncell = ((ndz + r) * side + ndx + r) * S + ny;
                int bit = 1 << (f ^ 1);
                if ((this.seen[ncell] & (bit | 0x40)) != 0) {
                   continue; // been through this face already, or one of the sections the walk starts with (they are open to every side)
@@ -384,11 +387,11 @@ final class CaveCull {
             for (int dz = -1; dz <= 1; dz++) {
                for (int dx = -1; dx <= 1; dx++) {
                   int y = sy + dy;
-                  if (y < 0 || y > 15 || dx < -r || dx > r || dz < -r || dz > r) {
+                  if (y < 0 || y >= S || dx < -r || dx > r || dz < -r || dz > r) {
                      continue;
                   }
 
-                  int cell = ((dz + r) * side + dx + r) * 16 + y;
+                  int cell = ((dz + r) * side + dx + r) * S + y;
                   if (this.seen[cell] == 0) {
                      this.seen[cell] = (byte)0x40;
                      this.order[this.count++] = cell;
@@ -401,4 +404,5 @@ final class CaveCull {
          this.hasRun = true;
       }
    }
+
 }

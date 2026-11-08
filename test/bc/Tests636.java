@@ -35,8 +35,8 @@ final class Tests636 {
       }
       check(m.contains("static Box shell(Game g, String title, String sub)"),
          "all screens use one plain centred panel");
-      check(m.contains("ui.backdrop(0.62F)") && m.contains("gui.gradient(px, py, pw, ph"),
-         "the panel is drawn over the dimmed world");
+      check(m.contains("ui.backdrop(0.30F)") && m.contains("gui.gradient(0.0F, 0.0F, W, 58.0F"),
+         "V6.37: the Minecraft-style scrim keeps the panorama visible, with no framed panel");
       String game = src("src/bc/Game.java");
       for (String s : new String[]{"title", "worlds", "multiplayer", "newWorld", "minigames",
          "singleplayer", "mpHub", "mpCreate", "loading", "waiting", "pause", "more",
@@ -96,8 +96,8 @@ final class Tests636 {
    }
 
    static void wiring() throws Exception {
-      eq("6.36", Game.VERSION_STR, "the game version is 6.36");
-      eq("6.36", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.36");
+      eq("6.37", Game.VERSION_STR, "the game version is 6.37");
+      eq("6.37", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
       check(src("README.md").contains("V6.36"), "README describes V6.36");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.36"), "the packaged readme describes V6.36");
       check(new File("docs/releases/v6.36.md").isFile(), "V6.36 release notes exist");

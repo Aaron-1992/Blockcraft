@@ -235,7 +235,7 @@ final class Fire {
                   int nx = x + dx;
                   int ny = y + dy;
                   int nz = z + dz;
-                  if (ny >= 0 && ny <= 255 && w.isLoaded(nx, nz)) {
+                  if (ny >= 0 && ny < Chunk.H && w.isLoaded(nx, nz)) {
                      int enc = this.neighborEncouragement(nx, ny, nz);
                      if (enc > 0) {
                         int odds = (enc + 40 + 14) / (age + 30); // 14 = "normal" difficulty in Minecraft

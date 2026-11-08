@@ -291,7 +291,7 @@ final class TestsPerf {
          for (int dz = -4; dz <= 4; dz++) {
             for (int dx = -4; dx <= 4; dx++) {
                if (dx * dx + dz * dz <= 16) {
-                  expected += 16;
+                  expected += CaveCull.S;
                }
             }
          }
@@ -299,7 +299,7 @@ final class TestsPerf {
          eq(expected, open, "everything inside the ring of 4 chunks is reached when it is all open");
          check(walk.reached(2, 0, 8) && !walk.reached(6, 0, 8), "the cached visibility query matches the walk bounds");
          // a wall of rock one chunk east of the camera: a whole chunk column of closed sections
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < CaveCull.S; sy++) {
             setConn(w.chunk(1, 0), sy, 0L);
          }
 
@@ -328,14 +328,14 @@ final class TestsPerf {
          for (int dz = -1; dz <= 1; dz++) {
             for (int dx = -1; dx <= 1; dx++) {
                if (dx != 0 || dz != 0) {
-                  for (int sy = 0; sy < 16; sy++) {
+                  for (int sy = 0; sy < CaveCull.S; sy++) {
                      setConn(w.chunk(dx, dz), sy, 0L);
                   }
                }
             }
          }
 
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < CaveCull.S; sy++) {
             setConn(w.chunk(1, 0), sy, 0L);
          }
 
@@ -352,13 +352,13 @@ final class TestsPerf {
          // a world of rock with the camera's chunk open and a tunnel along x at the camera's height through the three chunks east of it
          for (int cz = -4; cz <= 4; cz++) {
             for (int cx = -4; cx <= 4; cx++) {
-               for (int sy = 0; sy < 16; sy++) {
+               for (int sy = 0; sy < CaveCull.S; sy++) {
                   setConn(w.chunk(cx, cz), sy, 0L);
                }
             }
          }
 
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < CaveCull.S; sy++) {
             setConn(w.chunk(0, 0), sy, CaveCull.ALL);
          }
 
@@ -400,7 +400,7 @@ final class TestsPerf {
          check(!wrong, "nothing is reached but the tunnel and the camera's 27 sections");
          // a bend: west -> north is connected, west -> east is not: from the west the walk turns north and does not go on east
          setConn(w.chunk(2, 0), 8, CaveCull.bit(5, 2) | CaveCull.bit(2, 5));
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < CaveCull.S; sy++) {
             setConn(w.chunk(2, -1), sy, sy == 8 ? CaveCull.ALL : 0L);
          }
 
@@ -464,7 +464,7 @@ final class TestsPerf {
          for (Chunk c : cs) {
             c.recomputeSectionOccupancy();
             CaveCull.computeChunk(c);
-            for (int sy = 0; sy < 16; sy++) {
+            for (int sy = 0; sy < CaveCull.S; sy++) {
                Mesher.Result r = Mesher.build(w, c, sy, true);
                if (r.conn != c.sections[sy].conn) {
                   connectivityMismatches++;
@@ -523,13 +523,13 @@ final class TestsPerf {
                      continue;
                   }
 
-                  for (int y = 0; y < 16; y++) {
+                  for (int y = 0; y < CaveCull.S; y++) {
                      Mesher.Result r = Mesher.build(w, c, y, true);
                      boolean faces = r.nO + r.nT > 0;
                      Renderer.free(r);
                      if (faces) {
                         withFaces++;
-                        if (reached[(((dz + 5) * 11) + dx + 5) * 16 + y]) {
+                        if (reached[(((dz + 5) * 11) + dx + 5) * CaveCull.S + y]) {
                            reachedWithFaces++;
                         }
                      }
@@ -563,7 +563,7 @@ final class TestsPerf {
                   int vx = voxel[0];
                   int vy = voxel[1];
                   int vz = voxel[2];
-                  if (vy < 0 || vy > 255) {
+                  if (vy < 0 || vy >= Chunk.H) {
                      break;
                   }
 
@@ -575,7 +575,7 @@ final class TestsPerf {
                   int ddx = (vx >> 4) - cx;
                   int ddz = (vz >> 4) - cz;
                   if (ddx * ddx + ddz * ddz <= 25) {
-                     int cell = (((ddz + 5) * 11) + ddx + 5) * 16 + (vy >> 4);
+                     int cell = (((ddz + 5) * 11) + ddx + 5) * CaveCull.S + (vy >> 4);
                      if (Math.abs(ddx) <= 5 && Math.abs(ddz) <= 5 && !reached[cell]) {
                         misses++;
                         if (misses <= 5) {

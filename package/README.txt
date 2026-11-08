@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.36  -  an original Minecraft-style voxel sandbox   (EDITION V6.36)
+BLOCKCRAFT V6.37  -  an original Minecraft-style voxel sandbox   (EDITION V6.37)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,45 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.37 - MINECRAFT-STYLE MENUS AND A RENDERING REPAIR
+
+  * MENUS ARE LIKE MINECRAFT, BUT BETTER. No framed panel, no nav
+    rail, no numbered cards, no cyan kickers. The panorama / world
+    stays visible behind a light scrim with dark bands top and
+    bottom, a plain title and a centred column of buttons. Action
+    rows are wide enough that no label is clipped. The footer is
+    quiet: "Blockcraft V6.37" and "Original game - not Mojang".
+
+  * THE LIVE WORLD-MAP PREVIEW ON CREATE NEW WORLD IS KEPT, with the
+    biome count, the seed and the real world depth. Every setting
+    still prints its actual value (Render Distance: 8 chunks,
+    70 degrees, Depth: 384 blocks, VSync: ON).
+
+  * SHADERS AND EFFECTS IN NORMAL SETTINGS:
+      Shaders: OFF / ON / FANCY     (FANCY = shaders on + waterQ 2)
+      Effects: LOW / MEDIUM / HIGH
+    Debug Advanced still has all 61 video / LOD / performance
+    controls.
+
+  * NO BURN-IN. Turning shaders on or changing effects quality now
+    clears the scene, bloom, AO, ray, cloud, copy and shadow buffers
+    and rebuilds the shadow maps before the first frame is drawn.
+    You no longer have to look at the ground and toggle twice.
+
+  * CLOUDS / WEATHER / SKY ARE NO LONGER OFFSET in deep worlds.
+    The blocky clouds, CPU cloud mesh, rain curtains, raymarched
+    cloud shader, cloud slab, cloud-shadow plane, lightning tops,
+    sun visibility and sky gloom all follow the lifted sea level
+    (63 -> 191 in a 384-block-deep world).
+
+  * NORMAL CHUNKS RENDER ABOVE THE ORIGINAL HEIGHT. Cave culling,
+    the renderer's visibility/shadow loops, LOD summaries, the big
+    map and eight gameplay systems now use Chunk.H / Chunk.SECTIONS
+    instead of a hardcoded 16 sections / y=255.
+
+  * Old saves are untouched. This is NOT Minecraft: no Mojang code
+    or assets.
 
 WHAT'S NEW IN V6.36 - PLAIN MENUS AND NUMBERS IN SETTINGS
 

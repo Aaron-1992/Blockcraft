@@ -341,6 +341,12 @@ public final class Weather {
       return BASE_FAIR + (BASE_STORM - BASE_FAIR) * storm;
    }
 
+   /** V6.37: absolute cloud base in a world whose sea level is lifted by {@code lift} blocks.
+    * The classic signature above stays for the headless weather tests and legacy saves. */
+   public static float baseAlt(float storm, int lift) {
+      return baseAlt(storm) + lift;
+   }
+
    // ------------------------------------------------------------------ cells, forcing
    /** A storm cell that was summoned (/weather storm): drifts with layer A, grows, rains itself out. */
    public static final class Cell {
@@ -720,7 +726,7 @@ public final class Weather {
          return Math.max(Gen.SEA - 1, this.world.gen.column(x, z).h);
       }
 
-      return 64;
+      return Gen.SEA + 1;
    }
 
    /** Makes a bolt strike at (x, z). Close strikes in loaded terrain also hurt and ignite things. */
@@ -731,7 +737,7 @@ public final class Weather {
       b.z = z;
       int gy = this.surfaceY((int)Math.floor(x), (int)Math.floor(z));
       b.ground = gy + 1;
-      b.top = baseAlt(s.storm(x, z)) + 16.0;
+      b.top = baseAlt(s.storm(x, z), this.world == null ? 0 : this.world.settings.depth) + 16.0;
       b.life = 22;
       b.seg = boltGeometry(this.rnd.nextLong(), x, b.top, z, b.ground);
       Game g = this.world == null ? null : this.world.game;

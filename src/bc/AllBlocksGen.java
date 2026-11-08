@@ -190,7 +190,7 @@ public final class AllBlocksGen extends Gen {
    }
 
    private static void setIfInChunk(Chunk c, int cx, int cz, int wx, int wy, int wz, int id) {
-      if (wy >= 0 && wy < 256 && wx >> 4 == cx && wz >> 4 == cz) {
+      if (wy >= 0 && wy < Chunk.H && wx >> 4 == cx && wz >> 4 == cz) {
          c.set(wx & 15, wy, wz & 15, id);
       }
    }

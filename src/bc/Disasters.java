@@ -981,7 +981,7 @@ public final class Disasters {
          int by = (int)Math.floor(m.y);
          int bz = (int)Math.floor(m.z);
          loaded = this.w.isLoaded(bx, bz);
-         hit = loaded && by >= 1 && by < 256 && Blocks.solid[this.w.getBlock(bx, by, bz)];
+         hit = loaded && by >= 1 && by < Chunk.H && Blocks.solid[this.w.getBlock(bx, by, bz)];
       }
 
       if (g != null && m.age % 2 == 0 && g.particles.size() < MAX_PARTICLES && g.player != null && Math.hypot(m.x - g.player.x, m.z - g.player.z) < 150.0) {

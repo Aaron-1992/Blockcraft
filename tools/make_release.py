@@ -545,6 +545,32 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.37":
+        release_notes += (
+            "\n### Minecraft-style menus, lifted skies, sections above y=255, no burn-in\n\n"
+            "Both the V6.35 Atlas UI and the V6.36 plain-panel UI were rejected. Menus now use the "
+            "classic Minecraft shell: the panorama / paused world stays visible behind a light scrim "
+            "with dark top and bottom bands, a plain title, and a centred 200-unit button column - "
+            "no nav rail, no numbered cards, no framed panel, no clipped labels. The **live world-map "
+            "preview on Create New World is kept**, every setting still prints its real value, and the "
+            "ordinary Video tab now has `Shaders: OFF / ON / FANCY` and `Effects: LOW / MEDIUM / HIGH`. "
+            "Debug Advanced still exposes all 61 controls.\n\n"
+            "**No burn-in:** `Shaders.syncOptions()` watches every graphics option and `invalidate()` "
+            "clears the scene, six bloom, AO, ray, cloud, copy, cloud-shadow and both depth-only shadow "
+            "targets (and drops stale shadow maps) before the first shader frame after a toggle. Freshly "
+            "allocated FBO textures are cleared too. No looking at the ground first.\n\n"
+            "**Clouds and weather follow the lifted sea level:** blocky clouds, CPU cloud mesh, rain "
+            "curtains, the raymarched cloud shader (new `cloudLift` uniform), the cloud slab, the "
+            "cloud-shadow plane, lightning tops, sun visibility and sky gloom all shift with the world's "
+            "depth. `CaveCull.Walk` and the renderer's visibility/shadow loops now index all "
+            "`Chunk.SECTIONS` (24), and `LodMap` / `MapView` / eight gameplay systems use `Chunk.H`, so "
+            "chunks above the old y=256 ceiling render again. Saved `World.pack` is unchanged: old "
+            "saves still load byte-for-byte.\n\n"
+            "Headless software board: `docs/screenshots/v6.37-menus.png` (NOT a GPU screenshot). "
+            "Unit suite with six new V6.37 regression groups, strict equivalence (396 identical / "
+            "65 changed on purpose / 156 new), all 21 GLSL programs and the distributed V6.10 "
+            "sound-world reload checks. No real-GPU/Windows playtest is claimed. No Mojang code or assets.\n"
+        )
     if version == "6.36":
         release_notes += (
             "\n### Plain menus, and settings that show their numbers\n\n"

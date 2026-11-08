@@ -2851,7 +2851,7 @@ public final class SkyGen extends Gen {
    }
 
    private static void setW(Chunk ch, int wx, int wy, int wz, int id) {
-      if (wy < 0 || wy > 255) {
+      if (wy < 0 || wy >= Chunk.H) {
          return;
       }
       if ((wx >> 4) == ch.cx && (wz >> 4) == ch.cz) {

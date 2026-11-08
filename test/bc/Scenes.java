@@ -30,7 +30,23 @@ final class Scenes {
       g.splash = "Also try voxels!";
       g.ui.randomSeed = 7311L;
       switch (name) {
-         // ---- V6.35 Atlas UI: the screens the game actually draws now
+         // ---- V6.37: Minecraft-style shell (the screens the game actually draws now)
+         case "mc-title": g.screen = Game.S.TITLE; Menus635.title(g); return;
+         case "mc-sp": g.screen = Game.S.SP_HUB; Menus635.singleplayer(g); return;
+         case "mc-video": g.screen = Game.S.OPTIONS; g.ui.optTab = 0; Menus635.options(g); return;
+         case "mc-world": g.screen = Game.S.OPTIONS; g.newSettings = new WorldSettings(); g.ui.optTab = 1; Menus635.options(g); return;
+         case "mc-advanced": g.screen = Game.S.OPTIONS; g.opt.debugVideo = true; g.ui.optTab = Menus635.ADV_TAB; Menus635.options(g); return;
+         case "mc-newworld": g.screen = Game.S.NEWWORLD; g.newSettings = new WorldSettings(); Menus635.newWorld(g); return;
+         case "mc-worlds":
+            g.screen = Game.S.WORLDS;
+            g.worldList = new ArrayList<>();
+            g.worldList.add(world("a", "My Survival World", 0, 12345L, 1, 3600_000L * 3));
+            g.worldList.add(world("b", "Creative Castle", 1, -987654321L, 1, 3600_000L * 30));
+            g.worldName = "b";
+            Menus635.worlds(g); return;
+         case "mc-pause": g.screen = Game.S.PAUSE; g.worldDisplayName = "My Survival World"; Menus635.pause(g); return;
+         case "mc-minigames": g.screen = Game.S.MINIGAMES; g.newSettings = new WorldSettings(); g.newSettings.type = WorldSettings.BATTLE; Menus635.minigames(g); return;
+         // ---- V6.35 Atlas UI: the screens the game actually drew then
          case "plain-video": g.screen = Game.S.OPTIONS; g.ui.optTab = 0; Menus635.options(g); return;
          case "plain-world": g.screen = Game.S.OPTIONS; g.newSettings = new WorldSettings(); g.ui.optTab = 1; Menus635.options(g); return;
          case "plain-gameplay": g.screen = Game.S.OPTIONS; g.ui.optTab = 4; Menus635.options(g); return;

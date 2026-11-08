@@ -1358,7 +1358,7 @@ final class Redstone319 {
          return true;
       }
       if (y <= 0
-         || y >= 255
+         || y >= Chunk.H - 1
          || Kinetics.machine(id)
          || RasterComputer.handles(id)
          || id == Blocks.BEDROCK

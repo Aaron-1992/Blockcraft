@@ -1198,7 +1198,7 @@ final class Mobs312 {
             int bx = (int)Math.floor(f.x);
             int by = (int)Math.floor(f.y);
             int bz = (int)Math.floor(f.z);
-            if (!w.isLoaded(bx, bz) || by < 0 || by > 255) {
+            if (!w.isLoaded(bx, bz) || by < 0 || by >= Chunk.H) {
                gone = true;
                break;
             }

@@ -24,7 +24,9 @@ final class TestsUi {
       "atlas-title", "atlas-sp", "atlas-mp", "atlas-mpcreate", "atlas-newworld", "atlas-worlds",
       "atlas-minigames", "atlas-options", "atlas-advanced", "atlas-pause", "atlas-more",
       "atlas-packs", "atlas-mods", "atlas-credits", "atlas-loading", "atlas-waiting", "atlas-multiplayer",
-      "plain-video", "plain-world", "plain-gameplay", "plain-advanced"
+      "plain-video", "plain-world", "plain-gameplay", "plain-advanced",
+      "mc-title", "mc-sp", "mc-video", "mc-world", "mc-advanced", "mc-newworld",
+      "mc-worlds", "mc-pause", "mc-minigames"
    };
    static File tmp;
 

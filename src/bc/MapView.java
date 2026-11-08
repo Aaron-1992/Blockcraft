@@ -126,7 +126,7 @@ final class MapView {
          int idx = iz * 16 + ix;
          h = c.hm[idx];
          biome = c.biome[idx] & 255;
-         if (h >= 0 && h < 256) top = c.get(ix, h, iz);
+         if (h >= 0 && h < Chunk.H) top = c.get(ix, h, iz);
          int hE = c.hm[iz * 16 + Math.min(15, ix + 1)];
          int hS = c.hm[Math.min(15, iz + 1) * 16 + ix];
          relief = (hE - hS) * 0.02F;
