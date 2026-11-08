@@ -1,4 +1,4 @@
-# Repository / game-folder layout (V6.31 cleanup)
+# Repository / game-folder layout (V6.34)
 
 The repo had accumulated **1.3 GB** of old update-pack ZIPs and three loose
 copies of full Windows downloads. V6.31 removes the 25 obsolete patch packs
@@ -9,7 +9,7 @@ everything now lives, so the checkout is ~156 MB instead of ~1.3 GB.
 
 | Path | What it is |
 | --- | --- |
-| `src/bc/` | All game Java sources. `Trailer.java` (montage), `Caves6.java` / `CaveStructures6.java` (V6.32 Minecraft-density caves & structures), `Caves5.java` / `CaveStructures5.java` (V6.31, kept for those saves), `Lod.java` (cross-fades). |
+| `src/bc/` | All game Java sources. `Trailer.java` (montage), `Caves7.java` / `CaveStructures7.java` (V6.34 3D cave volume and integrated structures), `Caves6.java` / `CaveStructures6.java` (V6.32), `Caves5.java` / `CaveStructures5.java` (V6.31) — all kept so old saves keep their own carver, `Lod.java` (cross-fades). |
 | `test/bc/` | Headless regression suites, one `Tests6xx.java` per milestone. |
 | `tools/` | `build.py`, `runtests.py`, `glsl_check.py`, `make_release.py`, `verify_release.py`, `tilesheet.py`. |
 | `res/` | Resources copied into `blockcraft.jar`. `res/sounds/soundbank.bin` is the big music bank; `res/sounds/foley/` holds the ten real CC0 WAV recordings + `CREDITS.txt`. |

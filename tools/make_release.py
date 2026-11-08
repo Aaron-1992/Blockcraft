@@ -545,6 +545,36 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.34":
+        release_notes += (
+            "\n### Caves completely redone - no more drilled holes\n\n"
+            "V6.32 kept the ground solid and then bored an aperture shaft straight down until "
+            "it hit a cave. `caveVer = 7` (new worlds only) removes every entrance system: "
+            "**one continuous 3D cave volume** - sheared spaghetti/noodle worm tunnels, "
+            "clustered cheese caverns, rare giant halls, local aquifers and lava - is carved "
+            "in absolute world Y from bedrock to the grass. A mouth is simply where that "
+            "volume intersects the terrain, so the walls are sloping and ragged and every "
+            "opening is different. No aperture, no funnel, no shaft, no hashed bowl or ramp. "
+            "Headless 96x96 land sample: **9.0% carved overall, 4.4% in the top 20 blocks, "
+            "121 open columns (1.3%), one single-block vertical shaft, 84 openings continuing "
+            "into the network** (V6.31 was 16.1% / 19.3% / 930). Ravine cracks are dialled "
+            "almost completely out. Everything is original - no Mojang code or assets.\n\n"
+            "### All structures now work with the cave system\n\n"
+            "`CaveStructures7.air()` is called from the carver for every block, so mineshafts, "
+            "dungeons, strongholds, amethyst geodes, ancient cities and ruined portals are part "
+            "of the SAME air field: caverns cut straight through them instead of being attached "
+            "by a short link tunnel. Floors, walls, supports and loot are stamped only where the "
+            "rock outside is solid, so a cave that passes through a wall stays open. The legacy "
+            "sealed dungeon / mineshaft / stronghold generators are disabled for new worlds and "
+            "village sites now reject ground containing a cave mouth. Old saves keep their own "
+            "cave version.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite with six new V6.34 regression groups, strict equivalence, all "
+            "21 GLSL programs, `tools/verify_release.py` (now hashing `bc/Caves7.class` and "
+            "`bc/CaveStructures7.class`), and the before/after generator cross-sections in "
+            "`docs/screenshots/v6.34-caves.png` (a software render, NOT a GPU screenshot). No "
+            "real-GPU/Windows playtest is claimed.\n"
+        )
     if version == "6.33":
         release_notes += (
             "\n### All menus redone\n\n"

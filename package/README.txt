@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.33  -  an original Minecraft-style voxel sandbox   (EDITION V6.33)
+BLOCKCRAFT V6.34  -  an original Minecraft-style voxel sandbox   (EDITION V6.34)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,38 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.34 - CAVES AND STRUCTURES COMPLETELY REDONE
+
+  * NO MORE HOLES DRILLED FROM THE TOP. The old carver kept a solid
+    crust and then bored an aperture shaft down until it hit a cave.
+    caveVer 7 (NEW WORLDS ONLY) is ONE continuous 3D cave volume:
+      - winding spaghetti / noodle worm tunnels sheared in Y so
+        they lean as they rise
+      - big clustered cheese caverns, rare giant deep halls
+      - local aquifers and lava lakes at the bottom
+      - carved in absolute world Y from bedrock up to the grass
+    An entrance is simply where that volume intersects the terrain.
+    No aperture, no funnel, no shaft, no hashed bowl or ramp: the
+    mouth walls are the cave's own angled, ragged noise walls.
+    Headless 96x96 land sample: 9.0% carved overall, 4.4% in the
+    top 20 blocks, 121 open columns, 1 single-block vertical shaft,
+    84 openings continuing into the cave network. See the before /
+    after cross-sections in docs/screenshots/v6.34-caves.png (a
+    headless software render, NOT a GPU screenshot).
+  * ALL STRUCTURES WORK WITH THE CAVE SYSTEM. Mineshafts, dungeons,
+    strongholds, amethyst geodes, ancient cities and ruined portals
+    are carved by the SAME air function as the caves, so caverns cut
+    straight through corridors and rooms. Floors / walls / supports /
+    loot are stamped only where the rock outside is solid, so a cave
+    that passes through a wall stays open. The old sealed legacy
+    dungeon, mineshaft and stronghold generators are switched off for
+    new worlds; villages no longer spawn straddling a cave mouth.
+  * Ravine cracks are dialled almost all the way out so surface
+    openings come from real caves, not top-down cuts.
+  * V6.33 menus, V6.31 LOD cross-fades and the montage trailer,
+    borderless fullscreen and V6.29 real CC0 sounds are unchanged.
+  * Old saves keep their cave version. No Mojang code or assets.
 
 WHAT'S NEW IN V6.33 - ALL MENUS REDONE
 

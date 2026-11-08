@@ -49,6 +49,8 @@ final class CaveWorks {
    /** V6.32: Minecraft-density carver and Minecraft-style structures for caveVer >= 6. */
    final Caves6 deep6;
    final CaveStructures6 structures6;
+   /** V6.34: Minecraft-style 3D cave volume; structures are part of its air. */
+   final Caves7 deep7;
    private final ConcurrentHashMap<Long, Plan> plans = new ConcurrentHashMap<>();
 
    CaveWorks(long seed, WorldSettings st, Gen gen, Noise a, Noise b, Noise c, Noise e) {
@@ -64,6 +66,7 @@ final class CaveWorks {
       this.structures5 = new CaveStructures5(seed, gen, this.deep);
       this.deep6 = new Caves6(seed, st, gen);
       this.structures6 = new CaveStructures6(seed, gen, this.deep6);
+      this.deep7 = new Caves7(seed, st, gen);
    }
 
    // ------------------------------------------------------------------ instance shortcuts
@@ -86,6 +89,11 @@ final class CaveWorks {
       return this.deep6.carve(x, y, z, surfaceH, allowSurface);
    }
 
+   /** V6.34: one continuous 3D cave volume from bedrock to the grass. */
+   int carve7(int x, int y, int z, int surfaceH, boolean allowSurface) {
+      return this.deep7.carve(x, y, z, surfaceH, allowSurface);
+   }
+
    boolean mouth(int x, int z) {
       return mouth(this.e, this.seed, x, z);
    }
@@ -97,6 +105,9 @@ final class CaveWorks {
 
    /** True when the surface here is the opening of a real cave entrance. */
    boolean mouthSurface(int x, int z, int surfaceH) {
+      if (this.st.caveVer >= 7) {
+         return this.deep7.surfaceOpen(x, z, surfaceH);
+      }
       if (this.st.caveVer >= 6) {
          return this.deep6.surfaceOpen(x, z, surfaceH);
       }
@@ -291,7 +302,10 @@ final class CaveWorks {
          strata(ch);
       }
 
-      if (st.caveVer >= 6) {
+      if (st.caveVer >= 7) {
+         // V6.34: decorations AND structure blocks come from the one carver.
+         this.deep7.finish(ch);
+      } else if (st.caveVer >= 6) {
          this.deep6.finish(ch);      // sparse V6.32 cave decorations
       } else if (st.caveVer >= 5) {
          this.deep.finish(ch);       // strata-like decorations for the V6.31 caves
@@ -302,9 +316,10 @@ final class CaveWorks {
       }
 
       if (st.caveStructures) {
-         if (st.caveVer >= 6) this.structures6.apply(ch);   // V6.32 Minecraft-style structures
-         else if (st.caveVer >= 5) this.structures5.apply(ch);   // the V6.31 structure set
-         else structures(ch);
+         // V6.34 structures are already generated inside Caves7.finish().
+         if (st.caveVer == 6) this.structures6.apply(ch);   // V6.32 Minecraft-style structures
+         else if (st.caveVer == 5) this.structures5.apply(ch);   // the V6.31 structure set
+         else if (st.caveVer < 5) structures(ch);
       }
 
       ch.computeHeightmap();

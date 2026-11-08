@@ -578,7 +578,7 @@ final class Screens {
       ws.caveLayers = g.opt.caveLayers;
       ws.caveLakes = g.opt.caveLakes;
       ws.caveRichness = g.opt.caveRichness;
-      ws.caveVer = g.opt.caveCliffs ? 6 : 1;
+      ws.caveVer = g.opt.caveCliffs ? 7 : 1;
       ws.biomeBorders = g.opt.biomeBorders;
       ws.treeDensity = g.opt.treeDensity;
       ws.treeScale = g.opt.treeScale;
@@ -682,7 +682,7 @@ final class Screens {
       // you nothing about the 28..32 biomes that were missing from the preview colour table.
       String content = ui.preview.distinctBiomes() + " of " + Biomes.N + " biomes in view  -  "
          + (ws.aquatic ? "new oceans, reefs & kelp" : "classic oceans")
-         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  Minecraft-density caves, natural entrances, aquifers & structures" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
+         + (ws.terrainVer >= 3 ? (ws.caveVer >= 3 ? "  -  3D cave volumes, natural mouths, aquifers & integrated structures" : (ws.caveVer >= 2 ? "  -  Caves & Cliffs, aquifers & geodes" : "  -  layered caves & underground structures"))
             : (ws.terrainVer >= 2 ? "  -  bigger caves & mountains" : ""))
          + (ws.biomeBorders > 0 ? "  -  smooth biome borders" : "")
          + (ws.giantTrees ? "  -  giant trees" : "")
@@ -1538,7 +1538,7 @@ final class Screens {
             "The V6.21+ terrain with smooth biome borders and layered generation. Used for NEW worlds only.",
             () -> o.newTerrain = !o.newTerrain);
          ui.toggle("Caves & Cliffs", o.caveCliffs, x1, oy, colW, 20.0F,
-            "Minecraft-density caves with natural surface entrances and the new structures (caveVer 6). OFF keeps the V6.21 caves.",
+            "Minecraft-style 3D cave volumes that open where they meet the ground, with mineshafts, dungeons and geodes inside the same cave system (caveVer 7). OFF keeps the V6.21 caves.",
             () -> o.caveCliffs = !o.caveCliffs);
       }
       oy += row;

@@ -287,7 +287,7 @@ final class Trailer {
       ws.type = WorldSettings.DEFAULT;
       ws.aquatic = true;
       ws.terrainVer = 3;
-      ws.caveVer = 6;
+      ws.caveVer = 7;
       ws.biomeBorders = 1;
       World w = new World(SEED, null, Dim.OVERWORLD, ws);
       w.saveEnabled = false;

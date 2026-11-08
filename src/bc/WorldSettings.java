@@ -380,7 +380,7 @@ public final class WorldSettings {
       s.caveLayers = Boolean.parseBoolean(p.getProperty("cavelayers", "true"));
       s.caveLakes = Boolean.parseBoolean(p.getProperty("cavelakes", "true"));
       try {
-         s.caveVer = Math.max(1, Math.min(6, Integer.parseInt(p.getProperty("cavever", "1").trim())));
+         s.caveVer = Math.max(1, Math.min(7, Integer.parseInt(p.getProperty("cavever", "1").trim())));
          s.biomeBorders = Math.max(0, Math.min(2, Integer.parseInt(p.getProperty("biomeborders", "0").trim())));
          s.treeDensity = f(p, "treedensity", 1.0F, 0.4F, 1.4F);
          s.treeScale = f(p, "treescale", 1.0F, 0.7F, 1.5F);

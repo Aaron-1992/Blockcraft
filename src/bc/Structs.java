@@ -57,12 +57,33 @@ public final class Structs {
       return var0 == 0 || var0 == 29 || Blocks.isLeaves(var0) || Blocks.isFluid(var0) || Blocks.coll[var0] == null;
    }
 
+   /**
+    * V6.34: surface structures must respect the cave system. A village (or any
+    * other building site) is not allowed to straddle a cave mouth, otherwise
+    * its foundation hangs in mid-air. Old worlds keep their original layout.
+    */
+   static boolean caveMouthNear(Gen gen, int x, int z) {
+      if (!(gen instanceof TerraGen) || gen.settings.caveVer < 7) return false;
+      TerraGen t = (TerraGen)gen;
+      for (int[] o : new int[][]{{0, 0}, {12, 0}, {-12, 0}, {0, 12}, {0, -12}, {24, 24}, {-24, -24}}) {
+         int wx = x + o[0], wz = z + o[1];
+         Gen.Col c = gen.column(wx, wz);
+         if (t.caves.mouthSurface(wx, wz, c.h)) return true;
+      }
+      return false;
+   }
+
    public void apply(Chunk var1) {
       try {
          this.villages(var1);
          Landmarks319.apply(this, var1);
-         this.dungeons(var1);
-         this.mineshafts(var1);
+         // V6.34: the legacy isolated dungeon/mineshaft generators build
+         // sealed boxes that ignore the caves. New worlds use the six
+         // structure types that CaveStructures7 carves into the same air field.
+         if (this.gen.settings.caveVer < 7) {
+            this.dungeons(var1);
+            this.mineshafts(var1);
+         }
       } catch (RuntimeException var3) {
          var3.printStackTrace();
       }
@@ -101,7 +122,8 @@ public final class Structs {
          var6 = var1 * var5 + 70 + var4.nextInt(var5 - 140);
          var7 = var2 * var5 + 70 + var4.nextInt(var5 - 140);
          Col var11 = this.gen.column(var6, var7);
-         if (Biomes.village(var11.biome) && var11.h >= 65 && var11.h <= 90) {
+         if (Biomes.village(var11.biome) && var11.h >= 65 && var11.h <= 90
+            && !caveMouthNear(this.gen, var6, var7)) {
             boolean var12 = true;
 
             for (int[] var16 : new int[][]{{12, 0}, {-12, 0}, {0, 12}, {0, -12}}) {

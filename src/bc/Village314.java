@@ -75,7 +75,8 @@ final class Village314 {
          int x = rx * 320 + 70 + r.nextInt(180);
          int z = rz * 320 + 70 + r.nextInt(180);
          Col c = gen.column(x, z);
-         if (Biomes.village(c.biome) && c.h >= 65 && c.h <= 92 && flatAround(gen, x, z, c.h)) {
+         if (Biomes.village(c.biome) && c.h >= 65 && c.h <= 92 && flatAround(gen, x, z, c.h)
+            && !Structs.caveMouthNear(gen, x, z)) {
             cx = x;
             cz = z;
             cc = c;
