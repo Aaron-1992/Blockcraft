@@ -79,10 +79,14 @@ final class Tests635 {
       Chunk.readBlocks(new DataInputStream(new ByteArrayInputStream(legacy)), fromOld);
       eq(7, fromOld[99] & 0xFFFF, "a pre-3.12 file still reads");
 
-      long k = World.pack(-1234, 383, 5678);
-      eq(-1234, World.ux(k), "x survives the 9-bit-y coordinate packing");
-      eq(383, World.uy(k), "y=383 fits in the light queue packing");
-      eq(5678, World.uz(k), "z survives the 9-bit-y coordinate packing");
+      long k = World.packH(-1234, 383, 5678);
+      eq(-1234, World.uxH(k), "x survives the 9-bit-y queue packing");
+      eq(383, World.uyH(k), "y=383 fits in the light queue packing");
+      eq(5678, World.uzH(k), "z survives the 9-bit-y queue packing");
+      long savedKey = World.pack(-1234, 200, 5678);
+      eq(-1234, World.ux(savedKey), "the persisted key format is unchanged (x)");
+      eq(200, World.uy(savedKey), "the persisted key format is unchanged (y)");
+      eq(5678, World.uz(savedKey), "the persisted key format is unchanged (z)");
       eq(63, Gen.BASE_SEA, "classic sea level is unchanged");
       WorldSettings deep = settings(128, 8);
       Gen.applySea(deep);

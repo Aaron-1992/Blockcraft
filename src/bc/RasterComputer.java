@@ -76,7 +76,7 @@ final class RasterComputer {
          s.dirty=true;if(handles(old)){s.pixels.remove(k);s.statuses.remove(k);s.cpus.remove(k);s.roms.remove(k);s.rams.remove(k);s.keys.remove(k);s.media.slots.remove(k);}
       }
    }
-   static void loaded(World w,Chunk c){w.raster.dirty=true;for(int i=0;i<c.blocks.length;i++)if(handles(c.blocks[i]&4095)){w.raster.nodes.add(World.pack(c.cx*16+(i&15),i>>8,c.cz*16+((i>>4)&15)));w.raster.dirty=true;}}
+   static void loaded(World w,Chunk c){w.raster.dirty=true;for(int i=0;i<c.blocks.length;i++){int y=i>>8;if(y>255)continue;if(handles(c.blocks[i]&4095)){w.raster.nodes.add(World.pack(c.cx*16+(i&15),y,c.cz*16+((i>>4)&15)));w.raster.dirty=true;}}}
    static void dirty(World w,long key){Chunk c=w.chunkAt(World.ux(key),World.uz(key));if(c!=null)c.sections[World.uy(key)>>4].dirty=true;}
    static void rebuild(World w){
       State s=w.raster;s.nets.clear();Set<Long> unseen=new HashSet<>(s.nodes);

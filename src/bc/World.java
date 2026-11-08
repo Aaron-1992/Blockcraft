@@ -716,22 +716,47 @@ public final class World {
       }
    }
 
-   /** V6.35: y needs 9 bits (0..383); x/z keep 25 bits each and bits 60..63 stay free for the removal-light tag. */
-   static final int COORD_OFF = 16777216;
+   /**
+    * The classic coordinate key. This format is PERSISTED in raster.dat,
+    * circuit.dat and other save files, so it must never change: old worlds
+    * (including the distributed V6.10 sound machines) load their saved keys.
+    */
    static long pack(int var0, int var1, int var2) {
-      return (long)(var0 + COORD_OFF) << 34 | (long)(var2 + COORD_OFF) << 9 | (var1 & 511L);
+      return (long)(var0 + 33554432) << 34 | (long)(var2 + 33554432) << 8 | (var1 & 255L);
    }
 
    static int ux(long var0) {
-      return (int)(var0 >>> 34 & 33554431L) - COORD_OFF;
+      return (int)(var0 >>> 34 & 67108863L) - 33554432;
    }
 
    static int uz(long var0) {
-      return (int)(var0 >>> 9 & 33554431L) - COORD_OFF;
+      return (int)(var0 >>> 8 & 67108863L) - 33554432;
    }
 
    static int uy(long var0) {
-      return (int)(var0 & 511L);
+      return (int)(var0 & 255L);
+   }
+
+   /**
+    * V6.35: the internal light / fluid / block-update queues need 9 bits for Y
+    * (the world is 384 tall). These keys are ephemeral and never saved, so a
+    * separate packing keeps every old save file byte-for-byte compatible.
+    */
+   static final int QUEUE_OFF = 16777216;
+   static long packH(int x, int y, int z) {
+      return (long)(x + QUEUE_OFF) << 34 | (long)(z + QUEUE_OFF) << 9 | (y & 511L);
+   }
+
+   static int uxH(long v) {
+      return (int)(v >>> 34 & 33554431L) - QUEUE_OFF;
+   }
+
+   static int uzH(long v) {
+      return (int)(v >>> 9 & 33554431L) - QUEUE_OFF;
+   }
+
+   static int uyH(long v) {
+      return (int)(v & 511L);
    }
 
    private void resetBounds() {
@@ -780,9 +805,9 @@ public final class World {
       int lastCz = Integer.MIN_VALUE;
       while (!work.addQ.isEmpty()) {
          long var2 = work.addQ.poll();
-         int var4 = ux(var2);
-         int var5 = uy(var2);
-         int var6 = uz(var2);
+         int var4 = uxH(var2);
+         int var5 = uyH(var2);
+         int var6 = uzH(var2);
          int cx = var4 >> 4;
          int cz = var6 >> 4;
          if (cx != lastCx || cz != lastCz) {
@@ -830,7 +855,7 @@ public final class World {
                               }
 
                               this.touch(var10, var11, var12);
-                              work.addQ.add(pack(var10, var11, var12));
+                              work.addQ.add(packH(var10, var11, var12));
                            }
                         }
                      }
@@ -854,14 +879,14 @@ public final class World {
       Chunk lastC = var6;
       int lastCx = var6.cx;
       int lastCz = var6.cz;
-      work.remQ.add(pack(var2, var3, var4) | (long)var5 << 60);
+      work.remQ.add(packH(var2, var3, var4) | (long)var5 << 60);
 
       while (!work.remQ.isEmpty()) {
          long var7 = work.remQ.poll();
          int var9 = (int)(var7 >>> 60);
-         int var10 = ux(var7 & 1152921504606846975L);
-         int var11 = uy(var7);
-         int var12 = uz(var7 & 1152921504606846975L);
+         int var10 = uxH(var7 & 1152921504606846975L);
+         int var11 = uyH(var7);
+         int var12 = uzH(var7 & 1152921504606846975L);
 
          for (int var13 = 0; var13 < 6; var13++) {
             int var14 = var10 + DX[var13];
@@ -889,9 +914,9 @@ public final class World {
                         }
 
                         this.touch(var14, var15, var16);
-                        work.remQ.add(pack(var14, var15, var16) | (long)var20 << 60);
+                        work.remQ.add(packH(var14, var15, var16) | (long)var20 << 60);
                      } else {
-                        work.addQ.add(pack(var14, var15, var16));
+                        work.addQ.add(packH(var14, var15, var16));
                      }
                   }
                }
@@ -968,7 +993,7 @@ public final class World {
                   int seedStartY = isVoid ? Math.max(36, var7 + 1) : (var7 + 1);
 
                   for (int var28 = seedStartY; var28 <= var26; var28++) {
-                     work.addQ.add(pack(var2 + var6, var28, var3 + var5));
+                     work.addQ.add(packH(var2 + var6, var28, var3 + var5));
                   }
                }
             }
@@ -992,7 +1017,7 @@ public final class World {
                   int var22 = var17 >> 8;
                   int var24 = var17 >> 4 & 15;
                   int var27 = var17 & 15;
-                  work.addQ.add(pack(var2 + var27, var22, var3 + var24));
+                  work.addQ.add(packH(var2 + var27, var22, var3 + var24));
                }
             }
          }
@@ -1046,7 +1071,7 @@ public final class World {
                   int var10 = this.lightOf(var5, var2, var8, var6, var9);
                   if (var10 > 1) {
                      if (Blocks.opacity[var1.blocks[Chunk.idx(var11, var6, var12)] & BlockState.ID_MASK] < 15 && this.lightOf(var1, var2, var11, var6, var12) < var10 - 1) {
-                        work.addQ.add(pack(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
+                        work.addQ.add(packH(var5.cx * 16 + var8, var6, var5.cz * 16 + var9));
                      }
                   }
                }
@@ -1136,13 +1161,13 @@ public final class World {
                   var5.setBlk(var6, var2, var7, var12);
                }
 
-               work.addQ.add(pack(var1, var2, var3));
+               work.addQ.add(packH(var1, var2, var3));
             }
 
             for (int var13 = 0; var13 < 6; var13++) {
                int var14 = var2 + DY[var13];
                if (var14 >= 0 && var14 < Chunk.H) {
-                  work.addQ.add(pack(var1 + DX[var13], var14, var3 + DZ[var13]));
+                  work.addQ.add(packH(var1 + DX[var13], var14, var3 + DZ[var13]));
                }
             }
 
@@ -1172,14 +1197,14 @@ public final class World {
    }
 
    void scheduleFluid(int var1, int var2, int var3, int var4) {
-      long var5 = pack(var1, var2, var3);
+      long var5 = packH(var1, var2, var3);
       if (this.fluidPending.add(var5)) {
          ((ArrayList)this.fluidDue.computeIfAbsent(this.tickCount + var4, var0 -> new ArrayList())).add(var5);
       }
    }
 
    void scheduleBlock(int var1, int var2, int var3) {
-      long var4 = pack(var1, var2, var3);
+      long var4 = packH(var1, var2, var3);
       if (this.blockPending.add(var4)) {
          this.blockUpdates.add(var4);
       }
@@ -1321,7 +1346,7 @@ public final class World {
             while (!this.fluidDue.isEmpty() && this.fluidDue.firstKey() <= this.tickCount && var1 < 20000) {
                for (long var4 : (ArrayList<Long>)this.fluidDue.pollFirstEntry().getValue()) {
                   this.fluidPending.remove(var4);
-                  this.fluidUpdate(ux(var4), uy(var4), uz(var4));
+                  this.fluidUpdate(uxH(var4), uyH(var4), uzH(var4));
                   var1++;
                }
             }
@@ -1331,7 +1356,7 @@ public final class World {
             while (!this.blockUpdates.isEmpty() && var7++ < 600) {
                long var8 = (Long)this.blockUpdates.poll();
                this.blockPending.remove(var8);
-               this.blockUpdate(ux(var8), uy(var8), uz(var8));
+               this.blockUpdate(uxH(var8), uyH(var8), uzH(var8));
             }
          } else {
             this.redstone.clear(); // authoritative host owns scheduled events
