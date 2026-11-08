@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.32";
+   public static final String VERSION_STR = "6.33";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -2105,6 +2105,16 @@ public final class Game {
                this.seedField = this.seedField + (char)var1;
             }
          }
+      } else if (this.screen == Game.S.MP_CREATE) {
+         if (var1 >= 32 && var1 < 127) {
+            if (this.focusField == 0 && this.newName.length() < 24) {
+               this.newName = this.newName + (char)var1;
+            } else if (this.focusField == 1 && this.seedField.length() < 30) {
+               this.seedField = this.seedField + (char)var1;
+            } else if (this.focusField == 2 && Net319.customNick.length() < 16) {
+               Net319.customNick = Net319.customNick + (char)var1;
+            }
+         }
       } else if (this.screen == Game.S.MULTIPLAYER) {
          if (var1 >= 32 && var1 < 127 && Net319.serverAddr.length() < 64) {
             Net319.serverAddr = Net319.serverAddr + (char)var1;
@@ -2340,6 +2350,58 @@ public final class Game {
                   }
 
                   return;
+               case SP_HUB:
+                  if (var1 == 256 && var2 == 1) {
+                     this.setScreen(Game.S.TITLE);
+                  }
+
+                  return;
+               case MP_HUB:
+                  if (var1 == 256 && var2 == 1) {
+                     this.setScreen(Game.S.TITLE);
+                  }
+
+                  return;
+               case MP_CREATE: {
+                  boolean ctrl = (var3 & 10) != 0;
+                  if (var1 == 256 && var2 == 1) {
+                     this.setScreen(Game.S.MP_HUB);
+                     return;
+                  }
+                  if (ctrl && var1 == 67 && var2 == 1) {
+                     this.setClipboard(this.focusField == 0 ? this.newName
+                        : (this.focusField == 1 ? this.seedField : Net319.customNick));
+                     return;
+                  }
+                  if (ctrl && var1 == 88 && var2 == 1) {
+                     String v = this.focusField == 0 ? this.newName
+                        : (this.focusField == 1 ? this.seedField : Net319.customNick);
+                     this.setClipboard(v);
+                     if (this.focusField == 0) this.newName = "";
+                     else if (this.focusField == 1) this.seedField = "";
+                     else Net319.customNick = "";
+                     return;
+                  }
+                  if (ctrl && var1 == 86) {
+                     String paste = sanitizePaste(this.getClipboard(), 24);
+                     if (this.focusField == 0) this.newName += paste;
+                     else if (this.focusField == 1) this.seedField += paste;
+                     else Net319.customNick += paste;
+                     return;
+                  }
+                  if (var1 == 259 || var1 == 261) {
+                     if (this.focusField == 0 && this.newName.length() > 0) {
+                        this.newName = ctrl ? deleteLastWord(this.newName) : this.newName.substring(0, this.newName.length() - 1);
+                     } else if (this.focusField == 1 && this.seedField.length() > 0) {
+                        this.seedField = ctrl ? deleteLastWord(this.seedField) : this.seedField.substring(0, this.seedField.length() - 1);
+                     } else if (this.focusField == 2 && Net319.customNick.length() > 0) {
+                        Net319.customNick = Net319.customNick.substring(0, Net319.customNick.length() - 1);
+                     }
+                  }
+                  if (var1 == 265 && var2 == 1) this.focusField = this.focusField <= 0 ? 2 : this.focusField - 1;
+                  else if (var1 == 264 && var2 == 1) this.focusField = (this.focusField + 1) % 3;
+                  return;
+               }
                case MULTIPLAYER: {
                   boolean ctrl = (var3 & 10) != 0;
                   if (ctrl && var1 == 67 && var2 == 1) {
@@ -3953,7 +4015,9 @@ public final class Game {
       int cap = this.opt.maxFps;
       boolean menu = this.screen == Game.S.TITLE || this.screen == Game.S.WORLDS || this.screen == Game.S.NEWWORLD || this.screen == Game.S.MULTIPLAYER
          || this.screen == Game.S.OPTIONS || this.screen == Game.S.SKINS || this.screen == Game.S.PAUSE || this.screen == Game.S.CREDITS
-         || this.screen == Game.S.TRAILER || this.screen == Game.S.MORE;
+         || this.screen == Game.S.TRAILER || this.screen == Game.S.MORE
+         || this.screen == Game.S.SP_HUB || this.screen == Game.S.MP_HUB
+         || this.screen == Game.S.MP_CREATE;
       if (menu) {
          cap = cap > 0 ? Math.min(cap, 60) : 60;
       }
@@ -6498,6 +6562,15 @@ public final class Game {
          case MINIGAMES:
             Screens.minigames(this);
             break;
+         case SP_HUB:
+            Screens.singleplayer(this);
+            break;
+         case MP_HUB:
+            Screens.mpHub(this);
+            break;
+         case MP_CREATE:
+            Screens.mpCreate(this);
+            break;
          case LOADING:
             Screens.loading(this);
             break;
@@ -7756,7 +7829,10 @@ public final class Game {
       MAP,
       DEAD,
       TRAILER,
-      MORE;
+      MORE,
+      SP_HUB,
+      MP_HUB,
+      MP_CREATE;
    }
 
    static final class WInfo {

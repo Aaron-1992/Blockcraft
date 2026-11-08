@@ -163,9 +163,9 @@ final class Tests621 {
    static void advancedTab() throws Exception {
       Game g = screen(343, 1800); // tall enough for every one of the 57 scrolling rows
       g.opt.debugVideo = true;
-      g.ui.optTab = 4;
+      g.ui.optTab = Screens.ADV_TAB;
       Screens.options(g);
-      eq(5, Screens.tabs(g.opt).length, "the debug switch still shows five tabs");
+      eq(8, Screens.tabs(g.opt).length, "the debug switch still shows eight tabs");
       eq(61, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
       check(button(g, "V6.21 Caves"), "the layered cave generator is configurable");
       check(button(g, "Cave Richness"), "cave richness is configurable");
@@ -587,7 +587,7 @@ final class Tests621 {
    }
 
    static void shaderAndVersion() {
-      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
+      eq("6.33", Game.VERSION_STR, "the game version is 6.33");
       check(ShaderSrc.CLOUD_FS.contains("uniform float wxBeauty"), "the cloud shader has the beauty uniform");
       check(ShaderSrc.CLOUD_FS.contains("warm sunset rim"), "the cloud shader has a warm sunset rim");
       check(ShaderSrc.CLOUD_FS.contains("silver lining"), "the cloud shader still has silver linings");

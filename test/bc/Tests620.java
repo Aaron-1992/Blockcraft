@@ -128,7 +128,7 @@ final class Tests620 {
    static void advancedTab() throws Exception {
       Game g = screen(343, 1800); // tall enough for all 50 rows
       g.opt.debugVideo = true;
-      g.ui.optTab = 4;
+      g.ui.optTab = Screens.ADV_TAB;
       Screens.options(g);
       check(button(g, "Minimap:"), "the minimap switch is configurable in game");
       check(button(g, "Rotate Minimap"), "minimap rotation is configurable");

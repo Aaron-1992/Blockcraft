@@ -134,7 +134,7 @@ final class Tests631 {
          "the More screen keeps every secondary entry");
       check(s.contains("Watch Trailer (1:00)"), "the trailer is still one click away");
       String g = src("src/bc/Game.java");
-      check(g.contains("MORE;") && g.contains("case MORE:") && g.contains("case MORE:"),
+      check((g.contains("MORE;") || g.contains("MORE,")) && g.contains("case MORE:"),
          "the More screen is a real game screen");
       check(g.contains("this.screen == Game.S.MORE"), "escape leaves the More screen");
       check(src("docs/FILE-LAYOUT.md").contains("releases"), "the cleaned repository layout is documented");
@@ -276,8 +276,8 @@ final class Tests631 {
    }
 
    static void wiring() throws Exception {
-      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
-      eq("6.32", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.32");
+      eq("6.33", Game.VERSION_STR, "the game version is 6.33");
+      eq("6.33", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.33");
       check(src("README.md").contains("V6.31"), "README describes V6.31");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.31"), "the packaged readme describes V6.31");
       check(new File("docs/releases/v6.31.md").isFile(), "V6.31 release notes exist");

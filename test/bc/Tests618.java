@@ -129,12 +129,12 @@ final class Tests618 {
    static void advancedTab() throws Exception {
       // A tall GUI so every one of the 28 scrolling rows is actually drawn (rows outside the viewport are skipped).
       Game g = screen(343, 1000);
-      eq(4, Screens.tabs(g.opt).length, "four tabs before the debug switch");
+      eq(7, Screens.tabs(g.opt).length, "seven focused tabs before the debug switch");
       g.opt.debugVideo = true;
-      eq(5, Screens.tabs(g.opt).length, "the debug switch adds a fifth tab");
-      eq("Advanced", Screens.tabs(g.opt)[4], "the tab is called Advanced");
+      eq(8, Screens.tabs(g.opt).length, "the debug switch adds the eighth tab");
+      eq("Advanced", Screens.tabs(g.opt)[Screens.ADV_TAB], "the tab is called Advanced");
 
-      g.ui.optTab = 4;
+      g.ui.optTab = Screens.ADV_TAB;
       Screens.options(g);
       check(button(g, "Shadow Map"), "the shadow-map size is configurable in game");
       check(button(g, "Cloud Steps"), "the cloud raymarch step count is configurable in game");
@@ -158,7 +158,7 @@ final class Tests618 {
       eq(0, g.opt.shadowRes, "the shadow-map slider changes the option");
 
       g.opt.debugVideo = false;
-      eq(4, Screens.tabs(g.opt).length, "turning the switch off hides the tab again");
+      eq(7, Screens.tabs(g.opt).length, "turning the switch off hides the tab again");
       g.ui.optTab = 0;
       Screens.options(g); // must still draw without the fifth tab
       check(button(g, "Debug Video"), "the switch itself is on the Video tab");

@@ -3,6 +3,7 @@ package bc;
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
@@ -36,8 +37,8 @@ final class Screens {
    };
 
    // =================================================================== title
-   /** V6.31: a clean five-button title screen. Secondary screens live behind
-    * "More..." so the menu is not a wall of small buttons any more. */
+   /** V6.33: the main screen has exactly three choices - Singleplayer,
+    * Multiplayer and Settings. Trailer and Quit are small footer buttons. */
    static void title(Game g) {
       Ui ui = g.ui;
       Gui gui = g.gui;
@@ -51,7 +52,8 @@ final class Screens {
       double time = ui.time();
       float bottom = Logo.draw(gui, cx, top, cell, time);
       boolean infdev = ModLoader.isInfdevActive();
-      String subTitle = infdev ? "MINECRAFT INFDEV (JUNE 2010)" : ("JAVA & CONSOLE EDITION  -  V" + Game.VERSION_STR);
+      String subTitle = Game.clipText(infdev ? "MINECRAFT INFDEV (JUNE 2010)"
+         : ("JAVA & CONSOLE EDITION  -  V" + Game.VERSION_STR), gui.w - 8.0F);
       float stW = Gui.textWidth(subTitle) + 16.0F;
       gui.gradient(cx - stW * 0.5F, bottom + 8.0F, stW, 11.0F, 0x90121826, 0x900A0D16);
       gui.rect(cx - stW * 0.5F, bottom + 19.0F, stW, 1.0F, infdev ? 0x8063D43E : 0x80FFD84A);
@@ -59,7 +61,8 @@ final class Screens {
       String splashText = infdev ? "Infdev 2010!" : g.splash;
       if (splashText != null) {
          float sw = Gui.textWidth(splashText);
-         float sx = Math.min(cx + Logo.width(cell) / 2.0F - 22.0F, gui.w - sw / 2.0F - 12.0F);
+         float sx = Math.max(sw / 2.0F + 4.0F,
+            Math.min(cx + Logo.width(cell) / 2.0F - 22.0F, gui.w - sw / 2.0F - 12.0F));
          gui.push();
          gui.translate(sx, bottom - 6.0F);
          gui.rotate(-18.0F);
@@ -71,28 +74,199 @@ final class Screens {
 
       float bw = Math.min(220.0F, gui.w - 40.0F);
       float bx = cx - bw / 2.0F;
-      float row = 24.0F;
-      float by = Math.max(bottom + 26.0F, gui.h * 0.42F);
-      by = Math.min(by, gui.h - 40.0F - row * 5.0F);
-      ui.button("Singleplayer", bx, by, bw, 20.0F, true, "Play a saved world or create a new one.", () -> openWorlds(g));
-      ui.button("Multiplayer", bx, by + row, bw, 20.0F, true, "Join a LAN world.", () -> {
-         g.mpReturn = Game.S.TITLE;
-         openMultiplayer(g);
-      });
-      ui.button("Watch Trailer (1:00)", bx, by + row * 2, bw, 20.0F, true,
+      float row = 27.0F;
+      float by = Math.max(bottom + 26.0F, gui.h * 0.40F);
+      by = Math.min(by, gui.h - 46.0F - row * 3.0F);
+      ui.button("Singleplayer", bx, by, bw, 22.0F, true,
+         "Play an open world or a Console Edition mini game.", () -> g.setScreen(Game.S.SP_HUB));
+      ui.button("Multiplayer", bx, by + row, bw, 22.0F, true,
+         "Host or join a world, or play mini games with friends.", () -> openMpHub(g));
+      ui.button("Settings", bx, by + row * 2, bw, 22.0F, true,
+         "Video, graphics, gameplay, controls, sound, world generation, content and advanced options.", () -> {
+            g.optionsReturn = Game.S.TITLE;
+            g.setScreen(Game.S.OPTIONS);
+         });
+      // a gold rule under the three choices, like a proper title screen
+      gui.rect(bx, by + row * 3 + 2.0F, bw, 1.0F, 0x60FFD84A);
+
+      float small = Math.min(120.0F, (gui.w - 12.0F) / 2.0F);
+      ui.button("Trailer (1:00)", 4.0F, gui.h - 22.0F, small, 18.0F, true,
          "A one-minute in-game cinematic montage. ESC or click to skip.", () -> Trailer.start(g));
-      ui.button("Options...", bx, by + row * 3, bw, 20.0F, true, "Video, sound, controls and debug settings.", () -> {
-         g.optionsReturn = Game.S.TITLE;
-         g.setScreen(Game.S.OPTIONS);
-      });
-      ui.button("Quit Game", bx, by + row * 4, bw, 20.0F, true, null, () -> GLFW.glfwSetWindowShouldClose(g.window, true));
-      ui.button("More...", gui.w - 74.0F, 6.0F, 68.0F, 18.0F, true,
-         "Mini Games, Skins, Resource Packs, Mods, the All Blocks gallery and Credits.", () -> g.setScreen(Game.S.MORE));
-      gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
-      gui.text("Textures: " + ResourcePacks.activeId() + (TexPixel32.enabled() ? " 32px" : " 16px"),
-         4.0F, gui.h - 22.0F, 0xFFC4C4CE, true);
+      ui.button("Quit Game", gui.w - small - 4.0F, gui.h - 22.0F, small, 18.0F, true, null,
+         () -> GLFW.glfwSetWindowShouldClose(g.window, true));
+      gui.text("Blockcraft V" + Game.VERSION_STR, 4.0F, gui.h - 32.0F, 0xFFC4C4CE, true);
       String r = "Not affiliated with Mojang";
-      gui.text(r, gui.w - Gui.textWidth(r) - 4.0F, gui.h - 11.0F, 0xFFC4C4CE, true);
+      gui.text(Game.clipText(r, gui.w - 8.0F), Math.max(4.0F, gui.w - Gui.textWidth(r) - 4.0F),
+         gui.h - 32.0F, 0xFFC4C4CE, true);
+   }
+
+   /** V6.33: Singleplayer hub - choose between an open world and mini games. */
+   static void singleplayer(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      float cx = gui.w / 2.0F;
+      float pw = Math.min(300.0F, gui.w - 16.0F);
+      float px = cx - pw / 2.0F;
+      ui.title("Singleplayer", 7.0F);
+      float py = 24.0F;
+      float footY = gui.h - 24.0F;
+      float ph = footY - py - 4.0F;
+      ui.panel(px, py, pw, ph);
+      float ix = px + 7.0F;
+      float iw = pw - 14.0F;
+      gui.text("Choose how you want to play", ix, py + 5.0F, Ui.GOLD, true);
+      float cardY = py + 17.0F;
+      float cardH = Math.min(34.0F, (ph - 52.0F) / 3.0F);
+      // two big mode cards
+      card(g, ui, gui, ix, cardY, iw, cardH, "Open World", "Survival, Creative, seeds and world generation", 0x304A7A36,
+         () -> openWorlds(g));
+      card(g, ui, gui, ix, cardY + cardH + 5.0F, iw, cardH, "Mini Games", "Battle, Tumble, Bedwars, CS2 and more", 0x307A4A36,
+         () -> openMinigames(g, Game.S.SP_HUB));
+      float extraY = cardY + 2.0F * (cardH + 5.0F) + 3.0F;
+      if (extraY + 18.0F <= py + ph - 2.0F) {
+         ui.button("All Blocks Gallery", ix, extraY, iw, 18.0F, true,
+            "A world with every block and item laid out to inspect.", () -> {
+               g.ensureAllBlocksShowcaseWorld();
+               g.worldName = "All_Blocks_Showcase";
+               g.startWorld(false, null, 1);
+            });
+      }
+      ui.button("Back", cx - 100.0F, footY, 200.0F, 20.0F, true, null, () -> g.setScreen(Game.S.TITLE));
+      ui.drawToast();
+   }
+
+   /** A coloured mode card: a filled panel, a title, a description and one big button. */
+   private static void card(Game g, Ui ui, Gui gui, float x, float y, float w, float h,
+      String name, String desc, int tint, Runnable action) {
+      gui.rect(x, y, w, h, 0xFF080B12);
+      gui.gradient(x + 1, y + 1, w - 2, h - 2, tint, 0xE0121724);
+      gui.rect(x + 1, y + 1, 2.0F, h - 2, 0xC0FFD84A);
+      gui.rect(x + 1, y + h - 2, w - 2, 1.0F, 0x50FFD84A);
+      gui.text(name, x + 8.0F, y + 4.0F, 0xFFFFF4C8, true);
+      gui.text(Game.clipText(desc, w - 16.0F), x + 8.0F, y + 15.0F, Ui.DIM, true);
+      float bw = Math.min(88.0F, w * 0.36F);
+      ui.button("Play", x + w - bw - 5.0F, y + (h - 18.0F) / 2.0F, bw, 18.0F, true,
+         name + " - " + desc, action);
+   }
+
+   static void openMpHub(Game g) {
+      g.mpReturn = Game.S.MP_HUB;
+      g.focusField = 0;
+      g.setScreen(Game.S.MP_HUB);
+   }
+
+   /** V6.33: Multiplayer hub - the same two choices as Singleplayer, plus a
+    * named world creation screen and direct address joining. */
+   static void mpHub(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      float cx = gui.w / 2.0F;
+      float pw = Math.min(300.0F, gui.w - 16.0F);
+      float px = cx - pw / 2.0F;
+      ui.title("Multiplayer", 7.0F);
+      float py = 24.0F;
+      float footY = gui.h - 24.0F;
+      float ph = footY - py - 4.0F;
+      ui.panel(px, py, pw, ph);
+      float ix = px + 7.0F;
+      float iw = pw - 14.0F;
+      gui.text("Play with friends", ix, py + 5.0F, Ui.GOLD, true);
+      float cardY = py + 17.0F;
+      float cardH = Math.min(30.0F, (ph - 76.0F) / 4.0F);
+      card(g, ui, gui, ix, cardY, iw, cardH, "Open World", "Join or host a survival world", 0x303A5A7A,
+         () -> { g.mpReturn = Game.S.MP_HUB; openMultiplayer(g); });
+      card(g, ui, gui, ix, cardY + cardH + 4.0F, iw, cardH, "Mini Games", "Battle, Tumble, Bedwars with friends", 0x307A4A36,
+         () -> openMinigames(g, Game.S.MP_HUB));
+      float createY = cardY + 2.0F * (cardH + 4.0F);
+      if (createY + 18.0F <= py + ph - 26.0F) {
+         ui.button("Create & Host World", ix, createY, iw, 18.0F, true,
+            "Name a world, pick a seed, game mode, type and your player name - just like Create New World.", () -> {
+               g.focusField = 0;
+               g.setScreen(Game.S.MP_CREATE);
+            });
+      }
+      float fieldY = createY + 20.0F;
+      if (fieldY + 26.0F <= py + ph - 2.0F) {
+         ui.label("Server Address / Share Code", ix, fieldY, Ui.DIM);
+         ui.field(ix, fieldY + 9.0F, iw, 16.0F, Net319.serverAddr, "127.0.0.1:25565", g.focusField == 0, () -> g.focusField = 0);
+         ui.button("Join", ix + iw - 52.0F, fieldY + 9.0F, 52.0F, 16.0F, true,
+            "Connect to the IP:Port, tunnel URL or BC-... Share Code above.",
+            () -> Net319.joinFromMenu(g, Net319.serverAddr));
+      }
+      ui.button("Back", cx - 100.0F, footY, 200.0F, 20.0F, true, null, () -> g.setScreen(Game.S.TITLE));
+      ui.drawToast();
+   }
+
+   /** V6.33: multiplayer world creation, laid out like Create New World with
+    * a real world name, seed, player name and a live preview. */
+   static void mpCreate(Game g) {
+      Ui ui = g.ui;
+      Gui gui = g.gui;
+      ui.begin();
+      ui.backdrop(0.5F);
+      WorldSettings ws = g.newSettings;
+      float cx = gui.w / 2.0F;
+      float colW = Math.min(150.0F, (gui.w - 28.0F) / 2.0F);
+      float gap = 8.0F;
+      float x0 = cx - colW - gap / 2.0F;
+      float x1 = cx + gap / 2.0F;
+      float y = 24.0F;
+      ui.title("Create Multiplayer World", 8.0F);
+
+      ui.label("World Name", x0, y, Ui.DIM);
+      ui.field(x0, y + 10.0F, colW, 18.0F, g.newName, "New World", g.focusField == 0, () -> g.focusField = 0);
+      ui.label("Seed", x0, y + 34.0F, Ui.DIM);
+      ui.field(x0, y + 44.0F, colW, 18.0F, g.seedField, "Random", g.focusField == 1, () -> g.focusField = 1);
+      ui.label("Player Name", x0, y + 68.0F, Ui.DIM);
+      ui.field(x0, y + 78.0F, colW, 18.0F, Net319.customNick, "Your nickname", g.focusField == 2, () -> g.focusField = 2);
+
+      float by0 = y + 102.0F;
+      ui.button("Game Mode: " + MODE_NAME[g.newMode % MODE_NAME.length], x0, by0, colW, 20.0F, true, null,
+         () -> g.newMode = (g.newMode + 1) % MODE_NAME.length);
+      ui.button("Type: " + ws.typeName(), x0, by0 + 24.0F, colW, 20.0F, true,
+         WorldSettings.TYPE_INFO[ws.type], () -> {
+            ws.type = WorldSettings.TYPE_ORDER[(ws.typeIndex() + 1) % WorldSettings.TYPE_ORDER.length];
+         });
+      ui.toggle("Structures", ws.structures, x0, by0 + 48.0F, colW, 20.0F,
+         "Villages, temples, ruins and the new underground structures.", () -> ws.structures = !ws.structures);
+      if (by0 + 92.0F <= gui.h - 30.0F) {
+         ui.toggle("Bonus Chest", ws.bonusChest, x0, by0 + 72.0F, colW, 20.0F,
+            "A chest with starting supplies next to spawn.", () -> ws.bonusChest = !ws.bonusChest);
+      }
+
+      // right column: a live preview of the world this name/seed makes
+      float pv = Math.min(64.0F, Math.max(30.0F, gui.h - 220.0F));
+      if (ui.preview == null) ui.preview = new WorldPreview(96, 60, 20, true);
+      ui.preview.update(seedValue(g), ws);
+      gui.rect(x1 - 1, y - 1, colW + 2, pv + 2, 0xFF000000);
+      gui.image(ui.preview.img, x1, y, colW, pv);
+      gui.text(Game.clipText("Preview - " + ui.preview.distinctBiomes() + " biomes", colW), x1, y + pv + 3.0F, Ui.GOLD, true);
+      ui.paragraph(WorldSettings.TYPE_INFO[ws.type], x1, y + pv + 15.0F, colW, Ui.DIM, 3);
+      if (gui.h >= 300) {
+         ui.paragraph("The world name, seed, mode and type are used for the hosted world, exactly like singleplayer creation.",
+            x0, by0 + 98.0F, colW * 2 + gap, Ui.FAINT, 2);
+      }
+
+      float by = gui.h - 26.0F;
+      ui.button("Create & Host", x0, by, colW, 20.0F, true,
+         "Start this world and open it to LAN / Share Code friends.", () -> createMpWorld(g));
+      ui.button("Cancel", x1, by, colW, 20.0F, true, null, () -> g.setScreen(Game.S.MP_HUB));
+      ui.drawToast();
+   }
+
+   /** Copy the creation screen into the hosting settings, then host. */
+   static void createMpWorld(Game g) {
+      applyNewWorldSettings(g);
+      Net319.mpWorldType = g.newSettings.type;
+      Net319.mpGameMode = Math.max(0, Math.min(4, g.newMode));
+      Net319.mpWorldName = g.newName.trim().isEmpty() ? "Multiplayer World" : g.newName.trim();
+      Net319.mpSeed = seedValue(g);
+      if (!Net319.customNick.isEmpty()) Net319.setNickname(g, Net319.customNick);
+      Net319.hostFromMenu(g);
    }
 
    /** V6.31: everything that used to clutter the title screen, in one tidy list. */
@@ -537,9 +711,11 @@ final class Screens {
    }
 
    // =================================================================== options
-   static final String[] TABS = {"Video", "Graphics", "Gameplay", "Controls"};
-   /** Update 6.18: turning on "Debug Video" reveals the fifth tab with every render, shader and performance setting. */
-   static final String[] TABS_DEBUG = {"Video", "Graphics", "Gameplay", "Controls", "Advanced"};
+   /** V6.33: seven focused tabs so nothing has to be hunted for in one long list. */
+   static final String[] TABS = {"Video", "Graphics", "Gameplay", "Controls", "Sound", "World", "Content"};
+   /** Debug Video unlocks the eighth tab with every render/shader/performance setting. */
+   static final String[] TABS_DEBUG = {"Video", "Graphics", "Gameplay", "Controls", "Sound", "World", "Content", "Advanced"};
+   static final int ADV_TAB = 7;
    static final int[] LOD_STEPS = {0, 32, 64, 128, 256, 384, 512};
    static final int[] SHADOW_RES = {512, 1024, 2048};
    static final int[] CLOUD_RES = {1, 2, 4};
@@ -574,12 +750,23 @@ final class Screens {
       float x0 = cx - pw / 2.0F;
       float x1 = x0 + colW + 6.0F;
       ui.title("Options", 7.0F);
-      ui.tabs(tabs(o), ui.optTab, x0, 20.0F, pw, 16.0F, i -> {
+      // V6.33: two rows of tabs, four per row, so every label stays readable
+      // even in a 320x240 window.
+      String[] names = tabs(o);
+      int half = (names.length + 1) / 2;
+      int sel = Options.clamp(ui.optTab, 0, names.length - 1);
+      String[] rowA = Arrays.copyOfRange(names, 0, half);
+      String[] rowB = Arrays.copyOfRange(names, half, names.length);
+      ui.tabs(rowA, sel < half ? sel : -1, x0, 20.0F, pw, 15.0F, i -> {
          ui.optTab = i;
          ui.optScroll[0] = 0.0F;
       });
+      ui.tabs(rowB, sel >= half ? sel - half : -1, x0, 36.0F, pw, 15.0F, i -> {
+         ui.optTab = half + i;
+         ui.optScroll[0] = 0.0F;
+      });
       float row = gui.h >= 300 ? 24.0F : 22.0F;
-      float top = 42.0F;
+      float top = 56.0F;
       float hintH = 26.0F;
       float doneY = gui.h - 24.0F;
       float hintY = doneY - hintH - 5.0F;
@@ -587,7 +774,7 @@ final class Screens {
       int rows;
       switch (ui.optTab) {
          case 0:
-            rows = 5;
+            rows = 7;
             break;
          case 1:
             rows = 4;
@@ -596,6 +783,15 @@ final class Screens {
             rows = 7;
             break;
          case 4:
+            rows = 3;
+            break;
+         case 5:
+            rows = 5;
+            break;
+         case 6:
+            rows = 4;
+            break;
+         case ADV_TAB:
             rows = ADV_ROWS;
             break;
          case 3:
@@ -622,6 +818,15 @@ final class Screens {
             controlsTab(g, x0, x1, oy);
             break;
          case 4:
+            soundTab(g, o, x0, x1, colW, oy, row, top, viewH);
+            break;
+         case 5:
+            worldTab(g, o, x0, x1, colW, oy, row, top, viewH);
+            break;
+         case 6:
+            contentTab(g, x0, x1, colW, oy, row, top, viewH);
+            break;
+         case ADV_TAB:
             advancedTab(g, o, x0, x1, colW, oy, row, top, viewH);
             break;
          default:
@@ -632,6 +837,9 @@ final class Screens {
       String[] about = {
          "Resolution, distance and the window.", "Looks: shadows, water, clouds, colours, glow.", "How the game plays and how the mouse feels.",
          "The keys of the game. They cannot be changed yet.",
+         "Sound and music volume, 3D acoustics and the soundtrack.",
+         "World generation: terrain, caves, biomes, trees and underground content.",
+         "Skins, resource packs, mods, credits, the trailer and the extras menu.",
          "Advanced Video: every render, shader and performance setting in one place. Changes are saved with Done."
       };
       String fallback = about[Math.min(ui.optTab, about.length - 1)];
@@ -1293,6 +1501,128 @@ final class Screens {
       }
    }
 
+   /** V6.33: sound settings, split out of the old catch-all screens. */
+   static void soundTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
+      Ui ui = g.ui;
+      if (shows(oy, row, top, viewH)) {
+         ui.slider("Sound Volume: " + (int)(o.soundVolume * 100.0F) + "%", x0, oy, colW, 20.0F, o.soundVolume,
+            "Footsteps, blocks, weather and the real recorded foley WAVs.", v -> o.soundVolume = v);
+         ui.slider("Music Volume: " + (int)(o.musicVolume * 100.0F) + "%", x1, oy, colW, 20.0F, o.musicVolume,
+            "The Console Edition soundtrack and the trailer's four acts.", v -> o.musicVolume = v);
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("3D Acoustics", o.realAcoustics, x0, oy, colW, 20.0F,
+            "Binaural panning, wall occlusion, cave reverb and Doppler shift.", () -> o.realAcoustics = !o.realAcoustics);
+         ui.toggle("Constant Music", o.constantMusic, x1, oy, colW, 20.0F,
+            "Keep music playing instead of the usual quiet pauses.", () -> o.constantMusic = !o.constantMusic);
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Next Track", x0, oy, colW, 20.0F, true,
+            "Cycle the Console Edition Battle / Tumble / menu track.", () -> {
+               SoundEngine.nextBattleTrack();
+               ui.say("Music: " + SoundEngine.currentMusicDisplayName());
+            });
+         ui.button("Foley: " + SoundEngine.recordedFoleyCount() + " WAVs", x1, oy, colW, 20.0F, true,
+            "Real CC0 field recordings in sounds/foley/. Replace any WAV and restart.",
+            () -> ui.say(SoundEngine.recordedFoleyCount() + " real CC0 WAV recordings loaded"));
+      }
+   }
+
+   /** V6.33: world-generation settings that used to be buried in Advanced. */
+   static void worldTab(Game g, Options o, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
+      Ui ui = g.ui;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("New Terrain", o.newTerrain, x0, oy, colW, 20.0F,
+            "The V6.21+ terrain with smooth biome borders and layered generation. Used for NEW worlds only.",
+            () -> o.newTerrain = !o.newTerrain);
+         ui.toggle("Caves & Cliffs", o.caveCliffs, x1, oy, colW, 20.0F,
+            "Minecraft-density caves with natural surface entrances and the new structures (caveVer 6). OFF keeps the V6.21 caves.",
+            () -> o.caveCliffs = !o.caveCliffs);
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         String[] border = {"Sharp", "Smooth", "Very Smooth"};
+         ui.button("Borders: " + border[Options.clamp(o.biomeBorders, 0, 2)], x0, oy, colW, 20.0F, true,
+            "How gradually one biome blends into the next in new worlds.", () -> o.biomeBorders = (o.biomeBorders + 1) % 3);
+         ui.slider("Tree Density: " + (int)(o.treeDensity * 100.0F) + "%", x1, oy, colW, 20.0F,
+            (o.treeDensity - 0.4F) / 1.0F, "How many trees grow. Lower it if dense forests stutter.",
+            v -> o.treeDensity = Options.clampf(0.4F + v, 0.4F, 1.4F));
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("Giant Trees", o.giantTrees, x0, oy, colW, 20.0F,
+            "Allow the rare Giant size tier for every tree species.", () -> o.giantTrees = !o.giantTrees);
+         ui.toggle("Cave Structures", o.caveStructures, x1, oy, colW, 20.0F,
+            "Mineshafts, dungeons, strongholds, geodes, ancient cities and ruined portals underground.",
+            () -> o.caveStructures = !o.caveStructures);
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("Cave Layers", o.caveLayers, x0, oy, colW, 20.0F,
+            "Granite, diorite and andesite strata exposed on cave walls.", () -> o.caveLayers = !o.caveLayers);
+         ui.toggle("Cave Lakes", o.caveLakes, x1, oy, colW, 20.0F,
+            "Local aquifers and lava lakes below the water table.", () -> o.caveLakes = !o.caveLakes);
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Cave Scale: " + String.format("%.1f", o.caveScale), x0, oy, colW, 20.0F, true,
+            "How wide the cave tunnels are in new worlds.", () -> o.caveScale = 0.6F + ((int)((o.caveScale - 0.6F) * 10.0F) + 1) % 25 / 10.0F);
+         ui.button("Cave Amount: " + String.format("%.1f", o.caveDensity), x1, oy, colW, 20.0F, true,
+            "How much of the underground is carved in new worlds.", () -> o.caveDensity = 0.4F + ((int)((o.caveDensity - 0.4F) * 10.0F) + 1) % 22 / 10.0F);
+      }
+   }
+
+   /** V6.33: every content / extras screen in one tab, instead of hunting through menus. */
+   static void contentTab(Game g, float x0, float x1, float colW, float oy, float row, float top, float viewH) {
+      Ui ui = g.ui;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Skins...", x0, oy, colW, 20.0F, true, "Choose, import or create a player skin.", () -> {
+            g.skinReturn = Game.S.OPTIONS;
+            g.setScreen(Game.S.SKINS);
+         });
+         ui.button("Resource Packs", x1, oy, colW, 20.0F, true, "PNG edits, the tilesheet and installed packs.", () -> {
+            g.packsReturn = Game.S.OPTIONS;
+            g.setScreen(Game.S.PACKS);
+         });
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("Mods...", x0, oy, colW, 20.0F, true, "Enable or disable installed mods.", () -> {
+            g.modsReturn = Game.S.OPTIONS;
+            g.setScreen(Game.S.MODS);
+         });
+         ui.button("Credits", x1, oy, colW, 20.0F, true, "Music, art and sound attributions.", () -> {
+            g.creditsReturn = Game.S.OPTIONS;
+            g.creditsScroll = 0.0F;
+            g.setScreen(Game.S.CREDITS);
+         });
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("More...", x0, oy, colW, 20.0F, true,
+            "The full extras list: mini games, skins, packs, mods, gallery and credits.", () -> g.setScreen(Game.S.MORE));
+         ui.button("Watch Trailer (1:00)", x1, oy, colW, 20.0F, true,
+            "The one-minute in-game cinematic montage. ESC or click to skip.", () -> Trailer.start(g));
+      }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.button("All Blocks Gallery", x0, oy, colW, 20.0F, true,
+            "A world with every block and item laid out to inspect.", () -> {
+               g.ensureAllBlocksShowcaseWorld();
+               g.worldName = "All_Blocks_Showcase";
+               g.startWorld(false, null, 1);
+            });
+         ui.button("Reload Tilesheet", x1, oy, colW, 20.0F, true,
+            "Re-read tilesheet.png and apply your edited cells immediately.", () -> {
+               Tilesheet.invalidate();
+               ResourcePacks.reload(g);
+               ui.say("Tilesheet: " + Tilesheet.changedTiles() + " edited tiles active");
+            });
+      }
+   }
+
    static void controlsTab(Game g, float x0, float x1, float oy) {
       Gui gui = g.gui;
       int half = (KEYS.length + 1) / 2;
@@ -1605,14 +1935,21 @@ final class Screens {
       float footY = gui.h - 24.0F;
       float ph = footY - py - 4.0F;
       ui.panel(px, py, pw, ph);
+      // V6.33: a proper game-hub look - a gold header rule, two coloured cards
+      // and a divider instead of a wall of identical grey buttons.
+      gui.rect(px + 1, py + 1, pw - 2, 2.0F, 0x90FFD84A);
+      gui.rect(px + 1, py + 3, pw - 2, ph - 4, 0x0A1A2A4A);
 
       float ix = px + 6.0F;
       float iw = pw - 12.0F;
       float colW = (iw - 6.0F) / 2.0F;
       float x1 = ix + colW + 6.0F;
+      gui.rect(ix - 2.0F, py + 3.0F, colW + 3.0F, ph - 6.0F, 0x181C2A38);
+      gui.rect(x1 - 2.0F, py + 3.0F, colW + 3.0F, ph - 6.0F, 0x181C2A38);
+      gui.rect(x1 - 4.0F, py + 4.0F, 1.0F, ph - 8.0F, 0x40FFFFFF);
 
       // Left column: 8 Mode-Specific Arena Map Buttons + Loadout / Bot Options + Music Track
-      ui.label("Select Arena Map", ix, py + 4.0F, Ui.GOLD);
+      ui.label(Game.clipText("ARENA MAPS  /  " + ws.typeName(), colW), ix, py + 4.0F, Ui.GOLD);
       float mW = (colW - 4.0F) / 2.0F;
       for (int m = 0; m < WorldSettings.MAP_COUNT; m++) {
          final int mapIdx = m;
@@ -1624,6 +1961,11 @@ final class Screens {
          String mInfo = WorldSettings.mapInfoFor(ws.type, m);
          String rawLbl = sel ? "[" + mName + "]" : mName;
          String lbl = Game.clipText(rawLbl, mW - 8.0F);
+         if (sel) {
+            // the selected arena gets a gold frame, so the choice is obvious
+            gui.rect(mx - 1.0F, my - 1.0F, mW + 2.0F, 18.0F, 0x80FFD84A);
+            gui.rect(mx, my, mW, 16.0F, 0x303A2A10);
+         }
          ui.button(lbl, mx, my, mW, 16.0F, true,
             mName + " (" + mTheme + "): " + mInfo,
             () -> {
@@ -1731,6 +2073,7 @@ final class Screens {
          ui.preview = new WorldPreview(96, 60, 20, true);
       }
       ui.preview.update(ui.randomSeed + ws.mapId * 1337L, ws);
+      gui.rect(x1 - 2.0F, py + 4.0F, colW + 4.0F, pvH + 4.0F, 0x7098C4FF);
       gui.rect(x1 - 1, py + 5.0F, colW + 2, pvH + 2, 0xFF000000);
       gui.image(ui.preview.img, x1, py + 6.0F, colW, pvH);
 
@@ -1741,6 +2084,8 @@ final class Screens {
       }
 
       float third = (pw - 8.0F) / 3.0F;
+      gui.centered(Game.clipText(ws.typeName() + "  -  " + ws.mapName(), pw), cx, py + ph - 12.0F, Ui.GOLD, true, 1.0F);
+      gui.rect(px - 1.0F, footY - 1.0F, third + 2.0F, 22.0F, 0x80FFD84A);
       ui.button("Play Now", px, footY, third, 20.0F, true,
          "Jump straight into the " + ws.typeName() + " (" + ws.mapName() + ") match!",
          () -> {

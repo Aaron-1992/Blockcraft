@@ -127,9 +127,9 @@ final class Tests619 {
    static void advancedTab() throws Exception {
       Game g = screen(343, 1600); // tall enough for every one of the 44 scrolling rows
       g.opt.debugVideo = true;
-      g.ui.optTab = 4;
+      g.ui.optTab = Screens.ADV_TAB;
       Screens.options(g);
-      eq(5, Screens.tabs(g.opt).length, "the debug switch still shows five tabs");
+      eq(8, Screens.tabs(g.opt).length, "the debug switch still shows eight tabs");
       check(button(g, "Moon Shadows"), "moon shadows are configurable");
       check(button(g, "Entity Shadows"), "entity shadows are configurable");
       check(button(g, "Hand Lighting"), "shader hand lighting is configurable");

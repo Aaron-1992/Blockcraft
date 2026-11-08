@@ -45,6 +45,25 @@ final class Scenes {
             g.newSettings.mapId = WorldSettings.MAP_COVE;
             Screens.minigames(g);
             break;
+         case "sp-hub":
+            g.screen = Game.S.SP_HUB;
+            g.newSettings = new WorldSettings();
+            Screens.singleplayer(g);
+            break;
+         case "mp-hub":
+            g.screen = Game.S.MP_HUB;
+            g.newSettings = new WorldSettings();
+            g.focusField = 0;
+            Screens.mpHub(g);
+            break;
+         case "mp-create":
+            g.screen = Game.S.MP_CREATE;
+            g.newSettings = new WorldSettings();
+            g.newName = "";
+            g.seedField = "";
+            g.focusField = 0;
+            Screens.mpCreate(g);
+            break;
          case "worlds":
          case "worlds-long":
          case "worlds-empty": {
@@ -99,8 +118,16 @@ final class Scenes {
          case "options-1":
          case "options-2":
          case "options-3":
+         case "options-4":
+         case "options-5":
+         case "options-6":
+         case "options-7":
             g.screen = Game.S.OPTIONS;
-            g.ui.optTab = name.charAt(name.length() - 1) - '0';
+            {
+               int t = name.charAt(name.length() - 1) - '0';
+               g.opt.debugVideo = t >= Screens.ADV_TAB;
+               g.ui.optTab = t;
+            }
             Screens.options(g);
             break;
          case "pause":

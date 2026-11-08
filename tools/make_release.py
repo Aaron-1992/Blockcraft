@@ -545,6 +545,30 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.33":
+        release_notes += (
+            "\n### All menus redone\n\n"
+            "The main screen is now exactly **Singleplayer / Multiplayer / Settings** "
+            "(Trailer and Quit are small footer buttons). Singleplayer opens a hub with "
+            "**Open World** and **Mini Games** cards. Multiplayer opens the same hub plus "
+            "a Server Address field and **Create & Host World** - a full Create New World-style "
+            "screen with a real **world name, seed, player name, game mode, world type, "
+            "structures and a live biome preview**; those values are actually used for the "
+            "hosted world. The Mini Games hub has coloured cards, a highlighted selected arena, "
+            "a framed preview and a prominent Play Now.\n\n"
+            "### Settings: more tabs, less searching\n\n"
+            "Seven focused tabs - **Video, Graphics, Gameplay, Controls, Sound, World, Content** - "
+            "are drawn in two readable rows of four, plus the Debug **Advanced** tab. Sound "
+            "holds volume, 3D acoustics and music; World holds the cave / biome / tree / structure "
+            "generation switches that used to be buried in Advanced; Content holds Skins, Packs, "
+            "Mods, Credits, the trailer, the gallery and the tilesheet. Every screen is still "
+            "checked at seven window sizes by the headless layout test.\n\n"
+            "### Verification\n\n"
+            "Headless unit suite with five new V6.33 regression groups, strict equivalence, all "
+            "21 GLSL programs, `tools/verify_release.py`, and `docs/screenshots/v6.33-menus.png` "
+            "(a software render of all nine redesigned screens, NOT a GPU screenshot). No "
+            "real-GPU/Windows playtest is claimed.\n"
+        )
     if version == "6.32":
         release_notes += (
             "\n### Caves rebuilt to Minecraft density\n\n"

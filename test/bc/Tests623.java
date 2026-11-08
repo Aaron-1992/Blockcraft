@@ -148,7 +148,7 @@ final class Tests623 {
    static void advancedTab() throws Exception {
       Game g = screen(343, 1900); // tall enough for every one of the 61 scrolling rows
       g.opt.debugVideo = true;
-      g.ui.optTab = 4;
+      g.ui.optTab = Screens.ADV_TAB;
       Screens.options(g);
       eq(61, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
       check(button(g, "Tree Size"), "tree size is configurable in game");
@@ -390,7 +390,7 @@ final class Tests623 {
    }
 
    static void wiring() {
-      eq("6.32", Game.VERSION_STR, "the game version is 6.32");
+      eq("6.33", Game.VERSION_STR, "the game version is 6.33");
       Game g = screen(480, 360);
       g.opt.treeScale = 1.3F;
       g.opt.giantTrees = false;

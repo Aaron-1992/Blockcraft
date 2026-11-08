@@ -150,7 +150,7 @@ final class Tests622 {
    static void advancedTab() throws Exception {
       Game g = screen(343, 1800); // tall enough for every one of the 60 scrolling rows
       g.opt.debugVideo = true;
-      g.ui.optTab = 4;
+      g.ui.optTab = Screens.ADV_TAB;
       Screens.options(g);
       eq(61, Screens.ADV_ROWS, "the Advanced tab knows every row it has");
       check(button(g, "Caves & Cliffs"), "the Caves & Cliffs carver is configurable");

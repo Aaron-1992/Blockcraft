@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.32  -  an original Minecraft-style voxel sandbox   (EDITION V6.32)
+BLOCKCRAFT V6.33  -  an original Minecraft-style voxel sandbox   (EDITION V6.33)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,38 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.33 - ALL MENUS REDONE
+
+  * MAIN SCREEN: exactly three big buttons - Singleplayer,
+    Multiplayer and Settings. "Trailer (1:00)" and "Quit Game"
+    are small footer buttons, so the menu is no longer a wall.
+  * SINGLEPLAYER opens a hub with two clearly drawn cards:
+    "Open World" (your saved worlds / Create New World) and
+    "Mini Games" (the Console Edition modes). Also an All Blocks
+    Gallery shortcut and a Back button.
+  * MULTIPLAYER opens the same hub, with actual names and stuff:
+    "Open World" (the full join / host / Share Code screen),
+    "Mini Games", "Create & Host World", a Server Address field
+    with a Join button, and Back.
+  * CREATE MULTIPLAYER WORLD is laid out just like singleplayer
+    creation: World Name, Seed, Player Name, Game Mode, World Type,
+    Structures, Bonus Chest, a live biome preview, and a
+    "Create & Host" button. The name, seed, mode and type are
+    really used for the hosted world.
+  * MINI GAMES looks better: a gold header rule, two coloured
+    cards, a gold frame on the selected arena map, a framed live
+    preview, a mode banner and a highlighted "Play Now".
+  * SETTINGS has MORE TABS so you don't have to search: Video,
+    Graphics, Gameplay, Controls, Sound, World and Content, drawn
+    in two rows of four so labels stay readable on small windows.
+    Sound holds volume / 3D acoustics / music; World holds the
+    cave, biome, tree and structure generation switches that used
+    to be buried in Advanced; Content holds Skins, Packs, Mods,
+    Credits, the trailer, the gallery and the tilesheet.
+    Debug Video still unlocks the eighth Advanced tab.
+  * V6.32 caves, V6.31 LOD cross-fades, borderless fullscreen
+    and everything earlier are unchanged.
 
 WHAT'S NEW IN V6.32 - THE WORLD IS SOLID AGAIN
 

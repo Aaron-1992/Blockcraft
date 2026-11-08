@@ -176,6 +176,9 @@ public final class Net319 {
    public static String statusText = "Ready — Host a world, launch Server.bat, or join via IP / Share Code";
    public static int mpWorldType = WorldSettings.DEFAULT;
    public static int mpGameMode = 0; // 0=Survival, 1=Creative, 2=Adventure, 3=Spectator
+   /** V6.33: the name and seed chosen on the Create Multiplayer World screen. */
+   public static String mpWorldName = "Multiplayer World";
+   public static long mpSeed = 0L;
    public static boolean mpWorldwide = true;
    public static volatile String publicAddress = "";
    public static volatile String shareCode = "";
@@ -1173,7 +1176,9 @@ public final class Net319 {
          SkyGen.resetMatchState();
       }
       if (g.world == null || ws.isMinigame() || (g.world.settings != null && g.world.settings.type != mpWorldType)) {
-         long seed = ws.isMinigame() ? (System.currentTimeMillis() & 0x7FFFFFFFL) : 20260400L;
+         long seed = ws.isMinigame() ? (System.currentTimeMillis() & 0x7FFFFFFFL)
+            : (mpSeed != 0L ? mpSeed : 20260400L);
+         g.worldDisplayName = mpWorldName;
          Gen tmpGen = Dim.makeGen(Dim.OVERWORLD, seed, ws);
          int[] sp = tmpGen.findSpawn();
          g.joinMultiplayerWorld(seed, 0, 1000L, sp[0] + 0.5, Math.max(65.0, sp[1]), sp[2] + 0.5, mpWorldType, mpGameMode, ws.mapId);
