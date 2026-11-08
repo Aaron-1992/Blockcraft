@@ -401,8 +401,8 @@ public final class Panorama {
                + 1.8 * Math.sin(x * 0.73 - layer);
             int shownH = (int)Math.max(h + relief, Gen.SEA);
             int base = water ? 0x2F55B0 : WorldPreview.color(biome);
-            if (!water && shownH > 150 && biome != Biomes.DESERT && biome != Biomes.BADLANDS) {
-               base = mix(base, 0xF4F8FA, Math.min(1.0F, (shownH - 150) / 40.0F));
+            if (!water && shownH > 150 + Gen.depth() && biome != Biomes.DESERT && biome != Biomes.BADLANDS) {
+               base = mix(base, 0xF4F8FA, Math.min(1.0F, (shownH - 150 - Gen.depth()) / 40.0F));
             }
             float shade = haze * (0.9F + Math.min(0.2F, (shownH - Gen.SEA) / 400.0F));
             int col = 0xFF000000
@@ -545,7 +545,7 @@ public final class Panorama {
    static double[] score(Gen gen, int x, int z) {
       Gen.Col centreCol = gen.column(x, z);
       int centre = centreCol.h;
-      if (centre < Gen.SEA + 3 || centre > 112) {
+      if (centre < Gen.SEA + 3 || centre > 112 + Gen.depth()) {
          return null;
       }
 

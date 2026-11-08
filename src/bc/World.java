@@ -226,7 +226,7 @@ public final class World {
    }
 
    public int getBlock(int var1, int var2, int var3) {
-      if (var2 >= 0 && var2 <= 255) {
+      if (var2 >= 0 && var2 < Chunk.H) {
          Chunk var4 = this.chunk(var1 >> 4, var3 >> 4);
          return var4 == null ? 0 : var4.blocks[Chunk.idx(var1 & 15, var2, var3 & 15)] & BlockState.ID_MASK;
       } else {
@@ -235,7 +235,7 @@ public final class World {
    }
 
    public int getSky(int var1, int var2, int var3) {
-      if (var2 > 255) {
+      if (var2 >= Chunk.H) {
          return 15;
       }
 
@@ -248,7 +248,7 @@ public final class World {
    }
 
    public int getBlk(int var1, int var2, int var3) {
-      if (var2 >= 0 && var2 <= 255) {
+      if (var2 >= 0 && var2 < Chunk.H) {
          Chunk var4 = this.chunkAt(var1, var3);
          return var4 == null ? 0 : var4.blk(var1 & 15, var2, var3 & 15);
       } else {
@@ -423,7 +423,7 @@ public final class World {
                            var19.dirty = true;
                         }
                      } else if (Math.abs(var24) + Math.abs(var25) == 1) {
-                        for (int sy = 0; sy < 16; sy++) {
+                        for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
                            if (!var26.isSectionEmpty(sy) && !var22.isSectionEmpty(sy)) {
                               var26.sections[sy].dirty = true;
                            }
@@ -716,20 +716,22 @@ public final class World {
       }
    }
 
+   /** V6.35: y needs 9 bits (0..383); x/z keep 25 bits each and bits 60..63 stay free for the removal-light tag. */
+   static final int COORD_OFF = 16777216;
    static long pack(int var0, int var1, int var2) {
-      return (long)(var0 + 33554432) << 34 | (long)(var2 + 33554432) << 8 | var1;
+      return (long)(var0 + COORD_OFF) << 34 | (long)(var2 + COORD_OFF) << 9 | (var1 & 511L);
    }
 
    static int ux(long var0) {
-      return (int)(var0 >>> 34 & 67108863L) - 33554432;
+      return (int)(var0 >>> 34 & 33554431L) - COORD_OFF;
    }
 
    static int uz(long var0) {
-      return (int)(var0 >>> 8 & 67108863L) - 33554432;
+      return (int)(var0 >>> 9 & 33554431L) - COORD_OFF;
    }
 
    static int uy(long var0) {
-      return (int)(var0 & 255L);
+      return (int)(var0 & 511L);
    }
 
    private void resetBounds() {
@@ -756,7 +758,7 @@ public final class World {
                Chunk chunk = this.chunk(cx, cz);
                if (chunk != null) {
                   int minSection = Math.max(0, (work.by0 - 1) >> 4);
-                  int maxSection = Math.min(15, (work.by1 + 1) >> 4);
+                  int maxSection = Math.min(Chunk.SECTIONS - 1, (work.by1 + 1) >> 4);
                   for (int sy = minSection; sy <= maxSection; sy++) {
                      chunk.sections[sy].dirty = true;
                   }
@@ -796,7 +798,7 @@ public final class World {
                   int var10 = var4 + DX[var9];
                   int var11 = var5 + DY[var9];
                   int var12 = var6 + DZ[var9];
-                  if (var11 >= minLightY && var11 <= 255) {
+                  if (var11 >= minLightY && var11 < Chunk.H) {
                      int ncx = var10 >> 4;
                      int ncz = var12 >> 4;
                      Chunk var13;
@@ -865,7 +867,7 @@ public final class World {
             int var14 = var10 + DX[var13];
             int var15 = var11 + DY[var13];
             int var16 = var12 + DZ[var13];
-            if (var15 >= minLightY && var15 <= 255) {
+            if (var15 >= minLightY && var15 < Chunk.H) {
                int ncx = var14 >> 4;
                int ncz = var16 >> 4;
                if (ncx != lastCx || ncz != lastCz) {
@@ -940,14 +942,14 @@ public final class World {
                }
             }
             int bulkStartY = Math.max(voidMinY, maxHm + 1);
-            if (bulkStartY < 256) {
-               Arrays.fill(var1.light, bulkStartY << 8, 65536, (byte)0xF0);
+            if (bulkStartY < Chunk.H) {
+               Arrays.fill(var1.light, bulkStartY << 8, Chunk.SIZE, (byte)0xF0);
             }
             // Update 3.12: only the Overworld has a sky - the Nether and the End have no sky light at all
             for (int var5 = 0; var5 < 16; var5++) {
                for (int var6 = 0; var6 < 16; var6++) {
                   int var7 = var1.hm[var5 * 16 + var6];
-                  int colTopY = Math.min(256, bulkStartY);
+                  int colTopY = Math.min(Chunk.H, bulkStartY);
                   for (int var8 = Math.max(voidMinY, var7 + 1); var8 < colTopY; var8++) {
                      var1.setSky(var6, var8, var5, 15);
                   }
@@ -962,7 +964,7 @@ public final class World {
                   int hN = var5 > 0 ? var1.hm[(var5 - 1) * 16 + var6] : (var4[3] == null ? var7 : var4[3].hm[15 * 16 + var6]);
                   if (hN > var21) var21 = hN;
 
-                  int var26 = Math.min(255, Math.max(var7 + 1, var21));
+                  int var26 = Math.min(Chunk.H - 1, Math.max(var7 + 1, var21));
                   int seedStartY = isVoid ? Math.max(36, var7 + 1) : (var7 + 1);
 
                   for (int var28 = seedStartY; var28 <= var26; var28++) {
@@ -977,7 +979,7 @@ public final class World {
 
          short[] var16 = var1.blocks;
 
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
             if (var1.isSectionEmpty(sy)) {
                continue;
             }
@@ -1013,7 +1015,7 @@ public final class World {
       LightScratch work = this.scratch();
       boolean isVoid = this.settings != null && this.settings.isVoidMode();
       int yLo = isVoid ? 36 : 0;
-      int yHi = isVoid ? 148 : 256;
+      int yHi = isVoid ? 148 : Chunk.H;
       for (int var4 = 0; var4 < 4; var4++) {
          Chunk var5 = var3[var4];
          if (var5 != null) {
@@ -1055,7 +1057,7 @@ public final class World {
 
    /** Raw 16-bit saved state: 12-bit block ID plus block-specific property bits. */
    public int getState(int x, int y, int z) {
-      Chunk c = y < 0 || y > 255 ? null : chunkAt(x, z);
+      Chunk c = y < 0 || y >= Chunk.H ? null : chunkAt(x, z);
       return c == null ? 0 : c.blocks[Chunk.idx(x & 15, y, z & 15)] & 0xFFFF;
    }
 
@@ -1076,7 +1078,7 @@ public final class World {
       if (state < 0 || state > 65535) return false;
       LightScratch work = this.scratch();
       int var4 = state & BlockState.ID_MASK;
-      if (var2 >= 0 && var2 <= 255) {
+      if (var2 >= 0 && var2 < Chunk.H) {
          Chunk var5 = this.chunkAt(var1, var3);
          if (var5 == null) {
             return false;
@@ -1123,7 +1125,7 @@ public final class World {
             int var12 = 0;
             if (!var10) {
                var12 = Blocks.emit[var4];
-            } else if (this.dim == Dim.OVERWORLD && Blocks.opacity[var4] == 0 && (var2 == 255 || this.getSky(var1, var2 + 1, var3) == 15)) {
+            } else if (this.dim == Dim.OVERWORLD && Blocks.opacity[var4] == 0 && (var2 == Chunk.H - 1 || this.getSky(var1, var2 + 1, var3) == 15)) {
                var12 = 15;
             }
 
@@ -1139,7 +1141,7 @@ public final class World {
 
             for (int var13 = 0; var13 < 6; var13++) {
                int var14 = var2 + DY[var13];
-               if (var14 >= 0 && var14 <= 255) {
+               if (var14 >= 0 && var14 < Chunk.H) {
                   work.addQ.add(pack(var1 + DX[var13], var14, var3 + DZ[var13]));
                }
             }
@@ -1188,7 +1190,7 @@ public final class World {
          int var5 = var4 < 0 ? var1 : var1 + DX[var4];
          int var6 = var4 < 0 ? var2 : var2 + DY[var4];
          int var7 = var4 < 0 ? var3 : var3 + DZ[var4];
-         if (var6 >= 0 && var6 <= 255) {
+         if (var6 >= 0 && var6 < Chunk.H) {
             int var8 = this.getBlock(var5, var6, var7);
             if (WaterPhysics.contains(this, var5, var6, var7)) scheduleFluid(var5, var6, var7, 5);
             if (Blocks.isFluid(var8)) {

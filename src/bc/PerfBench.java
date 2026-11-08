@@ -69,7 +69,7 @@ final class PerfBench {
                return false;
             }
 
-            for (int sy = 0; sy < 16; sy++) {
+            for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
                Chunk.Section s = c.sections[sy];
                if (s.inFlight || s.dirty && !c.isSectionEmpty(sy) && g.rend.meshCandidate(w, c, sy)) {
                   return false;
@@ -86,7 +86,7 @@ final class PerfBench {
       int vboSections = 0;
       int deferredSections = 0;
       for (Chunk c : g.world.chunks.values()) {
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
             Chunk.Section section = c.sections[sy];
             if (section.vboO != 0 || section.vboT != 0) {
                vboSections++;

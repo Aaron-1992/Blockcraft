@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.34  -  an original Minecraft-style voxel sandbox   (EDITION V6.34)
+BLOCKCRAFT V6.35  -  an original Minecraft-style voxel sandbox   (EDITION V6.35)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,38 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.35 - DEEP WORLDS, CRAZIER CAVES, ALL-NEW MENUS
+
+  * WORLDS ARE 384 BLOCKS TALL. New worlds lift the terrain and
+    sea level by 128 (sea 63 -> 191), so there are ~190 blocks of
+    underground below sea level instead of ~62. Mountains reach
+    above y=330. You can genuinely get completely lost down there.
+    Old saves load with depth 0 and keep their classic height.
+  * CAVES GET CRAZIER THE DEEPER YOU GO. caveVer 8 keeps the one
+    continuous 3D cave volume (no drilled shafts) but adds a depth
+    gradient: widening worm tunnels, lower cheese gates, cathedral
+    "mega" chambers below ~y=100, a cross-sheared abyss maze, bigger
+    and more frequent giant halls, lava seas and crystal fields.
+    Headless cross-section: 47.2% carved in the abyss, 30.4% deep,
+    6.3% middle, 4.0% in the daylight layer. The surface is intact.
+    See docs/screenshots/v6.35-caves.png (NOT a GPU screenshot).
+  * 12 UNDERGROUND STRUCTURES, all carved by the SAME cave air
+    function: Mineshaft, Dungeon, Stronghold, Amethyst Geode,
+    Ancient City, Ruined Portal, Crystal Cathedral, Fossil Hall,
+    Lava Forge, Lost Library, Abyssal Maze and Sunken Vault. They
+    grow with depth and get extra abyss-only sites.
+  * EVERY MENU REBUILT FROM SCRATCH as the "Atlas UI": a nav rail,
+    numbered glass cards, a cyan header rule and a common footer.
+    Main menu, both hubs, Create New World, Create Multiplayer
+    World, world list, multiplayer, mini games, settings (7 tabs
+    plus Debug Advanced), pause, more, packs, mods, credits,
+    loading and lobby are all new. THE LIVE WORLD-MAP PREVIEW ON
+    CREATE NEW WORLD IS KEPT and now previews the real world depth.
+    All 61 advanced video settings are still behind Debug Video.
+    See docs/screenshots/v6.35-menus.png (software render).
+  * New "Deep World" switch in Settings > World and on Create New
+    World. No Mojang code or assets.
 
 WHAT'S NEW IN V6.34 - CAVES AND STRUCTURES COMPLETELY REDONE
 

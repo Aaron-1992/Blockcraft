@@ -128,7 +128,7 @@ final class TestsPerf {
             chunk.set(1, 160, 1, Blocks.STONE);
             chunk.recomputeSectionOccupancy();
             chunk.lit = true;
-            for (int sy = 0; sy < 16; sy++) {
+            for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
                if (sy != 5 && sy != 10) {
                   chunk.markMeshed(sy);
                   chunk.sections[sy].dirty = false;

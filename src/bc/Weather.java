@@ -717,7 +717,7 @@ public final class Weather {
             return c.hm[(z & 15) * 16 + (x & 15)];
          }
 
-         return Math.max(62, this.world.gen.column(x, z).h);
+         return Math.max(Gen.SEA - 1, this.world.gen.column(x, z).h);
       }
 
       return 64;

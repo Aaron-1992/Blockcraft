@@ -1,12 +1,20 @@
 package bc;
 
 public final class Chunk {
-   public static final int H = 256;
+   /**
+    * V6.35: the world is 384 blocks tall (24 sections) so a deep world can put
+    * ~190 blocks of caves below sea level. The old 0..255 part of every save is
+    * byte-for-byte compatible; blocks at y=256..383 live in a trailer.
+    */
+   public static final int H = 384;
+   public static final int SECTIONS = H >> 4;
+   public static final int SIZE = 256 * H;
+   public static final int CLASSIC_SIZE = 65536;
    public final int cx;
    public final int cz;
    /** Update 3.12: block ids are 12 bits wide (0..4095), so the array holds shorts (Update 3.5 - 3.11 used one byte per block). */
-   public final short[] blocks = new short[65536];
-   public final byte[] light = new byte[65536];
+   public final short[] blocks = new short[SIZE];
+   public final byte[] light = new byte[SIZE];
    public final int[] hm = new int[256];
    public final int[] grassColor = new int[256];
    public final int[] foliageColor = new int[256];
@@ -23,14 +31,14 @@ public final class Chunk {
    public volatile boolean lit;
    public volatile boolean lighting;
    public volatile boolean unloaded;
-   public final Chunk.Section[] sections = new Chunk.Section[16];
+   public final Chunk.Section[] sections = new Chunk.Section[SECTIONS];
 
    public Chunk(int var1, int var2) {
       this.cx = var1;
       this.cz = var2;
       java.util.Arrays.fill(this.waterColor, 0xFFFFFF);
 
-      for (int var3 = 0; var3 < 16; var3++) {
+      for (int var3 = 0; var3 < SECTIONS; var3++) {
          this.sections[var3] = new Chunk.Section();
       }
    }
@@ -51,23 +59,25 @@ public final class Chunk {
 
    /** Marks the extension of a chunk file that holds block ids above 255 (see {@link #writeBlocks}). */
    static final int EXT_MAGIC = 0x42435831; // "BCX1"
+   /** V6.35: marks the trailer holding block ids for y=256..383. */
+   static final int DEEP_MAGIC = 0x42434450; // "BCDP"
 
    /**
-    * Update 3.12: the block part of a chunk file. Files of Update 3.5 - 3.11 hold the 65536 block ids as bytes; this format keeps that part
-    * unchanged (the low 8 bits of every id, so old files stay readable and an old game still reads the blocks it knows) and appends the
-    * high 4 bits as a second array behind a magic number - only when some id is above 255.
+    * Writes the block part of a chunk file. The first 65536 ids (y=0..255) keep
+    * the exact 3.5/3.12 layout so old games and old saves still read them. The
+    * V6.35 high blocks are appended as a trailer; an old reader sees an unknown
+    * magic and simply stops, which is safe.
     */
    static void writeBlocks(java.io.DataOutputStream out, short[] blocks) throws java.io.IOException {
-      byte[] lo = new byte[blocks.length];
+      byte[] lo = new byte[CLASSIC_SIZE];
       byte[] hi = null;
-      for (int i = 0; i < blocks.length; i++) {
+      for (int i = 0; i < CLASSIC_SIZE; i++) {
          int id = blocks[i] & 0xFFFF;
          lo[i] = (byte)id;
          if (id > 255) {
             if (hi == null) {
-               hi = new byte[blocks.length];
+               hi = new byte[CLASSIC_SIZE];
             }
-
             hi[i] = (byte)(id >> 8);
          }
       }
@@ -77,13 +87,32 @@ public final class Chunk {
          out.writeInt(EXT_MAGIC);
          out.write(hi);
       }
+
+      int extra = blocks.length - CLASSIC_SIZE;
+      if (extra > 0) {
+         boolean any = false;
+         for (int i = CLASSIC_SIZE; i < blocks.length; i++) {
+            if (blocks[i] != 0) { any = true; break; }
+         }
+         if (any) {
+            out.writeInt(DEEP_MAGIC);
+            out.writeInt(extra);
+            for (int i = CLASSIC_SIZE; i < blocks.length; i++) {
+               out.writeShort(blocks[i] & 0xFFFF);
+            }
+         }
+      }
    }
 
-   /** The counterpart of {@link #writeBlocks}: reads the blocks of a chunk file written by any version since 3.5 into {@code dst} (65536 ids). */
+   /**
+    * Reads a chunk file written by any version since 3.5. {@code dst} may be a
+    * classic 65536-element scratch array (the deep trailer is then ignored) or
+    * a full V6.35 chunk array.
+    */
    static void readBlocks(java.io.DataInputStream in, short[] dst) throws java.io.IOException {
-      byte[] lo = new byte[dst.length];
+      byte[] lo = new byte[CLASSIC_SIZE];
       in.readFully(lo);
-      for (int i = 0; i < dst.length; i++) {
+      for (int i = 0; i < CLASSIC_SIZE; i++) {
          dst[i] = (short)(lo[i] & 255);
       }
 
@@ -93,16 +122,25 @@ public final class Chunk {
       }
 
       int magic = b0 << 24 | in.readUnsignedByte() << 16 | in.readUnsignedByte() << 8 | in.readUnsignedByte();
-      if (magic != EXT_MAGIC) {
-         return; // unknown trailer: ignore it
-      }
-
-      byte[] hi = new byte[dst.length];
-      in.readFully(hi);
-      for (int i = 0; i < dst.length; i++) {
-         if (hi[i] != 0) {
-            dst[i] = (short)((hi[i] & 255) << 8 | lo[i] & 255);
+      if (magic == EXT_MAGIC) {
+         byte[] hi = new byte[CLASSIC_SIZE];
+         in.readFully(hi);
+         for (int i = 0; i < CLASSIC_SIZE; i++) {
+            if (hi[i] != 0) {
+               dst[i] = (short)((hi[i] & 255) << 8 | lo[i] & 255);
+            }
          }
+         int d0 = in.read();
+         if (d0 < 0) return;
+         magic = d0 << 24 | in.readUnsignedByte() << 16 | in.readUnsignedByte() << 8 | in.readUnsignedByte();
+      }
+      if (magic != DEEP_MAGIC || dst.length < SIZE) {
+         return; // unknown trailer or a classic-sized scratch buffer
+      }
+      int extra = in.readInt();
+      if (extra != SIZE - CLASSIC_SIZE) return;
+      for (int i = CLASSIC_SIZE; i < SIZE; i++) {
+         dst[i] = (short)(in.readUnsignedShort());
       }
    }
 
@@ -133,7 +171,7 @@ public final class Chunk {
 
    /** Rebuilds section occupancy once after a generator, disk load, or direct bulk edit. */
    public void recomputeSectionOccupancy() {
-      for (int sy = 0; sy < 16; sy++) {
+      for (int sy = 0; sy < SECTIONS; sy++) {
          int count = 0;
          int start = sy << 12;
          int end = start + 4096;
@@ -199,7 +237,7 @@ public final class Chunk {
     * so the section emits 0 vertices and has CaveCull connectivity 0L.
     */
    public boolean isSectionFullyEnclosedOpaque(World w, int sy) {
-      if (sy >= 15 || w == null) {
+      if (sy >= SECTIONS - 1 || w == null) {
          return false;
       }
       boolean[] op = Blocks.opaque;
@@ -212,10 +250,12 @@ public final class Chunk {
          }
       }
       // Check plane immediately above (y = (sy << 4) + 16)
-      int topBase = (sy + 1) << 12;
-      for (int i = topBase; i < topBase + 256; i++) {
-         if (!op[b[i] & BlockState.ID_MASK]) {
-            return false;
+      if (sy + 1 < SECTIONS) {
+         int topBase = (sy + 1) << 12;
+         for (int i = topBase; i < topBase + 256; i++) {
+            if (!op[b[i] & BlockState.ID_MASK]) {
+               return false;
+            }
          }
       }
       // Check plane immediately below (if sy > 0; sy == 0 has solid bedrock below in Mesher)
@@ -257,7 +297,7 @@ public final class Chunk {
    public void computeHeightmap() {
       for (int var1 = 0; var1 < 16; var1++) {
          for (int var2 = 0; var2 < 16; var2++) {
-            int var3 = 255;
+            int var3 = H - 1;
 
             while (var3 > 0 && Blocks.opacity[this.blocks[idx(var2, var3, var1)] & BlockState.ID_MASK] == 0) {
                var3--;

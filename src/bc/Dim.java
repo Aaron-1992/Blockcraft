@@ -99,6 +99,9 @@ public final class Dim {
 
    /** Update 3.13: the Overworld generator depends on what the world was created with (the classic one for old worlds). */
    static Gen makeGen(int d, long seed, WorldSettings st) {
+      if (d == OVERWORLD) {
+         Gen.applySea(st);
+      }
       if (d == NETHER) {
          return new NetherGen(seed);
       }

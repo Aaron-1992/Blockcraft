@@ -107,8 +107,8 @@ final class Tests633 {
       check(s.contains("ARENA MAPS") && s.contains("0x80FFD84A")
          && s.contains("gui.centered(Game.clipText(ws.typeName()"),
          "the mini games hub has a proper card look and a selected-map highlight");
-      eq("6.34", Game.VERSION_STR, "the game version is 6.34");
-      eq("6.34", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.34");
+      eq("6.35", Game.VERSION_STR, "the game version is 6.35");
+      eq("6.35", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.35");
       check(src("README.md").contains("V6.33"), "README describes V6.33");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.33"), "the packaged readme describes V6.33");
       check(new File("docs/releases/v6.33.md").isFile(), "V6.33 release notes exist");

@@ -237,7 +237,7 @@ final class CaveCull {
 
    /** Computes accurate connectivity for every section once, on the chunk-generation worker, before the chunk becomes visible. */
    static void computeChunk(Chunk chunk) {
-      for (int sy = 0; sy < 16; sy++) {
+      for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
          Chunk.Section section = chunk.sections[sy];
          section.conn = section.nonAirCount == 0 ? ALL : compute(chunk, sy);
          section.connKnown = true;

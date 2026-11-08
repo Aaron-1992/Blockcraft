@@ -712,15 +712,15 @@ final class Tests311 {
          }
       });
 
-      test("covered: a chunk counts as meshed once all 16 sections were, and stays so while a section is being meshed again", () -> {
+      test("covered: a chunk counts as meshed once all 24 sections were, and stays so while a section is being meshed again", () -> {
          Chunk c = new Chunk(0, 0);
-         for (int sy = 0; sy < 15; sy++) {
+         for (int sy = 0; sy < Chunk.SECTIONS - 1; sy++) {
             c.markMeshed(sy);
             check(!c.everMeshed, "not yet after " + (sy + 1) + " sections");
          }
 
-         c.markMeshed(15);
-         check(c.everMeshed, "all 16");
+         c.markMeshed(Chunk.SECTIONS - 1);
+         check(c.everMeshed, "all " + Chunk.SECTIONS);
          c.sections[7].dirty = true;
          c.sections[7].inFlight = true;
          check(c.everMeshed, "a section that is re-meshed does not uncover the chunk");

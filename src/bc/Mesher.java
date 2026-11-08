@@ -152,7 +152,7 @@ public final class Mesher {
             if (var12 < 0) {
                Arrays.fill(var22, rowBase, rowBase + 18, (short)6);
                Arrays.fill(var23, rowBase, rowBase + 18, (byte)0);
-            } else if (var12 > 255) {
+            } else if (var12 >= Chunk.H) {
                Arrays.fill(var22, rowBase, rowBase + 18, (short)0);
                Arrays.fill(var23, rowBase, rowBase + 18, (byte)-16);
             } else {

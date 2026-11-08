@@ -103,6 +103,9 @@ public final class TerraGen extends Gen {
       double bad;
       double isle;
       double tEff;
+      /** V6.35: height before the deep-world lift; climate/biome rules use this. */
+      int genH;
+      /** Absolute block height = genH + settings.depth. */
       int h;
       int biome;
       /** Update 6.22: neighbour biome across a climate border and the 0..1 border weight. */
@@ -284,13 +287,14 @@ public final class TerraGen extends Gen {
       o.sw = sw;
       o.bad = bad;
       o.isle = isle;
-      o.h = (int)clamp(Math.floor(hd), 4.0, 245.0);
-      o.tEff = t - Math.max(0.0, o.h - 82.0) * 0.0035;
+      o.genH = (int)clamp(Math.floor(hd), 4.0, 245.0);
+      o.h = o.genH + this.st.depth;
+      o.tEff = t - Math.max(0.0, o.genH - 82.0) * 0.0035;
       int b0 = pick(o);
       double bandW = borders > 0 ? (borders >= 2 ? 0.065 : 0.038) : 0.0;
       double blend = borders > 0 ? clamp(1.0 - climateEdge(t, hu) / bandW, 0.0, 1.0) : 0.0;
       int alt = -1;
-      if (blend > 0.0 && !Biomes.ocean(b0) && !Biomes.river(b0) && o.h >= 61) {
+      if (blend > 0.0 && !Biomes.ocean(b0) && !Biomes.river(b0) && o.genH >= 61) {
          double t0 = o.t, hu0 = o.hu;
          o.t = clamp(t0 + bandW, 0.0, 1.0);
          int a1 = pick(o);
@@ -309,11 +313,11 @@ public final class TerraGen extends Gen {
       o.biome = b0;
       o.altBiome = alt;
       o.blend = blend;
-      if (st.aquatic && Biomes.ocean(o.biome)) o.biome=Aquatic.ocean(t,o.h);
+      if (st.aquatic && Biomes.ocean(o.biome)) o.biome=Aquatic.ocean(t,o.genH);
    }
 
    static int pick(Cl o) {
-      int h = o.h;
+      int h = o.genH;
       double t = o.t;
       double hu = o.hu;
       double v = o.v;
@@ -424,6 +428,9 @@ public final class TerraGen extends Gen {
       return c;
    }
 
+   /** V6.35: sea level of this world (63 classic, 191 in a deep world). */
+   int sea() { return 63 + this.st.depth; }
+
    int heightAt(int x, int z) {
       Cl s = new Cl();
       this.sample(x, z, s);
@@ -476,7 +483,7 @@ public final class TerraGen extends Gen {
    /** rule[0] top, [1] filler, [2] filler depth below the top, [3] block under the filler, [4] its depth. */
    void surface(Cl s, int slope, int wx, int wz, int[] rule) {
       int b = s.biome;
-      int h = s.h;
+      int h = s.genH;   // climate/snow/beach rules live in the unshifted height space
       // Update 6.22: across a border band the two biomes' surfaces interleave column by column,
       // so sand turns into grass (or podzol into dirt) gradually instead of at one hard line.
       if (s.blend > 0.42 && s.altBiome >= 0 && s.altBiome != b && this.st.biomeBorders > 0) {
@@ -707,6 +714,7 @@ public final class TerraGen extends Gen {
       final boolean cc5 = ver3 && this.st.caveVer >= 5;   // V6.31: caves break through the ground
       final boolean cc6 = ver3 && this.st.caveVer >= 6;   // V6.32: Minecraft-density caves
       final boolean cc7 = ver3 && this.st.caveVer >= 7;   // V6.34: one 3D cave volume, structures inside it
+      final boolean cc8 = ver3 && this.st.caveVer >= 8;   // V6.35: depth-scaled caves in a 384-tall world
       int[] hs = new int[256];
       int[] bm = new int[256];
       int[] rule = new int[5];
@@ -730,7 +738,7 @@ public final class TerraGen extends Gen {
             int fd = rule[2];
             int under = rule[3];
             int ud = rule[4];
-            boolean banded = s.biome == Biomes.BADLANDS && h >= 60;
+            boolean banded = s.biome == Biomes.BADLANDS && s.genH >= 60;
             for (int y = 0; y <= h; y++) {
                int id = 1;
                int d = h - y;
@@ -745,29 +753,31 @@ public final class TerraGen extends Gen {
                } else if (ud > 0 && d <= fd + ud) {
                   id = under;
                } else if (banded && y >= 44) {
-                  id = this.bands[y];
+                  id = this.bands[y & 255];
                }
 
                b[Chunk.idx(x, y, z)] = (short)id;
             }
 
-            for (int y = h + 1; y < 63; y++) {
+            int sea = this.sea();
+            for (int y = h + 1; y < sea; y++) {
                b[Chunk.idx(x, y, z)] = 50;
             }
 
-            if (h < 63 && (s.biome == Biomes.FROZEN_OCEAN || s.biome == Biomes.DEEP_FROZEN_OCEAN || s.biome == Biomes.FROZEN_RIVER)) {
-               b[Chunk.idx(x, 62, z)] = (short)Blocks313.ICE;
+            if (h < sea && (s.biome == Biomes.FROZEN_OCEAN || s.biome == Biomes.DEEP_FROZEN_OCEAN || s.biome == Biomes.FROZEN_RIVER)) {
+               b[Chunk.idx(x, sea - 1, z)] = (short)Blocks313.ICE;
             }
 
             // caves
             // V6.31 has NO built cave mouths: the noise caves themselves are
             // allowed to reach the surface, so openings are all different.
-            CaveCliffs.Mouth[] ms = cc3 && !cc5 && !cc6 && !cc7 && (cc4 || h >= 64) ? this.caves.mouths(wx, wz) : null;
+            CaveCliffs.Mouth[] ms = cc3 && !cc5 && !cc6 && !cc7 && !cc8 && (cc4 || h >= 64) ? this.caves.mouths(wx, wz) : null;
             // V6.34: no entrance objects at all. Dry land is carved right up to
             // the grass by the same 3D cave field that made the caverns below.
-            boolean allowSurface = cc7 ? Caves7.landBiome(s.biome, h)
+            boolean allowSurface = cc8 ? Caves8.landBiome(s.biome, h, sea)
+               : (cc7 ? Caves7.landBiome(s.biome, h)
                : (cc6 ? Caves6.landBiome(s.biome, h)
-               : (cc5 && Caves5.landBiome(s.biome, h)));
+               : (cc5 && Caves5.landBiome(s.biome, h))));
             boolean inMouth = false;
             if (ms != null) {
                for (CaveCliffs.Mouth m : ms) if (m.surfaceHole(wx, wz)) { inMouth = true; break; }
@@ -775,13 +785,13 @@ public final class TerraGen extends Gen {
             int top2 = h - 3;
             // V6.29: with real walk-in cave mouths, the old noise sinkholes and
             // vertical shafts (the endless cracks in the ground) are switched off.
-            boolean mouth = !cc4 && !cc5 && !cc6 && !cc7 && h >= 64 && (ver3 ? this.caves.mouth(wx, wz) : this.entranceBig(wx, wz)) && s.biome != Biomes.MUSHROOM;
-            boolean shaft = ver3 && !cc4 && !cc5 && !cc6 && !cc7 && CaveWorks.shaft(this.seed, wx, wz);
+            boolean mouth = !cc4 && !cc5 && !cc6 && !cc7 && !cc8 && h >= 64 && (ver3 ? this.caves.mouth(wx, wz) : this.entranceBig(wx, wz)) && s.biome != Biomes.MUSHROOM;
+            boolean shaft = ver3 && !cc4 && !cc5 && !cc6 && !cc7 && !cc8 && CaveWorks.shaft(this.seed, wx, wz);
             if (mouth || shaft || inMouth || allowSurface) {
                top2 = h;
             }
 
-            if (h < 64) {
+            if (h < sea + 1) {
                top2 = Math.min(top2, h - 6);
             }
 
@@ -792,7 +802,15 @@ public final class TerraGen extends Gen {
                   continue;
                }
 
-               if (cc7) {
+               if (cc8) {
+                  // V6.35: ONE 3D cave volume with a depth gradient, carved
+                  // from bedrock to the grass. Crazier the further down you go.
+                  int cv = this.caves.carve8(wx, y, wz, h, allowSurface);
+                  if (cv != 0) {
+                     b[Chunk.idx(x, y, z)] = (short)(cv == CaveCliffs.LAVA ? Blocks.LAVA
+                        : (cv == CaveCliffs.WATER ? Blocks.WATER : 0));
+                  }
+               } else if (cc7) {
                   // V6.34: ONE 3D cave volume, carved from bedrock to the grass.
                   // Where it intersects the terrain it opens naturally - no
                   // shafts, funnels, apertures or drilled holes of any kind.
@@ -858,7 +876,7 @@ public final class TerraGen extends Gen {
 
             // A stone lip makes the mouth read as a cave entrance rather than
             // a random hole, and stops grass/trees growing on its edge.
-            if (ms != null && !cc5 && !cc6 && !cc7 && h >= 64) {
+            if (ms != null && !cc5 && !cc6 && !cc7 && !cc8 && h >= 64) {
                for (CaveCliffs.Mouth m : ms) {
                   if (m.rim(wx, wz)) {
                      b[Chunk.idx(x, h, z)] = (short)Blocks.STONE;
@@ -957,16 +975,17 @@ public final class TerraGen extends Gen {
             int wz = ch.cz * 16 + z;
             float p = r.nextFloat();
             float q = r.nextFloat();
-            if (h < 63) {
+            int sea = this.sea();
+            if (h < sea) {
                // lily pads on the still water of swamps and (rarely) rivers, jungles' pools
-               if (h <= 61 && ch.get(x, 62, z) == 50 && ch.get(x, 63, z) == 0 && (biome == Biomes.SWAMP && p < 0.16F || biome == Biomes.RIVER && p < 0.015F)) {
-                  ch.set(x, 63, z, Blocks313.LILY_PAD);
+               if (h <= sea - 2 && ch.get(x, sea - 1, z) == 50 && ch.get(x, sea, z) == 0 && (biome == Biomes.SWAMP && p < 0.16F || biome == Biomes.RIVER && p < 0.015F)) {
+                  ch.set(x, sea, z, Blocks313.LILY_PAD);
                }
 
                continue;
             }
 
-            if (h > 240) {
+            if (h > 240 + this.st.depth) {
                continue;
             }
 
@@ -1200,7 +1219,7 @@ public final class TerraGen extends Gen {
                }
 
                this.sample(wx, wz, s);
-               if (s.h < 64 || s.h > 232) {
+               if (s.h < this.sea() + 1 || s.h > 232 + this.st.depth) {
                   continue;
                }
 
@@ -1445,13 +1464,13 @@ public final class TerraGen extends Gen {
             int x = (int)(Math.cos(a) * ring);
             int z = (int)(Math.sin(a) * ring);
             Gen.Col c = this.column(x, z);
-            if (c.h >= 65 && c.h <= 100 && Biomes.spawnable(c.biome) && !this.entrance(x, z)
+            if (c.h >= this.sea() + 2 && c.h <= 100 + this.st.depth && Biomes.spawnable(c.biome) && !this.entrance(x, z)
                && this.ravine(x, z) <= 0.0 && !this.caves.mouthSurface(x, z, c.h)) {
                return new int[]{x, c.h + 1, z};
             }
          }
       }
 
-      return new int[]{0, Math.max(65, this.column(0, 0).h) + 1, 0};
+      return new int[]{0, Math.max(this.sea() + 2, this.column(0, 0).h) + 1, 0};
    }
 }

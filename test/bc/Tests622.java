@@ -167,7 +167,7 @@ final class Tests622 {
       Game g = screen(480, 360);
       Screens.applyNewWorldSettings(g);
       eq(3, g.newSettings.terrainVer, "new worlds still use terrainVer 3");
-      eq(7, g.newSettings.caveVer, "new worlds get the V6.34 3D cave-volume carver");
+      eq(8, g.newSettings.caveVer, "new worlds get the V6.35 deep-world carver");
       eq(1, g.newSettings.biomeBorders, "new worlds get smooth biome borders");
       eq(1.0F, g.newSettings.treeDensity, "new worlds copy the tree density");
       g.opt.caveCliffs = false;
@@ -190,7 +190,7 @@ final class Tests622 {
       p.setProperty("biomeborders", "-4");
       p.setProperty("treedensity", "8");
       WorldSettings clamped = WorldSettings.load(p);
-      eq(7, clamped.caveVer, "a future cave version is clamped");
+      eq(8, clamped.caveVer, "a future cave version is clamped");
       eq(0, clamped.biomeBorders, "a bad border setting is clamped");
       eq(1.4F, clamped.treeDensity, "tree density is clamped");
 

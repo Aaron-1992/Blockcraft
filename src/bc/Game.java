@@ -34,7 +34,7 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.34";
+   public static final String VERSION_STR = "6.35";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
@@ -5983,7 +5983,7 @@ public final class Game {
             var17 += this.target.nz;
          }
 
-         if (var16 >= 0 && var16 <= 255 && (Blocks.replaceable[this.world.getBlock(var15,var16,var17)] || var2==283 && BlockState.waterloggable(this.world.getBlock(var15,var16,var17)))) {
+         if (var16 >= 0 && var16 < Chunk.H && (Blocks.replaceable[this.world.getBlock(var15,var16,var17)] || var2==283 && BlockState.waterloggable(this.world.getBlock(var15,var16,var17)))) {
             if(var2==283)WaterPhysics.fill(this.world,var15,var16,var17);
             else this.world.setBlock(var15, var16, var17, Blocks.LAVA);
             this.meshNow(var15, var16, var17);
@@ -6082,7 +6082,7 @@ public final class Game {
       }
 
       int below = this.world.getBlock(h.x, h.y, h.z);
-      if (!Blocks.isWater(below) || Blocks.fluidLevel(below) != 0 || h.y + 1 > 255) {
+      if (!Blocks.isWater(below) || Blocks.fluidLevel(below) != 0 || h.y + 1 >= Chunk.H) {
          return false;
       }
 
@@ -6221,7 +6221,7 @@ public final class Game {
 
             // Update 3.10: slabs and stairs go into the upper half of the cell when you click the underside of a block or the upper half of a side face
             boolean upper = !var7 && (this.target.ny == -1 || this.target.ny == 0 && this.target.fy > 0.5);
-            if (var4 >= 0 && var4 <= 255) {
+            if (var4 >= 0 && var4 < Chunk.H) {
                int var11 = this.world.getBlock(var3, var4, var5);
                if (slabMat >= 0 && Blocks.isSlab(var11) && Blocks.stairSlabMaterial(var11) == slabMat) {
                   // the cell next to the clicked face already has such a slab (in either half): both together are the full block
@@ -6325,7 +6325,7 @@ public final class Game {
 
                boolean tallPlant = Blocks313.isDouble(var2) && !Blocks313.isDoubleUpper(var2);
                if (tallPlant) {
-                  int above = var4 + 1 > 255 ? 1 : this.world.getBlock(var3, var4 + 1, var5);
+                  int above = var4 + 1 >= Chunk.H ? 1 : this.world.getBlock(var3, var4 + 1, var5);
                   if (above != 0 && !Blocks.replaceable[above]) {
                      return false;
                   }
@@ -6546,36 +6546,38 @@ public final class Game {
       if(System.getProperty("bc.auto")!=null&&Boolean.getBoolean("bc.worldonly"))return;
       Perf.mark(Perf.GUI);
       this.gui.begin(this.fbW, this.fbH, var1);
+      // V6.35: every menu is drawn by the new Atlas UI (Menus635). The old
+      // Screens.* menu methods are kept only as a regression/compatibility surface.
       switch (this.screen) {
          case TITLE:
-            Screens.title(this);
+            Menus635.title(this);
             break;
          case WORLDS:
-            Screens.worlds(this);
+            Menus635.worlds(this);
             break;
          case MULTIPLAYER:
-            Screens.multiplayer(this);
+            Menus635.multiplayer(this);
             break;
          case NEWWORLD:
-            Screens.newWorld(this);
+            Menus635.newWorld(this);
             break;
          case MINIGAMES:
-            Screens.minigames(this);
+            Menus635.minigames(this);
             break;
          case SP_HUB:
-            Screens.singleplayer(this);
+            Menus635.singleplayer(this);
             break;
          case MP_HUB:
-            Screens.mpHub(this);
+            Menus635.mpHub(this);
             break;
          case MP_CREATE:
-            Screens.mpCreate(this);
+            Menus635.mpCreate(this);
             break;
          case LOADING:
-            Screens.loading(this);
+            Menus635.loading(this);
             break;
          case WAITING:
-            Screens.waiting(this);
+            Menus635.waiting(this);
             break;
          case MAP:
             MapView.screen(this);
@@ -6586,7 +6588,7 @@ public final class Game {
          default:
             this.drawHud();
             if (this.screen == Game.S.PAUSE) {
-               Screens.pause(this);
+               Menus635.pause(this);
             } else if (this.screen == Game.S.INV) {
                this.drawInventory();
             } else if (this.screen == Game.S.ADV) {
@@ -6599,7 +6601,7 @@ public final class Game {
             Trailer.draw(this);   // V6.30: letterbox + title cards over the real world
             break;
          case MORE:
-            Screens.more(this);
+            Menus635.more(this);
             break;
          case MIDI:
             if(this.midiScreen!=null)this.midiScreen.draw();
@@ -6609,16 +6611,16 @@ public final class Game {
             this.drawSkins();
             break;
          case PACKS:
-            Screens.resourcePacks(this);
+            Menus635.resourcePacks(this);
             break;
          case MODS:
-            Screens.mods(this);
+            Menus635.mods(this);
             break;
          case CREDITS:
-            Screens.credits(this);
+            Menus635.credits(this);
             break;
          case OPTIONS:
-            Screens.options(this);
+            Menus635.options(this);
       }
 
       this.activeBtns = this.btns;

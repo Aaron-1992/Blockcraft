@@ -221,7 +221,7 @@ public final class Renderer {
          return false;
       }
       if (!chunk.everMeshed) {
-         for (int sy = 0; sy < 16; sy++) {
+         for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
             Chunk.Section section = chunk.sections[sy];
             if (!section.meshed && !chunk.isSectionEmpty(sy) && this.meshCandidate(world, chunk, sy)) {
                return false;
@@ -236,7 +236,7 @@ public final class Renderer {
       if (chunk == null || !chunk.lit || chunk.lighting) {
          return false;
       }
-      for (int sy = 0; sy < 16; sy++) {
+      for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
          Chunk.Section section = chunk.sections[sy];
          if ((section.dirty || section.inFlight || !section.meshed) && this.meshCandidate(world, chunk, sy)) {
             return false;
@@ -334,7 +334,7 @@ public final class Renderer {
                Chunk var14 = var1.chunk(var4 + var13[0], var5 + var13[1]);
                if (var14 != null) {
                   boolean hasDirty = false;
-                  for (int sy = 0; sy < 16; sy++) {
+                  for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
                      Section section = var14.sections[sy];
                      if (section.dirty && !section.inFlight
                         && (var14.isSectionEmpty(sy) || this.meshCandidate(var1, var14, sy))) {
@@ -350,7 +350,7 @@ public final class Renderer {
                   }
 
                   // Fast inline pass: clear empty air sections immediately without scanning underground rock on the main thread
-                  for (int sy = 0; sy < 16; sy++) {
+                  for (int sy = 0; sy < Chunk.SECTIONS; sy++) {
                      Section sec = var14.sections[sy];
                      if (sec.dirty && !sec.inFlight && var14.isSectionEmpty(sy)) {
                         sec.dirty = false;
@@ -371,7 +371,7 @@ public final class Renderer {
                      }
                   }
 
-                  int surfSy = Math.max(3, Math.min(14, var14.hm[136] >> 4));
+                  int surfSy = Math.max(0, Math.min(Chunk.SECTIONS - 1, var14.hm[136] >> 4));
                   for (int var17 : SECTION_ORDER[surfSy]) {
                      Section var18 = var14.sections[var17];
                      if (var18.dirty && !var18.inFlight && this.meshCandidate(var1, var14, var17)) {
@@ -412,15 +412,16 @@ public final class Renderer {
 
    /** Visit every section once, even when the surface is above section seven. */
    static int[] sectionOrder(int surface) {
-      int[] order=new int[16];int n=0;
-      for(int step=0;n<16;step++) {
+      int[] order=new int[Chunk.SECTIONS];int n=0;
+      for(int step=0;n<Chunk.SECTIONS;step++) {
          int sy=surface+((step&1)==0?-(step>>1):((step+1)>>1));
-         if(sy>=0&&sy<16)order[n++]=sy;
+         if(sy>=0&&sy<Chunk.SECTIONS)order[n++]=sy;
+         if(step>Chunk.SECTIONS*4)break;
       }
       return order;
    }
-   private static final int[][] SECTION_ORDER=new int[16][];
-   static {for(int sy=0;sy<16;sy++)SECTION_ORDER[sy]=sectionOrder(sy);}
+   private static final int[][] SECTION_ORDER=new int[Chunk.SECTIONS][];
+   static {for(int sy=0;sy<Chunk.SECTIONS;sy++)SECTION_ORDER[sy]=sectionOrder(sy);}
 
    public void uploadMeshes(int var1) {
       this.uploadMeshes(var1, 3000000L);
@@ -587,7 +588,7 @@ public final class Renderer {
                int var8 = var2 + var5 * 16;
                int var9 = var3 + var7 * 16;
                int var10 = var4 + var6 * 16;
-               if (var9 >= 0 && var9 <= 255) {
+               if (var9 >= 0 && var9 < Chunk.H) {
                   Chunk var11 = var1.chunkAt(var8, var10);
                   if (var11 != null) {
                      int var12 = var9 >> 4;
@@ -1358,12 +1359,12 @@ public final class Renderer {
       this.lsY = this.camY;
       this.lsZ = this.camZ;
       int var3 = Math.max(0, (int)this.camY - 14);
-      int var4 = Math.min(255, (int)this.camY + 14);
+      int var4 = Math.min(Chunk.H - 1, (int)this.camY + 14);
       ArrayList<float[]> var5 = new ArrayList<>();
       int var6 = (int)Math.floor(this.camX) >> 4;
       int var7 = (int)Math.floor(this.camZ) >> 4;
-      int syLo = var3 >> 4;
-      int syHi = var4 >> 4;
+      int syLo = Math.max(0, var3 >> 4);
+      int syHi = Math.min(Chunk.SECTIONS - 1, var4 >> 4);
 
       for (int var8 = -2; var8 <= 2; var8++) {
          for (int var9 = -2; var9 <= 2; var9++) {

@@ -117,7 +117,7 @@ final class Landmarks319 {
       for (int dz = 0; dz < d; dz += 3) {
          for (int dx = 0; dx < w; dx += 3) {
             Col cc = gen.column(x0 + dx, z0 + dz);
-            if (cc.h < 63 || Math.abs(cc.h - y0) > 2 || Biomes.ocean(cc.biome) || Biomes.river(cc.biome)) {
+            if (cc.h < Gen.SEA || Math.abs(cc.h - y0) > 2 || Biomes.ocean(cc.biome) || Biomes.river(cc.biome)) {
                return null;
             }
          }

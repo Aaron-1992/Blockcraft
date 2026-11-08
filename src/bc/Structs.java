@@ -122,13 +122,13 @@ public final class Structs {
          var6 = var1 * var5 + 70 + var4.nextInt(var5 - 140);
          var7 = var2 * var5 + 70 + var4.nextInt(var5 - 140);
          Col var11 = this.gen.column(var6, var7);
-         if (Biomes.village(var11.biome) && var11.h >= 65 && var11.h <= 90
+         if (Biomes.village(var11.biome) && var11.h >= Gen.SEA + 2 && var11.h <= 90 + Gen.depth()
             && !caveMouthNear(this.gen, var6, var7)) {
             boolean var12 = true;
 
             for (int[] var16 : new int[][]{{12, 0}, {-12, 0}, {0, 12}, {0, -12}}) {
                Col var17 = this.gen.column(var6 + var16[0], var7 + var16[1]);
-               if (Math.abs(var17.h - var11.h) > 5 || var17.h < 64) {
+               if (Math.abs(var17.h - var11.h) > 5 || var17.h < Gen.SEA + 1) {
                   var12 = false;
                }
             }

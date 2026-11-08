@@ -3,7 +3,15 @@ package bc;
 import java.util.Random;
 
 public class Gen {
-   public static final int SEA = 63;
+   /** Classic sea level. V6.35 deep worlds lift the whole terrain by WorldSettings.depth. */
+   public static final int BASE_SEA = 63;
+   /** The sea level of the currently active generator/world; set by Dim.makeGen. */
+   public static volatile int SEA = BASE_SEA;
+   public static void applySea(WorldSettings st) {
+      SEA = BASE_SEA + (st == null ? 0 : st.depth);
+   }
+   /** How far the active world's terrain was lifted (0 for classic saves). */
+   public static int depth() { return SEA - BASE_SEA; }
    public static final int OCEAN = 0;
    public static final int BEACH = 1;
    public static final int PLAINS = 2;

@@ -152,7 +152,7 @@ final class Circuit {
          List<Long> net=new ArrayList<>();ArrayDeque<Long> q=new ArrayDeque<>();q.add(start);
          while(!q.isEmpty()){
             long k=q.remove();net.add(k);int x=World.ux(k),y=World.uy(k),z=World.uz(k);
-            for(int[] d:DIR)if(y+d[1]>=0&&y+d[1]<=255){long n=World.pack(x+d[0],y+d[1],z+d[2]);if(unseen.remove(n))q.add(n);}
+            for(int[] d:DIR)if(y+d[1]>=0&&y+d[1]<Chunk.H){long n=World.pack(x+d[0],y+d[1],z+d[2]);if(unseen.remove(n))q.add(n);}
          }
          s.nets.add(net);
       }

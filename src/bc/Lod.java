@@ -233,10 +233,10 @@ public final class Lod {
             Col col = this.gen.column(x, z);
             terrain[i] = col.h;
             biome[i] = col.biome;
-            boolean sea = col.h < 63;
+            boolean sea = col.h < Gen.SEA;
             int c;
             if (sea) {
-               float d = Math.min(1.0F, (63 - col.h) / 30.0F);
+               float d = Math.min(1.0F, (Gen.SEA - col.h) / 30.0F);
                c = (int)(58.0F * (1.0F - d * 0.6F)) << 16 | (int)(104.0F * (1.0F - d * 0.5F)) << 8 | (int)(208.0F * (1.0F - d * 0.4F));
                if (col.biome > 6) {
                   c = Biomes.lodWater(col.biome, c);
@@ -266,7 +266,7 @@ public final class Lod {
             }
 
             wet[i] = sea;
-            topY[i] = sea ? 63 : col.h + 1;
+            topY[i] = sea ? Gen.SEA : col.h + 1;
             rgb[i] = c;
          }
       }

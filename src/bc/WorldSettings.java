@@ -241,9 +241,17 @@ public final class WorldSettings {
    public float caveRichness = 1.0F;
    /** Update 6.29: 1 = V6.21 layered caves, 2 = Caves &amp; Cliffs carver, 3 = V6.28 sloped mouths,
     * 4 = V6.29 walk-in cave entrances, 5 = V6.31 natural surface-breaking caves,
-    * 6 = V6.32 Minecraft-density caves and Minecraft-style structures.
+    * 6 = V6.32 Minecraft-density caves and Minecraft-style structures,
+    * 7 = V6.34 one 3D cave volume with integrated structures,
+    * 8 = V6.35 depth-scaled caves in a 384-block-deep world.
     * Old saves keep the version they were created with. */
    public int caveVer = 1;
+   /** V6.35: how far the whole terrain/sea is lifted, in blocks. 0 = the classic
+    * 256-tall world; 128 = a deep world with ~190 blocks of caves below sea level.
+    * Old saves load with 0, so nothing in an existing world ever moves. */
+   public int depth = 0;
+   /** Sea level for this world's generator (63 in classic worlds, 191 in deep ones). */
+   public int sea() { return 63 + this.depth; }
    /** Update 6.22: 0 = sharp legacy biome borders, 1 = smooth, 2 = very smooth. */
    public int biomeBorders = 0;
    /** Update 6.22: global tree-density multiplier (0.4..1.4); lower is much cheaper in taiga. */
@@ -280,6 +288,7 @@ public final class WorldSettings {
       s.caveLakes = this.caveLakes;
       s.caveRichness = this.caveRichness;
       s.caveVer = this.caveVer;
+      s.depth = this.depth;
       s.biomeBorders = this.biomeBorders;
       s.treeDensity = this.treeDensity;
       s.treeScale = this.treeScale;
@@ -330,6 +339,7 @@ public final class WorldSettings {
       p.setProperty("cavelakes", Boolean.toString(this.caveLakes));
       p.setProperty("caverichness", Float.toString(this.caveRichness));
       p.setProperty("cavever", Integer.toString(this.caveVer));
+      p.setProperty("worlddepth", Integer.toString(this.depth));
       p.setProperty("biomeborders", Integer.toString(this.biomeBorders));
       p.setProperty("treedensity", Float.toString(this.treeDensity));
       p.setProperty("treescale", Float.toString(this.treeScale));
@@ -380,13 +390,15 @@ public final class WorldSettings {
       s.caveLayers = Boolean.parseBoolean(p.getProperty("cavelayers", "true"));
       s.caveLakes = Boolean.parseBoolean(p.getProperty("cavelakes", "true"));
       try {
-         s.caveVer = Math.max(1, Math.min(7, Integer.parseInt(p.getProperty("cavever", "1").trim())));
+         s.caveVer = Math.max(1, Math.min(8, Integer.parseInt(p.getProperty("cavever", "1").trim())));
+         s.depth = Math.max(0, Math.min(128, Integer.parseInt(p.getProperty("worlddepth", "0").trim())));
          s.biomeBorders = Math.max(0, Math.min(2, Integer.parseInt(p.getProperty("biomeborders", "0").trim())));
          s.treeDensity = f(p, "treedensity", 1.0F, 0.4F, 1.4F);
          s.treeScale = f(p, "treescale", 1.0F, 0.7F, 1.5F);
          s.giantTrees = Boolean.parseBoolean(p.getProperty("gianttrees", "true"));
       } catch (NumberFormatException e) {
          s.caveVer = 1;
+         s.depth = 0;
          s.biomeBorders = 0;
          s.treeDensity = 1.0F;
          s.treeScale = 1.0F;

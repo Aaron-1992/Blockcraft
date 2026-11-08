@@ -154,7 +154,7 @@ final class MapView {
          base = 0x2F55B0;
       } else if (top == Blocks.SAND || top == Blocks.SANDSTONE) {
          base = 0xE2D69C;
-      } else if (top == Blocks.SNOW || (h > 150 && biome != Biomes.DESERT && biome != Biomes.BADLANDS)) {
+      } else if (top == Blocks.SNOW || (h > 150 + Gen.depth() && biome != Biomes.DESERT && biome != Biomes.BADLANDS)) {
          base = 0xEAF3F7;
       } else if (top == Blocks.STONE) {
          base = 0x8E8E8E;

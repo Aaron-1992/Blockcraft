@@ -98,7 +98,7 @@ final class Tests632 {
       settings(6).save(p);
       eq(6, WorldSettings.load(p).caveVer, "cave version 6 round-trips");
       p.setProperty("cavever", "99");
-      eq(7, WorldSettings.load(p).caveVer, "future cave versions clamp to 7");
+      eq(8, WorldSettings.load(p).caveVer, "future cave versions clamp to 8");
       Properties legacy = new Properties();
       legacy.setProperty("gentype", "0");
       eq(1, WorldSettings.load(legacy).caveVer, "old saves keep their V6.21 caves");
@@ -133,7 +133,7 @@ final class Tests632 {
       check(c6.contains("aperture.noise2") && c6.contains("crater.noise2"),
          "entrances are noise-shaped, not a repeated template");
       String t = src("src/bc/TerraGen.java");
-      check(t.contains("cc3 && !cc5 && !cc6 && !cc7") && t.contains("!cc6 && !cc7 && h >= 64"),
+      check(t.contains("cc3 && !cc5 && !cc6 && !cc7 && !cc8") && t.contains("!cc6 && !cc7 && !cc8 && h >= 64"),
          "no built cave mouths or stone rims are used for V6.32");
    }
 
@@ -194,14 +194,14 @@ final class Tests632 {
    }
 
    static void wiring() throws Exception {
-      eq("6.34", Game.VERSION_STR, "the game version is 6.34");
-      eq("6.34", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.34");
+      eq("6.35", Game.VERSION_STR, "the game version is 6.35");
+      eq("6.35", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.35");
       check(src("README.md").contains("V6.32"), "README describes V6.32");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.32"), "the packaged readme describes V6.32");
       check(new File("docs/releases/v6.32.md").isFile(), "V6.32 release notes exist");
       check(new File("docs/screenshots/v6.32-caves.png").isFile(), "the cave preview exists");
-      check(src("src/bc/Screens.java").contains("g.opt.caveCliffs ? 7 : 1"), "new worlds use caveVer 7");
-      check(src("src/bc/Trailer.java").contains("ws.caveVer = 7"), "the trailer world uses the new caves");
+      check(src("src/bc/Screens.java").contains("g.opt.caveCliffs ? 8 : 1"), "new worlds use caveVer 8");
+      check(src("src/bc/Trailer.java").contains("ws.caveVer = 8"), "the trailer world uses the new caves");
       check(src("tools/build.py").contains("\"Caves6\"")
          && src("tools/verify_release.py").contains("\"Caves6\""),
          "the build receipt and verifier hash the new carver");

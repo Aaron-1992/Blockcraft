@@ -257,7 +257,7 @@ final class Tests634 {
       settings(7).save(p);
       eq(7, WorldSettings.load(p).caveVer, "cave version 7 round-trips");
       p.setProperty("cavever", "99");
-      eq(7, WorldSettings.load(p).caveVer, "future cave versions clamp to 7");
+      eq(8, WorldSettings.load(p).caveVer, "future cave versions clamp to 8");
       for (int v = 1; v <= 6; v++) {
          Properties old = new Properties();
          settings(v).save(old);
@@ -266,19 +266,19 @@ final class Tests634 {
       Properties legacy = new Properties();
       legacy.setProperty("gentype", "0");
       eq(1, WorldSettings.load(legacy).caveVer, "pre-settings saves keep V6.21 caves");
-      check(src("src/bc/Screens.java").contains("g.opt.caveCliffs ? 7 : 1"),
-         "only Create New World selects caveVer 7");
+      check(src("src/bc/Screens.java").contains("g.opt.caveCliffs ? 8 : 1"),
+         "only Create New World selects caveVer 8");
    }
 
    static void wiring() throws Exception {
-      eq("6.34", Game.VERSION_STR, "the game version is 6.34");
-      eq("6.34", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.34");
+      eq("6.35", Game.VERSION_STR, "the game version is 6.35");
+      eq("6.35", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.35");
       check(src("README.md").contains("V6.34"), "README describes V6.34");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.34"),
          "the packaged readme describes V6.34");
       check(new File("docs/releases/v6.34.md").isFile(), "V6.34 release notes exist");
       check(new File("docs/screenshots/v6.34-caves.png").isFile(), "the cave preview exists");
-      check(src("src/bc/Trailer.java").contains("ws.caveVer = 7"), "the trailer uses the new caves");
+      check(src("src/bc/Trailer.java").contains("ws.caveVer = 8"), "the trailer uses the new caves");
       check(src("tools/build.py").contains("\"Caves7\"")
          && src("tools/verify_release.py").contains("\"Caves7\""),
          "the build receipt and verifier hash the new carver and structures");

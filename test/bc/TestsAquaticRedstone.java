@@ -9,11 +9,12 @@ public final class TestsAquaticRedstone {
    static void advance(World w,int ticks){for(int i=0;i<ticks;i++)w.tick();}
    public static void main(String[] args){run();System.out.println("Aquatic/redstone: "+passed+" passed, "+failed+" failed");System.exit(failed==0?0:1);}
    static void run(){
-      test("renderer: tall-terrain loading schedules all sixteen sections, including bedrock",()->{
-         for(int surface=0;surface<16;surface++) {
+      test("renderer: tall-terrain loading schedules all 24 sections, including bedrock",()->{
+         int full=(1<<Chunk.SECTIONS)-1;
+         for(int surface=0;surface<Chunk.SECTIONS;surface++) {
             int[] order=Renderer.sectionOrder(surface);int mask=0;
-            for(int sy:order){check(sy>=0&&sy<16,"valid section");check((mask&(1<<sy))==0,"scheduled exactly once");mask|=1<<sy;}
-            eq(65535,mask,"no forgotten section for surface "+surface);eq(surface,order[0],"surface first");
+            for(int sy:order){check(sy>=0&&sy<Chunk.SECTIONS,"valid section");check((mask&(1<<sy))==0,"scheduled exactly once");mask|=1<<sy;}
+            eq(full,mask,"no forgotten section for surface "+surface);eq(surface,order[0],"surface first");
          }
       });
 

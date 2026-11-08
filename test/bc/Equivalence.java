@@ -151,6 +151,13 @@ public final class Equivalence {
     * The blocks of a chunk as the byte array they were up to Update 3.11 (low 8 bits of every id). Read through Chunk.get() so the same
     * test classes also run against the old 3.5 jar, where Chunk.blocks is a byte[] and not a short[].
     */
+   /** V6.35: Chunk.light is taller now; equivalence still checks the classic 0..255 layers byte-for-byte. */
+   static byte[] lightBytes(Chunk c) {
+      byte[] b = new byte[65536];
+      System.arraycopy(c.light, 0, b, 0, 65536);
+      return b;
+   }
+
    static byte[] blockBytes(Chunk c) {
       byte[] b = new byte[65536];
       for (int y = 0; y < 256; y++) {
@@ -228,7 +235,7 @@ public final class Equivalence {
          for (long k : keys) {
             Chunk c = w.chunks.get(k);
             blocks = mix(blocks, mix(k, h(blockBytes(c))));
-            light = mix(light, mix(k, h(c.light)));
+            light = mix(light, mix(k, h(lightBytes(c))));
             if (c.lit) {
                lit++;
             }

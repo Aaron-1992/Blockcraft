@@ -699,7 +699,7 @@ final class WeatherFx {
          return c.hm[(z & 15) * 16 + (x & 15)] + 1.0F;
       }
 
-      return Math.max(62, w.gen.column(x, z).h) + 1.0F;
+      return Math.max(Gen.SEA - 1, w.gen.column(x, z).h) + 1.0F;
    }
 
    /** Builds the whole cloud + rain-curtain mesh around (camX, camZ) for the weather at {@code sn}. */

@@ -150,6 +150,8 @@ public final class Options {
    public float weatherReach = 1.0F;
    /** Update 6.22: new worlds use the Caves & Cliffs carver instead of the V6.21 layered caves. */
    public boolean caveCliffs = true;
+   /** V6.35: new open worlds are 384 blocks tall with ~190 blocks below sea level. */
+   public boolean deepWorld = true;
    /** Update 6.22: 0 = sharp legacy biome borders, 1 = smooth, 2 = very smooth. */
    public int biomeBorders = 1;
    /** Update 6.22: global tree-density multiplier (0.4..1.4). Lower is much cheaper in taiga. */
@@ -272,6 +274,7 @@ public final class Options {
                this.weatherWind = clampf(Float.parseFloat(var2.getProperty("weatherWind", "1.0")), 0.2F, 2.0F);
                this.weatherReach = clampf(Float.parseFloat(var2.getProperty("weatherReach", "1.0")), 0.5F, 1.5F);
                this.caveCliffs = Boolean.parseBoolean(var2.getProperty("caveCliffs", "true"));
+               this.deepWorld = Boolean.parseBoolean(var2.getProperty("deepWorld", "true"));
                this.biomeBorders = clamp(Integer.parseInt(var2.getProperty("biomeBorders", "1")), 0, 2);
                this.treeDensity = clampf(Float.parseFloat(var2.getProperty("treeDensity", "1.0")), 0.4F, 1.4F);
                this.minimapPos = clamp(Integer.parseInt(var2.getProperty("minimapPos", "0")), 0, 3);
@@ -381,6 +384,7 @@ public final class Options {
       var1.setProperty("weatherWind", this.weatherWind + "");
       var1.setProperty("weatherReach", this.weatherReach + "");
       var1.setProperty("caveCliffs", this.caveCliffs + "");
+      var1.setProperty("deepWorld", this.deepWorld + "");
       var1.setProperty("biomeBorders", this.biomeBorders + "");
       var1.setProperty("treeDensity", this.treeDensity + "");
       var1.setProperty("minimapPos", this.minimapPos + "");

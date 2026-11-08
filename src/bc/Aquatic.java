@@ -82,7 +82,7 @@ final class Aquatic {
                double dist=Math.sqrt((wx-cx)*(wx-cx)+(wz-cz)*(wz-cz));
                double radius=6+Math.floorMod(root>>>32,7),q=1-dist/radius;
                if(q<=0)continue;
-               int top=63+(int)(q*(8+Math.floorMod(root>>>40,10)));
+               int top=Gen.SEA+(int)(q*(8+Math.floorMod(root>>>40,10)));
                for(int y=Math.max(h+1,58-(int)(q*5));y<=top;y++)if(ch.get(x,y,z)==0||Blocks.isWater(ch.get(x,y,z))||ch.get(x,y,z)==Blocks313.ICE)
                   ch.set(x,y,z,y==top?Blocks.SNOW:Blocks313.PACKED_ICE);
             }

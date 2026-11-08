@@ -578,7 +578,8 @@ final class Screens {
       ws.caveLayers = g.opt.caveLayers;
       ws.caveLakes = g.opt.caveLakes;
       ws.caveRichness = g.opt.caveRichness;
-      ws.caveVer = g.opt.caveCliffs ? 7 : 1;
+      ws.caveVer = g.opt.caveCliffs ? 8 : 1;
+      ws.depth = g.opt.deepWorld && g.opt.caveCliffs && ws.terra() ? 128 : 0;
       ws.biomeBorders = g.opt.biomeBorders;
       ws.treeDensity = g.opt.treeDensity;
       ws.treeScale = g.opt.treeScale;

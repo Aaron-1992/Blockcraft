@@ -51,6 +51,8 @@ final class CaveWorks {
    final CaveStructures6 structures6;
    /** V6.34: Minecraft-style 3D cave volume; structures are part of its air. */
    final Caves7 deep7;
+   /** V6.35: depth-scaled caves for the 384-block-deep world. */
+   final Caves8 deep8;
    private final ConcurrentHashMap<Long, Plan> plans = new ConcurrentHashMap<>();
 
    CaveWorks(long seed, WorldSettings st, Gen gen, Noise a, Noise b, Noise c, Noise e) {
@@ -67,6 +69,7 @@ final class CaveWorks {
       this.deep6 = new Caves6(seed, st, gen);
       this.structures6 = new CaveStructures6(seed, gen, this.deep6);
       this.deep7 = new Caves7(seed, st, gen);
+      this.deep8 = new Caves8(seed, st, gen);
    }
 
    // ------------------------------------------------------------------ instance shortcuts
@@ -94,6 +97,11 @@ final class CaveWorks {
       return this.deep7.carve(x, y, z, surfaceH, allowSurface);
    }
 
+   /** V6.35: the depth-scaled carver. */
+   int carve8(int x, int y, int z, int surfaceH, boolean allowSurface) {
+      return this.deep8.carve(x, y, z, surfaceH, allowSurface);
+   }
+
    boolean mouth(int x, int z) {
       return mouth(this.e, this.seed, x, z);
    }
@@ -105,6 +113,9 @@ final class CaveWorks {
 
    /** True when the surface here is the opening of a real cave entrance. */
    boolean mouthSurface(int x, int z, int surfaceH) {
+      if (this.st.caveVer >= 8) {
+         return this.deep8.surfaceOpen(x, z, surfaceH);
+      }
       if (this.st.caveVer >= 7) {
          return this.deep7.surfaceOpen(x, z, surfaceH);
       }
@@ -302,7 +313,10 @@ final class CaveWorks {
          strata(ch);
       }
 
-      if (st.caveVer >= 7) {
+      if (st.caveVer >= 8) {
+         // V6.35: depth-scaled decorations AND structures from the one carver.
+         this.deep8.finish(ch);
+      } else if (st.caveVer >= 7) {
          // V6.34: decorations AND structure blocks come from the one carver.
          this.deep7.finish(ch);
       } else if (st.caveVer >= 6) {

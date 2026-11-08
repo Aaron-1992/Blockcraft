@@ -102,12 +102,12 @@ final class Trailer {
    }
 
    static double ground(Gen gen, double x, double z) {
-      if (gen == null) return 70.0;
+      if (gen == null) return Gen.SEA + 7.0;
       try {
          Gen.Col c = gen.column((int)Math.floor(x), (int)Math.floor(z));
-         return c == null ? 70.0 : Math.max(64.0, c.h);
+         return c == null ? Gen.SEA + 7.0 : Math.max(Gen.SEA + 1.0, c.h);
       } catch (Throwable ignored) {
-         return 70.0;
+         return Gen.SEA + 7.0;
       }
    }
 
@@ -287,7 +287,8 @@ final class Trailer {
       ws.type = WorldSettings.DEFAULT;
       ws.aquatic = true;
       ws.terrainVer = 3;
-      ws.caveVer = 7;
+      ws.caveVer = 8;
+      ws.depth = 128;
       ws.biomeBorders = 1;
       World w = new World(SEED, null, Dim.OVERWORLD, ws);
       w.saveEnabled = false;

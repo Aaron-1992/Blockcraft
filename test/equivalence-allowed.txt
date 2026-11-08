@@ -36,3 +36,6 @@ statics Mobs.
 statics ShaderSrc.WORLD_FS
 statics ShaderSrc.LOD_FS
 statics ShaderSrc.COMP_FS
+
+# ---- V6.35: the world is 384 blocks tall instead of 256, so Chunk.H intentionally changed ----
+statics Chunk.H

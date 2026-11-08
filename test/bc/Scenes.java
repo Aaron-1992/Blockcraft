@@ -30,6 +30,30 @@ final class Scenes {
       g.splash = "Also try voxels!";
       g.ui.randomSeed = 7311L;
       switch (name) {
+         // ---- V6.35 Atlas UI: the screens the game actually draws now
+         case "atlas-title": g.screen = Game.S.TITLE; Menus635.title(g); return;
+         case "atlas-sp": g.screen = Game.S.SP_HUB; Menus635.singleplayer(g); return;
+         case "atlas-mp": g.screen = Game.S.MP_HUB; g.focusField = 0; Menus635.mpHub(g); return;
+         case "atlas-mpcreate": g.screen = Game.S.MP_CREATE; g.newSettings = new WorldSettings(); g.newName = ""; g.seedField = ""; g.focusField = 0; Menus635.mpCreate(g); return;
+         case "atlas-newworld": g.screen = Game.S.NEWWORLD; g.newSettings = new WorldSettings(); Menus635.newWorld(g); return;
+         case "atlas-worlds":
+            g.screen = Game.S.WORLDS;
+            g.worldList = new ArrayList<>();
+            g.worldList.add(world("a", "My Survival World", 0, 12345L, 1, 3600_000L * 3));
+            g.worldList.add(world("b", "Creative Castle", 1, -987654321L, 1, 3600_000L * 30));
+            g.worldName = "b";
+            Menus635.worlds(g); return;
+         case "atlas-minigames": g.screen = Game.S.MINIGAMES; g.newSettings = new WorldSettings(); g.newSettings.type = WorldSettings.BATTLE; Menus635.minigames(g); return;
+         case "atlas-options": g.screen = Game.S.OPTIONS; g.ui.optTab = 0; Menus635.options(g); return;
+         case "atlas-advanced": g.screen = Game.S.OPTIONS; g.opt.debugVideo = true; g.ui.optTab = Menus635.ADV_TAB; Menus635.options(g); return;
+         case "atlas-pause": g.screen = Game.S.PAUSE; g.worldDisplayName = "My Survival World"; Menus635.pause(g); return;
+         case "atlas-more": g.screen = Game.S.MORE; Menus635.more(g); return;
+         case "atlas-packs": g.screen = Game.S.PACKS; Menus635.resourcePacks(g); return;
+         case "atlas-mods": g.screen = Game.S.MODS; Menus635.mods(g); return;
+         case "atlas-credits": g.screen = Game.S.CREDITS; Menus635.credits(g); return;
+         case "atlas-loading": g.screen = Game.S.LOADING; g.worldDisplayName = "My Survival World"; g.loadingMsg = "Chunks: 14/25"; g.loadFrac = 0.5F; Menus635.loading(g); return;
+         case "atlas-waiting": g.screen = Game.S.WAITING; Menus635.waiting(g); return;
+         case "atlas-multiplayer": g.screen = Game.S.MULTIPLAYER; g.focusField = 0; Menus635.multiplayer(g); return;
          case "title":
             g.screen = Game.S.TITLE;
             Screens.title(g);

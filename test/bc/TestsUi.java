@@ -20,7 +20,10 @@ final class TestsUi {
       "title", "multiplayer", "minigames", "packs", "mods", "credits", "worlds", "worlds-long", "worlds-empty", "newworld", "newworld-flat", "newworld-seed", "newworld-long", "options-0", "options-1", "options-2",
       "options-3", "options-4", "options-5", "options-6", "options-7",
       "sp-hub", "mp-hub", "mp-create", "pause", "loading", "inv-survival", "inv-table", "inv-chest", "inv-furnace", "inv-trade", "inv-creative", "inv-creative-1", "inv-creative-4",
-      "inv-search", "inv-search-none", "inv-tip-tool", "inv-tip-ore", "inv-tip-food", "inv-tip-tab"
+      "inv-search", "inv-search-none", "inv-tip-tool", "inv-tip-ore", "inv-tip-food", "inv-tip-tab",
+      "atlas-title", "atlas-sp", "atlas-mp", "atlas-mpcreate", "atlas-newworld", "atlas-worlds",
+      "atlas-minigames", "atlas-options", "atlas-advanced", "atlas-pause", "atlas-more",
+      "atlas-packs", "atlas-mods", "atlas-credits", "atlas-loading", "atlas-waiting", "atlas-multiplayer"
    };
    static File tmp;
 
