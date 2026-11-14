@@ -260,6 +260,10 @@ public final class WorldSettings {
    public float treeScale = 1.0F;
    /** Update 6.23: allow the rare Giant size tier in new worlds. */
    public boolean giantTrees = true;
+   /** V6.38 seasonal cycle and local wind controls. */
+   public boolean seasons = true;
+   public int seasonDays = Seasons.DEFAULT_DAYS;
+   public int windLevel = 1;
 
    public static WorldSettings classic() {
       WorldSettings s = new WorldSettings();
@@ -293,6 +297,9 @@ public final class WorldSettings {
       s.treeDensity = this.treeDensity;
       s.treeScale = this.treeScale;
       s.giantTrees = this.giantTrees;
+      s.seasons = this.seasons;
+      s.seasonDays = this.seasonDays;
+      s.windLevel = this.windLevel;
       return s;
    }
 
@@ -344,6 +351,9 @@ public final class WorldSettings {
       p.setProperty("treedensity", Float.toString(this.treeDensity));
       p.setProperty("treescale", Float.toString(this.treeScale));
       p.setProperty("gianttrees", Boolean.toString(this.giantTrees));
+      p.setProperty("seasons", Boolean.toString(this.seasons));
+      p.setProperty("seasondays", Integer.toString(Seasons.clampDays(this.seasonDays)));
+      p.setProperty("windlevel", Integer.toString(Options.clamp(this.windLevel, 0, 2)));
    }
 
    private static float f(Properties p, String key, float def, float lo, float hi) {
@@ -405,6 +415,9 @@ public final class WorldSettings {
          s.giantTrees = true;
       }
 
+      s.seasons = Boolean.parseBoolean(p.getProperty("seasons", "true"));
+      try { s.seasonDays = Seasons.clampDays(Integer.parseInt(p.getProperty("seasondays", "8").trim())); } catch (NumberFormatException ignored) { s.seasonDays = Seasons.DEFAULT_DAYS; }
+      try { s.windLevel = Options.clamp(Integer.parseInt(p.getProperty("windlevel", "1").trim()), 0, 2); } catch (NumberFormatException ignored) { s.windLevel = 1; }
       return s;
    }
 

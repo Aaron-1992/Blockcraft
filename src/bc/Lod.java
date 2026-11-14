@@ -223,7 +223,7 @@ public final class Lod {
                int k = (z & 15) * 16 + (x & 15);
                wet[i] = sum.depth[k] > 0;
                topY[i] = sum.top[k];
-               rgb[i] = sum.rgb[k];
+               rgb[i] = Seasons.tint(sum.rgb[k], false);
                cliff[i] = sum.side[k];
                terrain[i] = sum.top[k] - 1;
                biome[i] = 2;
@@ -267,7 +267,7 @@ public final class Lod {
 
             wet[i] = sea;
             topY[i] = sea ? Gen.SEA : col.h + 1;
-            rgb[i] = c;
+            rgb[i] = Seasons.tint(c, false);
          }
       }
 

@@ -34,13 +34,15 @@ import org.lwjgl.opengl.GL13;
 import org.lwjgl.system.MemoryUtil;
 
 public final class Game {
-   public static final String VERSION_STR = "6.37";
+   public static final String VERSION_STR = "6.38";
    public static final String TITLE_STR = "Blockcraft V" + VERSION_STR;
    public Options opt;
    /** Update 6.18: last values pushed into the renderer by {@link #applyVideoTuning()}; -1 means "not applied yet". */
    private int tunedShadow = -1, tunedCloudRes = -1, tunedCloudSteps = -1, tunedBloom = -1, tunedShadowInterval = -1, tunedMips = -1;
    public World world;
    public Player player;
+   /** V6.38 player-specific ambient temperature, wind chill and exposure. */
+   final BodyTemp bodyTemp = new BodyTemp();
    public Renderer rend;
    Gui gui = new Gui();
    /** Update 3.13: the widgets and state of the menu screens (see Screens). */
@@ -2835,6 +2837,28 @@ public final class Game {
                      this.say("Set own game mode to " + var23[var19] + " Mode");
                   }
                   break;
+               case "season":
+                  if (this.world == null || this.world.dim != Dim.OVERWORLD) {
+                     this.say("§cSeasons are available in the Overworld.");
+                  } else if (var2.length < 2) {
+                     this.say("Season: " + Seasons.label(this.world.dayTime, this.world.settings.seasonDays));
+                  } else {
+                     String arg = var2[1].toLowerCase();
+                     if (arg.equals("next")) {
+                        long one = (long)this.world.settings.seasonDays * Seasons.DAY;
+                        long rem = Math.floorMod(this.world.dayTime, one);
+                        this.world.dayTime += one - rem;
+                        if (rem == 0L) this.world.dayTime += one;
+                     } else if (arg.equals("on") || arg.equals("off")) {
+                        this.world.settings.seasons = arg.equals("on");
+                        Seasons.publish(this.world.dayTime, this.world.settings.seasonDays, this.world.settings.seasons);
+                     } else {
+                        this.say("§cUsage: /season [next|on|off]");
+                        break;
+                     }
+                     this.say("Season: " + Seasons.label(this.world.dayTime, this.world.settings.seasonDays));
+                  }
+                  break;
                case "time":
                   if (var2.length >= 3 && var2[1].equalsIgnoreCase("set")) {
                      String var15 = var2[2].toLowerCase();
@@ -4499,6 +4523,12 @@ public final class Game {
       this.tickEquip();
       this.tickArm();
       this.world.tick();
+      this.bodyTemp.tick(this);
+      this.player.temperatureFactor = this.bodyTemp.movementFactor;
+      if (!this.player.creative && !this.player.flying && !this.player.inWater && !this.player.inLava) {
+         this.player.vx += this.bodyTemp.windPushX;
+         this.player.vz += this.bodyTemp.windPushZ;
+      }
       this.world.fire.particles(this);
       this.Tex_tick();
       if (this.screen != Game.S.PAUSE && this.screen != Game.S.WAITING) {
@@ -6551,38 +6581,37 @@ public final class Game {
       if(System.getProperty("bc.auto")!=null&&Boolean.getBoolean("bc.worldonly"))return;
       Perf.mark(Perf.GUI);
       this.gui.begin(this.fbW, this.fbH, var1);
-      // V6.35: every menu is drawn by the new Atlas UI (Menus635). The old
-      // Screens.* menu methods are kept only as a regression/compatibility surface.
+      // V6.38: restore the classic Screens flow while retaining the V6.37 renderer and world fixes.
       switch (this.screen) {
          case TITLE:
-            Menus635.title(this);
+            Screens.title(this);
             break;
          case WORLDS:
-            Menus635.worlds(this);
+            Screens.worlds(this);
             break;
          case MULTIPLAYER:
-            Menus635.multiplayer(this);
+            Screens.multiplayer(this);
             break;
          case NEWWORLD:
-            Menus635.newWorld(this);
+            Screens.newWorld(this);
             break;
          case MINIGAMES:
-            Menus635.minigames(this);
+            Screens.minigames(this);
             break;
          case SP_HUB:
-            Menus635.singleplayer(this);
+            Screens.singleplayer(this);
             break;
          case MP_HUB:
-            Menus635.mpHub(this);
+            Screens.mpHub(this);
             break;
          case MP_CREATE:
-            Menus635.mpCreate(this);
+            Screens.mpCreate(this);
             break;
          case LOADING:
-            Menus635.loading(this);
+            Screens.loading(this);
             break;
          case WAITING:
-            Menus635.waiting(this);
+            Screens.waiting(this);
             break;
          case MAP:
             MapView.screen(this);
@@ -6593,7 +6622,7 @@ public final class Game {
          default:
             this.drawHud();
             if (this.screen == Game.S.PAUSE) {
-               Menus635.pause(this);
+               Screens.pause(this);
             } else if (this.screen == Game.S.INV) {
                this.drawInventory();
             } else if (this.screen == Game.S.ADV) {
@@ -6606,7 +6635,7 @@ public final class Game {
             Trailer.draw(this);   // V6.30: letterbox + title cards over the real world
             break;
          case MORE:
-            Menus635.more(this);
+            Screens.more(this);
             break;
          case MIDI:
             if(this.midiScreen!=null)this.midiScreen.draw();
@@ -6616,16 +6645,16 @@ public final class Game {
             this.drawSkins();
             break;
          case PACKS:
-            Menus635.resourcePacks(this);
+            Screens.resourcePacks(this);
             break;
          case MODS:
-            Menus635.mods(this);
+            Screens.mods(this);
             break;
          case CREDITS:
-            Menus635.credits(this);
+            Screens.credits(this);
             break;
          case OPTIONS:
-            Menus635.options(this);
+            Screens.options(this);
       }
 
       this.activeBtns = this.btns;
@@ -6998,6 +7027,22 @@ public final class Game {
       }
    }
 
+   void drawClimateHud() {
+      if (!this.opt.climateHud || this.world == null || this.world.dim != Dim.OVERWORLD || this.player == null) return;
+      float w = Math.min(158.0F, Math.max(110.0F, this.gui.w * 0.40F));
+      float x = 5.0F;
+      float y = 18.0F;
+      String season = this.world.settings.seasons ? Seasons.label(this.world.dayTime, this.world.settings.seasonDays) : "Seasons off";
+      String air = String.format(java.util.Locale.ROOT, "Air %.1f C", this.bodyTemp.airC);
+      String feels = String.format(java.util.Locale.ROOT, "Feels %.1f C", this.bodyTemp.feelsC);
+      String wind = "Wind " + this.world.wind.label();
+      this.gui.rect(x - 4.0F, y - 3.0F, w + 8.0F, 34.0F, 0x99060910);
+      this.gui.text(Game.clipText(season, w), x, y, 0xFFFFE58A, true);
+      int tc = this.bodyTemp.feelsC < 0.0F ? 0xFF9FD8FF : (this.bodyTemp.feelsC > 32.0F ? 0xFFFFA477 : 0xFFEAF2FA);
+      this.gui.text(Game.clipText(air + "  " + feels, w), x, y + 10.0F, tc, true);
+      this.gui.text(Game.clipText(wind, w), x, y + 20.0F, 0xFFC3D5E8, true);
+   }
+
    void drawHud() {
       if (!this.hideGui) {
          this.drawOverlays();
@@ -7037,6 +7082,7 @@ public final class Game {
             this.drawWaystonesHud();
          }
          this.map.drawMini(this); // Update 6.20: the corner minimap
+         this.drawClimateHud();
       }
 
       if (this.debug) {

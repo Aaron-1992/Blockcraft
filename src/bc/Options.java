@@ -119,6 +119,8 @@ public final class Options {
    /** Update 6.20: nearby mobs show as dots on both maps. */
    public boolean minimapMobs = true;
    /** Update 6.20: minimap edge length index into MapView.SIZES = {64, 96, 128} GUI units. */
+   /** V6.38: show season, ambient temperature and wind chill in the HUD. */
+   public boolean climateHud = true;
    public int minimapSize = 1;
    /** Update 6.20: blocks between the player and the edge of the minimap. */
    public int minimapRadius = 128;
@@ -259,6 +261,7 @@ public final class Options {
                this.minimapRotate = Boolean.parseBoolean(var2.getProperty("minimapRotate", "false"));
                this.minimapMobs = Boolean.parseBoolean(var2.getProperty("minimapMobs", "true"));
                this.minimapSize = clamp(Integer.parseInt(var2.getProperty("minimapSize", "1")), 0, 2);
+               this.climateHud = Boolean.parseBoolean(var2.getProperty("climateHud", "true"));
                this.minimapRadius = clamp(Integer.parseInt(var2.getProperty("minimapRadius", "128")), 32, 512);
                this.mapRefresh = clamp(Integer.parseInt(var2.getProperty("mapRefresh", "3")), 1, 20);
                this.bigMapZoom = clamp(Integer.parseInt(var2.getProperty("bigMapZoom", "2")), 0, 5);
@@ -320,6 +323,7 @@ public final class Options {
       var1.setProperty("borderless", this.borderless + "");
       var1.setProperty("lodDistance", this.lodDistance + "");
       var1.setProperty("bobbing", this.bobbing + "");
+      var1.setProperty("climateHud", this.climateHud + "");
       var1.setProperty("invertY", this.invertY + "");
       var1.setProperty("shaders", this.shaders + "");
       var1.setProperty("waterQ", this.waterQ + "");

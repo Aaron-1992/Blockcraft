@@ -1,4 +1,4 @@
-BLOCKCRAFT V6.37  -  an original Minecraft-style voxel sandbox   (EDITION V6.37)
+BLOCKCRAFT V6.38  -  an original voxel sandbox   (EDITION V6.38)
 ==========================================================================
 Run Blockcraft.exe (Windows 64-bit). Java is bundled in the "jre" folder - nothing to install.
 Needs a GPU/driver with OpenGL 2.1+. The built-in shader pack needs OpenGL 3.0+ (falls back to
@@ -8,6 +8,33 @@ If it does not start, run Blockcraft-debug.bat and look at the messages, or open
 
 This is NOT Minecraft and contains no Mojang code or assets: all textures, the world
 generator and the physics are written from scratch.
+
+WHAT'S NEW IN V6.38 - CLASSIC MENUS, SEASONS AND LOCAL CLIMATE
+
+  * CLASSIC SCREENS ARE BACK. The title, world list, Create New World,
+    options and pause flow use the classic Screens UI again, with more
+    breathing room and readable labels. The live world-map preview and
+    real numeric settings remain. This rolls back later rejected menu
+    redraws; it does not claim those designs were accepted.
+
+  * FOUR SEASONS. Spring, summer, autumn and winter follow the saved
+    world clock. Seasonal air temperature, rain/snow, crop growth and
+    grass/foliage colour respond to the cycle. Season length and the
+    season switch are configurable. Use /season next, /season on or
+    /season off in the Overworld.
+
+  * PLAYER CLIMATE. An optional HUD shows the current season, air
+    temperature, feels-like temperature and wind. The estimate accounts
+    for biome, altitude, time of day, shelter, rain, water, nearby heat
+    and wind chill. Severe exposure has a small capped movement and
+    exhaustion effect; it does not directly damage health.
+
+  * REAL LOCAL WIND. Wind varies by position, height, seed and time. Its
+    world strength is configurable. It drifts weather and adds a gentle
+    push to exposed players, and contributes to wind chill.
+
+  * PRESERVED DEEP-WORLD FIXES. V6.37 cloud/weather heights and rendering
+    across all 24 vertical sections remain. No Mojang code or assets.
 
 WHAT'S NEW IN V6.37 - MINECRAFT-STYLE MENUS AND A RENDERING REPAIR
 

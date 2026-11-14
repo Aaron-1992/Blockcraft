@@ -248,7 +248,9 @@ public final class Weather {
          this.oaz = offAz(ts);
          this.obx = offBx(ts);
          this.obz = offBz(ts);
-         this.bias = climate(ts);
+         float seasonalCloud = world == null || !world.settings.seasons ? 0.0F
+            : (Seasons.cloudiness(Seasons.index(world.dayTime, world.settings.seasonDays)) - 0.8F) * SIGMA * 0.35F;
+         this.bias = climate(ts) + seasonalCloud;
          float l = -9.0F;
          float h = 9.0F;
          switch (forceMode) {
@@ -276,8 +278,10 @@ public final class Weather {
 
          this.cells = c;
          double dt = 0.5;
-         this.windX = (float)((offAx(ts + dt) - offAx(ts - dt)) / (2 * dt));
-         this.windZ = (float)((offAz(ts + dt) - offAz(ts - dt)) / (2 * dt));
+         float layerX = (float)((offAx(ts + dt) - offAx(ts - dt)) / (2 * dt));
+         float layerZ = (float)((offAz(ts + dt) - offAz(ts - dt)) / (2 * dt));
+         this.windX = world == null ? layerX : (float)(world.wind.x * 0.65 + layerX * 0.35);
+         this.windZ = world == null ? layerZ : (float)(world.wind.z * 0.65 + layerZ * 0.35);
       }
 
       /** The raw weather value at a point. */
@@ -442,7 +446,8 @@ public final class Weather {
          }
       }
 
-      return Biomes.precipitation(biome, h);
+      int base = Biomes.precipitation(biome, h);
+      return this.world == null ? base : Seasons.precipitation(base, biome, h, this.world.dayTime, this.world.settings.seasonDays, this.world.settings.seasons);
    }
 
    /** Highest storm and thunderhead within about 5.4 km of (px, pz): the cloud shader only has to march the tall slab when there is one. */

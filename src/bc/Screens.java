@@ -623,6 +623,16 @@ final class Screens {
          "Villages, strongholds, ruins, temples and the other buildings that generate on their own. The Nether and the End keep theirs.", () -> ws.structures = !ws.structures);
       ui.toggle("Bonus Chest", ws.bonusChest, x0, ry + 48.0F, colW, 20.0F, "A chest with a few starting supplies next to where you appear.", () -> ws.bonusChest = !ws.bonusChest);
       float leftEnd = ry + 70.0F;
+      if (gui.h >= 360.0F) {
+         ui.toggle("Four Seasons", ws.seasons, x0, ry + 96.0F, colW, 20.0F,
+            "A year cycles through spring, summer, autumn and winter. Season length and wind can be changed in the in-world Gameplay options.",
+            () -> ws.seasons = !ws.seasons);
+         String[] windNames = {"Calm", "Natural", "Strong"};
+         ui.button("Wind: " + windNames[Options.clamp(ws.windLevel, 0, 2)], x0, ry + 120.0F, colW, 20.0F, true,
+            "A spatially varying local wind field influences player wind chill and weather drift.",
+            () -> ws.windLevel = (ws.windLevel + 1) % 3);
+         leftEnd = ry + 142.0F;
+      }
       // Update 6.18: the aquatic generator (and therefore the five new ocean biomes) is a visible choice here.
       if (gui.h >= 300.0F) {
          ui.toggle("New Oceans", ws.aquatic, x0, ry + 72.0F, colW, 20.0F,
@@ -781,7 +791,7 @@ final class Screens {
             rows = 4;
             break;
          case 2:
-            rows = 7;
+            rows = 10;
             break;
          case 4:
             rows = 3;
@@ -1500,6 +1510,35 @@ final class Screens {
             "Press M while playing to open the pannable, zoomable world map (wheel or +/- zoom, WASD/arrows pan, click to centre).",
             () -> ui.say("Press M in a world to open the big map"));
       }
+      oy += row;
+      if (shows(oy, row, top, viewH)) {
+         ui.toggle("Climate HUD", o.climateHud, x0, oy, colW, 20.0F,
+            "Show season, air temperature, feels-like temperature and local wind while playing.", () -> o.climateHud = !o.climateHud);
+         if (g.world != null) {
+            ui.toggle("Seasons", g.world.settings.seasons, x1, oy, colW, 20.0F,
+               "Enable or pause the four-season cycle for this world.", () -> {
+                  g.world.settings.seasons = !g.world.settings.seasons;
+                  Seasons.publish(g.world.dayTime, g.world.settings.seasonDays, g.world.settings.seasons);
+               });
+         }
+      }
+      oy += row;
+      if (g.world != null && shows(oy, row, top, viewH)) {
+         int[] days = {4, 8, 16, 32};
+         ui.button("Season Length: " + g.world.settings.seasonDays + " days", x0, oy, colW, 20.0F, true,
+            "A full year is four seasons. Click to cycle 4, 8, 16 and 32 days per season.", () -> {
+               int at = 0;
+               for (int i = 0; i < days.length; i++) if (days[i] == g.world.settings.seasonDays) at = i;
+               g.world.settings.seasonDays = days[(at + 1) % days.length];
+            });
+         String[] winds = {"Calm", "Natural", "Strong"};
+         ui.button("Wind: " + winds[Options.clamp(g.world.settings.windLevel, 0, 2)], x1, oy, colW, 20.0F, true,
+            "Changes deterministic local wind strength for this world.", () -> {
+               g.world.settings.windLevel = (g.world.settings.windLevel + 1) % 3;
+               g.world.wind.scale = g.world.settings.windLevel;
+            });
+      }
+
    }
 
    /** V6.33: sound settings, split out of the old catch-all screens. */

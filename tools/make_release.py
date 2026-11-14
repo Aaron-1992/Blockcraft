@@ -545,6 +545,24 @@ def main():
             "and `tools/verify_release.py` now also checks `bc/ResourcePacks.class`. No "
             "real-GPU/Windows playtest is claimed.\n"
         )
+    if version == "6.38":
+        release_notes += (
+            "\n### Classic Screens restored; seasons, player temperature and real local wind\n\n"
+            "The title, world list, Create New World, options and pause flow are routed back through "
+            "the classic `Screens.java` UI, with spacing, readable labels and the live map preview retained. "
+            "This reverses the later rejected menu redraws while keeping V6.37's deep-world rendering repairs.\n\n"
+            "**Four seasons:** worlds cycle through spring, summer, autumn and winter on the saved world clock. "
+            "Season length and enablement are configurable; temperature, snow/rain, foliage tints and crop growth "
+            "respond to the cycle. `/season next|on|off` is available in the Overworld.\n\n"
+            "**Player climate:** the HUD reports season, air temperature, feels-like temperature and wind. "
+            "The estimate accounts for biome, elevation, time of day, shelter, rain, water, nearby heat and wind chill; "
+            "extreme exposure has a small bounded survival movement/exhaustion effect.\n\n"
+            "**Spatial local wind:** a deterministic seed/time field varies by position and height. Its strength is "
+            "configurable per world; it nudges the weather drift and exposed player movement, and contributes to "
+            "wind chill. Existing V6.37 deep-world/cloud-height and 24-section fixes are preserved. No Mojang code/assets.\n\n"
+            "Headless tests cover seasonal transitions, crop/precipitation helpers, wind determinism and world-setting persistence. "
+            "No real-GPU/Windows playtest is claimed.\n"
+        )
     if version == "6.37":
         release_notes += (
             "\n### Minecraft-style menus, lifted skies, sections above y=255, no burn-in\n\n"

@@ -25,7 +25,7 @@ final class Tests635 {
       test("6.35: deep terrain really reaches above y=255", Tests635::terrain);
       test("6.35: caves get crazier the deeper you go", Tests635::gradient);
       test("6.35: twelve deep structures share the cave air", Tests635::structures);
-      test("6.35: every menu is drawn by the new Atlas UI", Tests635::menus);
+      test("6.35: the classic Screens UI is restored after rejected menu redraws", Tests635::menus);
       test("6.35: old saves keep their depth and cave version", Tests635::oldSaves);
       test("6.35: version, notes, previews and release wiring point at 6.35", Tests635::wiring);
    }
@@ -244,31 +244,21 @@ final class Tests635 {
 
    static void menus() throws Exception {
       String game = src("src/bc/Game.java");
-      String m = src("src/bc/Menus635.java");
-      for (String s : new String[]{"title", "worlds", "multiplayer", "newWorld", "minigames",
+      for (String screen : new String[]{"title", "worlds", "multiplayer", "newWorld", "minigames",
          "singleplayer", "mpHub", "mpCreate", "loading", "waiting", "pause", "more",
          "resourcePacks", "mods", "credits", "options"}) {
-         check(game.contains("Menus635." + s + "(this)"), "the " + s + " screen is drawn by the Atlas UI");
-         check(m.contains("static void " + s + "(Game g)"), "the Atlas UI implements " + s);
+         check(game.contains("Screens." + screen + "(this)"), "classic Screens is routed for " + screen);
       }
-      check(!game.contains("Screens.title(this)") && !game.contains("Screens.options(this)"),
-         "no old menu screen is still drawn");
-      check(m.contains("ui.preview.update(Screens.seedValue(g), ws)"),
-         "the live world-map preview is kept on Create New World");
-      check(m.contains("gui.image(ui.preview.img"), "the preview image is actually drawn");
-      check(m.contains("ws.depth = g.opt.deepWorld"), "the preview matches the world that will be created");
-      check(m.contains("TABS") && m.contains("numberRow") && m.contains("sliderRow")
-         && m.contains("shell("), "the V6.36 UI has plain panels, tab rows and numeric setting rows");
-      check(m.contains("Screens.advancedTab"), "Debug Advanced still exposes every video setting");
-      check(m.contains("Every setting shows its current value"), "the settings screen promises visible values");
+      check(!game.contains("Menus635.title(this)") && !game.contains("Menus635.options(this)"),
+         "the rejected V6.35 menu is not active");
+      String screens = src("src/bc/Screens.java");
+      check(screens.contains("ui.preview.update") && screens.contains("gui.image(ui.preview.img"),
+         "the live world map preview remains on Create New World");
+      check(screens.contains("Season") && screens.contains("Climate HUD"),
+         "the restored classic settings include climate controls");
       String scenes = src("test/bc/Scenes.java");
-      check(scenes.contains("Menus635.title(g)") && scenes.contains("Menus635.options(g)"),
-         "the headless layout suite draws the new menus");
-      String ui = src("test/bc/TestsUi.java");
-      check(ui.contains("\"atlas-title\"") && ui.contains("\"atlas-advanced\""),
-         "the new menus are checked at all seven window sizes");
-      String s = src("src/bc/Screens.java");
-      check(s.contains("ws.depth = g.opt.deepWorld"), "Create New World still sets the depth");
+      check(scenes.contains("Screens.title(g)") && scenes.contains("Screens.options(g)"),
+         "headless scene coverage draws the restored classic screens");
    }
 
    static void oldSaves() throws Exception {
@@ -289,8 +279,8 @@ final class Tests635 {
    }
 
    static void wiring() throws Exception {
-      eq("6.37", Game.VERSION_STR, "the game version is 6.37");
-      eq("6.37", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
+      eq("6.38", Game.VERSION_STR, "the game version is 6.37");
+      eq("6.38", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
       check(src("README.md").contains("V6.35"), "README describes V6.35");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.35"), "the packaged readme describes V6.35");
       check(new File("docs/releases/v6.35.md").isFile(), "V6.35 release notes exist");

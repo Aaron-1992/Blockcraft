@@ -390,7 +390,7 @@ final class Tests623 {
    }
 
    static void wiring() {
-      eq("6.37", Game.VERSION_STR, "the game version is 6.37");
+      eq("6.38", Game.VERSION_STR, "the game version is 6.37");
       Game g = screen(480, 360);
       g.opt.treeScale = 1.3F;
       g.opt.giantTrees = false;

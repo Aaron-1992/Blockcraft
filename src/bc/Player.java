@@ -52,6 +52,8 @@ public final class Player {
    public final double[] bb = new double[6];
    private final double[] res = new double[3];
    public float flySpeed = 0.05F;
+   /** V6.38 bounded movement effect for severe heat or cold. */
+   public float temperatureFactor = 1.0F;
    public static final double W = 0.6;
 
    public void setPos(double var1, double var3, double var5) {
@@ -466,6 +468,7 @@ public final class Player {
             var6 = this.sprinting ? 0.026F : 0.02F;
          }
 
+         var6 *= Math.max(0.80F, Math.min(1.0F, this.temperatureFactor));
          this.moveFlying(var2, var3, var6);
          this.move(var1, this.vx, this.vy, this.vz);
          if (!this.flying) {

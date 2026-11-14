@@ -109,6 +109,9 @@ public final class World {
    public boolean inPassiveTick;
    /** Update 3.13: what the world was created with (generator type, structures). */
    public final WorldSettings settings;
+   /** V6.38 spatially varying, deterministic wind field. */
+   public final Wind wind;
+   private int seasonIndex = -1;
 
    public World(long var1, File var3) {
       this(var1, var3, Dim.OVERWORLD);
@@ -124,6 +127,8 @@ public final class World {
       this.seed = var1;
       this.dim = dimension;
       this.settings = st == null ? WorldSettings.classic() : st;
+      this.wind = new Wind(var1, this.settings.windLevel);
+      Seasons.publish(this.dayTime, this.settings.seasonDays, this.settings.seasons && dimension == Dim.OVERWORLD);
       this.gen = Dim.makeGen(dimension, var1, this.settings);
       this.weather = new Weather(this);
       if (dimension != Dim.OVERWORLD) {
@@ -1333,7 +1338,17 @@ public final class World {
          this.dayTime++; // (-Dbc.frozen=1, a test hook: the sun stands still, so that two pictures of one scene are one picture)
       }
 
+      this.wind.scale = this.settings.windLevel;
+      this.wind.update(this.tickCount);
       if (this.dim == Dim.OVERWORLD) {
+         Seasons.publish(this.dayTime, this.settings.seasonDays, this.settings.seasons);
+         int nextSeason = Seasons.index(this.dayTime, this.settings.seasonDays);
+         if (this.settings.seasons && nextSeason != this.seasonIndex) {
+            this.seasonIndex = nextSeason;
+            if (this.game != null) this.game.remeshAll();
+         } else if (!this.settings.seasons) {
+            this.seasonIndex = -1;
+         }
          this.lodRefresh();
       }
 
@@ -1522,10 +1537,11 @@ public final class World {
 
             int y = c.hm[(z & 15) * 16 + (x & 15)];
             int b = this.getBlock(x, y, z);
+            float seasonGrowth = Seasons.growth(this.dayTime, this.settings.seasonDays, this.dim == Dim.OVERWORLD && this.settings.seasons);
             if (this.getBlock(x, y + 1, z) == Blocks.SUGAR_CANE) {
                if (!this.canCaneStay(x, y + 1, z)) {
                   this.scheduleBlock(x, y + 1, z); // e.g. the water next to it was removed diagonally: it pops off
-               } else if (this.rnd.nextInt(16) == 0) {
+               } else if (this.rnd.nextInt(Math.max(1, Math.round(16.0F / seasonGrowth))) == 0) {
                   this.growCane(x, y + 1, z);
                }
 
@@ -1551,13 +1567,13 @@ public final class World {
 
             if (stem) {
                if (Blocks.stemStage(above) < 7) {
-                  if (this.rnd.nextInt(wet ? 5 : 12) == 0) {
+                  if (this.rnd.nextInt(Math.max(1, Math.round((wet ? 5 : 12) / seasonGrowth))) == 0) {
                      this.setBlock(x, y + 1, z, above + 1);
                   }
-               } else if (this.rnd.nextInt(wet ? 12 : 24) == 0) {
+               } else if (this.rnd.nextInt(Math.max(1, Math.round((wet ? 12 : 24) / seasonGrowth))) == 0) {
                   this.tryFruit(x, y + 1, z, above);
                }
-            } else if (crop && !Blocks.isRipe(above) && this.rnd.nextInt(wet ? 5 : 12) == 0) {
+            } else if (crop && !Blocks.isRipe(above) && this.rnd.nextInt(Math.max(1, Math.round((wet ? 5 : 12) / seasonGrowth))) == 0) {
                this.setBlock(x, y + 1, z, above + 1);
             }
          }

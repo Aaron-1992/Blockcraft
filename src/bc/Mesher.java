@@ -272,7 +272,7 @@ public final class Mesher {
       }
       switch (Blocks.tint[var1]) {
          case 1:
-            return var0.grassColor[var3 * 16 + var2];
+            return Seasons.tint(var0.grassColor[var3 * 16 + var2], false);
          case 2:
             if (var1 == 14) {
                return 6396257;
@@ -281,7 +281,7 @@ public final class Mesher {
                   return 8431445;
                }
 
-               return var0.foliageColor[var3 * 16 + var2];
+               return Seasons.tint(var0.foliageColor[var3 * 16 + var2], true);
             }
          default:
             return 16777215;

@@ -20,7 +20,7 @@ final class Tests637 {
       test("6.37: clouds, weather and the shadow plane follow the lifted sea level", Tests637::heights);
       test("6.37: normal chunks render above the old y=256 ceiling", Tests637::sections);
       test("6.37: enabling shaders or changing effects quality clears stale buffers", Tests637::burnIn);
-      test("6.37: menus are Minecraft-style and the world-map preview is kept", Tests637::menus);
+      test("6.37 rendering baseline: classic Screens and the world-map preview are kept", Tests637::menus);
       test("6.37: Shaders OFF/ON/FANCY and Effects LOW/MEDIUM/HIGH are in normal settings", Tests637::settings);
       test("6.37: version, notes, preview and release wiring point at 6.37", Tests637::wiring);
    }
@@ -128,32 +128,17 @@ final class Tests637 {
 
    // ------------------------------------------------------------------ menus
    static void menus() throws Exception {
-      String m = src("src/bc/Menus635.java");
-      for (String bad : new String[]{"NAV_SUB", "card(Game g", "ATLAS UI", "ESC = BACK",
-         "DEEP WORLD  /", "cyan", "01  /  WORLD"}) {
-         check(!m.contains(bad), "no '" + bad + "' from the two rejected menu overhauls");
+      String game = src("src/bc/Game.java");
+      for (String screen : new String[]{"title", "worlds", "multiplayer", "newWorld", "minigames", "options", "pause"}) {
+         check(game.contains("Screens." + screen + "(this)"), "V6.38 restores the classic Screens route for " + screen);
       }
-      check(m.contains("static Box shell(Game g, String title, String sub)"), "one shell draws every screen");
-      check(m.contains("ui.backdrop(0.30F)") && m.contains("gui.gradient(0.0F, 0.0F, W, 58.0F"),
-         "the panorama / world stays visible behind dark top and bottom bands");
-      check(!m.contains("gui.gradient(px, py, pw, ph"), "the rejected framed panel is gone");
-      check(m.contains("Math.min(200.0F, W - 12.0F)"), "a classic centred 200-unit button column");
-      check(m.contains("float x, y, w, h, foot;\n      float fx, fw;"),
-         "forms and lists can use the full width while menu buttons stay centred");
-      check(m.contains("gui.text(\"Blockcraft V\" + Game.VERSION_STR") && m.contains("Original game - not Mojang"),
-         "the footer is quiet, like Minecraft's, and says what the game is");
-      check(m.contains("ui.preview.update(Screens.seedValue(g), ws)") && m.contains("gui.image(ui.preview.img"),
-         "Create New World still draws the live world-map preview");
-      check(m.contains("ui.preview.topBiomes(8)") && m.contains("\"Biomes: \""),
-         "the biome key and its number are still shown");
-      check(m.contains("ws.depth = g.opt.deepWorld"), "the preview uses the real world depth");
-      String scenes = src("test/bc/Scenes.java");
-      String ui = src("test/bc/TestsUi.java");
-      for (String scene : new String[]{"mc-title", "mc-video", "mc-newworld", "mc-worlds", "mc-advanced"}) {
-         check(scenes.contains("case \"" + scene + "\""), "the " + scene + " screen has a headless scene");
-         check(ui.contains("\"" + scene + "\""), "and is checked at all seven window sizes");
-      }
-      check(new File("docs/screenshots/v6.37-menus.png").isFile(), "the V6.37 menu board exists");
+      check(!game.contains("Menus635.title(this)") && !game.contains("Menus635.options(this)"),
+         "the rejected V6.37 menu shell is not the active title/options UI");
+      String screens = src("src/bc/Screens.java");
+      check(screens.contains("ui.preview.update") && screens.contains("Create New World"),
+         "the live map preview is retained on the classic Create New World screen");
+      check(screens.contains("New Oceans") && screens.contains("Season"),
+         "world setup keeps numeric settings and exposes seasonal world generation");
    }
 
    // ------------------------------------------------------------------ settings
@@ -176,12 +161,12 @@ final class Tests637 {
 
    // ------------------------------------------------------------------ wiring
    static void wiring() throws Exception {
-      eq("6.37", Game.VERSION_STR, "the game version is 6.37");
-      eq("6.37", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
-      check(src("README.md").contains("V6.37"), "README describes V6.37");
-      check(src("package/README.txt").contains("WHAT'S NEW IN V6.37"), "the packaged readme describes V6.37");
-      check(new File("docs/releases/v6.37.md").isFile(), "V6.37 release notes exist");
-      check(src("tools/make_release.py").contains("if version == \"6.37\""), "GitHub release notes describe 6.37");
+      eq("6.38", Game.VERSION_STR, "the game version is 6.37");
+      eq("6.38", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
+      check(src("README.md").contains("V6.38"), "README describes V6.38");
+      check(src("package/README.txt").contains("WHAT'S NEW IN V6.38"), "the packaged readme describes V6.38");
+      check(new File("docs/releases/v6.38.md").isFile(), "V6.38 release notes exist");
+      check(src("tools/make_release.py").contains("if version == \"6.38\""), "GitHub release notes describe 6.38");
       check(src("docs/FILE-LAYOUT.md").contains("Menus635"), "the layout doc still lists the UI class");
    }
 }

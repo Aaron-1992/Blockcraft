@@ -16,7 +16,7 @@ final class Tests636 {
    }
 
    static void run() {
-      test("6.36: the rejected Atlas look is gone", Tests636::plain);
+      test("6.36: classic Screens routes are active", Tests636::plain);
       test("6.36: every setting prints its current value", Tests636::numbers);
       test("6.36: labels are plain and make sense", Tests636::labels);
       test("6.36: the world-map preview is still there", Tests636::preview);
@@ -28,23 +28,15 @@ final class Tests636 {
    }
 
    static void plain() throws Exception {
-      String m = src("src/bc/Menus635.java");
-      for (String bad : new String[]{"NAV_SUB", "card(Game g", "ATLAS UI", "ESC = BACK",
-         "DEEP WORLD  /", "cyan", "01  /  WORLD"}) {
-         check(!m.contains(bad), "no '" + bad + "' left from the rejected nav-rail/card UI");
-      }
-      check(m.contains("static Box shell(Game g, String title, String sub)"),
-         "all screens use one plain centred panel");
-      check(m.contains("ui.backdrop(0.30F)") && m.contains("gui.gradient(0.0F, 0.0F, W, 58.0F"),
-         "V6.37: the Minecraft-style scrim keeps the panorama visible, with no framed panel");
       String game = src("src/bc/Game.java");
-      for (String s : new String[]{"title", "worlds", "multiplayer", "newWorld", "minigames",
-         "singleplayer", "mpHub", "mpCreate", "loading", "waiting", "pause", "more",
-         "resourcePacks", "mods", "credits", "options"}) {
-         check(game.contains("Menus635." + s + "(this)"), "the " + s + " screen is routed to the plain UI");
+      for (String screen : new String[]{"title", "worlds", "multiplayer", "newWorld", "minigames", "options", "pause"}) {
+         check(game.contains("Screens." + screen + "(this)"), "classic Screens handles " + screen);
       }
-      check(!game.contains("Screens.title(this)") && !game.contains("Screens.options(this)"),
-         "no old menu screen is drawn");
+      check(!game.contains("Menus635.title(this)") && !game.contains("Menus635.options(this)"),
+         "the rejected Minecraft-shell UI is not routed for title or settings");
+      String old = src("src/bc/Screens.java");
+      check(old.contains("Create New World") && old.contains("ui.preview.update"),
+         "the classic screens retain the live world preview");
    }
 
    static void numbers() throws Exception {
@@ -96,8 +88,8 @@ final class Tests636 {
    }
 
    static void wiring() throws Exception {
-      eq("6.37", Game.VERSION_STR, "the game version is 6.37");
-      eq("6.37", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
+      eq("6.38", Game.VERSION_STR, "the game version is 6.37");
+      eq("6.38", src("ci/release-trigger.txt").trim(), "the release workflow publishes 6.37");
       check(src("README.md").contains("V6.36"), "README describes V6.36");
       check(src("package/README.txt").contains("WHAT'S NEW IN V6.36"), "the packaged readme describes V6.36");
       check(new File("docs/releases/v6.36.md").isFile(), "V6.36 release notes exist");
