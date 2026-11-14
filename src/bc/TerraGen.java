@@ -8,7 +8,7 @@ import java.util.Random;
  * rugged), a ridge noise for the peaks, temperature and humidity. They pick one of 28 {@link Biomes}; rivers are carved along the zero lines
  * of another noise, and every biome has its own surface, trees and plants.
  */
-public final class TerraGen extends Gen {
+public class TerraGen extends Gen {
    private static final double[] SPLINE_C = new double[]{-1.0, -0.6, -0.35, -0.16, -0.05, 0.02, 0.10, 0.30, 0.60, 1.0};
    private static final double[] SPLINE_H = new double[]{22.0, 32.0, 44.0, 55.0, 61.0, 64.0, 66.0, 72.0, 86.0, 100.0};
 

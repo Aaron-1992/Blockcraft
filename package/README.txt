@@ -30,8 +30,16 @@ WHAT'S NEW IN V6.38 - CLASSIC MENUS, SEASONS AND LOCAL CLIMATE
     exhaustion effect; it does not directly damage health.
 
   * REAL LOCAL WIND. Wind varies by position, height, seed and time. Its
-    world strength is configurable. It drifts weather and adds a gentle
-    push to exposed players, and contributes to wind chill.
+    world strength is configurable. It drifts weather and contributes to
+    wind chill; ordinary breezes do not move the player. Only exposed
+    players in extreme gusts above 18 m/s get a small nudge. Animated
+    wind streaks show dry-air movement, while leaves and plants sway with
+    the local wind and gusts.
+
+  * ISLAND WORLDS. Create New World offers Small (256 chunks), Medium
+    (512 chunks) and Big Islands (1028 chunks). Each is a finite,
+    irregular, biome-rich island with beaches and surrounding ocean.
+    Chunks are 16x16 blocks; normal caves, plants and structures remain.
 
   * PRESERVED DEEP-WORLD FIXES. V6.37 cloud/weather heights and rendering
     across all 24 vertical sections remain. No Mojang code or assets.

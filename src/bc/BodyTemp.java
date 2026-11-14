@@ -104,16 +104,25 @@ final class BodyTemp {
       this.airC = base;
 
       double[] local = w.wind.at(p.x, p.y, p.z, this.windTmp);
-      float exposure = roof ? 0.12F : 1.0F;
-      this.windPushX = (float)local[0] * 0.00030F * exposure;
-      this.windPushZ = (float)local[1] * 0.00030F * exposure;
       float kmh = (float)(Math.sqrt(local[0] * local[0] + local[1] * local[1]) * 3.6);
+      // Breezes affect wind chill and scenery, not player movement. Only exposed players in near-hurricane gusts get a small nudge.
+      float exposure = roof ? 0.0F : 1.0F;
+      float speed = kmh / 3.6F;
+      this.windPushX = windPush((float)local[0], speed, exposure);
+      this.windPushZ = windPush((float)local[1], speed, exposure);
       float chill = base;
       if (!roof && base <= 10.0F && kmh > 4.8F) {
          double v16 = Math.pow(kmh, 0.16);
          chill = (float)(13.12 + 0.6215 * base - 11.37 * v16 + 0.3965 * base * v16);
       }
       this.feelsC = chill - dampCooling;
+   }
+
+   /** Wind starts affecting horizontal motion only above 18 m/s (~65 km/h), reaching full strength at 25 m/s. */
+   static float windPush(float component, float speed, float exposure) {
+      if (speed <= 18.0F || exposure <= 0.0F) return 0.0F;
+      float strength = clamp((speed - 18.0F) / 7.0F, 0.0F, 1.0F);
+      return component * 0.00030F * strength * clamp(exposure, 0.0F, 1.0F);
    }
 
    private static float biomeBias(int biome) {

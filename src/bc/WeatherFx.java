@@ -53,6 +53,8 @@ final class WeatherFx {
    float sunVis = 1.0F;
    /** 0..1: how grey/dark the sky is overall */
    float overcast;
+   /** Local wind used for dry-air streaks; rain/snow curtains use the same snapshot vector. */
+   float windX, windZ;
    /** the slab the cloud shader marches: thin in fair weather (like before 3.8), tall only while a thunderhead is within reach */
    /** V6.37: cloud/rain heights are lifted with the world's sea level. */
    float lift = 0.0F;
@@ -136,6 +138,8 @@ final class WeatherFx {
       double x = g.player.x;
       double z = g.player.z;
       this.snap.at(x, z, this.tmp);
+      this.windX = this.snap.windX;
+      this.windZ = this.snap.windZ;
       this.cover = this.tmp[0];
       this.rain = this.tmp[1];
       this.storm = this.tmp[2];
@@ -1236,14 +1240,12 @@ final class WeatherFx {
       }
 
       Weather wx = this.r.g.world.weather;
-      if (wx.suppressed) {
-         return;
-      }
-
-      this.ensureTextures();
-      if (this.r.shadersOn() && this.r.sh.cloudsOk && this.r.sh.sceneActive) {
-         // the shader path draws no blocky clouds but still needs the curtains: keep the (cheap) mesh job running
-         this.maintain(this.snap, this.r.camX, this.r.camZ);
+      if (!wx.suppressed) {
+         this.ensureTextures();
+         if (this.r.shadersOn() && this.r.sh.cloudsOk && this.r.sh.sceneActive) {
+            // the shader path draws no blocky clouds but still needs the curtains: keep the (cheap) mesh job running
+            this.maintain(this.snap, this.r.camX, this.r.camZ);
+         }
       }
 
       GL11.glEnable(2929);
@@ -1253,9 +1255,12 @@ final class WeatherFx {
       GL11.glDisable(3008);
       GL11.glDisable(2884);
       float[] tint = this.cloudTint(this.r.daylight, this.r.sunAngle);
-      this.drawShafts(partial, tint, fogR, fogG, fogB);
-      this.drawNear(partial, tint);
-      this.drawBolts(partial);
+      if (!wx.suppressed) {
+         this.drawShafts(partial, tint, fogR, fogG, fogB);
+         this.drawNear(partial, tint);
+         this.drawBolts(partial);
+      }
+      this.drawWindStreaks(partial);
       GL11.glDepthMask(true);
       GL11.glDisable(3042);
       GL11.glDisable(2912);
@@ -1338,6 +1343,44 @@ final class WeatherFx {
 
    double builtOffZNow(Weather.Snap sn) {
       return this.uj0[0] * (double)CELLS[0] + sn.oaz;
+   }
+
+   /** Fine camera-relative streaks show air movement even on a dry day and remain occluded by terrain. */
+   void drawWindStreaks(float partial) {
+      Game g = this.r.g;
+      if (g == null || g.world == null || g.player == null || g.player.eyeInWater) return;
+      double speed = Math.sqrt((double)this.windX * this.windX + (double)this.windZ * this.windZ);
+      if (speed < 0.8) return;
+      double dx = this.windX / speed, dz = this.windZ / speed;
+      double px = -dz, pz = dx;
+      double time = (g.world.wind.tick + partial) / 20.0;
+      float strength = (float)Math.max(0.18, Math.min(1.0, speed / 10.0)) * this.windAmt;
+      float gust = 0.72F + 0.28F * (float)Math.sin(time * 2.0 + g.world.wind.gust * 5.0);
+      float len = (float)(1.25 + Math.min(2.4, speed * 0.12));
+      GL11.glDisable(3553);
+      for (int pass = 0; pass < 2; pass++) {
+         GL11.glBlendFunc(770, pass == 0 ? 771 : 1);
+         GL11.glLineWidth(pass == 0 ? 2.6F : 1.15F);
+         GL11.glBegin(1);
+         for (int i = 0; i < 48; i++) {
+            long h = g.world.wind.seed + i * 0x9E3779B97F4A7C15L;
+            double across = ((h >>> 17 & 0xFFFFL) / 65535.0) * 25.0 - 12.5;
+            double yoff = ((h >>> 33 & 0xFFFFL) / 65535.0) * 9.0 - 4.5;
+            double phase = (h >>> 1 & 0xFFFFL) / 65535.0 * 22.0;
+            double along = (phase + time * (0.5 + speed * 0.70)) % 22.0 - 11.0;
+            double x = dx * along + px * across;
+            double z = dz * along + pz * across;
+            float alpha = pass == 0 ? 0.24F * strength : (0.24F + 0.20F * strength) * gust;
+            if (pass == 0) GL11.glColor4f(0.22F, 0.34F, 0.48F, alpha);
+            else GL11.glColor4f(0.72F, 0.88F, 1.0F, alpha);
+            GL11.glVertex3d(x, yoff, z);
+            GL11.glVertex3d(x + dx * len * gust, yoff + 0.025, z + dz * len * gust);
+         }
+         GL11.glEnd();
+      }
+      GL11.glLineWidth(1.0F);
+      GL11.glBlendFunc(770, 771);
+      GL11.glEnable(3553);
    }
 
    /** Rain / snow streaks in a disc around the camera, stopped by whatever is overhead (the chunk heightmap). */

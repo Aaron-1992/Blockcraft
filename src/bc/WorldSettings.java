@@ -34,15 +34,20 @@ public final class WorldSettings {
    public static final int CASTLE_SIEGE = 11;
    /** All Blocks & Items Texture Showcase Gallery (walkable museum with every block, plant, crop, door, bed, banner, redstone part & item chests). */
    public static final int ALL_BLOCKS = 12;
-   public static final int TYPES = 13;
+   /** Island widths are nominal chunk counts; each chunk is 16x16 blocks. */
+   public static final int ISLAND_SMALL = 13;
+   public static final int ISLAND_MEDIUM = 14;
+   public static final int ISLAND_BIG = 15;
+   public static final int TYPES = 16;
 
    /** Standard world types cycled by the "Type:" button on Create New World (keeps Mini Games in their own dedicated menu). */
-   public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, ALL_BLOCKS, CLASSIC};
+   public static final int[] TYPE_ORDER = new int[]{DEFAULT, LARGE, AMPLIFIED, FLAT, ALL_BLOCKS, CLASSIC, ISLAND_SMALL, ISLAND_MEDIUM, ISLAND_BIG};
    /** Console Edition & Tactical Mini Game modes shown on the dedicated Mini Games menu. */
    public static final int[] MINIGAME_ORDER = new int[]{BATTLE, TUMBLE, BEDWARS, CS2, MURDER, END_FIGHT, CASTLE_SIEGE};
 
    public static final String[] TYPE_NAME = new String[]{
-      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Tumble", "Battle", "Bedwars", "CS2 Strike", "Murder Mystery", "End Fight", "Castle Siege", "All Blocks Gallery"
+      "Classic (old)", "Default", "Superflat", "Large Biomes", "Amplified", "Tumble", "Battle", "Bedwars", "CS2 Strike", "Murder Mystery", "End Fight", "Castle Siege", "All Blocks Gallery",
+      "Small Islands (256 chunks)", "Medium Islands (512 chunks)", "Big Islands (1028 chunks)"
    };
    public static final String[] TYPE_INFO = new String[]{
       "The terrain of Update 3.5 - 3.12",
@@ -57,7 +62,10 @@ public final class WorldSettings {
       "Murder Mystery: 1 Murderer with a concealed Knife, 1 Sheriff with a Pistol, and Innocents scavenging 5 Gold Ingots to arm themselves!",
       "Bed-Spam End Fight: rapidly place and detonate beds in the End! Zero self-damage/knockback from your own beds; blast foes into the void!",
       "Castle Siege Conquest: Attackers vs Defenders! Fire Siege Cannons, Mortars & TNT to breach castle walls and capture the inner Control Zones!",
-      "All Blocks & Items Gallery: every single block, plant, crop, door, bed, banner, redstone part & chest of all items laid out to inspect!"
+      "All Blocks & Items Gallery: every single block, plant, crop, door, bed, banner, redstone part & chest of all items laid out to inspect!",
+      "Small island world: a rugged, biome-rich island about 256 chunks across, surrounded by ocean.",
+      "Medium island world: a rugged, biome-rich island about 512 chunks across, surrounded by ocean.",
+      "Big island world: a rugged, biome-rich island about 1028 chunks across, surrounded by ocean."
    };
 
    // Console Edition Mini Game Maps ("like the real deal") — all 8 ported Console Edition maps
@@ -305,7 +313,8 @@ public final class WorldSettings {
 
    /** The generator that builds terrain with biomes, rivers and so on ({@link TerraGen}). */
    public boolean terra() {
-      return this.type == DEFAULT || this.type == LARGE || this.type == AMPLIFIED;
+      return this.type == DEFAULT || this.type == LARGE || this.type == AMPLIFIED
+         || this.type == ISLAND_SMALL || this.type == ISLAND_MEDIUM || this.type == ISLAND_BIG;
    }
 
    public String typeName() {

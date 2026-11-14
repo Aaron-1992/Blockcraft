@@ -124,6 +124,8 @@ public final class Dim {
          g = new FlatGen(seed, st);
       } else if (st.isVoidMode()) {
          g = new SkyGen(seed, st);
+      } else if (st.type == WorldSettings.ISLAND_SMALL || st.type == WorldSettings.ISLAND_MEDIUM || st.type == WorldSettings.ISLAND_BIG) {
+         g = new IslandGen(seed, st);
       } else {
          g = new TerraGen(seed, st);
       }

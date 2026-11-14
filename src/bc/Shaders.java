@@ -213,6 +213,7 @@ public final class Shaders {
    public float sunX;
    public float sunY;
    public float sunZ;
+   private float windX, windZ, windSpeed;
    public float sunUp;
    /** Update 6.24: soft radial mask for light-facing entity shadow silhouettes. */
    int shadowBlobTex;
@@ -861,6 +862,13 @@ public final class Shaders {
       this.sunY = var2;
       this.sunZ = var3;
    }
+
+   /** Wind vector for real-time leaf and plant sway. */
+   public void setWind(float x, float z, float speed) {
+      this.windX = x;
+      this.windZ = z;
+      this.windSpeed = speed;
+   }
    /**
     * Update 6.19: choose the light that throws shadows. During the day it is the sun; once the sun is below
     * the horizon the moon (the opposite direction) takes over, dimmer and cool blue. {@code sunDir} in the
@@ -1113,6 +1121,7 @@ public final class Shaders {
       GL20.glUniform2f(this.loc(prog, "flowerTiles"), var18, var19);
       this.u1f(prog, "waterTile", var20);
       this.u1f(prog, "waves", 1.0F);
+      GL20.glUniform3f(this.loc(prog, "wind"), this.windX, this.windZ, this.windSpeed);
       this.u1i(prog, "tex", 0);
       this.u1i(prog, "lightmap", 1);
       this.u1i(prog, "shadowMap", 2);

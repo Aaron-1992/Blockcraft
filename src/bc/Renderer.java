@@ -48,6 +48,7 @@ public final class Renderer {
    boolean shadowDirty;
    final float[] proj = new float[16];
    final float[] mv = new float[16];
+   private final double[] windTmp = new double[2];
    final float[][] planes = new float[6][4];
    public float fogR;
    public float fogG;
@@ -1161,6 +1162,12 @@ public final class Renderer {
       arrays(true);
       if (var50) {
          this.fillDynLights();
+         if (this.g.world != null) {
+            double[] wind = this.g.world.wind.at(this.camX, this.camY, this.camZ, this.windTmp);
+            this.sh.setWind((float)wind[0], (float)wind[1], (float)Math.sqrt(wind[0] * wind[0] + wind[1] * wind[1]));
+         } else {
+            this.sh.setWind(0.0F, 0.0F, 0.0F);
+         }
       }
 
       if (var50) {

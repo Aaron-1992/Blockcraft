@@ -17,6 +17,9 @@ final class Tests638 {
       test("6.38: seasons cycle and blend on the world clock", Tests638::seasons);
       test("6.38: local wind is seed-stable, spatial and tunable", Tests638::wind);
       test("6.38: climate settings survive world save/load", Tests638::persistence);
+      test("6.38: islands are selectable, chunk-sized and surrounded by ocean", Tests638::islands);
+      test("6.38: only extreme exposed wind nudges the player", Tests638::windMovement);
+      test("6.38: foliage sway and dry-air wind streaks use local wind", Tests638::windVisuals);
       test("6.38: classic menus, climate controls and release wiring", Tests638::wiring);
    }
 
@@ -59,6 +62,43 @@ final class Tests638 {
       eq(2, loaded.windLevel, "wind strength is saved");
       WorldSettings copied = source.copy();
       eq(source.windLevel, copied.windLevel, "world copies retain climate settings");
+   }
+
+   static void islands() {
+      int[] types = new int[]{WorldSettings.ISLAND_SMALL, WorldSettings.ISLAND_MEDIUM, WorldSettings.ISLAND_BIG};
+      int[] widths = new int[]{256, 512, 1028};
+      for (int i = 0; i < types.length; i++) {
+         boolean selectable = false;
+         for (int type : WorldSettings.TYPE_ORDER) selectable |= type == types[i];
+         check(selectable, "island type is in the world-creation cycle");
+         WorldSettings settings = new WorldSettings();
+         settings.type = types[i];
+         Gen generator = Dim.makeGen(Dim.OVERWORLD, 87123L, settings);
+         check(generator instanceof IslandGen, "world type selects IslandGen");
+         IslandGen island = (IslandGen)generator;
+         eq(widths[i], island.widthChunks(), "nominal island width in chunks");
+         Gen.Col ocean = island.column(widths[i] * 32, 0);
+         check(ocean.h < settings.sea() && Biomes.ocean(ocean.biome), "outside the island is ocean");
+         check(WorldSettings.TYPE_INFO[types[i]].contains("chunks across"), "island size is explained in the UI");
+      }
+   }
+
+   static void windMovement() {
+      eq(0.0F, BodyTemp.windPush(9.0F, 12.0F, 1.0F), "normal wind does not move the player");
+      eq(0.0F, BodyTemp.windPush(9.0F, 18.0F, 1.0F), "movement threshold starts above 18 m/s");
+      check(BodyTemp.windPush(9.0F, 25.0F, 1.0F) > 0.0F, "only extreme gusts can move an exposed player");
+      eq(0.0F, BodyTemp.windPush(9.0F, 25.0F, 0.0F), "shelter blocks wind movement");
+   }
+
+   static void windVisuals() throws Exception {
+      String shader = new String(Files.readAllBytes(new File("src/bc/ShaderSrc.java").toPath()), "UTF-8");
+      check(shader.contains("wind.x * (0.016 + 0.018*gust)") && shader.contains("wind.x * (0.018 + 0.022*gust)"),
+         "leaf and plant sway follows gust strength");
+      String fx = new String(Files.readAllBytes(new File("src/bc/WeatherFx.java").toPath()), "UTF-8");
+      check(fx.contains("void drawWindStreaks(float partial)") && fx.contains("this.drawWindStreaks(partial)"),
+         "wind streaks are drawn even when rain is suppressed");
+      String renderer = new String(Files.readAllBytes(new File("src/bc/Renderer.java").toPath()), "UTF-8");
+      check(renderer.contains("this.sh.setWind("), "the renderer passes its local wind vector to the foliage shader");
    }
 
    static void wiring() throws Exception {
